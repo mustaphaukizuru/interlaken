@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { to: '/nosotros',          label: 'Nosotros' },
   { to: '/admisiones',        label: 'Admisiones' },
   { to: '/puertas-abiertas',  label: 'Puertas Abiertas' },
+  { to: '/agendar-visita',    label: 'Agendar Visita' },
   { to: '/contacto',          label: 'Contacto' },
 ];
 
@@ -50,6 +51,7 @@ const FOOTER_GROUPS = [
       { label: 'Proceso de admisión', to: '/admisiones' },
       { label: 'Pre-Registro', to: '/pre-registro' },
       { label: 'Puertas Abiertas', to: '/puertas-abiertas' },
+      { label: 'Agendar Visita', to: '/agendar-visita' },
     ],
   },
   {

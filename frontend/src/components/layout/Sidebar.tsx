@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import Logo from '@/components/ui/Logo';
 import {
   LayoutDashboard, CreditCard, Users, LogOut,
-  Coffee, ClipboardList, BarChart3, type LucideIcon,
+  Coffee, ClipboardList, BarChart3, CalendarClock, type LucideIcon,
 } from 'lucide-react';
 
 type Role = 'parent' | 'student' | 'admin';
@@ -15,6 +15,7 @@ const navByRole: Record<Role, NavEntry[]> = {
     { icon: BarChart3,     label: 'Dashboard',   to: '/admin', end: true },
     { icon: Users,         label: 'Alumnos',     to: '/admin/alumnos' },
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
+    { icon: CalendarClock, label: 'Visitas',     to: '/admin/visitas' },
     { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
   ],
   parent: [

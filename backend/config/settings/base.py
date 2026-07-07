@@ -40,6 +40,7 @@ LOCAL_APPS = [
     'apps.cafeteria',
     'apps.payments',
     'apps.portal',
+    'apps.bookings',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -230,6 +231,8 @@ JAZZMIN_SETTINGS = {
         'payments.payment': 'fas fa-credit-card',
         'portal.announcement': 'fas fa-bullhorn',
         'portal.event': 'fas fa-calendar-star',
+        'bookings.availabilityslot': 'fas fa-calendar-check',
+        'bookings.booking': 'fas fa-user-clock',
     },
     'default_icon_parents': 'fas fa-chevron-circle-right',
     'default_icon_children': 'fas fa-dot-circle',

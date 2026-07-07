@@ -77,6 +77,38 @@ export interface OpenSchoolEvent {
   is_active: boolean;
 }
 
+export interface AvailabilitySlot {
+  id: number;
+  visit_type: 'open_class' | 'individual';
+  date: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  location: string;
+  spots_remaining: number;
+  is_full: boolean;
+}
+
+export interface Booking {
+  id: number;
+  slot: number;
+  visit_type: 'open_class' | 'individual';
+  slot_date: string;
+  slot_start_time: string;
+  slot_end_time: string;
+  slot_location: string;
+  parent_name: string;
+  parent_email: string;
+  parent_phone: string;
+  child_name: string;
+  child_grade: string;
+  num_attendees: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'attended' | 'no_show';
+  source: 'web' | 'whatsapp' | 'admin';
+  confirmation_sent: boolean;
+  created_at: string;
+}
+
 export interface DashboardData {
   children_count?: number;
   children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;

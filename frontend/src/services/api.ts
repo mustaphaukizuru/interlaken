@@ -129,6 +129,48 @@ export const contactApi = {
     api.post('/contact/', data),
 };
 
+// ── BOOKINGS ──────────────────────────────────────────────
+export const bookingsApi = {
+  // Public
+  getAvailability: (params?: { type?: string; from?: string; to?: string }) =>
+    api.get('/bookings/availability/', { params }),
+
+  createBooking: (data: {
+    slot: number;
+    parent_name: string;
+    parent_email: string;
+    parent_phone: string;
+    child_name?: string;
+    child_grade?: string;
+    num_attendees?: number;
+  }) => api.post('/bookings/', data),
+
+  getBooking: (id: number) =>
+    api.get(`/bookings/${id}/`),
+
+  cancelBooking: (id: number) =>
+    api.post(`/bookings/${id}/cancel/`),
+
+  // Admin
+  generateSlots: (data: {
+    visit_type?: string;
+    start_date: string;
+    end_date: string;
+    weekdays: number[];
+    window_start: string;
+    window_end: string;
+    interval_minutes?: number;
+    capacity?: number;
+    location?: string;
+  }) => api.post('/bookings/availability/', data),
+
+  getAdminBookings: (params?: { type?: string; status?: string; date?: string }) =>
+    api.get('/bookings/admin/bookings/', { params }),
+
+  bookingAction: (id: number, action: 'confirm' | 'cancel' | 'attended' | 'no_show') =>
+    api.post(`/bookings/admin/bookings/${id}/${action}/`),
+};
+
 // ── PORTAL ────────────────────────────────────────────────
 export const portalApi = {
   getDashboard: () =>

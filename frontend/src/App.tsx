@@ -9,6 +9,7 @@ import AdmissionsPage  from './pages/public/AdmissionsPage';
 import PreRegisterPage from './pages/public/PreRegisterPage';
 import RegisterPage    from './pages/public/RegisterPage';
 import OpenSchoolPage  from './pages/public/OpenSchoolPage';
+import BookVisitPage   from './pages/public/BookVisitPage';
 import ContactPage     from './pages/public/ContactPage';
 
 // Auth
@@ -28,6 +29,7 @@ import AdminDashboard    from './pages/admin/AdminDashboard';
 import AdminAdmissions   from './pages/admin/AdminAdmissions';
 import AdminCafeteria    from './pages/admin/AdminCafeteria';
 import AdminStudents     from './pages/admin/AdminStudents';
+import AdminBookings     from './pages/admin/AdminBookings';
 
 // Guards
 import { ProtectedRoute }  from './components/layout/ProtectedRoute';
@@ -54,6 +56,7 @@ export default function App() {
             <Route path="/pre-registro"  element={<PreRegisterPage />} />
             <Route path="/inscripcion"   element={<RegisterPage />} />
             <Route path="/puertas-abiertas" element={<OpenSchoolPage />} />
+            <Route path="/agendar-visita" element={<BookVisitPage />} />
             <Route path="/contacto"      element={<ContactPage />} />
           </Route>
 
@@ -90,6 +93,7 @@ export default function App() {
           }>
             <Route index              element={<AdminDashboard />} />
             <Route path="admisiones"  element={<AdminAdmissions />} />
+            <Route path="visitas"     element={<AdminBookings />} />
             <Route path="cafeteria"   element={<AdminCafeteria />} />
             <Route path="alumnos"     element={<AdminStudents />} />
           </Route>
