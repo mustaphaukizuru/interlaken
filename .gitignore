@@ -5,7 +5,10 @@ __pycache__/
 .env.local
 CLAUDE.md
 *.sqlite3
+*.sqlite3-journal
 db_local.sqlite3
+venv/
+backend/venv/
 backend/staticfiles/
 backend/media/
 backend/db.sqlite3

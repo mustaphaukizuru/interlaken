@@ -1,0 +1,23 @@
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312", "py313"]
+extend-exclude = '''
+/(
+  | venv
+  | migrations
+  | staticfiles
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["venv", "migrations", "staticfiles"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501"]  # line length handled by black
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"config/settings/*.py" = ["F403", "F405"]  # star imports from base settings
