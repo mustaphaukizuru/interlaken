@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 .env
 .env.local
+CLAUDE.md
 *.sqlite3
 db_local.sqlite3
 backend/staticfiles/
