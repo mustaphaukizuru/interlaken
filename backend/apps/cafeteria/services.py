@@ -2,10 +2,11 @@
 cafeteria/services.py — Loyverse API integration service
 """
 import logging
+from decimal import Decimal
+
 import requests
 from django.conf import settings
 from django.utils import timezone
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def _get(endpoint, params=None):
         return resp.json()
     except requests.RequestException as e:
         logger.error(f'Loyverse GET {endpoint} failed: {e}')
-        raise LoyverseError(str(e))
+        raise LoyverseError(str(e)) from e
 
 
 def get_customer_by_id(loyverse_customer_id: str) -> dict:
@@ -91,7 +92,6 @@ def sync_student_balance(student_profile) -> Decimal:
 def sync_all_balances():
     """Sync balances for all active students. Called by a periodic task."""
     from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import CafeteriaBalance
 
     students = StudentProfile.objects.filter(
         is_active=True
@@ -129,4 +129,4 @@ def add_points_to_customer(loyverse_customer_id: str, points: float, note: str =
         return resp.json()
     except requests.RequestException as e:
         logger.error(f'Failed to add points to {loyverse_customer_id}: {e}')
-        raise LoyverseError(str(e))
+        raise LoyverseError(str(e)) from e

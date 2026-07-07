@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+
 from apps.accounts.serializers import StudentProfileSerializer
+
+from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 
 
 class CafeteriaBalanceSerializer(serializers.ModelSerializer):

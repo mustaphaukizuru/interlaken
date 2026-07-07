@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, automated-build]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (ruff · black · pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      # Force SQLite and provide throwaway secrets so settings import cleanly
+      # without a .env file. No real credentials, no external services.
+      SQLITE_LOCAL: '1'
+      SECRET_KEY: ci-test-secret-key-not-for-production
+      DB_NAME: test_interlaken
+      GOOGLE_CLIENT_ID: ci-client-id.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: ci-client-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install system libraries (mysqlclient build)
+        run: sudo apt-get update && sudo apt-get install -y default-libmysqlclient-dev pkg-config
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff==0.15.20 black==26.5.1
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (black, advisory)
+        # Non-blocking: the existing codebase predates black; new code is formatted.
+        run: black --check --diff . || echo "::warning::Black would reformat some files (advisory, non-blocking)"
+
+      - name: Django system check
+        run: python manage.py check
+
+      - name: Tests (pytest on SQLite)
+        run: pytest
+
+  frontend:
+    name: Frontend (eslint · tsc · vitest · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Type check (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Tests (vitest)
+        run: npm run test
+
+      - name: Build (vite)
+        run: npm run build

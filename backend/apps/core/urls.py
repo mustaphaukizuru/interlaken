@@ -2,11 +2,12 @@
 Core: SPA catch-all + WhatsApp redirect.
 Include this LAST in config/urls.py so it doesn't shadow API routes.
 """
-from django.urls import path, re_path
-from django.conf import settings
-from django.views.generic import TemplateView
-from django.http import HttpResponseRedirect
 import urllib.parse
+
+from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.urls import path, re_path
+from django.views.generic import TemplateView
 
 
 def whatsapp_redirect(request):

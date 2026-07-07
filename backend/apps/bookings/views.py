@@ -10,13 +10,14 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.ratelimit import ratelimit
 from apps.accounts.models import User
+from apps.core.ratelimit import ratelimit
+
 from .models import AvailabilitySlot, Booking
 from .serializers import (
     AvailabilitySlotSerializer,
-    BookingSerializer,
     BookingCreateSerializer,
+    BookingSerializer,
     SlotGeneratorSerializer,
 )
 from .services import send_booking_confirmation

@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import PreRegistration, Registration, RegistrationDocument, OpenSchoolDay
+
+from .models import OpenSchoolDay, PreRegistration, Registration, RegistrationDocument
 
 
 class PreRegistrationSerializer(serializers.ModelSerializer):

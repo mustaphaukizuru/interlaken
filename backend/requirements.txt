@@ -8,6 +8,9 @@ django-filter==23.5
 
 # Database
 mysqlclient==2.2.4
+# Pure-Python MySQL driver installed as MySQLdb in config/__init__.py — the
+# actual runtime driver on cPanel and in CI (no libmysqlclient build needed).
+PyMySQL==1.1.1
 
 # Auth
 social-auth-app-django==5.4.1
@@ -40,6 +43,9 @@ django-ratelimit==4.1.0
 # Production
 gunicorn==21.2.0
 whitenoise==6.6.0
+
+# Monitoring (no-op unless SENTRY_DSN is configured)
+sentry-sdk==2.19.2
 
 # Dev
 pytest-django==4.8.0

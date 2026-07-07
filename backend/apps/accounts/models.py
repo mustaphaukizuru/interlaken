@@ -1,7 +1,7 @@
 """
 accounts/models.py — Custom User + Role system for Colegio Interlaken
 """
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 

@@ -1,8 +1,8 @@
 """
 Colegio Interlaken — Base Django Settings
 """
-import os
 from pathlib import Path
+
 import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -142,6 +142,7 @@ REST_FRAMEWORK = {
 }
 
 from datetime import timedelta
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -200,6 +201,45 @@ USE_TZ = True
 
 # ── SECURITY ──────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ── ERROR MONITORING (Sentry) ─────────────────────────────
+# Fully optional: without SENTRY_DSN set, this block is a no-op and the SDK is
+# never even imported. PII is scrubbed (send_default_pii=False) and a before_send
+# hook strips anything that looks like a secret from the outgoing event.
+SENTRY_DSN = env('SENTRY_DSN', default='')
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    _SENSITIVE_KEYS = (
+        'password', 'secret', 'token', 'authorization', 'api_key', 'apikey',
+        'credential', 'cookie', 'ssn', 'curp',
+    )
+
+    def _scrub_sensitive(event, _hint):
+        """Best-effort removal of secret-looking values before an event is sent."""
+        request = event.get('request') or {}
+        headers = request.get('headers')
+        if isinstance(headers, dict):
+            for key in list(headers):
+                if any(s in key.lower() for s in _SENSITIVE_KEYS):
+                    headers[key] = '[Filtered]'
+        extra = event.get('extra')
+        if isinstance(extra, dict):
+            for key in list(extra):
+                if any(s in key.lower() for s in _SENSITIVE_KEYS):
+                    extra[key] = '[Filtered]'
+        return event
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        environment=env('SENTRY_ENVIRONMENT', default='development' if DEBUG else 'production'),
+        release=env('SENTRY_RELEASE', default=None),
+        traces_sample_rate=env.float('SENTRY_TRACES_SAMPLE_RATE', default=0.0),
+        send_default_pii=False,
+        before_send=_scrub_sensitive,
+    )
 
 # ── FILE UPLOAD ───────────────────────────────────────────
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB

@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import PreRegistration, Registration, RegistrationDocument, OpenSchoolDay
+
+from .models import OpenSchoolDay, PreRegistration, Registration, RegistrationDocument
 
 
 @admin.register(PreRegistration)

@@ -16,8 +16,11 @@ extend-exclude = ["venv", "migrations", "staticfiles"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
-ignore = ["E501"]  # line length handled by black
+# E402 (imports not at top) is expected in Django bootstrap files that must set
+# os.environ / install PyMySQL before importing Django; line length is black's job.
+ignore = ["E501", "E402"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"conftest.py" = ["E402"]
 "config/settings/*.py" = ["F403", "F405"]  # star imports from base settings

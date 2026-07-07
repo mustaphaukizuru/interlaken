@@ -1,5 +1,7 @@
 from django.contrib import admin
+
 from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+
 
 @admin.register(CafeteriaBalance)
 class CafeteriaBalanceAdmin(admin.ModelAdmin):

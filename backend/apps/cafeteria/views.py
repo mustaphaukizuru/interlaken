@@ -1,18 +1,23 @@
 """
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.models import StudentProfile, User
 from apps.core.ratelimit import ratelimit
-from apps.accounts.models import User, StudentProfile
+
 from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
-from .serializers import CafeteriaBalanceSerializer, CafeteriaTransactionSerializer, TopUpRequestSerializer
-from .services import sync_student_balance, sync_all_balances, add_points_to_customer
+from .serializers import (
+    CafeteriaBalanceSerializer,
+    CafeteriaTransactionSerializer,
+    TopUpRequestSerializer,
+)
+from .services import add_points_to_customer, sync_all_balances, sync_student_balance
 
 
 class IsParentOrAdmin(permissions.BasePermission):

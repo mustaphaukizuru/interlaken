@@ -2,17 +2,17 @@
 Portal views: role-aware dashboard, announcements, notifications.
 """
 from django.db.models import Sum
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import User, StudentProfile
+from apps.accounts.models import StudentProfile, User
+from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
-from apps.admissions.models import PreRegistration, Registration
+
 from .models import Announcement, Notification
 from .serializers import AnnouncementSerializer, NotificationSerializer
-
 
 # `User.Role` values are singular (`parent`) while `Announcement.Audience`
 # values are plural (`parents`); map between them so audience filters match.

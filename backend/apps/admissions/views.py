@@ -1,17 +1,17 @@
 """
 admissions/views.py — Public forms API (no auth required)
 """
-from rest_framework import generics, status, permissions
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.exceptions import NotFound
-from django.core.mail import send_mail
 from django.conf import settings
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import generics, permissions, status
+from rest_framework.exceptions import NotFound
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import PreRegistration, Registration, RegistrationDocument, OpenSchoolDay
+from .models import OpenSchoolDay, Registration, RegistrationDocument
 
 
 def _is_staff(request):
@@ -40,11 +40,11 @@ def _require_registration_access(request, reg):
         return
     raise NotFound('No encontrado.')
 from .serializers import (
-    PreRegistrationSerializer,
-    RegistrationSerializer,
-    RegistrationDocumentSerializer,
-    OpenSchoolDaySerializer,
     OpenSchoolDayEventSerializer,
+    OpenSchoolDaySerializer,
+    PreRegistrationSerializer,
+    RegistrationDocumentSerializer,
+    RegistrationSerializer,
 )
 
 

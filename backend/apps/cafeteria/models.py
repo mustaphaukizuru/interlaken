@@ -4,6 +4,7 @@ cafeteria/models.py — Loyverse cafeteria integration & balance tracking.
 """
 from django.db import models
 from django.utils import timezone
+
 from apps.accounts.models import StudentProfile
 
 
