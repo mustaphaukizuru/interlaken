@@ -21,8 +21,9 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
 class ParentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    students = StudentProfileSerializer(many=True, read_only=True, source='user.parents.through')
+    # A parent's children come via the reverse of StudentProfile.parents (related_name='children').
+    students = StudentProfileSerializer(many=True, read_only=True, source='user.children')
 
     class Meta:
         model = ParentProfile
-        fields = ['id', 'user', 'phone', 'relationship']
+        fields = ['id', 'user', 'phone', 'relationship', 'students']

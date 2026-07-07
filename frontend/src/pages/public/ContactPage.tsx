@@ -1,6 +1,37 @@
 import { Phone, Mail, MapPin, Clock } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
+import { contactApi } from '@/services/api';
+
+const schema = z.object({
+  name:    z.string().min(2, 'Nombre requerido'),
+  email:   z.string().email('Correo electrónico inválido'),
+  subject: z.string().min(2, 'Asunto requerido'),
+  message: z.string().min(10, 'El mensaje es demasiado corto'),
+});
+
+type FormData = z.infer<typeof schema>;
 
 export default function ContactPage() {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      await contactApi.send(data);
+      toast.success('Mensaje enviado. Le responderemos pronto.');
+      reset();
+    } catch {
+      toast.error('No se pudo enviar el mensaje. Intente nuevamente.');
+    }
+  };
+
   return (
     <div>
       <section className="bg-gradient-to-r from-brand-700 to-brand-600 text-white py-16">
@@ -56,33 +87,33 @@ export default function ContactPage() {
         {/* Contact form */}
         <div className="card">
           <h2 className="text-xl font-bold text-slate-900 mb-4">Envíenos un mensaje</h2>
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-            }}
-          >
+          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div>
               <label className="label">Nombre</label>
-              <input className="input-field" placeholder="Su nombre completo" />
+              <input className="input-field" placeholder="Su nombre completo" {...register('name')} />
+              {errors.name && <p className="mt-1.5 text-xs text-red-600">{errors.name.message}</p>}
             </div>
             <div>
               <label className="label">Correo electrónico</label>
-              <input className="input-field" type="email" placeholder="correo@ejemplo.com" />
+              <input className="input-field" type="email" placeholder="correo@ejemplo.com" {...register('email')} />
+              {errors.email && <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>}
             </div>
             <div>
               <label className="label">Asunto</label>
-              <input className="input-field" placeholder="¿En qué le podemos ayudar?" />
+              <input className="input-field" placeholder="¿En qué le podemos ayudar?" {...register('subject')} />
+              {errors.subject && <p className="mt-1.5 text-xs text-red-600">{errors.subject.message}</p>}
             </div>
             <div>
               <label className="label">Mensaje</label>
               <textarea
                 className="input-field min-h-[100px] resize-none"
                 placeholder="Describa su consulta…"
+                {...register('message')}
               />
+              {errors.message && <p className="mt-1.5 text-xs text-red-600">{errors.message.message}</p>}
             </div>
-            <button type="submit" className="btn-primary w-full justify-center">
-              Enviar mensaje
+            <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center disabled:opacity-60">
+              {isSubmitting ? 'Enviando…' : 'Enviar mensaje'}
             </button>
           </form>
         </div>

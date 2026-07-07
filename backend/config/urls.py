@@ -6,6 +6,8 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.core.views import ContactCreateView
+
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
@@ -20,6 +22,7 @@ urlpatterns = [
     path('api/v1/cafeteria/',   include('apps.cafeteria.urls')),
     path('api/v1/payments/',    include('apps.payments.urls')),
     path('api/v1/portal/',      include('apps.portal.urls')),
+    path('api/v1/contact/',     ContactCreateView.as_view(), name='contact-create'),
 
     # React SPA catch-all (serves index.html for all unmatched routes)
     path('', include('apps.core.urls')),

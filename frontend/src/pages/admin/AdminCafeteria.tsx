@@ -23,7 +23,7 @@ export default function AdminCafeteria() {
   });
 
   const syncAllMutation = useMutation({
-    mutationFn: () => cafeteriaApi.syncBalance(0),
+    mutationFn: () => cafeteriaApi.syncAll(),
     onSuccess: () => {
       toast.success('Sincronización completada.');
       queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-balances'] });

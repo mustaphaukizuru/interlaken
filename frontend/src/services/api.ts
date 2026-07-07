@@ -106,6 +106,9 @@ export const cafeteriaApi = {
 
   syncBalance: (studentId: number) =>
     api.post(`/cafeteria/admin/sync/${studentId}/`),
+
+  syncAll: () =>
+    api.post('/cafeteria/admin/sync-all/'),
 };
 
 // ── PAYMENTS ─────────────────────────────────────────────
@@ -118,6 +121,12 @@ export const paymentsApi = {
 
   getMyPayments: () =>
     api.get('/payments/history/'),
+};
+
+// ── CONTACT ───────────────────────────────────────────────
+export const contactApi = {
+  send: (data: { name: string; email: string; subject: string; message: string }) =>
+    api.post('/contact/', data),
 };
 
 // ── PORTAL ────────────────────────────────────────────────

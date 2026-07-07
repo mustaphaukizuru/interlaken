@@ -14,6 +14,24 @@ from .models import Announcement, Notification
 from .serializers import AnnouncementSerializer, NotificationSerializer
 
 
+# `User.Role` values are singular (`parent`) while `Announcement.Audience`
+# values are plural (`parents`); map between them so audience filters match.
+ROLE_TO_AUDIENCE = {
+    User.Role.PARENT:  Announcement.Audience.PARENTS,
+    User.Role.STUDENT: Announcement.Audience.STUDENTS,
+    User.Role.STAFF:   Announcement.Audience.STAFF,
+}
+
+
+def audiences_for_user(user):
+    """Return the announcement audiences visible to `user` (always includes 'all')."""
+    audiences = [Announcement.Audience.ALL]
+    mapped = ROLE_TO_AUDIENCE.get(user.role)
+    if mapped:
+        audiences.append(mapped)
+    return audiences
+
+
 class DashboardView(APIView):
     """GET /api/v1/portal/dashboard/ — Role-aware summary."""
     permission_classes = [permissions.IsAuthenticated]
@@ -89,9 +107,8 @@ class DashboardView(APIView):
             }
 
         # Common: announcements + unread notifications
-        audience_filter = ['all', user.role]
         announcements = Announcement.objects.filter(
-            is_active=True, audience__in=audience_filter
+            is_active=True, audience__in=audiences_for_user(user)
         )[:5]
         data['announcements'] = AnnouncementSerializer(announcements, many=True).data
         data['unread_notifications'] = Notification.objects.filter(user=user, is_read=False).count()
@@ -107,7 +124,7 @@ class AnnouncementListView(generics.ListAPIView):
     def get_queryset(self):
         return Announcement.objects.filter(
             is_active=True,
-            audience__in=['all', self.request.user.role],
+            audience__in=audiences_for_user(self.request.user),
         )
 
 
