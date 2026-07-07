@@ -111,6 +111,10 @@
 
   /* Cards */
   .card-dark { background: var(--dark-card); border: 1px solid rgba(124,77,214,0.25); border-radius: var(--radius); }
+  /* Hover lift — subtle raise + deeper shadow on interactive cards */
+  .hover-lift { transition: transform var(--transition), box-shadow var(--transition); }
+  .hover-lift:hover { transform: translateY(-6px); box-shadow: 0 26px 50px -22px rgba(64,26,142,0.4); }
+  @media (prefers-reduced-motion: reduce) { .hover-lift:hover { transform: none; } }
 
   /* Navigation portal items */
   .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.58); transition: var(--transition); cursor: pointer; }
