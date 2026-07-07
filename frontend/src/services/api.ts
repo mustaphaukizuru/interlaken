@@ -91,7 +91,13 @@ export const cafeteriaApi = {
   getMyBalance: () =>
     api.get('/cafeteria/balance/'),
 
-  getTransactions: (params?: { page?: number }) =>
+  getTransactions: (params?: {
+    page?: number;
+    student?: number;
+    type?: 'purchase' | 'topup' | 'refund';
+    from?: string;
+    to?: string;
+  }) =>
     api.get('/cafeteria/transactions/', { params }),
 
   requestTopUp: (studentId: number, amount: number, method: string) =>

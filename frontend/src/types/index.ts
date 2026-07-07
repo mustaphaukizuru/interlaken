@@ -26,11 +26,20 @@ export interface CafeteriaBalance {
   last_synced: string;
 }
 
+export interface CafeteriaTransactionItem {
+  name: string;
+  quantity: number | string;
+  total: string | null;
+}
+
 export interface CafeteriaTransaction {
   id: number;
+  student_id: number;
   transaction_type: 'purchase' | 'topup' | 'refund';
   amount: string;
   description: string;
+  items: CafeteriaTransactionItem[];
+  balance_after: string | null;
   date: string;
   loyverse_receipt_id: string;
 }

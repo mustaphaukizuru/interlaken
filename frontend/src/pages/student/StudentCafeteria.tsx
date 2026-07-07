@@ -58,19 +58,33 @@ export default function StudentCafeteria() {
         ) : (
           <div className="divide-y divide-slate-100">
             {transactions.map((tx) => (
-              <div key={tx.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {tx.transaction_type === 'topup'
-                    ? <ArrowUpCircle className="w-4 h-4 text-brand-500 flex-shrink-0" />
-                    : <ArrowDownCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />}
-                  <div>
+              <div key={tx.id} className="py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="mt-0.5">
+                    {tx.transaction_type === 'topup'
+                      ? <ArrowUpCircle className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                      : <ArrowDownCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                  </span>
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-900">{tx.description || (tx.transaction_type === 'topup' ? 'Recarga' : 'Compra en cafetería')}</p>
                     <p className="text-xs text-slate-400">{format(new Date(tx.date), "d MMM yyyy · HH:mm", { locale: es })}</p>
+                    {tx.items?.length > 0 && (
+                      <ul className="mt-1 text-xs text-slate-500 space-y-0.5">
+                        {tx.items.map((it, i) => (
+                          <li key={i}>{it.quantity}× {it.name}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
-                <span className={`text-sm font-semibold ${tx.transaction_type !== 'purchase' ? 'text-brand-600' : 'text-slate-700'}`}>
-                  {tx.transaction_type !== 'purchase' ? '+' : '-'}${parseFloat(tx.amount).toFixed(2)}
-                </span>
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-sm font-semibold ${tx.transaction_type !== 'purchase' ? 'text-brand-600' : 'text-slate-700'}`}>
+                    {tx.transaction_type !== 'purchase' ? '+' : '-'}${parseFloat(tx.amount).toFixed(2)}
+                  </span>
+                  {tx.balance_after != null && (
+                    <p className="text-xs text-slate-400 mt-0.5">Saldo ${parseFloat(tx.balance_after).toFixed(2)}</p>
+                  )}
+                </div>
               </div>
             ))}
           </div>

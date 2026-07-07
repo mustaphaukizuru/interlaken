@@ -15,11 +15,13 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
 
 
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):
+    student_id = serializers.IntegerField(source='student.id', read_only=True)
+
     class Meta:
         model = CafeteriaTransaction
         fields = [
-            'id', 'transaction_type', 'amount', 'description',
-            'date', 'loyverse_receipt_id',
+            'id', 'student_id', 'transaction_type', 'amount', 'description',
+            'items', 'balance_after', 'date', 'loyverse_receipt_id',
         ]
 
 

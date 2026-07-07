@@ -69,7 +69,7 @@ environment is unambiguous:
 0    8  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_booking_reminders >> /home/rene82/logs/bookings.log 2>&1
 ```
 
-- `sync_purchases` is a **placeholder until Prompt 09** (logs a notice, processes nothing) — the cron line is valid now and starts working once the pipeline ships.
+- `sync_purchases` (Prompt 09) polls Loyverse receipts, idempotently records each new purchase (unique `loyverse_receipt_id`), debits the local balance, and notifies every linked parent (in-app + email); a purchase that crosses the low-balance threshold triggers a deduped alert. Safe to run every 5 min — re-runs never duplicate or re-notify.
 - `low_balance_alerts` self-dedups (7-day cooldown, cleared on recovery), so a daily schedule won't spam parents; add `--force` only for a manual one-off sweep.
 - `mkdir -p /home/rene82/logs` once so the redirect targets exist.
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw } from 'lucide-react';
+import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,12 +25,20 @@ const txLabel = (type: string) => {
   return 'Compra';
 };
 
+type TypeFilter = '' | 'purchase' | 'topup' | 'refund';
+
 export default function CafeteriaPage() {
   const queryClient = useQueryClient();
   const [topupAmount, setTopupAmount] = useState('');
   const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
+
+  // History filters
+  const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
+  const [filterType, setFilterType] = useState<TypeFilter>('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
 
   const { data: balances, isLoading: balancesLoading } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
@@ -41,11 +49,14 @@ export default function CafeteriaPage() {
   });
 
   const { data: transactions, isLoading: txLoading } = useQuery<CafeteriaTransaction[]>({
-    queryKey: ['cafeteria-transactions', selectedStudent],
+    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo],
     queryFn: async () => {
-      const { data } = await cafeteriaApi.getTransactions(
-        selectedStudent ? { page: 1 } : undefined
-      );
+      const { data } = await cafeteriaApi.getTransactions({
+        student: filterStudent === 'all' ? undefined : filterStudent,
+        type: filterType || undefined,
+        from: filterFrom || undefined,
+        to: filterTo || undefined,
+      });
       return data.results ?? data;
     },
   });
@@ -62,14 +73,24 @@ export default function CafeteriaPage() {
     onError: () => toast.error('No fue posible procesar la recarga. Intente nuevamente.'),
   });
 
-  const isLoading = balancesLoading || txLoading;
-  if (isLoading) return <LoadingSpinner size="lg" className="mt-20" />;
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
+    queryClient.invalidateQueries({ queryKey: ['cafeteria-transactions'] });
+    toast.success('Actualizando saldos y movimientos…');
+  };
+
+  if (balancesLoading) return <LoadingSpinner size="lg" className="mt-20" />;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Cafetería</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Cafetería</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={refresh}>
+          <RefreshCw className="w-3 h-3" /> Actualizar
+        </Button>
       </div>
 
       {/* Balance cards */}
@@ -152,6 +173,48 @@ export default function CafeteriaPage() {
 
       {/* Transactions */}
       <Card title="Historial de movimientos">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {(balances?.length ?? 0) > 1 && (
+            <select
+              className="input-field w-auto text-sm"
+              value={filterStudent}
+              onChange={(e) => setFilterStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              aria-label="Filtrar por alumno"
+            >
+              <option value="all">Todos los alumnos</option>
+              {balances?.map((b) => (
+                <option key={b.student.id} value={b.student.id}>{b.student.user.full_name}</option>
+              ))}
+            </select>
+          )}
+          <select
+            className="input-field w-auto text-sm"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as TypeFilter)}
+            aria-label="Filtrar por tipo"
+          >
+            <option value="">Todos los tipos</option>
+            <option value="purchase">Compras</option>
+            <option value="topup">Recargas</option>
+            <option value="refund">Devoluciones</option>
+          </select>
+          <input
+            type="date"
+            className="input-field w-auto text-sm"
+            value={filterFrom}
+            onChange={(e) => setFilterFrom(e.target.value)}
+            aria-label="Desde"
+          />
+          <input
+            type="date"
+            className="input-field w-auto text-sm"
+            value={filterTo}
+            onChange={(e) => setFilterTo(e.target.value)}
+            aria-label="Hasta"
+          />
+        </div>
+
         {txLoading ? (
           <LoadingSpinner />
         ) : !transactions?.length ? (
@@ -159,22 +222,35 @@ export default function CafeteriaPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {transactions.map((tx) => (
-              <div key={tx.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {txIcon(tx.transaction_type)}
-                  <div>
+              <div key={tx.id} className="py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="mt-0.5">{txIcon(tx.transaction_type)}</span>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-900">{txLabel(tx.transaction_type)}</p>
                     <p className="text-xs text-slate-400">
-                      {format(new Date(tx.date), 'd MMM yyyy', { locale: es })}
-                      {tx.description ? ` · ${tx.description}` : ''}
+                      {format(new Date(tx.date), 'd MMM yyyy · HH:mm', { locale: es })}
                     </p>
+                    {tx.items?.length > 0 ? (
+                      <ul className="mt-1 text-xs text-slate-500 space-y-0.5">
+                        {tx.items.map((it, i) => (
+                          <li key={i}>{it.quantity}× {it.name}</li>
+                        ))}
+                      </ul>
+                    ) : tx.description ? (
+                      <p className="mt-1 text-xs text-slate-500">{tx.description}</p>
+                    ) : null}
                   </div>
                 </div>
-                <span className={`text-sm font-semibold ${
-                  tx.transaction_type === 'purchase' ? 'text-slate-700' : 'text-brand-600'
-                }`}>
-                  {tx.transaction_type === 'purchase' ? '-' : '+'}${parseFloat(tx.amount).toFixed(2)}
-                </span>
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-sm font-semibold ${
+                    tx.transaction_type === 'purchase' ? 'text-slate-700' : 'text-brand-600'
+                  }`}>
+                    {tx.transaction_type === 'purchase' ? '-' : '+'}${parseFloat(tx.amount).toFixed(2)}
+                  </span>
+                  {tx.balance_after != null && (
+                    <p className="text-xs text-slate-400 mt-0.5">Saldo ${parseFloat(tx.balance_after).toFixed(2)}</p>
+                  )}
+                </div>
               </div>
             ))}
           </div>

@@ -16,7 +16,8 @@ Notes for maintainers:
   remote write. It is intentionally **not** on the money-in critical path.
 """
 import logging
-from decimal import Decimal
+from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -25,6 +26,7 @@ from urllib3.util.retry import Retry
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,235 @@ def get_recent_transactions(loyverse_customer_id: str, limit: int = 20) -> list:
         'rows_limit': limit,
     })
     return data.get('receipts', [])
+
+
+def get_receipts(since: str | None = None, limit: int = 250, max_pages: int = 20) -> list:
+    """Fetch receipts store-wide, newest first, following Loyverse's cursor.
+
+    The Loyverse ``/receipts`` endpoint has no ``customer_id`` filter, so
+    ``sync_purchases`` polls the store's receipts and matches each one against the
+    linked students in memory. ``since`` is an ISO-8601 string passed as
+    ``created_at_min`` to bound the poll; pagination beyond the first page uses the
+    opaque ``cursor`` (which cannot be combined with other filters).
+    """
+    receipts: list = []
+    cursor = None
+    for _ in range(max_pages):
+        if cursor:
+            params = {'cursor': cursor, 'limit': limit}
+        else:
+            params = {'limit': limit}
+            if since:
+                params['created_at_min'] = since
+        data = _get('/receipts', params=params)
+        receipts.extend(data.get('receipts', []) or [])
+        cursor = data.get('cursor')
+        if not cursor:
+            break
+    return receipts
+
+
+def _to_decimal(value) -> Decimal:
+    try:
+        return Decimal(str(value if value is not None else 0))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal('0')
+
+
+def _parse_receipt(receipt: dict):
+    """Normalise a Loyverse receipt into the pieces a transaction needs.
+
+    Returns ``(amount, items, summary, is_refund, date)`` where ``amount`` is the
+    absolute total (MXN), ``items`` is a JSON-friendly list of line items and
+    ``summary`` is a short human string for the notification / description.
+    """
+    amount = _to_decimal(receipt.get('total_money')).copy_abs()
+    is_refund = (receipt.get('receipt_type') or 'SALE').upper() == 'REFUND'
+
+    items, parts = [], []
+    for li in receipt.get('line_items') or []:
+        name = li.get('item_name') or li.get('variant_name') or 'Artículo'
+        raw_qty = li.get('quantity', 1)
+        try:
+            qty = float(raw_qty)
+            qty = int(qty) if qty.is_integer() else qty
+        except (TypeError, ValueError):
+            qty = raw_qty
+        total = li.get('total_money')
+        items.append({
+            'name': name,
+            'quantity': qty,
+            'total': str(_to_decimal(total)) if total is not None else None,
+        })
+        parts.append(f'{qty}× {name}' if qty not in (1, '1') else name)
+
+    summary = ', '.join(parts)[:255]
+    raw_date = receipt.get('receipt_date') or receipt.get('created_at')
+    date = parse_datetime(raw_date) if raw_date else None
+    return amount, items, summary, is_refund, date
+
+
+def _record_receipt(student, receipt: dict):
+    """Idempotently record one receipt against ``student``.
+
+    Returns the newly-created ``CafeteriaTransaction`` (with balance debited), or
+    ``None`` if the receipt had no usable id or was already processed — the unique
+    ``loyverse_receipt_id`` makes re-runs a no-op.
+    """
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+    receipt_id = str(receipt.get('receipt_number') or '').strip()
+    if not receipt_id:
+        return None
+
+    amount, items, summary, is_refund, date = _parse_receipt(receipt)
+    tx_type = (CafeteriaTransaction.TxType.REFUND if is_refund
+               else CafeteriaTransaction.TxType.PURCHASE)
+
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+        tx, created = CafeteriaTransaction.objects.get_or_create(
+            loyverse_receipt_id=receipt_id,
+            defaults={
+                'student': student,
+                'transaction_type': tx_type,
+                'amount': amount,
+                'description': summary,
+                'items': items,
+                'date': date or timezone.now(),
+            },
+        )
+        if not created:
+            return None
+
+        # Purchases debit the local ledger; refunds credit it (spec R1: DB is the
+        # source of truth, Loyverse receipts are authoritative for spend).
+        current = cb.balance or Decimal('0')
+        cb.balance = current + amount if is_refund else current - amount
+        cb.last_synced = timezone.now()
+        cb.save(update_fields=['balance', 'last_synced'])
+
+        tx.balance_after = cb.balance
+        tx.save(update_fields=['balance_after'])
+        return tx
+
+
+def _notify_purchase(tx):
+    """Fan out an in-app + email purchase notification to every guardian."""
+    from apps.cafeteria.models import CafeteriaTransaction
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    student = tx.student
+    if tx.transaction_type == CafeteriaTransaction.TxType.REFUND:
+        title = 'Devolución en cafetería'
+        head = f'Se registró una devolución de ${tx.amount:.2f}'
+    else:
+        title = 'Compra en cafetería'
+        head = f'Compra en cafetería: ${tx.amount:.2f}'
+    detail = f' — {tx.description}' if tx.description else ''
+    balance = f' Saldo actual: ${tx.balance_after:.2f}.' if tx.balance_after is not None else ''
+    message = f'{student.user.full_name}: {head}{detail}.{balance}'
+
+    notified = 0
+    for parent in student.parents.all():
+        notify(parent, Notification.NotifType.CAFETERIA, title, message)
+        notified += 1
+    return notified
+
+
+def _maybe_low_balance_alert(cb, now):
+    """Send a deduped low-balance alert if a purchase pushed the balance under.
+
+    Mirrors the ``low_balance_alerts`` cron dedup: one alert per cooldown window,
+    tracked on ``CafeteriaBalance.last_low_balance_alert_at`` and cleared by that
+    command once the balance recovers.
+    """
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    if not cb.is_low_balance:
+        return 0
+
+    cooldown = getattr(settings, 'CAFETERIA_LOW_BALANCE_ALERT_COOLDOWN_DAYS', 7)
+    cutoff = now - timedelta(days=cooldown)
+    if cb.last_low_balance_alert_at is not None and cb.last_low_balance_alert_at > cutoff:
+        return 0
+
+    student = cb.student
+    title = 'Saldo bajo en cafetería'
+    message = (
+        f'El saldo de cafetería de {student.user.full_name} es de '
+        f'${cb.balance:.2f}, por debajo del mínimo de '
+        f'${cb.low_balance_threshold:.2f}. Le recomendamos recargar para evitar '
+        f'contratiempos a la hora del almuerzo.'
+    )
+    notified = 0
+    for parent in student.parents.all():
+        notify(parent, Notification.NotifType.CAFETERIA, title, message)
+        notified += 1
+
+    cb.last_low_balance_alert_at = now
+    cb.save(update_fields=['last_low_balance_alert_at'])
+    return notified
+
+
+def sync_purchases():
+    """Poll Loyverse receipts → transactions + balance debit + parent alerts.
+
+    Idempotent: each receipt maps to a unique ``CafeteriaTransaction`` so re-runs
+    neither duplicate rows nor re-notify. Called by the ``sync_purchases`` cron
+    command (spec §2.1). Returns a summary dict.
+    """
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+    students = {
+        s.loyverse_id: s
+        for s in StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
+    }
+    if not students:
+        logger.info('sync_purchases: no students with a Loyverse id — nothing to do.')
+        return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0}
+
+    # Only poll receipts newer than the last one we processed (idempotency still
+    # guards the overlap window); a small look-back avoids missing boundary rows.
+    last = (CafeteriaTransaction.objects
+            .filter(transaction_type=CafeteriaTransaction.TxType.PURCHASE)
+            .order_by('-date').first())
+    since = (last.date - timedelta(minutes=5)).isoformat() if last and last.date else None
+
+    receipts = get_receipts(since=since)
+
+    now = timezone.now()
+    created = notified = 0
+    for receipt in receipts:
+        customer_id = receipt.get('customer_id')
+        student = students.get(customer_id) if customer_id else None
+        if student is None:
+            continue
+
+        tx = _record_receipt(student, receipt)
+        if tx is None:
+            continue
+
+        created += 1
+        notified += _notify_purchase(tx)
+
+        if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
+            cb = CafeteriaBalance.objects.get(student=student)
+            notified += _maybe_low_balance_alert(cb, now)
+
+    logger.info(
+        f'sync_purchases: {len(receipts)} receipt(s) polled, {created} new, '
+        f'{notified} notification(s) sent.'
+    )
+    return {
+        'students': len(students),
+        'receipts': len(receipts),
+        'created': created,
+        'notified': notified,
+    }
 
 
 def sync_student_balance(student_profile) -> Decimal:

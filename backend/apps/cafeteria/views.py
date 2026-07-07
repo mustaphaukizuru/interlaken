@@ -59,33 +59,49 @@ class MyBalanceView(APIView):
 
 
 class MyTransactionsView(generics.ListAPIView):
-    """GET /api/v1/cafeteria/transactions/"""
+    """GET /api/v1/cafeteria/transactions/?student=&type=&from=&to=
+
+    Paginated (global PageNumberPagination) and scoped by role: students see their
+    own history, parents see their children's, admins see all. Optional filters:
+    ``type`` (purchase|topup|refund), ``from``/``to`` (ISO date, inclusive).
+    """
     serializer_class = CafeteriaTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        student_id = self.request.query_params.get('student')
+        params = self.request.query_params
+        student_id = params.get('student')
 
         if user.role == User.Role.STUDENT:
             try:
-                return CafeteriaTransaction.objects.filter(student=user.student_profile)
+                qs = CafeteriaTransaction.objects.filter(student=user.student_profile)
             except StudentProfile.DoesNotExist:
                 return CafeteriaTransaction.objects.none()
-
-        if user.role == User.Role.PARENT:
+        elif user.role == User.Role.PARENT:
             my_students = StudentProfile.objects.filter(parents=user)
             if student_id:
                 my_students = my_students.filter(id=student_id)
-            return CafeteriaTransaction.objects.filter(student__in=my_students)
-
-        if user.role == User.Role.ADMIN:
+            qs = CafeteriaTransaction.objects.filter(student__in=my_students)
+        elif user.role == User.Role.ADMIN:
             qs = CafeteriaTransaction.objects.all()
             if student_id:
                 qs = qs.filter(student_id=student_id)
-            return qs
+        else:
+            return CafeteriaTransaction.objects.none()
 
-        return CafeteriaTransaction.objects.none()
+        tx_type = params.get('type')
+        if tx_type in CafeteriaTransaction.TxType.values:
+            qs = qs.filter(transaction_type=tx_type)
+
+        date_from = params.get('from')
+        if date_from:
+            qs = qs.filter(date__date__gte=date_from)
+        date_to = params.get('to')
+        if date_to:
+            qs = qs.filter(date__date__lte=date_to)
+
+        return qs
 
 
 @method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')

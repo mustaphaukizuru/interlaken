@@ -1,19 +1,30 @@
 """
 sync_purchases — poll Loyverse receipts → cafeteria transactions + parent alerts.
 
-Placeholder scaffolding. The full purchase pipeline (idempotent receipt ingest,
-balance debit, per-parent purchase notifications, low-balance follow-up) is
-implemented in **Prompt 09**. The command exists now so the cron line documented
-in DEPLOYMENT.md §3 is valid and the schedule can be set up ahead of time.
+cPanel cron target (see DEPLOYMENT.md §3), suggested every 5 minutes. Idempotent:
+each receipt maps to a unique ``CafeteriaTransaction`` so re-running never
+duplicates a purchase or re-notifies a parent. Loyverse/credential failures are
+logged and reported, not fatal, so cron never emails a traceback for a transient
+hiccup.
 """
 from django.core.management.base import BaseCommand
 
+from apps.cafeteria.services import LoyverseError, sync_purchases
+
 
 class Command(BaseCommand):
-    help = 'Poll Loyverse receipts and record cafeteria purchases (implemented in Prompt 09).'
+    help = 'Poll Loyverse receipts and record cafeteria purchases + parent notifications.'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.WARNING(
-            'sync_purchases is a placeholder — the purchase pipeline lands in Prompt 09. '
-            'No receipts were processed.'
+        try:
+            result = sync_purchases()
+        except LoyverseError as e:
+            self.stderr.write(self.style.ERROR(f'sync_purchases could not reach Loyverse: {e}'))
+            return
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Purchase sync complete: {result['receipts']} receipt(s) polled, "
+            f"{result['created']} new transaction(s), "
+            f"{result['notified']} notification(s) sent "
+            f"across {result['students']} linked student(s)."
         ))

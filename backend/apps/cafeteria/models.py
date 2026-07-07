@@ -50,6 +50,10 @@ class CafeteriaTransaction(models.Model):
     description         = models.CharField(max_length=255, blank=True)
     date                = models.DateTimeField(default=timezone.now)
     loyverse_receipt_id = models.CharField(max_length=100, blank=True, unique=True)
+    # Itemized receipt lines from Loyverse (F2): [{name, quantity, total}, ...].
+    items               = models.JSONField(default=list, blank=True)
+    # Running balance snapshot right after this transaction was applied.
+    balance_after       = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
         verbose_name = 'Transacción de Cafetería'
