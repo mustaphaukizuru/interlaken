@@ -1,0 +1,98 @@
+export interface User {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  role: 'admin' | 'parent' | 'student' | 'staff';
+  avatar: string;
+  whatsapp: string;
+}
+
+export interface StudentProfile {
+  id: number;
+  user: User;
+  student_id: string;
+  grade: string;
+  group: string;
+  loyverse_id: string;
+}
+
+export interface CafeteriaBalance {
+  id: number;
+  student: StudentProfile;
+  balance: string;
+  low_balance_threshold: string;
+  last_synced: string;
+}
+
+export interface CafeteriaTransaction {
+  id: number;
+  transaction_type: 'purchase' | 'topup' | 'refund';
+  amount: string;
+  description: string;
+  date: string;
+  loyverse_receipt_id: string;
+}
+
+export interface Payment {
+  id: number;
+  payment_type: 'tuition' | 'enrollment' | 'cafeteria' | 'other';
+  amount: string;
+  currency: string;
+  description: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
+  gateway_transaction_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Announcement {
+  id: number;
+  title: string;
+  body: string;
+  audience: 'all' | 'parents' | 'students' | 'staff';
+  created_at: string;
+}
+
+export interface PreRegistrationData {
+  child_name: string;
+  child_dob: string;
+  grade_applying: string;
+  parent_name: string;
+  email: string;
+  phone: string;
+  how_did_you_hear?: string;
+  message?: string;
+}
+
+export interface OpenSchoolEvent {
+  id: number;
+  date: string;
+  title: string;
+  description: string;
+  location: string;
+  max_capacity: number;
+  spots_remaining: number;
+  is_active: boolean;
+}
+
+export interface DashboardData {
+  children_count?: number;
+  children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;
+  cafeteria_balances?: Array<{ student_name: string; balance: string; low: boolean; last_synced: string }>;
+  recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
+  student_id?: string;
+  grade?: string;
+  group?: string;
+  cafeteria_balance?: string;
+  is_low_balance?: boolean;
+  total_students?: number;
+  total_users?: number;
+  pending_preregistrations?: number;
+  pending_registrations?: number;
+  pending_payments?: number;
+  total_revenue?: string;
+  announcements?: Announcement[];
+  unread_notifications?: number;
+}

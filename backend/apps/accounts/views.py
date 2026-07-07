@@ -1,0 +1,231 @@
+"""
+Accounts views: Google OAuth flow, JWT token exchange, user profile, students list.
+"""
+import requests
+from django.conf import settings
+from django.contrib.auth import login, logout
+from django.shortcuts import redirect
+from django.http import JsonResponse
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import User, StudentProfile
+from .serializers import UserSerializer, StudentProfileSerializer
+
+
+def _get_tokens(user):
+    """Return JWT access + refresh token pair for a user."""
+    refresh = RefreshToken.for_user(user)
+    return {
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }
+
+
+class GoogleLoginView(APIView):
+    """
+    Redirects user to Google's OAuth consent screen.
+    Used by the frontend button: GET /auth/google/
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        google_auth_url = (
+            'https://accounts.google.com/o/oauth2/v2/auth'
+            f'?client_id={settings.GOOGLE_CLIENT_ID}'
+            '&response_type=code'
+            '&scope=openid%20email%20profile'
+            f'&redirect_uri={settings.GOOGLE_REDIRECT_URI}'
+            '&access_type=offline'
+        )
+        return redirect(google_auth_url)
+
+
+class GoogleCallbackView(APIView):
+    """
+    Handles the OAuth callback from Google.
+    Exchanges code → access_token → user info, creates/finds user, returns JWT.
+    GET /auth/google/callback/?code=...
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        code = request.GET.get('code')
+        if not code:
+            return redirect(f'{settings.FRONTEND_URL}/login?error=no_code')
+
+        # Exchange code for tokens
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': settings.GOOGLE_CLIENT_ID,
+                'client_secret': settings.GOOGLE_CLIENT_SECRET,
+                'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+                'grant_type': 'authorization_code',
+            },
+            timeout=10,
+        )
+
+        if token_response.status_code != 200:
+            return redirect(f'{settings.FRONTEND_URL}/login?error=token_exchange_failed')
+
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
+
+        # Get user info from Google
+        userinfo_response = requests.get(
+            'https://www.googleapis.com/oauth2/v3/userinfo',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10,
+        )
+
+        if userinfo_response.status_code != 200:
+            return redirect(f'{settings.FRONTEND_URL}/login?error=userinfo_failed')
+
+        userinfo = userinfo_response.json()
+        google_id = userinfo.get('sub')
+        email = userinfo.get('email')
+        first_name = userinfo.get('given_name', '')
+        last_name = userinfo.get('family_name', '')
+        avatar = userinfo.get('picture', '')
+
+        if not email:
+            return redirect(f'{settings.FRONTEND_URL}/login?error=no_email')
+
+        # Create or update user
+        user, created = User.objects.get_or_create(email=email, defaults={
+            'first_name': first_name,
+            'last_name': last_name,
+            'google_id': google_id,
+            'avatar': avatar,
+            'role': User.Role.PARENT,  # default role; admin assigns final role
+        })
+
+        if not created:
+            # Update profile picture and google_id if changed
+            updated = False
+            if user.google_id != google_id:
+                user.google_id = google_id
+                updated = True
+            if avatar and user.avatar != avatar:
+                user.avatar = avatar
+                updated = True
+            if updated:
+                user.save(update_fields=['google_id', 'avatar'])
+
+        tokens = _get_tokens(user)
+
+        # Redirect to frontend with tokens in query params (stored immediately by JS)
+        frontend_redirect = (
+            f'{settings.FRONTEND_URL}/auth/callback'
+            f'?access={tokens["access"]}'
+            f'&refresh={tokens["refresh"]}'
+            f'&role={user.role}'
+        )
+        return redirect(frontend_redirect)
+
+
+class GoogleTokenView(APIView):
+    """
+    POST /api/v1/accounts/google/token/
+    Alternative: frontend sends { credential: <google_id_token> } and gets JWT back.
+    Uses Google's tokeninfo endpoint to validate.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        credential = request.data.get('credential')
+        if not credential:
+            return Response({'error': 'credential required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify the ID token with Google
+        verify_response = requests.get(
+            f'https://oauth2.googleapis.com/tokeninfo?id_token={credential}',
+            timeout=10,
+        )
+
+        if verify_response.status_code != 200:
+            return Response({'error': 'invalid_token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        payload = verify_response.json()
+
+        # Validate audience
+        if payload.get('aud') != settings.GOOGLE_CLIENT_ID:
+            return Response({'error': 'token_audience_mismatch'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        email = payload.get('email')
+        if not email:
+            return Response({'error': 'no_email'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user, _ = User.objects.get_or_create(email=email, defaults={
+            'first_name': payload.get('given_name', ''),
+            'last_name': payload.get('family_name', ''),
+            'google_id': payload.get('sub', ''),
+            'avatar': payload.get('picture', ''),
+            'role': User.Role.PARENT,
+        })
+
+        tokens = _get_tokens(user)
+        return Response({
+            'user': UserSerializer(user).data,
+            **tokens,
+        })
+
+
+class LogoutView(APIView):
+    """POST /auth/logout/ — Blacklist refresh token (simplejwt) if available."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get('refresh')
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+        except Exception:
+            pass
+        logout(request)
+        return Response({'detail': 'Sesión cerrada correctamente.'})
+
+
+class CurrentUserView(generics.RetrieveUpdateAPIView):
+    """GET/PATCH /api/v1/accounts/me/"""
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+
+class StudentListView(generics.ListAPIView):
+    """GET /api/v1/accounts/students/ — List students (admin only or parent's own children)."""
+    serializer_class = StudentProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == User.Role.ADMIN:
+            return StudentProfile.objects.select_related('user').all()
+        elif user.role == User.Role.PARENT:
+            # Return only children linked to this parent
+            return StudentProfile.objects.filter(parents=user).select_related('user')
+        return StudentProfile.objects.none()
+
+
+class StudentDetailView(generics.RetrieveAPIView):
+    """GET /api/v1/accounts/students/<pk>/"""
+    serializer_class = StudentProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == User.Role.ADMIN:
+            return StudentProfile.objects.all()
+        elif user.role == User.Role.PARENT:
+            return StudentProfile.objects.filter(parents=user)
+        elif user.role == User.Role.STUDENT:
+            return StudentProfile.objects.filter(user=user)
+        return StudentProfile.objects.none()
