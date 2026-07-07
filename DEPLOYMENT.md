@@ -56,6 +56,23 @@ Shared cPanel hosting has **no Redis and no persistent worker processes**, so th
 Each cron entry activates the cPanel venv then runs the command, e.g.:
 `/home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances`
 
+**Exact cPanel crontab lines** (Cron Jobs → *Add New Cron Job*). Adjust `<app>` to the
+Application root and confirm the venv path in cPanel → *Setup Python App*. `manage.py`
+defaults to production settings via `passenger_wsgi`; pin it explicitly for cron so the
+environment is unambiguous:
+
+```cron
+# m  h  dom mon dow   command
+*/10 *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances >> /home/rene82/logs/cafeteria.log 2>&1
+*/5  *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_purchases >> /home/rene82/logs/cafeteria.log 2>&1
+0    7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py low_balance_alerts >> /home/rene82/logs/cafeteria.log 2>&1
+0    8  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_booking_reminders >> /home/rene82/logs/bookings.log 2>&1
+```
+
+- `sync_purchases` is a **placeholder until Prompt 09** (logs a notice, processes nothing) — the cron line is valid now and starts working once the pipeline ships.
+- `low_balance_alerts` self-dedups (7-day cooldown, cleared on recovery), so a daily schedule won't spam parents; add `--force` only for a manual one-off sweep.
+- `mkdir -p /home/rene82/logs` once so the redirect targets exist.
+
 > This **supersedes** the Celery/Redis references in `CAFETERIA_WALLET_SPEC.md` §7 R6. Remove `celery`, `redis`, `django-celery-beat` from `requirements.txt` (dead weight on this host). Real-time paths (Loyverse/WhatsApp/payment webhooks) are just HTTPS endpoints and work fine under Passenger.
 
 ---

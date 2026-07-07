@@ -19,6 +19,9 @@ class CafeteriaBalance(models.Model):
     balance              = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     low_balance_threshold= models.DecimalField(max_digits=8, decimal_places=2, default=50)
     last_synced          = models.DateTimeField(null=True, blank=True)
+    # When the last low-balance alert was sent, so the daily cron doesn't spam.
+    # Cleared once the balance recovers above the threshold (see low_balance_alerts).
+    last_low_balance_alert_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Saldo de Cafetería'

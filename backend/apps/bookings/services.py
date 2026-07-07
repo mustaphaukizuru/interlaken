@@ -1,17 +1,19 @@
 """
 bookings/services.py — Notifications for visit bookings.
 
-Uses ``portal.services.notify`` when that helper exists (Prompt 08); otherwise
-falls back to Django's ``send_mail`` (console backend in dev). No external APIs
-here — Google Calendar/WhatsApp arrive in Prompts 13–14.
+Routes email through the shared ``portal.services.send_email`` helper (Prompt 08);
+falls back to Django's ``send_mail`` (console backend in dev) if that module is
+absent. A booking's ``parent_email`` is not necessarily a registered user, so we
+use ``send_email`` (raw recipient) rather than ``notify`` (which needs a User).
+No external APIs here — Google Calendar/WhatsApp arrive in Prompts 13–14.
 """
 from django.conf import settings
 from django.core.mail import send_mail
 
-try:  # pragma: no cover - optional dependency on Prompt 08
-    from apps.portal.services import notify as _portal_notify
+try:  # pragma: no cover - portal.services ships in Prompt 08
+    from apps.portal.services import send_email as _portal_send_email
 except Exception:  # ImportError or module missing
-    _portal_notify = None
+    _portal_send_email = None
 
 
 def _visit_type_label(booking):
@@ -39,11 +41,8 @@ def send_booking_confirmation(booking):
     )
     recipients = [booking.parent_email]
 
-    if _portal_notify is not None:
-        try:
-            _portal_notify(subject=subject, message=body, recipients=recipients)
-        except Exception:
-            pass
+    if _portal_send_email is not None:
+        _portal_send_email(subject=subject, message=body, recipients=recipients)
     else:
         send_mail(
             subject=subject,
