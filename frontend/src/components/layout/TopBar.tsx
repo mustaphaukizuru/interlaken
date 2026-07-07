@@ -20,10 +20,10 @@ export default function TopBar({ title, subtitle }: { title: string; subtitle?: 
         {/* Search */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: '#fff', border: '1px solid #ECEAF3', borderRadius: 12, width: 200, boxShadow: 'var(--shadow-card)' }} className="hidden md:flex">
           <Search size={15} color="#9A93AE" />
-          <input placeholder="Buscar..." style={{ border: 'none', outline: 'none', fontSize: 13, background: 'transparent', flex: 1, color: '#1A1130' }} />
+          <input placeholder="Buscar..." aria-label="Buscar" style={{ border: 'none', outline: 'none', fontSize: 13, background: 'transparent', flex: 1, color: '#1A1130' }} />
         </div>
         {/* Bell */}
-        <button style={{ width: 42, height: 42, borderRadius: 11, background: '#fff', border: '1px solid #ECEAF3', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--shadow-card)', position: 'relative' }}>
+        <button aria-label="Notificaciones" style={{ width: 42, height: 42, borderRadius: 11, background: '#fff', border: '1px solid #ECEAF3', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--shadow-card)', position: 'relative' }}>
           <Bell size={19} color="#6E6885" />
           <span style={{ position: 'absolute', top: 10, right: 10, width: 7, height: 7, borderRadius: '50%', background: '#ef2558', border: '2px solid #fff' }} />
         </button>

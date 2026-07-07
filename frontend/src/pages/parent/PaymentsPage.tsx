@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { paymentsApi } from '@/services/api';
 import type { Payment } from '@/types';
 
@@ -78,55 +79,53 @@ export default function PaymentsPage() {
       </div>
 
       {/* New payment modal */}
-      {showNew && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card w-full max-w-sm space-y-4">
-            <h3 className="font-semibold text-slate-900">Realizar pago</h3>
-            <div>
-              <label className="label">Tipo de pago</label>
-              <select
-                className="input-field"
-                value={form.payment_type}
-                onChange={(e) => setForm((f) => ({ ...f, payment_type: e.target.value }))}
-              >
-                {Object.entries(paymentTypeLabel).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Monto (MXN)</label>
-              <input
-                type="number"
-                className="input-field"
-                placeholder="0.00"
-                value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Descripción (opcional)</label>
-              <input
-                className="input-field"
-                placeholder="Ej. Colegiatura Agosto 2025"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setShowNew(false)} className="flex-1">Cancelar</Button>
-              <Button
-                loading={initiateMutation.isPending}
-                onClick={() => initiateMutation.mutate()}
-                disabled={!form.amount || parseFloat(form.amount) <= 0}
-                className="flex-1"
-              >
-                Pagar
-              </Button>
-            </div>
-          </div>
+      <Modal open={showNew} onClose={() => setShowNew(false)} title="Realizar pago">
+        <div>
+          <label className="label" htmlFor="payment-type">Tipo de pago</label>
+          <select
+            id="payment-type"
+            className="input-field"
+            value={form.payment_type}
+            onChange={(e) => setForm((f) => ({ ...f, payment_type: e.target.value }))}
+          >
+            {Object.entries(paymentTypeLabel).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
         </div>
-      )}
+        <div>
+          <label className="label" htmlFor="payment-amount">Monto (MXN)</label>
+          <input
+            id="payment-amount"
+            type="number"
+            className="input-field"
+            placeholder="0.00"
+            value={form.amount}
+            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="payment-description">Descripción (opcional)</label>
+          <input
+            id="payment-description"
+            className="input-field"
+            placeholder="Ej. Colegiatura Agosto 2025"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowNew(false)} className="flex-1">Cancelar</Button>
+          <Button
+            loading={initiateMutation.isPending}
+            onClick={() => initiateMutation.mutate()}
+            disabled={!form.amount || parseFloat(form.amount) <= 0}
+            className="flex-1"
+          >
+            Pagar
+          </Button>
+        </div>
+      </Modal>
 
       {/* Payments list */}
       <Card>

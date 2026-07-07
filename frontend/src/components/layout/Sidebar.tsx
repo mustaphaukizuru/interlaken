@@ -92,7 +92,7 @@ export default function Sidebar({ role, onNavigate }: { role: Role; onNavigate?:
           <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.first_name} {user?.last_name}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
         </div>
-        <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 4, transition: 'color 0.2s' }} onMouseOver={e => (e.currentTarget.style.color = '#ef2558')} onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>
+        <button aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => { logout(); navigate('/login'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 4, transition: 'color 0.2s' }} onMouseOver={e => (e.currentTarget.style.color = '#ef2558')} onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>
           <LogOut size={17} />
         </button>
       </div>

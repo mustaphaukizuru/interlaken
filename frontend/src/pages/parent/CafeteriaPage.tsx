@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 
@@ -108,45 +109,46 @@ export default function CafeteriaPage() {
       </div>
 
       {/* Top-up modal */}
-      {showTopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card w-full max-w-sm space-y-4">
-            <h3 className="font-semibold text-slate-900">Solicitar recarga</h3>
-            <div>
-              <label className="label">Monto (MXN)</label>
-              <input
-                type="number"
-                min="50"
-                max="2000"
-                className="input-field"
-                placeholder="Ej. 200"
-                value={topupAmount}
-                onChange={(e) => setTopupAmount(e.target.value)}
-              />
-              <p className="text-xs text-slate-400 mt-1">Mínimo $50 · Máximo $2,000</p>
-            </div>
-            <div>
-              <label className="label">Método de pago</label>
-              <select className="input-field" value={topupMethod} onChange={(e) => setTopupMethod(e.target.value as any)}>
-                <option value="online">Pago en línea (tarjeta)</option>
-                <option value="office">Pago en caja escolar</option>
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setShowTopup(false)} className="flex-1">Cancelar</Button>
-              <Button
-                variant="primary"
-                loading={topupMutation.isPending}
-                onClick={() => topupMutation.mutate()}
-                disabled={!topupAmount || parseFloat(topupAmount) < 50}
-                className="flex-1"
-              >
-                Solicitar recarga
-              </Button>
-            </div>
-          </div>
+      <Modal open={showTopup} onClose={() => setShowTopup(false)} title="Solicitar recarga">
+        <div>
+          <label className="label" htmlFor="topup-amount">Monto (MXN)</label>
+          <input
+            id="topup-amount"
+            type="number"
+            min="50"
+            max="2000"
+            className="input-field"
+            placeholder="Ej. 200"
+            value={topupAmount}
+            onChange={(e) => setTopupAmount(e.target.value)}
+          />
+          <p className="text-xs text-slate-400 mt-1">Mínimo $50 · Máximo $2,000</p>
         </div>
-      )}
+        <div>
+          <label className="label" htmlFor="topup-method">Método de pago</label>
+          <select
+            id="topup-method"
+            className="input-field"
+            value={topupMethod}
+            onChange={(e) => setTopupMethod(e.target.value as any)}
+          >
+            <option value="online">Pago en línea (tarjeta)</option>
+            <option value="office">Pago en caja escolar</option>
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowTopup(false)} className="flex-1">Cancelar</Button>
+          <Button
+            variant="primary"
+            loading={topupMutation.isPending}
+            onClick={() => topupMutation.mutate()}
+            disabled={!topupAmount || parseFloat(topupAmount) < 50}
+            className="flex-1"
+          >
+            Solicitar recarga
+          </Button>
+        </div>
+      </Modal>
 
       {/* Transactions */}
       <Card title="Historial de movimientos">

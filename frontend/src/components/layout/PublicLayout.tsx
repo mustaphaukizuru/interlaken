@@ -1,6 +1,9 @@
 import { Outlet, Link, NavLink } from 'react-router-dom';
-import { useState } from 'react';
-import { Menu, X, Phone, Mail } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Menu, X, Phone, Mail, MapPin, ChevronDown,
+  Facebook, Instagram, Youtube,
+} from 'lucide-react';
 import Logo from '@/components/ui/Logo';
 
 const NAV_LINKS = [
@@ -10,8 +13,142 @@ const NAV_LINKS = [
   { to: '/contacto',          label: 'Contacto' },
 ];
 
+/** Grouped entries for the "Programas ▾" mega-menu. Routes are unchanged: the
+ *  levels point at Admisiones and the extracurriculars at Nosotros. */
+const PROGRAM_GROUPS = [
+  {
+    heading: 'Niveles',
+    items: [
+      { label: 'Preescolar', to: '/admisiones' },
+      { label: 'Primaria', to: '/admisiones' },
+      { label: 'Secundaria', to: '/admisiones' },
+    ],
+  },
+  {
+    heading: 'Programas',
+    items: [
+      { label: 'Inglés', to: '/nosotros' },
+      { label: 'Deportes', to: '/nosotros' },
+      { label: 'Arte y Música', to: '/nosotros' },
+      { label: 'Ciencia y Robótica', to: '/nosotros' },
+    ],
+  },
+];
+
+const FOOTER_GROUPS = [
+  {
+    heading: 'Niveles',
+    links: [
+      { label: 'Preescolar', to: '/admisiones' },
+      { label: 'Primaria', to: '/admisiones' },
+      { label: 'Secundaria', to: '/admisiones' },
+    ],
+  },
+  {
+    heading: 'Admisiones',
+    links: [
+      { label: 'Proceso de admisión', to: '/admisiones' },
+      { label: 'Pre-Registro', to: '/pre-registro' },
+      { label: 'Puertas Abiertas', to: '/puertas-abiertas' },
+    ],
+  },
+  {
+    heading: 'Comunidad',
+    links: [
+      { label: 'Nosotros', to: '/nosotros' },
+      { label: 'Contacto', to: '/contacto' },
+      { label: 'Portal Escolar', to: '/login' },
+    ],
+  },
+];
+
+const SOCIALS = [
+  { label: 'Facebook', href: 'https://facebook.com', Icon: Facebook },
+  { label: 'Instagram', href: 'https://instagram.com', Icon: Instagram },
+  { label: 'YouTube', href: 'https://youtube.com', Icon: Youtube },
+];
+
+/** Accessible desktop "Programas ▾" dropdown: hover + click, aria-expanded,
+ *  Escape to close (restoring focus), and outside-click dismissal. */
+function ProgramsDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        ref={btnRef}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+      >
+        Programas
+        <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Programas"
+          className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-[420px]"
+        >
+          <div className="rounded-2xl border border-slate-100 bg-white shadow-xl p-5 grid grid-cols-2 gap-5">
+            {PROGRAM_GROUPS.map((group) => (
+              <div key={group.heading}>
+                <p className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-2">{group.heading}</p>
+                <ul className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <li key={item.label}>
+                      <Link
+                        to={item.to}
+                        role="menuitem"
+                        onClick={() => setOpen(false)}
+                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
+  const [mobileProgramsOpen, setMobileProgramsOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -36,6 +173,7 @@ export function PublicLayout() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6">
+            <ProgramsDropdown />
             {NAV_LINKS.map((link) => (
               <NavLink
                 key={link.to}
@@ -64,7 +202,9 @@ export function PublicLayout() {
           {/* Mobile burger */}
           <button
             onClick={() => setOpen(!open)}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-50"
+            aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={open}
+            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
           >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -73,6 +213,31 @@ export function PublicLayout() {
         {/* Mobile menu */}
         {open && (
           <div className="md:hidden bg-white border-t border-slate-100 px-4 pb-4 pt-2 space-y-1">
+            {/* Programas accordion */}
+            <button
+              type="button"
+              aria-expanded={mobileProgramsOpen}
+              onClick={() => setMobileProgramsOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            >
+              Programas
+              <ChevronDown className={`w-4 h-4 transition-transform ${mobileProgramsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {mobileProgramsOpen && (
+              <div className="pl-3 space-y-0.5">
+                {PROGRAM_GROUPS.flatMap((g) => g.items).map((item, i) => (
+                  <Link
+                    key={`${item.label}-${i}`}
+                    to={item.to}
+                    onClick={() => setOpen(false)}
+                    className="block px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+
             {NAV_LINKS.map((link) => (
               <NavLink
                 key={link.to}
@@ -106,32 +271,62 @@ export function PublicLayout() {
 
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 text-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 md:grid-cols-5 gap-8">
+          {/* Brand column */}
+          <div className="col-span-2">
             <div className="mb-3">
               <Logo variant="horizontal" size={40} theme="dark" />
             </div>
-            <p className="text-xs leading-relaxed">
+            <p className="text-xs leading-relaxed max-w-xs">
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
               Tlalnepantla, Estado de México.
             </p>
-          </div>
-          <div>
-            <h4 className="text-white font-semibold mb-3">Navegación</h4>
-            <ul className="space-y-2 text-xs">
-              {NAV_LINKS.map((l) => (
-                <li key={l.to}>
-                  <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
-                </li>
+            <div className="flex items-center gap-3 mt-5">
+              {SOCIALS.map(({ label, href, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                >
+                  <Icon className="w-4 h-4" />
+                </a>
               ))}
-            </ul>
+            </div>
           </div>
+
+          {/* Link groups */}
+          {FOOTER_GROUPS.map((group) => (
+            <div key={group.heading}>
+              <h4 className="text-white font-semibold mb-3">{group.heading}</h4>
+              <ul className="space-y-2 text-xs">
+                {group.links.map((l) => (
+                  <li key={l.label}>
+                    <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {/* Contact */}
           <div>
             <h4 className="text-white font-semibold mb-3">Contacto</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="tel:+525512345678" className="hover:text-white transition-colors">(55) 1234-5678</a></li>
-              <li><a href="mailto:colegio@interlaken.edu.mx" className="hover:text-white transition-colors">colegio@interlaken.edu.mx</a></li>
-              <li>Tlalnepantla de Baz, Estado de México</li>
+              <li className="flex items-start gap-2">
+                <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <a href="tel:+525512345678" className="hover:text-white transition-colors">(55) 1234-5678</a>
+              </li>
+              <li className="flex items-start gap-2">
+                <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <a href="mailto:colegio@interlaken.edu.mx" className="hover:text-white transition-colors break-all">colegio@interlaken.edu.mx</a>
+              </li>
+              <li className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <span>Tlalnepantla de Baz, Estado de México</span>
+              </li>
             </ul>
             <a
               href="https://wa.me/5215512345678?text=Hola%2C%20me%20gustar%C3%ADa%20obtener%20m%C3%A1s%20informaci%C3%B3n"
@@ -144,8 +339,11 @@ export function PublicLayout() {
             </a>
           </div>
         </div>
-        <div className="border-t border-slate-800 py-4 text-center text-xs">
-          © {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados
+        <div className="border-t border-slate-800">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-center">
+            <span>© {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados</span>
+            <span className="text-slate-500">Institución con reconocimiento de validez oficial · SEP</span>
+          </div>
         </div>
       </footer>
     </div>

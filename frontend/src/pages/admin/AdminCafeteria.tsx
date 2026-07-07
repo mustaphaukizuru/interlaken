@@ -69,6 +69,7 @@ export default function AdminCafeteria() {
           <input
             className="input-field pl-9"
             placeholder="Buscar alumno o matrícula…"
+            aria-label="Buscar alumno o matrícula"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -107,6 +108,8 @@ export default function AdminCafeteria() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
+                          title="Sincronizar saldo"
                           onClick={() => syncOneMutation.mutate(b.student.id)}
                           loading={syncOneMutation.isPending}
                         >
