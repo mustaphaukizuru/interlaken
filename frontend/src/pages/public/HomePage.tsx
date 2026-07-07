@@ -207,7 +207,7 @@ export default function HomePage() {
             </div>
             {/* Image + floating cards */}
             <div style={{ position: 'relative' }}>
-              <img src="/assets/court-wide.webp" alt="Colegio Interlaken" style={{ width: '100%', borderRadius: 20, border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.6)', objectFit: 'cover', aspectRatio: '4/3' }} onError={hideOnError} />
+              <img src="/assets/court-wide.webp" alt="Colegio Interlaken" fetchPriority="high" decoding="async" style={{ width: '100%', borderRadius: 20, border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.6)', objectFit: 'cover', aspectRatio: '4/3' }} onError={hideOnError} />
               <div style={{ position: 'absolute', top: 18, left: -14, background: '#fff', color: '#1A1130', borderRadius: 14, padding: '12px 16px', boxShadow: '0 16px 30px -12px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div className="stat-icon" style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(217,119,6,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Award size={18} color="#d97706" /></div>
                 <div><div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 14 }}>Top 5 Colegios</div><div style={{ fontSize: 11, color: '#6E6885' }}>Zona Norte CDMX</div></div>
@@ -257,9 +257,9 @@ export default function HomePage() {
           </Reveal>
           <Reveal direction="left" style={{ position: 'relative' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <img src="/assets/classroom.webp" alt="" style={{ borderRadius: 16, objectFit: 'cover', height: 200, gridRow: 'span 2', width: '100%' }} onError={hideOnError} />
-              <img src="/assets/campus-mural.webp" alt="" style={{ borderRadius: 16, objectFit: 'cover', height: 93, width: '100%' }} onError={hideOnError} />
-              <img src="/assets/hopscotch.webp" alt="" style={{ borderRadius: 16, objectFit: 'cover', height: 93, width: '100%' }} onError={hideOnError} />
+              <img src="/assets/classroom.webp" alt="" loading="lazy" decoding="async" style={{ borderRadius: 16, objectFit: 'cover', height: 200, gridRow: 'span 2', width: '100%' }} onError={hideOnError} />
+              <img src="/assets/campus-mural.webp" alt="" loading="lazy" decoding="async" style={{ borderRadius: 16, objectFit: 'cover', height: 93, width: '100%' }} onError={hideOnError} />
+              <img src="/assets/hopscotch.webp" alt="" loading="lazy" decoding="async" style={{ borderRadius: 16, objectFit: 'cover', height: 93, width: '100%' }} onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
             <div style={{ position: 'absolute', bottom: -18, right: -8, background: '#fff', borderRadius: 16, padding: '14px 18px', boxShadow: '0 20px 40px -16px rgba(64,26,142,0.35)', border: '1px solid #ECEAF3', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -284,7 +284,7 @@ export default function HomePage() {
             <Reveal key={l.name} delay={i * 90}>
               <div className="card hover-lift" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ position: 'relative', height: 180 }}>
-                  <img src={l.img} alt={l.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
+                  <img src={l.img} alt={l.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
                   <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 40%, ${l.accent}dd 100%)` }} />
                   <h3 style={{ position: 'absolute', bottom: 14, left: 18, color: '#fff', fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 22 }}>{l.name}</h3>
                 </div>
@@ -310,7 +310,7 @@ export default function HomePage() {
               <div style={{ position: 'relative', width: 150, height: 150, margin: '0 auto' }}>
                 <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `${p.accent}14` }} />
                 <div style={{ position: 'absolute', inset: 10, borderRadius: '50%', overflow: 'hidden', border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px ${p.accent}88` }}>
-                  <img src={p.img} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
+                  <img src={p.img} alt={p.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
                 </div>
                 <div style={{ position: 'absolute', bottom: 2, right: 2, width: 40, height: 40, borderRadius: '50%', background: p.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px -6px rgba(0,0,0,0.4)' }}>
                   <p.icon size={19} color="#fff" />
@@ -372,7 +372,7 @@ export default function HomePage() {
         <Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', overflow: 'hidden', borderRadius: 24, boxShadow: '0 24px 48px -20px rgba(16,12,40,0.35)' }}>
             <div style={{ position: 'relative', minHeight: 240 }}>
-              <img src="/assets/facade-sign.webp" alt="Puertas Abiertas Colegio Interlaken" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
+              <img src="/assets/facade-sign.webp" alt="Puertas Abiertas Colegio Interlaken" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
             </div>
             <div style={{ background: 'linear-gradient(135deg, #1da2ab 0%, #401a8e 100%)', color: '#fff', padding: '44px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, alignSelf: 'flex-start', padding: '6px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.15)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>

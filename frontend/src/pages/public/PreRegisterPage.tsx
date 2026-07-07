@@ -7,6 +7,7 @@ import { CheckCircle } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { admissionsApi } from '@/services/api';
+import { trackEvent, FunnelEvent } from '@/services/analytics';
 import type { PreRegistrationData } from '@/types';
 
 const schema = z.object({
@@ -42,6 +43,7 @@ export default function PreRegisterPage() {
   const onSubmit = async (data: FormData) => {
     try {
       await admissionsApi.preRegister(data as PreRegistrationData);
+      trackEvent(FunnelEvent.SubmitPreRegister, { grade: data.grade_applying });
       setSuccess(true);
     } catch {
       toast.error('Ocurrió un error. Verifique los datos e intente nuevamente.');

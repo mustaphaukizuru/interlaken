@@ -5,6 +5,7 @@ import {
   Facebook, Instagram, Youtube,
 } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { RouteSeo } from '@/components/seo/Seo';
 
 const NAV_LINKS = [
   { to: '/nosotros',          label: 'Nosotros' },
@@ -154,6 +155,7 @@ export function PublicLayout() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <RouteSeo />
       {/* Top bar */}
       <div className="hidden md:flex bg-brand-800 text-white text-xs px-6 py-1.5 justify-end gap-6">
         <a href="tel:+525512345678" className="flex items-center gap-1 hover:text-brand-200 transition-colors">

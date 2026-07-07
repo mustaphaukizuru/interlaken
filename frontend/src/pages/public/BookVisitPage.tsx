@@ -8,6 +8,7 @@ import { CalendarDays, Clock, MapPin, CheckCircle, MessageCircle } from 'lucide-
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { bookingsApi } from '@/services/api';
+import { trackEvent, FunnelEvent } from '@/services/analytics';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -71,6 +72,7 @@ export default function BookVisitPage() {
         child_grade: values.child_grade,
         num_attendees: 1,
       });
+      trackEvent(FunnelEvent.BookingConversion, { grade: values.child_grade });
       setConfirmed(selectedSlot);
       setSelectedSlot(null);
       setSelectedDate(null);

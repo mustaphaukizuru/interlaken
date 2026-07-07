@@ -17,7 +17,7 @@
 | Group signup endpoint | ✅ `POST /api/v1/admissions/open-school/signup/` | creates a signup; **no** calendar/confirmation yet |
 | Individual-visit availability | ❌ | needs new models |
 | Individual-visit booking | ❌ | needs new models + slot picker UI |
-| Google Calendar integration | ❌ | no `google-api-python-client` / `google-auth` in requirements |
+| Google Calendar integration | ✅ (Prompt 13) | service-account event create/cancel, fail-soft + `sync_calendar` retry; needs GCP setup (DEPLOYMENT §8) |
 | WhatsApp booking | ⚠️ partial | `WHATSAPP_NUMBER` in settings + `core/urls.py` wa.me redirect exist; no conversational booking |
 
 So **type 1 is ~half-built**; **type 2 is new**; **Calendar + WhatsApp booking are new**.
@@ -67,6 +67,13 @@ class Booking:
 ---
 
 ## 3. Google Calendar integration
+
+> **✅ Implemented in Prompt 13 (Phase 2).** Code: `apps/bookings/services/calendar.py`
+> (`create_event` / `update_event` / `cancel_event` + `sync_booking_created` /
+> `sync_booking_cancelled` lifecycle helpers), wired into `bookings/views.py`
+> (create/confirm → event, cancel → delete) and the `sync_calendar` retry command.
+> **Fail-soft:** a booking never fails on a calendar error. **Manual GCP + env setup
+> is required** for events to actually appear — see [DEPLOYMENT.md §8](DEPLOYMENT.md#8-google-calendar-for-bookings-service-account--prompt-13).
 
 **Recommended: a service account writing to a shared school calendar** (server-side, no per-parent OAuth, cron-friendly).
 
@@ -159,6 +166,6 @@ Existing `admissions/open-school/*` either migrate here or gain `google_event_id
 ## 9. Suggested delivery phases
 
 - **Phase 1 — Individual visits (web):** `bookings` app + models + availability admin + slot-picker page + capacity-safe booking. (No external deps yet — confirmations by email.)
-- **Phase 2 — Google Calendar:** service account + event create/cancel + parent invites.
+- **Phase 2 — Google Calendar:** ✅ (Prompt 13) service account + event create/cancel + parent invites; fail-soft + `sync_calendar` retry cron. Requires manual GCP setup (DEPLOYMENT §8).
 - **Phase 3 — Open class unification:** fold `OpenSchoolDay` into slots; live "Puertas Abiertas" banner.
 - **Phase 4 — WhatsApp Tier 1** (deep link) → **Tier 2** (Cloud API bot) once the WABA number is approved.

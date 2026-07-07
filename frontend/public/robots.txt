@@ -1,0 +1,12 @@
+# Colegio Interlaken — robots.txt
+User-agent: *
+Allow: /
+
+# Portal and auth areas are behind login; keep them out of the index.
+Disallow: /portal
+Disallow: /alumno
+Disallow: /admin
+Disallow: /login
+Disallow: /auth
+
+Sitemap: https://interlaken.edu.mx/sitemap.xml

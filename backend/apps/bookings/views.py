@@ -20,7 +20,7 @@ from .serializers import (
     BookingSerializer,
     SlotGeneratorSerializer,
 )
-from .services import send_booking_confirmation
+from .services import calendar, send_booking_confirmation
 
 
 class IsAdmin(permissions.BasePermission):
@@ -140,8 +140,10 @@ class BookingCreateView(APIView):
                 source=Booking.Source.WEB,
             )
 
-        # Send confirmation outside the transaction/lock.
+        # Side effects outside the transaction/lock — both fail-soft, so a broken
+        # SMTP or Google Calendar never turns a saved booking into a 500.
         send_booking_confirmation(booking)
+        calendar.sync_booking_created(booking)
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -173,6 +175,8 @@ class BookingCancelView(APIView):
 
         booking.status = Booking.Status.CANCELLED
         booking.save(update_fields=['status', 'updated_at'])
+        # Remove the parent's calendar event (fail-soft; clears the stored id).
+        calendar.sync_booking_cancelled(booking)
         return Response(BookingSerializer(booking).data)
 
 
@@ -216,6 +220,10 @@ class AdminBookingActionView(APIView):
 
         booking.status = new_status
         booking.save(update_fields=['status', 'updated_at'])
-        if action == 'confirm' and not booking.confirmation_sent:
-            send_booking_confirmation(booking)
+        if action == 'confirm':
+            if not booking.confirmation_sent:
+                send_booking_confirmation(booking)
+            calendar.sync_booking_created(booking)
+        elif action == 'cancel':
+            calendar.sync_booking_cancelled(booking)
         return Response(BookingSerializer(booking).data)

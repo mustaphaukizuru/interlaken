@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, ClipboardList, CheckCircle, ArrowRight, CalendarDays } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
+import { trackEvent, FunnelEvent } from '@/services/analytics';
 
 const STEPS = [
   {
@@ -46,6 +48,12 @@ const DOCS = [
 ];
 
 export default function AdmissionsPage() {
+  // Admissions funnel entry point (page views also cover this; the explicit
+  // event makes the funnel step unambiguous in the analytics tool).
+  useEffect(() => {
+    trackEvent(FunnelEvent.ViewAdmissions);
+  }, []);
+
   return (
     <div>
       {/* ── HERO ── */}

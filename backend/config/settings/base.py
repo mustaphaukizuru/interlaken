@@ -190,6 +190,15 @@ GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
 GLOBAL_PAYMENTS_WEBHOOK_SECRET = env('GLOBAL_PAYMENTS_WEBHOOK_SECRET', default='')
 BANORTE_WEBHOOK_SECRET = env('BANORTE_WEBHOOK_SECRET', default='')
 
+# ── GOOGLE CALENDAR ───────────────────────────────────────
+# Server-side calendar writes for confirmed bookings use a *service account*
+# (NOT the OAuth login client). Both empty → calendar integration is a no-op and
+# bookings still succeed (fail-soft, picked up later by `manage.py sync_calendar`).
+# See BOOKING_CALENDAR_SPEC.md §3 / DEPLOYMENT.md §8 for the GCP setup. Never
+# commit the key file — GOOGLE_CALENDAR_SA_KEY is a path read from the env.
+GOOGLE_CALENDAR_ID = env('GOOGLE_CALENDAR_ID', default='')
+GOOGLE_CALENDAR_SA_KEY = env('GOOGLE_CALENDAR_SA_KEY', default='')
+
 # ── WHATSAPP ──────────────────────────────────────────────
 WHATSAPP_NUMBER = env('WHATSAPP_NUMBER', default='')
 

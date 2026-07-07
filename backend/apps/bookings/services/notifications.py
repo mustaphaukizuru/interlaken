@@ -1,11 +1,13 @@
 """
-bookings/services.py — Notifications for visit bookings.
+bookings/services/notifications.py — Branded email confirmations for bookings.
 
 Routes email through the shared ``portal.services.send_email`` helper (Prompt 08);
 falls back to Django's ``send_mail`` (console backend in dev) if that module is
 absent. A booking's ``parent_email`` is not necessarily a registered user, so we
 use ``send_email`` (raw recipient) rather than ``notify`` (which needs a User).
-No external APIs here — Google Calendar/WhatsApp arrive in Prompts 13–14.
+
+This is our *own* branded confirmation — kept even when Google Calendar sends its
+attendee invite (Prompt 13), so a parent always gets an Interlaken-styled email.
 """
 from django.conf import settings
 from django.core.mail import send_mail

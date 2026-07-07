@@ -52,6 +52,7 @@ Shared cPanel hosting has **no Redis and no persistent worker processes**, so th
 | Poll Loyverse purchases → notify | `python manage.py sync_purchases` | every 5 min |
 | Low-balance alerts | `python manage.py low_balance_alerts` | daily 07:00 |
 | Booking reminders | `python manage.py send_booking_reminders` | daily 08:00 |
+| Retry booking → Calendar events | `python manage.py sync_calendar` | every 15 min |
 
 Each cron entry activates the cPanel venv then runs the command, e.g.:
 `/home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances`
@@ -67,10 +68,12 @@ environment is unambiguous:
 */5  *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_purchases >> /home/rene82/logs/cafeteria.log 2>&1
 0    7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py low_balance_alerts >> /home/rene82/logs/cafeteria.log 2>&1
 0    8  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_booking_reminders >> /home/rene82/logs/bookings.log 2>&1
+*/15 *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_calendar >> /home/rene82/logs/bookings.log 2>&1
 ```
 
 - `sync_purchases` (Prompt 09) polls Loyverse receipts, idempotently records each new purchase (unique `loyverse_receipt_id`), debits the local balance, and notifies every linked parent (in-app + email); a purchase that crosses the low-balance threshold triggers a deduped alert. Safe to run every 5 min — re-runs never duplicate or re-notify.
 - `low_balance_alerts` self-dedups (7-day cooldown, cleared on recovery), so a daily schedule won't spam parents; add `--force` only for a manual one-off sweep.
+- `sync_calendar` (Prompt 13) retries Google Calendar creation for active bookings whose event failed at booking time (empty `google_event_id`), and clears events left on cancelled bookings. It's a **clean no-op** when calendar is unconfigured, so it's safe to schedule unconditionally. Requires the §8 service-account setup to actually create events.
 - `mkdir -p /home/rene82/logs` once so the redirect targets exist.
 
 > This **supersedes** the Celery/Redis references in `CAFETERIA_WALLET_SPEC.md` §7 R6. Remove `celery`, `redis`, `django-celery-beat` from `requirements.txt` (dead weight on this host). Real-time paths (Loyverse/WhatsApp/payment webhooks) are just HTTPS endpoints and work fine under Passenger.
@@ -147,4 +150,52 @@ Automate steps 2–4 in a `deploy` script or a management command. (Alternative:
 6. `migrate`, `createsuperuser`, build+collect React (§5).
 7. Google Cloud Console → add the slash redirect URI; verify login end-to-end.
 8. Set cron jobs (§3). Switch email to SMTP; send a test.
-9. Rotate secrets (§6).
+9. Configure Google Calendar service account (§8) so confirmed bookings create events.
+10. Rotate secrets (§6).
+
+---
+
+## 8. Google Calendar for bookings (service account) — Prompt 13
+
+Confirmed bookings create an event on the **school's Google Calendar** and invite
+the parent. This runs server-side with a **service account** — NOT the OAuth login
+client (`client_secret_…json`), which cannot write calendar events. Setup is
+entirely in the GCP Console + cPanel; **no key is ever committed to git**.
+
+**One-time GCP setup (project `interlaken-project`):**
+1. **APIs & Services → Library → enable "Google Calendar API"**.
+2. **APIs & Services → Credentials → Create credentials → Service account**
+   (e.g. `interlaken-calendar`). No project roles are needed.
+3. On the new service account → **Keys → Add key → Create new key → JSON**.
+   Download it. This is the file the app reads — keep it secret.
+4. **Share the school calendar with the service account.** Google Calendar (web) →
+   the school calendar → *Settings and sharing* → *Share with specific people* →
+   add the service account's email (`…@interlaken-project.iam.gserviceaccount.com`)
+   with **"Make changes to events"**.
+5. Copy the calendar's **Calendar ID** (Settings → *Integrate calendar* →
+   `…@group.calendar.google.com`, or your primary address).
+
+**Upload the key & set env (server only):**
+- Place the JSON somewhere outside the docroot and out of git, e.g.
+  `/home/rene82/secrets/interlaken-calendar.json` (`chmod 600`).
+- Add to the production `.env`:
+  ```
+  GOOGLE_CALENDAR_ID=<calendar id>@group.calendar.google.com
+  GOOGLE_CALENDAR_SA_KEY=/home/rene82/secrets/interlaken-calendar.json
+  ```
+- `pip install -r requirements.txt` pulls `google-api-python-client` + `google-auth`.
+
+**Behaviour / guarantees:**
+- Both env values set + key readable → a confirmed booking creates a calendar event
+  and (via `sendUpdates='all'`) Google emails the parent an invite; cancelling a
+  booking deletes the event. Our own branded confirmation email still sends too.
+- Either value empty (or the libs missing) → calendar is a **no-op**; bookings still
+  succeed. Events are back-filled later by `manage.py sync_calendar` (§3) once
+  configured.
+- **Attendee invites & Domain-Wide Delegation:** a plain service account may be
+  refused when *inviting attendees* ("Service accounts cannot invite attendees
+  without Domain-Wide Delegation"). If parents don't receive Google invites, either
+  (a) enable Domain-Wide Delegation for the service account in Google Workspace
+  Admin (scope `https://www.googleapis.com/auth/calendar`), or (b) rely on our
+  branded confirmation email — the code already retries event creation *without* the
+  attendee so the event itself always lands on the school calendar.
