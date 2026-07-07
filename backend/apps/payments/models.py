@@ -21,6 +21,10 @@ class Payment(models.Model):
         CAFETERIA  = 'cafeteria',  'Recarga Cafetería'
         OTHER      = 'other',      'Otro'
 
+    class Gateway(models.TextChoices):
+        GLOBAL_PAYMENTS = 'global_payments', 'Global Payments'
+        BANORTE         = 'banorte',         'Banorte'
+
     user          = models.ForeignKey(User, on_delete=models.SET_NULL, null=True,
                                       related_name='payments')
     payment_type  = models.CharField(max_length=20, choices=Type.choices)
@@ -29,8 +33,14 @@ class Payment(models.Model):
     status        = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     description   = models.CharField(max_length=255, blank=True)
 
+    # Links a cafeteria top-up payment back to its TopUpRequest (spec §2.2). The
+    # webhook uses this to credit the right student's local ledger on success.
+    related_topup = models.ForeignKey('cafeteria.TopUpRequest', on_delete=models.SET_NULL,
+                                      null=True, blank=True, related_name='payments')
+
     # Gateway fields
-    gateway       = models.CharField(max_length=50, default='global_payments')
+    gateway       = models.CharField(max_length=50, choices=Gateway.choices,
+                                     default=Gateway.GLOBAL_PAYMENTS)
     gateway_tx_id = models.CharField(max_length=255, blank=True, unique=True, null=True)
     gateway_ref   = models.CharField(max_length=255, blank=True)
     gateway_raw   = models.JSONField(default=dict, blank=True)  # Full gateway response

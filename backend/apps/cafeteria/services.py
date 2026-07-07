@@ -387,6 +387,130 @@ def sync_all_balances():
     return {'synced': synced, 'failed': failed}
 
 
+def _topup_reference(payment) -> str:
+    """Stable idempotency key for an online top-up, stored on the ``topup``
+    transaction's unique ``loyverse_receipt_id`` so a replayed webhook is a no-op."""
+    return f'topup-payment-{payment.id}'
+
+
+def complete_online_topup(payment):
+    """Credit the local cafeteria ledger for a confirmed online top-up (spec §2.2).
+
+    Given a **successful** cafeteria ``Payment`` linked to a ``TopUpRequest`` (via
+    ``related_topup``), this atomically:
+
+    - credits the student's local ``CafeteriaBalance`` — the source of truth per
+      spec **R1** (Loyverse ``total_points`` is read-only, so we **never** write to
+      Loyverse here; the local ledger is authoritative for credit),
+    - records a ``topup`` ``CafeteriaTransaction`` with ``balance_after`` set,
+    - marks the ``TopUpRequest`` completed.
+
+    Idempotent and safe to call more than once: the unique reference guards against
+    a retried/replayed webhook double-crediting. Returns the created
+    ``CafeteriaTransaction`` (or ``None`` if the payment isn't a linked top-up or
+    was already applied).
+    """
+    from django.utils import timezone as _tz
+
+    from apps.cafeteria.models import (CafeteriaBalance, CafeteriaTransaction,
+                                       TopUpRequest)
+
+    topup = getattr(payment, 'related_topup', None)
+    if topup is None:
+        return None
+
+    student = topup.student
+    amount = Decimal(str(payment.amount))
+    reference = _topup_reference(payment)
+
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+
+        if CafeteriaTransaction.objects.filter(loyverse_receipt_id=reference).exists():
+            logger.info(f'Top-up {reference!r} already credited for {student} — no-op.')
+            return None
+
+        cb.balance = (cb.balance or Decimal('0')) + amount
+        cb.last_synced = _tz.now()
+        cb.save(update_fields=['balance', 'last_synced'])
+
+        tx = CafeteriaTransaction.objects.create(
+            student=student,
+            transaction_type=CafeteriaTransaction.TxType.TOPUP,
+            amount=amount,
+            description=payment.description or f'Recarga en línea #{topup.id}',
+            loyverse_receipt_id=reference,
+            balance_after=cb.balance,
+        )
+
+        topup.status = TopUpRequest.Status.COMPLETED
+        topup.processed_at = _tz.now()
+        topup.payment_ref = payment.gateway_tx_id or str(payment.id)
+        topup.save(update_fields=['status', 'processed_at', 'payment_ref'])
+
+    logger.info(f'Online top-up credited: ${amount} to {student} (payment #{payment.id}).')
+    return tx
+
+
+def fail_online_topup(payment):
+    """Mark a linked ``TopUpRequest`` failed after a declined/failed payment.
+
+    Credits **nothing** (spec F4: no Loyverse/ledger credit on failure). Idempotent.
+    Returns the ``TopUpRequest`` (or ``None`` if the payment isn't a linked top-up).
+    """
+    from django.utils import timezone as _tz
+
+    from apps.cafeteria.models import TopUpRequest
+
+    topup = getattr(payment, 'related_topup', None)
+    if topup is None:
+        return None
+
+    if topup.status != TopUpRequest.Status.PENDING:
+        return topup
+
+    topup.status = TopUpRequest.Status.FAILED
+    topup.processed_at = _tz.now()
+    topup.save(update_fields=['status', 'processed_at'])
+    return topup
+
+
+def notify_topup_result(payment, *, success: bool) -> int:
+    """Notify the student's guardians of a top-up outcome (type ``payment`` + email).
+
+    Best-effort and side-effect-only (call it **after** the DB transaction commits so
+    email sending never runs inside a lock). Returns the number of guardians notified.
+    """
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    topup = getattr(payment, 'related_topup', None)
+    if topup is None:
+        return 0
+
+    student = topup.student
+    if success:
+        title = 'Recarga de cafetería exitosa'
+        message = (
+            f'Se acreditaron ${payment.amount:.2f} al saldo de cafetería de '
+            f'{student.user.full_name}. Gracias por su pago. '
+            f'Referencia: {payment.gateway_tx_id or payment.id}.'
+        )
+    else:
+        title = 'Recarga de cafetería no completada'
+        message = (
+            f'No fue posible procesar la recarga de ${payment.amount:.2f} para '
+            f'{student.user.full_name}. No se realizó ningún cargo a su saldo. '
+            f'Puede intentarlo nuevamente desde el portal.'
+        )
+
+    notified = 0
+    for parent in student.parents.all():
+        notify(parent, Notification.NotifType.PAYMENT, title, message)
+        notified += 1
+    return notified
+
+
 def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
                            reference: str = '') -> dict:
     """Credit a student's cafeteria balance after a successful top-up.

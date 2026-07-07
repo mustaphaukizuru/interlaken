@@ -1,0 +1,38 @@
+"""
+payments/gateways/banorte.py — Banorte "Pago en Línea" hosted checkout.
+
+Same contract as Global Payments: the parent is redirected to Banorte's hosted
+page (no card data on our servers), and Banorte notifies us server-to-server. The
+sandbox URL below is a placeholder until Banorte merchant credentials are wired
+(see DEPLOYMENT.md); the webhook verification is real (HMAC on the raw body).
+"""
+from urllib.parse import urlencode
+
+from django.conf import settings
+
+from .base import BaseGateway
+
+# Default sandbox checkout endpoint; overridable via BANORTE_CHECKOUT_URL.
+_DEFAULT_CHECKOUT_URL = 'https://gateway.sandbox.banorte.com/pagos/checkout'
+
+
+class BanorteGateway(BaseGateway):
+    name = 'banorte'
+    webhook_secret_setting = 'BANORTE_WEBHOOK_SECRET'
+    # Banorte/Pago en Línea vocabulary (incl. the ISO-8583 "00" approval code).
+    SUCCESS_STATUSES = frozenset({'APPROVED', 'SUCCESS', 'PAID', 'CAPTURED', '00'})
+    FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'REJECTED', 'CANCELLED', 'ERROR'})
+
+    def create_checkout(self, payment) -> str:
+        base = getattr(settings, 'BANORTE_CHECKOUT_URL', '') or _DEFAULT_CHECKOUT_URL
+        params = {
+            'merchant_id': getattr(settings, 'BANORTE_MERCHANT_ID', ''),
+            'reference': payment.id,
+            'amount': f'{payment.amount:.2f}',
+            'currency': payment.currency,
+            'env': getattr(settings, 'BANORTE_ENV', 'sandbox'),
+        }
+        return_url = getattr(settings, 'PAYMENT_RETURN_URL', '')
+        if return_url:
+            params['return_url'] = f'{return_url}?payment_id={payment.id}'
+        return f'{base}?{urlencode(params)}'
