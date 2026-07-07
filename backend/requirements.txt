@@ -30,9 +30,9 @@ django-anymail==10.3
 
 # Utilities
 python-decouple==3.8
-celery==5.3.6
-redis==5.0.3
-django-celery-beat==2.6.0
+# NOTE: Celery/Redis removed — the cPanel shared host cannot run background
+# workers or a Redis broker. Scheduled jobs run via cron (see Prompt 08 /
+# DEPLOYMENT.md), not celery beat.
 
 # Security
 django-ratelimit==4.1.0

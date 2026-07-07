@@ -3,7 +3,10 @@
  */
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+// Single source of truth: VITE_API_BASE_URL is the backend host (no path).
+// The REST API lives under /api/v1; the OAuth redirect lives under /auth.
+const API_HOST = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const BASE_URL = `${API_HOST}/api/v1`;
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -43,7 +46,7 @@ api.interceptors.response.use(
 // ── AUTH ──────────────────────────────────────────────────
 export const authApi = {
   googleLogin: () => {
-    window.location.href = `${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/auth/google/`;
+    window.location.href = `${API_HOST}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
   refresh: (refresh: string) => api.post('/accounts/token/refresh/', { refresh }),

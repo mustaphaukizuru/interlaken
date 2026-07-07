@@ -108,6 +108,13 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
 ]
 SOCIAL_AUTH_GOOGLE_OAUTH2_EXTRA_DATA = ['first_name', 'last_name', 'picture']
 
+# Google OAuth (read by apps/accounts/views.py). Redirect URI MUST end with '/'
+# to match the Django route /auth/google/callback/ and Google Cloud Console.
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
+GOOGLE_REDIRECT_URI = env('GOOGLE_REDIRECT_URI', default='http://localhost:8000/auth/google/callback/')
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+
 LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/portal/'
 LOGOUT_REDIRECT_URL = '/'
