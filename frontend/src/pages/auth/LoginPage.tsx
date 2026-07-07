@@ -90,7 +90,7 @@ export default function LoginPage() {
           <div style={{ position: 'absolute', bottom: -100, right: -80, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(29,162,171,0.22), rgba(8,5,22,0) 68%)' }} />
 
           <div style={{ position: 'relative' }}>
-            <Logo size={46} theme="dark" />
+            <Logo variant="stacked" size={120} theme="dark" eager />
           </div>
           <div style={{ position: 'relative' }}>
             <div className="section-label-pink" style={{ display: 'inline-flex' }}>Portal Escolar</div>
@@ -117,7 +117,7 @@ export default function LoginPage() {
           <div style={{ width: '100%', maxWidth: 400 }}>
             {/* Mobile logo */}
             <div className="lg:hidden" style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
-              <Logo size={44} theme="light" />
+              <Logo variant="stacked" size={96} theme="light" eager />
             </div>
 
             <div style={{ background: '#fff', border: '1px solid #ECEAF3', borderRadius: 22, padding: '32px 28px', boxShadow: '0 20px 50px -24px rgba(64,26,142,0.35)' }}>

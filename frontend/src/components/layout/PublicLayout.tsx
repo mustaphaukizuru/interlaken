@@ -30,8 +30,8 @@ export function PublicLayout() {
       <header className="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center">
-            <Logo variant="horizontal" size={36} theme="light" />
+          <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
+            <Logo variant="horizontal" size={40} theme="light" eager />
           </Link>
 
           {/* Desktop nav */}
@@ -109,7 +109,7 @@ export function PublicLayout() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <div className="mb-3">
-              <Logo variant="horizontal" size={34} theme="dark" />
+              <Logo variant="horizontal" size={40} theme="dark" />
             </div>
             <p className="text-xs leading-relaxed">
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.

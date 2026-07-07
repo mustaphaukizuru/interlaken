@@ -22,4 +22,10 @@ Thumbs.db
 .DS_Store
 
 .claude/
-frontend/assets/
+
+# Ignore the bulky campus imagery in assets/, but keep the official logo
+# source PNGs tracked as the source of truth for scripts/build-logos.py.
+frontend/assets/*
+!frontend/assets/logo-horizontal.png
+!frontend/assets/logo-vertical.png
+!frontend/assets/logo-40 anos.png

@@ -47,8 +47,8 @@ export default function Sidebar({ role, onNavigate }: { role: Role; onNavigate?:
       <div style={{ position: 'absolute', bottom: -80, right: -60, width: 240, height: 240, borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(239,37,88,0.12), rgba(8,5,22,0) 70%)' }} />
 
       {/* Logo */}
-      <Link to="/" style={{ position: 'relative', padding: '4px 4px 8px' }}>
-        <Logo size={38} theme="dark" />
+      <Link to="/" style={{ position: 'relative', display: 'flex', justifyContent: 'center', padding: '4px 4px 8px' }} aria-label="Colegio Interlaken — Inicio">
+        <Logo variant="stacked" size={92} theme="dark" eager />
       </Link>
 
       {/* Role badge */}
