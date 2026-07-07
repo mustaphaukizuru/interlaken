@@ -1,160 +1,112 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Coffee, CreditCard, AlertTriangle, Users, ArrowRight, Bell } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
+import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
-import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 import type { DashboardData } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const payBadge = (s: string) => {
+  if (s === 'completed') return { cls: 'badge-teal', label: 'Completado' };
+  if (s === 'failed') return { cls: 'badge-pink', label: 'Fallido' };
+  if (s === 'processing') return { cls: 'badge-purple', label: 'Procesando' };
+  return { cls: 'badge-amber', label: 'Pendiente' };
+};
+
 export default function ParentDashboard() {
   const { user } = useAuthStore();
-
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
-    queryFn: async () => {
-      const { data } = await portalApi.getDashboard();
-      return data;
-    },
+    queryFn: async () => (await portalApi.getDashboard()).data,
     staleTime: 1000 * 60 * 2,
   });
 
-  if (isLoading) return <LoadingSpinner size="lg" className="mt-20" />;
-
-  const hasLowBalance = data?.cafeteria_balances?.some((b) => b.low);
-  const paymentStatusColor = (s: string) => {
-    if (s === 'completed') return 'success';
-    if (s === 'failed') return 'error';
-    if (s === 'pending') return 'warning';
-    return 'neutral';
-  };
+  const firstChild = data?.children?.[0];
+  const balanceObj = data?.cafeteria_balances?.[0];
+  const hasLowBalance = data?.cafeteria_balances?.some(b => b.low);
+  const pendingPayments = data?.recent_payments?.filter(p => p.status === 'pending').length ?? 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">
-          Bienvenido, {user?.first_name}
-        </h1>
-        <p className="text-slate-500 text-sm mt-0.5">
-          {format(new Date(), "EEEE d 'de' MMMM, yyyy", { locale: es })}
-        </p>
-      </div>
-
-      {/* Low balance alert */}
-      {hasLowBalance && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-500" />
-          <div className="flex-1 text-sm">
-            <strong>Saldo bajo en cafetería.</strong> Recargue el saldo para que su hijo/a pueda continuar usando los servicios.
+    <div style={{ margin: '-24px clamp(-32px,-4vw,-16px) 0' }}>
+      <TopBar
+        title={`Bienvenido/a, ${user?.first_name ?? ''}`}
+        subtitle={`Portal Familiar${firstChild ? ` · ${firstChild.name}` : ''}`}
+      />
+      <div style={{ padding: '24px clamp(16px,4vw,32px)' }}>
+        {/* Low balance alert */}
+        {hasLowBalance && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(239,37,88,0.07)', border: '1px solid #ef2558', borderRadius: 14, padding: '14px 18px', marginBottom: 20, color: '#d81a49' }}>
+            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, fontSize: 13.5 }}>
+              <strong>Saldo bajo en cafetería.</strong> Recargue el saldo para continuar usando los servicios.
+            </div>
+            <Link to="/portal/cafeteria" style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' }}>Recargar →</Link>
           </div>
-          <Link to="/portal/cafeteria" className="text-xs font-semibold text-amber-700 hover:underline whitespace-nowrap">
-            Recargar →
-          </Link>
+        )}
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 24 }}>
+          {isLoading ? (
+            [0, 1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 148 }} />)
+          ) : (
+            <>
+              <StatCard title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />
+              <StatCard title="Saldo Cafetería" value={`$${balanceObj?.balance ?? '0.00'}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'teal'} />
+              <StatCard title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="pink" />
+              <StatCard title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="green" />
+            </>
+          )}
         </div>
-      )}
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Alumnos" value={data?.children_count ?? 0} icon={Users} />
-        <StatCard
-          title="Saldo cafetería"
-          value={`$${data?.cafeteria_balances?.[0]?.balance ?? '0.00'}`}
-          icon={Coffee}
-          color={hasLowBalance ? 'amber' : 'brand'}
-        />
-        <StatCard
-          title="Pagos pendientes"
-          value={data?.recent_payments?.filter((p) => p.status === 'pending').length ?? 0}
-          icon={CreditCard}
-          color="blue"
-        />
-        <StatCard
-          title="Avisos"
-          value={data?.unread_notifications ?? 0}
-          icon={Bell}
-          color="amber"
-        />
-      </div>
-
-      {/* Children */}
-      {data?.children && data.children.length > 0 && (
-        <Card title="Mis alumnos">
-          <div className="divide-y divide-slate-100">
-            {data.children.map((child) => {
-              const balance = data.cafeteria_balances?.find((b) => b.student_name === child.name);
-              return (
-                <div key={child.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 font-semibold text-sm">
-                      {child.name.split(' ')[0][0]}
-                    </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+          {/* Recent payments */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #ECEAF3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>Últimos Pagos</h2>
+              <Link to="/portal/pagos" style={{ fontSize: 12.5, color: '#401a8e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>Ver todos <ArrowRight size={13} /></Link>
+            </div>
+            <div>
+              {!data?.recent_payments?.length ? (
+                <p style={{ textAlign: 'center', color: '#9A93AE', fontSize: 13, padding: '28px' }}>Sin pagos registrados</p>
+              ) : data.recent_payments.slice(0, 5).map((p, i) => {
+                const b = payBadge(p.status);
+                return (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 20px', borderTop: i === 0 ? 'none' : '1px solid #ECEAF3' }}>
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{child.name}</p>
-                      <p className="text-xs text-slate-500">{child.grade} · Grupo {child.group} · ID {child.student_id}</p>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1130', textTransform: 'capitalize' }}>{p.type}</div>
+                      <div style={{ fontSize: 12, color: '#9A93AE' }}>{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1130', fontFamily: 'Poppins, sans-serif' }}>${p.amount}</div>
+                      <span className={b.cls} style={{ marginTop: 3 }}>{b.label}</span>
                     </div>
                   </div>
-                  {balance && (
-                    <Badge variant={balance.low ? 'warning' : 'success'}>
-                      ${balance.balance}
-                    </Badge>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </Card>
-      )}
 
-      {/* Two column: payments + announcements */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent payments */}
-        <Card
-          title="Últimos pagos"
-          action={<Link to="/portal/pagos" className="text-xs text-brand-600 hover:underline flex items-center gap-1">Ver todos <ArrowRight className="w-3 h-3" /></Link>}
-        >
-          {!data?.recent_payments?.length ? (
-            <p className="text-sm text-slate-400 text-center py-6">Sin pagos registrados</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data.recent_payments.map((p) => (
-                <div key={p.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 capitalize">{p.type}</p>
-                    <p className="text-xs text-slate-400">{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-slate-900">${p.amount}</p>
-                    <Badge variant={paymentStatusColor(p.status) as any} className="mt-0.5">
-                      {p.status === 'completed' ? 'Completado' : p.status === 'pending' ? 'Pendiente' : 'Fallido'}
-                    </Badge>
-                  </div>
+          {/* Announcements */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #ECEAF3' }}>
+              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>Avisos Escolares</h2>
+            </div>
+            <div>
+              {!data?.announcements?.length ? (
+                <p style={{ textAlign: 'center', color: '#9A93AE', fontSize: 13, padding: '28px' }}>Sin avisos</p>
+              ) : data.announcements.slice(0, 4).map((a, i) => (
+                <div key={a.id} style={{ padding: '13px 20px', borderTop: i === 0 ? 'none' : '1px solid #ECEAF3' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1130' }}>{a.title}</div>
+                  <div style={{ fontSize: 12.5, color: '#6E6885', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{a.body}</div>
+                  <div style={{ fontSize: 11.5, color: '#9A93AE', marginTop: 4 }}>{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
                 </div>
               ))}
             </div>
-          )}
-        </Card>
-
-        {/* Announcements */}
-        <Card title="Avisos escolares">
-          {!data?.announcements?.length ? (
-            <p className="text-sm text-slate-400 text-center py-6">Sin avisos</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data.announcements.map((a) => (
-                <div key={a.id} className="py-3 first:pt-0 last:pb-0">
-                  <p className="text-sm font-medium text-slate-900">{a.title}</p>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{a.body}</p>
-                  <p className="text-xs text-slate-300 mt-1">{format(new Date(a.created_at), 'd MMM', { locale: es })}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

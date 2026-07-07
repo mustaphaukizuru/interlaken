@@ -17,3 +17,6 @@ frontend/.env*.local
 *.log
 Thumbs.db
 .DS_Store
+
+.claude/
+frontend/assets/

@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { Coffee, Bell } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Card } from '@/components/ui/Card';
+import { Coffee, Bell, GraduationCap } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 import type { DashboardData } from '@/types';
@@ -13,70 +10,63 @@ export default function StudentDashboard() {
   const { user } = useAuthStore();
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
-    queryFn: async () => {
-      const { data } = await portalApi.getDashboard();
-      return data;
-    },
+    queryFn: async () => (await portalApi.getDashboard()).data,
   });
 
-  if (isLoading) return <LoadingSpinner size="lg" className="mt-20" />;
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Hola, {user?.first_name}</h1>
-        <p className="text-slate-500 text-sm mt-0.5">
-          {format(new Date(), "EEEE d 'de' MMMM, yyyy", { locale: es })}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard
-          title="Saldo cafetería"
-          value={`$${parseFloat(data?.cafeteria_balance ?? '0').toFixed(2)}`}
-          icon={Coffee}
-          color={data?.is_low_balance ? 'amber' : 'brand'}
-          trend={data?.is_low_balance ? 'Saldo bajo — solicita recarga' : undefined}
-        />
-        <StatCard
-          title="Avisos"
-          value={data?.unread_notifications ?? 0}
-          icon={Bell}
-          color="blue"
-        />
-      </div>
-
-      {/* Student info */}
-      <Card title="Mi información">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-slate-400">Matrícula</p>
-            <p className="text-sm font-semibold text-slate-900 mt-0.5">{data?.student_id ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">Grado</p>
-            <p className="text-sm font-semibold text-slate-900 mt-0.5">{data?.grade ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">Grupo</p>
-            <p className="text-sm font-semibold text-slate-900 mt-0.5">{data?.group ?? '—'}</p>
-          </div>
+    <div style={{ margin: '-24px clamp(-32px,-4vw,-16px) 0' }}>
+      <TopBar title={`Hola, ${user?.first_name ?? ''}`} subtitle="Portal del Alumno" />
+      <div style={{ padding: '24px clamp(16px,4vw,32px)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 24 }}>
+          {isLoading ? (
+            [0, 1].map(i => <div key={i} className="skeleton" style={{ height: 148 }} />)
+          ) : (
+            <>
+              <StatCard
+                title="Saldo Cafetería"
+                value={`$${parseFloat(data?.cafeteria_balance ?? '0').toFixed(2)}`}
+                icon={Coffee}
+                color={data?.is_low_balance ? 'amber' : 'teal'}
+                subtitle={data?.is_low_balance ? 'Saldo bajo — solicita recarga' : undefined}
+              />
+              <StatCard title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />
+            </>
+          )}
         </div>
-      </Card>
 
-      {/* Announcements */}
-      {data?.announcements && data.announcements.length > 0 && (
-        <Card title="Avisos escolares">
-          <div className="divide-y divide-slate-100">
-            {data.announcements.map((a) => (
-              <div key={a.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="text-sm font-medium text-slate-900">{a.title}</p>
-                <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{a.body}</p>
+        {/* Student info */}
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div className="stat-icon" style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(64,26,142,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <GraduationCap size={20} color="#401a8e" />
+            </div>
+            <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>Mi Información</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 16 }}>
+            {[['Matrícula', data?.student_id], ['Grado', data?.grade], ['Grupo', data?.group]].map(([k, v]) => (
+              <div key={k as string}>
+                <div style={{ fontSize: 11.5, color: '#9A93AE' }}>{k}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1130', marginTop: 2, fontFamily: 'Poppins, sans-serif' }}>{(v as string) ?? '—'}</div>
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        </div>
+
+        {/* Announcements */}
+        {!!data?.announcements?.length && (
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #ECEAF3' }}>
+              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>Avisos Escolares</h2>
+            </div>
+            {data.announcements.map((a, i) => (
+              <div key={a.id} style={{ padding: '13px 20px', borderTop: i === 0 ? 'none' : '1px solid #ECEAF3' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1130' }}>{a.title}</div>
+                <div style={{ fontSize: 12.5, color: '#6E6885', marginTop: 2 }}>{a.body}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

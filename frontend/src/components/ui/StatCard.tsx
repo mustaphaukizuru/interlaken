@@ -1,34 +1,47 @@
-import { type LucideIcon } from 'lucide-react';
-import { clsx } from 'clsx';
+import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 
-interface Props {
-  title: string;
-  value: string | number;
-  icon?: LucideIcon;
-  trend?: string;
-  color?: 'brand' | 'amber' | 'red' | 'blue';
-}
+type Color = 'purple' | 'pink' | 'teal' | 'green' | 'amber';
 
-const colors = {
-  brand: 'bg-brand-50 text-brand-600',
-  amber: 'bg-amber-50 text-amber-600',
-  red:   'bg-red-50 text-red-600',
-  blue:  'bg-blue-50 text-blue-600',
+const theme: Record<Color, { bg: string; color: string; shadow: string }> = {
+  purple: { bg: 'rgba(64,26,142,0.1)',  color: '#401a8e', shadow: '0 12px 28px -10px rgba(64,26,142,0.28)' },
+  pink:   { bg: 'rgba(239,37,88,0.1)',   color: '#ef2558', shadow: '0 12px 28px -10px rgba(239,37,88,0.25)' },
+  teal:   { bg: 'rgba(29,162,171,0.12)', color: '#1da2ab', shadow: '0 12px 28px -10px rgba(29,162,171,0.28)' },
+  green:  { bg: 'rgba(72,160,24,0.1)',   color: '#48a018', shadow: 'var(--shadow-card)' },
+  amber:  { bg: 'rgba(217,119,6,0.1)',   color: '#d97706', shadow: 'var(--shadow-card)' },
 };
 
-export function StatCard({ title, value, icon: Icon, trend, color = 'brand' }: Props) {
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  suffix?: string;
+  icon: LucideIcon;
+  color: Color;
+  trend?: { value: string; up: boolean };
+  subtitle?: string;
+}
+
+export function StatCard({ title, value, suffix, icon: Icon, color, trend, subtitle }: StatCardProps) {
+  const t = theme[color];
   return (
-    <div className="card flex items-start gap-4">
-      {Icon && (
-        <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', colors[color])}>
-          <Icon className="w-5 h-5" />
+    <div style={{ background: '#fff', border: '1px solid #ECEAF3', borderRadius: 18, padding: '22px', boxShadow: t.shadow, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon size={22} color={t.color} />
         </div>
-      )}
-      <div className="min-w-0">
-        <p className="text-sm text-slate-500">{title}</p>
-        <p className="text-2xl font-bold text-slate-900 mt-0.5">{value}</p>
-        {trend && <p className="text-xs text-slate-400 mt-1">{trend}</p>}
+        {trend && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: trend.up ? 'rgba(29,162,171,0.1)' : 'rgba(239,37,88,0.1)', color: trend.up ? '#1da2ab' : '#ef2558' }}>
+            {trend.up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}{trend.value}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 12.5, fontWeight: 500, color: '#6E6885' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 11.5, color: '#9A93AE', marginTop: 1 }}>{subtitle}</div>}
+      <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 36, letterSpacing: -1, color: '#1A1130', lineHeight: 1.1 }}>{value}</span>
+        {suffix && <span style={{ fontSize: 17, fontWeight: 600, color: '#9A93AE' }}>{suffix}</span>}
       </div>
     </div>
   );
 }
+
+export default StatCard;

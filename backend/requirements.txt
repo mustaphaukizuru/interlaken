@@ -44,3 +44,4 @@ whitenoise==6.6.0
 # Dev
 pytest-django==4.8.0
 factory-boy==3.3.0
+django-jazzmin==3.0.5

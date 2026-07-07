@@ -1,6 +1,7 @@
 import { Outlet, Link, NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { Menu, X, Phone, Mail } from 'lucide-react';
+import Logo from '@/components/ui/Logo';
 
 const NAV_LINKS = [
   { to: '/nosotros',          label: 'Nosotros' },
@@ -25,12 +26,12 @@ export function PublicLayout() {
       </div>
 
       {/* Main nav */}
+      <div className="accent-bar" />
       <header className="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 font-bold text-brand-700 text-lg">
-            <div className="w-9 h-9 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">CI</div>
-            <span className="hidden sm:block">Colegio Interlaken</span>
+          <Link to="/" className="flex items-center">
+            <Logo variant="horizontal" size={36} theme="light" />
           </Link>
 
           {/* Desktop nav */}
@@ -107,9 +108,8 @@ export function PublicLayout() {
       <footer className="bg-slate-900 text-slate-400 text-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
-            <div className="flex items-center gap-2 text-white font-bold mb-3">
-              <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">CI</div>
-              Colegio Interlaken
+            <div className="mb-3">
+              <Logo variant="horizontal" size={34} theme="dark" />
             </div>
             <p className="text-xs leading-relaxed">
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
