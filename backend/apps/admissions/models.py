@@ -1,6 +1,8 @@
 """
 admissions/models.py — Pre-registration, Registration, Open School Day
 """
+from uuid import uuid4
+
 from django.db import models
 from django.utils import timezone
 
@@ -66,6 +68,11 @@ class Registration(models.Model):
         APPROVED   = 'approved',   'Aprobado'
         REJECTED   = 'rejected',   'Rechazado'
         COMPLETE   = 'complete',   'Inscripción Completa'
+
+    # Unguessable capability token issued at creation. Anonymous applicants must
+    # present it (query param or X-Access-Token header) to read/update their own
+    # registration; staff (JWT) bypass it. Never exposed in list endpoints.
+    access_token = models.UUIDField(default=uuid4, editable=False, unique=True)
 
     # Link to pre-registration if available
     pre_registration = models.ForeignKey(PreRegistration, null=True, blank=True,

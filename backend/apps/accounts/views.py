@@ -6,11 +6,15 @@ from django.conf import settings
 from django.contrib.auth import login, logout
 from django.shortcuts import redirect
 from django.http import JsonResponse
+from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.views import TokenObtainPairView
 
+from apps.core.ratelimit import ratelimit
 from .models import User, StudentProfile
 from .serializers import UserSerializer, StudentProfileSerializer
 
@@ -43,6 +47,7 @@ class GoogleLoginView(APIView):
         return redirect(google_auth_url)
 
 
+@method_decorator(ratelimit('oauth-callback', '20/m', key='ip', method='GET'), name='dispatch')
 class GoogleCallbackView(APIView):
     """
     Handles the OAuth callback from Google.
@@ -128,6 +133,7 @@ class GoogleCallbackView(APIView):
         return redirect(frontend_redirect)
 
 
+@method_decorator(ratelimit('google-token', '10/m', key='ip', method='POST'), name='dispatch')
 class GoogleTokenView(APIView):
     """
     POST /api/v1/accounts/google/token/
@@ -176,19 +182,29 @@ class GoogleTokenView(APIView):
 
 
 class LogoutView(APIView):
-    """POST /auth/logout/ — Blacklist refresh token (simplejwt) if available."""
+    """POST /auth/logout/ — Blacklist the refresh token so it can't be reused."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response({'error': 'refresh token requerido.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
-            refresh_token = request.data.get('refresh')
-            if refresh_token:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
-        except Exception:
-            pass
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError:
+            # Token is invalid, expired, or already blacklisted.
+            return Response({'error': 'Token inválido o ya revocado.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         logout(request)
         return Response({'detail': 'Sesión cerrada correctamente.'})
+
+
+@method_decorator(ratelimit('login', '10/m', key='ip', method='POST'), name='dispatch')
+class RateLimitedTokenObtainView(TokenObtainPairView):
+    """POST /api/v1/accounts/token/ — email/password login, IP rate-limited."""
+    pass
 
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):

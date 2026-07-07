@@ -77,20 +77,80 @@ Public (`/`, `/nosotros`, `/admisiones`, `/pre-registro`, `/inscripcion`, `/puer
 
 ## 5. Security Issues (P1 — fix before production)
 
-### 5.1 🟠 Admissions IDOR — unauthenticated PII read/write
-`RegistrationDetailView` (RetrieveUpdate), `RegistrationSubmitView`, `DocumentUploadView` are all `permission_classes = [AllowAny]`, keyed only on sequential integer `pk` (`apps/admissions/views.py:66,73,104`). Anyone can enumerate `register/<pk>/` to read/modify any applicant's CURP, medical data, and parent contacts, and upload documents to any registration.
-**Fix:** require auth + ownership, or gate behind an unguessable token issued at creation.
+> **Prompt 03 (2026-07-07) closed 5.1–5.3 and added rate limiting.** 5.4 remains
+> open and is documented below with the recommended fix. See `ROADMAP.md §C`.
 
-### 5.2 🟠 Payment webhook is unauthenticated
-`PaymentWebhookView` is `AllowAny` + `@csrf_exempt` with **no signature/HMAC verification** (`apps/payments/views.py:47-78`). Anyone who knows/guesses a `payment_id` can POST `{"status":"SUCCESS"}` and mark a payment paid.
-**Fix:** verify a gateway signature before trusting the payload.
+### 5.1 ✅ Admissions IDOR — *fixed*
+`Registration` now carries an unguessable `access_token` (`UUIDField`, migration
+`admissions/0002`). It is returned **once** from the create response and required
+(as `?access_token=` or `X-Access-Token` header) by `RegistrationDetailView`,
+`RegistrationSubmitView`, and `DocumentUploadView`; a missing/wrong token returns
+**404** (no PK enumeration leak). Authenticated staff/admin (JWT) bypass the token.
+The token is never included in serializer output or any list endpoint.
+*(was: all three views `AllowAny`, keyed only on sequential integer `pk`.)*
 
-### 5.3 🟠 Logout never invalidates refresh tokens
-`SIMPLE_JWT` sets `BLACKLIST_AFTER_ROTATION=True` and `LogoutView` calls `token.blacklist()`, but `rest_framework_simplejwt.token_blacklist` is **not in `INSTALLED_APPS`** (no blacklist migration ran). The error is swallowed by a bare `except Exception: pass`, so logout silently does nothing.
-**Fix:** add `token_blacklist` to `INSTALLED_APPS` and run migrations.
+### 5.2 ✅ Payment webhook now authenticated — *fixed*
+`PaymentWebhookView` calls `verify_webhook(request)`, which HMAC-SHA256s the raw
+body against `GLOBAL_PAYMENTS_WEBHOOK_SECRET` / `BANORTE_WEBHOOK_SECRET` and
+constant-time compares to `X-Webhook-Signature`. It **fails closed** (401 when no
+secret is configured or the signature is absent/wrong) and is **idempotent**: a
+webhook for an already-final payment returns `already_processed` without
+re-applying. Success now goes through `payment.mark_success()` (sets
+`completed_at`).
+*(was: `AllowAny` + `csrf_exempt`, trusts `{"status":"SUCCESS"}` blindly.)*
 
-### 5.4 🟡 Tokens exposed in URL + localStorage
-`GoogleCallbackView` redirects with the JWT in the **URL query string** (lands in history/logs/referrer), and the frontend stores access+refresh in `localStorage` (XSS-reachable). Prefer a short-lived one-time code + `HttpOnly` cookies for refresh.
+### 5.3 ✅ Logout invalidates refresh tokens — *fixed*
+`rest_framework_simplejwt.token_blacklist` is now in `INSTALLED_APPS` (blacklist
+migrations applied). `LogoutView` blacklists the refresh token and **surfaces
+errors** instead of the old silent `except Exception: pass` — a missing token is
+`400`, an invalid/expired/already-revoked token is `400`, and a subsequently
+reused refresh token is rejected at `token/refresh/` with `401`.
+*(was: `token.blacklist()` silently no-op'd because the app wasn't installed.)*
+
+### 5.3b ✅ Rate limiting wired — *new*
+`django-ratelimit` (via `apps/core/ratelimit.py`, which returns **429** on
+exceed) now guards abuse-prone endpoints per client IP: `POST
+/api/v1/accounts/token/` and `GoogleTokenView` (`10/m`), the Google OAuth
+callback (`20/m`), `POST /api/v1/cafeteria/topup/` (`20/m`), and the payment
+webhook (`120/m`, higher because a busy gateway legitimately bursts).
+
+### 5.4 🟡 Tokens exposed in URL + localStorage — *OPEN (documented risk)*
+`GoogleCallbackView` still redirects to the frontend with the JWT **access +
+refresh tokens in the URL query string** (`apps/accounts/views.py`, the
+`/auth/callback?access=…&refresh=…` redirect), and the SPA reads them from
+`window.location` and stores both in `localStorage` (`LoginPage.tsx:26-38`).
+
+**Why it's still open (not a quick edit):** the query-string tokens leak into
+browser history, server/proxy access logs, and the `Referer` header of any
+resource the callback page loads. `localStorage` is readable by any XSS. The
+correct fix — a short-lived **one-time code** exchanged via POST, with the
+refresh token set as an `HttpOnly; Secure; SameSite` cookie — requires a
+**cross-process store** for the code→token mapping. The production target is
+**cPanel shared hosting under Passenger with multiple worker processes and no
+Redis** (see `deployment-infra`); Django's default `LocMemCache` is per-process,
+so a cache-backed one-time code would intermittently fail when the exchange
+request lands on a different worker than the callback. A robust fix therefore
+needs either a DB-backed one-time-code model or a shared cache, plus matching
+frontend changes at `/auth/callback` — and it cannot be end-to-end verified
+locally without a live Google redirect. It was deliberately deferred rather than
+shipped half-working (a broken login is worse than this documented exposure).
+
+**Recommended fix (next security pass):**
+1. Add a `OneTimeAuthCode` model (`code` = random 32+ bytes, `user`, `expires_at`
+   ~120s, `used` flag) or use a shared cache backend.
+2. `GoogleCallbackView` stores the code and redirects to
+   `/auth/callback?code=<code>` (no tokens in the URL).
+3. New `POST /api/v1/accounts/oauth/exchange/` (rate-limited, `AllowAny`) trades
+   a single-use, unexpired code for the JWT pair; set the **refresh** token as an
+   `HttpOnly; Secure; SameSite=Lax` cookie and return only the short-lived access
+   token to JS.
+4. Update `LoginPage.tsx` to read `?code=` and call the exchange endpoint.
+5. Once HTTPS is restored on the host (the expired SSL cert currently blocks
+   OAuth anyway — see `deployment-infra`), enable `Secure` cookies + HSTS.
+
+Until then, mitigations already in place: access-token lifetime is 8h and
+`ROTATE_REFRESH_TOKENS`/`BLACKLIST_AFTER_ROTATION` are on, so a leaked refresh
+token is single-use and revocable via logout (5.3).
 
 ---
 

@@ -2,11 +2,13 @@
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.ratelimit import ratelimit
 from apps.accounts.models import User, StudentProfile
 from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from .serializers import CafeteriaBalanceSerializer, CafeteriaTransactionSerializer, TopUpRequestSerializer
@@ -81,6 +83,7 @@ class MyTransactionsView(generics.ListAPIView):
         return CafeteriaTransaction.objects.none()
 
 
+@method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')
 class TopUpRequestCreateView(generics.CreateAPIView):
     """POST /api/v1/cafeteria/topup/"""
     serializer_class = TopUpRequestSerializer

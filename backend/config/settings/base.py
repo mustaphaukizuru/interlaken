@@ -27,6 +27,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
     'social_django',
@@ -178,6 +179,12 @@ LOYVERSE_BASE_URL = 'https://api.loyverse.com/v1.0'
 GLOBAL_PAYMENTS_APP_ID = env('GLOBAL_PAYMENTS_APP_ID', default='')
 GLOBAL_PAYMENTS_APP_KEY = env('GLOBAL_PAYMENTS_APP_KEY', default='')
 GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
+
+# Shared secrets for verifying inbound payment webhooks (HMAC-SHA256 of the raw
+# request body, hex digest, in the X-Webhook-Signature header). Empty → the
+# webhook fails closed (rejects everything) until a secret is configured.
+GLOBAL_PAYMENTS_WEBHOOK_SECRET = env('GLOBAL_PAYMENTS_WEBHOOK_SECRET', default='')
+BANORTE_WEBHOOK_SECRET = env('BANORTE_WEBHOOK_SECRET', default='')
 
 # ── WHATSAPP ──────────────────────────────────────────────
 WHATSAPP_NUMBER = env('WHATSAPP_NUMBER', default='')

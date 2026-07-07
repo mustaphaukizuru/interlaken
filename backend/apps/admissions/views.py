@@ -5,11 +5,40 @@ from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.exceptions import NotFound
 from django.core.mail import send_mail
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from .models import PreRegistration, Registration, RegistrationDocument, OpenSchoolDay
+
+
+def _is_staff(request):
+    """True for authenticated staff/admin users (JWT), who bypass the token gate."""
+    user = getattr(request, 'user', None)
+    return bool(
+        user and user.is_authenticated
+        and (user.is_staff or getattr(user, 'role', '') == 'admin')
+    )
+
+
+def _require_registration_access(request, reg):
+    """Gate a Registration behind its access_token for anonymous applicants.
+
+    Staff pass through. Everyone else must present the correct ``access_token``
+    (query param or ``X-Access-Token`` header). On failure we raise NotFound so
+    the endpoint leaks nothing about which sequential PKs exist.
+    """
+    if _is_staff(request):
+        return
+    provided = (
+        request.query_params.get('access_token')
+        or request.headers.get('X-Access-Token', '')
+    )
+    if provided and str(provided) == str(reg.access_token):
+        return
+    raise NotFound('No encontrado.')
 from .serializers import (
     PreRegistrationSerializer,
     RegistrationSerializer,
@@ -62,12 +91,31 @@ class RegistrationCreateView(generics.CreateAPIView):
     serializer_class = RegistrationSerializer
     permission_classes = [permissions.AllowAny]
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        # Hand the capability token back exactly once, to the creating applicant.
+        data = dict(serializer.data)
+        data['access_token'] = str(serializer.instance.access_token)
+        return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
 
 class RegistrationDetailView(generics.RetrieveUpdateAPIView):
-    """GET/PATCH /api/v1/admissions/register/<id>/ — Retrieve or update."""
+    """GET/PATCH /api/v1/admissions/register/<id>/ — Retrieve or update.
+
+    Anonymous applicants must present the registration's ``access_token``;
+    staff (JWT) may access without it.
+    """
     serializer_class = RegistrationSerializer
     permission_classes = [permissions.AllowAny]
     queryset = Registration.objects.all()
+
+    def get_object(self):
+        reg = get_object_or_404(Registration, pk=self.kwargs['pk'])
+        _require_registration_access(self.request, reg)
+        return reg
 
 
 class RegistrationSubmitView(APIView):
@@ -79,6 +127,8 @@ class RegistrationSubmitView(APIView):
             reg = Registration.objects.get(pk=pk)
         except Registration.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        _require_registration_access(request, reg)
 
         if reg.status != Registration.Status.DRAFT:
             return Response({'error': 'Registration already submitted'},
@@ -111,6 +161,8 @@ class DocumentUploadView(APIView):
             reg = Registration.objects.get(pk=pk)
         except Registration.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        _require_registration_access(request, reg)
 
         file = request.FILES.get('file')
         doc_type = request.data.get('doc_type')
