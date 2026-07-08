@@ -5,6 +5,8 @@ import requests
 from django.conf import settings
 from django.contrib.auth import logout
 from django.shortcuts import redirect
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -137,20 +139,14 @@ class GoogleTokenView(APIView):
         if not credential:
             return Response({'error': 'credential required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Verify the ID token with Google
-        verify_response = requests.get(
-            f'https://oauth2.googleapis.com/tokeninfo?id_token={credential}',
-            timeout=10,
-        )
-
-        if verify_response.status_code != 200:
+        # Verify the ID token LOCALLY (signature + audience + expiry) instead of
+        # GETting Google's tokeninfo endpoint with the credential in the URL
+        # (IK-SEC A4: no token in a URL). Raises ValueError on any invalid token.
+        try:
+            payload = google_id_token.verify_oauth2_token(
+                credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+        except ValueError:
             return Response({'error': 'invalid_token'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        payload = verify_response.json()
-
-        # Validate audience
-        if payload.get('aud') != settings.GOOGLE_CLIENT_ID:
-            return Response({'error': 'token_audience_mismatch'}, status=status.HTTP_401_UNAUTHORIZED)
 
         email = payload.get('email')
         if not email:

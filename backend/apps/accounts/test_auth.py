@@ -123,6 +123,29 @@ class TestGoogleCallback:
         assert "error=token_exchange_failed" in resp["Location"]
 
 
+# ── Google ID-token exchange (local verification, no token in a URL) ───────
+class TestGoogleTokenExchange:
+    @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
+    def test_valid_credential_sets_cookie_and_returns_access(self, mock_verify, api_client):
+        mock_verify.return_value = {
+            "sub": "g-1", "email": "gtoken@test.mx",
+            "given_name": "G", "family_name": "T",
+        }
+        resp = api_client.post(reverse("google-token"), {"credential": "fake"}, format="json")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["access"] and "refresh" not in resp.data
+        assert resp.cookies[REFRESH_COOKIE]["httponly"] is True
+        # Verification is local — the credential is passed to the audience check,
+        # never placed in an outbound URL.
+        mock_verify.assert_called_once()
+
+    @patch("apps.accounts.views.google_id_token.verify_oauth2_token",
+           side_effect=ValueError("invalid"))
+    def test_invalid_credential_is_401(self, _mock_verify, api_client):
+        resp = api_client.post(reverse("google-token"), {"credential": "bad"}, format="json")
+        assert resp.status_code == 401
+
+
 # ── cookie session: refresh rotation, CSRF, silent refresh, logout ─────────
 class TestCookieSession:
     def _refresh(self, api_client, csrf, refresh_value=None, header=True):
