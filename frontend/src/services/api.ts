@@ -175,6 +175,51 @@ export const paymentsApi = {
     api.get('/payments/history/'),
 };
 
+// ── FINANCE / TUITION (Prompt 17) ─────────────────────────
+export const financeApi = {
+  // Parent
+  getInvoices: (params?: { student?: number; status?: string; period?: string }) =>
+    api.get('/finance/invoices/', { params }),
+
+  getInvoice: (id: number) =>
+    api.get(`/finance/invoices/${id}/`),
+
+  payInvoice: (id: number, gateway?: string) =>
+    api.post(`/finance/invoices/${id}/pay/`, gateway ? { gateway } : {}),
+
+  downloadReceipt: (id: number) =>
+    api.get(`/finance/invoices/${id}/receipt/`, { responseType: 'blob' }),
+
+  // Admin
+  getDashboard: (period?: string) =>
+    api.get('/finance/admin/dashboard/', { params: period ? { period } : {} }),
+
+  getAdminInvoices: (params?: {
+    status?: string; period?: string; student?: number; grade?: string; q?: string;
+  }) => api.get('/finance/admin/invoices/', { params }),
+
+  getAdminInvoice: (id: number) =>
+    api.get(`/finance/admin/invoices/${id}/`),
+
+  getStudentLedger: (studentId: number) =>
+    api.get(`/finance/admin/student/${studentId}/`),
+
+  markPaid: (id: number, reason?: string, method?: string) =>
+    api.post(`/finance/admin/invoices/${id}/mark-paid/`, { reason, method }),
+
+  adjustInvoice: (id: number, amount: number, reason: string) =>
+    api.post(`/finance/admin/invoices/${id}/adjust/`, { amount, reason }),
+
+  cancelInvoice: (id: number, reason: string) =>
+    api.post(`/finance/admin/invoices/${id}/cancel/`, { reason }),
+
+  generate: (period?: string) =>
+    api.post('/finance/admin/generate/', period ? { period } : {}),
+
+  bulkAction: (invoiceIds: number[], action: 'mark_paid' | 'cancel' | 'remind', reason?: string) =>
+    api.post('/finance/admin/bulk/', { invoice_ids: invoiceIds, action, reason }),
+};
+
 // ── CONTACT ───────────────────────────────────────────────
 export const contactApi = {
   send: (data: { name: string; email: string; subject: string; message: string }) =>

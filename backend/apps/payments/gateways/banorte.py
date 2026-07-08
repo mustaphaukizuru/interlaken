@@ -23,7 +23,7 @@ class BanorteGateway(BaseGateway):
     SUCCESS_STATUSES = frozenset({'APPROVED', 'SUCCESS', 'PAID', 'CAPTURED', '00'})
     FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'REJECTED', 'CANCELLED', 'ERROR'})
 
-    def create_checkout(self, payment) -> str:
+    def create_checkout(self, payment, return_url: str | None = None) -> str:
         base = getattr(settings, 'BANORTE_CHECKOUT_URL', '') or _DEFAULT_CHECKOUT_URL
         params = {
             'merchant_id': getattr(settings, 'BANORTE_MERCHANT_ID', ''),
@@ -32,7 +32,7 @@ class BanorteGateway(BaseGateway):
             'currency': payment.currency,
             'env': getattr(settings, 'BANORTE_ENV', 'sandbox'),
         }
-        return_url = getattr(settings, 'PAYMENT_RETURN_URL', '')
-        if return_url:
-            params['return_url'] = f'{return_url}?payment_id={payment.id}'
+        resolved = self._return_url(payment, return_url)
+        if resolved:
+            params['return_url'] = resolved
         return f'{base}?{urlencode(params)}'

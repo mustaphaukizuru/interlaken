@@ -51,9 +51,19 @@ class BaseGateway:
     FAILURE_STATUSES: frozenset = frozenset()
 
     # ── checkout ──────────────────────────────────────────────
-    def create_checkout(self, payment) -> str:  # pragma: no cover - abstract
-        """Return the hosted-payment redirect URL for ``payment``."""
+    def create_checkout(self, payment, return_url: str | None = None) -> str:  # pragma: no cover - abstract
+        """Return the hosted-payment redirect URL for ``payment``.
+
+        ``return_url`` overrides where the hosted page sends the parent's browser
+        back (e.g. the tuition return route vs. the cafeteria one); ``None`` falls
+        back to ``settings.PAYMENT_RETURN_URL``.
+        """
         raise NotImplementedError
+
+    def _return_url(self, payment, return_url: str | None) -> str:
+        """Resolve the browser return URL, defaulting to ``PAYMENT_RETURN_URL``."""
+        base = return_url or getattr(settings, 'PAYMENT_RETURN_URL', '')
+        return f'{base}?payment_id={payment.id}' if base else ''
 
     # ── webhook ───────────────────────────────────────────────
     def verify_webhook(self, request):

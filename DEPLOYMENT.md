@@ -53,6 +53,9 @@ Shared cPanel hosting has **no Redis and no persistent worker processes**, so th
 | Low-balance alerts | `python manage.py low_balance_alerts` | daily 07:00 |
 | Booking reminders | `python manage.py send_booking_reminders` | daily 08:00 |
 | Retry booking → Calendar events | `python manage.py sync_calendar` | every 15 min |
+| Generate monthly tuition invoices | `python manage.py generate_invoices` | monthly, 1st 06:00 |
+| Apply tuition late fees | `python manage.py apply_late_fees` | daily 06:30 |
+| Tuition payment reminders | `python manage.py send_payment_reminders` | daily 07:30 |
 
 Each cron entry activates the cPanel venv then runs the command, e.g.:
 `/home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances`
@@ -69,11 +72,17 @@ environment is unambiguous:
 0    7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py low_balance_alerts >> /home/rene82/logs/cafeteria.log 2>&1
 0    8  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_booking_reminders >> /home/rene82/logs/bookings.log 2>&1
 */15 *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_calendar >> /home/rene82/logs/bookings.log 2>&1
+0    6  1   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py generate_invoices >> /home/rene82/logs/finance.log 2>&1
+30   6  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py apply_late_fees >> /home/rene82/logs/finance.log 2>&1
+30   7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_payment_reminders >> /home/rene82/logs/finance.log 2>&1
 ```
 
 - `sync_purchases` (Prompt 09) polls Loyverse receipts, idempotently records each new purchase (unique `loyverse_receipt_id`), debits the local balance, and notifies every linked parent (in-app + email); a purchase that crosses the low-balance threshold triggers a deduped alert. Safe to run every 5 min — re-runs never duplicate or re-notify.
 - `low_balance_alerts` self-dedups (7-day cooldown, cleared on recovery), so a daily schedule won't spam parents; add `--force` only for a manual one-off sweep.
 - `sync_calendar` (Prompt 13) retries Google Calendar creation for active bookings whose event failed at booking time (empty `google_event_id`), and clears events left on cancelled bookings. It's a **clean no-op** when calendar is unconfigured, so it's safe to schedule unconditionally. Requires the §8 service-account setup to actually create events.
+- `generate_invoices` (Prompt 17) mints one tuition invoice per active student for the current month from the matching `FeeSchedule` (applying sibling/beca discounts). **Idempotent per `(student, period)`** — a re-run creates nothing new. Pass `--period YYYY-MM` to backfill a specific month.
+- `apply_late_fees` (Prompt 17) charges a one-time late fee (per the invoice's `FeeSchedule` rule) on overdue unpaid invoices past their grace window and flips them to *overdue*. **Idempotent** (`Invoice.late_fee_applied`) — safe to run daily.
+- `send_payment_reminders` (Prompt 17) emails/notifies parents before the due date and after an invoice is overdue; each reminder is **deduped per invoice**, so a daily schedule won't spam. Windows tuned via `TUITION_REMINDER_BEFORE_DAYS` / `TUITION_REMINDER_OVERDUE_DAYS`.
 - `mkdir -p /home/rene82/logs` once so the redirect targets exist.
 
 > This **supersedes** the Celery/Redis references in `CAFETERIA_WALLET_SPEC.md` §7 R6. Remove `celery`, `redis`, `django-celery-beat` from `requirements.txt` (dead weight on this host). Real-time paths (Loyverse/WhatsApp/payment webhooks) are just HTTPS endpoints and work fine under Passenger.

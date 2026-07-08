@@ -23,7 +23,7 @@ class GlobalPaymentsGateway(BaseGateway):
     SUCCESS_STATUSES = frozenset({'CAPTURED', 'SUCCESS', 'PAID', 'APPROVED'})
     FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'ERROR', 'CANCELLED'})
 
-    def create_checkout(self, payment) -> str:
+    def create_checkout(self, payment, return_url: str | None = None) -> str:
         base = getattr(settings, 'GLOBAL_PAYMENTS_HPP_URL', '') or _DEFAULT_HPP_URL
         params = {
             'order_id': payment.id,
@@ -32,7 +32,7 @@ class GlobalPaymentsGateway(BaseGateway):
             'app_id': getattr(settings, 'GLOBAL_PAYMENTS_APP_ID', ''),
             'env': getattr(settings, 'GLOBAL_PAYMENTS_ENV', 'sandbox'),
         }
-        return_url = getattr(settings, 'PAYMENT_RETURN_URL', '')
-        if return_url:
-            params['return_url'] = f'{return_url}?payment_id={payment.id}'
+        resolved = self._return_url(payment, return_url)
+        if resolved:
+            params['return_url'] = resolved
         return f'{base}?{urlencode(params)}'

@@ -73,6 +73,8 @@ class _WebhookProcessMixin:
         """
         from apps.cafeteria.services import (complete_online_topup,
                                              fail_online_topup)
+        from apps.finance.services import (complete_invoice_payment,
+                                           fail_invoice_payment)
 
         notify_arg = None
         with db_transaction.atomic():
@@ -89,7 +91,8 @@ class _WebhookProcessMixin:
 
             if event.status == 'success':
                 payment.mark_success(event.transaction_id or payment.gateway_tx_id, event.raw)
-                complete_online_topup(payment)  # None for non-cafeteria payments
+                complete_online_topup(payment)     # None for non-cafeteria payments
+                complete_invoice_payment(payment)  # None for non-tuition payments
                 notify_arg = (payment, True)
             elif event.status == 'failed':
                 payment.status = Payment.Status.FAILED
@@ -98,6 +101,7 @@ class _WebhookProcessMixin:
                 payment.gateway_raw = event.raw
                 payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
                 fail_online_topup(payment)
+                fail_invoice_payment(payment)
                 notify_arg = (payment, False)
             else:
                 # Non-terminal notification (PENDING/PROCESSING): record raw only.
@@ -127,6 +131,9 @@ class _WebhookProcessMixin:
             if payment.payment_type == Payment.Type.CAFETERIA:
                 from apps.cafeteria.services import notify_topup_result
                 notify_topup_result(payment, success=success)
+            elif payment.payment_type == Payment.Type.TUITION:
+                from apps.finance.services import notify_invoice_result
+                notify_invoice_result(payment, success=success)
 
         return Response(body, status=http_status)
 

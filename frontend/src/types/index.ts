@@ -105,6 +105,66 @@ export interface Payment {
   updated_at: string;
 }
 
+// ── Finance / tuition (Prompt 17) ──────────────────────────
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
+
+export interface InvoiceLineItem {
+  id: number;
+  kind: 'tuition' | 'discount' | 'late_fee' | 'adjustment';
+  kind_display: string;
+  description: string;
+  amount: string;
+}
+
+export interface Invoice {
+  id: number;
+  student_id: number;
+  student_name: string;
+  student_code: string;
+  grade: string;
+  period: string;
+  period_label: string;
+  issue_date?: string;
+  due_date: string;
+  currency: string;
+  subtotal?: string;
+  discount_total?: string;
+  late_fee_total?: string;
+  amount: string;
+  amount_paid: string;
+  balance_due: string;
+  status: InvoiceStatus;
+  status_display: string;
+  paid_at?: string | null;
+  notes?: string;
+  line_items?: InvoiceLineItem[];
+}
+
+export interface InvoiceAdjustment {
+  id: number;
+  kind: string;
+  kind_display: string;
+  amount: string;
+  reason: string;
+  admin_name: string;
+  status_after: string;
+  amount_after: string | null;
+  amount_paid_after: string | null;
+  created_at: string;
+}
+
+export interface FinanceDashboard {
+  period: string;
+  billed: string;
+  collected: string;
+  outstanding: string;
+  collection_rate: number;
+  invoices: number;
+  paid: number;
+  overdue: number;
+  pending: number;
+}
+
 export interface Announcement {
   id: number;
   title: string;

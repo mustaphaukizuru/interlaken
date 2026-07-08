@@ -42,6 +42,7 @@ LOCAL_APPS = [
     'apps.portal',
     'apps.bookings',
     'apps.whatsapp',
+    'apps.finance',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -208,6 +209,19 @@ PAYMENT_RETURN_URL = env(
 # webhook fails closed (rejects everything) until a secret is configured.
 GLOBAL_PAYMENTS_WEBHOOK_SECRET = env('GLOBAL_PAYMENTS_WEBHOOK_SECRET', default='')
 BANORTE_WEBHOOK_SECRET = env('BANORTE_WEBHOOK_SECRET', default='')
+
+# Where the hosted page returns the parent after paying a tuition invoice.
+TUITION_RETURN_URL = env(
+    'TUITION_RETURN_URL',
+    default=f'{FRONTEND_URL}/portal/colegiaturas/retorno',
+)
+
+# ── FINANCE / TUITION (Prompt 17) ─────────────────────────
+# Days *before* the due date to send the "próxima a vencer" reminder, and days
+# *after* the due date to send the "vencida" reminder. send_payment_reminders is
+# a cron command; each reminder is deduped per invoice.
+TUITION_REMINDER_BEFORE_DAYS = env.int('TUITION_REMINDER_BEFORE_DAYS', default=3)
+TUITION_REMINDER_OVERDUE_DAYS = env.int('TUITION_REMINDER_OVERDUE_DAYS', default=1)
 
 # ── GOOGLE CALENDAR ───────────────────────────────────────
 # Server-side calendar writes for confirmed bookings use a *service account*

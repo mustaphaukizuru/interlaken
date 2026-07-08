@@ -28,6 +28,8 @@ const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
 const CafeteriaPage   = lazy(() => import('./pages/parent/CafeteriaPage'));
 const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupReturn'));
 const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
+const ColegiaturasPage = lazy(() => import('./pages/parent/ColegiaturasPage'));
+const ColegiaturaPaymentReturn = lazy(() => import('./pages/parent/ColegiaturaPaymentReturn'));
 
 // Student portal
 const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
@@ -40,6 +42,7 @@ const AdminCafeteria  = lazy(() => import('./pages/admin/AdminCafeteria'));
 const AdminCafeteriaStudent = lazy(() => import('./pages/admin/AdminCafeteriaStudent'));
 const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
+const AdminFinance    = lazy(() => import('./pages/admin/AdminFinance'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,6 +97,8 @@ export default function App() {
               <Route index            element={<ParentDashboard />} />
               <Route path="cafeteria" element={<CafeteriaPage />} />
               <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
+              <Route path="colegiaturas" element={<ColegiaturasPage />} />
+              <Route path="colegiaturas/retorno" element={<ColegiaturaPaymentReturn />} />
               <Route path="pagos"     element={<PaymentsPage />} />
             </Route>
 
@@ -118,6 +123,7 @@ export default function App() {
               <Route path="visitas"     element={<AdminBookings />} />
               <Route path="cafeteria"   element={<AdminCafeteria />} />
               <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
+              <Route path="finanzas"    element={<AdminFinance />} />
               <Route path="alumnos"     element={<AdminStudents />} />
             </Route>
 
