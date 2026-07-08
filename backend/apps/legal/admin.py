@@ -1,6 +1,17 @@
 from django.contrib import admin
 
-from .models import ConsentRecord, PrivacyNoticeVersion
+from .models import ArcoRequest, ConsentRecord, PrivacyNoticeVersion
+
+
+@admin.register(ArcoRequest)
+class ArcoRequestAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'request_type', 'requester_email', 'status',
+                    'statutory_deadline', 'resolved_at')
+    list_filter = ('request_type', 'status')
+    search_fields = ('requester_email', 'details')
+    readonly_fields = ('requester', 'requester_email', 'request_type', 'details',
+                       'statutory_deadline', 'created_at', 'updated_at', 'resolved_at')
+    ordering = ('-created_at',)
 
 
 @admin.register(PrivacyNoticeVersion)

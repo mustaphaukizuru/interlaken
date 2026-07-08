@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import ConsentPurpose, PrivacyNoticeVersion
+from .models import ArcoRequest, ConsentPurpose, PrivacyNoticeVersion
 
 
 class PrivacyNoticeSerializer(serializers.ModelSerializer):
@@ -22,3 +22,17 @@ class ConsentInputSerializer(serializers.Serializer):
         if invalid:
             raise serializers.ValidationError(f'Propósitos inválidos: {sorted(invalid)}')
         return value
+
+
+class ArcoRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ArcoRequest
+        fields = ['id', 'requester_email', 'request_type', 'details', 'status',
+                  'resolution_note', 'statutory_deadline', 'created_at', 'resolved_at']
+        read_only_fields = ['id', 'requester_email', 'status', 'resolution_note',
+                            'statutory_deadline', 'created_at', 'resolved_at']
+
+
+class ArcoStatusInputSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=ArcoRequest.Status.choices)
+    resolution_note = serializers.CharField(required=False, allow_blank=True, default='')

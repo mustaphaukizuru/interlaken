@@ -6,9 +6,21 @@ the guardian accepted. ConsentRecord is IMMUTABLE and granular per purpose:
 revoking consent is a NEW record (granted=False), never an edit. Current state
 for a (guardian, purpose[, student]) is "the latest record wins".
 """
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import IntegrityError, models
 from django.utils import timezone
+
+
+def add_business_days(start_date, days):
+    """Return the date `days` business days (Mon–Fri) after `start_date`."""
+    d, added = start_date, 0
+    while added < days:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            added += 1
+    return d
 
 
 class ConsentPurpose(models.TextChoices):
@@ -92,3 +104,50 @@ class ConsentRecord(models.Model):
 
     def delete(self, *args, **kwargs):
         raise IntegrityError('ConsentRecord is immutable; it cannot be deleted.')
+
+
+# LFPDPPP art. 32: the responsable must answer an ARCO request within 20 business days.
+ARCO_RESPONSE_BUSINESS_DAYS = 20
+
+
+class ArcoRequest(models.Model):
+    """A data-subject rights request (Acceso, Rectificación, Cancelación, Oposición)."""
+
+    class Type(models.TextChoices):
+        ACCESS        = 'access',        'Acceso'
+        RECTIFICATION = 'rectification', 'Rectificación'
+        CANCELLATION  = 'cancellation',  'Cancelación'
+        OPPOSITION    = 'opposition',    'Oposición'
+
+    class Status(models.TextChoices):
+        RECEIVED  = 'received',  'Recibida'
+        IN_REVIEW = 'in_review', 'En revisión'
+        RESOLVED  = 'resolved',  'Resuelta'
+        REJECTED  = 'rejected',  'Rechazada'
+
+    requester          = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
+                                           on_delete=models.SET_NULL, related_name='arco_requests')
+    requester_email    = models.EmailField()   # snapshot, survives account deletion
+    request_type       = models.CharField(max_length=20, choices=Type.choices)
+    details            = models.TextField(blank=True, default='')
+    status             = models.CharField(max_length=20, choices=Status.choices,
+                                          default=Status.RECEIVED)
+    resolution_note    = models.TextField(blank=True, default='')
+    statutory_deadline = models.DateField()
+    created_at         = models.DateTimeField(default=timezone.now)
+    updated_at         = models.DateTimeField(auto_now=True)
+    resolved_at        = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Solicitud ARCO'
+        verbose_name_plural = 'Solicitudes ARCO'
+
+    def __str__(self):
+        return f'{self.get_request_type_display()} — {self.requester_email} ({self.status})'
+
+    def save(self, *args, **kwargs):
+        if not self.statutory_deadline:
+            self.statutory_deadline = add_business_days(
+                timezone.now().date(), ARCO_RESPONSE_BUSINESS_DAYS)
+        return super().save(*args, **kwargs)

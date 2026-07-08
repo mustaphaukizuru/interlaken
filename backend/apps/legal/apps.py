@@ -7,8 +7,9 @@ class LegalConfig(AppConfig):
     verbose_name = 'Legal y Privacidad'
 
     def ready(self):
-        # Register consent mutations in the append-only audit log (IK-SEC A3).
+        # Register consent + ARCO mutations in the append-only audit log (IK-SEC A3).
         from apps.core.audit import register_audit
 
-        from .models import ConsentRecord
+        from .models import ArcoRequest, ConsentRecord
         register_audit(ConsentRecord, ['purpose', 'granted'], 'legal.consent')
+        register_audit(ArcoRequest, ['status'], 'legal.arco')

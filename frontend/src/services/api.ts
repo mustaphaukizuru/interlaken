@@ -309,6 +309,18 @@ export const legalApi = {
   /** Record granular consent (grant/revoke) for the guardian, optionally per student. */
   recordConsent: (purposes: Record<string, boolean>, student?: number) =>
     api.post('/legal/consent/', { purposes, ...(student ? { student } : {}) }),
+
+  // ARCO rights (Acceso, Rectificación, Cancelación, Oposición)
+  listArco: () => api.get('/legal/arco/'),
+  createArco: (requestType: string, details: string) =>
+    api.post('/legal/arco/', { request_type: requestType, details }),
+  /** Acceso: download everything held on the requesting household. */
+  exportMyData: () => api.get('/legal/arco/export/'),
+  // Staff console
+  adminListArco: (status?: string) =>
+    api.get('/legal/admin/arco/', { params: status ? { status } : {} }),
+  adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
+    api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
 };
 
 // ── CONTACT ───────────────────────────────────────────────
