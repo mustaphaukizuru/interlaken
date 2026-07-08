@@ -1,10 +1,39 @@
-/* Fonts (Poppins + Inter) are loaded via templates/admin/base_site.html with
-   preconnect — no render-blocking @import here. */
+/* ============================================================================
+   Colegio Interlaken — Django Admin (Jazzmin / AdminLTE 3 / Bootstrap 4) skin
+   Brand tokens sampled from the official logo (see frontend/BRAND.md).
+   Fonts (Poppins + Inter) load via templates/admin/base_site.html (preconnect).
+   Phase 2: on-brand tokens + reskin · off-brand cyan fully retired.
+   ============================================================================ */
 
 :root {
-  --color-primary: #401a8e;
-  --color-secondary: #ef2558;
-  --color-teal: #1da2ab;
+  /* Official brand palette (matches the React app / frontend/BRAND.md) */
+  --brand-green:        #47a028;  /* primary / anchor — wordmark "INTERLAKEN"  */
+  --brand-green-dark:   #316f1c;  /* green text on light surfaces (AA)         */
+  --brand-green-bright: #5fbe46;  /* light green ("COLEGIO")                    */
+  --brand-coral:        #dd2622;  /* warm accent — tagline + clock hands       */
+  --brand-coral-dark:   #b31c19;  /* coral text on light surfaces (AA)         */
+  --brand-purple:       #401a8e;  /* energetic secondary / chrome              */
+  --brand-purple-light: #5a27b8;
+  --brand-pink:         #ef2558;  /* high-energy accent / danger               */
+  --brand-amber:        #d97706;  /* warning                                   */
+
+  /* Neutrals / surfaces */
+  --ink:        #1A1130;
+  --muted:      #6E6885;
+  --subtle:     #9A93AE;
+  --cream:      #F5F4FA;
+  --cream-2:    #FAF9FD;
+  --border:     #ECEAF3;
+  --dark:       #080516;
+  --dark-2:     #0f0a24;
+  --dark-3:     #2a2342;
+
+  /* Elevation / radius */
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 2px rgba(16,12,40,0.04), 0 4px 16px -8px rgba(64,26,142,0.10);
+  --focus-ring: 0 0 0 3px rgba(71,160,40,0.30);
 }
 
 /* Brand mark in the dark sidebar brand area — clock isotipo, not a circle */
@@ -14,51 +43,90 @@
   border-radius: 6px; background: transparent;
 }
 
-/* Sidebar */
-.main-sidebar { background: #080516 !important; box-shadow: 2px 0 20px rgba(64,26,142,0.3) !important; }
-.brand-link { background: #0f0a24 !important; border-color: rgba(255,255,255,0.08) !important; padding: 16px 20px !important; }
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.main-sidebar { background: var(--dark) !important; box-shadow: 2px 0 20px rgba(64,26,142,0.3) !important; }
+.brand-link { background: var(--dark-2) !important; border-color: rgba(255,255,255,0.08) !important; padding: 14px 18px !important; }
 .brand-link:hover { background: #1a1035 !important; }
 .sidebar-dark-purple .nav-sidebar .nav-link { color: rgba(255,255,255,0.6) !important; font-family: 'Inter', sans-serif; font-size: 13.5px; border-radius: 10px; margin: 1px 8px; transition: all 0.2s; }
-.sidebar-dark-purple .nav-sidebar .nav-link:hover { background: rgba(255,255,255,0.06) !important; color: rgba(255,255,255,0.9) !important; }
-.sidebar-dark-purple .nav-sidebar .nav-link.active { background: linear-gradient(100deg, #401a8e, #5a27b8) !important; color: #fff !important; box-shadow: 0 8px 20px -8px rgba(64,26,142,0.85) !important; }
+.sidebar-dark-purple .nav-sidebar .nav-link:hover { background: rgba(255,255,255,0.06) !important; color: rgba(255,255,255,0.92) !important; }
+.sidebar-dark-purple .nav-sidebar .nav-link.active { background: linear-gradient(100deg, var(--brand-purple), var(--brand-purple-light)) !important; color: #fff !important; box-shadow: 0 8px 20px -8px rgba(64,26,142,0.85) !important; }
+/* Active item gets a coral edge accent for a warm brand cue */
+.sidebar-dark-purple .nav-sidebar .nav-link.active { border-left: 3px solid var(--brand-coral) !important; }
+.sidebar-dark-purple .nav-sidebar .nav-treeview .nav-link.active { background: rgba(71,160,40,0.22) !important; border-left-color: var(--brand-green) !important; }
+.nav-sidebar .nav-icon { color: rgba(255,255,255,0.5); }
+.nav-sidebar .nav-link.active .nav-icon { color: #fff; }
 
-/* Navbar */
-.main-header.navbar { background: #401a8e !important; border-color: #4d22a8 !important; }
+/* ── Navbar ────────────────────────────────────────────────────────────── */
+.main-header.navbar { background: var(--brand-purple) !important; border-color: #4d22a8 !important; }
 .navbar-dark .navbar-nav .nav-link { color: rgba(255,255,255,0.85) !important; }
 .navbar-dark .navbar-nav .nav-link:hover { color: #fff !important; }
 
-/* Brand text */
-.brand-text { font-family: 'Poppins', sans-serif !important; font-weight: 800 !important; font-size: 16px !important; letter-spacing: 1px !important; color: #3aa852 !important; }
+/* Brand text — green wordmark tone */
+.brand-text { font-family: 'Poppins', sans-serif !important; font-weight: 800 !important; font-size: 16px !important; letter-spacing: 1px !important; color: var(--brand-green-bright) !important; }
 
-/* Content area */
-.content-wrapper { background: #F5F4FA !important; font-family: 'Inter', sans-serif; }
-.card { border-radius: 14px !important; border-color: #ECEAF3 !important; box-shadow: 0 1px 2px rgba(16,12,40,0.04), 0 4px 16px -8px rgba(64,26,142,0.1) !important; }
-.card-header { border-bottom-color: #ECEAF3 !important; font-family: 'Poppins', sans-serif !important; font-weight: 700 !important; }
+/* ── Content area ──────────────────────────────────────────────────────── */
+.content-wrapper { background: var(--cream) !important; font-family: 'Inter', sans-serif; }
+.content-header h1 { font-family: 'Poppins', sans-serif !important; font-weight: 700 !important; color: var(--ink) !important; }
+a { color: var(--brand-purple); }
+a:hover { color: var(--brand-coral-dark); }
 
-/* Buttons */
-.btn-primary { background: #401a8e !important; border-color: #401a8e !important; font-family: 'Poppins', sans-serif !important; font-weight: 600 !important; border-radius: 8px !important; }
-.btn-primary:hover { background: #5e3aad !important; border-color: #5e3aad !important; }
-.btn-success { background: #1da2ab !important; border-color: #1da2ab !important; border-radius: 8px !important; }
-.btn-danger  { background: #ef2558 !important; border-color: #ef2558 !important; border-radius: 8px !important; }
-.btn-warning { background: #d97706 !important; border-color: #d97706 !important; border-radius: 8px !important; color: #fff !important; }
+.card { border-radius: var(--radius-lg) !important; border-color: var(--border) !important; box-shadow: var(--shadow-card) !important; }
+.card-header { border-bottom-color: var(--border) !important; font-family: 'Poppins', sans-serif !important; font-weight: 700 !important; color: var(--ink) !important; }
+/* Dashboard model cards get a thin green top accent (brand presence) */
+.col-sm-6 > .card, .dashboard .card { border-top: 3px solid var(--brand-green) !important; }
 
-/* Table */
-.table thead th { background: #F5F4FA !important; color: #1A1130 !important; font-family: 'Poppins', sans-serif !important; font-weight: 700 !important; font-size: 12px !important; letter-spacing: 0.5px !important; border-color: #ECEAF3 !important; }
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.btn { border-radius: var(--radius-sm) !important; font-family: 'Poppins', sans-serif !important; font-weight: 600 !important; }
+.btn-primary { background: var(--brand-purple) !important; border-color: var(--brand-purple) !important; }
+.btn-primary:hover { background: var(--brand-purple-light) !important; border-color: var(--brand-purple-light) !important; }
+/* Success = GREEN (the "Agregar" buttons) — off-brand cyan retired */
+.btn-success { background: var(--brand-green) !important; border-color: var(--brand-green) !important; color: #fff !important; }
+.btn-success:hover { background: var(--brand-green-dark) !important; border-color: var(--brand-green-dark) !important; }
+.btn-danger  { background: var(--brand-pink) !important; border-color: var(--brand-pink) !important; }
+.btn-danger:hover { background: #d41a49 !important; border-color: #d41a49 !important; }
+.btn-warning { background: var(--brand-amber) !important; border-color: var(--brand-amber) !important; color: #fff !important; }
+.btn-outline-info { color: var(--brand-purple) !important; border-color: var(--brand-purple) !important; }
+.btn-outline-info:hover { background: var(--brand-purple) !important; color: #fff !important; }
+/* Object-tools (Agregar / Historia) buttons on change-list */
+.object-tools a, a.addlink { background: var(--brand-green) !important; border-radius: var(--radius-sm) !important; }
+.object-tools a:hover, a.addlink:hover { background: var(--brand-green-dark) !important; }
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+.table thead th { background: var(--cream) !important; color: var(--ink) !important; font-family: 'Poppins', sans-serif !important; font-weight: 700 !important; font-size: 12px !important; letter-spacing: 0.5px !important; border-color: var(--border) !important; }
 .table-striped tbody tr:nth-of-type(odd) { background: rgba(64,26,142,0.025) !important; }
-.table td, .table th { border-color: #ECEAF3 !important; font-size: 13.5px; }
+.table tbody tr:hover { background: rgba(71,160,40,0.05) !important; }
+.table td, .table th { border-color: var(--border) !important; font-size: 13.5px; }
+#result_list a { color: var(--brand-purple); }
+#result_list a:hover { color: var(--brand-coral-dark); }
 
-/* Forms */
-.form-control { border-color: #ECEAF3 !important; border-radius: 8px !important; font-size: 13.5px !important; }
-.form-control:focus { border-color: #401a8e !important; box-shadow: 0 0 0 3px rgba(64,26,142,0.12) !important; }
-select.form-control { border-radius: 8px !important; }
+/* ── Forms ─────────────────────────────────────────────────────────────── */
+.form-control, .form-control:not(.is-invalid) { border-color: var(--border) !important; border-radius: var(--radius-sm) !important; font-size: 13.5px !important; }
+.form-control:focus, select:focus, textarea:focus { border-color: var(--brand-green) !important; box-shadow: var(--focus-ring) !important; }
+select.form-control { border-radius: var(--radius-sm) !important; }
+.changeform-tabs-item.active .nav-link, .nav-tabs .nav-link.active { color: var(--brand-purple) !important; border-bottom: 2px solid var(--brand-green) !important; font-weight: 600 !important; }
 
-/* Badges / info-boxes */
-.info-box { border-radius: 12px !important; }
-.info-box-icon { border-radius: 12px 0 0 12px !important; }
-.bg-purple { background: #401a8e !important; }
-.bg-pink    { background: #ef2558 !important; }
+/* ── Badges / status (map admin states → brand tokens) ─────────────────── */
+.badge, .label { font-family: 'Inter', sans-serif; font-weight: 600; border-radius: 999px; padding: 0.35em 0.7em; }
+.badge-success, .label-success, .bg-success, span.badge.badge-success { background: var(--brand-green) !important; color: #fff !important; }
+.badge-danger,  .label-danger,  .bg-danger  { background: var(--brand-pink) !important; color: #fff !important; }
+.badge-warning, .label-warning, .bg-warning { background: var(--brand-amber) !important; color: #fff !important; }
+.badge-info,    .label-info,    .bg-info    { background: var(--brand-purple) !important; color: #fff !important; }
+.badge-secondary, .bg-secondary { background: var(--subtle) !important; color: #fff !important; }
+.badge-coral, .bg-coral { background: var(--brand-coral) !important; color: #fff !important; }
+.text-success { color: var(--brand-green-dark) !important; }
+.text-danger  { color: var(--brand-coral-dark) !important; }
+.text-warning { color: #b45309 !important; }
+.text-info, .text-primary { color: var(--brand-purple) !important; }
 
-/* Pagination */
-.page-item.active .page-link { background: #401a8e !important; border-color: #401a8e !important; }
-.page-link { color: #401a8e !important; }
-.page-link:hover { background: #ede8f7 !important; color: #401a8e !important; }
+/* ── Info-boxes / small boxes (dashboard stats) ────────────────────────── */
+.info-box { border-radius: var(--radius) !important; }
+.info-box-icon { border-radius: var(--radius) 0 0 var(--radius) !important; }
+.bg-purple { background: var(--brand-purple) !important; }
+.bg-pink   { background: var(--brand-pink) !important; }
+.bg-green, .bg-olive { background: var(--brand-green) !important; }
+
+/* ── Pagination ────────────────────────────────────────────────────────── */
+.page-item.active .page-link { background: var(--brand-purple) !important; border-color: var(--brand-purple) !important; }
+.page-link { color: var(--brand-purple) !important; }
+.page-link:hover { background: #ede8f7 !important; color: var(--brand-purple) !important; }
+.paginator a:focus, .paginator a:hover { color: var(--brand-coral-dark) !important; }
