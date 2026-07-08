@@ -1,9 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
+/* Fonts (Poppins + Inter) are loaded via templates/admin/base_site.html with
+   preconnect — no render-blocking @import here. */
 
 :root {
   --color-primary: #401a8e;
   --color-secondary: #ef2558;
   --color-teal: #1da2ab;
+}
+
+/* Brand mark in the dark sidebar brand area — clock isotipo, not a circle */
+.brand-image.interlaken-brand-logo {
+  height: 33px; width: auto; max-height: 33px;
+  float: none; margin: -2px 8px 0 0; opacity: 1;
+  border-radius: 6px; background: transparent;
 }
 
 /* Sidebar */

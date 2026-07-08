@@ -305,6 +305,12 @@ JAZZMIN_SETTINGS = {
     'site_title': 'Admin · Interlaken',
     'site_header': 'Colegio Interlaken',
     'site_brand': 'INTERLAKEN',
+    # Brand marks — served from backend/static/admin/ (copied from official logo assets)
+    'site_logo': 'admin/logo-isotipo.png',            # clock isotipo in the dark brand area
+    'site_logo_classes': 'interlaken-brand-logo',      # no forced circle (see interlaken_admin.css)
+    'site_icon': 'admin/logo-isotipo.png',             # favicon
+    'login_logo': 'admin/logo-vertical.png',           # colored, on the light login card
+    'login_logo_dark': 'admin/logo-vertical-white.png',
     'welcome_sign': 'Panel de Administración — Colegio Interlaken',
     'copyright': 'Colegio Interlaken',
     'search_model': ['accounts.User'],
