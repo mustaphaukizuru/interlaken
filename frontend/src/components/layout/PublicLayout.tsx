@@ -110,7 +110,7 @@ function ProgramsDropdown() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
       >
         Programas
         <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -122,7 +122,7 @@ function ProgramsDropdown() {
           aria-label="Programas"
           className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-[420px]"
         >
-          <div className="rounded-2xl border border-slate-100 bg-white shadow-xl p-5 grid grid-cols-2 gap-5">
+          <div className="rounded-2xl border border-line bg-white shadow-xl p-5 grid grid-cols-2 gap-5">
             {PROGRAM_GROUPS.map((group) => (
               <div key={group.heading}>
                 <p className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-2">{group.heading}</p>
@@ -133,7 +133,7 @@ function ProgramsDropdown() {
                         to={item.to}
                         role="menuitem"
                         onClick={() => setOpen(false)}
-                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                        className="block rounded-lg px-3 py-2 text-sm text-ink hover:bg-brand-50 hover:text-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                       >
                         {item.label}
                       </Link>
@@ -182,7 +182,7 @@ export function PublicLayout() {
 
       {/* Main nav */}
       <div className="accent-bar" />
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-line sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
@@ -198,7 +198,7 @@ export function PublicLayout() {
                 to={link.to}
                 className={({ isActive }) =>
                   `text-sm font-medium transition-colors ${
-                    isActive ? 'text-brand-600' : 'text-slate-600 hover:text-brand-600'
+                    isActive ? 'text-brand-600' : 'text-muted hover:text-brand-600'
                   }`
                 }
               >
@@ -222,7 +222,7 @@ export function PublicLayout() {
             onClick={() => setOpen(!open)}
             aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={open}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            className="md:hidden p-2 rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
           >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -230,13 +230,13 @@ export function PublicLayout() {
 
         {/* Mobile menu */}
         {open && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+          <div className="md:hidden bg-white border-t border-line px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
             {/* Programas accordion */}
             <button
               type="button"
               aria-expanded={mobileProgramsOpen}
               onClick={() => setMobileProgramsOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             >
               Programas
               <ChevronDown className={`w-4 h-4 transition-transform ${mobileProgramsOpen ? 'rotate-180' : ''}`} />
@@ -248,7 +248,7 @@ export function PublicLayout() {
                     key={`${item.label}-${i}`}
                     to={item.to}
                     onClick={() => setOpen(false)}
-                    className="block px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+                    className="block px-3 py-2 rounded-lg text-sm text-muted hover:bg-cream"
                   >
                     {item.label}
                   </Link>
@@ -263,7 +263,7 @@ export function PublicLayout() {
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
                   `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-50'
+                    isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-cream'
                   }`
                 }
               >
