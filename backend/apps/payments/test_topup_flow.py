@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -87,6 +88,26 @@ class TestTopUpInitiation:
         assert resp.status_code == 201, resp.data
         assert "redirect_url" not in resp.data
         assert not Payment.objects.filter(related_topup_id=resp.data["id"]).exists()
+
+    def test_online_topup_gateway_failure_marks_payment_failed(self, api_client):
+        """A gateway checkout failure must not leave an orphan PENDING payment."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        api_client.force_authenticate(user=parent)
+        with patch(
+            "apps.payments.gateways.global_payments.GlobalPaymentsGateway.create_checkout",
+            side_effect=RuntimeError("boom"),
+        ):
+            resp = api_client.post(
+                reverse("cafeteria-topup"),
+                {"student": student.id, "amount": "100.00", "method": "online",
+                 "gateway": "global_payments"},
+                format="json",
+            )
+        assert resp.status_code == 502, resp.data
+        payment = Payment.objects.get(related_topup__student=student)
+        assert payment.status == Payment.Status.FAILED
+        assert not Payment.objects.filter(status=Payment.Status.PENDING).exists()
 
 
 def _make_online_topup(parent, student, amount="200.00"):

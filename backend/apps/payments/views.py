@@ -7,6 +7,8 @@ cafeteria top-up — credit the student's **local** ledger on success (spec R1: 
 Loyverse write) and notify the parent. Failures mark everything failed and credit
 nothing.
 """
+import logging
+
 from django.db import transaction as db_transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -19,6 +21,8 @@ from apps.core.ratelimit import ratelimit
 from .gateways import get_gateway, iter_gateways
 from .models import Payment
 from .serializers import PaymentInitiateSerializer, PaymentSerializer
+
+logger = logging.getLogger(__name__)
 
 # Statuses that are terminal — a webhook that arrives for one of these is a
 # duplicate/replay and must be a no-op (idempotency).
@@ -47,8 +51,21 @@ class PaymentInitiateView(APIView):
 
         try:
             hpp_url = gateway.create_checkout(payment)
-        except Exception:  # pragma: no cover - defensive; keep the record either way
-            hpp_url = None
+        except Exception as exc:
+            logger.exception(
+                'create_checkout failed for payment=%s gateway=%s user=%s type=%s amount=%s',
+                payment.id, gateway.name, request.user.pk, payment.payment_type, payment.amount,
+            )
+            payment.mark_failed(exc, stage='create_checkout')
+            return self._checkout_failed(payment)
+
+        if not hpp_url:
+            logger.error(
+                'create_checkout returned no URL for payment=%s gateway=%s',
+                payment.id, gateway.name,
+            )
+            payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
+            return self._checkout_failed(payment)
 
         return Response({
             'payment_id': payment.id,
@@ -59,6 +76,15 @@ class PaymentInitiateView(APIView):
             'redirect_url': hpp_url,
             'detail': 'Pago registrado correctamente.',
         }, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _checkout_failed(payment):
+        """Explicit, frontend-consumable error for a failed checkout creation."""
+        return Response({
+            'payment_id': payment.id,
+            'status': payment.status,
+            'detail': 'No se pudo iniciar el pago con el proveedor. Intenta de nuevo más tarde.',
+        }, status=status.HTTP_502_BAD_GATEWAY)
 
 
 class _WebhookProcessMixin:

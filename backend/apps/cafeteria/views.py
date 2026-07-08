@@ -1,6 +1,8 @@
 """
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
+import logging
+
 from django.db import models
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -25,6 +27,8 @@ from .serializers import (
 )
 from .services import (add_points_to_customer, adjust_balance, reconcile_balances,
                        refund_transaction, sync_all_balances, sync_student_balance)
+
+logger = logging.getLogger(__name__)
 
 
 class IsParentOrAdmin(permissions.BasePermission):
@@ -162,7 +166,16 @@ class TopUpRequestCreateView(generics.CreateAPIView):
             try:
                 redirect_url = gateway.create_checkout(payment)
             except Exception as e:
+                logger.exception(
+                    'create_checkout failed for cafeteria top-up payment=%s gateway=%s student=%s',
+                    payment.id, gateway.name, student.id,
+                )
+                payment.mark_failed(e, stage='create_checkout')
                 return Response({'error': f'No se pudo iniciar el pago: {e}'}, status=502)
+
+            if not redirect_url:
+                payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
+                return Response({'error': 'No se pudo iniciar el pago.'}, status=502)
 
             data.update({
                 'payment_id': payment.id,
