@@ -29,12 +29,15 @@ from .services import (add_points_to_customer, adjust_balance, reconcile_balance
 
 class IsParentOrAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.role in (User.Role.PARENT, User.Role.ADMIN)
+        user = request.user
+        return bool(user and user.is_authenticated
+                    and user.role in (User.Role.PARENT, User.Role.ADMIN))
 
 
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.role == User.Role.ADMIN
+        user = request.user
+        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 class MyBalanceView(APIView):

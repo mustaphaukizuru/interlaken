@@ -26,7 +26,10 @@ from .serializers import (AdjustInvoiceInputSerializer, CancelInvoiceInputSerial
 
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.role == User.Role.ADMIN)
+        user = request.user
+        # AnonymousUser is truthy but has no `.role`; `is_authenticated` is the
+        # correct guard (a bare truthiness check would raise AttributeError -> 500).
+        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 def _parent_invoices(user):
