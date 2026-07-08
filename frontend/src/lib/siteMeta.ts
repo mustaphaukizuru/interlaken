@@ -87,6 +87,11 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       'Contacta a Colegio Interlaken en Tlalnepantla, Estado de México. Teléfono, correo y ubicación para resolver tus dudas de admisión.',
   },
+  '/aviso-de-privacidad': {
+    title: 'Aviso de Privacidad',
+    description:
+      'Aviso de Privacidad de Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO.',
+  },
 };
 
 /**

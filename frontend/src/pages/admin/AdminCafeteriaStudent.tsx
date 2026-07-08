@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
@@ -315,35 +316,33 @@ export default function AdminCafeteriaStudent() {
         </form>
       </Modal>
 
-      {/* Refund modal */}
-      <Modal open={!!refundTx} onClose={() => setRefundTx(null)} title="Confirmar devolución">
-        {refundTx && (
-          <form
-            onSubmit={(e) => { e.preventDefault(); refundMutation.mutate(); }}
-            className="space-y-4"
-          >
-            <p className="text-sm text-muted">
+      {/* Refund — irreversible money movement: type-to-confirm */}
+      <ConfirmDialog
+        open={!!refundTx}
+        title="Confirmar devolución"
+        confirmLabel="Procesar devolución"
+        requireText="DEVOLVER"
+        loading={refundMutation.isPending}
+        onClose={() => setRefundTx(null)}
+        onConfirm={() => refundMutation.mutate()}
+        message={
+          refundTx && (
+            <>
               Se revertirá la {txLabel(refundTx.transaction_type).toLowerCase()} de{' '}
-              <span className="font-semibold">${parseFloat(refundTx.amount).toFixed(2)}</span> del{' '}
+              <span className="font-semibold text-ink">${parseFloat(refundTx.amount).toFixed(2)}</span> del{' '}
               {fmtDate(refundTx.date)}. Se ajustará el saldo y se notificará a los tutores.
-            </p>
-            <Input
-              label="Motivo (opcional)"
-              maxLength={500}
-              value={refundReason}
-              onChange={(e) => setRefundReason(e.target.value)}
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => setRefundTx(null)}>
-                Cancelar
-              </Button>
-              <Button type="submit" size="sm" variant="danger" loading={refundMutation.isPending}>
-                Procesar devolución
-              </Button>
-            </div>
-          </form>
-        )}
-      </Modal>
+              Esta acción no se puede deshacer.
+            </>
+          )
+        }
+      >
+        <Input
+          label="Motivo (opcional)"
+          maxLength={500}
+          value={refundReason}
+          onChange={(e) => setRefundReason(e.target.value)}
+        />
+      </ConfirmDialog>
     </div>
   );
 }

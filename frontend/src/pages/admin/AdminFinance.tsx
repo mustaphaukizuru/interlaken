@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { financeApi } from '@/services/api';
 import type { Invoice, FinanceDashboard } from '@/types';
 
@@ -35,6 +36,7 @@ export default function AdminFinance() {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [adjustFor, setAdjustFor] = useState<Invoice | null>(null);
+  const [cancelFor, setCancelFor] = useState<Invoice | null>(null);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
@@ -73,7 +75,7 @@ export default function AdminFinance() {
 
   const cancel = useMutation({
     mutationFn: (id: number) => financeApi.cancelInvoice(id, 'Cancelada por administración'),
-    onSuccess: () => { toast.success('Factura cancelada.'); invalidate(); },
+    onSuccess: () => { toast.success('Factura cancelada.'); setCancelFor(null); invalidate(); },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'No se pudo cancelar.'),
   });
 
@@ -184,6 +186,7 @@ export default function AdminFinance() {
                         markPaid={markPaid}
                         cancel={cancel}
                         onAdjust={setAdjustFor}
+                        onCancel={setCancelFor}
                       />
                     </div>
                   </li>
@@ -230,6 +233,7 @@ export default function AdminFinance() {
                               markPaid={markPaid}
                               cancel={cancel}
                               onAdjust={setAdjustFor}
+                              onCancel={setCancelFor}
                             />
                           </div>
                         </td>
@@ -244,6 +248,27 @@ export default function AdminFinance() {
       </Card>
 
       <AdjustModal invoice={adjustFor} onClose={() => setAdjustFor(null)} onDone={invalidate} />
+
+      <ConfirmDialog
+        open={!!cancelFor}
+        title="Cancelar colegiatura"
+        confirmLabel="Cancelar colegiatura"
+        requireText="CANCELAR"
+        loading={cancel.isPending}
+        onClose={() => setCancelFor(null)}
+        onConfirm={() => cancelFor && cancel.mutate(cancelFor.id)}
+        message={
+          cancelFor && (
+            <>
+              Esto cancelará la colegiatura de{' '}
+              <span className="font-semibold text-ink">{cancelFor.student_name}</span> del periodo{' '}
+              <span className="font-semibold text-ink">{cancelFor.period_label}</span> por{' '}
+              <span className="font-semibold text-ink">${parseFloat(cancelFor.amount).toFixed(2)}</span>.
+              La factura quedará anulada y no podrá cobrarse. Esta acción no se puede deshacer.
+            </>
+          )
+        }
+      />
     </div>
   );
 }
@@ -260,12 +285,14 @@ function InvoiceActions({
   markPaid,
   cancel,
   onAdjust,
+  onCancel,
 }: {
   inv: Invoice;
   open: boolean;
   markPaid: InvoiceMutation;
   cancel: InvoiceMutation;
   onAdjust: (inv: Invoice) => void;
+  onCancel: (inv: Invoice) => void;
 }) {
   return (
     <>
@@ -288,7 +315,7 @@ function InvoiceActions({
         <Button size="sm" variant="ghost" title="Cancelar"
           aria-label={`Cancelar la colegiatura de ${inv.student_name}`}
           loading={cancel.isPending && cancel.variables === inv.id}
-          onClick={() => cancel.mutate(inv.id)}>
+          onClick={() => onCancel(inv)}>
           <Ban className="w-4 h-4 text-coral-600" />
         </Button>
       )}

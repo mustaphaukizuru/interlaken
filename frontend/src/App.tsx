@@ -22,6 +22,7 @@ const RegisterPage    = lazy(() => import('./pages/public/RegisterPage'));
 const OpenSchoolPage  = lazy(() => import('./pages/public/OpenSchoolPage'));
 const BookVisitPage   = lazy(() => import('./pages/public/BookVisitPage'));
 const ContactPage     = lazy(() => import('./pages/public/ContactPage'));
+const AvisoPrivacidadPage = lazy(() => import('./pages/public/AvisoPrivacidadPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
@@ -92,6 +93,7 @@ export default function App() {
               <Route path="/puertas-abiertas" element={<OpenSchoolPage />} />
               <Route path="/agendar-visita" element={<BookVisitPage />} />
               <Route path="/contacto"      element={<ContactPage />} />
+              <Route path="/aviso-de-privacidad" element={<AvisoPrivacidadPage />} />
             </Route>
 
             {/* ── AUTH ────────────────────────────────────── */}

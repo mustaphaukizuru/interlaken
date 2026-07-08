@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { bookingsApi } from '@/services/api';
 import type { Booking } from '@/types';
 
@@ -166,14 +167,15 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
 type BookingAct = 'confirm' | 'cancel' | 'attended' | 'no_show';
 
 function BookingActions({
-  id,
-  parentName,
+  booking,
   onAction,
+  onCancelRequest,
 }: {
-  id: number;
-  parentName: string;
+  booking: Booking;
   onAction: (v: { id: number; act: BookingAct }) => void;
+  onCancelRequest: (b: Booking) => void;
 }) {
+  const { id, parent_name: parentName } = booking;
   const base =
     'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
   return (
@@ -197,7 +199,7 @@ function BookingActions({
       <button
         title="Cancelar"
         aria-label={`Cancelar la reserva de ${parentName}`}
-        onClick={() => onAction({ id, act: 'cancel' })}
+        onClick={() => onCancelRequest(booking)}
         className={`${base} hover:bg-coral-50 hover:text-coral-600`}
       >
         <X className="w-4 h-4" />
@@ -209,6 +211,7 @@ function BookingActions({
 export default function AdminBookings() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
+  const [cancelFor, setCancelFor] = useState<Booking | null>(null);
 
   const { data: bookings, isLoading } = useQuery<Booking[]>({
     queryKey: ['admin-bookings', statusFilter],
@@ -226,6 +229,7 @@ export default function AdminBookings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-bookings'] });
       toast.success('Reserva actualizada.');
+      setCancelFor(null);
     },
     onError: () => toast.error('No fue posible actualizar la reserva.'),
   });
@@ -296,7 +300,7 @@ export default function AdminBookings() {
                       <p className="text-subtle text-xs">{b.parent_phone}</p>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1">
-                      <BookingActions id={b.id} parentName={b.parent_name} onAction={action.mutate} />
+                      <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
                     </div>
                   </li>
                 );
@@ -343,7 +347,7 @@ export default function AdminBookings() {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center gap-1">
-                            <BookingActions id={b.id} parentName={b.parent_name} onAction={action.mutate} />
+                            <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
                           </div>
                         </td>
                       </tr>
@@ -355,6 +359,27 @@ export default function AdminBookings() {
           </>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={!!cancelFor}
+        title="Cancelar visita"
+        confirmLabel="Cancelar visita"
+        loading={action.isPending}
+        onClose={() => setCancelFor(null)}
+        onConfirm={() => cancelFor && action.mutate({ id: cancelFor.id, act: 'cancel' })}
+        message={
+          cancelFor && (
+            <>
+              Esto cancelará la visita de{' '}
+              <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
+              <span className="font-semibold text-ink">
+                {format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}
+              </span>{' '}
+              a las {cancelFor.slot_start_time.slice(0, 5)}. Se liberará el cupo y se notificará al tutor.
+            </>
+          )
+        }
+      />
     </div>
   );
 }

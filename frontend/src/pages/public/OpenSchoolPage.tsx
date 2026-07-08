@@ -3,14 +3,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
 import { CalendarDays, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { admissionsApi } from '@/services/api';
+import { SITE_URL, SITE_NAME } from '@/lib/siteMeta';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import type { OpenSchoolEvent } from '@/types';
 
 const schema = z.object({
@@ -73,8 +76,8 @@ export default function OpenSchoolPage() {
             <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-brand-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">¡Registro confirmado!</h2>
-            <p className="text-slate-500">
+            <h2 className="text-2xl font-bold text-ink mb-2">¡Registro confirmado!</h2>
+            <p className="text-muted">
               Recibirá un correo con los detalles del evento. ¡Esperamos verle pronto!
             </p>
           </div>
@@ -83,11 +86,11 @@ export default function OpenSchoolPage() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             {/* Events list */}
             <div>
-              <h2 className="font-semibold text-slate-900 mb-4">Próximas fechas</h2>
+              <h2 className="font-semibold text-ink mb-4">Próximas fechas</h2>
               {isLoading ? (
                 <LoadingSpinner />
               ) : !events?.length ? (
-                <p className="text-slate-500 text-sm">No hay eventos programados actualmente.</p>
+                <p className="text-muted text-sm">No hay eventos programados actualmente.</p>
               ) : (
                 <div className="space-y-3">
                   {events.map((event) => (
@@ -97,7 +100,7 @@ export default function OpenSchoolPage() {
                       className={`card w-full border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 ${
                         selectedEvent?.id === event.id
                           ? 'border-brand-500 bg-brand-50'
-                          : 'border-slate-100 hover:border-brand-300'
+                          : 'border-line hover:border-brand-300'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -105,15 +108,15 @@ export default function OpenSchoolPage() {
                           <CalendarDays className="w-5 h-5 text-brand-600" />
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 text-sm">{event.title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="font-semibold text-ink text-sm">{event.title}</p>
+                          <p className="text-xs text-muted mt-0.5">
                             {format(
                               new Date(event.date),
                               "EEEE d 'de' MMMM, yyyy · HH:mm",
                               { locale: es },
                             )}
                           </p>
-                          <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                          <div className="flex items-center gap-3 mt-2 text-xs text-subtle">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
                               {event.location}
@@ -133,9 +136,9 @@ export default function OpenSchoolPage() {
 
             {/* Registration form */}
             <div>
-              <h2 className="font-semibold text-slate-900 mb-4">Registrar asistencia</h2>
+              <h2 className="font-semibold text-ink mb-4">Registrar asistencia</h2>
               {!selectedEvent ? (
-                <div className="card bg-slate-50 border-dashed border-2 border-slate-200 text-center py-10 text-slate-400 text-sm">
+                <div className="card bg-cream border-dashed border-2 border-line text-center py-10 text-subtle text-sm">
                   Seleccione una fecha a la izquierda
                 </div>
               ) : (
@@ -189,9 +192,9 @@ export default function OpenSchoolPage() {
           </div>
 
           {/* WhatsApp fallback */}
-          <div className="mt-10 rounded-2xl border border-slate-100 bg-slate-50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-slate-600 text-center sm:text-left">
-              <p className="font-semibold text-slate-900">¿Prefiere registrarse por WhatsApp?</p>
+          <div className="mt-10 rounded-2xl border border-line bg-cream p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-muted text-center sm:text-left">
+              <p className="font-semibold text-ink">¿Prefiere registrarse por WhatsApp?</p>
               <p>Escríbanos y con gusto le apartamos su lugar en el próximo evento.</p>
             </div>
             <a
