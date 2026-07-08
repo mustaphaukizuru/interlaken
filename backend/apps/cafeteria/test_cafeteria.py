@@ -13,9 +13,24 @@ from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.cafeteria import services
-from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
+from apps.cafeteria.models import (CafeteriaBalance, CafeteriaTransaction,
+                                   TopUpRequest)
+from apps.portal.models import Notification
 
 pytestmark = pytest.mark.django_db
+
+
+def _receipt(customer_id, number, total, *, receipt_type="SALE", line_items=None,
+             date="2026-07-01T12:00:00.000Z"):
+    """Build a minimal Loyverse receipt payload matching ``_parse_receipt``."""
+    return {
+        "customer_id": customer_id,
+        "receipt_number": number,
+        "receipt_type": receipt_type,
+        "total_money": total,
+        "receipt_date": date,
+        "line_items": line_items or [],
+    }
 
 
 class TestBalanceSync:
