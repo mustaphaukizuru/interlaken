@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,6 +16,12 @@ from apps.bookings.serializers import BookingSerializer, OpenClassEventSerialize
 from apps.bookings.services import SlotUnavailable, create_booking
 
 from .models import Registration, RegistrationDocument
+from .serializers import (
+    PreRegistrationSerializer,
+    RegistrationDocumentSerializer,
+    RegistrationSerializer,
+)
+from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
 
 def _is_staff(request):
@@ -27,27 +33,27 @@ def _is_staff(request):
     )
 
 
-def _require_registration_access(request, reg):
-    """Gate a Registration behind its access_token for anonymous applicants.
+def _session_token(request):
+    """Read the working session token from the header or POST body (never a URL)."""
+    return request.headers.get('X-Session-Token') or request.data.get('session_token', '')
 
-    Staff pass through. Everyone else must present the correct ``access_token``
-    (query param or ``X-Access-Token`` header). On failure we raise NotFound so
-    the endpoint leaks nothing about which sequential PKs exist.
+
+def authorize_registration(request, pk):
+    """Return the Registration if the caller may act on it, else raise 401.
+
+    Staff (JWT) may act on any registration. Anonymous applicants must present a
+    valid, unexpired SESSION token (header/body). Anonymous callers get a uniform
+    401 whether or not the PK exists, so sequential PKs can't be enumerated.
     """
     if _is_staff(request):
-        return
-    provided = (
-        request.query_params.get('access_token')
-        or request.headers.get('X-Access-Token', '')
-    )
-    if provided and str(provided) == str(reg.access_token):
-        return
-    raise NotFound('No encontrado.')
-from .serializers import (
-    PreRegistrationSerializer,
-    RegistrationDocumentSerializer,
-    RegistrationSerializer,
-)
+        return get_object_or_404(Registration, pk=pk)
+    try:
+        reg = Registration.objects.get(pk=pk)
+    except Registration.DoesNotExist:
+        raise AuthenticationFailed('Sesión de inscripción inválida.')
+    if not session_valid(reg, _session_token(request)):
+        raise AuthenticationFailed('Sesión de inscripción inválida.')
+    return reg
 
 
 class PreRegistrationCreateView(generics.CreateAPIView):
@@ -98,26 +104,50 @@ class RegistrationCreateView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
-        # Hand the capability token back exactly once, to the creating applicant.
+        # Hand the one-time INVITE token back exactly once, in the body (never a
+        # URL). It is exchanged (POST) for a session token to continue the flow.
         data = dict(serializer.data)
-        data['access_token'] = str(serializer.instance.access_token)
+        data['invite_token'] = issue_invite(serializer.instance)
         return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class RegistrationAccessView(APIView):
+    """POST /api/v1/admissions/register/<id>/access/ — exchange invite → session.
+
+    Body ``{token}``. Single-use: a valid, unexpired invite is consumed and a
+    short-lived session token is returned (used via the X-Session-Token header on
+    subsequent steps). Reuse or an expired/invalid token → 401.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, pk):
+        try:
+            reg = Registration.objects.get(pk=pk)
+        except Registration.DoesNotExist:
+            raise AuthenticationFailed('Invitación inválida o expirada.')
+        token = request.data.get('token', '')
+        if not redeem_invite(reg, token):
+            raise AuthenticationFailed('Invitación inválida o expirada.')
+        session = issue_session(reg)
+        return Response({
+            'session_token': session,
+            'expires_at': reg.session_expires_at,
+            'registration': RegistrationSerializer(reg).data,
+        })
 
 
 class RegistrationDetailView(generics.RetrieveUpdateAPIView):
     """GET/PATCH /api/v1/admissions/register/<id>/ — Retrieve or update.
 
-    Anonymous applicants must present the registration's ``access_token``;
-    staff (JWT) may access without it.
+    Anonymous applicants must present a valid SESSION token (X-Session-Token
+    header); staff (JWT) may access without it.
     """
     serializer_class = RegistrationSerializer
     permission_classes = [permissions.AllowAny]
     queryset = Registration.objects.all()
 
     def get_object(self):
-        reg = get_object_or_404(Registration, pk=self.kwargs['pk'])
-        _require_registration_access(self.request, reg)
-        return reg
+        return authorize_registration(self.request, self.kwargs['pk'])
 
 
 class RegistrationSubmitView(APIView):
@@ -125,12 +155,7 @@ class RegistrationSubmitView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, pk):
-        try:
-            reg = Registration.objects.get(pk=pk)
-        except Registration.DoesNotExist:
-            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        _require_registration_access(request, reg)
+        reg = authorize_registration(request, pk)
 
         if reg.status != Registration.Status.DRAFT:
             return Response({'error': 'Registration already submitted'},
@@ -159,12 +184,7 @@ class DocumentUploadView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, pk):
-        try:
-            reg = Registration.objects.get(pk=pk)
-        except Registration.DoesNotExist:
-            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        _require_registration_access(request, reg)
+        reg = authorize_registration(request, pk)
 
         file = request.FILES.get('file')
         doc_type = request.data.get('doc_type')

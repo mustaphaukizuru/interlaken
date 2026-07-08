@@ -69,10 +69,19 @@ class Registration(models.Model):
         REJECTED   = 'rejected',   'Rechazado'
         COMPLETE   = 'complete',   'Inscripción Completa'
 
-    # Unguessable capability token issued at creation. Anonymous applicants must
-    # present it (query param or X-Access-Token header) to read/update their own
-    # registration; staff (JWT) bypass it. Never exposed in list endpoints.
+    # Internal opaque id (no longer a secret capability — see the hashed tokens
+    # below). Kept for stable admin/reference URLs.
     access_token = models.UUIDField(default=uuid4, editable=False, unique=True)
+
+    # ── Access tokens (IK-SEC A2) ─────────────────────────────────────────────
+    # Only SHA-256 hashes are stored. The one-time INVITE token is returned once
+    # at creation and exchanged (POST) for a short-lived SESSION token that gates
+    # subsequent steps. Tokens never appear in a URL. See admissions/tokens.py.
+    invite_token_hash  = models.CharField(max_length=64, blank=True, default='')
+    invite_expires_at  = models.DateTimeField(null=True, blank=True)
+    invite_used_at     = models.DateTimeField(null=True, blank=True)
+    session_token_hash = models.CharField(max_length=64, blank=True, default='')
+    session_expires_at = models.DateTimeField(null=True, blank=True)
 
     # Link to pre-registration if available
     pre_registration = models.ForeignKey(PreRegistration, null=True, blank=True,

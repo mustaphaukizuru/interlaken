@@ -118,6 +118,12 @@ export const authApi = {
 };
 
 // ── ADMISSIONS ────────────────────────────────────────────
+// The one-time invite token (returned by createRegistration) is exchanged via
+// exchangeAccess() for a session token, which is passed on subsequent steps as
+// the X-Session-Token header — never a URL. See AUTH.md / IK-SEC A2.
+const sessionHeaders = (token?: string) =>
+  token ? { headers: { 'X-Session-Token': token } } : {};
+
 export const admissionsApi = {
   preRegister: (data: unknown) =>
     api.post('/admissions/pre-register/', data),
@@ -125,21 +131,28 @@ export const admissionsApi = {
   createRegistration: (data: unknown) =>
     api.post('/admissions/register/', data),
 
-  getRegistration: (id: number) =>
-    api.get(`/admissions/register/${id}/`),
+  /** Exchange the one-time invite token for a working session token. */
+  exchangeAccess: (id: number, token: string) =>
+    api.post(`/admissions/register/${id}/access/`, { token }),
 
-  updateRegistration: (id: number, data: unknown) =>
-    api.patch(`/admissions/register/${id}/`, data),
+  getRegistration: (id: number, sessionToken?: string) =>
+    api.get(`/admissions/register/${id}/`, sessionHeaders(sessionToken)),
 
-  submitRegistration: (id: number) =>
-    api.post(`/admissions/register/${id}/submit/`),
+  updateRegistration: (id: number, data: unknown, sessionToken?: string) =>
+    api.patch(`/admissions/register/${id}/`, data, sessionHeaders(sessionToken)),
 
-  uploadDocument: (registrationId: number, file: File, docType: string) => {
+  submitRegistration: (id: number, sessionToken?: string) =>
+    api.post(`/admissions/register/${id}/submit/`, {}, sessionHeaders(sessionToken)),
+
+  uploadDocument: (registrationId: number, file: File, docType: string, sessionToken?: string) => {
     const form = new FormData();
     form.append('file', file);
     form.append('doc_type', docType);
     return api.post(`/admissions/register/${registrationId}/documents/`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...(sessionToken ? { 'X-Session-Token': sessionToken } : {}),
+      },
     });
   },
 
