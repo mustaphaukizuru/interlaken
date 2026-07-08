@@ -9,7 +9,7 @@ import { Blob, Accent } from '@/components/ui/Blob';
 
 const VALUES: { icon: LucideIcon; title: string; desc: string; color: string }[] = [
   { icon: Award,   title: 'Excelencia académica', desc: 'Formación rigurosa con enfoque humanista y pensamiento crítico.', color: '#401a8e' },
-  { icon: Globe2,  title: 'Bilingüismo real',      desc: 'Inglés intensivo desde el nivel inicial con certificaciones internacionales.', color: '#1da2ab' },
+  { icon: Globe2,  title: 'Bilingüismo real',      desc: 'Inglés intensivo desde el nivel inicial con certificaciones internacionales.', color: '#47a028' },
   { icon: Heart,   title: 'Formación en valores',  desc: 'Ciudadanía, empatía y responsabilidad como parte de la vida diaria.', color: '#ef2558' },
   { icon: Sparkles, title: 'Innovación educativa', desc: 'Tecnología, ciencia y creatividad integradas al aula.', color: '#48a018' },
   { icon: Users,   title: 'Comunidad integrada',   desc: 'Un ambiente cálido e inclusivo donde cada familia pertenece.', color: '#8f6fd0' },
@@ -33,7 +33,7 @@ const TESTIMONIALS = [
   {
     name: 'Roberto Salas',
     relation: 'Papá de Secundaria',
-    color: '#1da2ab',
+    color: '#47a028',
     quote: 'El acompañamiento de los maestros es excepcional. Se nota que conocen a cada alumno por su nombre y su historia.',
   },
   {
@@ -58,7 +58,7 @@ export default function AboutPage() {
       {/* ── HERO ── */}
       <section style={{ position: 'relative', background: '#080516', color: '#fff', overflow: 'hidden' }}>
         <Blob tone="purple" opacity={0.5} size={520} shape={0} style={{ top: -180, left: -140 }} />
-        <Blob tone="teal" opacity={0.18} size={420} shape={2} style={{ bottom: -160, right: -120 }} />
+        <Blob tone="green" opacity={0.18} size={420} shape={2} style={{ bottom: -160, right: -120 }} />
         <div style={{ position: 'relative', maxWidth: 1120, margin: '0 auto', padding: '72px 24px' }}>
           <span className="section-label-pink" style={{ display: 'inline-flex' }}>Nuestra Historia</span>
           <h1 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 900, fontSize: 'clamp(34px, 5.5vw, 54px)', letterSpacing: -1.4, lineHeight: 1.08, marginTop: 12 }}>
@@ -94,7 +94,7 @@ export default function AboutPage() {
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 20 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: 'rgba(29,162,171,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Eye size={22} color="#1da2ab" />
+                  <Eye size={22} color="#47a028" />
                 </div>
                 <div>
                   <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 17, color: '#1A1130' }}>Visión</h3>
@@ -109,7 +109,7 @@ export default function AboutPage() {
 
           {/* Image collage + floating mini-stat card */}
           <Reveal direction="left" style={{ position: 'relative' }}>
-            <Accent tone="teal" variant="ring" size={64} opacity={0.4} style={{ top: -24, right: 20 }} />
+            <Accent tone="green" variant="ring" size={64} opacity={0.4} style={{ top: -24, right: 20 }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, position: 'relative' }}>
               <img src="/assets/facade.webp" alt="Fachada del Colegio Interlaken" style={{ borderRadius: 16, objectFit: 'cover', height: 240, gridRow: 'span 2', width: '100%' }} onError={hideOnError} />
               <img src="/assets/classroom.webp" alt="Aula del colegio" style={{ borderRadius: 16, objectFit: 'cover', height: 113, width: '100%' }} onError={hideOnError} />
@@ -153,7 +153,7 @@ export default function AboutPage() {
       {/* ── NIVELES ── */}
       <Section bg="white">
         <Reveal style={{ textAlign: 'center', marginBottom: 36 }}>
-          <span className="section-label-teal" style={{ display: 'inline-flex' }}>Oferta educativa</span>
+          <span className="section-label-green" style={{ display: 'inline-flex' }}>Oferta educativa</span>
           <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(28px, 4vw, 40px)', color: '#1A1130', letterSpacing: -1 }}>Niveles educativos</h2>
         </Reveal>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

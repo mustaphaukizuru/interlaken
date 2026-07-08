@@ -1,13 +1,13 @@
 import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 
-type Color = 'purple' | 'pink' | 'teal' | 'green' | 'amber';
+type Color = 'purple' | 'pink' | 'coral' | 'green' | 'amber';
 
 const theme: Record<Color, { bg: string; color: string; shadow: string }> = {
   purple: { bg: 'rgba(64,26,142,0.1)',  color: '#401a8e', shadow: '0 12px 28px -10px rgba(64,26,142,0.28)' },
   pink:   { bg: 'rgba(239,37,88,0.1)',   color: '#ef2558', shadow: '0 12px 28px -10px rgba(239,37,88,0.25)' },
-  teal:   { bg: 'rgba(29,162,171,0.12)', color: '#1da2ab', shadow: '0 12px 28px -10px rgba(29,162,171,0.28)' },
-  green:  { bg: 'rgba(72,160,24,0.1)',   color: '#48a018', shadow: 'var(--shadow-card)' },
-  amber:  { bg: 'rgba(217,119,6,0.1)',   color: '#d97706', shadow: 'var(--shadow-card)' },
+  coral:  { bg: 'rgba(221,38,34,0.1)',   color: '#c51d1a', shadow: '0 12px 28px -10px rgba(221,38,34,0.28)' },
+  green:  { bg: 'rgba(71,160,24,0.1)',   color: '#316f1c', shadow: 'var(--shadow-card)' },
+  amber:  { bg: 'rgba(217,119,6,0.1)',   color: '#b45309', shadow: 'var(--shadow-card)' },
 };
 
 interface StatCardProps {
@@ -29,7 +29,7 @@ export function StatCard({ title, value, suffix, icon: Icon, color, trend, subti
           <Icon size={22} color={t.color} />
         </div>
         {trend && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: trend.up ? 'rgba(29,162,171,0.1)' : 'rgba(239,37,88,0.1)', color: trend.up ? '#1da2ab' : '#ef2558' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: trend.up ? 'rgba(71,160,24,0.1)' : 'rgba(239,37,88,0.1)', color: trend.up ? '#316f1c' : '#ef2558' }}>
             {trend.up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}{trend.value}
           </span>
         )}

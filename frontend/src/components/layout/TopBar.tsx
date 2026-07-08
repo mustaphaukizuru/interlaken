@@ -7,7 +7,7 @@ export default function TopBar({ title, subtitle }: { title: string; subtitle?: 
   return (
     <>
       {/* 3px accent bar */}
-      <div style={{ height: 3, background: 'linear-gradient(90deg, #401a8e 0%, #5e3aad 28%, #ef2558 60%, #1da2ab 100%)', flexShrink: 0 }} />
+      <div style={{ height: 3, background: 'linear-gradient(90deg, #401a8e 0%, #9a1185 30%, #ef2558 60%, #47a028 100%)', flexShrink: 0 }} />
       <header style={{
         display: 'flex', alignItems: 'center', gap: 16, padding: '14px 32px',
         position: 'sticky', top: 3, zIndex: 20, borderBottom: '1px solid #ECEAF3',

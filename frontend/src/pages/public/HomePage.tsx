@@ -17,7 +17,7 @@ import { Reveal } from '@/components/ui/Reveal';
 
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: '#ef2558', icon: Users },
-  { value: '80+', label: 'Maestros', color: '#1da2ab', icon: GraduationCap },
+  { value: '80+', label: 'Maestros', color: '#47a028', icon: GraduationCap },
   { value: '40', label: 'Años', color: '#8f6fd0', icon: CalendarDays },
   { value: '95%', label: 'Aprovechamiento', color: '#48d06a', icon: TrendingUp },
 ];
@@ -25,14 +25,14 @@ const STATS = [
 const TRUST_BADGES = ['Bilingüe', '40 años', 'Certificación SEP', 'Grupos reducidos'];
 
 const LEVELS = [
-  { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: '#1da2ab', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
+  { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: '#47a028', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
   { name: 'Primaria', img: '/assets/facade.webp', accent: '#401a8e', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
   { name: 'Secundaria', img: '/assets/secundaria.webp', accent: '#ef2558', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
 ];
 
 const PROGRAMS = [
   { name: 'Inglés', img: '/assets/classroom.webp', accent: '#401a8e', icon: Languages },
-  { name: 'Deportes', img: '/assets/campus-court.webp', accent: '#1da2ab', icon: Trophy },
+  { name: 'Deportes', img: '/assets/campus-court.webp', accent: '#47a028', icon: Trophy },
   { name: 'Arte y Música', img: '/assets/campus-mural.webp', accent: '#ef2558', icon: Palette },
   { name: 'Ciencia y Robótica', img: '/assets/secundaria.webp', accent: '#48a018', icon: FlaskConical },
 ];
@@ -68,7 +68,7 @@ const TESTIMONIALS = [
   {
     name: 'Roberto Salas',
     relation: 'Papá de Secundaria',
-    color: '#1da2ab',
+    color: '#47a028',
     quote: 'El acompañamiento de los maestros es excepcional. Se nota que conocen a cada alumno por su nombre y su historia.',
   },
   {
@@ -276,7 +276,7 @@ export default function HomePage() {
       {/* ── LEVELS ── */}
       <Section bg="cream">
         <Reveal style={{ textAlign: 'center', marginBottom: 40 }}>
-          <span className="section-label-teal" style={{ display: 'inline-flex' }}>Niveles Educativos</span>
+          <span className="section-label-green" style={{ display: 'inline-flex' }}>Niveles Educativos</span>
           <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(28px, 4vw, 40px)', color: '#1A1130', letterSpacing: -1 }}>Un camino de excelencia</h2>
         </Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
@@ -374,7 +374,7 @@ export default function HomePage() {
             <div style={{ position: 'relative', minHeight: 240 }}>
               <img src="/assets/facade-sign.webp" alt="Puertas Abiertas Colegio Interlaken" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={hideOnError} />
             </div>
-            <div style={{ background: 'linear-gradient(135deg, #1da2ab 0%, #401a8e 100%)', color: '#fff', padding: '44px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ background: 'linear-gradient(135deg, #47a028 0%, #401a8e 100%)', color: '#fff', padding: '44px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, alignSelf: 'flex-start', padding: '6px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.15)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
                 <Sparkles size={13} /> Próximo Evento
               </span>

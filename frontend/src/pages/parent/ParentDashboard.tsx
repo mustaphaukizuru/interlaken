@@ -10,8 +10,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const payBadge = (s: string) => {
-  if (s === 'success' || s === 'completed') return { cls: 'badge-teal', label: 'Completado' };
-  if (s === 'refunded') return { cls: 'badge-teal', label: 'Devuelto' };
+  if (s === 'success' || s === 'completed') return { cls: 'badge-green', label: 'Completado' };
+  if (s === 'refunded') return { cls: 'badge-green', label: 'Devuelto' };
   if (s === 'failed') return { cls: 'badge-pink', label: 'Fallido' };
   if (s === 'processing') return { cls: 'badge-purple', label: 'Procesando' };
   return { cls: 'badge-amber', label: 'Pendiente' };
@@ -55,7 +55,7 @@ export default function ParentDashboard() {
           ) : (
             <>
               <StatCard title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />
-              <StatCard title="Saldo Cafetería" value={`$${balanceObj?.balance ?? '0.00'}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'teal'} />
+              <StatCard title="Saldo Cafetería" value={`$${balanceObj?.balance ?? '0.00'}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />
               <StatCard title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="pink" />
               <StatCard title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="green" />
             </>

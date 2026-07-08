@@ -19,7 +19,7 @@ const STEPS = [
     step: '02',
     title: 'Puertas Abiertas',
     desc: 'Asiste a nuestro día de puertas abiertas para conocer las instalaciones y al equipo docente.',
-    color: '#1da2ab',
+    color: '#47a028',
   },
   {
     icon: ClipboardList,
@@ -58,7 +58,7 @@ export default function AdmissionsPage() {
     <div>
       {/* ── HERO ── */}
       <section style={{ position: 'relative', background: '#080516', color: '#fff', overflow: 'hidden' }}>
-        <Blob tone="teal" opacity={0.42} size={480} shape={2} style={{ top: -160, left: -120 }} />
+        <Blob tone="green" opacity={0.42} size={480} shape={2} style={{ top: -160, left: -120 }} />
         <Blob tone="pink" opacity={0.16} size={400} shape={1} style={{ bottom: -150, right: -110 }} />
         <div style={{ position: 'relative', maxWidth: 1120, margin: '0 auto', padding: '72px 24px' }}>
           <span className="section-label-pink" style={{ display: 'inline-flex' }}>Ciclo Escolar 2025–2026 · Inscripciones Abiertas</span>
@@ -83,7 +83,7 @@ export default function AdmissionsPage() {
           <div
             aria-hidden="true"
             className="hidden lg:block"
-            style={{ position: 'absolute', top: 28, left: '12.5%', right: '12.5%', height: 2, background: 'linear-gradient(90deg, #401a8e, #1da2ab, #ef2558, #48a018)', opacity: 0.35 }}
+            style={{ position: 'absolute', top: 28, left: '12.5%', right: '12.5%', height: 2, background: 'linear-gradient(90deg, #401a8e, #9a1185, #ef2558, #47a028)', opacity: 0.35 }}
           />
           <ol style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 28, listStyle: 'none', margin: 0, padding: 0 }}>
             {STEPS.map(({ icon: Icon, step, title, desc, color }, i) => (

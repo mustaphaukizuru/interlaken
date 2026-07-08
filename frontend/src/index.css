@@ -14,14 +14,16 @@
   --pink-dark: #d81a49;
   --pink-hot: #ec1f7f;
   --pink-light: #fde8ed;
-  --teal: #1da2ab;
-  --teal-bright: #25c3cd;
-  --teal-glow: #5fd6df;
-  --teal-light: #e3f6f7;
-  --green: #48a018;
-  --green-mid: #3aa852;
-  --green-dark: #2f9447;
-  --green-bright: #48d06a;
+  /* Coral — warm accent (tagline + clock hands + rule) */
+  --coral: #dd2622;
+  --coral-dark: #c51d1a;
+  --coral-light: #fdecec;
+  /* Green — primary anchor (wordmark) */
+  --green: #47a028;
+  --green-mid: #6fbb46;
+  --green-dark: #316f1c;
+  --green-bright: #8bd15f;
+  --green-light: #eef7e9;
   --amber: #d97706;
   /* Neutrals */
   --dark: #080516;
@@ -36,13 +38,14 @@
   --border: #ECEAF3;
   --border-2: #EEEBF5;
   /* Gradients */
-  --grad-bar: linear-gradient(90deg, #401a8e 0%, #5e3aad 28%, #ef2558 60%, #1da2ab 100%);
+  --grad-bar: linear-gradient(90deg, #401a8e 0%, #9a1185 30%, #ef2558 60%, #47a028 100%);
   --grad-cta: linear-gradient(120deg, #ef2558 0%, #401a8e 100%);
   --grad-purple: linear-gradient(100deg, #401a8e, #5a27b8);
   --shadow-card: 0 1px 2px rgba(16,12,40,0.04), 0 8px 24px -12px rgba(64,26,142,0.12);
   --shadow-purple: 0 12px 28px -10px rgba(64,26,142,0.38);
   --shadow-pink: 0 12px 28px -10px rgba(239,37,88,0.3);
-  --shadow-teal: 0 12px 28px -10px rgba(29,162,171,0.32);
+  --shadow-green: 0 12px 28px -10px rgba(71,160,40,0.32);
+  --shadow-coral: 0 12px 28px -10px rgba(221,38,34,0.3);
   --radius: 18px;
   --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
 }
@@ -105,8 +108,8 @@
   .btn-outline:hover { background: var(--purple); color: #fff; }
   .btn-ghost { @apply btn; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.22); }
   .btn-ghost:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.5); }
-  .btn-teal { @apply btn; background: var(--teal); color: #fff; box-shadow: var(--shadow-teal); }
-  .btn-teal:hover { background: var(--teal-bright); transform: translateY(-1px); }
+  .btn-green { @apply btn; background: var(--green); color: #fff; box-shadow: var(--shadow-green); }
+  .btn-green:hover { background: var(--green-dark); transform: translateY(-1px); }
   .btn-lg { padding: 16px 32px; font-size: 15px; }
 
   /* Cards */
@@ -126,12 +129,13 @@
   .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
   .badge-purple { @apply badge; background: var(--purple-light); color: var(--purple); }
   .badge-pink   { @apply badge; background: var(--pink-light); color: var(--pink); }
-  .badge-teal   { @apply badge; background: var(--teal-light); color: var(--teal); }
-  .badge-green  { @apply badge; background: rgba(72,160,24,0.1); color: var(--green); }
+  .badge-coral  { @apply badge; background: var(--coral-light); color: var(--coral); }
+  .badge-green  { @apply badge; background: var(--green-light); color: var(--green-dark); }
   .badge-amber  { @apply badge; background: rgba(217,119,6,0.1); color: var(--amber); }
 
   /* Section labels */
   .section-label-purple { @apply badge-purple; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
-  .section-label-teal   { @apply badge-teal;   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
+  .section-label-green  { @apply badge-green;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
+  .section-label-coral  { @apply badge-coral;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
   .section-label-pink   { @apply badge-pink;   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
 }

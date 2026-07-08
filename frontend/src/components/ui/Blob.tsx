@@ -1,12 +1,12 @@
 import { type CSSProperties } from 'react';
 
-type Tone = 'purple' | 'pink' | 'teal' | 'green' | 'amber';
+type Tone = 'purple' | 'pink' | 'coral' | 'green' | 'amber';
 
 const TONE: Record<Tone, string> = {
   purple: '#401a8e',
   pink: '#ef2558',
-  teal: '#1da2ab',
-  green: '#48d06a',
+  coral: '#dd2622',
+  green: '#47a028',
   amber: '#d97706',
 };
 
@@ -73,7 +73,7 @@ interface AccentProps {
  * brand-appropriate, restrained stand-in for the references' sticker doodles.
  */
 export function Accent({
-  tone = 'teal',
+  tone = 'green',
   size = 40,
   variant = 'ring',
   opacity = 0.5,

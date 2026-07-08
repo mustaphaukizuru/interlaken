@@ -24,7 +24,7 @@ export default function AdminDashboard() {
             <>
               <StatCard title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />
               <StatCard title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />
-              <StatCard title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="teal" />
+              <StatCard title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />
               <StatCard title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />
             </>
           )}
@@ -32,7 +32,7 @@ export default function AdminDashboard() {
 
         {/* Quick actions */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
-          <Link to="/admin/cafeteria" className="btn-teal"><RefreshCw size={16} /> Sincronizar Loyverse</Link>
+          <Link to="/admin/cafeteria" className="btn-green"><RefreshCw size={16} /> Sincronizar Loyverse</Link>
           <Link to="/admin/admisiones" className="btn" style={{ background: 'var(--purple)', color: '#fff' }}><UserPlus size={16} /> Nueva Admisión</Link>
           <Link to="/admin/alumnos" className="btn-outline"><Users size={16} /> Ver Alumnos</Link>
         </div>
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
                   <tr key={a.id} style={{ borderTop: i === 0 ? 'none' : '1px solid #ECEAF3' }}>
                     <td style={{ padding: '13px 22px', fontSize: 13.5, fontWeight: 600, color: '#1A1130' }}>{a.title}</td>
                     <td style={{ padding: '13px 22px', fontSize: 13, color: '#6E6885', textTransform: 'capitalize' }}>{a.audience}</td>
-                    <td style={{ padding: '13px 22px' }}><span className="badge-teal">Publicado</span></td>
+                    <td style={{ padding: '13px 22px' }}><span className="badge-green">Publicado</span></td>
                     <td style={{ padding: '13px 22px', fontSize: 13, color: '#9A93AE' }}>{new Date(a.created_at).toLocaleDateString('es-MX')}</td>
                   </tr>
                 ))}

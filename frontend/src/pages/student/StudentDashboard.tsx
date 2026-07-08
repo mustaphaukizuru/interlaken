@@ -26,7 +26,7 @@ export default function StudentDashboard() {
                 title="Saldo Cafetería"
                 value={`$${parseFloat(data?.cafeteria_balance ?? '0').toFixed(2)}`}
                 icon={Coffee}
-                color={data?.is_low_balance ? 'amber' : 'teal'}
+                color={data?.is_low_balance ? 'amber' : 'green'}
                 subtitle={data?.is_low_balance ? 'Saldo bajo — solicita recarga' : undefined}
               />
               <StatCard title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />
