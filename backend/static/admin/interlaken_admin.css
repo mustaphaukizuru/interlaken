@@ -130,3 +130,93 @@ select.form-control { border-radius: var(--radius-sm) !important; }
 .page-link { color: var(--brand-purple) !important; }
 .page-link:hover { background: #ede8f7 !important; color: var(--brand-purple) !important; }
 .paginator a:focus, .paginator a:hover { color: var(--brand-coral-dark) !important; }
+
+/* ============================================================================
+   Phase 3 — Mobile-first responsive (works cleanly from 360px up)
+   ============================================================================ */
+
+/* ── Global: no horizontal page scroll, safe-area insets ───────────────── */
+html { -webkit-text-size-adjust: 100%; }
+body, .wrapper { overflow-x: hidden; max-width: 100%; }
+.content-wrapper, .content, .container-fluid, .main-footer { max-width: 100%; }
+img, table, pre { max-width: 100%; }
+@supports (padding: max(0px)) {
+  .content-wrapper, .main-footer, .main-header.navbar {
+    padding-left:  max(var(--sa-l, 0px), env(safe-area-inset-left));
+    padding-right: max(var(--sa-r, 0px), env(safe-area-inset-right));
+  }
+}
+
+/* ── Change-list tables: contained scroller + sticky header ────────────── */
+#changelist .results, .results, .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#result_list { min-width: 100%; }
+#result_list thead th { position: sticky; top: 0; z-index: 2; }
+
+/* ── Change form: full-width inputs, no iOS zoom, tabs never overflow ──── */
+.changeform-tabs, .nav-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.nav-tabs .nav-item { flex: 0 0 auto; }
+.inline-group .tabular { overflow-x: auto; }
+
+/* ── Tablet+ : dashboard model cards grid (mobile-first upscale) ────────── */
+@media (min-width: 768px)  { .dashboard .col-12 > .card { } }
+
+/* ── Mobile / small tablet (≤ 991.98px) ────────────────────────────────── */
+@media (max-width: 991.98px) {
+  /* Dim overlay behind the off-canvas sidebar drawer (AdminLTE push-menu) */
+  body.sidebar-open .content-wrapper::before {
+    content: ''; position: fixed; inset: 0; z-index: 1035;
+    background: rgba(8,5,22,0.55); backdrop-filter: blur(1px);
+  }
+  .main-sidebar { z-index: 1038 !important; box-shadow: 4px 0 28px rgba(8,5,22,0.45) !important; }
+
+  /* Tap targets ≥ 44px */
+  .nav-sidebar .nav-link { min-height: 44px; display: flex; align-items: center; }
+  .navbar-nav .nav-link, .btn, .object-tools a, a.addlink, .paginator a, .page-link {
+    min-height: 44px; display: inline-flex; align-items: center;
+  }
+  .btn { padding: 0.5rem 0.9rem !important; }
+
+  /* Dashboard: model rows / action buttons wrap and stay tappable */
+  .dashboard td, .dashboard th { white-space: normal !important; }
+  .model-list .btn, table.dashboard .btn { margin: 2px 0; }
+
+  /* Object-tools + submit-row wrap instead of overflowing */
+  .object-tools { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 0 !important; }
+  .object-tools li { float: none !important; margin: 0 !important; }
+  .submit-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .submit-row input, .submit-row a { margin: 0 !important; }
+
+  /* Change-list: collapse filter sidebar into a full-width accordion block */
+  #changelist-filter {
+    position: static !important; width: 100% !important; margin: 0 0 14px !important;
+    border-radius: var(--radius) !important; border: 1px solid var(--border) !important;
+  }
+  #changelist .filtered { margin-right: 0 !important; }
+  #toolbar form input[type="text"] { width: 100%; }
+
+  /* Inputs full-width, 16px to prevent iOS zoom */
+  .form-control, input[type="text"], input[type="email"], input[type="number"],
+  input[type="password"], input[type="url"], input[type="date"], input[type="datetime-local"],
+  textarea, select { font-size: 16px !important; max-width: 100%; }
+  .form-row, .form-group { width: 100%; }
+  fieldset .form-row input:not([type="checkbox"]):not([type="radio"]),
+  fieldset .form-row textarea, fieldset .form-row select { width: 100% !important; box-sizing: border-box; }
+
+  /* Aligned label:value rows stack vertically on narrow screens */
+  .content-header .breadcrumb { flex-wrap: wrap; }
+
+  /* Navbar: let user menu + collapsible search fit */
+  .navbar .navbar-nav { flex-direction: row; }
+  .navbar-search-block { z-index: 1040; }
+}
+
+/* ── Phones (≤ 575.98px) ───────────────────────────────────────────────── */
+@media (max-width: 575.98px) {
+  .content-header h1 { font-size: 1.35rem; }
+  .card-body { padding: 0.9rem !important; }
+  .brand-text { font-size: 15px !important; }
+  /* Pagination wraps */
+  .paginator { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  /* Tighter table cells so more fits before the contained scroll kicks in */
+  .table td, .table th, #result_list td, #result_list th { padding: 0.5rem 0.55rem !important; }
+}
