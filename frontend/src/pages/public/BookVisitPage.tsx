@@ -12,6 +12,7 @@ import { trackEvent, FunnelEvent } from '@/services/analytics';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import type { AvailabilitySlot } from '@/types';
 
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5215512345678';
@@ -146,7 +147,7 @@ export default function BookVisitPage() {
                           className={`w-full text-left card border-2 min-h-[44px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
                             selectedDate === date
                               ? 'border-brand-500 bg-brand-50'
-                              : 'border-[#ECEAF3] hover:border-brand-300'
+                              : 'border-line hover:border-brand-300'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -175,7 +176,7 @@ export default function BookVisitPage() {
                                 className={`flex items-center gap-1.5 text-sm px-3 py-2 min-h-[44px] rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
                                   selectedSlot?.id === slot.id
                                     ? 'border-brand-500 bg-brand-500 text-white'
-                                    : 'border-[#ECEAF3] text-ink hover:border-brand-400'
+                                    : 'border-line text-ink hover:border-brand-400'
                                 }`}
                               >
                                 <Clock className="w-3.5 h-3.5" />
@@ -194,7 +195,7 @@ export default function BookVisitPage() {
               <div>
                 <h2 className="font-semibold text-fluid-lg text-ink mb-4">Sus datos</h2>
                 {!selectedSlot ? (
-                  <div className="card bg-cream border-dashed border-2 border-[#ECEAF3] text-center py-10 text-subtle text-sm">
+                  <div className="card bg-cream border-dashed border-2 border-line text-center py-10 text-subtle text-sm">
                     Seleccione un horario para continuar
                   </div>
                 ) : (
@@ -224,6 +225,8 @@ export default function BookVisitPage() {
                     <Input label="Nombre del alumno (opcional)" className={inputClass} {...register('child_name')} />
                     <Input label="Grado de interés (opcional)" className={inputClass} {...register('child_grade')} />
 
+                    <PrivacyNote />
+
                     <Button type="submit" loading={isSubmitting} className="w-full justify-center min-h-[44px]">
                       Confirmar visita
                     </Button>
@@ -233,7 +236,7 @@ export default function BookVisitPage() {
             </div>
 
             {/* WhatsApp fallback */}
-            <div className="mt-8 sm:mt-10 rounded-2xl border border-[#ECEAF3] bg-cream p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="mt-8 sm:mt-10 rounded-2xl border border-line bg-cream p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-muted text-center sm:text-left">
                 <p className="font-semibold text-ink">¿Prefiere agendar por WhatsApp?</p>
                 <p>Escríbanos y con gusto coordinamos su visita.</p>

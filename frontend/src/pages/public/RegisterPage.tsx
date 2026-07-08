@@ -26,7 +26,7 @@ export default function RegisterPage() {
               to="/pre-registro"
               className="btn-primary w-full justify-center min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
             >
-              Comenzar Pre-Registro
+              Inicie su pre-registro
             </Link>
             <Link
               to="/contacto"

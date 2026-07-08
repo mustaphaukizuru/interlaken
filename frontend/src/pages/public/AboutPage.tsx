@@ -16,12 +16,14 @@ const VALUES: { icon: LucideIcon; title: string; desc: string; color: string }[]
   { icon: Target,  title: 'Acompañamiento',        desc: 'Apoyo psicopedagógico personalizado para cada alumno.', color: 'var(--amber)' },
 ];
 
-// Levels use the brand scales (purple/green/coral have numeric ramps). Offer
-// matches the canonical identity: preescolar, primaria y secundaria.
+// Levels use brand scales/tokens (green/brand/coral have numeric ramps; the
+// 4th uses the purple token pair). Mirrors the levels offered in the
+// pre-registro grade picker.
 const LEVELS = [
-  { level: 'Preescolar', grades: '1°–3°', age: '3–6 años',   color: 'bg-green-50 border-green-200 text-green-700' },
-  { level: 'Primaria',   grades: '1°–6°', age: '6–12 años',  color: 'bg-brand-50 border-brand-200 text-brand-700' },
-  { level: 'Secundaria', grades: '1°–3°', age: '12–15 años', color: 'bg-coral-50 border-coral-200 text-coral-700' },
+  { level: 'Preescolar',   grades: '1°–3°', age: '3–6 años',   color: 'bg-green-50 border-green-200 text-green-700' },
+  { level: 'Primaria',     grades: '1°–6°', age: '6–12 años',  color: 'bg-brand-50 border-brand-200 text-brand-700' },
+  { level: 'Secundaria',   grades: '1°–3°', age: '12–15 años', color: 'bg-coral-50 border-coral-200 text-coral-700' },
+  { level: 'Preparatoria', grades: '1°–3°', age: '15–18 años', color: 'bg-purple-light border-purple/30 text-purple-dark' },
 ];
 
 /**
@@ -52,7 +54,7 @@ export default function AboutPage() {
           </h1>
           <p className="mt-4 max-w-xl text-fluid-base leading-relaxed text-white/60 sm:mt-[18px]">
             Colegio Interlaken es una institución educativa privada con más de cuatro décadas
-            de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta secundaria.
+            de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta preparatoria.
           </p>
         </div>
       </section>

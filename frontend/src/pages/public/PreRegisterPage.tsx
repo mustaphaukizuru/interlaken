@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { CheckCircle } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
 import type { PreRegistrationData } from '@/types';
@@ -123,7 +124,7 @@ export default function PreRegisterPage() {
             </div>
           </div>
 
-          <hr className="border-[#ECEAF3]" />
+          <hr className="border-line" />
 
           <div>
             <h2 className="font-semibold text-fluid-lg text-ink mb-1">Datos del tutor</h2>
@@ -179,8 +180,10 @@ export default function PreRegisterPage() {
             />
           </div>
 
+          <PrivacyNote />
+
           <Button type="submit" loading={isSubmitting} size="lg" className="w-full justify-center min-h-[44px]">
-            Enviar Pre-Registro
+            Enviar pre-registro
           </Button>
         </form>
       </div>

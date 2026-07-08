@@ -91,7 +91,7 @@ export default function LoginPage() {
             onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
           />
           <div className="absolute -left-[100px] -top-[120px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(64,26,142,0.6),rgba(8,5,22,0)_68%)]" />
-          <div className="absolute -bottom-[100px] -right-[80px] h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(29,162,171,0.22),rgba(8,5,22,0)_68%)]" />
+          <div className="absolute -bottom-[100px] -right-[80px] h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(71,160,40,0.22),rgba(8,5,22,0)_68%)]" />
 
           <div className="relative">
             <Logo variant="stacked" size={120} theme="dark" eager />
@@ -100,10 +100,10 @@ export default function LoginPage() {
             <div className="section-label-pink inline-flex">Portal Escolar</div>
             <h1 className="mt-3 font-head text-[44px] font-black leading-[1.08] tracking-[-1px] text-white">
               Formando Líderes<br />
-              <span className="bg-[linear-gradient(100deg,#ef2558_0%,#b13bbf_55%,#5e3aad_100%)] bg-clip-text text-transparent">con Excelencia</span>
+              <span className="bg-[linear-gradient(100deg,var(--pink)_0%,var(--purple-mid)_100%)] bg-clip-text text-transparent">con Excelencia</span>
             </h1>
             <p className="mt-4 max-w-[420px] text-[15px] leading-relaxed text-white/60">
-              Accede al portal de Colegio Interlaken para consultar calificaciones, asistencia, cafetería y pagos.
+              Acceda al portal de Colegio Interlaken para consultar colegiaturas, cafetería y pagos en línea.
             </p>
           </div>
           <div className="relative flex gap-7">
@@ -124,7 +124,7 @@ export default function LoginPage() {
               <Logo variant="stacked" size={96} theme="light" eager />
             </div>
 
-            <div className="rounded-[22px] border border-[#ECEAF3] bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
+            <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
               <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">Iniciar Sesión</h2>
               <p className="mb-6 mt-1 text-center text-[13px] text-muted">Bienvenido de vuelta a Interlaken</p>
 
@@ -137,7 +137,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => authApi.googleLogin()}
-                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-[#ECEAF3] bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -149,9 +149,9 @@ export default function LoginPage() {
               </button>
 
               <div className="my-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-[#ECEAF3]" />
+                <div className="h-px flex-1 bg-line" />
                 <span className="text-[11.5px] font-semibold text-subtle">O CON CORREO</span>
-                <div className="h-px flex-1 bg-[#ECEAF3]" />
+                <div className="h-px flex-1 bg-line" />
               </div>
 
               <form onSubmit={handleSubmit}>
@@ -187,7 +187,7 @@ export default function LoginPage() {
 
             <p className="mt-5 text-center text-[12.5px] text-subtle">
               ¿No tiene cuenta?{' '}
-              <Link to="/pre-registro" className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">Iniciar pre-registro</Link>
+              <Link to="/pre-registro" className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">Inicie su pre-registro</Link>
             </p>
           </div>
         </div>

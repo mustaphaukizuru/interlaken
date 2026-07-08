@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { api } from '@/services/api';
 
 interface PreReg {
@@ -30,7 +31,7 @@ const statusMeta: Record<string, { label: string; variant: any }> = {
 export default function AdminAdmissions() {
   const [search, setSearch] = useState('');
 
-  const { data: preRegs, isLoading } = useQuery<PreReg[]>({
+  const { data: preRegs, isLoading, isError, refetch } = useQuery<PreReg[]>({
     queryKey: ['admin-preregistrations'],
     queryFn: async () => {
       const { data } = await api.get('/admissions/pre-register/');
@@ -48,7 +49,7 @@ export default function AdminAdmissions() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-ink">Admisiones</h1>
+        <h1 className="text-fluid-xl font-bold text-ink">Admisiones</h1>
         <p className="text-muted text-sm mt-0.5">Pre-registros e inscripciones recibidas.</p>
       </div>
 
@@ -66,45 +67,90 @@ export default function AdminAdmissions() {
 
         {isLoading ? (
           <LoadingSpinner />
+        ) : isError ? (
+          <ErrorState onRetry={() => refetch()} />
         ) : !filtered?.length ? (
-          <EmptyState icon={ClipboardList} title="Sin pre-registros" description="Los pre-registros aparecerán aquí cuando se reciban." />
+          <EmptyState
+            icon={ClipboardList}
+            title={search ? 'Sin resultados' : 'Sin pre-registros'}
+            description={search ? 'Ningún pre-registro coincide con la búsqueda.' : 'Los pre-registros aparecerán aquí cuando se reciban.'}
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line">
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Alumno</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Grado</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Tutor</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Contacto</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Fecha</th>
-                  <th className="text-left py-2 text-xs font-semibold text-muted">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {filtered.map((p) => {
-                  const meta = statusMeta[p.status] ?? statusMeta.pending;
-                  return (
-                    <tr key={p.id} className="hover:bg-cream">
-                      <td className="py-3 pr-4 font-medium text-ink">{p.child_name}</td>
-                      <td className="py-3 pr-4 text-muted">{p.grade_applying}</td>
-                      <td className="py-3 pr-4 text-muted">{p.parent_name}</td>
-                      <td className="py-3 pr-4">
-                        <div className="text-muted">{p.email}</div>
-                        <div className="text-subtle text-xs">{p.phone}</div>
-                      </td>
-                      <td className="py-3 pr-4 text-subtle whitespace-nowrap">
-                        {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
-                      </td>
-                      <td className="py-3">
-                        <Badge variant={meta.variant}>{meta.label}</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile: stacked cards */}
+            <ul className="space-y-3 md:hidden">
+              {filtered.map((p) => {
+                const meta = statusMeta[p.status] ?? statusMeta.pending;
+                return (
+                  <li key={p.id} className="rounded-xl2 border border-line p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink">{p.child_name}</p>
+                        <p className="text-xs text-subtle">Grado: {p.grade_applying}</p>
+                      </div>
+                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                    </div>
+                    <dl className="mt-3 space-y-1 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted">Tutor</dt>
+                        <dd className="text-ink text-right">{p.parent_name}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted">Correo</dt>
+                        <dd className="text-ink text-right break-all">{p.email}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted">Teléfono</dt>
+                        <dd className="text-ink text-right">{p.phone}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted">Fecha</dt>
+                        <dd className="text-subtle text-right">{format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}</dd>
+                      </div>
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: dense table */}
+            <div className="admin-table-wrap hidden md:block">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Alumno</th>
+                    <th>Grado</th>
+                    <th>Tutor</th>
+                    <th>Contacto</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((p) => {
+                    const meta = statusMeta[p.status] ?? statusMeta.pending;
+                    return (
+                      <tr key={p.id}>
+                        <td className="font-medium text-ink">{p.child_name}</td>
+                        <td className="text-muted">{p.grade_applying}</td>
+                        <td className="text-muted">{p.parent_name}</td>
+                        <td>
+                          <div className="text-muted">{p.email}</div>
+                          <div className="text-subtle text-xs">{p.phone}</div>
+                        </td>
+                        <td className="text-subtle whitespace-nowrap">
+                          {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
+                        </td>
+                        <td>
+                          <Badge variant={meta.variant}>{meta.label}</Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
     </div>

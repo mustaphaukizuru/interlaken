@@ -7,6 +7,7 @@ import { contactApi } from '@/services/api';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
+import { PrivacyNote } from '@/components/ui/PrivacyNote';
 
 const schema = z.object({
   name:    z.string().min(2, 'Nombre requerido'),
@@ -49,12 +50,12 @@ export default function ContactPage() {
         <Blob tone="pink" opacity={0.4} size={460} shape={1} className="hidden sm:block" style={{ top: -150, left: -110 }} />
         <Blob tone="purple" opacity={0.4} size={420} shape={0} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
         <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-16">
-          <span className="section-label-pink inline-flex">Estamos para ayudarte</span>
+          <span className="section-label-pink inline-flex">Estamos para ayudarle</span>
           <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
             Contacto
           </h1>
           <p className="mt-4 max-w-[520px] text-base leading-relaxed text-white/60 sm:text-[17px]">
-            Resolvemos tus dudas sobre admisiones, costos y nuestro modelo educativo. Escríbenos y te contactaremos pronto.
+            Resolvemos sus dudas sobre admisiones, costos y nuestro modelo educativo. Escríbanos y le contactaremos pronto.
           </p>
         </div>
       </section>
@@ -99,7 +100,7 @@ export default function ContactPage() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Abrir ubicación en Google Maps"
-              className="relative mt-6 block h-[220px] overflow-hidden rounded-[18px] border border-[#ECEAF3] bg-gradient-to-br from-purple-light to-green-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+              className="relative mt-6 block h-[220px] overflow-hidden rounded-[18px] border border-line bg-gradient-to-br from-purple-light to-green-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
             >
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-purple">
                 <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white shadow-purple">
@@ -128,7 +129,7 @@ export default function ContactPage() {
           {/* Contact form */}
           <Reveal direction="left">
             <div className="card">
-              <h2 className="mb-[18px] font-head text-fluid-xl font-extrabold tracking-tight text-ink">Envíanos un mensaje</h2>
+              <h2 className="mb-[18px] font-head text-fluid-xl font-extrabold tracking-tight text-ink">Envíenos un mensaje</h2>
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
                 <div>
                   <label className="label" htmlFor="contact-name">Nombre</label>
@@ -156,6 +157,7 @@ export default function ContactPage() {
                   />
                   {errors.message && <p className="mt-1.5 text-xs text-red-600">{errors.message.message}</p>}
                 </div>
+                <PrivacyNote />
                 <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center disabled:opacity-60">
                   {isSubmitting ? 'Enviando…' : 'Enviar mensaje'}
                 </button>

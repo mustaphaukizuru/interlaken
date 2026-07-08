@@ -61,8 +61,29 @@ export default function OpenSchoolPage() {
     }
   };
 
+  // Event structured data for the upcoming Puertas Abiertas dates.
+  const eventsJsonLd = (events ?? []).map((e) => ({
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: e.title,
+    startDate: e.date,
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    eventStatus: 'https://schema.org/EventScheduled',
+    location: {
+      '@type': 'Place',
+      name: e.location || SITE_NAME,
+      address: 'Tlalnepantla de Baz, Estado de México',
+    },
+    organizer: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+  }));
+
   return (
     <div>
+      {eventsJsonLd.length > 0 && (
+        <Helmet>
+          <script type="application/ld+json">{JSON.stringify(eventsJsonLd)}</script>
+        </Helmet>
+      )}
       <section className="bg-gradient-to-r from-brand-700 to-brand-600 py-12 text-white sm:py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <h1 className="mb-2 font-head text-fluid-4xl font-bold">Puertas Abiertas</h1>
@@ -178,6 +199,8 @@ export default function OpenSchoolPage() {
                       ))}
                     </select>
                   </div>
+
+                  <PrivacyNote />
 
                   <Button
                     type="submit"

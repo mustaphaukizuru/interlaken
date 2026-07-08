@@ -296,7 +296,7 @@ export function PublicLayout() {
       </Link>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 text-sm">
+      <footer className="bg-dark text-white/60 text-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 md:grid-cols-5 gap-8">
           {/* Brand column */}
           <div className="col-span-2">
@@ -315,7 +315,7 @@ export function PublicLayout() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
                 >
                   <Icon className="w-4 h-4" />
                 </a>
@@ -365,10 +365,13 @@ export function PublicLayout() {
             </a>
           </div>
         </div>
-        <div className="border-t border-slate-800">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-center">
+        <div className="border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
             <span>© {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados</span>
-            <span className="text-slate-500">Institución con reconocimiento de validez oficial · SEP</span>
+            <div className="flex items-center gap-4">
+              <Link to="/aviso-de-privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
+              <span className="text-white/45">Reconocimiento de validez oficial · SEP</span>
+            </div>
           </div>
         </div>
       </footer>

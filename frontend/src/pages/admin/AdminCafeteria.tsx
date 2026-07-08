@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
 
@@ -93,7 +94,7 @@ function RosterTab() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
 
-  const { data: balances, isLoading } = useQuery<CafeteriaBalance[]>({
+  const { data: balances, isLoading, isError, refetch } = useQuery<CafeteriaBalance[]>({
     queryKey: ['admin-cafeteria-balances'],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getAllBalances();
@@ -145,65 +146,115 @@ function RosterTab() {
 
       {isLoading ? (
         <LoadingSpinner />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : !filtered?.length ? (
-        <EmptyState icon={Coffee} title="Sin saldos registrados" />
+        <EmptyState icon={Coffee} title={search ? 'Sin resultados' : 'Sin saldos registrados'} />
       ) : (
-        <div className="w-full overflow-x-auto rounded-xl2">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
-                <th className="py-2 pr-4">Alumno</th>
-                <th className="py-2 pr-4">Matrícula</th>
-                <th className="py-2 pr-4 text-right">Saldo</th>
-                <th className="py-2 pr-4">Estado</th>
-                <th className="py-2 pr-4">Últ. sinc.</th>
-                <th className="py-2 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {filtered.map((b) => {
-                const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
-                return (
-                  <tr key={b.id} className="hover:bg-cream">
-                    <td className="py-3 pr-4 font-medium text-ink">
-                      <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
-                        {b.student.user.full_name}
+        <>
+          {/* Mobile: stacked cards (mobile-priority workflow) */}
+          <ul className="space-y-3 md:hidden">
+            {filtered.map((b) => {
+              const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
+              return (
+                <li key={b.id} className="rounded-xl2 border border-line p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <Link to={`/admin/cafeteria/${b.student.id}`} className="min-w-0 font-medium text-ink hover:text-brand-700">
+                      {b.student.user.full_name}
+                      <span className="block text-xs font-normal text-subtle">{b.student.student_id}</span>
+                    </Link>
+                    <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>
+                  </div>
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted">Saldo</p>
+                      <p className="text-lg font-bold text-ink">${parseFloat(b.balance).toFixed(2)}</p>
+                      <p className="text-xs text-subtle">Sinc. {fmtDate(b.last_synced)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
+                        title="Sincronizar saldo"
+                        onClick={() => syncOne.mutate(b.student.id)}
+                        loading={syncOne.isPending}
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </Button>
+                      <Link
+                        to={`/admin/cafeteria/${b.student.id}`}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-cream"
+                        title="Ver detalle"
+                        aria-label={`Ver detalle de ${b.student.user.full_name}`}
+                      >
+                        <ChevronRight className="w-4 h-4" />
                       </Link>
-                    </td>
-                    <td className="py-3 pr-4 text-muted">{b.student.student_id}</td>
-                    <td className="py-3 pr-4 text-right font-semibold text-ink">${parseFloat(b.balance).toFixed(2)}</td>
-                    <td className="py-3 pr-4">
-                      <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>
-                    </td>
-                    <td className="py-3 pr-4 text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
-                    <td className="py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
-                          title="Sincronizar saldo"
-                          onClick={() => syncOne.mutate(b.student.id)}
-                          loading={syncOne.isPending}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </Button>
-                        <Link
-                          to={`/admin/cafeteria/${b.student.id}`}
-                          className="inline-flex items-center rounded-lg p-1.5 text-muted hover:bg-cream"
-                          title="Ver detalle"
-                          aria-label={`Ver detalle de ${b.student.user.full_name}`}
-                        >
-                          <ChevronRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Desktop: dense table */}
+          <div className="admin-table-wrap hidden md:block">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Alumno</th>
+                  <th>Matrícula</th>
+                  <th className="num">Saldo</th>
+                  <th>Estado</th>
+                  <th>Últ. sinc.</th>
+                  <th className="num">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((b) => {
+                  const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
+                  return (
+                    <tr key={b.id}>
+                      <td className="font-medium text-ink">
+                        <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
+                          {b.student.user.full_name}
                         </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="text-muted">{b.student.student_id}</td>
+                      <td className="num font-semibold text-ink">${parseFloat(b.balance).toFixed(2)}</td>
+                      <td>
+                        <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>
+                      </td>
+                      <td className="text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
+                      <td>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
+                            title="Sincronizar saldo"
+                            onClick={() => syncOne.mutate(b.student.id)}
+                            loading={syncOne.isPending}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </Button>
+                          <Link
+                            to={`/admin/cafeteria/${b.student.id}`}
+                            className="inline-flex items-center rounded-lg p-1.5 text-muted hover:bg-cream"
+                            title="Ver detalle"
+                            aria-label={`Ver detalle de ${b.student.user.full_name}`}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </Card>
   );
@@ -213,7 +264,7 @@ function RosterTab() {
 function DepositsTab() {
   const [status, setStatus] = useState('');
 
-  const { data, isLoading } = useQuery<TopUpLogEntry[]>({
+  const { data, isLoading, isError, refetch } = useQuery<TopUpLogEntry[]>({
     queryKey: ['admin-cafeteria-topups', status],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTopUpLog({ status: status || undefined });
@@ -243,37 +294,39 @@ function DepositsTab() {
 
       {isLoading ? (
         <LoadingSpinner />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : !data?.length ? (
         <EmptyState icon={ScrollText} title="Sin depósitos registrados" />
       ) : (
-        <div className="w-full overflow-x-auto rounded-xl2">
-          <table className="w-full text-sm">
+        <div className="admin-table-wrap">
+          <table className="admin-table">
             <thead>
-              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
-                <th className="py-2 pr-4">Fecha</th>
-                <th className="py-2 pr-4">Alumno</th>
-                <th className="py-2 pr-4 text-right">Monto</th>
-                <th className="py-2 pr-4">Método</th>
-                <th className="py-2 pr-4">Pasarela</th>
-                <th className="py-2 pr-4">Estado</th>
-                <th className="py-2">Referencia</th>
+              <tr>
+                <th>Fecha</th>
+                <th>Alumno</th>
+                <th className="num">Monto</th>
+                <th>Método</th>
+                <th>Pasarela</th>
+                <th>Estado</th>
+                <th>Referencia</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {data.map((d) => (
-                <tr key={d.id} className="hover:bg-cream">
-                  <td className="py-3 pr-4 whitespace-nowrap text-muted">{fmtDate(d.created_at)}</td>
-                  <td className="py-3 pr-4 font-medium text-ink">
+                <tr key={d.id}>
+                  <td className="whitespace-nowrap text-muted">{fmtDate(d.created_at)}</td>
+                  <td className="font-medium text-ink">
                     <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
                       {d.student_name}
                     </Link>
                     <span className="block text-xs text-subtle">{d.student_code}</span>
                   </td>
-                  <td className="py-3 pr-4 text-right font-semibold text-ink">${parseFloat(d.amount).toFixed(2)}</td>
-                  <td className="py-3 pr-4 text-muted">{d.method_display}</td>
-                  <td className="py-3 pr-4 text-muted">{d.gateway || '—'}</td>
-                  <td className="py-3 pr-4"><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
-                  <td className="py-3 text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
+                  <td className="num font-semibold text-ink">${parseFloat(d.amount).toFixed(2)}</td>
+                  <td className="text-muted">{d.method_display}</td>
+                  <td className="text-muted">{d.gateway || '—'}</td>
+                  <td><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
+                  <td className="text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -288,7 +341,7 @@ function DepositsTab() {
 function ReconcileTab() {
   const [onlyDrift, setOnlyDrift] = useState(true);
 
-  const { data, isLoading, isFetching, refetch } = useQuery<{
+  const { data, isLoading, isFetching, isError, refetch } = useQuery<{
     count: number; drift_count: number; results: ReconcileRow[];
   }>({
     queryKey: ['admin-cafeteria-reconcile', onlyDrift],
