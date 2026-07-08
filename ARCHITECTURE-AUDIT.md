@@ -146,7 +146,7 @@ DRF is **secure-by-default**: `DEFAULT_AUTHENTICATION_CLASSES=[JWTAuthentication
   - **`create_checkout` swallows all exceptions and returns `hpp_url=None` while still creating a PENDING Payment** → orphan payment records with no checkout URL (reconciliation risk).
   - **JWT access+refresh handed to frontend via OAuth callback URL query string** + stored in `localStorage` (STATUS_REPORT §5.4) — documented-but-open; needs one-time-code + HttpOnly cookie exchange.
 - **Dead/unused dependencies** — Backend: `globalpayments-api`, `python-decouple`, `httpx`, `django-anymail` (all never imported), `mysqlclient` (redundant; PyMySQL is the real driver). Frontend: `@google/generative-ai`, `react-dropzone` (both never imported). Prune.
-- **Repo's own `prompts/` pipeline — what's already built:** prompts **01–15, 17, 19 DONE** (logs + commits); **20 = deploy prep only** (automation + env template shipped; live cPanel deploy is an unverifiable ops step, **SSL expired**); **16 (legal/LFPDPPP) and 18 (academics: attendance/grades/teacher portal) NOT built** — confirmed by absent `apps/legal` and `apps/academics`, absent logs, absent commits. Admin + frontend UI/UX refinements (5 phases each) DONE.
+- **Repo's own `prompts/` pipeline — what's already built:** prompts **01–15, 17, 19 DONE** (logs + commits); **20 = deploy prep only** (automation + env template shipped; live cPanel deploy is an unverifiable ops step, **SSL expired**); **16 (legal/LFPDPPP) NOT built** — confirmed by absent `apps/legal`, absent logs, absent commits; **18 (academics) is out of scope** per the client contract. Admin + frontend UI/UX refinements (5 phases each) DONE.
 
 ---
 
@@ -172,9 +172,8 @@ DRF is **secure-by-default**: `DEFAULT_AUTHENTICATION_CLASSES=[JWTAuthentication
 3. **Append-only AuditLog:** DB-enforced immutability over money + minor-data mutations (unify the two adjustment trails).
 4. **Security hardening pass:** bookings ownership gate, admissions rate limits + token-out-of-URL, cafeteria perm `is_authenticated` guard, OAuth token-in-URL → one-time-code + HttpOnly cookie, `create_checkout` orphan-PENDING fix.
 5. **Inscripción ficha UI completion** + **facturación (RFC/CFDI via PAC)**.
-6. **Academics (Prompt 18):** attendance/grades/teacher portal.
-7. **Public-site + design-system cleanup:** level pages, Plataformas hub, token enforcement, query-error UX, dead-dep prune.
-8. **Go-live (Prompt 20):** renew SSL, provision live gateway creds, deploy.
+6. **Public-site + design-system cleanup:** level pages, Plataformas hub, token enforcement, query-error UX, dead-dep prune.
+7. **Go-live (Prompt 20):** renew SSL, provision live gateway creds, deploy.
 
 ---
 
@@ -186,7 +185,7 @@ DRF is **secure-by-default**: `DEFAULT_AUTHENTICATION_CLASSES=[JWTAuthentication
 
 3. **Only Loyverse and WhatsApp are really wired.** Both payment gateways (Global Payments, Banorte) are **sandbox URL-builder stubs** with real-but-unconfigured HMAC webhooks; **all Mexican fiscal (CFDI/PAC/SAT/RFC) is doc-only.** Any "payments work" claim is billing logic, not live charging.
 
-4. **Two whole modules were never built: legal/LFPDPPP (16) and academics (18).** No `apps/legal`, no `apps/academics`, no consent model. Legal consent is **legally required in Mexico** and gates a compliant public launch. Prompt 20 "deploy" is prep only — **the production SSL cert is expired**, blocking HTTPS, OAuth, and WhatsApp.
+4. **Legal/LFPDPPP (16) was never built.** No `apps/legal`, no consent model. Legal consent is **legally required in Mexico** and gates a compliant public launch. (Academics — attendance/grades/teacher portal — is **out of scope** per the client contract.) Prompt 20 "deploy" is prep only — **the production SSL cert is expired**, blocking HTTPS, OAuth, and WhatsApp.
 
 5. **Compliance & audit are the biggest risk cluster.** Zero LFPDPPP consent despite storing minors' CURP/medical data; audit trails are **mutable, manual-only**, covering neither automated money movements nor minor-data edits. Combined with the bookings `AllowAny`-by-PK IDOR, admissions token-in-URL, and JWT-in-URL/localStorage, the security/compliance surface needs a dedicated pass before handling real families' data at scale.
 
@@ -207,3 +206,32 @@ Scope note: fixes 2 and 3 each covered a *second* occurrence of the same defect
 (finance `IsAdmin`; cafeteria top-up checkout) beyond the specific lines named in
 §6 — the same "fix the whole class of bug" reasoning the task applied to the
 permission-class audit. No unrelated code was touched.
+
+---
+
+## IK-SEC + LEGAL — security hardening + LFPDPPP compliance (2026-07-08)
+
+One conventional commit per item; full suite green before and after each. Backend
+tests **122 → 164 (+42)**; frontend **13** (auth suite migrated to the memory/cookie
+model, no net count change). `manage.py check` clean; frontend `tsc` + build clean.
+
+### PART A — Security (IK-SEC)
+| Item | Commit | Evidence | Tests |
+|---|---|---|---|
+| **A1** JWT storage | `deda010` | Refresh → httpOnly+Secure+SameSite cookie; access in memory (15 min); double-submit CSRF; rotation+blacklist on refresh; OAuth callback off-URL (`?login=ok`); React auth layer migrated same commit; `AUTH.md`. | +6 (rotation, httpOnly, CSRF, silent-refresh, logout-revoke) |
+| **A2** Admissions tokens | `1e9c8a7` | One-time hashed-at-rest invite exchanged via POST for a session token (header, never a URL); single-use + expiring; uniform 401 (no PK enumeration). | 8 → 11 (+3): reuse/expired/wrong→401, hash-at-rest, no-token-in-URL |
+| **A3** Append-only AuditLog | `ee37bed` | Immutable `AuditLog` (instance + queryset update/delete raise); signal auto-diffs for Payment/wallet/student/role+perm; webhook money = `system:webhook`; actor via middleware. | +6 |
+| **A4** Security sweep | `f5f1cb9` | Google ID token verified locally (no `tokeninfo?id_token=` URL); logging + AllowAny serialization reviewed clean; `SECURITY-DECISIONS.md`. | +2 (GoogleToken exchange) |
+
+### PART B — LFPDPPP compliance (IK-LEGAL)
+| Item | Commit | Evidence | Tests |
+|---|---|---|---|
+| **B1** Consent data model | `a8eefc8` | New `legal` app: `PrivacyNoticeVersion` + immutable, granular `ConsentRecord` (5 purposes); revocation = new record; consent mutations audited (A3). | +7 |
+| **B2** Consent capture | `74d70aa` | Public notice endpoint; guardian consent GET/POST (own children only); `needs_acceptance` covers new account + version change; admissions Stage-B privacy + medical gating; per-student photo flag. | +10 (7 legal API + 3 admissions) |
+| **B3** ARCO rights | `0e8d29f` | `ArcoRequest` (A/R/C/O) + statutory 20-business-day deadline; parent + staff-console endpoints; Acceso household data export (own data, no secrets); status changes audited + attributed. | +5 |
+| **B4** Enforcement | `0015556` | Medical fields (`blood_type, allergies, medical_notes, estatura, peso`) Fernet-encrypted at rest + serializer-gated on role + MEDICAL_DATA consent; `report_retention` command (report-only, never deletes). | +5 |
+
+**Follow-ups (out of scope here):** the consent/ARCO React *screens* have a ready
+API client (`legalApi`) and follow existing component patterns + es-MX copy;
+`RegisterPage` remains the pre-existing placeholder. Prod must set a dedicated
+`FIELD_ENCRYPTION_KEY` and, for split-origin, `AUTH_COOKIE_SAMESITE=None`.
