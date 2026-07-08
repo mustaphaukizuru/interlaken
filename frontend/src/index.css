@@ -60,6 +60,36 @@
     overflow-x: hidden;
   }
   img { display: block; max-width: 100%; }
+
+  /* Focus-visible safety net: any interactive element that doesn't already opt
+     out with `focus:outline-none` (i.e. isn't giving itself a brand ring) still
+     gets a visible brand focus outline for keyboard users. Zero-specificity
+     `:where()` so component-level rings always win. */
+  :where(a, button, [role="button"], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--purple);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Skip-to-content link — visually hidden until focused. */
+  .skip-link {
+    position: fixed; top: 8px; left: 8px; z-index: 100;
+    transform: translateY(-150%);
+    background: var(--purple); color: #fff;
+    padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px;
+    transition: transform var(--transition);
+  }
+  .skip-link:focus { transform: translateY(0); }
+}
+
+/* Honor reduced-motion globally: neutralize animations, transitions, smooth scroll. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Top accent bar — show on all public pages */
@@ -130,7 +160,7 @@
   .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
   .badge-purple { @apply badge; background: var(--purple-light); color: var(--purple); }
   .badge-pink   { @apply badge; background: var(--pink-light); color: var(--pink); }
-  .badge-coral  { @apply badge; background: var(--coral-light); color: var(--coral); }
+  .badge-coral  { @apply badge; background: var(--coral-light); color: var(--coral-dark); }
   .badge-green  { @apply badge; background: var(--green-light); color: var(--green-dark); }
   .badge-amber  { @apply badge; background: rgba(217,119,6,0.1); color: var(--amber); }
 

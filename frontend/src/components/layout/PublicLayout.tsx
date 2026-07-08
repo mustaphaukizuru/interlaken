@@ -169,6 +169,7 @@ export function PublicLayout() {
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
+      <a href="#contenido" className="skip-link">Saltar al contenido</a>
       {/* Top bar */}
       <div className="hidden md:flex bg-brand-800 text-white text-xs px-6 py-1.5 justify-end gap-6">
         <a href="tel:+525512345678" className="flex items-center gap-1 hover:text-brand-200 transition-colors">
@@ -282,9 +283,17 @@ export function PublicLayout() {
       </header>
 
       {/* Page content */}
-      <main className="flex-1">
+      <main id="contenido" className="flex-1">
         <Outlet />
       </main>
+
+      {/* Sticky mobile CTA — quick path to pre-inscripción, phones only. */}
+      <Link
+        to="/pre-registro"
+        className="btn-pink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 justify-center shadow-lg md:hidden"
+      >
+        Pre-inscripción
+      </Link>
 
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 text-sm">

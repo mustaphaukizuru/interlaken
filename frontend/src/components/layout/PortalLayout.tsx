@@ -54,6 +54,7 @@ export function PortalLayout({ role }: Props) {
   return (
     <MobileNavContext.Provider value={{ open, toggle, close }}>
       <div className="flex min-h-screen bg-cream">
+        <a href="#contenido" className="skip-link">Saltar al contenido</a>
         {/* Off-canvas backdrop (mobile only) */}
         <div
           onClick={close}
@@ -67,7 +68,7 @@ export function PortalLayout({ role }: Props) {
         <Sidebar role={role} open={open} onNavigate={close} />
 
         {/* Main */}
-        <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
           <div className="flex-1 px-[clamp(16px,4vw,32px)] py-6">
             <Outlet />
           </div>
