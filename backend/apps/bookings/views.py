@@ -29,6 +29,21 @@ class IsAdmin(permissions.BasePermission):
         return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
+def _can_access_booking(user, booking):
+    """Object-level ownership for a booking.
+
+    Bookings carry no FK to a User (they are created from the public form), so a
+    "guardian owns it" is established by matching the authenticated account's email
+    to the booking's contact email. Admin/staff may access any booking.
+    """
+    if not (user and user.is_authenticated):
+        return False
+    if user.role in (User.Role.ADMIN, User.Role.STAFF):
+        return True
+    return bool(booking.parent_email) and \
+        booking.parent_email.strip().lower() == (user.email or '').strip().lower()
+
+
 def _open_slots_qs(params):
     """Filter active, non-past slots by optional ?type=&from=&to=."""
     today = timezone.now().date()
@@ -128,25 +143,37 @@ class BookingCreateView(APIView):
 
 
 class BookingDetailView(APIView):
-    """GET /api/v1/bookings/<id>/ — booking status / confirmation details."""
-    permission_classes = [permissions.AllowAny]
+    """GET /api/v1/bookings/<id>/ — booking status / confirmation details.
+
+    Authenticated + owner-only: exposes contact PII, so only the owning guardian
+    (or staff/admin) may read it. Non-owners get 404 (no existence oracle).
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
         try:
             booking = Booking.objects.select_related('slot').get(pk=pk)
         except Booking.DoesNotExist:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if not _can_access_booking(request.user, booking):
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(BookingSerializer(booking).data)
 
 
 class BookingCancelView(APIView):
-    """POST /api/v1/bookings/<id>/cancel/ — cancel a booking (frees the slot)."""
-    permission_classes = [permissions.AllowAny]
+    """POST /api/v1/bookings/<id>/cancel/ — cancel a booking (frees the slot).
+
+    Authenticated + owner-only (or staff/admin); non-owners get 404.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
         try:
             booking = Booking.objects.select_related('slot').get(pk=pk)
         except Booking.DoesNotExist:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not _can_access_booking(request.user, booking):
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
         if booking.status == Booking.Status.CANCELLED:
