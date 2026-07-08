@@ -50,8 +50,8 @@ export interface Payment {
   amount: string;
   currency: string;
   description: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
-  gateway_transaction_id: string;
+  status: 'pending' | 'processing' | 'success' | 'failed' | 'refunded';
+  gateway_tx_id: string;
   created_at: string;
   updated_at: string;
 }

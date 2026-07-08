@@ -10,7 +10,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const payBadge = (s: string) => {
-  if (s === 'completed') return { cls: 'badge-teal', label: 'Completado' };
+  if (s === 'success' || s === 'completed') return { cls: 'badge-teal', label: 'Completado' };
+  if (s === 'refunded') return { cls: 'badge-teal', label: 'Devuelto' };
   if (s === 'failed') return { cls: 'badge-pink', label: 'Fallido' };
   if (s === 'processing') return { cls: 'badge-purple', label: 'Procesando' };
   return { cls: 'badge-amber', label: 'Pendiente' };

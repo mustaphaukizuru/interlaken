@@ -31,6 +31,7 @@ export default function CafeteriaPage() {
   const queryClient = useQueryClient();
   const [topupAmount, setTopupAmount] = useState('');
   const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
+  const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
 
@@ -63,8 +64,20 @@ export default function CafeteriaPage() {
 
   const topupMutation = useMutation({
     mutationFn: () =>
-      cafeteriaApi.requestTopUp(selectedStudent!, parseFloat(topupAmount), topupMethod),
-    onSuccess: () => {
+      cafeteriaApi.requestTopUp(
+        selectedStudent!,
+        parseFloat(topupAmount),
+        topupMethod,
+        topupMethod === 'online' ? topupGateway : undefined,
+      ),
+    onSuccess: ({ data }) => {
+      // Online payments hand off to the gateway's hosted page; the balance is
+      // credited later by the confirmed webhook (see the return page).
+      if (topupMethod === 'online' && data?.redirect_url) {
+        toast.success('Redirigiendo a la pasarela de pago…');
+        window.location.href = data.redirect_url;
+        return;
+      }
       toast.success('Solicitud de recarga enviada correctamente.');
       setShowTopup(false);
       setTopupAmount('');
@@ -157,6 +170,23 @@ export default function CafeteriaPage() {
             <option value="office">Pago en caja escolar</option>
           </select>
         </div>
+        {topupMethod === 'online' && (
+          <div>
+            <label className="label" htmlFor="topup-gateway">Pasarela de pago</label>
+            <select
+              id="topup-gateway"
+              className="input-field"
+              value={topupGateway}
+              onChange={(e) => setTopupGateway(e.target.value as any)}
+            >
+              <option value="global_payments">Global Payments (tarjeta)</option>
+              <option value="banorte">Banorte (tarjeta / SPEI)</option>
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Será redirigido a la página segura de la pasarela para completar el pago.
+            </p>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setShowTopup(false)} className="flex-1">Cancelar</Button>
           <Button
@@ -166,7 +196,7 @@ export default function CafeteriaPage() {
             disabled={!topupAmount || parseFloat(topupAmount) < 50}
             className="flex-1"
           >
-            Solicitar recarga
+            {topupMethod === 'online' ? 'Continuar al pago' : 'Solicitar recarga'}
           </Button>
         </div>
       </Modal>

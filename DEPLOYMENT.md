@@ -199,3 +199,70 @@ entirely in the GCP Console + cPanel; **no key is ever committed to git**.
   Admin (scope `https://www.googleapis.com/auth/calendar`), or (b) rely on our
   branded confirmation email — the code already retries event creation *without* the
   attendee so the event itself always lands on the school calendar.
+
+---
+
+## 9. Cafeteria top-ups: payment gateways (Global Payments / Banorte) — Prompt 10
+
+Parents add money to a child's cafeteria wallet via a **hosted payment page** (HPP).
+Card data never touches our servers (PCI scope minimisation): we redirect the parent
+to the gateway, and the gateway confirms the charge **server-to-server** via a signed
+webhook. Only that verified webhook credits the balance — the credit is applied to the
+**local ledger** (`CafeteriaBalance`), never written back to Loyverse (per
+`CAFETERIA_WALLET_SPEC.md` §7 **R1**: Loyverse `total_points` is read-only).
+
+**Flow:** `POST /api/v1/cafeteria/topup/ {student, amount, method:"online", gateway}`
+→ creates a pending `TopUpRequest` + linked `Payment(type=cafeteria)` → returns the
+gateway **redirect URL** → parent pays on the HPP → gateway webhook → verify signature
+→ credit local ledger + `CafeteriaTransaction(topup)` → mark `TopUpRequest` completed →
+notify parent (in-app + email). Declines mark both **failed** and credit nothing. The
+whole path is **idempotent** — a replayed webhook is a no-op.
+
+**URLs to register in each gateway's merchant dashboard** (prod domain
+`https://interlaken.edu.mx`):
+
+| Purpose | URL |
+|---|---|
+| Return URL (browser redirect back) | `https://interlaken.edu.mx/portal/cafeteria/recarga/retorno?payment_id=<id>` |
+| Global Payments webhook (server→server) | `https://interlaken.edu.mx/api/v1/payments/webhook/global-payments/` |
+| Banorte webhook (server→server) | `https://interlaken.edu.mx/api/v1/payments/webhook/banorte/` |
+| Generic webhook (either gateway) | `https://interlaken.edu.mx/api/v1/payments/webhook/` |
+
+The return URL is a **redirect only** — it never credits the balance (the frontend page
+just polls the payment status). The **webhook** is the source of truth and MUST be the
+signed, server-to-server URL.
+
+**Webhook signature:** each webhook is authenticated with
+`HMAC-SHA256(secret, raw_request_body)` (hex) sent in the `X-Webhook-Signature` header;
+the endpoint **fails closed** (401) if no secret is configured or the signature doesn't
+match. Configure the gateway to sign with the matching secret below. (These are plain
+HTTPS endpoints under Passenger — no cron/worker needed; see §3.)
+
+**Production `.env` (server only — never commit):**
+```
+DEFAULT_PAYMENT_GATEWAY=global_payments
+PAYMENT_RETURN_URL=https://interlaken.edu.mx/portal/cafeteria/recarga/retorno
+
+# Global Payments
+GLOBAL_PAYMENTS_APP_ID=<merchant app id>
+GLOBAL_PAYMENTS_APP_KEY=<merchant app key>
+GLOBAL_PAYMENTS_ENV=live            # sandbox until credentials are verified
+GLOBAL_PAYMENTS_HPP_URL=<live HPP url from provider>
+GLOBAL_PAYMENTS_WEBHOOK_SECRET=<shared HMAC secret>
+
+# Banorte "Pago en Línea"
+BANORTE_MERCHANT_ID=<merchant id>
+BANORTE_ENV=live                    # sandbox until credentials are verified
+BANORTE_CHECKOUT_URL=<live checkout url from Banorte>
+BANORTE_WEBHOOK_SECRET=<shared HMAC secret>
+```
+
+**Sandbox vs live:** with `*_ENV=sandbox` (default) and no `*_HPP_URL`/`*_CHECKOUT_URL`
+set, the app builds a deterministic **sandbox** redirect URL carrying the order
+reference — enough to exercise the initiate → webhook flow end-to-end without live keys.
+Switch each gateway to `live` and set the provider's real hosted-page URL once merchant
+credentials are provisioned. The webhook verification is **always real** — set the
+`*_WEBHOOK_SECRET`s in every environment or the endpoint rejects everything (401).
+
+> **Never** credit a balance from the browser return URL or an unsigned webhook. Do
+> **not** store card/PAN data — the hosted page keeps it off our servers.

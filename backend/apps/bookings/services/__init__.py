@@ -9,6 +9,7 @@ The ``calendar`` submodule is namespaced (``from . import calendar as calendar``
 rather than star-imported to avoid clashing with Python's stdlib ``calendar``.
 """
 from . import calendar
+from .booking import SlotUnavailable, create_booking
 from .notifications import send_booking_confirmation
 
-__all__ = ['send_booking_confirmation', 'calendar']
+__all__ = ['send_booking_confirmation', 'calendar', 'create_booking', 'SlotUnavailable']

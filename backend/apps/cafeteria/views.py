@@ -106,9 +106,62 @@ class MyTransactionsView(generics.ListAPIView):
 
 @method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')
 class TopUpRequestCreateView(generics.CreateAPIView):
-    """POST /api/v1/cafeteria/topup/"""
+    """POST /api/v1/cafeteria/topup/  ``{student, amount, method, gateway?}``
+
+    ``method=office`` records a pending request for an admin to apply at the school
+    cashier (unchanged). ``method=online`` additionally creates a linked, pending
+    ``Payment(type=cafeteria)`` and returns the gateway **redirect/HPP URL** the
+    parent is sent to. The balance is only credited later, by the verified webhook
+    (spec §2.2) — never here.
+    """
     serializer_class = TopUpRequestSerializer
     permission_classes = [IsParentOrAdmin]
+
+    def create(self, request, *args, **kwargs):
+        from apps.payments.gateways import GATEWAY_CHOICES, get_gateway
+        from apps.payments.models import Payment
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        student = serializer.validated_data['student']
+
+        # A parent may only top up their own children (admins may top up anyone).
+        user = request.user
+        if user.role == User.Role.PARENT and not student.parents.filter(pk=user.pk).exists():
+            return Response({'error': 'No autorizado para este alumno.'}, status=403)
+
+        topup = serializer.save()
+        data = dict(self.get_serializer(topup).data)
+
+        if topup.method == TopUpRequest.Method.ONLINE:
+            gateway_name = (request.data.get('gateway') or '').lower() or None
+            if gateway_name and gateway_name not in GATEWAY_CHOICES:
+                return Response({'error': 'Pasarela de pago no válida.'}, status=400)
+            gateway = get_gateway(gateway_name)
+
+            payer = user if user.role == User.Role.PARENT else (student.parents.first() or user)
+            payment = Payment.objects.create(
+                user=payer,
+                payment_type=Payment.Type.CAFETERIA,
+                amount=topup.amount,
+                description=f'Recarga cafetería — {student.user.full_name}',
+                gateway=gateway.name,
+                related_topup=topup,
+                status=Payment.Status.PENDING,
+            )
+            try:
+                redirect_url = gateway.create_checkout(payment)
+            except Exception as e:
+                return Response({'error': f'No se pudo iniciar el pago: {e}'}, status=502)
+
+            data.update({
+                'payment_id': payment.id,
+                'gateway': gateway.name,
+                'redirect_url': redirect_url,
+            })
+
+        headers = self.get_success_headers(data)
+        return Response(data, status=201, headers=headers)
 
 
 class AdminBalancesView(generics.ListAPIView):

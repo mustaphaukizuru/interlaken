@@ -26,6 +26,7 @@ const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
 // Parent portal
 const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
 const CafeteriaPage   = lazy(() => import('./pages/parent/CafeteriaPage'));
+const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupReturn'));
 const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
 
 // Student portal
@@ -91,6 +92,7 @@ export default function App() {
             }>
               <Route index            element={<ParentDashboard />} />
               <Route path="cafeteria" element={<CafeteriaPage />} />
+              <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
               <Route path="pagos"     element={<PaymentsPage />} />
             </Route>
 

@@ -180,9 +180,27 @@ LOYVERSE_API_TOKEN = env('LOYVERSE_API_TOKEN', default='')
 LOYVERSE_BASE_URL = 'https://api.loyverse.com/v1.0'
 
 # ── PAYMENTS ──────────────────────────────────────────────
+# Which gateway a top-up defaults to when the client doesn't specify one.
+DEFAULT_PAYMENT_GATEWAY = env('DEFAULT_PAYMENT_GATEWAY', default='global_payments')
+
+# Global Payments (Hosted Payment Page). ``GLOBAL_PAYMENTS_HPP_URL`` overrides the
+# built-in sandbox default; the APP_ID/KEY are used when the live HPP SDK is wired.
 GLOBAL_PAYMENTS_APP_ID = env('GLOBAL_PAYMENTS_APP_ID', default='')
 GLOBAL_PAYMENTS_APP_KEY = env('GLOBAL_PAYMENTS_APP_KEY', default='')
 GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
+GLOBAL_PAYMENTS_HPP_URL = env('GLOBAL_PAYMENTS_HPP_URL', default='')
+
+# Banorte "Pago en Línea" hosted checkout.
+BANORTE_MERCHANT_ID = env('BANORTE_MERCHANT_ID', default='')
+BANORTE_ENV = env('BANORTE_ENV', default='sandbox')
+BANORTE_CHECKOUT_URL = env('BANORTE_CHECKOUT_URL', default='')
+
+# Where the hosted page returns the parent after payment (the frontend reads the
+# status). Defaults to the parent cafeteria return route on FRONTEND_URL.
+PAYMENT_RETURN_URL = env(
+    'PAYMENT_RETURN_URL',
+    default=f'{FRONTEND_URL}/portal/cafeteria/recarga/retorno',
+)
 
 # Shared secrets for verifying inbound payment webhooks (HMAC-SHA256 of the raw
 # request body, hex digest, in the X-Webhook-Signature header). Empty → the

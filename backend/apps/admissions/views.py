@@ -11,7 +11,11 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import OpenSchoolDay, Registration, RegistrationDocument
+from apps.bookings.models import AvailabilitySlot, Booking, VisitType
+from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
+from apps.bookings.services import SlotUnavailable, create_booking
+
+from .models import Registration, RegistrationDocument
 
 
 def _is_staff(request):
@@ -40,8 +44,6 @@ def _require_registration_access(request, reg):
         return
     raise NotFound('No encontrado.')
 from .serializers import (
-    OpenSchoolDayEventSerializer,
-    OpenSchoolDaySerializer,
     PreRegistrationSerializer,
     RegistrationDocumentSerializer,
     RegistrationSerializer,
@@ -189,35 +191,57 @@ class DocumentUploadView(APIView):
                         status=status.HTTP_201_CREATED)
 
 
-class OpenSchoolDayListView(generics.ListAPIView):
-    """GET /api/v1/admissions/open-school/ — List upcoming events."""
-    serializer_class = OpenSchoolDayEventSerializer
+class OpenSchoolDayListView(APIView):
+    """GET /api/v1/admissions/open-school/ — upcoming open-class events.
+
+    Backward-compatible route. Data now comes from the unified bookings model
+    (``AvailabilitySlot`` with ``visit_type=open_class``); see
+    BOOKING_CALENDAR_SPEC §4.2. The response keeps the public event shape
+    (``id, date, title, location, spots_remaining, is_active``).
+    """
     permission_classes = [permissions.AllowAny]
 
-    def get_queryset(self):
+    def get(self, request):
         today = timezone.now().date()
-        return OpenSchoolDay.objects.filter(
-            event_date__gte=today,
-            status=OpenSchoolDay.Status.CONFIRMED,
-        ).values('event_date', 'event_time', 'event_name').distinct()
+        slots = [
+            s for s in AvailabilitySlot.objects.filter(
+                visit_type=VisitType.OPEN_CLASS, is_active=True, date__gte=today,
+            ).order_by('date', 'start_time')
+            if not s.is_full
+        ]
+        return Response(OpenClassEventSerializer(slots, many=True).data)
 
 
-class OpenSchoolDaySignUpView(generics.CreateAPIView):
-    """POST /api/v1/admissions/open-school/ — Sign up for an event."""
-    serializer_class = OpenSchoolDaySerializer
+class OpenSchoolDaySignUpView(APIView):
+    """POST /api/v1/admissions/open-school/signup/ — book an open-class event.
+
+    Backward-compatible route. Creates a ``bookings.Booking`` (source=web) against
+    the chosen open_class slot, capacity-safe, with Google Calendar sync +
+    confirmation email (fail-soft). Accepts either the unified field names
+    (``slot/parent_name/parent_email/parent_phone/num_attendees``) or the legacy
+    frontend names (``event/name/email/phone/children_count``).
+    """
     permission_classes = [permissions.AllowAny]
 
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        send_mail(
-            subject='Confirmación — Puertas Abiertas Colegio Interlaken',
-            message=(
-                f'Estimado/a {instance.parent_name},\n\n'
-                f'Confirmamos su registro para el evento Puertas Abiertas el '
-                f'{instance.event_date} a las {instance.event_time}.\n\n'
-                f'¡Esperamos verle pronto!\nColegio Interlaken'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[instance.parent_email],
-            fail_silently=True,
-        )
+    def post(self, request):
+        d = request.data
+        slot_id = d.get('slot') or d.get('event')
+        if not slot_id:
+            return Response({'detail': 'Seleccione un evento.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            num = int(d.get('num_attendees') or d.get('children_count') or 1)
+        except (TypeError, ValueError):
+            num = 1
+        try:
+            booking = create_booking(
+                slot_id=slot_id,
+                parent_name=d.get('parent_name') or d.get('name') or '',
+                parent_email=d.get('parent_email') or d.get('email') or '',
+                parent_phone=d.get('parent_phone') or d.get('phone') or '',
+                num_attendees=max(1, num),
+                source=Booking.Source.WEB,
+            )
+        except SlotUnavailable as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)

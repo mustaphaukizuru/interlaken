@@ -1,3 +1,4 @@
+import datetime
 
 from rest_framework import serializers
 
@@ -12,9 +13,46 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailabilitySlot
         fields = [
-            'id', 'visit_type', 'date', 'start_time', 'end_time',
+            'id', 'visit_type', 'title', 'date', 'start_time', 'end_time',
             'capacity', 'location', 'spots_remaining', 'is_full',
         ]
+
+
+class OpenClassEventSerializer(serializers.ModelSerializer):
+    """Open-class ("Puertas Abiertas") slot mapped to the public event shape.
+
+    Serves the HomePage banner + OpenSchoolPage from the unified bookings model
+    while staying backward-compatible with the old ``OpenSchoolEvent`` payload
+    (``date`` is a combined datetime; ``title`` falls back to "Puertas Abiertas").
+    """
+    date            = serializers.SerializerMethodField()
+    title           = serializers.SerializerMethodField()
+    description     = serializers.SerializerMethodField()
+    max_capacity    = serializers.IntegerField(source='capacity', read_only=True)
+    spots_remaining = serializers.IntegerField(read_only=True)
+    is_active       = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AvailabilitySlot
+        fields = [
+            'id', 'date', 'title', 'description', 'location',
+            'max_capacity', 'spots_remaining', 'is_active',
+        ]
+
+    def get_date(self, obj):
+        # Combine date + start time so the frontend can render a full datetime.
+        return datetime.datetime.combine(obj.date, obj.start_time).isoformat()
+
+    def get_title(self, obj):
+        return obj.title or 'Puertas Abiertas'
+
+    def get_description(self, obj):
+        return (
+            f'Horario: {obj.start_time:%H:%M} - {obj.end_time:%H:%M}'
+        )
+
+    def get_is_active(self, obj):
+        return bool(obj.is_active and not obj.is_full)
 
 
 class BookingSerializer(serializers.ModelSerializer):

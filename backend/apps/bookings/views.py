@@ -3,7 +3,6 @@ bookings/views.py — Public slot picker + booking, admin availability & managem
 """
 from datetime import datetime, timedelta
 
-from django.db import transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import permissions, status
@@ -20,7 +19,7 @@ from .serializers import (
     BookingSerializer,
     SlotGeneratorSerializer,
 )
-from .services import calendar, send_booking_confirmation
+from .services import SlotUnavailable, calendar, create_booking, send_booking_confirmation
 
 
 class IsAdmin(permissions.BasePermission):
@@ -112,38 +111,19 @@ class BookingCreateView(APIView):
         serializer = BookingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        slot_id = data['slot'].id
-        num = data['num_attendees']
-
-        with transaction.atomic():
-            # Lock the slot row so concurrent bookings can't oversell capacity.
-            slot = AvailabilitySlot.objects.select_for_update().get(pk=slot_id)
-            if not slot.is_active or slot.date < timezone.now().date():
-                return Response(
-                    {'detail': 'Este horario ya no está disponible.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if slot.spots_remaining < num:
-                return Response(
-                    {'detail': 'El horario seleccionado ya no tiene cupo disponible.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            booking = Booking.objects.create(
-                slot=slot,
+        try:
+            booking = create_booking(
+                slot_id=data['slot'].id,
                 parent_name=data['parent_name'],
                 parent_email=data['parent_email'],
                 parent_phone=data['parent_phone'],
                 child_name=data.get('child_name', ''),
                 child_grade=data.get('child_grade', ''),
-                num_attendees=num,
-                status=Booking.Status.CONFIRMED,
+                num_attendees=data['num_attendees'],
                 source=Booking.Source.WEB,
             )
-
-        # Side effects outside the transaction/lock — both fail-soft, so a broken
-        # SMTP or Google Calendar never turns a saved booking into a 500.
-        send_booking_confirmation(booking)
-        calendar.sync_booking_created(booking)
+        except SlotUnavailable as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 

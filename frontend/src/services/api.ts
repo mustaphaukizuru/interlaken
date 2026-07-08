@@ -100,8 +100,13 @@ export const cafeteriaApi = {
   }) =>
     api.get('/cafeteria/transactions/', { params }),
 
-  requestTopUp: (studentId: number, amount: number, method: string) =>
-    api.post('/cafeteria/topup/', { student: studentId, amount, method }),
+  requestTopUp: (
+    studentId: number,
+    amount: number,
+    method: string,
+    gateway?: string,
+  ) =>
+    api.post('/cafeteria/topup/', { student: studentId, amount, method, gateway }),
 
   // Admin
   getAllBalances: () =>

@@ -25,6 +25,10 @@ class AvailabilitySlot(models.Model):
         max_length=20, choices=VisitType.choices, default=VisitType.INDIVIDUAL,
         verbose_name='Tipo de visita',
     )
+    # Event name — used for open_class group events ("Puertas Abiertas", etc.);
+    # left blank for individual visits (they don't need a public title).
+    title      = models.CharField(max_length=200, blank=True, default='',
+                                  verbose_name='Nombre del evento')
     date       = models.DateField(verbose_name='Fecha')
     start_time = models.TimeField(verbose_name='Hora de inicio')
     end_time   = models.TimeField(verbose_name='Hora de fin')

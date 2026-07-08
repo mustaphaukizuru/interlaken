@@ -1,11 +1,13 @@
 """
-Payments views: initiate Global Payments charge, webhook, history.
-"""
-import hashlib
-import hmac
-import json
+Payments views: initiate a hosted-payment charge, process gateway webhooks, history.
 
-from django.conf import settings
+Webhooks are authenticated per-gateway (HMAC-SHA256 over the raw body, Prompt 03),
+idempotent (a webhook for an already-finalised payment is a no-op), and — for a
+cafeteria top-up — credit the student's **local** ledger on success (spec R1: no
+Loyverse write) and notify the parent. Failures mark everything failed and credit
+nothing.
+"""
+from django.db import transaction as db_transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions, status
@@ -14,6 +16,7 @@ from rest_framework.views import APIView
 
 from apps.core.ratelimit import ratelimit
 
+from .gateways import get_gateway, iter_gateways
 from .models import Payment
 from .serializers import PaymentInitiateSerializer, PaymentSerializer
 
@@ -22,37 +25,8 @@ from .serializers import PaymentInitiateSerializer, PaymentSerializer
 FINAL_STATUSES = (Payment.Status.SUCCESS, Payment.Status.FAILED, Payment.Status.REFUNDED)
 
 
-def verify_webhook(request):
-    """Verify an inbound payment webhook against a shared HMAC secret.
-
-    Computes ``HMAC-SHA256(secret, raw_body)`` (hex) and constant-time compares
-    it to the ``X-Webhook-Signature`` header. Any configured gateway secret that
-    matches is accepted, so the same endpoint can serve Global Payments and
-    Banorte. Fails closed: with no secret configured (or no signature sent),
-    verification fails and the caller returns 401.
-    """
-    secrets = [
-        getattr(settings, 'GLOBAL_PAYMENTS_WEBHOOK_SECRET', ''),
-        getattr(settings, 'BANORTE_WEBHOOK_SECRET', ''),
-    ]
-    secrets = [s for s in secrets if s]
-    signature = (
-        request.headers.get('X-Webhook-Signature')
-        or request.headers.get('X-Signature', '')
-    )
-    if not secrets or not signature:
-        return False
-
-    body = request.body
-    for secret in secrets:
-        expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-        if hmac.compare_digest(expected, signature):
-            return True
-    return False
-
-
 class PaymentInitiateView(APIView):
-    """POST /api/v1/payments/initiate/"""
+    """POST /api/v1/payments/initiate/ — create a pending payment + hosted-page URL."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -61,77 +35,135 @@ class PaymentInitiateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
+        gateway = get_gateway(request.data.get('gateway'))
         payment = Payment.objects.create(
             user=request.user,
             payment_type=data['payment_type'],
             amount=data['amount'],
             description=data.get('description', ''),
+            gateway=gateway.name,
             status=Payment.Status.PENDING,
         )
 
-        from django.conf import settings as dj_settings
-        hpp_url = None
-        if getattr(dj_settings, 'GLOBAL_PAYMENTS_APP_ID', ''):
-            pass  # Wire Global Payments HPP SDK here when credentials are live
+        try:
+            hpp_url = gateway.create_checkout(payment)
+        except Exception:  # pragma: no cover - defensive; keep the record either way
+            hpp_url = None
 
         return Response({
             'payment_id': payment.id,
             'amount': str(payment.amount),
             'status': payment.status,
+            'gateway': payment.gateway,
             'hpp_url': hpp_url,
+            'redirect_url': hpp_url,
             'detail': 'Pago registrado correctamente.',
         }, status=status.HTTP_201_CREATED)
 
 
+class _WebhookProcessMixin:
+    """Shared webhook processing: verify → (idempotently) apply → credit → notify."""
+
+    def _apply_event(self, event):
+        """Apply a verified ``WebhookEvent`` inside a locked, idempotent transaction.
+
+        Returns ``(http_status, body, notify_arg)`` where ``notify_arg`` is
+        ``(payment, success)`` when a top-up notification should be sent **after**
+        commit, or ``None``.
+        """
+        from apps.cafeteria.services import (complete_online_topup,
+                                             fail_online_topup)
+
+        notify_arg = None
+        with db_transaction.atomic():
+            try:
+                payment = (Payment.objects
+                           .select_for_update()
+                           .get(pk=event.payment_id))
+            except (Payment.DoesNotExist, TypeError, ValueError):
+                return status.HTTP_404_NOT_FOUND, {'error': 'payment_not_found'}, None
+
+            # Idempotency: never re-process a payment already in a final state.
+            if payment.status in FINAL_STATUSES:
+                return status.HTTP_200_OK, {'detail': 'already_processed'}, None
+
+            if event.status == 'success':
+                payment.mark_success(event.transaction_id or payment.gateway_tx_id, event.raw)
+                complete_online_topup(payment)  # None for non-cafeteria payments
+                notify_arg = (payment, True)
+            elif event.status == 'failed':
+                payment.status = Payment.Status.FAILED
+                if event.transaction_id:
+                    payment.gateway_tx_id = event.transaction_id
+                payment.gateway_raw = event.raw
+                payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
+                fail_online_topup(payment)
+                notify_arg = (payment, False)
+            else:
+                # Non-terminal notification (PENDING/PROCESSING): record raw only.
+                payment.gateway_raw = event.raw
+                if event.transaction_id:
+                    payment.gateway_tx_id = event.transaction_id
+                payment.save(update_fields=['gateway_tx_id', 'gateway_raw', 'updated_at'])
+
+        return status.HTTP_200_OK, {'detail': 'ok'}, notify_arg
+
+    def _process(self, request, gateways):
+        """Verify the request against ``gateways`` and apply the first that matches."""
+        event = None
+        for gateway in gateways:
+            event = gateway.verify_webhook(request)
+            if event is not None:
+                break
+        if event is None:
+            return Response({'error': 'invalid_signature'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        http_status, body, notify_arg = self._apply_event(event)
+
+        # Email/notify outside the DB transaction (best-effort; never blocks the ack).
+        if notify_arg is not None:
+            payment, success = notify_arg
+            if payment.payment_type == Payment.Type.CAFETERIA:
+                from apps.cafeteria.services import notify_topup_result
+                notify_topup_result(payment, success=success)
+
+        return Response(body, status=http_status)
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 @method_decorator(ratelimit('payment-webhook', '120/m', key='ip', method='POST'), name='dispatch')
-class PaymentWebhookView(APIView):
-    """POST /api/v1/payments/webhook/ — Gateway server notification.
+class PaymentWebhookView(_WebhookProcessMixin, APIView):
+    """POST /api/v1/payments/webhook/ — generic endpoint (any configured gateway).
 
-    Requires a valid HMAC signature (see ``verify_webhook``) and is idempotent:
-    a webhook for an already-finalized payment is acknowledged but not
-    re-applied.
+    Tries every registered gateway's signature until one verifies, so a single URL
+    can serve both providers. Prefer the gateway-specific endpoints below when the
+    provider lets you configure a distinct notification URL.
     """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        if not verify_webhook(request):
-            return Response({'error': 'invalid_signature'}, status=status.HTTP_401_UNAUTHORIZED)
+        return self._process(request, list(iter_gateways()))
 
-        try:
-            payload = json.loads(request.body)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return Response({'error': 'invalid_payload'}, status=400)
 
-        transaction_id = payload.get('id') or payload.get('transaction_id')
-        gp_status = payload.get('status', '').upper()
-        payment_id = payload.get('order_id') or payload.get('reference')
+@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(ratelimit('payment-webhook-gp', '120/m', key='ip', method='POST'), name='dispatch')
+class GlobalPaymentsWebhookView(_WebhookProcessMixin, APIView):
+    """POST /api/v1/payments/webhook/global-payments/"""
+    permission_classes = [permissions.AllowAny]
 
-        try:
-            payment = Payment.objects.get(pk=payment_id)
-        except (Payment.DoesNotExist, TypeError, ValueError):
-            return Response({'error': 'payment_not_found'}, status=404)
+    def post(self, request):
+        return self._process(request, [get_gateway('global_payments')])
 
-        # Idempotency: never re-process a payment that already reached a final state.
-        if payment.status in FINAL_STATUSES:
-            return Response({'detail': 'already_processed'})
 
-        if gp_status in ('CAPTURED', 'SUCCESS'):
-            payment.mark_success(transaction_id or payment.gateway_tx_id, payload)
-        elif gp_status in ('DECLINED', 'FAILED', 'ERROR'):
-            payment.status = Payment.Status.FAILED
-            if transaction_id:
-                payment.gateway_tx_id = transaction_id
-            payment.gateway_raw = payload
-            payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
-        else:
-            # Non-terminal notification (e.g. PENDING/PROCESSING): record raw only.
-            payment.gateway_raw = payload
-            if transaction_id:
-                payment.gateway_tx_id = transaction_id
-            payment.save(update_fields=['gateway_tx_id', 'gateway_raw', 'updated_at'])
+@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(ratelimit('payment-webhook-banorte', '120/m', key='ip', method='POST'), name='dispatch')
+class BanorteWebhookView(_WebhookProcessMixin, APIView):
+    """POST /api/v1/payments/webhook/banorte/"""
+    permission_classes = [permissions.AllowAny]
 
-        return Response({'detail': 'ok'})
+    def post(self, request):
+        return self._process(request, [get_gateway('banorte')])
 
 
 class PaymentDetailView(generics.RetrieveAPIView):
