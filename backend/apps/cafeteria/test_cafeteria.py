@@ -79,6 +79,123 @@ class TestBalanceSync:
         assert cb.is_low_balance is False
 
 
+class TestSyncPurchases:
+    """Prompt 09 pipeline: receipts → transaction + balance debit + parent alerts."""
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_purchase_records_debits_and_notifies(self, mock_receipts, mailoutbox):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        mock_receipts.return_value = [
+            _receipt("loy-buyer", "R-1", 30, line_items=[
+                {"item_name": "Torta", "quantity": 1, "total_money": 20},
+                {"item_name": "Jugo", "quantity": 2, "total_money": 10},
+            ]),
+        ]
+
+        result = services.sync_purchases()
+
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="R-1")
+        assert tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE
+        assert tx.amount == Decimal("30")
+        assert tx.balance_after == Decimal("70")
+        # Itemised receipt lines are captured for the F2 history view.
+        assert [i["name"] for i in tx.items] == ["Torta", "Jugo"]
+        assert "Torta" in tx.description and "2× Jugo" in tx.description
+
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert cb.balance == Decimal("70")
+        assert cb.last_synced is not None
+
+        # In-app notification + email fan out to the guardian.
+        note = Notification.objects.get(user=parent)
+        assert note.notif_type == Notification.NotifType.CAFETERIA
+        assert "$30.00" in note.message
+        assert len(mailoutbox) == 1
+        assert parent.email in mailoutbox[0].to
+
+        assert result["created"] == 1
+        assert result["notified"] == 1
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_sync_is_idempotent(self, mock_receipts, mailoutbox):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        mock_receipts.return_value = [_receipt("loy-buyer", "R-1", 30)]
+
+        services.sync_purchases()
+        second = services.sync_purchases()
+
+        # Re-processing the same receipt neither duplicates the row, re-debits the
+        # balance, nor re-notifies the parent (unique loyverse_receipt_id).
+        assert CafeteriaTransaction.objects.filter(loyverse_receipt_id="R-1").count() == 1
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("70")
+        assert Notification.objects.filter(user=parent).count() == 1
+        assert len(mailoutbox) == 1
+        assert second["created"] == 0
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_refund_credits_balance(self, mock_receipts, mailoutbox):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("40"))
+        mock_receipts.return_value = [
+            _receipt("loy-buyer", "R-refund", 15, receipt_type="REFUND"),
+        ]
+
+        services.sync_purchases()
+
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="R-refund")
+        assert tx.transaction_type == CafeteriaTransaction.TxType.REFUND
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("55")
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_unlinked_customer_is_ignored(self, mock_receipts, mailoutbox):
+        parent = ParentFactory()
+        StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        mock_receipts.return_value = [_receipt("stranger", "R-x", 30)]
+
+        result = services.sync_purchases()
+
+        assert result["created"] == 0
+        assert CafeteriaTransaction.objects.count() == 0
+        assert len(mailoutbox) == 0
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_low_balance_alert_fires_once(self, mock_receipts, mailoutbox):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("60"), low_balance_threshold=Decimal("50"),
+        )
+        # A 40-peso purchase drops the balance to 20 (< 50 threshold).
+        mock_receipts.return_value = [_receipt("loy-buyer", "R-1", 40)]
+
+        services.sync_purchases()
+
+        titles = set(Notification.objects.filter(user=parent).values_list("title", flat=True))
+        assert "Compra en cafetería" in titles
+        assert "Saldo bajo en cafetería" in titles
+
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert cb.last_low_balance_alert_at is not None
+
+        # A second purchase within the cooldown window must not re-alert (deduped).
+        mock_receipts.return_value = [_receipt("loy-buyer", "R-2", 5)]
+        services.sync_purchases()
+        assert Notification.objects.filter(
+            user=parent, title="Saldo bajo en cafetería").count() == 1
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_no_linked_students_is_noop(self, mock_receipts):
+        StudentProfileFactory(loyverse_id="")  # not linked to Loyverse
+        result = services.sync_purchases()
+        assert result == {"students": 0, "receipts": 0, "created": 0, "notified": 0}
+        mock_receipts.assert_not_called()
+
+
 class TestAdminPermissions:
     def test_balances_endpoint_is_admin_only(self, api_client):
         api_client.force_authenticate(user=ParentFactory())
