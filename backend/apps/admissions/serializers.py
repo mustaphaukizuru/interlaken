@@ -22,6 +22,9 @@ class RegistrationDocumentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'uploaded_at', 'is_verified']
 
 
+MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes', 'estatura', 'peso')
+
+
 class RegistrationSerializer(serializers.ModelSerializer):
     documents = RegistrationDocumentSerializer(many=True, read_only=True)
 
@@ -33,12 +36,35 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'parent1_name', 'parent1_email', 'parent1_phone', 'parent1_occupation',
             'parent2_name', 'parent2_email', 'parent2_phone',
             'emergency_name', 'emergency_phone', 'emergency_rel',
-            'blood_type', 'allergies', 'medical_notes',
+            'blood_type', 'allergies', 'medical_notes', 'estatura', 'peso',
             'consent_photos_media', 'consent_medical_data', 'privacy_accepted_at',
             'status', 'submitted_at', 'created_at', 'documents',
         ]
         read_only_fields = ['id', 'status', 'submitted_at', 'created_at', 'documents',
                             'privacy_accepted_at']
+
+    def _can_read_medical(self, instance) -> bool:
+        """Medical fields are readable only by the owning applicant (valid session)
+        or by staff/admin AND only when MEDICAL_DATA consent is present (B4)."""
+        request = self.context.get('request')
+        if request is None:
+            return False
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated and (
+                user.is_staff or getattr(user, 'role', '') == 'admin'):
+            return bool(instance.consent_medical_data)
+        # Non-staff callers reach a registration only with a valid session token.
+        from .tokens import session_valid
+        token = request.headers.get('X-Session-Token') or request.data.get('session_token', '')
+        return session_valid(instance, token)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self._can_read_medical(instance):
+            for field in MEDICAL_FIELDS:
+                if field in data:
+                    data[field] = None
+        return data
 
 
 class OpenSchoolDaySerializer(serializers.ModelSerializer):

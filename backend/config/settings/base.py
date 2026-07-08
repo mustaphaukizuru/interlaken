@@ -170,6 +170,11 @@ AUTH_COOKIE_SAMESITE = env('AUTH_COOKIE_SAMESITE', default='Lax')
 AUTH_COOKIE_DOMAIN = env('AUTH_COOKIE_DOMAIN', default=None)
 AUTH_COOKIE_PATH = env('AUTH_COOKIE_PATH', default='/')
 
+# ── FIELD ENCRYPTION (at-rest, e.g. medical data — IK-LEGAL B4) ───
+# Dedicated Fernet key (urlsafe base64, 32 bytes). If blank, derived from
+# SECRET_KEY (dev/test). Set a real key in prod; see apps/core/fields.py.
+FIELD_ENCRYPTION_KEY = env('FIELD_ENCRYPTION_KEY', default='')
+
 # ── CORS ──────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True

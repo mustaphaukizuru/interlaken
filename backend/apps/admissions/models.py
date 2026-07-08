@@ -6,6 +6,8 @@ from uuid import uuid4
 from django.db import models
 from django.utils import timezone
 
+from apps.core.fields import EncryptedTextField
+
 
 class PreRegistration(models.Model):
     """Public pre-registration form — no login required."""
@@ -113,10 +115,13 @@ class Registration(models.Model):
     emergency_phone  = models.CharField(max_length=20, blank=True)
     emergency_rel    = models.CharField(max_length=50, blank=True)
 
-    # Medical
-    blood_type       = models.CharField(max_length=5, blank=True)
-    allergies        = models.TextField(blank=True)
-    medical_notes    = models.TextField(blank=True)
+    # Medical — sensitive personal data, ENCRYPTED AT REST (IK-LEGAL B4) and gated
+    # on MEDICAL_DATA consent + role in the serializer.
+    blood_type       = EncryptedTextField(blank=True, default='')
+    allergies        = EncryptedTextField(blank=True, default='')
+    medical_notes    = EncryptedTextField(blank=True, default='')
+    estatura         = EncryptedTextField(blank=True, default='', verbose_name='Estatura')
+    peso             = EncryptedTextField(blank=True, default='', verbose_name='Peso')
 
     # Status
     status       = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
