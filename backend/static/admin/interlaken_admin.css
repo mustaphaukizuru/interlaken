@@ -8,6 +8,7 @@
 :root {
   /* Official brand palette (matches the React app / frontend/BRAND.md) */
   --brand-green:        #47a028;  /* primary / anchor — wordmark "INTERLAKEN"  */
+  --brand-green-btn:    #3a8420;  /* solid fill under WHITE text — AA 4.66:1   */
   --brand-green-dark:   #316f1c;  /* green text on light surfaces (AA)         */
   --brand-green-bright: #5fbe46;  /* light green ("COLEGIO")                    */
   --brand-coral:        #dd2622;  /* warm accent — tagline + clock hands       */
@@ -79,8 +80,9 @@ a:hover { color: var(--brand-coral-dark); }
 .btn { border-radius: var(--radius-sm) !important; font-family: 'Poppins', sans-serif !important; font-weight: 600 !important; }
 .btn-primary { background: var(--brand-purple) !important; border-color: var(--brand-purple) !important; }
 .btn-primary:hover { background: var(--brand-purple-light) !important; border-color: var(--brand-purple-light) !important; }
-/* Success = GREEN (the "Agregar" buttons) — off-brand cyan retired */
-.btn-success { background: var(--brand-green) !important; border-color: var(--brand-green) !important; color: #fff !important; }
+/* Success = GREEN (the "Agregar" buttons) — off-brand cyan retired.
+   AA-safe fill (#3a8420) under white label text. */
+.btn-success { background: var(--brand-green-btn) !important; border-color: var(--brand-green-btn) !important; color: #fff !important; }
 .btn-success:hover { background: var(--brand-green-dark) !important; border-color: var(--brand-green-dark) !important; }
 .btn-danger  { background: var(--brand-pink) !important; border-color: var(--brand-pink) !important; }
 .btn-danger:hover { background: #d41a49 !important; border-color: #d41a49 !important; }
@@ -88,7 +90,7 @@ a:hover { color: var(--brand-coral-dark); }
 .btn-outline-info { color: var(--brand-purple) !important; border-color: var(--brand-purple) !important; }
 .btn-outline-info:hover { background: var(--brand-purple) !important; color: #fff !important; }
 /* Object-tools (Agregar / Historia) buttons on change-list */
-.object-tools a, a.addlink { background: var(--brand-green) !important; border-radius: var(--radius-sm) !important; }
+.object-tools a, a.addlink { background: var(--brand-green-btn) !important; color: #fff !important; border-radius: var(--radius-sm) !important; }
 .object-tools a:hover, a.addlink:hover { background: var(--brand-green-dark) !important; }
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
@@ -107,7 +109,7 @@ select.form-control { border-radius: var(--radius-sm) !important; }
 
 /* ── Badges / status (map admin states → brand tokens) ─────────────────── */
 .badge, .label { font-family: 'Inter', sans-serif; font-weight: 600; border-radius: 999px; padding: 0.35em 0.7em; }
-.badge-success, .label-success, .bg-success, span.badge.badge-success { background: var(--brand-green) !important; color: #fff !important; }
+.badge-success, .label-success, .bg-success, span.badge.badge-success { background: var(--brand-green-btn) !important; color: #fff !important; }
 .badge-danger,  .label-danger,  .bg-danger  { background: var(--brand-pink) !important; color: #fff !important; }
 .badge-warning, .label-warning, .bg-warning { background: var(--brand-amber) !important; color: #fff !important; }
 .badge-info,    .label-info,    .bg-info    { background: var(--brand-purple) !important; color: #fff !important; }
@@ -123,7 +125,7 @@ select.form-control { border-radius: var(--radius-sm) !important; }
 .info-box-icon { border-radius: var(--radius) 0 0 var(--radius) !important; }
 .bg-purple { background: var(--brand-purple) !important; }
 .bg-pink   { background: var(--brand-pink) !important; }
-.bg-green, .bg-olive { background: var(--brand-green) !important; }
+.bg-green, .bg-olive { background: var(--brand-green-btn) !important; }
 
 /* ── Pagination ────────────────────────────────────────────────────────── */
 .page-item.active .page-link { background: var(--brand-purple) !important; border-color: var(--brand-purple) !important; }
@@ -219,4 +221,67 @@ img, table, pre { max-width: 100%; }
   .paginator { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   /* Tighter table cells so more fits before the contained scroll kicks in */
   .table td, .table th, #result_list td, #result_list th { padding: 0.5rem 0.55rem !important; }
+}
+
+/* ============================================================================
+   Phase 4 — UX polish & accessibility
+   ============================================================================ */
+
+/* ── Visible focus everywhere (keyboard) — brand-green :focus-visible ring ─ */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, .btn:focus-visible, .nav-link:focus-visible,
+.page-link:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--brand-green) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--focus-ring) !important;
+}
+/* On the dark sidebar/navbar the green ring needs a light halo to stay visible */
+.main-sidebar a:focus-visible, .navbar a:focus-visible, .brand-link:focus-visible {
+  outline-color: #7ed957 !important;
+  box-shadow: 0 0 0 3px rgba(126,217,87,0.45) !important;
+}
+
+/* ── Branded login page (green/coral, clean card) ──────────────────────── */
+.login-page, .login-page.hold-transition { background: var(--cream) !important; }
+.login-page::before {
+  content: ''; position: fixed; inset: 0 0 auto 0; height: 5px;
+  background: linear-gradient(90deg, var(--brand-purple), var(--brand-pink), var(--brand-coral), var(--brand-green));
+}
+.login-box { width: 92%; max-width: 400px; }
+.login-box .card, .login-card-body, .card.card-outline {
+  border-radius: 18px !important; border: 1px solid var(--border) !important;
+  box-shadow: 0 10px 40px -12px rgba(64,26,142,0.28) !important;
+}
+.login-logo img, .login-box img.brand-image, .site-logo { max-height: 96px; width: auto; margin-bottom: 8px; }
+.login-box .btn-primary, .login-card-body [type="submit"] {
+  background: var(--brand-green-btn) !important; border-color: var(--brand-green-btn) !important; color: #fff !important;
+}
+.login-box .btn-primary:hover, .login-card-body [type="submit"]:hover {
+  background: var(--brand-green-dark) !important; border-color: var(--brand-green-dark) !important;
+}
+.login-box a { color: var(--brand-purple); }
+.login-box a:hover { color: var(--brand-coral-dark); }
+
+/* ── Readonly / empty states ───────────────────────────────────────────── */
+.readonly, .form-row.field-readonly p { color: var(--muted) !important; }
+.field-box .help, .help, .helptext { color: var(--subtle) !important; font-size: 12px !important; }
+.errornote, .errorlist { border-radius: var(--radius-sm) !important; }
+.errornote { background: rgba(221,38,34,0.08) !important; border: 1px solid var(--brand-coral) !important; color: var(--brand-coral-dark) !important; }
+.errorlist li { background: var(--brand-coral) !important; border-radius: var(--radius-sm) !important; }
+#result_list tbody tr td .text-muted, .paginator .this-page { color: var(--muted) !important; }
+.dashboard .empty, .module p.empty, td.empty { color: var(--subtle) !important; font-style: italic; }
+.messagelist .success { background: rgba(58,132,32,0.12) !important; color: var(--brand-green-dark) !important; border-left: 4px solid var(--brand-green-btn) !important; }
+.messagelist .warning { background: rgba(217,119,6,0.12) !important; color: #92400e !important; border-left: 4px solid var(--brand-amber) !important; }
+.messagelist .error { background: rgba(221,38,34,0.10) !important; color: var(--brand-coral-dark) !important; border-left: 4px solid var(--brand-coral) !important; }
+
+/* ── Mobile filter-panel collapse (driven by interlaken_admin.js) ──────── */
+@media (max-width: 991.98px) {
+  .interlaken-filter-toggle { margin-bottom: 10px; }
+  #changelist-filter.interlaken-filter-collapsed { display: none !important; }
+  #changelist-filter.interlaken-filter-collapsed.interlaken-filter-open { display: block !important; }
+}
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

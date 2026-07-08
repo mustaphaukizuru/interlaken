@@ -338,7 +338,7 @@ JAZZMIN_SETTINGS = {
     'default_icon_children': 'fas fa-dot-circle',
     'related_modal_active': True,
     'custom_css': 'admin/interlaken_admin.css',
-    'custom_js': None,
+    'custom_js': 'admin/interlaken_admin.js',
     'use_google_fonts_cdn': True,
     'show_ui_builder': False,
     'changeform_format': 'horizontal_tabs',
