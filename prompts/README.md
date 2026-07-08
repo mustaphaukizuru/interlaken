@@ -22,7 +22,6 @@ Ready-to-run prompts. **Open a fresh Claude Code session at `D:\Github\interlake
 | 15 | `15-testing-ci-monitoring.md` | pytest + Vitest + GitHub Actions + Sentry | 02 |
 | 16 | `16-legal-compliance.md` | Aviso de Privacidad, Terms, cookies, ARCO | 02 |
 | 17 | `17-tuition-billing.md` | Recurring colegiatura invoices | 02, 10 |
-| 18 | `18-academics-attendance-grades.md` | Attendance + alerts, grades, teacher portal | 02 |
 | 19 | `19-seo-analytics-pwa.md` | SEO, analytics, installable PWA | 05 |
 | 20 | `20-deploy-cpanel.md` | Go-live on GoDaddy cPanel | 02–05 done |
 

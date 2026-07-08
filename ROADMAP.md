@@ -68,19 +68,6 @@ Everything **below is new** — professional additions not yet captured, grouped
 | C6 | **Password policy + breach check**, account lockout | P1 |
 | C7 | **Signed webhooks everywhere** (payments, Loyverse, WhatsApp) | P0 |
 
-## D. Core academic features (the real "school product" — currently absent)
-
-| # | Recommendation | Why | Tier |
-|---|---|---|---|
-| D1 | **Grades / Boletas de calificaciones** | Report cards are the #1 parent expectation of a school portal. | P1 |
-| D2 | **Attendance (Asistencia)** + **auto absence alert to parents** | Daily attendance; instant WhatsApp/email if a child is absent — high perceived value. | P1 |
-| D3 | **Teacher portal + gradebook** | The `staff` role exists but has **no features**; teachers need to enter grades/attendance. | P1 |
-| D4 | **Class schedules / Horarios** | Per-student timetable. | P2 |
-| D5 | **Homework / Tareas** | Assignments + due dates + submission. | P2 |
-| D6 | **Academic calendar** (holidays, exams, events) | Shared school-year calendar (reuses Google Calendar work). | P1 |
-| D7 | **Parent ↔ teacher messaging** | Direct, logged communication channel. | P2 |
-| D8 | **Documents / Circulares repository** | Reglamento, formatos, circulares — downloadable. | P2 |
-
 ## E. Finance beyond cafeteria
 
 | # | Recommendation | Why / current state | Tier |
@@ -126,7 +113,7 @@ Everything **below is new** — professional additions not yet captured, grouped
 | # | Recommendation | Tier |
 |---|---|---|
 | I1 | **Bulk import** (students/parents via CSV/Excel) | P1 |
-| I2 | **Reporting & exports** (enrollment, finance, attendance) | P1 |
+| I2 | **Reporting & exports** (enrollment, finance) | P1 |
 | I3 | **Granular roles/permissions** (director, coordinator, teacher, cashier) | P2 |
 | I4 | **Data retention & archival policy** (per year cohort) | P2 |
 
@@ -135,8 +122,8 @@ Everything **below is new** — professional additions not yet captured, grouped
 ## Suggested sequencing (pragmatic)
 
 1. **Stabilize & launch (P0):** STATUS_REPORT P0/P1 fixes + SSL (DEPLOYMENT) + Aviso de Privacidad/Terms (B1/B3) + rate limiting (A7) + Sentry (A3) + backups (A9) + smoke tests on auth/payments (A1) + `.env.example`/README (A5/A12).
-2. **Core value + maturity (P1):** recurring tuition (E1) · attendance+alerts (D2) · grades (D1) · teacher portal (D3) · CI/CD (A2) · API docs (A6) · 2FA (C1) · CFDI (B6) · SEO+analytics (H1/H2) · PWA (G1) — alongside the cafeteria & booking specs.
-3. **Depth & engagement (P2):** messaging (D7) · homework/schedules (D4/D5) · CRM (F4) · newsletters (G2) · galleries (G4) · i18n (H5).
+2. **Core value + maturity (P1):** recurring tuition (E1) · CI/CD (A2) · API docs (A6) · 2FA (C1) · CFDI (B6) · SEO+analytics (H1/H2) · PWA (G1) — alongside the cafeteria & booking specs.
+3. **Depth & engagement (P2):** CRM (F4) · newsletters (G2) · galleries (G4) · i18n (H5).
 4. **Later:** advanced analytics, native app, LMS/SIS integrations, granular roles.
 
-> **North star:** items that are (a) legally required (B1), (b) trust/safety (security, backups), and (c) daily-value for parents (attendance alerts, grades, tuition, cafeteria) deliver the most return. The marketing site and portal are solid foundations; the gap to a *complete* school platform is the **academic + finance + compliance** layers above.
+> **North star:** items that are (a) legally required (B1), (b) trust/safety (security, backups), and (c) daily-value for parents (tuition, cafeteria) deliver the most return. The marketing site and portal are solid foundations; the gap to a *complete* platform is the **finance + compliance** layers above.
