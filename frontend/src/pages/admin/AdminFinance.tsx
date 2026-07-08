@@ -81,8 +81,8 @@ export default function AdminFinance() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-fluid-xl font-bold text-slate-900">Finanzas — Colegiaturas</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <h1 className="text-fluid-xl font-bold text-ink">Finanzas — Colegiaturas</h1>
+          <p className="text-muted text-sm mt-0.5">
             Facturación mensual, cobranza y estado de cuenta.
           </p>
         </div>
@@ -112,7 +112,7 @@ export default function AdminFinance() {
       <Card>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
             <input
               className="input-field pl-9"
               placeholder="Buscar alumno o matrícula…"
@@ -151,30 +151,30 @@ export default function AdminFinance() {
                 const meta = statusMeta[inv.status] ?? statusMeta.pending;
                 const open = inv.status === 'pending' || inv.status === 'overdue';
                 return (
-                  <li key={inv.id} className="rounded-xl2 border border-slate-100 p-4">
+                  <li key={inv.id} className="rounded-xl2 border border-line p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-900 truncate">{inv.student_name}</p>
-                        <p className="text-xs text-slate-400">{inv.student_code} · {inv.grade}</p>
+                        <p className="font-medium text-ink truncate">{inv.student_name}</p>
+                        <p className="text-xs text-subtle">{inv.student_code} · {inv.grade}</p>
                       </div>
                       <Badge variant={meta.variant}>{meta.label}</Badge>
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <dt className="text-xs font-semibold text-slate-500">Periodo</dt>
-                        <dd className="text-slate-600">{inv.period_label}</dd>
+                        <dt className="text-xs font-semibold text-muted">Periodo</dt>
+                        <dd className="text-muted">{inv.period_label}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs font-semibold text-slate-500">Vence</dt>
-                        <dd className="text-slate-500">{format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}</dd>
+                        <dt className="text-xs font-semibold text-muted">Vence</dt>
+                        <dd className="text-muted">{format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs font-semibold text-slate-500">Monto</dt>
-                        <dd className="font-semibold text-slate-900">${parseFloat(inv.amount).toFixed(2)}</dd>
+                        <dt className="text-xs font-semibold text-muted">Monto</dt>
+                        <dd className="font-semibold text-ink">${parseFloat(inv.amount).toFixed(2)}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs font-semibold text-slate-500">Saldo</dt>
-                        <dd className="text-slate-700">${parseFloat(inv.balance_due).toFixed(2)}</dd>
+                        <dt className="text-xs font-semibold text-muted">Saldo</dt>
+                        <dd className="text-muted">${parseFloat(inv.balance_due).toFixed(2)}</dd>
                       </div>
                     </dl>
                     <div className="mt-3 flex flex-wrap items-center gap-1">
@@ -195,7 +195,7 @@ export default function AdminFinance() {
             <div className="hidden md:block w-full overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+                  <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                     <th className="py-2 pr-4">Alumno</th>
                     <th className="py-2 pr-4">Periodo</th>
                     <th className="py-2 pr-4">Vence</th>
@@ -205,22 +205,22 @@ export default function AdminFinance() {
                     <th className="py-2 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-line">
                   {invoices.map((inv) => {
                     const meta = statusMeta[inv.status] ?? statusMeta.pending;
                     const open = inv.status === 'pending' || inv.status === 'overdue';
                     return (
-                      <tr key={inv.id} className="hover:bg-slate-50/50">
-                        <td className="py-3 pr-4 font-medium text-slate-900">
+                      <tr key={inv.id} className="hover:bg-cream">
+                        <td className="py-3 pr-4 font-medium text-ink">
                           {inv.student_name}
-                          <span className="block text-xs text-slate-400">{inv.student_code} · {inv.grade}</span>
+                          <span className="block text-xs text-subtle">{inv.student_code} · {inv.grade}</span>
                         </td>
-                        <td className="py-3 pr-4 text-slate-600">{inv.period_label}</td>
-                        <td className="py-3 pr-4 text-slate-500 whitespace-nowrap">
+                        <td className="py-3 pr-4 text-muted">{inv.period_label}</td>
+                        <td className="py-3 pr-4 text-muted whitespace-nowrap">
                           {format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}
                         </td>
-                        <td className="py-3 pr-4 text-right font-semibold text-slate-900">${parseFloat(inv.amount).toFixed(2)}</td>
-                        <td className="py-3 pr-4 text-right text-slate-700">${parseFloat(inv.balance_due).toFixed(2)}</td>
+                        <td className="py-3 pr-4 text-right font-semibold text-ink">${parseFloat(inv.amount).toFixed(2)}</td>
+                        <td className="py-3 pr-4 text-right text-muted">${parseFloat(inv.balance_due).toFixed(2)}</td>
                         <td className="py-3 pr-4"><Badge variant={meta.variant}>{meta.label}</Badge></td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
@@ -274,14 +274,14 @@ function InvoiceActions({
           aria-label={`Marcar pagada la colegiatura de ${inv.student_name}`}
           loading={markPaid.isPending && markPaid.variables === inv.id}
           onClick={() => markPaid.mutate(inv.id)}>
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <CheckCircle2 className="w-4 h-4 text-green-700" />
         </Button>
       )}
       {inv.status !== 'cancelled' && inv.status !== 'paid' && (
         <Button size="sm" variant="ghost" title="Ajustar monto"
           aria-label={`Ajustar la colegiatura de ${inv.student_name}`}
           onClick={() => onAdjust(inv)}>
-          <SlidersHorizontal className="w-4 h-4 text-slate-500" />
+          <SlidersHorizontal className="w-4 h-4 text-muted" />
         </Button>
       )}
       {open && (
@@ -289,7 +289,7 @@ function InvoiceActions({
           aria-label={`Cancelar la colegiatura de ${inv.student_name}`}
           loading={cancel.isPending && cancel.variables === inv.id}
           onClick={() => cancel.mutate(inv.id)}>
-          <Ban className="w-4 h-4 text-red-500" />
+          <Ban className="w-4 h-4 text-coral-600" />
         </Button>
       )}
     </>
@@ -300,9 +300,9 @@ function KpiCard({ icon: Icon, label, value, tone }: {
   icon: any; label: string; value: string; tone: 'slate' | 'emerald' | 'red' | 'brand';
 }) {
   const tones: Record<string, string> = {
-    slate: 'text-slate-600 bg-slate-100',
-    emerald: 'text-emerald-700 bg-emerald-50',
-    red: 'text-red-700 bg-red-50',
+    slate: 'text-muted bg-cream',
+    emerald: 'text-green-700 bg-green-50',
+    red: 'text-coral-700 bg-coral-50',
     brand: 'text-brand-700 bg-brand-50',
   };
   return (
@@ -311,8 +311,8 @@ function KpiCard({ icon: Icon, label, value, tone }: {
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className="text-lg font-bold text-slate-900 truncate">{value}</p>
+        <p className="text-xs text-subtle">{label}</p>
+        <p className="text-lg font-bold text-ink truncate">{value}</p>
       </div>
     </Card>
   );
@@ -339,7 +339,7 @@ function AdjustModal({ invoice, onClose, onDone }: {
     <Modal open={!!invoice} onClose={onClose} title="Ajustar colegiatura">
       {invoice && (
         <div className="space-y-4">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             {invoice.student_name} · {invoice.period_label}. Use un monto negativo para acreditar
             (descuento) o positivo para un cargo adicional.
           </p>

@@ -8,9 +8,9 @@ export default function TopBar({ title, subtitle }: { title: string; subtitle?: 
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
   return (
     <>
-      {/* 3px accent bar */}
-      <div className="h-[3px] flex-shrink-0" style={{ background: 'var(--grad-bar)' }} />
-      <header className="sticky top-[3px] z-20 flex items-center gap-3 border-b border-[#ECEAF3] bg-cream/[0.92] px-4 py-3.5 backdrop-blur-[14px] sm:gap-4 sm:px-6 lg:px-8">
+      {/* 3px accent bar — brand gradient sweep (token) */}
+      <div className="accent-bar" />
+      <header className="sticky top-[3px] z-20 flex items-center gap-3 border-b border-line bg-cream/[0.92] px-4 py-3.5 backdrop-blur-[14px] sm:gap-4 sm:px-6 lg:px-8">
         {/* Mobile hamburger */}
         <button
           type="button"
@@ -33,10 +33,9 @@ export default function TopBar({ title, subtitle }: { title: string; subtitle?: 
           <input placeholder="Buscar..." aria-label="Buscar" className="min-w-0 flex-1 border-none bg-transparent text-[13px] text-ink outline-none" />
         </div>
 
-        {/* Bell */}
+        {/* Bell — notifications feed not yet wired (see follow-ups); no fake unread dot. */}
         <button aria-label="Notificaciones" className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[11px] border border-line bg-white shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60">
           <Bell size={19} className="text-muted" />
-          <span className="absolute right-2.5 top-2.5 h-[7px] w-[7px] rounded-full border-2 border-white bg-pink" />
         </button>
 
         {/* Avatar */}

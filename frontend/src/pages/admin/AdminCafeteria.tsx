@@ -35,15 +35,15 @@ export default function AdminCafeteria() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-fluid-xl font-bold text-slate-900">Cafetería — Admin</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <h1 className="text-fluid-xl font-bold text-ink">Cafetería — Admin</h1>
+          <p className="text-muted text-sm mt-0.5">
             Saldos, depósitos, ajustes, devoluciones y reconciliación.
           </p>
         </div>
         <SchoolExportButtons />
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+      <div className="flex flex-wrap gap-1 border-b border-line">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -51,7 +51,7 @@ export default function AdminCafeteria() {
             className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === key
                 ? 'border-brand-600 text-brand-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             <Icon className="w-4 h-4" /> {label}
@@ -129,7 +129,7 @@ function RosterTab() {
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px] sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
           <input
             className="input-field pl-9"
             placeholder="Buscar alumno o matrícula…"
@@ -151,7 +151,7 @@ function RosterTab() {
         <div className="w-full overflow-x-auto rounded-xl2">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="py-2 pr-4">Alumno</th>
                 <th className="py-2 pr-4">Matrícula</th>
                 <th className="py-2 pr-4 text-right">Saldo</th>
@@ -160,22 +160,22 @@ function RosterTab() {
                 <th className="py-2 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-line">
               {filtered.map((b) => {
                 const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
                 return (
-                  <tr key={b.id} className="hover:bg-slate-50/50">
-                    <td className="py-3 pr-4 font-medium text-slate-900">
+                  <tr key={b.id} className="hover:bg-cream">
+                    <td className="py-3 pr-4 font-medium text-ink">
                       <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
                         {b.student.user.full_name}
                       </Link>
                     </td>
-                    <td className="py-3 pr-4 text-slate-500">{b.student.student_id}</td>
-                    <td className="py-3 pr-4 text-right font-semibold text-slate-900">${parseFloat(b.balance).toFixed(2)}</td>
+                    <td className="py-3 pr-4 text-muted">{b.student.student_id}</td>
+                    <td className="py-3 pr-4 text-right font-semibold text-ink">${parseFloat(b.balance).toFixed(2)}</td>
                     <td className="py-3 pr-4">
                       <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>
                     </td>
-                    <td className="py-3 pr-4 text-slate-500 whitespace-nowrap">{fmtDate(b.last_synced)}</td>
+                    <td className="py-3 pr-4 text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
                     <td className="py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Button
@@ -190,7 +190,7 @@ function RosterTab() {
                         </Button>
                         <Link
                           to={`/admin/cafeteria/${b.student.id}`}
-                          className="inline-flex items-center rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                          className="inline-flex items-center rounded-lg p-1.5 text-muted hover:bg-cream"
                           title="Ver detalle"
                           aria-label={`Ver detalle de ${b.student.user.full_name}`}
                         >
@@ -227,7 +227,7 @@ function DepositsTab() {
   return (
     <Card>
       <div className="flex items-center gap-2 mb-4">
-        <label htmlFor="deposit-status" className="text-sm text-slate-500">Estado:</label>
+        <label htmlFor="deposit-status" className="text-sm text-muted">Estado:</label>
         <select
           id="deposit-status"
           className="input-field w-auto"
@@ -249,7 +249,7 @@ function DepositsTab() {
         <div className="w-full overflow-x-auto rounded-xl2">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="py-2 pr-4">Fecha</th>
                 <th className="py-2 pr-4">Alumno</th>
                 <th className="py-2 pr-4 text-right">Monto</th>
@@ -259,21 +259,21 @@ function DepositsTab() {
                 <th className="py-2">Referencia</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-line">
               {data.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50/50">
-                  <td className="py-3 pr-4 whitespace-nowrap text-slate-500">{fmtDate(d.created_at)}</td>
-                  <td className="py-3 pr-4 font-medium text-slate-900">
+                <tr key={d.id} className="hover:bg-cream">
+                  <td className="py-3 pr-4 whitespace-nowrap text-muted">{fmtDate(d.created_at)}</td>
+                  <td className="py-3 pr-4 font-medium text-ink">
                     <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
                       {d.student_name}
                     </Link>
-                    <span className="block text-xs text-slate-400">{d.student_code}</span>
+                    <span className="block text-xs text-subtle">{d.student_code}</span>
                   </td>
-                  <td className="py-3 pr-4 text-right font-semibold text-slate-900">${parseFloat(d.amount).toFixed(2)}</td>
-                  <td className="py-3 pr-4 text-slate-600">{d.method_display}</td>
-                  <td className="py-3 pr-4 text-slate-500">{d.gateway || '—'}</td>
+                  <td className="py-3 pr-4 text-right font-semibold text-ink">${parseFloat(d.amount).toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-muted">{d.method_display}</td>
+                  <td className="py-3 pr-4 text-muted">{d.gateway || '—'}</td>
                   <td className="py-3 pr-4"><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
-                  <td className="py-3 text-slate-400 text-xs font-mono">{d.gateway_tx_id || '—'}</td>
+                  <td className="py-3 text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -299,11 +299,11 @@ function ReconcileTab() {
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Compara el saldo local contra los puntos de Loyverse y detecta diferencias.
         </p>
         <div className="flex items-center gap-3">
-          <label className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+          <label className="inline-flex items-center gap-1.5 text-sm text-muted">
             <input type="checkbox" checked={onlyDrift} onChange={(e) => setOnlyDrift(e.target.checked)} />
             Solo diferencias
           </label>
@@ -319,13 +319,13 @@ function ReconcileTab() {
         <EmptyState icon={Scale} title="Ejecuta la reconciliación" description="Presiona «Reconciliar» para comparar con Loyverse." />
       ) : (
         <>
-          <div className="mb-3 text-sm text-slate-600">
+          <div className="mb-3 text-sm text-muted">
             {data.drift_count > 0 ? (
-              <span className="inline-flex items-center gap-1.5 text-amber-700">
+              <span className="inline-flex items-center gap-1.5 text-amber">
                 <AlertTriangle className="w-4 h-4" /> {data.drift_count} diferencia(s) de {data.count} revisadas.
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              <span className="inline-flex items-center gap-1.5 text-green-700">
                 <CheckCircle2 className="w-4 h-4" /> Todo en orden ({data.count} revisadas).
               </span>
             )}
@@ -336,7 +336,7 @@ function ReconcileTab() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+                  <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                     <th className="py-2 pr-4">Alumno</th>
                     <th className="py-2 pr-4 text-right">Saldo local</th>
                     <th className="py-2 pr-4 text-right">Loyverse</th>
@@ -344,18 +344,18 @@ function ReconcileTab() {
                     <th className="py-2">Estado</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-line">
                   {data.results.map((r) => (
-                    <tr key={r.student_id} className="hover:bg-slate-50/50">
-                      <td className="py-3 pr-4 font-medium text-slate-900">
+                    <tr key={r.student_id} className="hover:bg-cream">
+                      <td className="py-3 pr-4 font-medium text-ink">
                         <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>
-                        <span className="block text-xs text-slate-400">{r.student_code}</span>
+                        <span className="block text-xs text-subtle">{r.student_code}</span>
                       </td>
-                      <td className="py-3 pr-4 text-right text-slate-900">${parseFloat(r.local_balance).toFixed(2)}</td>
-                      <td className="py-3 pr-4 text-right text-slate-600">
+                      <td className="py-3 pr-4 text-right text-ink">${parseFloat(r.local_balance).toFixed(2)}</td>
+                      <td className="py-3 pr-4 text-right text-muted">
                         {r.loyverse_balance !== null ? `$${parseFloat(r.loyverse_balance).toFixed(2)}` : '—'}
                       </td>
-                      <td className="py-3 pr-4 text-right font-medium text-slate-900">
+                      <td className="py-3 pr-4 text-right font-medium text-ink">
                         {r.drift !== null ? `$${parseFloat(r.drift).toFixed(2)}` : '—'}
                       </td>
                       <td className="py-3">
@@ -397,11 +397,11 @@ function LowBalanceTab() {
         <EmptyState icon={CheckCircle2} title="Ningún alumno con saldo bajo" />
       ) : (
         <>
-          <p className="text-sm text-slate-500 mb-3">{data.length} alumno(s) por debajo del umbral.</p>
+          <p className="text-sm text-muted mb-3">{data.length} alumno(s) por debajo del umbral.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                   <th className="py-2 pr-4">Alumno</th>
                   <th className="py-2 pr-4">Matrícula</th>
                   <th className="py-2 pr-4 text-right">Saldo</th>
@@ -409,18 +409,18 @@ function LowBalanceTab() {
                   <th className="py-2">Últ. sinc.</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-line">
                 {data.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/50">
-                    <td className="py-3 pr-4 font-medium text-slate-900">
+                  <tr key={b.id} className="hover:bg-cream">
+                    <td className="py-3 pr-4 font-medium text-ink">
                       <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
                         {b.student.user.full_name}
                       </Link>
                     </td>
-                    <td className="py-3 pr-4 text-slate-500">{b.student.student_id}</td>
-                    <td className="py-3 pr-4 text-right font-semibold text-amber-700">${parseFloat(b.balance).toFixed(2)}</td>
-                    <td className="py-3 pr-4 text-right text-slate-500">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
-                    <td className="py-3 text-slate-500 whitespace-nowrap">{fmtDate(b.last_synced)}</td>
+                    <td className="py-3 pr-4 text-muted">{b.student.student_id}</td>
+                    <td className="py-3 pr-4 text-right font-semibold text-amber">${parseFloat(b.balance).toFixed(2)}</td>
+                    <td className="py-3 pr-4 text-right text-muted">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
+                    <td className="py-3 text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
                   </tr>
                 ))}
               </tbody>

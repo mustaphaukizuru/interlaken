@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { FileText, ClipboardList, CheckCircle, ArrowRight, CalendarDays } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
@@ -11,29 +12,29 @@ const STEPS = [
     icon: FileText,
     step: '01',
     title: 'Pre-Registro',
-    desc: 'Completa el formulario de pre-registro en línea. Recibirás confirmación inmediata por correo.',
-    color: '#401a8e',
+    desc: 'Complete el formulario de pre-registro en línea. Recibirá confirmación inmediata por correo.',
+    color: 'var(--purple)',
   },
   {
     icon: CalendarDays,
     step: '02',
     title: 'Puertas Abiertas',
-    desc: 'Asiste a nuestro día de puertas abiertas para conocer las instalaciones y al equipo docente.',
-    color: '#47a028',
+    desc: 'Asista a nuestro día de puertas abiertas para conocer las instalaciones y al equipo docente.',
+    color: 'var(--green)',
   },
   {
     icon: ClipboardList,
     step: '03',
     title: 'Inscripción formal',
-    desc: 'Presenta los documentos requeridos y completa el proceso de inscripción con el personal administrativo.',
-    color: '#ef2558',
+    desc: 'Presente los documentos requeridos y complete el proceso de inscripción con el personal administrativo.',
+    color: 'var(--pink)',
   },
   {
     icon: CheckCircle,
     step: '04',
     title: '¡Bienvenido!',
-    desc: 'Recibirás tu kit de bienvenida, credencial escolar y acceso al portal de padres.',
-    color: '#48a018',
+    desc: 'Recibirá su kit de bienvenida, credencial escolar y acceso al portal de padres.',
+    color: 'var(--green)',
   },
 ];
 
@@ -47,6 +48,40 @@ const DOCS = [
   'Identificación oficial del tutor',
 ];
 
+/** Objection-handling FAQ — also emitted as FAQPage structured data below. */
+const FAQS = [
+  {
+    q: '¿Qué niveles educativos ofrece Colegio Interlaken?',
+    a: 'Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe en cada nivel.',
+  },
+  {
+    q: '¿El colegio cuenta con incorporación oficial ante la SEP?',
+    a: 'Sí. Nuestros planes de estudio tienen reconocimiento y validez oficial ante la Secretaría de Educación Pública.',
+  },
+  {
+    q: '¿Cuánto tarda el pre-registro en línea?',
+    a: 'Menos de 5 minutos. Recibirá confirmación inmediata y un asesor le contactará en un plazo de 2 días hábiles.',
+  },
+  {
+    q: '¿Qué documentos necesito para inscribir a mi hijo?',
+    a: 'Acta de nacimiento, CURP del alumno, comprobante de domicilio, boleta o certificado del ciclo anterior e identificación del tutor, entre otros.',
+  },
+  {
+    q: '¿Cómo protege el colegio los datos de mi familia?',
+    a: 'Tratamos sus datos personales conforme a la LFPDPPP. Consulte nuestro Aviso de Privacidad para conocer y ejercer sus derechos ARCO.',
+  },
+];
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQS.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
+
 export default function AdmissionsPage() {
   // Admissions funnel entry point (page views also cover this; the explicit
   // event makes the funnel step unambiguous in the analytics tool).
@@ -56,6 +91,9 @@ export default function AdmissionsPage() {
 
   return (
     <div>
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
+      </Helmet>
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-dark text-white">
         <Blob tone="green" opacity={0.42} size={480} shape={2} className="hidden sm:block" style={{ top: -160, left: -120 }} />
@@ -66,7 +104,7 @@ export default function AdmissionsPage() {
             Admisiones
           </h1>
           <p className="mt-4 max-w-[560px] text-base leading-relaxed text-white/60 sm:text-[17px]">
-            Un proceso simple, transparente y completamente en línea. Te acompañamos en cada paso.
+            Un proceso simple, transparente y completamente en línea. Le acompañamos en cada paso.
           </p>
         </div>
       </section>
@@ -83,7 +121,7 @@ export default function AdmissionsPage() {
           <div
             aria-hidden="true"
             className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-0.5 opacity-35 lg:block"
-            style={{ background: 'linear-gradient(90deg, #401a8e, #9a1185, #ef2558, #47a028)' }}
+            style={{ background: 'var(--grad-bar)' }}
           />
           <ol className="m-0 grid list-none grid-cols-1 gap-7 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map(({ icon: Icon, step, title, desc, color }, i) => (
@@ -92,7 +130,7 @@ export default function AdmissionsPage() {
                   {/* Numbered node */}
                   <div
                     className="relative z-[1] mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full border-[3px] bg-white"
-                    style={{ borderColor: color, boxShadow: `0 12px 26px -12px ${color}88` }}
+                    style={{ borderColor: color, boxShadow: `0 12px 26px -12px color-mix(in srgb, ${color} 53%, transparent)` }}
                   >
                     <Icon size={24} color={color} />
                     <span
@@ -132,13 +170,13 @@ export default function AdmissionsPage() {
               <div>
                 <h3 className="mb-2 text-xl font-bold text-brand-800">¿Listo para comenzar?</h3>
                 <p className="mb-6 text-sm leading-relaxed text-brand-700">
-                  El proceso de pre-registro toma menos de 5 minutos. Recibirás confirmación inmediata
+                  El proceso de pre-registro toma menos de 5 minutos. Recibirá confirmación inmediata
                   y nos pondremos en contacto para coordinar los siguientes pasos.
                 </p>
               </div>
               <div className="space-y-3">
                 <Link to="/pre-registro" className="btn-primary w-full justify-center">
-                  Iniciar Pre-Registro <ArrowRight className="h-4 w-4" />
+                  Inicie su pre-registro <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link to="/puertas-abiertas" className="btn-secondary w-full justify-center">
                   Ver fechas de Puertas Abiertas
@@ -146,6 +184,27 @@ export default function AdmissionsPage() {
               </div>
             </div>
           </Reveal>
+        </div>
+      </Section>
+
+      {/* ── FAQ (objection handling) ── */}
+      <Section bg="white">
+        <Reveal className="mb-8 text-center sm:mb-10">
+          <span className="section-label-green inline-flex">Preguntas frecuentes</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">Resolvemos sus dudas</h2>
+        </Reveal>
+        <div className="mx-auto max-w-[760px] space-y-3.5">
+          {FAQS.map((f, i) => (
+            <Reveal key={f.q} delay={i * 60}>
+              <details className="card group">
+                <summary className="flex cursor-pointer items-center justify-between gap-4 font-head text-[15.5px] font-bold text-ink [&::-webkit-details-marker]:hidden">
+                  {f.q}
+                  <ArrowRight size={18} className="flex-shrink-0 text-purple transition-transform group-open:rotate-90" />
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{f.a}</p>
+              </details>
+            </Reveal>
+          ))}
         </div>
       </Section>
     </div>

@@ -20,9 +20,9 @@ import type { CafeteriaStudentDetail, CafeteriaTransaction } from '@/types';
 
 const txIcon = (type: string) => {
   if (type === 'topup')      return <ArrowUpCircle className="w-4 h-4 text-brand-500" />;
-  if (type === 'refund')     return <RotateCcw className="w-4 h-4 text-blue-500" />;
-  if (type === 'adjustment') return <SlidersHorizontal className="w-4 h-4 text-purple-500" />;
-  return <ArrowDownCircle className="w-4 h-4 text-slate-400" />;
+  if (type === 'refund')     return <RotateCcw className="w-4 h-4 text-brand-500" />;
+  if (type === 'adjustment') return <SlidersHorizontal className="w-4 h-4 text-purple" />;
+  return <ArrowDownCircle className="w-4 h-4 text-subtle" />;
 };
 
 const txLabel = (type: string) => {
@@ -108,7 +108,7 @@ export default function AdminCafeteriaStudent() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/admin/cafeteria" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link to="/admin/cafeteria" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
           <ArrowLeft className="w-4 h-4" /> Volver a cafetería
         </Link>
       </div>
@@ -116,8 +116,8 @@ export default function AdminCafeteriaStudent() {
       {/* Header: student + balance + actions */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-fluid-xl font-bold text-slate-900">{balance.student.user.full_name}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <h1 className="text-fluid-xl font-bold text-ink">{balance.student.user.full_name}</h1>
+          <p className="text-muted text-sm mt-0.5">
             Matrícula {balance.student.student_id} · {balance.student.grade} {balance.student.group}
           </p>
         </div>
@@ -136,42 +136,42 @@ export default function AdminCafeteriaStudent() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Saldo actual</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">${parseFloat(balance.balance).toFixed(2)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Saldo actual</p>
+          <p className="mt-1 text-2xl font-bold text-ink">${parseFloat(balance.balance).toFixed(2)}</p>
           <Badge variant={isLow ? 'warning' : 'success'} className="mt-2">
             {isLow ? 'Saldo bajo' : 'Normal'}
           </Badge>
         </Card>
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Última sincronización</p>
-          <p className="mt-1 text-sm text-slate-700">
+          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Última sincronización</p>
+          <p className="mt-1 text-sm text-muted">
             {balance.last_synced ? fmtDate(balance.last_synced) : '—'}
           </p>
         </Card>
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Padres/Tutores</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Padres/Tutores</p>
           {parents.length ? (
-            <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
+            <ul className="mt-1 space-y-0.5 text-sm text-muted">
               {parents.map((p) => (
                 <li key={p.id} className="truncate" title={p.email}>{p.full_name}</li>
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-sm text-slate-400">Sin tutores vinculados</p>
+            <p className="mt-1 text-sm text-subtle">Sin tutores vinculados</p>
           )}
         </Card>
       </div>
 
       {/* Transactions */}
       <Card>
-        <h2 className="font-semibold text-slate-900 mb-3">Movimientos</h2>
+        <h2 className="font-semibold text-ink mb-3">Movimientos</h2>
         {!transactions.length ? (
           <EmptyState icon={ArrowDownCircle} title="Sin movimientos" />
         ) : (
           <div className="w-full overflow-x-auto rounded-xl2">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                   <th className="py-2 pr-4">Fecha</th>
                   <th className="py-2 pr-4">Tipo</th>
                   <th className="py-2 pr-4">Descripción</th>
@@ -180,16 +180,16 @@ export default function AdminCafeteriaStudent() {
                   <th className="py-2 text-right">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-line">
                 {transactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/50">
-                    <td className="py-3 pr-4 whitespace-nowrap text-slate-500">{fmtDate(t.date)}</td>
+                  <tr key={t.id} className="hover:bg-cream">
+                    <td className="py-3 pr-4 whitespace-nowrap text-muted">{fmtDate(t.date)}</td>
                     <td className="py-3 pr-4">
                       <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span>
                     </td>
-                    <td className="py-3 pr-4 text-slate-600 max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
-                    <td className="py-3 pr-4 text-right font-medium text-slate-900">${parseFloat(t.amount).toFixed(2)}</td>
-                    <td className="py-3 pr-4 text-right text-slate-500">
+                    <td className="py-3 pr-4 text-muted max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
+                    <td className="py-3 pr-4 text-right font-medium text-ink">${parseFloat(t.amount).toFixed(2)}</td>
+                    <td className="py-3 pr-4 text-right text-muted">
                       {t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—'}
                     </td>
                     <td className="py-3 text-right">
@@ -213,14 +213,14 @@ export default function AdminCafeteriaStudent() {
 
       {/* Audit trail */}
       <Card>
-        <h2 className="font-semibold text-slate-900 mb-3">Historial de ajustes y devoluciones</h2>
+        <h2 className="font-semibold text-ink mb-3">Historial de ajustes y devoluciones</h2>
         {!adjustments.length ? (
           <EmptyState icon={SlidersHorizontal} title="Sin ajustes registrados" />
         ) : (
           <div className="w-full overflow-x-auto rounded-xl2">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                   <th className="py-2 pr-4">Fecha</th>
                   <th className="py-2 pr-4">Tipo</th>
                   <th className="py-2 pr-4 text-right">Monto</th>
@@ -229,19 +229,19 @@ export default function AdminCafeteriaStudent() {
                   <th className="py-2 text-right">Saldo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-line">
                 {adjustments.map((a) => (
                   <tr key={a.id}>
-                    <td className="py-3 pr-4 whitespace-nowrap text-slate-500">{fmtDate(a.created_at)}</td>
+                    <td className="py-3 pr-4 whitespace-nowrap text-muted">{fmtDate(a.created_at)}</td>
                     <td className="py-3 pr-4">
                       <Badge variant={a.kind === 'refund' ? 'info' : 'neutral'}>{a.kind_display}</Badge>
                     </td>
-                    <td className={`py-3 pr-4 text-right font-medium ${parseFloat(a.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    <td className={`py-3 pr-4 text-right font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
                       {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
                     </td>
-                    <td className="py-3 pr-4 text-slate-600 max-w-xs truncate" title={a.reason}>{a.reason}</td>
-                    <td className="py-3 pr-4 text-slate-500">{a.admin_name || '—'}</td>
-                    <td className="py-3 text-right text-slate-500">
+                    <td className="py-3 pr-4 text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
+                    <td className="py-3 pr-4 text-muted">{a.admin_name || '—'}</td>
+                    <td className="py-3 text-right text-muted">
                       {a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—'}
                     </td>
                   </tr>
@@ -295,7 +295,7 @@ export default function AdminCafeteriaStudent() {
             onChange={(e) => setAdjustReason(e.target.value)}
             placeholder="Ej. Reembolso de cortesía, corrección…"
           />
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             Este movimiento queda registrado en la auditoría y se notifica a los tutores.
           </p>
           <div className="flex justify-end gap-2">
@@ -322,7 +322,7 @@ export default function AdminCafeteriaStudent() {
             onSubmit={(e) => { e.preventDefault(); refundMutation.mutate(); }}
             className="space-y-4"
           >
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted">
               Se revertirá la {txLabel(refundTx.transaction_type).toLowerCase()} de{' '}
               <span className="font-semibold">${parseFloat(refundTx.amount).toFixed(2)}</span> del{' '}
               {fmtDate(refundTx.date)}. Se ajustará el saldo y se notificará a los tutores.

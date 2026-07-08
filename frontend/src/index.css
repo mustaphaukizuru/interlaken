@@ -47,7 +47,11 @@
   --shadow-green: 0 12px 28px -10px rgba(71,160,40,0.32);
   --shadow-coral: 0 12px 28px -10px rgba(221,38,34,0.3);
   --radius: 18px;
-  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+  /* Motion scale — standard easing; fast 150ms / base 200ms / slow 300ms (max). */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s var(--ease);
+  --transition: 0.2s var(--ease);
+  --transition-slow: 0.3s var(--ease);
 }
 
 @layer base {
@@ -169,4 +173,18 @@
   .section-label-green  { @apply badge-green;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
   .section-label-coral  { @apply badge-coral;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
   .section-label-pink   { @apply badge-pink;   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
+
+  /* ── Admin data tables (DENSE variant — single source of admin table density) ──
+     Sticky header works because the wrapper is a bounded scroll container. On
+     mobile these tables are replaced by card stacks, so internal scroll is
+     desktop-only by design. */
+  .admin-table-wrap { @apply w-full overflow-auto rounded-xl2 border border-line; max-height: 68vh; }
+  .admin-table { @apply w-full border-collapse text-sm; }
+  .admin-table thead th {
+    @apply sticky top-0 z-10 whitespace-nowrap bg-cream-2 px-3 py-2.5 text-left font-head text-[11px] font-bold uppercase tracking-wider text-muted;
+  }
+  .admin-table tbody td { @apply px-3 py-2.5 align-middle; }
+  .admin-table tbody tr { @apply border-t border-line; }
+  .admin-table tbody tr:hover { @apply bg-cream; }
+  .admin-table .num { @apply text-right tabular-nums; }
 }

@@ -63,7 +63,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       {/* Role badge */}
       <div className="relative flex items-center gap-2.5 rounded-[14px] border border-purple-mid/40 bg-gradient-to-br from-purple/50 to-pink/[0.28] px-3.5 py-2.5">
         <div className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-white/10">
-          <Users size={17} color="white" />
+          <Users size={17} className="text-white" />
         </div>
         <div>
           <div className="font-head text-[9px] font-bold uppercase tracking-[1.8px] text-white/45">Portal</div>
