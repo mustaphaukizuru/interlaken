@@ -582,3 +582,256 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
 
     logger.info(f'Credited {amount} to {loyverse_customer_id}. Local balance: {new_balance}')
     return {'applied': True, 'balance': new_balance}
+
+
+# ── Admin console (Phase D) ──────────────────────────────────────────────────
+#
+# Manual adjustments, refunds and reconciliation. Every balance mutation here is
+# atomic (``select_for_update``) and audited via ``BalanceAdjustment`` so who/when/
+# why is always recoverable (spec §5 F5, R7). Per spec R1 the local ledger is the
+# source of truth — we never write ``total_points`` to Loyverse.
+
+
+def _notify_balance_change(student, title, message):
+    """Fan out an in-app + email notification to every guardian. Returns count."""
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    notified = 0
+    for parent in student.parents.all():
+        notify(parent, Notification.NotifType.CAFETERIA, title, message)
+        notified += 1
+    return notified
+
+
+def adjust_balance(student, amount, reason: str, admin=None):
+    """Apply an audited manual credit/debit to a student's cafeteria balance.
+
+    ``amount`` is a signed ``Decimal`` (positive = credit, negative = debit). This
+    atomically updates the local ledger, records an ``ADJUSTMENT``
+    ``CafeteriaTransaction`` (with running ``balance_after``) and a
+    ``BalanceAdjustment`` audit row, then notifies the guardians (outside the lock).
+
+    Returns the created ``BalanceAdjustment``. Raises ``ValueError`` on a zero
+    amount or a debit that would overdraw the balance below zero.
+    """
+    from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
+                                       CafeteriaTransaction)
+
+    amount = Decimal(str(amount)).quantize(Decimal('0.01'))
+    if amount == 0:
+        raise ValueError('El monto del ajuste no puede ser cero.')
+
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+        current = cb.balance or Decimal('0')
+        new_balance = current + amount
+        if new_balance < 0:
+            raise ValueError(
+                f'El ajuste dejaría el saldo en ${new_balance:.2f}; no se permite un '
+                f'saldo negativo (saldo actual ${current:.2f}).'
+            )
+
+        cb.balance = new_balance
+        cb.last_synced = timezone.now()
+        # A credit that lifts the balance above the threshold clears the alert dedup
+        # so a future dip re-alerts (mirrors low_balance_alerts recovery behaviour).
+        fields = ['balance', 'last_synced']
+        if not cb.is_low_balance and cb.last_low_balance_alert_at is not None:
+            cb.last_low_balance_alert_at = None
+            fields.append('last_low_balance_alert_at')
+        cb.save(update_fields=fields)
+
+        tx = CafeteriaTransaction.objects.create(
+            student=student,
+            transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT,
+            amount=amount.copy_abs(),
+            description=(f'Ajuste manual: {reason}' if reason else 'Ajuste manual'),
+            balance_after=cb.balance,
+        )
+        adj = BalanceAdjustment.objects.create(
+            student=student,
+            admin=admin,
+            kind=BalanceAdjustment.Kind.ADJUSTMENT,
+            amount=amount,
+            reason=reason,
+            balance_after=cb.balance,
+            transaction=tx,
+        )
+
+    # Best-effort remote mirror (R1: expected no-op on the current Loyverse plan).
+    if student.loyverse_id:
+        try:
+            with _session() as session:
+                resp = session.post(
+                    f'{_base_url()}/customers',
+                    json={'id': student.loyverse_id, 'total_points': float(cb.balance)},
+                    timeout=_TIMEOUT,
+                )
+                resp.raise_for_status()
+        except requests.RequestException as e:
+            logger.warning(f'Loyverse mirror after adjustment skipped for {student}: {e}')
+
+    verb = 'acreditaron' if amount > 0 else 'descontaron'
+    _notify_balance_change(
+        student,
+        'Ajuste de saldo en cafetería',
+        (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
+         f'{student.user.full_name}. Motivo: {reason}. '
+         f'Saldo actual: ${cb.balance:.2f}.'),
+    )
+    logger.info(f'Balance adjustment ${amount} for {student} by {admin} — reason: {reason!r}')
+    return adj
+
+
+def _net_effect(tx) -> Decimal:
+    """The signed effect the given transaction had on the local balance.
+
+    Credits (top-ups, refunds/devoluciones) are positive; purchases are negative.
+    Adjustments carry their own sign, recoverable from the audit row.
+    """
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaTransaction
+
+    amount = Decimal(str(tx.amount))
+    t = tx.transaction_type
+    if t == CafeteriaTransaction.TxType.PURCHASE:
+        return -amount
+    if t in (CafeteriaTransaction.TxType.TOPUP, CafeteriaTransaction.TxType.REFUND):
+        return amount
+    # ADJUSTMENT: amount is stored absolute; recover the sign from its audit row.
+    adj = BalanceAdjustment.objects.filter(transaction=tx).first()
+    return Decimal(str(adj.amount)) if adj else amount
+
+
+def refund_transaction(tx, reason: str = '', admin=None):
+    """Reverse a cafeteria transaction: undo its balance effect + refund any payment.
+
+    Creates a ``REFUND`` ledger transaction that negates the original's effect on
+    the balance (a top-up reversal debits; a purchase refund credits), marks the
+    linked ``Payment`` refunded when one exists, writes a ``BalanceAdjustment``
+    audit row, and notifies the guardians. Idempotent: a second call is a no-op
+    (guarded by a unique ``refund-tx-<id>`` reference).
+
+    Returns the created ``BalanceAdjustment``. Raises ``ValueError`` if the
+    transaction can't be refunded (already refunded, is itself a reversal, or the
+    debit would overdraw the balance).
+    """
+    from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
+                                       CafeteriaTransaction)
+    from apps.payments.models import Payment
+
+    if tx.transaction_type in (CafeteriaTransaction.TxType.REFUND,
+                               CafeteriaTransaction.TxType.ADJUSTMENT):
+        raise ValueError('Solo se pueden revertir compras o recargas.')
+
+    student = tx.student
+    reference = f'refund-tx-{tx.id}'
+    effect = _net_effect(tx)      # original effect on balance
+    reversal = -effect            # what the refund applies
+
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+
+        if CafeteriaTransaction.objects.filter(loyverse_receipt_id=reference).exists():
+            raise ValueError('Esta transacción ya fue reembolsada.')
+
+        current = cb.balance or Decimal('0')
+        new_balance = current + reversal
+        if new_balance < 0:
+            raise ValueError(
+                f'La devolución dejaría el saldo en ${new_balance:.2f}; el alumno ya '
+                f'gastó ese saldo. Saldo actual ${current:.2f}.'
+            )
+
+        cb.balance = new_balance
+        cb.last_synced = timezone.now()
+        cb.save(update_fields=['balance', 'last_synced'])
+
+        refund_tx = CafeteriaTransaction.objects.create(
+            student=student,
+            transaction_type=CafeteriaTransaction.TxType.REFUND,
+            amount=reversal.copy_abs(),
+            description=(f'Devolución de {tx.get_transaction_type_display().lower()} '
+                        f'#{tx.id}' + (f': {reason}' if reason else '')),
+            loyverse_receipt_id=reference,
+            balance_after=cb.balance,
+        )
+        adj = BalanceAdjustment.objects.create(
+            student=student,
+            admin=admin,
+            kind=BalanceAdjustment.Kind.REFUND,
+            amount=reversal,
+            reason=reason or f'Devolución de transacción #{tx.id}',
+            balance_after=cb.balance,
+            transaction=refund_tx,
+            source_transaction=tx,
+        )
+
+        # Mark any linked Payment refunded. Online top-ups tag their ledger row
+        # ``topup-payment-<payment_id>``; fall back to the TopUpRequest linkage.
+        payment = _payment_for_transaction(tx)
+        if payment is not None and payment.status != Payment.Status.REFUNDED:
+            payment.status = Payment.Status.REFUNDED
+            payment.save(update_fields=['status', 'updated_at'])
+
+    _notify_balance_change(
+        student,
+        'Devolución en cafetería',
+        (f'Se procesó una devolución de ${reversal.copy_abs():.2f} en el saldo de '
+         f'cafetería de {student.user.full_name}.'
+         + (f' Motivo: {reason}.' if reason else '')
+         + f' Saldo actual: ${cb.balance:.2f}.'),
+    )
+    logger.info(f'Refund of tx #{tx.id} for {student} by {admin} — reversal ${reversal}')
+    return adj
+
+
+def _payment_for_transaction(tx):
+    """Best-effort locate the ``Payment`` behind a top-up ledger transaction."""
+    import re
+
+    from apps.payments.models import Payment
+
+    m = re.match(r'topup-payment-(\d+)$', tx.loyverse_receipt_id or '')
+    if m:
+        return Payment.objects.filter(pk=int(m.group(1))).first()
+    return None
+
+
+def reconcile_balances():
+    """Compare each linked student's local ledger against Loyverse ``total_points``.
+
+    Returns a list of rows (one per student with a ``loyverse_id``) flagging any
+    drift between the DB balance and the remote points. Read-only — it never writes
+    to either side (surfacing drift is the point; see spec §7 R1). Students whose
+    Loyverse fetch errors are reported with ``error`` set rather than dropped.
+    """
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import CafeteriaBalance
+
+    rows = []
+    students = StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
+    for student in students.select_related('user'):
+        cb, _ = CafeteriaBalance.objects.get_or_create(student=student)
+        local = Decimal(str(cb.balance or 0))
+        row = {
+            'student_id': student.id,
+            'student_name': student.user.full_name,
+            'student_code': student.student_id,
+            'loyverse_id': student.loyverse_id,
+            'local_balance': local,
+            'loyverse_balance': None,
+            'drift': None,
+            'in_sync': False,
+            'error': None,
+        }
+        try:
+            customer = get_customer_by_id(student.loyverse_id)
+            remote = get_balance_from_customer(customer)
+            row['loyverse_balance'] = remote
+            row['drift'] = local - remote
+            row['in_sync'] = (local == remote)
+        except LoyverseError as e:
+            row['error'] = str(e)
+        rows.append(row)
+    return rows

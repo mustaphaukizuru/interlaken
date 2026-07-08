@@ -38,9 +38,10 @@ class CafeteriaTransaction(models.Model):
     """Loyverse transaction log synced from API."""
 
     class TxType(models.TextChoices):
-        PURCHASE = 'purchase', 'Compra'
-        TOPUP    = 'topup',    'Recarga'
-        REFUND   = 'refund',   'Devolución'
+        PURCHASE   = 'purchase',   'Compra'
+        TOPUP      = 'topup',      'Recarga'
+        REFUND     = 'refund',     'Devolución'
+        ADJUSTMENT = 'adjustment', 'Ajuste'
 
     student             = models.ForeignKey(
                               StudentProfile, on_delete=models.CASCADE,
@@ -96,3 +97,47 @@ class TopUpRequest(models.Model):
 
     def __str__(self):
         return f'{self.student} — ${self.amount} ({self.status})'
+
+
+class BalanceAdjustment(models.Model):
+    """Audit trail for every **manual** admin change to a cafeteria balance.
+
+    Covers two admin actions (spec §5 F5): a manual credit/debit ("adjustment")
+    and a transaction reversal ("refund"). One row is written for each, capturing
+    *who* did it, *when*, the signed *amount* applied to the local ledger, the
+    *reason*, and the resulting balance — so every financial mutation is traceable
+    (spec constraint: all financial mutations audited).
+    """
+
+    class Kind(models.TextChoices):
+        ADJUSTMENT = 'adjustment', 'Ajuste manual'
+        REFUND     = 'refund',     'Devolución'
+
+    student       = models.ForeignKey(
+                        StudentProfile, on_delete=models.CASCADE,
+                        related_name='balance_adjustments')
+    admin         = models.ForeignKey(
+                        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+                        related_name='cafeteria_adjustments')
+    kind          = models.CharField(max_length=20, choices=Kind.choices, default=Kind.ADJUSTMENT)
+    # Signed delta applied to the local ledger: positive = credit, negative = debit.
+    amount        = models.DecimalField(max_digits=10, decimal_places=2)
+    reason        = models.TextField()
+    balance_after = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # The ledger transaction this audit row produced (and, for a refund, it also
+    # points at the transaction being reversed via ``source_transaction``).
+    transaction        = models.ForeignKey(
+                             CafeteriaTransaction, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name='adjustments')
+    source_transaction = models.ForeignKey(
+                             CafeteriaTransaction, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name='reversals')
+    created_at    = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = 'Ajuste de Saldo'
+        verbose_name_plural = 'Ajustes de Saldo'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.student} — {self.get_kind_display()} ${self.amount}'

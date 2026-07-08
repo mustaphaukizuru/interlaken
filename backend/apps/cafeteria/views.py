@@ -1,6 +1,7 @@
 """
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
+from django.db import models
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -11,13 +12,19 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 from apps.core.ratelimit import ratelimit
 
-from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
+                     TopUpRequest)
 from .serializers import (
+    AdjustmentInputSerializer,
+    BalanceAdjustmentSerializer,
     CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
+    RefundInputSerializer,
+    TopUpLogSerializer,
     TopUpRequestSerializer,
 )
-from .services import add_points_to_customer, sync_all_balances, sync_student_balance
+from .services import (add_points_to_customer, adjust_balance, reconcile_balances,
+                       refund_transaction, sync_all_balances, sync_student_balance)
 
 
 class IsParentOrAdmin(permissions.BasePermission):
@@ -227,3 +234,194 @@ class AdminSyncAllView(APIView):
             return Response({'detail': 'Sincronización completada.'})
         except Exception as e:
             return Response({'error': str(e)}, status=502)
+
+
+# ── Admin console (Phase D) ──────────────────────────────────────────────────
+
+
+class AdminTopUpLogView(generics.ListAPIView):
+    """GET /api/v1/cafeteria/admin/topups/?status=&method=&from=&to=
+
+    Deposits/top-up log: every ``TopUpRequest`` (office + online) enriched with its
+    linked gateway ``Payment`` state. Paginated; filters by ``status``, ``method``
+    and a ``from``/``to`` created-date range (spec §5).
+    """
+    serializer_class = TopUpLogSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        qs = (TopUpRequest.objects
+              .select_related('student__user')
+              .prefetch_related('payments')
+              .all())
+        params = self.request.query_params
+
+        status_f = params.get('status')
+        if status_f in TopUpRequest.Status.values:
+            qs = qs.filter(status=status_f)
+
+        method_f = params.get('method')
+        if method_f in TopUpRequest.Method.values:
+            qs = qs.filter(method=method_f)
+
+        date_from = params.get('from')
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        date_to = params.get('to')
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        return qs
+
+
+class AdminStudentDetailView(APIView):
+    """GET /api/v1/cafeteria/admin/student/<pk>/
+
+    Per-student console: balance, linked parents, full transaction ledger and the
+    audit trail of manual adjustments/refunds (spec §5 "Per-student detail").
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        student = get_object_or_404(
+            StudentProfile.objects.select_related('user'), pk=pk)
+        balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
+        transactions = CafeteriaTransaction.objects.filter(student=student)[:200]
+        adjustments = BalanceAdjustment.objects.filter(student=student)
+
+        parents = [
+            {'id': p.id, 'full_name': p.full_name, 'email': p.email, 'whatsapp': p.whatsapp}
+            for p in student.parents.all()
+        ]
+
+        return Response({
+            'balance': CafeteriaBalanceSerializer(balance).data,
+            'parents': parents,
+            'transactions': CafeteriaTransactionSerializer(transactions, many=True).data,
+            'adjustments': BalanceAdjustmentSerializer(adjustments, many=True).data,
+        })
+
+
+class AdminAdjustBalanceView(APIView):
+    """POST /api/v1/cafeteria/admin/adjust/<student_pk>/  ``{amount, reason}``
+
+    Audited manual credit (+) or debit (−) to a student's balance. Writes a
+    ``BalanceAdjustment`` and an ``ADJUSTMENT`` ledger row, then notifies parents.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, student_pk):
+        student = get_object_or_404(StudentProfile, pk=student_pk)
+        serializer = AdjustmentInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            adj = adjust_balance(
+                student,
+                serializer.validated_data['amount'],
+                serializer.validated_data['reason'],
+                admin=request.user,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+
+        return Response(BalanceAdjustmentSerializer(adj).data, status=201)
+
+
+class AdminRefundView(APIView):
+    """POST /api/v1/cafeteria/admin/refund/<tx_pk>/  ``{reason?}``
+
+    Reverse a transaction: undo its balance effect, mark any linked ``Payment``
+    refunded, audit it, notify parents (spec §5 / §6.11).
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, tx_pk):
+        tx = get_object_or_404(CafeteriaTransaction, pk=tx_pk)
+        serializer = RefundInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            adj = refund_transaction(
+                tx,
+                reason=serializer.validated_data.get('reason', ''),
+                admin=request.user,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+
+        return Response(BalanceAdjustmentSerializer(adj).data, status=201)
+
+
+class AdminReconcileView(APIView):
+    """GET /api/v1/cafeteria/admin/reconcile/
+
+    Compare each linked student's local ledger vs Loyverse points and flag drift.
+    ``?only=drift`` returns only the out-of-sync/errored rows.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        rows = reconcile_balances()
+
+        def _ser(r):
+            return {
+                **r,
+                'local_balance': str(r['local_balance']),
+                'loyverse_balance': None if r['loyverse_balance'] is None else str(r['loyverse_balance']),
+                'drift': None if r['drift'] is None else str(r['drift']),
+            }
+
+        data = [_ser(r) for r in rows]
+        if request.query_params.get('only') == 'drift':
+            data = [r for r in data if not r['in_sync']]
+
+        return Response({
+            'count': len(data),
+            'drift_count': sum(1 for r in data if not r['in_sync']),
+            'results': data,
+        })
+
+
+class AdminLowBalanceView(APIView):
+    """GET /api/v1/cafeteria/admin/low-balance/
+
+    Students whose balance is at or below their low-balance threshold, for
+    proactive outreach (spec §5).
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        balances = (CafeteriaBalance.objects
+                    .select_related('student__user')
+                    .filter(balance__lte=models.F('low_balance_threshold'))
+                    .order_by('balance'))
+        return Response(CafeteriaBalanceSerializer(balances, many=True).data)
+
+
+class AdminExportStudentView(APIView):
+    """GET /api/v1/cafeteria/admin/export/student/<pk>/?format=csv|pdf"""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        from . import exports
+
+        student = get_object_or_404(
+            StudentProfile.objects.select_related('user'), pk=pk)
+        fmt = (request.query_params.get('format') or 'csv').lower()
+        if fmt == 'pdf':
+            return exports.student_statement_pdf(student)
+        return exports.student_statement_csv(student)
+
+
+class AdminExportSchoolView(APIView):
+    """GET /api/v1/cafeteria/admin/export/school/?format=csv|pdf"""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from . import exports
+
+        fmt = (request.query_params.get('format') or 'csv').lower()
+        if fmt == 'pdf':
+            return exports.school_statement_pdf()
+        return exports.school_statement_csv()

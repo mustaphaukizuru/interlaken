@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from .models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
+                     TopUpRequest)
 
 
 @admin.register(CafeteriaBalance)
@@ -23,3 +24,14 @@ class TopUpRequestAdmin(admin.ModelAdmin):
     search_fields = ('student__user__email',)
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'processed_at')
+
+
+@admin.register(BalanceAdjustment)
+class BalanceAdjustmentAdmin(admin.ModelAdmin):
+    list_display = ('student', 'kind', 'amount', 'balance_after', 'admin', 'created_at')
+    list_filter = ('kind', 'created_at')
+    search_fields = ('student__user__email', 'reason')
+    ordering = ('-created_at',)
+    # Audit rows are immutable — created only through the service layer.
+    readonly_fields = ('student', 'admin', 'kind', 'amount', 'reason', 'balance_after',
+                       'transaction', 'source_transaction', 'created_at')
