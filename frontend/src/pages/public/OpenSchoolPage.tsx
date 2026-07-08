@@ -60,14 +60,14 @@ export default function OpenSchoolPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-r from-brand-700 to-brand-600 text-white py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h1 className="text-4xl font-bold mb-2">Puertas Abiertas</h1>
+      <section className="bg-gradient-to-r from-brand-700 to-brand-600 py-12 text-white sm:py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h1 className="mb-2 font-head text-fluid-4xl font-bold">Puertas Abiertas</h1>
           <p className="text-brand-100">Conozca nuestras instalaciones y equipo docente</p>
         </div>
       </section>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-12">
         {registered ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -80,7 +80,7 @@ export default function OpenSchoolPage() {
           </div>
         ) : (
           <>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             {/* Events list */}
             <div>
               <h2 className="font-semibold text-slate-900 mb-4">Próximas fechas</h2>
@@ -94,7 +94,7 @@ export default function OpenSchoolPage() {
                     <button
                       key={event.id}
                       onClick={() => setSelectedEvent(event)}
-                      className={`w-full text-left card border-2 transition-colors ${
+                      className={`card w-full border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 ${
                         selectedEvent?.id === event.id
                           ? 'border-brand-500 bg-brand-50'
                           : 'border-slate-100 hover:border-brand-300'
@@ -167,7 +167,7 @@ export default function OpenSchoolPage() {
                   <div>
                     <label className="label">Número de asistentes</label>
                     <select
-                      className="input-field"
+                      className="input-field text-base"
                       {...register('children_count', { valueAsNumber: true })}
                     >
                       {[1, 2, 3, 4, 5].map((n) => (

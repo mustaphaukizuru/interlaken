@@ -76,65 +76,68 @@ export default function LoginPage() {
   const alertMsg = formError ?? oauthMessage;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="flex min-h-screen flex-col">
       <div className="accent-bar" />
-      <div style={{ flex: 1, display: 'flex' }}>
+      <div className="flex flex-1">
         {/* Left dark panel */}
-        <div
-          className="hidden lg:flex"
-          style={{ width: '48%', position: 'relative', background: '#080516', flexDirection: 'column', justifyContent: 'space-between', padding: '48px', overflow: 'hidden' }}
-        >
+        <div className="relative hidden w-[48%] flex-col justify-between overflow-hidden bg-dark p-12 lg:flex">
           {/* blurred campus bg */}
-          <img src="/assets/facade.webp" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.16, filter: 'blur(2px)' }} onError={e => ((e.target as HTMLImageElement).style.display = 'none')} />
-          <div style={{ position: 'absolute', top: -120, left: -100, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(64,26,142,0.6), rgba(8,5,22,0) 68%)' }} />
-          <div style={{ position: 'absolute', bottom: -100, right: -80, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(29,162,171,0.22), rgba(8,5,22,0) 68%)' }} />
+          <img
+            src="/assets/facade.webp"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.16] blur-[2px]"
+            onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
+          />
+          <div className="absolute -left-[100px] -top-[120px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(64,26,142,0.6),rgba(8,5,22,0)_68%)]" />
+          <div className="absolute -bottom-[100px] -right-[80px] h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(29,162,171,0.22),rgba(8,5,22,0)_68%)]" />
 
-          <div style={{ position: 'relative' }}>
+          <div className="relative">
             <Logo variant="stacked" size={120} theme="dark" eager />
           </div>
-          <div style={{ position: 'relative' }}>
-            <div className="section-label-pink" style={{ display: 'inline-flex' }}>Portal Escolar</div>
-            <h1 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 900, fontSize: 44, lineHeight: 1.08, color: '#fff', letterSpacing: -1, marginTop: 12 }}>
+          <div className="relative">
+            <div className="section-label-pink inline-flex">Portal Escolar</div>
+            <h1 className="mt-3 font-head text-[44px] font-black leading-[1.08] tracking-[-1px] text-white">
               Formando Líderes<br />
-              <span style={{ background: 'linear-gradient(100deg, #ef2558 0%, #b13bbf 55%, #5e3aad 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>con Excelencia</span>
+              <span className="bg-[linear-gradient(100deg,#ef2558_0%,#b13bbf_55%,#5e3aad_100%)] bg-clip-text text-transparent">con Excelencia</span>
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, marginTop: 16, maxWidth: 420, lineHeight: 1.6 }}>
+            <p className="mt-4 max-w-[420px] text-[15px] leading-relaxed text-white/60">
               Accede al portal de Colegio Interlaken para consultar calificaciones, asistencia, cafetería y pagos.
             </p>
           </div>
-          <div style={{ position: 'relative', display: 'flex', gap: 28 }}>
+          <div className="relative flex gap-7">
             {[['40', 'Años'], ['1,200+', 'Alumnos'], ['95%', 'Aprovechamiento']].map(([n, l]) => (
               <div key={l}>
-                <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 24, color: '#fff' }}>{n}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{l}</div>
+                <div className="font-head text-2xl font-extrabold text-white">{n}</div>
+                <div className="text-xs text-white/50">{l}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Right form panel */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', background: '#F5F4FA' }}>
-          <div style={{ width: '100%', maxWidth: 400 }}>
+        <div className="flex flex-1 items-center justify-center bg-cream px-6 py-8 sm:px-8 sm:py-10">
+          <div className="w-full max-w-[400px]">
             {/* Mobile logo */}
-            <div className="lg:hidden" style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+            <div className="mb-7 flex justify-center lg:hidden">
               <Logo variant="stacked" size={96} theme="light" eager />
             </div>
 
-            <div style={{ background: '#fff', border: '1px solid #ECEAF3', borderRadius: 22, padding: '32px 28px', boxShadow: '0 20px 50px -24px rgba(64,26,142,0.35)' }}>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 22, color: '#1A1130', textAlign: 'center' }}>Iniciar Sesión</h2>
-              <p style={{ fontSize: 13, color: '#6E6885', textAlign: 'center', marginTop: 4, marginBottom: 24 }}>Bienvenido de vuelta a Interlaken</p>
+            <div className="rounded-[22px] border border-[#ECEAF3] bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
+              <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">Iniciar Sesión</h2>
+              <p className="mb-6 mt-1 text-center text-[13px] text-muted">Bienvenido de vuelta a Interlaken</p>
 
               {alertMsg && (
-                <div style={{ background: 'rgba(239,37,88,0.08)', border: '1px solid #ef2558', borderRadius: 12, padding: '11px 14px', fontSize: 13, color: '#d81a49', marginBottom: 18 }}>
+                <div className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark">
                   {alertMsg}
                 </div>
               )}
 
               <button
+                type="button"
                 onClick={() => authApi.googleLogin()}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, border: '1px solid #ECEAF3', borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 600, color: '#1A1130', background: '#fff', cursor: 'pointer' }}
+                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-[#ECEAF3] bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
-                <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
@@ -143,26 +146,46 @@ export default function LoginPage() {
                 Continuar con Google
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
-                <div style={{ flex: 1, height: 1, background: '#ECEAF3' }} />
-                <span style={{ fontSize: 11.5, color: '#9A93AE', fontWeight: 600 }}>O CON CORREO</span>
-                <div style={{ flex: 1, height: 1, background: '#ECEAF3' }} />
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-[#ECEAF3]" />
+                <span className="text-[11.5px] font-semibold text-subtle">O CON CORREO</span>
+                <div className="h-px flex-1 bg-[#ECEAF3]" />
               </div>
 
               <form onSubmit={handleSubmit}>
-                <label className="label">Correo electrónico</label>
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="correo@interlaken.edu.mx" className="input-field" style={{ marginBottom: 14 }} />
-                <label className="label">Contraseña</label>
-                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="input-field" style={{ marginBottom: 20 }} />
-                <button type="submit" disabled={submitting} className="btn-pink" style={{ width: '100%', justifyContent: 'center', opacity: submitting ? 0.7 : 1 }}>
+                <label htmlFor="login-email" className="label">Correo electrónico</label>
+                <input
+                  id="login-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="correo@interlaken.edu.mx"
+                  className="input-field mb-3.5 min-h-[44px] text-base"
+                />
+                <label htmlFor="login-password" className="label">Contraseña</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="input-field mb-5 min-h-[44px] text-base"
+                />
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-pink min-h-[44px] w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-70"
+                >
                   {submitting ? 'Ingresando…' : 'Ingresar'}
                 </button>
               </form>
             </div>
 
-            <p style={{ textAlign: 'center', fontSize: 12.5, color: '#9A93AE', marginTop: 20 }}>
+            <p className="mt-5 text-center text-[12.5px] text-subtle">
               ¿No tiene cuenta?{' '}
-              <Link to="/pre-registro" style={{ color: '#401a8e', fontWeight: 600 }}>Iniciar pre-registro</Link>
+              <Link to="/pre-registro" className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">Iniciar pre-registro</Link>
             </p>
           </div>
         </div>

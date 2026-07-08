@@ -116,7 +116,7 @@ export default function AdminCafeteriaStudent() {
       {/* Header: student + balance + actions */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">{balance.student.user.full_name}</h1>
+          <h1 className="text-fluid-xl font-bold text-slate-900">{balance.student.user.full_name}</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             Matrícula {balance.student.student_id} · {balance.student.grade} {balance.student.group}
           </p>
@@ -168,7 +168,7 @@ export default function AdminCafeteriaStudent() {
         {!transactions.length ? (
           <EmptyState icon={ArrowDownCircle} title="Sin movimientos" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto rounded-xl2">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
@@ -217,7 +217,7 @@ export default function AdminCafeteriaStudent() {
         {!adjustments.length ? (
           <EmptyState icon={SlidersHorizontal} title="Sin ajustes registrados" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto rounded-xl2">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">

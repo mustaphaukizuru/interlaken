@@ -68,31 +68,31 @@ export default function CafeteriaTopupReturn() {
       text: 'Estamos verificando el estado de su recarga. Esto tomará unos segundos.',
     },
     success: {
-      icon: <CheckCircle2 className="w-12 h-12 text-brand-600" />,
+      icon: <CheckCircle2 className="w-12 h-12 text-green-600" />,
       title: 'Recarga exitosa',
       text: 'El saldo de cafetería se acreditó correctamente. Ya puede verlo en su portal.',
     },
     failed: {
-      icon: <XCircle className="w-12 h-12 text-red-500" />,
+      icon: <XCircle className="w-12 h-12 text-coral" />,
       title: 'La recarga no se completó',
       text: 'No se realizó ningún cargo. Puede intentarlo nuevamente desde la página de cafetería.',
     },
     pending: {
-      icon: <Clock className="w-12 h-12 text-amber-500" />,
+      icon: <Clock className="w-12 h-12 text-amber" />,
       title: 'Recarga en proceso',
       text: 'Su pago se está procesando. El saldo se actualizará en cuanto se confirme; puede revisar el historial en unos minutos.',
     },
   }[outcome];
 
   return (
-    <div className="max-w-md mx-auto mt-10">
+    <div className="mx-auto mt-10 w-full max-w-md px-4 sm:px-0">
       <Card className="text-center">
-        <div className="flex justify-center mb-4">{content.icon}</div>
-        <h1 className="text-lg font-bold text-slate-900">{content.title}</h1>
-        <p className="text-sm text-slate-500 mt-2">{content.text}</p>
+        <div className="mb-4 flex justify-center">{content.icon}</div>
+        <h1 className="text-fluid-lg font-bold text-ink">{content.title}</h1>
+        <p className="mt-2 text-fluid-sm text-muted">{content.text}</p>
         <div className="mt-6">
           <Link to="/portal/cafeteria">
-            <Button variant="primary" className="w-full">
+            <Button variant="primary" className="min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40">
               <Coffee className="w-4 h-4" /> Volver a cafetería
             </Button>
           </Link>

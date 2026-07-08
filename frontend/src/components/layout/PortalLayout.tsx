@@ -1,50 +1,79 @@
 import { Outlet } from 'react-router-dom';
-import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 
 interface Props {
   role: 'parent' | 'student' | 'admin';
 }
 
+/**
+ * Shared mobile-nav state. TopBar is rendered by each page (inside <Outlet/>),
+ * so it consumes this context to reach the hamburger toggle owned by PortalLayout.
+ */
+interface MobileNavCtx {
+  open: boolean;
+  toggle: () => void;
+  close: () => void;
+}
+
+const MobileNavContext = createContext<MobileNavCtx>({
+  open: false,
+  toggle: () => {},
+  close: () => {},
+});
+
+export function useMobileNav() {
+  return useContext(MobileNavContext);
+}
+
 export function PortalLayout({ role }: Props) {
   const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const toggle = useCallback(() => setOpen((v) => !v), []);
+
+  // Lock body scroll while the drawer is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, close]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F5F4FA' }}>
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar role={role} />
-      </div>
+    <MobileNavContext.Provider value={{ open, toggle, close }}>
+      <div className="flex min-h-screen bg-cream">
+        {/* Off-canvas backdrop (mobile only) */}
+        <div
+          onClick={close}
+          aria-hidden="true"
+          className={`fixed inset-0 z-40 bg-dark/55 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
+            open ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        />
 
-      {/* Mobile slide-over */}
-      {open && (
-        <div className="lg:hidden" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(8,5,22,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setOpen(false)} />
-          <div style={{ position: 'relative', zIndex: 10 }}>
-            <button onClick={() => setOpen(false)} style={{ position: 'absolute', top: 18, right: -46, width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <X size={18} />
-            </button>
-            <Sidebar role={role} onNavigate={() => setOpen(false)} />
+        {/* Sidebar: off-canvas drawer on mobile, static on desktop */}
+        <Sidebar role={role} open={open} onNavigate={close} />
+
+        {/* Main */}
+        <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+          <div className="flex-1 px-[clamp(16px,4vw,32px)] py-6">
+            <Outlet />
           </div>
-        </div>
-      )}
-
-      {/* Main */}
-      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setOpen(true)}
-          className="lg:hidden"
-          style={{ position: 'fixed', top: 12, left: 12, zIndex: 50, width: 42, height: 42, borderRadius: 11, background: '#080516', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 20px -6px rgba(64,26,142,0.6)' }}
-        >
-          <Menu size={20} />
-        </button>
-        <div style={{ flex: 1, padding: '24px clamp(16px, 4vw, 32px)' }}>
-          <Outlet />
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </MobileNavContext.Provider>
   );
 }
 

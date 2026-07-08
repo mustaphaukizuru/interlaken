@@ -56,15 +56,15 @@ export default function AboutPage() {
   return (
     <div>
       {/* ── HERO ── */}
-      <section style={{ position: 'relative', background: '#080516', color: '#fff', overflow: 'hidden' }}>
-        <Blob tone="purple" opacity={0.5} size={520} shape={0} style={{ top: -180, left: -140 }} />
-        <Blob tone="green" opacity={0.18} size={420} shape={2} style={{ bottom: -160, right: -120 }} />
-        <div style={{ position: 'relative', maxWidth: 1120, margin: '0 auto', padding: '72px 24px' }}>
-          <span className="section-label-pink" style={{ display: 'inline-flex' }}>Nuestra Historia</span>
-          <h1 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 900, fontSize: 'clamp(34px, 5.5vw, 54px)', letterSpacing: -1.4, lineHeight: 1.08, marginTop: 12 }}>
+      <section className="relative overflow-hidden bg-dark text-white">
+        <Blob tone="purple" opacity={0.5} size={520} shape={0} className="hidden sm:block" style={{ top: -180, left: -140 }} />
+        <Blob tone="green" opacity={0.18} size={420} shape={2} className="hidden sm:block" style={{ bottom: -160, right: -120 }} />
+        <div className="relative mx-auto max-w-[1120px] px-6 py-14 sm:py-16 lg:py-[72px]">
+          <span className="section-label-pink inline-flex">Nuestra Historia</span>
+          <h1 className="mt-3 font-head font-black text-fluid-4xl leading-[1.08] tracking-[-0.04em]">
             40 años formando<br />líderes en Tlalnepantla
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 17, marginTop: 18, maxWidth: 560, lineHeight: 1.7 }}>
+          <p className="mt-4 max-w-xl text-fluid-base leading-relaxed text-white/60 sm:mt-[18px]">
             Colegio Interlaken es una institución educativa privada con más de cuatro décadas
             de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta preparatoria.
           </p>
@@ -73,32 +73,32 @@ export default function AboutPage() {
 
       {/* ── MISIÓN / VISIÓN split ── */}
       <Section bg="white">
-        <div style={{ display: 'grid', gap: 44, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', alignItems: 'center' }}>
-          <Reveal direction="right" style={{ position: 'relative' }}>
-            <Blob tone="pink" opacity={0.1} size={280} shape={1} style={{ top: -40, left: -50 }} />
-            <div style={{ position: 'relative' }}>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(26px, 3.5vw, 36px)', color: '#1A1130', letterSpacing: -0.8, lineHeight: 1.15 }}>
+        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-11">
+          <Reveal direction="right" className="relative">
+            <Blob tone="pink" opacity={0.1} size={280} shape={1} className="hidden sm:block" style={{ top: -40, left: -50 }} />
+            <div className="relative">
+              <h2 className="font-head text-fluid-3xl font-extrabold leading-tight tracking-[-0.02em] text-ink">
                 Nuestra misión y visión
               </h2>
-              <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: 'rgba(64,26,142,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="mt-6 flex gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-purple/10">
                   <Target size={22} color="#401a8e" />
                 </div>
                 <div>
-                  <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 17, color: '#1A1130' }}>Misión</h3>
-                  <p style={{ color: '#6E6885', fontSize: 15, marginTop: 6, lineHeight: 1.7 }}>
+                  <h3 className="font-head text-[17px] font-bold text-ink">Misión</h3>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-muted">
                     Formar personas íntegras, críticas y comprometidas con su entorno, capaces de
                     afrontar los retos del siglo XXI con confianza y habilidades globales.
                   </p>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 16, marginTop: 20 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0, background: 'rgba(29,162,171,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="mt-5 flex gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-green/10">
                   <Eye size={22} color="#47a028" />
                 </div>
                 <div>
-                  <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 17, color: '#1A1130' }}>Visión</h3>
-                  <p style={{ color: '#6E6885', fontSize: 15, marginTop: 6, lineHeight: 1.7 }}>
+                  <h3 className="font-head text-[17px] font-bold text-ink">Visión</h3>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-muted">
                     Ser la comunidad educativa de referencia en la zona, reconocida por la excelencia
                     académica, el bilingüismo y la formación humana de sus egresados.
                   </p>
@@ -108,21 +108,21 @@ export default function AboutPage() {
           </Reveal>
 
           {/* Image collage + floating mini-stat card */}
-          <Reveal direction="left" style={{ position: 'relative' }}>
-            <Accent tone="green" variant="ring" size={64} opacity={0.4} style={{ top: -24, right: 20 }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, position: 'relative' }}>
-              <img src="/assets/facade.webp" alt="Fachada del Colegio Interlaken" style={{ borderRadius: 16, objectFit: 'cover', height: 240, gridRow: 'span 2', width: '100%' }} onError={hideOnError} />
-              <img src="/assets/classroom.webp" alt="Aula del colegio" style={{ borderRadius: 16, objectFit: 'cover', height: 113, width: '100%' }} onError={hideOnError} />
-              <img src="/assets/campus-mural.webp" alt="Mural del campus" style={{ borderRadius: 16, objectFit: 'cover', height: 113, width: '100%' }} onError={hideOnError} />
+          <Reveal direction="left" className="relative">
+            <Accent tone="green" variant="ring" size={64} opacity={0.4} className="hidden sm:block" style={{ top: -24, right: 20 }} />
+            <div className="relative grid grid-cols-2 gap-3.5">
+              <img src="/assets/facade.webp" alt="Fachada del Colegio Interlaken" width={520} height={240} loading="lazy" className="row-span-2 h-60 w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/classroom.webp" alt="Aula del colegio" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/campus-mural.webp" alt="Mural del campus" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
-            <div style={{ position: 'absolute', bottom: -20, left: -10, background: '#fff', borderRadius: 16, padding: '14px 18px', boxShadow: '0 20px 40px -16px rgba(64,26,142,0.35)', border: '1px solid #ECEAF3', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(239,37,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="absolute -bottom-5 -left-2.5 flex items-center gap-3 rounded-2xl border border-[#ECEAF3] bg-white px-4 py-3.5 shadow-purple sm:-left-2.5">
+              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-pink/10">
                 <Award size={20} color="#ef2558" />
               </div>
               <div>
-                <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 20, color: '#1A1130', lineHeight: 1 }}>+2,500</div>
-                <div style={{ fontSize: 11.5, color: '#6E6885' }}>Egresados</div>
+                <div className="font-head text-xl font-extrabold leading-none text-ink">+2,500</div>
+                <div className="text-[11.5px] text-muted">Egresados</div>
               </div>
             </div>
           </Reveal>
@@ -131,19 +131,22 @@ export default function AboutPage() {
 
       {/* ── VALORES row ── */}
       <Section bg="cream">
-        <Reveal style={{ textAlign: 'center', marginBottom: 44 }}>
-          <span className="section-label-purple" style={{ display: 'inline-flex' }}>Lo que nos define</span>
-          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(28px, 4vw, 40px)', color: '#1A1130', letterSpacing: -1 }}>Nuestros valores</h2>
+        <Reveal className="mb-10 text-center sm:mb-11">
+          <span className="section-label-purple inline-flex">Lo que nos define</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">Nuestros valores</h2>
         </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 22 }}>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {VALUES.map((v, i) => (
             <Reveal key={v.title} delay={i * 70}>
-              <div className="card hover-lift" style={{ height: '100%' }}>
-                <div style={{ width: 46, height: 46, borderRadius: 13, background: `${v.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="card hover-lift h-full">
+                <div
+                  className="flex h-[46px] w-[46px] items-center justify-center rounded-xl2"
+                  style={{ background: `${v.color}18` }}
+                >
                   <v.icon size={22} color={v.color} />
                 </div>
-                <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 17, color: '#1A1130', marginTop: 16 }}>{v.title}</h3>
-                <p style={{ color: '#6E6885', fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>{v.desc}</p>
+                <h3 className="mt-4 font-head text-[17px] font-bold text-ink">{v.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{v.desc}</p>
               </div>
             </Reveal>
           ))}
@@ -152,11 +155,11 @@ export default function AboutPage() {
 
       {/* ── NIVELES ── */}
       <Section bg="white">
-        <Reveal style={{ textAlign: 'center', marginBottom: 36 }}>
-          <span className="section-label-green" style={{ display: 'inline-flex' }}>Oferta educativa</span>
-          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(28px, 4vw, 40px)', color: '#1A1130', letterSpacing: -1 }}>Niveles educativos</h2>
+        <Reveal className="mb-9 text-center">
+          <span className="section-label-green inline-flex">Oferta educativa</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">Niveles educativos</h2>
         </Reveal>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {LEVELS.map((l, i) => (
             <Reveal key={l.level} delay={i * 80}>
               <div className={`rounded-2xl border-2 p-5 ${l.color}`}>
@@ -171,21 +174,26 @@ export default function AboutPage() {
 
       {/* ── TESTIMONIOS ── */}
       <Section bg="cream">
-        <Reveal style={{ textAlign: 'center', marginBottom: 44 }}>
-          <span className="section-label-pink" style={{ display: 'inline-flex' }}>Testimonios</span>
-          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(28px, 4vw, 40px)', color: '#1A1130', letterSpacing: -1 }}>Lo que dicen nuestras familias</h2>
+        <Reveal className="mb-10 text-center sm:mb-11">
+          <span className="section-label-pink inline-flex">Testimonios</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">Lo que dicen nuestras familias</h2>
         </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {TESTIMONIALS.map((t, i) => (
             <Reveal key={t.name} delay={i * 90}>
-              <div className="card hover-lift" style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 18 }}>
-                <Quote size={30} color={t.color} style={{ opacity: 0.5 }} />
-                <p style={{ color: '#3d3654', fontSize: 15, lineHeight: 1.7, flex: 1 }}>“{t.quote}”</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
-                  <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15 }}>{initials(t.name)}</div>
+              <div className="card hover-lift flex h-full flex-col gap-[18px]">
+                <Quote size={30} color={t.color} className="opacity-50" />
+                <p className="flex-1 text-[15px] leading-relaxed text-[#3d3654]">“{t.quote}”</p>
+                <div className="mt-1 flex items-center gap-3">
+                  <div
+                    className="flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full font-head text-[15px] font-bold text-white"
+                    style={{ background: t.color }}
+                  >
+                    {initials(t.name)}
+                  </div>
                   <div>
-                    <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>{t.name}</div>
-                    <div style={{ fontSize: 12.5, color: '#6E6885' }}>{t.relation}</div>
+                    <div className="font-head text-[15px] font-bold text-ink">{t.name}</div>
+                    <div className="text-[12.5px] text-muted">{t.relation}</div>
                   </div>
                 </div>
               </div>
@@ -195,12 +203,12 @@ export default function AboutPage() {
       </Section>
 
       {/* ── CTA ── */}
-      <Section bg="gradient" spacing="sm" style={{ textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 900, fontSize: 'clamp(26px, 4vw, 40px)', letterSpacing: -1 }}>¿Quieres conocernos de cerca?</h2>
-        <p style={{ fontSize: 17, opacity: 0.9, marginTop: 12, maxWidth: 560, margin: '12px auto 0' }}>Agenda una visita o inicia tu pre-inscripción en línea en solo unos minutos.</p>
-        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 14, marginTop: 28 }}>
-          <Link to="/pre-registro" className="btn btn-lg" style={{ background: '#fff', color: '#401a8e' }}>Iniciar Pre-registro <ArrowRight size={17} /></Link>
-          <Link to="/puertas-abiertas" className="btn-ghost btn-lg">Puertas Abiertas</Link>
+      <Section bg="gradient" spacing="sm" className="text-center">
+        <h2 className="font-head text-fluid-3xl font-black tracking-[-0.025em]">¿Quieres conocernos de cerca?</h2>
+        <p className="mx-auto mt-3 max-w-xl text-fluid-base opacity-90">Agenda una visita o inicia tu pre-inscripción en línea en solo unos minutos.</p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3.5">
+          <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Iniciar Pre-registro <ArrowRight size={17} /></Link>
+          <Link to="/puertas-abiertas" className="btn-ghost btn-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Puertas Abiertas</Link>
         </div>
       </Section>
     </div>

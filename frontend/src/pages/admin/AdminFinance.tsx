@@ -81,12 +81,12 @@ export default function AdminFinance() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Finanzas — Colegiaturas</h1>
+          <h1 className="text-fluid-xl font-bold text-slate-900">Finanzas — Colegiaturas</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             Facturación mensual, cobranza y estado de cuenta.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="month"
             className="input-field w-auto"
@@ -101,7 +101,7 @@ export default function AdminFinance() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={Wallet} label="Facturado" value={`$${dashboard?.billed ?? '0.00'}`} tone="slate" />
         <KpiCard icon={TrendingUp} label="Cobrado" value={`$${dashboard?.collected ?? '0.00'}`} tone="emerald" />
         <KpiCard icon={AlertTriangle} label="Pendiente" value={`$${dashboard?.outstanding ?? '0.00'}`} tone="red" />
@@ -144,74 +144,155 @@ export default function AdminFinance() {
             description="Genere las colegiaturas del periodo con el botón «Generar»."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
-                  <th className="py-2 pr-4">Alumno</th>
-                  <th className="py-2 pr-4">Periodo</th>
-                  <th className="py-2 pr-4">Vence</th>
-                  <th className="py-2 pr-4 text-right">Monto</th>
-                  <th className="py-2 pr-4 text-right">Saldo</th>
-                  <th className="py-2 pr-4">Estado</th>
-                  <th className="py-2 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {invoices.map((inv) => {
-                  const meta = statusMeta[inv.status] ?? statusMeta.pending;
-                  const open = inv.status === 'pending' || inv.status === 'overdue';
-                  return (
-                    <tr key={inv.id} className="hover:bg-slate-50/50">
-                      <td className="py-3 pr-4 font-medium text-slate-900">
-                        {inv.student_name}
-                        <span className="block text-xs text-slate-400">{inv.student_code} · {inv.grade}</span>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600">{inv.period_label}</td>
-                      <td className="py-3 pr-4 text-slate-500 whitespace-nowrap">
-                        {format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-semibold text-slate-900">${parseFloat(inv.amount).toFixed(2)}</td>
-                      <td className="py-3 pr-4 text-right text-slate-700">${parseFloat(inv.balance_due).toFixed(2)}</td>
-                      <td className="py-3 pr-4"><Badge variant={meta.variant}>{meta.label}</Badge></td>
-                      <td className="py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {open && (
-                            <Button size="sm" variant="ghost" title="Marcar pagada"
-                              aria-label={`Marcar pagada la colegiatura de ${inv.student_name}`}
-                              loading={markPaid.isPending && markPaid.variables === inv.id}
-                              onClick={() => markPaid.mutate(inv.id)}>
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            </Button>
-                          )}
-                          {inv.status !== 'cancelled' && inv.status !== 'paid' && (
-                            <Button size="sm" variant="ghost" title="Ajustar monto"
-                              aria-label={`Ajustar la colegiatura de ${inv.student_name}`}
-                              onClick={() => setAdjustFor(inv)}>
-                              <SlidersHorizontal className="w-4 h-4 text-slate-500" />
-                            </Button>
-                          )}
-                          {open && (
-                            <Button size="sm" variant="ghost" title="Cancelar"
-                              aria-label={`Cancelar la colegiatura de ${inv.student_name}`}
-                              loading={cancel.isPending && cancel.variables === inv.id}
-                              onClick={() => cancel.mutate(inv.id)}>
-                              <Ban className="w-4 h-4 text-red-500" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile: stacked cards */}
+            <ul className="space-y-3 md:hidden">
+              {invoices.map((inv) => {
+                const meta = statusMeta[inv.status] ?? statusMeta.pending;
+                const open = inv.status === 'pending' || inv.status === 'overdue';
+                return (
+                  <li key={inv.id} className="rounded-xl2 border border-slate-100 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{inv.student_name}</p>
+                        <p className="text-xs text-slate-400">{inv.student_code} · {inv.grade}</p>
+                      </div>
+                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                    </div>
+                    <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <dt className="text-xs font-semibold text-slate-500">Periodo</dt>
+                        <dd className="text-slate-600">{inv.period_label}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold text-slate-500">Vence</dt>
+                        <dd className="text-slate-500">{format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold text-slate-500">Monto</dt>
+                        <dd className="font-semibold text-slate-900">${parseFloat(inv.amount).toFixed(2)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold text-slate-500">Saldo</dt>
+                        <dd className="text-slate-700">${parseFloat(inv.balance_due).toFixed(2)}</dd>
+                      </div>
+                    </dl>
+                    <div className="mt-3 flex flex-wrap items-center gap-1">
+                      <InvoiceActions
+                        inv={inv}
+                        open={open}
+                        markPaid={markPaid}
+                        cancel={cancel}
+                        onAdjust={setAdjustFor}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block w-full overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
+                    <th className="py-2 pr-4">Alumno</th>
+                    <th className="py-2 pr-4">Periodo</th>
+                    <th className="py-2 pr-4">Vence</th>
+                    <th className="py-2 pr-4 text-right">Monto</th>
+                    <th className="py-2 pr-4 text-right">Saldo</th>
+                    <th className="py-2 pr-4">Estado</th>
+                    <th className="py-2 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {invoices.map((inv) => {
+                    const meta = statusMeta[inv.status] ?? statusMeta.pending;
+                    const open = inv.status === 'pending' || inv.status === 'overdue';
+                    return (
+                      <tr key={inv.id} className="hover:bg-slate-50/50">
+                        <td className="py-3 pr-4 font-medium text-slate-900">
+                          {inv.student_name}
+                          <span className="block text-xs text-slate-400">{inv.student_code} · {inv.grade}</span>
+                        </td>
+                        <td className="py-3 pr-4 text-slate-600">{inv.period_label}</td>
+                        <td className="py-3 pr-4 text-slate-500 whitespace-nowrap">
+                          {format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}
+                        </td>
+                        <td className="py-3 pr-4 text-right font-semibold text-slate-900">${parseFloat(inv.amount).toFixed(2)}</td>
+                        <td className="py-3 pr-4 text-right text-slate-700">${parseFloat(inv.balance_due).toFixed(2)}</td>
+                        <td className="py-3 pr-4"><Badge variant={meta.variant}>{meta.label}</Badge></td>
+                        <td className="py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <InvoiceActions
+                              inv={inv}
+                              open={open}
+                              markPaid={markPaid}
+                              cancel={cancel}
+                              onAdjust={setAdjustFor}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
 
       <AdjustModal invoice={adjustFor} onClose={() => setAdjustFor(null)} onDone={invalidate} />
     </div>
+  );
+}
+
+type InvoiceMutation = {
+  isPending: boolean;
+  variables?: number;
+  mutate: (id: number) => void;
+};
+
+function InvoiceActions({
+  inv,
+  open,
+  markPaid,
+  cancel,
+  onAdjust,
+}: {
+  inv: Invoice;
+  open: boolean;
+  markPaid: InvoiceMutation;
+  cancel: InvoiceMutation;
+  onAdjust: (inv: Invoice) => void;
+}) {
+  return (
+    <>
+      {open && (
+        <Button size="sm" variant="ghost" title="Marcar pagada"
+          aria-label={`Marcar pagada la colegiatura de ${inv.student_name}`}
+          loading={markPaid.isPending && markPaid.variables === inv.id}
+          onClick={() => markPaid.mutate(inv.id)}>
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        </Button>
+      )}
+      {inv.status !== 'cancelled' && inv.status !== 'paid' && (
+        <Button size="sm" variant="ghost" title="Ajustar monto"
+          aria-label={`Ajustar la colegiatura de ${inv.student_name}`}
+          onClick={() => onAdjust(inv)}>
+          <SlidersHorizontal className="w-4 h-4 text-slate-500" />
+        </Button>
+      )}
+      {open && (
+        <Button size="sm" variant="ghost" title="Cancelar"
+          aria-label={`Cancelar la colegiatura de ${inv.student_name}`}
+          loading={cancel.isPending && cancel.variables === inv.id}
+          onClick={() => cancel.mutate(inv.id)}>
+          <Ban className="w-4 h-4 text-red-500" />
+        </Button>
+      )}
+    </>
   );
 }
 

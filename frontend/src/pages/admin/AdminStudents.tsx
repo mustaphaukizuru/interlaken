@@ -28,7 +28,7 @@ export default function AdminStudents() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Alumnos</h1>
+        <h1 className="text-fluid-xl font-bold text-slate-900">Alumnos</h1>
         <p className="text-slate-500 text-sm mt-0.5">Directorio de alumnos activos.</p>
       </div>
 
@@ -48,37 +48,71 @@ export default function AdminStudents() {
         ) : !filtered?.length ? (
           <EmptyState icon={Users} title="Sin alumnos" description="Los alumnos registrados aparecerán aquí." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Nombre</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Matrícula</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Grado</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Grupo</th>
-                  <th className="text-left py-2 text-xs font-semibold text-slate-500">Correo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/50">
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                          {s.user.first_name[0]}
-                        </div>
-                        <span className="font-medium text-slate-900">{s.user.full_name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-slate-500">{s.student_id}</td>
-                    <td className="py-3 pr-4 text-slate-700">{s.grade}</td>
-                    <td className="py-3 pr-4 text-slate-700">{s.group}</td>
-                    <td className="py-3 text-slate-400 text-xs">{s.user.email}</td>
+          <>
+            {/* Mobile: stacked cards */}
+            <ul className="space-y-3 md:hidden">
+              {filtered.map((s) => (
+                <li key={s.id} className="rounded-xl2 border border-slate-100 p-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                      {s.user.first_name[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 truncate">{s.user.full_name}</p>
+                      <p className="text-slate-400 text-xs truncate">{s.user.email}</p>
+                    </div>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <dt className="text-xs font-semibold text-slate-500">Matrícula</dt>
+                      <dd className="text-slate-700">{s.student_id}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold text-slate-500">Grado</dt>
+                      <dd className="text-slate-700">{s.grade}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold text-slate-500">Grupo</dt>
+                      <dd className="text-slate-700">{s.group}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block w-full overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Nombre</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Matrícula</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Grado</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Grupo</th>
+                    <th className="text-left py-2 text-xs font-semibold text-slate-500">Correo</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filtered.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50/50">
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                            {s.user.first_name[0]}
+                          </div>
+                          <span className="font-medium text-slate-900">{s.user.full_name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-slate-500">{s.student_id}</td>
+                      <td className="py-3 pr-4 text-slate-700">{s.grade}</td>
+                      <td className="py-3 pr-4 text-slate-700">{s.group}</td>
+                      <td className="py-3 text-slate-400 text-xs">{s.user.email}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
     </div>

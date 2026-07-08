@@ -62,9 +62,14 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
       }
     };
 
+    // Lock background scroll while the dialog is open.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
       // Restore focus to whatever opened the dialog.
       previouslyFocused.current?.focus?.();
     };
@@ -74,7 +79,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -85,7 +90,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="card w-full space-y-4 focus:outline-none"
+        className="card w-full max-h-[92dvh] space-y-4 overflow-y-auto rounded-b-none rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] focus:outline-none max-sm:!max-w-none sm:rounded-2xl sm:pb-6"
         style={{ maxWidth }}
       >
         <div className="flex items-start justify-between gap-4">

@@ -163,6 +163,49 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
   );
 }
 
+type BookingAct = 'confirm' | 'cancel' | 'attended' | 'no_show';
+
+function BookingActions({
+  id,
+  parentName,
+  onAction,
+}: {
+  id: number;
+  parentName: string;
+  onAction: (v: { id: number; act: BookingAct }) => void;
+}) {
+  const base =
+    'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+  return (
+    <>
+      <button
+        title="Marcar asistió"
+        aria-label={`Marcar que ${parentName} asistió`}
+        onClick={() => onAction({ id, act: 'attended' })}
+        className={`${base} hover:bg-brand-50 hover:text-brand-600`}
+      >
+        <UserCheck className="w-4 h-4" />
+      </button>
+      <button
+        title="Confirmar"
+        aria-label={`Confirmar la reserva de ${parentName}`}
+        onClick={() => onAction({ id, act: 'confirm' })}
+        className={`${base} hover:bg-green-50 hover:text-green-600`}
+      >
+        <Check className="w-4 h-4" />
+      </button>
+      <button
+        title="Cancelar"
+        aria-label={`Cancelar la reserva de ${parentName}`}
+        onClick={() => onAction({ id, act: 'cancel' })}
+        className={`${base} hover:bg-red-50 hover:text-red-600`}
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </>
+  );
+}
+
 export default function AdminBookings() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -190,7 +233,7 @@ export default function AdminBookings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Visitas</h1>
+        <h1 className="text-fluid-xl font-bold text-slate-900">Visitas</h1>
         <p className="text-slate-500 text-sm mt-0.5">
           Publique disponibilidad y gestione las visitas individuales.
         </p>
@@ -226,74 +269,90 @@ export default function AdminBookings() {
             description="Las visitas agendadas aparecerán aquí."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Fecha</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Tutor</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Contacto</th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Estado</th>
-                  <th className="text-left py-2 text-xs font-semibold text-slate-500">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {bookings.map((b) => {
-                  const meta = statusMeta[b.status] ?? statusMeta.pending;
-                  return (
-                    <tr key={b.id} className="hover:bg-slate-50/50">
-                      <td className="py-3 pr-4 whitespace-nowrap">
-                        <div className="font-medium text-slate-900">
+          <>
+            {/* Mobile: stacked cards */}
+            <ul className="space-y-3 md:hidden">
+              {bookings.map((b) => {
+                const meta = statusMeta[b.status] ?? statusMeta.pending;
+                return (
+                  <li key={b.id} className="rounded-xl2 border border-slate-100 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">
                           {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
-                        </div>
-                        <div className="text-slate-400 text-xs">
+                        </p>
+                        <p className="text-slate-400 text-xs">
                           {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-700">
-                        {b.parent_name}
-                        {b.child_name && (
-                          <div className="text-slate-400 text-xs">Alumno: {b.child_name}</div>
-                        )}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <div className="text-slate-500">{b.parent_email}</div>
-                        <div className="text-slate-400 text-xs">{b.parent_phone}</div>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Badge variant={meta.variant}>{meta.label}</Badge>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-1">
-                          <button
-                            title="Marcar asistió"
-                            onClick={() => action.mutate({ id: b.id, act: 'attended' })}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
-                          >
-                            <UserCheck className="w-4 h-4" />
-                          </button>
-                          <button
-                            title="Confirmar"
-                            onClick={() => action.mutate({ id: b.id, act: 'confirm' })}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-green-50 hover:text-green-600 transition-colors"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            title="Cancelar"
-                            onClick={() => action.mutate({ id: b.id, act: 'cancel' })}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </p>
+                      </div>
+                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                    </div>
+                    <div className="mt-3 text-sm">
+                      <p className="text-slate-700">{b.parent_name}</p>
+                      {b.child_name && (
+                        <p className="text-slate-400 text-xs">Alumno: {b.child_name}</p>
+                      )}
+                      <p className="text-slate-500 mt-1 break-words">{b.parent_email}</p>
+                      <p className="text-slate-400 text-xs">{b.parent_phone}</p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-1">
+                      <BookingActions id={b.id} parentName={b.parent_name} onAction={action.mutate} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block w-full overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Fecha</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Tutor</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Contacto</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Estado</th>
+                    <th className="text-left py-2 text-xs font-semibold text-slate-500">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {bookings.map((b) => {
+                    const meta = statusMeta[b.status] ?? statusMeta.pending;
+                    return (
+                      <tr key={b.id} className="hover:bg-slate-50/50">
+                        <td className="py-3 pr-4 whitespace-nowrap">
+                          <div className="font-medium text-slate-900">
+                            {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
+                          </div>
+                          <div className="text-slate-400 text-xs">
+                            {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-slate-700">
+                          {b.parent_name}
+                          {b.child_name && (
+                            <div className="text-slate-400 text-xs">Alumno: {b.child_name}</div>
+                          )}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="text-slate-500">{b.parent_email}</div>
+                          <div className="text-slate-400 text-xs">{b.parent_phone}</div>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge variant={meta.variant}>{meta.label}</Badge>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-1">
+                            <BookingActions id={b.id} parentName={b.parent_name} onAction={action.mutate} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
     </div>

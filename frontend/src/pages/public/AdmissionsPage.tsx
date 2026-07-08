@@ -57,15 +57,15 @@ export default function AdmissionsPage() {
   return (
     <div>
       {/* ── HERO ── */}
-      <section style={{ position: 'relative', background: '#080516', color: '#fff', overflow: 'hidden' }}>
-        <Blob tone="green" opacity={0.42} size={480} shape={2} style={{ top: -160, left: -120 }} />
-        <Blob tone="pink" opacity={0.16} size={400} shape={1} style={{ bottom: -150, right: -110 }} />
-        <div style={{ position: 'relative', maxWidth: 1120, margin: '0 auto', padding: '72px 24px' }}>
-          <span className="section-label-pink" style={{ display: 'inline-flex' }}>Ciclo Escolar 2025–2026 · Inscripciones Abiertas</span>
-          <h1 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 900, fontSize: 'clamp(34px, 5.5vw, 54px)', letterSpacing: -1.4, lineHeight: 1.08, marginTop: 12 }}>
+      <section className="relative overflow-hidden bg-dark text-white">
+        <Blob tone="green" opacity={0.42} size={480} shape={2} className="hidden sm:block" style={{ top: -160, left: -120 }} />
+        <Blob tone="pink" opacity={0.16} size={400} shape={1} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
+        <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-[72px]">
+          <span className="section-label-pink inline-flex">Ciclo Escolar 2025–2026 · Inscripciones Abiertas</span>
+          <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
             Admisiones
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 17, marginTop: 18, maxWidth: 560, lineHeight: 1.7 }}>
+          <p className="mt-4 max-w-[560px] text-base leading-relaxed text-white/60 sm:text-[17px]">
             Un proceso simple, transparente y completamente en línea. Te acompañamos en cada paso.
           </p>
         </div>
@@ -73,29 +73,37 @@ export default function AdmissionsPage() {
 
       {/* ── PROCESS TIMELINE ── */}
       <Section bg="white">
-        <Reveal style={{ textAlign: 'center', marginBottom: 48 }}>
-          <span className="section-label-purple" style={{ display: 'inline-flex' }}>Cómo funciona</span>
-          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(28px, 4vw, 40px)', color: '#1A1130', letterSpacing: -1 }}>Proceso de admisión</h2>
+        <Reveal className="mb-10 text-center sm:mb-12">
+          <span className="section-label-purple inline-flex">Cómo funciona</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">Proceso de admisión</h2>
         </Reveal>
 
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           {/* Connecting line (desktop only) */}
           <div
             aria-hidden="true"
-            className="hidden lg:block"
-            style={{ position: 'absolute', top: 28, left: '12.5%', right: '12.5%', height: 2, background: 'linear-gradient(90deg, #401a8e, #9a1185, #ef2558, #47a028)', opacity: 0.35 }}
+            className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-0.5 opacity-35 lg:block"
+            style={{ background: 'linear-gradient(90deg, #401a8e, #9a1185, #ef2558, #47a028)' }}
           />
-          <ol style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 28, listStyle: 'none', margin: 0, padding: 0 }}>
+          <ol className="m-0 grid list-none grid-cols-1 gap-7 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map(({ icon: Icon, step, title, desc, color }, i) => (
               <Reveal key={step} delay={i * 100} direction="up">
-                <li style={{ position: 'relative', textAlign: 'center' }}>
+                <li className="relative text-center">
                   {/* Numbered node */}
-                  <div style={{ position: 'relative', width: 58, height: 58, margin: '0 auto', borderRadius: '50%', background: '#fff', border: `3px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 12px 26px -12px ${color}88`, zIndex: 1 }}>
+                  <div
+                    className="relative z-[1] mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full border-[3px] bg-white"
+                    style={{ borderColor: color, boxShadow: `0 12px 26px -12px ${color}88` }}
+                  >
                     <Icon size={24} color={color} />
-                    <span style={{ position: 'absolute', top: -8, right: -8, minWidth: 24, height: 24, padding: '0 6px', borderRadius: 999, background: color, color: '#fff', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{step}</span>
+                    <span
+                      className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 font-head text-xs font-bold text-white"
+                      style={{ background: color }}
+                    >
+                      {step}
+                    </span>
                   </div>
-                  <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 18, color: '#1A1130', marginTop: 18 }}>{title}</h3>
-                  <p style={{ color: '#6E6885', fontSize: 13.5, marginTop: 8, lineHeight: 1.6, maxWidth: 240, marginLeft: 'auto', marginRight: 'auto' }}>{desc}</p>
+                  <h3 className="mt-4 font-head text-lg font-bold text-ink">{title}</h3>
+                  <p className="mx-auto mt-2 max-w-[240px] text-[13.5px] leading-relaxed text-muted">{desc}</p>
                 </li>
               </Reveal>
             ))}
@@ -105,14 +113,14 @@ export default function AdmissionsPage() {
 
       {/* ── DOCUMENTS + CTA ── */}
       <Section bg="cream">
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid gap-8 md:grid-cols-2">
           <Reveal direction="right">
-            <div className="card" style={{ height: '100%' }}>
-              <h3 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 19, color: '#1A1130', marginBottom: 18 }}>Documentos requeridos</h3>
+            <div className="card h-full">
+              <h3 className="mb-4 font-head text-[19px] font-bold text-ink">Documentos requeridos</h3>
               <ul className="space-y-2.5">
                 {DOCS.map((d) => (
-                  <li key={d} className="flex items-center gap-2.5 text-sm text-slate-600">
-                    <CheckCircle className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                  <li key={d} className="flex items-center gap-2.5 text-sm text-muted">
+                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
                     {d}
                   </li>
                 ))}
@@ -120,17 +128,17 @@ export default function AdmissionsPage() {
             </div>
           </Reveal>
           <Reveal direction="left">
-            <div className="card bg-brand-50 border-brand-200 flex flex-col justify-between" style={{ height: '100%' }}>
+            <div className="card flex h-full flex-col justify-between border-brand-200 bg-brand-50">
               <div>
-                <h3 className="font-bold text-brand-800 text-xl mb-2">¿Listo para comenzar?</h3>
-                <p className="text-brand-700 text-sm leading-relaxed mb-6">
+                <h3 className="mb-2 text-xl font-bold text-brand-800">¿Listo para comenzar?</h3>
+                <p className="mb-6 text-sm leading-relaxed text-brand-700">
                   El proceso de pre-registro toma menos de 5 minutos. Recibirás confirmación inmediata
                   y nos pondremos en contacto para coordinar los siguientes pasos.
                 </p>
               </div>
               <div className="space-y-3">
                 <Link to="/pre-registro" className="btn-primary w-full justify-center">
-                  Iniciar Pre-Registro <ArrowRight className="w-4 h-4" />
+                  Iniciar Pre-Registro <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link to="/puertas-abiertas" className="btn-secondary w-full justify-center">
                   Ver fechas de Puertas Abiertas

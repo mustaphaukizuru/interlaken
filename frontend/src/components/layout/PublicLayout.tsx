@@ -153,8 +153,21 @@ export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [mobileProgramsOpen, setMobileProgramsOpen] = useState(false);
 
+  // Lock body scroll while the mobile menu is open (prevents background scroll).
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       {/* Top bar */}
       <div className="hidden md:flex bg-brand-800 text-white text-xs px-6 py-1.5 justify-end gap-6">
@@ -216,7 +229,7 @@ export function PublicLayout() {
 
         {/* Mobile menu */}
         {open && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-4 pb-4 pt-2 space-y-1">
+          <div className="md:hidden bg-white border-t border-slate-100 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
             {/* Programas accordion */}
             <button
               type="button"

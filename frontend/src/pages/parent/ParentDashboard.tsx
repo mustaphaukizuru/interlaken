@@ -31,27 +31,32 @@ export default function ParentDashboard() {
   const pendingPayments = data?.recent_payments?.filter(p => p.status === 'pending').length ?? 0;
 
   return (
-    <div style={{ margin: '-24px clamp(-32px,-4vw,-16px) 0' }}>
+    <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">
       <TopBar
         title={`Bienvenido/a, ${user?.first_name ?? ''}`}
         subtitle={`Portal Familiar${firstChild ? ` · ${firstChild.name}` : ''}`}
       />
-      <div style={{ padding: '24px clamp(16px,4vw,32px)' }}>
+      <div className="px-[clamp(16px,4vw,32px)] py-6">
         {/* Low balance alert */}
         {hasLowBalance && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(239,37,88,0.07)', border: '1px solid #ef2558', borderRadius: 14, padding: '14px 18px', marginBottom: 20, color: '#d81a49' }}>
-            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: 13.5 }}>
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-pink bg-pink/5 px-4 py-3.5 text-pink-dark sm:flex-row sm:items-center sm:px-[18px]">
+            <AlertTriangle size={20} className="shrink-0" />
+            <div className="flex-1 text-[13.5px]">
               <strong>Saldo bajo en cafetería.</strong> Recargue el saldo para continuar usando los servicios.
             </div>
-            <Link to="/portal/cafeteria" style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' }}>Recargar →</Link>
+            <Link
+              to="/portal/cafeteria"
+              className="whitespace-nowrap text-[12.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40 rounded"
+            >
+              Recargar →
+            </Link>
           </div>
         )}
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 24 }}>
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
           {isLoading ? (
-            [0, 1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 148 }} />)
+            [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
           ) : (
             <>
               <StatCard title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />
@@ -62,27 +67,32 @@ export default function ParentDashboard() {
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* Recent payments */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #ECEAF3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>Últimos Pagos</h2>
-              <Link to="/portal/pagos" style={{ fontSize: 12.5, color: '#401a8e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>Ver todos <ArrowRight size={13} /></Link>
+          <div className="card !p-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4">
+              <h2 className="font-head text-[15px] font-bold text-ink">Últimos Pagos</h2>
+              <Link
+                to="/portal/pagos"
+                className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded"
+              >
+                Ver todos <ArrowRight size={13} />
+              </Link>
             </div>
             <div>
               {!data?.recent_payments?.length ? (
-                <p style={{ textAlign: 'center', color: '#9A93AE', fontSize: 13, padding: '28px' }}>Sin pagos registrados</p>
+                <p className="p-7 text-center text-[13px] text-subtle">Sin pagos registrados</p>
               ) : data.recent_payments.slice(0, 5).map((p, i) => {
                 const b = payBadge(p.status);
                 return (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 20px', borderTop: i === 0 ? 'none' : '1px solid #ECEAF3' }}>
+                  <div key={p.id} className={`flex items-center justify-between px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
                     <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1130', textTransform: 'capitalize' }}>{p.type}</div>
-                      <div style={{ fontSize: 12, color: '#9A93AE' }}>{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
+                      <div className="text-[13.5px] font-semibold capitalize text-ink">{p.type}</div>
+                      <div className="text-[12px] text-subtle">{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1130', fontFamily: 'Poppins, sans-serif' }}>${p.amount}</div>
-                      <span className={b.cls} style={{ marginTop: 3 }}>{b.label}</span>
+                    <div className="text-right">
+                      <div className="font-head text-[14px] font-bold text-ink">${p.amount}</div>
+                      <span className={`${b.cls} mt-[3px]`}>{b.label}</span>
                     </div>
                   </div>
                 );
@@ -91,18 +101,18 @@ export default function ParentDashboard() {
           </div>
 
           {/* Announcements */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #ECEAF3' }}>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, color: '#1A1130' }}>Avisos Escolares</h2>
+          <div className="card !p-0 overflow-hidden">
+            <div className="border-b border-cream px-5 py-4">
+              <h2 className="font-head text-[15px] font-bold text-ink">Avisos Escolares</h2>
             </div>
             <div>
               {!data?.announcements?.length ? (
-                <p style={{ textAlign: 'center', color: '#9A93AE', fontSize: 13, padding: '28px' }}>Sin avisos</p>
+                <p className="p-7 text-center text-[13px] text-subtle">Sin avisos</p>
               ) : data.announcements.slice(0, 4).map((a, i) => (
-                <div key={a.id} style={{ padding: '13px 20px', borderTop: i === 0 ? 'none' : '1px solid #ECEAF3' }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1A1130' }}>{a.title}</div>
-                  <div style={{ fontSize: 12.5, color: '#6E6885', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{a.body}</div>
-                  <div style={{ fontSize: 11.5, color: '#9A93AE', marginTop: 4 }}>{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
+                <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
+                  <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{a.body}</div>
+                  <div className="mt-1 text-[11.5px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
                 </div>
               ))}
             </div>

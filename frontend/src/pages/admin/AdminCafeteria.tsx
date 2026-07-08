@@ -35,7 +35,7 @@ export default function AdminCafeteria() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Cafetería — Admin</h1>
+          <h1 className="text-fluid-xl font-bold text-slate-900">Cafetería — Admin</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             Saldos, depósitos, ajustes, devoluciones y reconciliación.
           </p>
@@ -127,8 +127,8 @@ function RosterTab() {
 
   return (
     <Card>
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="relative flex-1 min-w-[200px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             className="input-field pl-9"
@@ -148,7 +148,7 @@ function RosterTab() {
       ) : !filtered?.length ? (
         <EmptyState icon={Coffee} title="Sin saldos registrados" />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto rounded-xl2">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
@@ -246,7 +246,7 @@ function DepositsTab() {
       ) : !data?.length ? (
         <EmptyState icon={ScrollText} title="Sin depósitos registrados" />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto rounded-xl2">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
