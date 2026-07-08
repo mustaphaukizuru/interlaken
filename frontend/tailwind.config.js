@@ -61,6 +61,9 @@ export default {
         ink:     { DEFAULT: '#1A1130' },
         muted:   '#6E6885',
         subtle:  '#9A93AE',
+        // Hairline borders / dividers (mirror --border / --border-2 in index.css)
+        line:    '#ECEAF3',
+        'line-2': '#EEEBF5',
         'nav-admisiones':  '#dd2622',
         'nav-circulares':  '#c84040',
         'nav-plataformas': '#47a028',

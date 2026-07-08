@@ -20,10 +20,10 @@ const PAD: Record<NonNullable<SectionProps['spacing']>, string> = {
 };
 
 const BG: Record<BgVariant, React.CSSProperties> = {
-  white: { background: '#fff', color: '#1A1130' },
-  cream: { background: '#FAF9FD', color: '#1A1130' },
-  dark: { background: '#080516', color: '#fff' },
-  gradient: { background: 'linear-gradient(120deg, #ef2558 0%, #401a8e 100%)', color: '#fff' },
+  white: { background: 'white', color: 'var(--text-main)' },
+  cream: { background: 'var(--cream-2)', color: 'var(--text-main)' },
+  dark: { background: 'var(--dark)', color: 'white' },
+  gradient: { background: 'var(--grad-cta)', color: 'white' },
   none: {},
 };
 

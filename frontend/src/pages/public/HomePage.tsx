@@ -275,7 +275,7 @@ export default function HomePage() {
               <img src="/assets/hopscotch.webp" alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
-            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-purple-xlight bg-white px-4 py-3.5 shadow-purple sm:-right-2">
+            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-right-2">
               <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-purple/10"><Star size={20} color="var(--purple)" /></div>
               <div>
                 <div className="font-head text-xl font-extrabold leading-none text-ink">+2,500</div>
