@@ -186,8 +186,8 @@ export const cafeteriaApi = {
     api.post('/cafeteria/topup/', { student: studentId, amount, method, gateway }),
 
   // Admin
-  getAllBalances: () =>
-    api.get('/cafeteria/admin/balances/'),
+  getAllBalances: (params?: { page?: number }) =>
+    api.get('/cafeteria/admin/balances/', { params }),
 
   applyTopUp: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/apply/`),
@@ -199,7 +199,7 @@ export const cafeteriaApi = {
     api.post('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
-  getTopUpLog: (params?: { status?: string; method?: string; from?: string; to?: string }) =>
+  getTopUpLog: (params?: { status?: string; method?: string; from?: string; to?: string; page?: number }) =>
     api.get('/cafeteria/admin/topups/', { params }),
 
   getStudentDetail: (studentId: number) =>
@@ -214,8 +214,8 @@ export const cafeteriaApi = {
   reconcile: (onlyDrift?: boolean) =>
     api.get('/cafeteria/admin/reconcile/', { params: onlyDrift ? { only: 'drift' } : {} }),
 
-  getLowBalance: () =>
-    api.get('/cafeteria/admin/low-balance/'),
+  getLowBalance: (params?: { page?: number }) =>
+    api.get('/cafeteria/admin/low-balance/', { params }),
 
   exportStudent: (studentId: number, fmt: 'csv' | 'pdf') =>
     api.get(`/cafeteria/admin/export/student/${studentId}/`, {
@@ -272,7 +272,7 @@ export const financeApi = {
     api.get('/finance/admin/dashboard/', { params: period ? { period } : {} }),
 
   getAdminInvoices: (params?: {
-    status?: string; period?: string; student?: number; grade?: string; q?: string;
+    status?: string; period?: string; student?: number; grade?: string; q?: string; page?: number;
   }) => api.get('/finance/admin/invoices/', { params }),
 
   getAdminInvoice: (id: number) =>
@@ -364,7 +364,7 @@ export const bookingsApi = {
     location?: string;
   }) => api.post('/bookings/availability/', data),
 
-  getAdminBookings: (params?: { type?: string; status?: string; date?: string }) =>
+  getAdminBookings: (params?: { type?: string; status?: string; date?: string; page?: number }) =>
     api.get('/bookings/admin/bookings/', { params }),
 
   bookingAction: (id: number, action: 'confirm' | 'cancel' | 'attended' | 'no_show') =>
@@ -376,6 +376,6 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: () =>
-    api.get('/accounts/students/'),
+  getStudents: (params?: { page?: number }) =>
+    api.get('/accounts/students/', { params }),
 };

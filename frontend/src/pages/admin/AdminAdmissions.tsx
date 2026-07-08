@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ClipboardList, Search } from 'lucide-react';
 import { format } from 'date-fns';
@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Pagination } from '@/components/ui/Pagination';
 import { api } from '@/services/api';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 
 interface PreReg {
   id: number;
@@ -30,14 +32,16 @@ const statusMeta: Record<string, { label: string; variant: any }> = {
 
 export default function AdminAdmissions() {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
-  const { data: preRegs, isLoading, isError, refetch } = useQuery<PreReg[]>({
-    queryKey: ['admin-preregistrations'],
-    queryFn: async () => {
-      const { data } = await api.get('/admissions/pre-register/');
-      return data.results ?? data;
-    },
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-preregistrations', page],
+    queryFn: async () => toPaged<PreReg>((await api.get('/admissions/pre-register/', { params: { page } })).data),
+    placeholderData: keepPreviousData,
   });
+
+  const preRegs = data?.results;
+  const count = data?.count ?? 0;
 
   const filtered = preRegs?.filter((p) =>
     !search ||
@@ -55,7 +59,7 @@ export default function AdminAdmissions() {
 
       <Card title="Pre-registros">
         {/* Search */}
-        <div className="relative mb-4">
+        <div className="relative mb-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
           <input
             className="input-field pl-9"
@@ -64,6 +68,7 @@ export default function AdminAdmissions() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <p className="mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
         {isLoading ? (
           <LoadingSpinner />
@@ -152,6 +157,8 @@ export default function AdminAdmissions() {
             </div>
           </>
         )}
+
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="pre-registros" />
       </Card>
     </div>
   );

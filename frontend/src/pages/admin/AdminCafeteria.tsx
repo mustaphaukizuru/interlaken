@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -14,7 +14,9 @@ import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Pagination } from '@/components/ui/Pagination';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
 
 type Tab = 'roster' | 'deposits' | 'reconcile' | 'low';
@@ -93,14 +95,16 @@ function SchoolExportButtons() {
 function RosterTab() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
-  const { data: balances, isLoading, isError, refetch } = useQuery<CafeteriaBalance[]>({
-    queryKey: ['admin-cafeteria-balances'],
-    queryFn: async () => {
-      const { data } = await cafeteriaApi.getAllBalances();
-      return data.results ?? data;
-    },
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-cafeteria-balances', page],
+    queryFn: async () => toPaged<CafeteriaBalance>((await cafeteriaApi.getAllBalances({ page })).data),
+    placeholderData: keepPreviousData,
   });
+
+  const balances = data?.results;
+  const count = data?.count ?? 0;
 
   const syncAll = useMutation({
     mutationFn: () => cafeteriaApi.syncAll(),
@@ -143,6 +147,7 @@ function RosterTab() {
           <RefreshCw className="w-3.5 h-3.5" /> Sincronizar todos
         </Button>
       </div>
+      <p className="-mt-2 mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
       {isLoading ? (
         <LoadingSpinner />
@@ -256,6 +261,8 @@ function RosterTab() {
           </div>
         </>
       )}
+
+      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="alumnos" />
     </Card>
   );
 }
@@ -263,14 +270,17 @@ function RosterTab() {
 // ── Deposits log ─────────────────────────────────────────────────────────────
 function DepositsTab() {
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError, refetch } = useQuery<TopUpLogEntry[]>({
-    queryKey: ['admin-cafeteria-topups', status],
-    queryFn: async () => {
-      const { data } = await cafeteriaApi.getTopUpLog({ status: status || undefined });
-      return data.results ?? data;
-    },
+  const { data: paged, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-cafeteria-topups', status, page],
+    queryFn: async () =>
+      toPaged<TopUpLogEntry>((await cafeteriaApi.getTopUpLog({ status: status || undefined, page })).data),
+    placeholderData: keepPreviousData,
   });
+
+  const data = paged?.results;
+  const count = paged?.count ?? 0;
 
   const statusVariant = (s: string) =>
     s === 'completed' ? 'success' : s === 'failed' ? 'error' : 'warning';
@@ -283,7 +293,7 @@ function DepositsTab() {
           id="deposit-status"
           className="input-field w-auto"
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
         >
           <option value="">Todos</option>
           <option value="pending">Pendiente</option>
@@ -333,6 +343,8 @@ function DepositsTab() {
           </table>
         </div>
       )}
+
+      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="depósitos" />
     </Card>
   );
 }
@@ -386,32 +398,32 @@ function ReconcileTab() {
           {!data.results.length ? (
             <EmptyState icon={CheckCircle2} title="Sin diferencias" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="admin-table-wrap">
+              <table className="admin-table">
                 <thead>
-                  <tr className="border-b border-line text-left text-xs font-semibold text-muted">
-                    <th className="py-2 pr-4">Alumno</th>
-                    <th className="py-2 pr-4 text-right">Saldo local</th>
-                    <th className="py-2 pr-4 text-right">Loyverse</th>
-                    <th className="py-2 pr-4 text-right">Diferencia</th>
-                    <th className="py-2">Estado</th>
+                  <tr>
+                    <th>Alumno</th>
+                    <th className="num">Saldo local</th>
+                    <th className="num">Loyverse</th>
+                    <th className="num">Diferencia</th>
+                    <th>Estado</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody>
                   {data.results.map((r) => (
-                    <tr key={r.student_id} className="hover:bg-cream">
-                      <td className="py-3 pr-4 font-medium text-ink">
+                    <tr key={r.student_id}>
+                      <td className="font-medium text-ink">
                         <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>
                         <span className="block text-xs text-subtle">{r.student_code}</span>
                       </td>
-                      <td className="py-3 pr-4 text-right text-ink">${parseFloat(r.local_balance).toFixed(2)}</td>
-                      <td className="py-3 pr-4 text-right text-muted">
+                      <td className="num text-ink">${parseFloat(r.local_balance).toFixed(2)}</td>
+                      <td className="num text-muted">
                         {r.loyverse_balance !== null ? `$${parseFloat(r.loyverse_balance).toFixed(2)}` : '—'}
                       </td>
-                      <td className="py-3 pr-4 text-right font-medium text-ink">
+                      <td className="num font-medium text-ink">
                         {r.drift !== null ? `$${parseFloat(r.drift).toFixed(2)}` : '—'}
                       </td>
-                      <td className="py-3">
+                      <td>
                         {r.error ? (
                           <Badge variant="error">Error</Badge>
                         ) : r.in_sync ? (
@@ -434,13 +446,16 @@ function ReconcileTab() {
 
 // ── Low balance ──────────────────────────────────────────────────────────────
 function LowBalanceTab() {
-  const { data, isLoading } = useQuery<CafeteriaBalance[]>({
-    queryKey: ['admin-cafeteria-low-balance'],
-    queryFn: async () => {
-      const { data } = await cafeteriaApi.getLowBalance();
-      return data.results ?? data;
-    },
+  const [page, setPage] = useState(1);
+
+  const { data: paged, isLoading } = useQuery({
+    queryKey: ['admin-cafeteria-low-balance', page],
+    queryFn: async () => toPaged<CafeteriaBalance>((await cafeteriaApi.getLowBalance({ page })).data),
+    placeholderData: keepPreviousData,
   });
+
+  const data = paged?.results;
+  const count = paged?.count ?? 0;
 
   return (
     <Card>
@@ -450,35 +465,36 @@ function LowBalanceTab() {
         <EmptyState icon={CheckCircle2} title="Ningún alumno con saldo bajo" />
       ) : (
         <>
-          <p className="text-sm text-muted mb-3">{data.length} alumno(s) por debajo del umbral.</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <p className="text-sm text-muted mb-3">{count} alumno(s) por debajo del umbral.</p>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
               <thead>
-                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
-                  <th className="py-2 pr-4">Alumno</th>
-                  <th className="py-2 pr-4">Matrícula</th>
-                  <th className="py-2 pr-4 text-right">Saldo</th>
-                  <th className="py-2 pr-4 text-right">Umbral</th>
-                  <th className="py-2">Últ. sinc.</th>
+                <tr>
+                  <th>Alumno</th>
+                  <th>Matrícula</th>
+                  <th className="num">Saldo</th>
+                  <th className="num">Umbral</th>
+                  <th>Últ. sinc.</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {data.map((b) => (
-                  <tr key={b.id} className="hover:bg-cream">
-                    <td className="py-3 pr-4 font-medium text-ink">
+                  <tr key={b.id}>
+                    <td className="font-medium text-ink">
                       <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
                         {b.student.user.full_name}
                       </Link>
                     </td>
-                    <td className="py-3 pr-4 text-muted">{b.student.student_id}</td>
-                    <td className="py-3 pr-4 text-right font-semibold text-amber">${parseFloat(b.balance).toFixed(2)}</td>
-                    <td className="py-3 pr-4 text-right text-muted">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
-                    <td className="py-3 text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
+                    <td className="text-muted">{b.student.student_id}</td>
+                    <td className="num font-semibold text-amber">${parseFloat(b.balance).toFixed(2)}</td>
+                    <td className="num text-muted">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
+                    <td className="text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="alumnos" />
         </>
       )}
     </Card>

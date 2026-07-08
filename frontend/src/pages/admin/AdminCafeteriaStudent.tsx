@@ -169,31 +169,31 @@ export default function AdminCafeteriaStudent() {
         {!transactions.length ? (
           <EmptyState icon={ArrowDownCircle} title="Sin movimientos" />
         ) : (
-          <div className="w-full overflow-x-auto rounded-xl2">
-            <table className="w-full text-sm">
+          <div className="admin-table-wrap">
+            <table className="admin-table">
               <thead>
-                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
-                  <th className="py-2 pr-4">Fecha</th>
-                  <th className="py-2 pr-4">Tipo</th>
-                  <th className="py-2 pr-4">Descripción</th>
-                  <th className="py-2 pr-4 text-right">Monto</th>
-                  <th className="py-2 pr-4 text-right">Saldo</th>
-                  <th className="py-2 text-right">Acción</th>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Descripción</th>
+                  <th className="num">Monto</th>
+                  <th className="num">Saldo</th>
+                  <th className="num">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {transactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-cream">
-                    <td className="py-3 pr-4 whitespace-nowrap text-muted">{fmtDate(t.date)}</td>
-                    <td className="py-3 pr-4">
+                  <tr key={t.id}>
+                    <td className="whitespace-nowrap text-muted">{fmtDate(t.date)}</td>
+                    <td>
                       <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span>
                     </td>
-                    <td className="py-3 pr-4 text-muted max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
-                    <td className="py-3 pr-4 text-right font-medium text-ink">${parseFloat(t.amount).toFixed(2)}</td>
-                    <td className="py-3 pr-4 text-right text-muted">
+                    <td className="text-muted max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
+                    <td className="num font-medium text-ink">${parseFloat(t.amount).toFixed(2)}</td>
+                    <td className="num text-muted">
                       {t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—'}
                     </td>
-                    <td className="py-3 text-right">
+                    <td className="num">
                       {refundable(t) && (
                         <Button
                           size="sm"
@@ -218,31 +218,31 @@ export default function AdminCafeteriaStudent() {
         {!adjustments.length ? (
           <EmptyState icon={SlidersHorizontal} title="Sin ajustes registrados" />
         ) : (
-          <div className="w-full overflow-x-auto rounded-xl2">
-            <table className="w-full text-sm">
+          <div className="admin-table-wrap">
+            <table className="admin-table">
               <thead>
-                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
-                  <th className="py-2 pr-4">Fecha</th>
-                  <th className="py-2 pr-4">Tipo</th>
-                  <th className="py-2 pr-4 text-right">Monto</th>
-                  <th className="py-2 pr-4">Motivo</th>
-                  <th className="py-2 pr-4">Admin</th>
-                  <th className="py-2 text-right">Saldo</th>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th className="num">Monto</th>
+                  <th>Motivo</th>
+                  <th>Admin</th>
+                  <th className="num">Saldo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {adjustments.map((a) => (
                   <tr key={a.id}>
-                    <td className="py-3 pr-4 whitespace-nowrap text-muted">{fmtDate(a.created_at)}</td>
-                    <td className="py-3 pr-4">
+                    <td className="whitespace-nowrap text-muted">{fmtDate(a.created_at)}</td>
+                    <td>
                       <Badge variant={a.kind === 'refund' ? 'info' : 'neutral'}>{a.kind_display}</Badge>
                     </td>
-                    <td className={`py-3 pr-4 text-right font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
+                    <td className={`num font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
                       {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
                     </td>
-                    <td className="py-3 pr-4 text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
-                    <td className="py-3 pr-4 text-muted">{a.admin_name || '—'}</td>
-                    <td className="py-3 text-right text-muted">
+                    <td className="text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
+                    <td className="text-muted">{a.admin_name || '—'}</td>
+                    <td className="num text-muted">
                       {a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—'}
                     </td>
                   </tr>

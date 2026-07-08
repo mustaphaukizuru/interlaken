@@ -1,23 +1,29 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Users, Search } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Pagination } from '@/components/ui/Pagination';
 import { portalApi } from '@/services/api';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { StudentProfile } from '@/types';
 
 export default function AdminStudents() {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
-  const { data: students, isLoading } = useQuery<StudentProfile[]>({
-    queryKey: ['admin-students'],
-    queryFn: async () => {
-      const { data } = await portalApi.getStudents();
-      return data.results ?? data;
-    },
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-students', page],
+    queryFn: async () => toPaged<StudentProfile>((await portalApi.getStudents({ page })).data),
+    placeholderData: keepPreviousData,
   });
 
+  const students = data?.results;
+  const count = data?.count ?? 0;
+
+  // Server-side search needs `search_fields` on the viewset (follow-up); today the
+  // box filters the loaded page only.
   const filtered = students?.filter((s) =>
     !search ||
     s.user.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -32,8 +38,8 @@ export default function AdminStudents() {
         <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
       </div>
 
-      <Card title={`${students?.length ?? 0} alumnos registrados`}>
-        <div className="relative mb-4">
+      <Card title={`${count} alumnos registrados`}>
+        <div className="relative mb-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
           <input
             className="input-field pl-9"
@@ -42,11 +48,16 @@ export default function AdminStudents() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <p className="mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
         {isLoading ? (
           <LoadingSpinner />
         ) : !filtered?.length ? (
-          <EmptyState icon={Users} title="Sin alumnos" description="Los alumnos registrados aparecerán aquí." />
+          <EmptyState
+            icon={Users}
+            title={search ? 'Sin resultados' : 'Sin alumnos'}
+            description={search ? 'Ningún alumno coincide en esta página.' : 'Los alumnos registrados aparecerán aquí.'}
+          />
         ) : (
           <>
             {/* Mobile: stacked cards */}
@@ -80,22 +91,22 @@ export default function AdminStudents() {
               ))}
             </ul>
 
-            {/* Desktop: table */}
-            <div className="hidden md:block w-full overflow-x-auto">
-              <table className="w-full text-sm">
+            {/* Desktop: dense table */}
+            <div className="admin-table-wrap hidden md:block">
+              <table className="admin-table">
                 <thead>
-                  <tr className="border-b border-line">
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Nombre</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Matrícula</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Grado</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Grupo</th>
-                    <th className="text-left py-2 text-xs font-semibold text-muted">Correo</th>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Matrícula</th>
+                    <th>Grado</th>
+                    <th>Grupo</th>
+                    <th>Correo</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody>
                   {filtered.map((s) => (
-                    <tr key={s.id} className="hover:bg-cream">
-                      <td className="py-3 pr-4">
+                    <tr key={s.id}>
+                      <td>
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                             {s.user.first_name[0]}
@@ -103,10 +114,10 @@ export default function AdminStudents() {
                           <span className="font-medium text-ink">{s.user.full_name}</span>
                         </div>
                       </td>
-                      <td className="py-3 pr-4 text-muted">{s.student_id}</td>
-                      <td className="py-3 pr-4 text-muted">{s.grade}</td>
-                      <td className="py-3 pr-4 text-muted">{s.group}</td>
-                      <td className="py-3 text-subtle text-xs">{s.user.email}</td>
+                      <td className="text-muted">{s.student_id}</td>
+                      <td className="text-muted">{s.grade}</td>
+                      <td className="text-muted">{s.group}</td>
+                      <td className="text-subtle text-xs">{s.user.email}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -114,6 +125,8 @@ export default function AdminStudents() {
             </div>
           </>
         )}
+
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="alumnos" />
       </Card>
     </div>
   );

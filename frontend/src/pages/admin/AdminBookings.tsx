@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { CalendarClock, CalendarPlus, Check, X, UserCheck } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,7 +11,9 @@ import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Pagination } from '@/components/ui/Pagination';
 import { bookingsApi } from '@/services/api';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { Booking } from '@/types';
 
 const statusMeta: Record<string, { label: string; variant: any }> = {
@@ -211,17 +213,20 @@ function BookingActions({
 export default function AdminBookings() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
 
-  const { data: bookings, isLoading } = useQuery<Booking[]>({
-    queryKey: ['admin-bookings', statusFilter],
-    queryFn: async () => {
-      const { data } = await bookingsApi.getAdminBookings(
-        statusFilter ? { status: statusFilter } : undefined,
-      );
-      return data.results ?? data;
-    },
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-bookings', statusFilter, page],
+    queryFn: async () =>
+      toPaged<Booking>(
+        (await bookingsApi.getAdminBookings({ ...(statusFilter ? { status: statusFilter } : {}), page })).data,
+      ),
+    placeholderData: keepPreviousData,
   });
+
+  const bookings = data?.results;
+  const count = data?.count ?? 0;
 
   const action = useMutation({
     mutationFn: ({ id, act }: { id: number; act: 'confirm' | 'cancel' | 'attended' | 'no_show' }) =>
@@ -252,8 +257,9 @@ export default function AdminBookings() {
         action={
           <select
             className="input-field text-sm py-1.5"
+            aria-label="Filtrar por estado"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           >
             <option value="">Todas</option>
             <option value="confirmed">Confirmadas</option>
@@ -307,24 +313,24 @@ export default function AdminBookings() {
               })}
             </ul>
 
-            {/* Desktop: table */}
-            <div className="hidden md:block w-full overflow-x-auto">
-              <table className="w-full text-sm">
+            {/* Desktop: dense table */}
+            <div className="admin-table-wrap hidden md:block">
+              <table className="admin-table">
                 <thead>
-                  <tr className="border-b border-line">
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Fecha</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Tutor</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Contacto</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-muted">Estado</th>
-                    <th className="text-left py-2 text-xs font-semibold text-muted">Acciones</th>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Tutor</th>
+                    <th>Contacto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody>
                   {bookings.map((b) => {
                     const meta = statusMeta[b.status] ?? statusMeta.pending;
                     return (
-                      <tr key={b.id} className="hover:bg-cream">
-                        <td className="py-3 pr-4 whitespace-nowrap">
+                      <tr key={b.id}>
+                        <td className="whitespace-nowrap">
                           <div className="font-medium text-ink">
                             {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
                           </div>
@@ -332,20 +338,20 @@ export default function AdminBookings() {
                             {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
                           </div>
                         </td>
-                        <td className="py-3 pr-4 text-muted">
+                        <td className="text-muted">
                           {b.parent_name}
                           {b.child_name && (
                             <div className="text-subtle text-xs">Alumno: {b.child_name}</div>
                           )}
                         </td>
-                        <td className="py-3 pr-4">
+                        <td>
                           <div className="text-muted">{b.parent_email}</div>
                           <div className="text-subtle text-xs">{b.parent_phone}</div>
                         </td>
-                        <td className="py-3 pr-4">
+                        <td>
                           <Badge variant={meta.variant}>{meta.label}</Badge>
                         </td>
-                        <td className="py-3">
+                        <td>
                           <div className="flex items-center gap-1">
                             <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
                           </div>
@@ -358,6 +364,8 @@ export default function AdminBookings() {
             </div>
           </>
         )}
+
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="reservas" />
       </Card>
 
       <ConfirmDialog
