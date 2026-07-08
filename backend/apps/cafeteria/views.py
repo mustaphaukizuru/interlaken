@@ -400,7 +400,7 @@ class AdminLowBalanceView(APIView):
 
 
 class AdminExportStudentView(APIView):
-    """GET /api/v1/cafeteria/admin/export/student/<pk>/?format=csv|pdf"""
+    """GET /api/v1/cafeteria/admin/export/student/<pk>/?fmt=csv|pdf"""
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
@@ -408,20 +408,20 @@ class AdminExportStudentView(APIView):
 
         student = get_object_or_404(
             StudentProfile.objects.select_related('user'), pk=pk)
-        fmt = (request.query_params.get('format') or 'csv').lower()
+        fmt = (request.query_params.get('fmt') or 'csv').lower()
         if fmt == 'pdf':
             return exports.student_statement_pdf(student)
         return exports.student_statement_csv(student)
 
 
 class AdminExportSchoolView(APIView):
-    """GET /api/v1/cafeteria/admin/export/school/?format=csv|pdf"""
+    """GET /api/v1/cafeteria/admin/export/school/?fmt=csv|pdf"""
     permission_classes = [IsAdmin]
 
     def get(self, request):
         from . import exports
 
-        fmt = (request.query_params.get('format') or 'csv').lower()
+        fmt = (request.query_params.get('fmt') or 'csv').lower()
         if fmt == 'pdf':
             return exports.school_statement_pdf()
         return exports.school_statement_csv()

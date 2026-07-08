@@ -44,6 +44,55 @@ export interface CafeteriaTransaction {
   loyverse_receipt_id: string;
 }
 
+export interface TopUpLogEntry {
+  id: number;
+  student_id: number;
+  student_name: string;
+  student_code: string;
+  amount: string;
+  method: 'online' | 'office';
+  method_display: string;
+  status: 'pending' | 'completed' | 'failed';
+  status_display: string;
+  gateway: string;
+  payment_status: string;
+  gateway_tx_id: string;
+  created_at: string;
+  processed_at: string | null;
+}
+
+export interface BalanceAdjustment {
+  id: number;
+  kind: 'adjustment' | 'refund';
+  kind_display: string;
+  amount: string;
+  reason: string;
+  balance_after: string | null;
+  admin_name: string;
+  transaction: number | null;
+  source_transaction: number | null;
+  created_at: string;
+}
+
+export interface ReconcileRow {
+  student_id: number;
+  student_name: string;
+  student_code: string;
+  loyverse_id: string;
+  local_balance: string;
+  loyverse_balance: string | null;
+  drift: string | null;
+  in_sync: boolean;
+  error: string | null;
+}
+
+export interface CafeteriaStudentDetail {
+  balance: CafeteriaBalance;
+  parents: Array<{ id: number; full_name: string; email: string; whatsapp: string }>;
+  transactions: CafeteriaTransaction[];
+  adjustments: BalanceAdjustment[];
+}
+
 export interface Payment {
   id: number;
   payment_type: 'tuition' | 'enrollment' | 'cafeteria' | 'other';

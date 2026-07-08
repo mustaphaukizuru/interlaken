@@ -120,7 +120,48 @@ export const cafeteriaApi = {
 
   syncAll: () =>
     api.post('/cafeteria/admin/sync-all/'),
+
+  // Admin console (Phase D)
+  getTopUpLog: (params?: { status?: string; method?: string; from?: string; to?: string }) =>
+    api.get('/cafeteria/admin/topups/', { params }),
+
+  getStudentDetail: (studentId: number) =>
+    api.get(`/cafeteria/admin/student/${studentId}/`),
+
+  adjustBalance: (studentId: number, amount: number, reason: string) =>
+    api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason }),
+
+  refundTransaction: (txId: number, reason?: string) =>
+    api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
+
+  reconcile: (onlyDrift?: boolean) =>
+    api.get('/cafeteria/admin/reconcile/', { params: onlyDrift ? { only: 'drift' } : {} }),
+
+  getLowBalance: () =>
+    api.get('/cafeteria/admin/low-balance/'),
+
+  exportStudent: (studentId: number, fmt: 'csv' | 'pdf') =>
+    api.get(`/cafeteria/admin/export/student/${studentId}/`, {
+      params: { fmt }, responseType: 'blob',
+    }),
+
+  exportSchool: (fmt: 'csv' | 'pdf') =>
+    api.get('/cafeteria/admin/export/school/', {
+      params: { fmt }, responseType: 'blob',
+    }),
 };
+
+/** Trigger a browser download for an axios blob response. */
+export function downloadBlob(data: Blob, filename: string) {
+  const url = window.URL.createObjectURL(data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
 
 // ── PAYMENTS ─────────────────────────────────────────────
 export const paymentsApi = {

@@ -37,6 +37,7 @@ const StudentCafeteria  = lazy(() => import('./pages/student/StudentCafeteria'))
 const AdminDashboard  = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminAdmissions = lazy(() => import('./pages/admin/AdminAdmissions'));
 const AdminCafeteria  = lazy(() => import('./pages/admin/AdminCafeteria'));
+const AdminCafeteriaStudent = lazy(() => import('./pages/admin/AdminCafeteriaStudent'));
 const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 
@@ -116,6 +117,7 @@ export default function App() {
               <Route path="admisiones"  element={<AdminAdmissions />} />
               <Route path="visitas"     element={<AdminBookings />} />
               <Route path="cafeteria"   element={<AdminCafeteria />} />
+              <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
               <Route path="alumnos"     element={<AdminStudents />} />
             </Route>
 

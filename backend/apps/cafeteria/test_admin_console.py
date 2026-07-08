@@ -313,7 +313,7 @@ class TestExports:
         _balance(student, 100)
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(
-            reverse("admin-export-student", args=[student.id]), {"format": "pdf"})
+            reverse("admin-export-student", args=[student.id]), {"fmt": "pdf"})
         assert resp.status_code == 200
         assert resp["Content-Type"] == "application/pdf"
         assert resp.content.startswith(b"%PDF-1.4")
