@@ -34,9 +34,11 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'parent2_name', 'parent2_email', 'parent2_phone',
             'emergency_name', 'emergency_phone', 'emergency_rel',
             'blood_type', 'allergies', 'medical_notes',
+            'consent_photos_media', 'consent_medical_data', 'privacy_accepted_at',
             'status', 'submitted_at', 'created_at', 'documents',
         ]
-        read_only_fields = ['id', 'status', 'submitted_at', 'created_at', 'documents']
+        read_only_fields = ['id', 'status', 'submitted_at', 'created_at', 'documents',
+                            'privacy_accepted_at']
 
 
 class OpenSchoolDaySerializer(serializers.ModelSerializer):

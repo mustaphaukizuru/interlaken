@@ -97,8 +97,10 @@ class TestSessionGate:
     def test_submit_requires_session_header(self, api_client):
         reg_id, token = self._session(api_client)
         assert api_client.post(reverse("register-submit", args=[reg_id])).status_code == 401
+        # Stage B also requires accepting the privacy notice (IK-LEGAL B2).
         ok = api_client.post(
-            reverse("register-submit", args=[reg_id]), HTTP_X_SESSION_TOKEN=token
+            reverse("register-submit", args=[reg_id]),
+            {"accept_privacy": True}, format="json", HTTP_X_SESSION_TOKEN=token,
         )
         assert ok.status_code == 200
         assert Registration.objects.get(pk=reg_id).status == Registration.Status.SUBMITTED

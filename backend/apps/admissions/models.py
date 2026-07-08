@@ -125,6 +125,17 @@ class Registration(models.Model):
     updated_at   = models.DateTimeField(auto_now=True)
     admin_notes  = models.TextField(blank=True)
 
+    # ── Consent (IK-LEGAL B2) — captured on the anonymous registration itself ─────
+    # (Applicants aren't guardian User accounts yet, so LFPDPPP acceptance is
+    # recorded here, tied to the exact notice version; medical fields are gated on
+    # consent_medical_data at submit.)
+    privacy_notice_version = models.ForeignKey('legal.PrivacyNoticeVersion', null=True,
+                                               blank=True, on_delete=models.SET_NULL,
+                                               related_name='+')
+    privacy_accepted_at    = models.DateTimeField(null=True, blank=True)
+    consent_photos_media   = models.BooleanField(default=False)
+    consent_medical_data   = models.BooleanField(default=False)
+
     class Meta:
         verbose_name = 'Inscripción'
         verbose_name_plural = 'Inscripciones'

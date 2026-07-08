@@ -297,6 +297,20 @@ export const financeApi = {
     api.post('/finance/admin/bulk/', { invoice_ids: invoiceIds, action, reason }),
 };
 
+// ── LEGAL / CONSENT (LFPDPPP) ─────────────────────────────
+export const legalApi = {
+  /** Current Aviso de Privacidad (public). */
+  getNotice: () => api.get('/legal/notice/'),
+
+  /** The guardian's consent state + whether re-acceptance is needed. */
+  getConsent: (student?: number) =>
+    api.get('/legal/consent/', { params: student ? { student } : {} }),
+
+  /** Record granular consent (grant/revoke) for the guardian, optionally per student. */
+  recordConsent: (purposes: Record<string, boolean>, student?: number) =>
+    api.post('/legal/consent/', { purposes, ...(student ? { student } : {}) }),
+};
+
 // ── CONTACT ───────────────────────────────────────────────
 export const contactApi = {
   send: (data: { name: string; email: string; subject: string; message: string }) =>

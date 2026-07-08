@@ -36,3 +36,29 @@ def has_consent(guardian, purpose, student=None) -> bool:
 def consent_state(guardian, student=None) -> dict:
     """Map each purpose → current granted state for the guardian (optionally per student)."""
     return {p.value: has_consent(guardian, p.value, student) for p in ConsentPurpose}
+
+
+def needs_acceptance(guardian) -> bool:
+    """True if the guardian has not accepted the CURRENT notice's core processing.
+
+    Covers both a brand-new account (no records) and a material notice-version
+    change (their latest acceptance was under an older version).
+    """
+    notice = PrivacyNoticeVersion.current()
+    if notice is None:
+        return False
+    latest = (ConsentRecord.objects
+              .filter(guardian=guardian,
+                      purpose=ConsentPurpose.ACADEMIC_PROCESSING,
+                      student__isnull=True)
+              .order_by('-captured_at')
+              .first())
+    return not (latest and latest.granted and latest.notice_version_id == notice.id)
+
+
+def photo_media_allowed(student) -> bool:
+    """Queryable flag for the gallery/CMS: any guardian granted PHOTOS_MEDIA for this student."""
+    return any(
+        has_consent(guardian, ConsentPurpose.PHOTOS_MEDIA, student)
+        for guardian in student.parents.all()
+    )

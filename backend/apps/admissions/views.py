@@ -161,6 +161,24 @@ class RegistrationSubmitView(APIView):
             return Response({'error': 'Registration already submitted'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # LFPDPPP (IK-LEGAL B2): Stage B requires acceptance of the current notice.
+        if reg.privacy_accepted_at is None:
+            from apps.legal.models import PrivacyNoticeVersion
+            if not request.data.get('accept_privacy'):
+                return Response(
+                    {'error': 'Debe aceptar el Aviso de Privacidad para enviar la inscripción.'},
+                    status=status.HTTP_400_BAD_REQUEST)
+            reg.privacy_notice_version = PrivacyNoticeVersion.current()
+            reg.privacy_accepted_at = timezone.now()
+            reg.save(update_fields=['privacy_notice_version', 'privacy_accepted_at'])
+
+        # Medical data may only be submitted with explicit MEDICAL_DATA consent.
+        has_medical = any([reg.blood_type, reg.allergies, reg.medical_notes])
+        if has_medical and not reg.consent_medical_data:
+            return Response(
+                {'error': 'Se requiere consentimiento de datos de salud para enviar información médica.'},
+                status=status.HTTP_400_BAD_REQUEST)
+
         reg.submit()
         # Send confirmation email
         send_mail(
