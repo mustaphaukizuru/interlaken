@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/v1/payments/',    include('apps.payments.urls')),
     path('api/v1/portal/',      include('apps.portal.urls')),
     path('api/v1/bookings/',    include('apps.bookings.urls')),
+    path('api/v1/whatsapp/',    include('apps.whatsapp.urls')),
     path('api/v1/contact/',     ContactCreateView.as_view(), name='contact-create'),
 
     # React SPA catch-all (serves index.html for all unmatched routes)

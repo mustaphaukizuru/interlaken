@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { CalendarDays, MapPin, Users, CheckCircle } from 'lucide-react';
+import { CalendarDays, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { admissionsApi } from '@/services/api';
@@ -22,6 +22,11 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
+
+const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5215512345678';
+const WHATSAPP_TEXT = encodeURIComponent(
+  'Hola, me gustaría registrarme para un evento de Puertas Abiertas en el Colegio Interlaken.',
+);
 
 export default function OpenSchoolPage() {
   const [selectedEvent, setSelectedEvent] = useState<OpenSchoolEvent | null>(null);
@@ -74,6 +79,7 @@ export default function OpenSchoolPage() {
             </p>
           </div>
         ) : (
+          <>
           <div className="grid md:grid-cols-2 gap-8">
             {/* Events list */}
             <div>
@@ -181,6 +187,24 @@ export default function OpenSchoolPage() {
               )}
             </div>
           </div>
+
+          {/* WhatsApp fallback */}
+          <div className="mt-10 rounded-2xl border border-slate-100 bg-slate-50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-slate-600 text-center sm:text-left">
+              <p className="font-semibold text-slate-900">¿Prefiere registrarse por WhatsApp?</p>
+              <p>Escríbanos y con gusto le apartamos su lugar en el próximo evento.</p>
+            </div>
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_TEXT}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Reservar por WhatsApp
+            </a>
+          </div>
+          </>
         )}
       </div>
     </div>

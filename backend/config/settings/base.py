@@ -41,6 +41,7 @@ LOCAL_APPS = [
     'apps.payments',
     'apps.portal',
     'apps.bookings',
+    'apps.whatsapp',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -218,7 +219,19 @@ GOOGLE_CALENDAR_ID = env('GOOGLE_CALENDAR_ID', default='')
 GOOGLE_CALENDAR_SA_KEY = env('GOOGLE_CALENDAR_SA_KEY', default='')
 
 # ── WHATSAPP ──────────────────────────────────────────────
+# Tier 1 (deep link): WHATSAPP_NUMBER powers the wa.me "Reservar por WhatsApp"
+# button — zero external setup. Tier 2 (conversational Cloud API bot) is behind
+# the keys below; all empty → the webhook still verifies signatures and answers
+# Meta's handshake, but outbound sends are no-ops (no crash). See
+# BOOKING_CALENDAR_SPEC.md §5 / DEPLOYMENT.md §9 for the Meta WABA setup.
 WHATSAPP_NUMBER = env('WHATSAPP_NUMBER', default='')
+# Meta WhatsApp Business (Cloud API) credentials — Tier 2 self-service booking.
+WHATSAPP_TOKEN = env('WHATSAPP_TOKEN', default='')            # permanent/system-user access token
+WHATSAPP_PHONE_ID = env('WHATSAPP_PHONE_ID', default='')      # the WABA phone number id
+WHATSAPP_VERIFY_TOKEN = env('WHATSAPP_VERIFY_TOKEN', default='')  # GET handshake shared secret
+WHATSAPP_APP_SECRET = env('WHATSAPP_APP_SECRET', default='')  # HMAC secret for X-Hub-Signature-256
+# Graph API version used for outbound Cloud API calls.
+WHATSAPP_API_VERSION = env('WHATSAPP_API_VERSION', default='v19.0')
 
 # ── INTERNATIONALISATION ──────────────────────────────────
 LANGUAGE_CODE = 'es-mx'

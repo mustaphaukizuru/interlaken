@@ -266,3 +266,74 @@ credentials are provisioned. The webhook verification is **always real** — set
 
 > **Never** credit a balance from the browser return URL or an unsigned webhook. Do
 > **not** store card/PAN data — the hosted page keeps it off our servers.
+
+---
+
+## 10. WhatsApp booking — Tier 1 (deep link) & Tier 2 (Cloud API bot) — Prompt 14
+
+Parents can start a visit booking from WhatsApp. Two tiers, independent of each other:
+
+**Tier 1 — deep link (live now, zero setup).** The "Reservar por WhatsApp" buttons
+(agendar-visita, puertas-abiertas) open `wa.me/<WHATSAPP_NUMBER>?text=…` with a
+prefilled Spanish message. Staff reply and create the `Booking` in Django admin
+(`source=whatsapp`). Only `WHATSAPP_NUMBER` (backend) / `VITE_WHATSAPP_NUMBER`
+(frontend, digits only, country code first) are needed.
+
+**Tier 2 — conversational bot (Meta WhatsApp Business Cloud API).** Endpoint
+`GET|POST /api/v1/whatsapp/webhook/`. A parent messages the number → the bot replies
+with an interactive **list of the next open slots** → tapping one creates a
+`Booking(source=whatsapp)` (capacity-safe, + Google Calendar §8, fail-soft) and
+confirms in-channel.
+
+> ⚠️ **Requires valid HTTPS** (§1 — the SSL fix). Meta will not register a webhook on
+> an expired/invalid certificate. Works fine under Passenger — it's just an HTTPS
+> endpoint, no persistent worker/Celery needed.
+
+**One-time Meta setup:**
+1. **Meta for Developers → Create app → Business → add the "WhatsApp" product.**
+2. **WhatsApp → API Setup:** note the **Phone number ID** (`WHATSAPP_PHONE_ID`) and
+   generate a **permanent** access token via a **System User** (Business Settings →
+   Users → System Users → generate token with `whatsapp_business_messaging`) →
+   `WHATSAPP_TOKEN`. (The temporary 24-h token in API Setup is only for sandbox tests.)
+3. **App Settings → Basic → App Secret** → `WHATSAPP_APP_SECRET` (verifies
+   `X-Hub-Signature-256` on every inbound call).
+4. **WhatsApp → Configuration → Webhook:**
+   - Callback URL: `https://interlaken.edu.mx/api/v1/whatsapp/webhook/`
+   - Verify token: any string you invent — set the **same** value as
+     `WHATSAPP_VERIFY_TOKEN`. Meta's `GET` handshake must echo the challenge (it does).
+   - Subscribe to the **`messages`** field.
+
+**Env (production `.env`):**
+```
+WHATSAPP_NUMBER=52155…            # Tier 1 deep link + display
+WHATSAPP_TOKEN=<system-user token>
+WHATSAPP_PHONE_ID=<phone number id>
+WHATSAPP_VERIFY_TOKEN=<invent a string; matches Meta's webhook field>
+WHATSAPP_APP_SECRET=<Meta app secret>
+WHATSAPP_API_VERSION=v19.0        # optional
+```
+
+**Behaviour / guarantees:**
+- **Signature is always enforced.** With no `WHATSAPP_APP_SECRET` (or a bad/missing
+  `X-Hub-Signature-256`), `POST` fails closed with **403**. Never trust an unsigned call.
+- Cloud API creds unset (`WHATSAPP_TOKEN`/`WHATSAPP_PHONE_ID` blank) → the webhook still
+  verifies signatures and answers the handshake, but outbound sends are **no-ops** (no
+  crash). Set them to enable self-service replies.
+- A verified `POST` always returns **200** (even if handling fails) so Meta doesn't
+  retry-storm; message handling is fail-soft.
+
+**Sandbox testing (before the WABA number is approved):**
+- Use the **temporary token** + a test recipient added under WhatsApp → API Setup.
+- Local: expose `http://localhost:8000` over HTTPS with a tunnel (e.g. `ngrok http 8000`)
+  and register that URL + `WHATSAPP_VERIFY_TOKEN` as the webhook.
+- Verify handshake:
+  `curl "https://<tunnel>/api/v1/whatsapp/webhook/?hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=1234"`
+  → echoes `1234`.
+- Simulate an inbound message: sign the JSON body with the app secret and POST it:
+  ```bash
+  BODY='{"entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"Ana"}}],"messages":[{"from":"5215500000000","type":"text","text":{"body":"hola"}}]}}]}]}'
+  SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WHATSAPP_APP_SECRET" | awk '{print $2}')"
+  curl -X POST https://<tunnel>/api/v1/whatsapp/webhook/ \
+       -H "Content-Type: application/json" -H "X-Hub-Signature-256: $SIG" -d "$BODY"
+  ```
+  An **unsigned** POST returns 403; a **signed** one is processed (200).
