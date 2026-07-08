@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { api, authApi } from '@/services/api';
+import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
 import toast from 'react-hot-toast';
 
@@ -15,28 +15,29 @@ const ROLE_PATHS: Record<string, string> = {
 export default function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { setAuth, isAuthenticated, user } = useAuthStore();
+  const { setAuth, setUser, isAuthenticated, user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Handle Google OAuth callback (tokens in URL params)
+  // Handle the Google OAuth return. The backend set the session as httpOnly
+  // cookies and redirected here with ?login=ok (NO tokens in the URL); we mint
+  // an in-memory access token from the cookie via a silent refresh.
   useEffect(() => {
-    const access = params.get('access');
-    const refresh = params.get('refresh');
-    if (access && refresh) {
-      authApi.me()
-        .then(({ data }) => {
-          setAuth(data, access, refresh);
-          navigate(ROLE_PATHS[data.role] ?? '/portal', { replace: true });
-        })
-        .catch(() => {
-          toast.error('Error al iniciar sesión. Intente nuevamente.');
-          navigate('/login', { replace: true });
-        });
-    }
-  }, [params, setAuth, navigate]);
+    if (params.get('login') !== 'ok') return;
+    bootstrapSession()
+      .then(async (ok) => {
+        if (!ok) throw new Error('no-session');
+        const { data } = await authApi.me();
+        setUser(data);
+        navigate(ROLE_PATHS[data.role] ?? '/portal', { replace: true });
+      })
+      .catch(() => {
+        toast.error('Error al iniciar sesión. Intente nuevamente.');
+        navigate('/login', { replace: true });
+      });
+  }, [params, setUser, navigate]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -60,11 +61,12 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const { data } = await api.post('/accounts/token/', { email, password });
-      const access = data.access ?? data.token;
-      const refresh = data.refresh ?? '';
-      localStorage.setItem('access_token', access);
+      const access = data.access;
+      // Set the in-memory token first so the /me call is authorized; the refresh
+      // token was set as an httpOnly cookie by the server.
+      useAuthStore.getState().setAccess(access);
       const { data: me } = await authApi.me();
-      setAuth(me, access, refresh);
+      setAuth(me, access);
       navigate(ROLE_PATHS[me.role] ?? '/portal', { replace: true });
     } catch {
       setFormError('Credenciales incorrectas o cuenta sin contraseña. Use Google si su cuenta es institucional.');

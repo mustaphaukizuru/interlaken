@@ -1,7 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
+
+import { bootstrapSession } from './services/api';
+import { useAuthStore } from './store/authStore';
 
 // Layouts & guards are part of the shell — keep them in the main chunk.
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
@@ -65,6 +68,13 @@ function RouteFallback() {
 }
 
 export default function App() {
+  // On reload, a previously-authenticated user has no in-memory access token;
+  // silently re-mint one from the httpOnly refresh cookie (see AUTH.md).
+  useEffect(() => {
+    const s = useAuthStore.getState();
+    if (s.isAuthenticated && !s.accessToken) void bootstrapSession();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

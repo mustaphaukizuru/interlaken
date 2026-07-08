@@ -146,12 +146,26 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    # Access token is short-lived and kept in memory on the client (never in
+    # localStorage); the httpOnly refresh cookie mints a fresh one silently.
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# ── AUTH COOKIES (httpOnly refresh + double-submit CSRF) ───
+# The refresh token lives ONLY in an httpOnly cookie (never readable by JS, never
+# in a URL). A second, JS-readable CSRF cookie is echoed back in the X-CSRF-Token
+# header on refresh/logout (double-submit) so a cross-site page can't drive them.
+# See AUTH.md.
+AUTH_REFRESH_COOKIE = env('AUTH_REFRESH_COOKIE', default='interlaken_refresh')
+AUTH_CSRF_COOKIE = env('AUTH_CSRF_COOKIE', default='interlaken_csrf')
+AUTH_COOKIE_SECURE = env.bool('AUTH_COOKIE_SECURE', default=not env.bool('DEBUG', default=False))
+AUTH_COOKIE_SAMESITE = env('AUTH_COOKIE_SAMESITE', default='Lax')
+AUTH_COOKIE_DOMAIN = env('AUTH_COOKIE_DOMAIN', default=None)
+AUTH_COOKIE_PATH = env('AUTH_COOKIE_PATH', default='/')
 
 # ── CORS ──────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173'])

@@ -1,5 +1,11 @@
 /**
- * authStore.ts — Global auth state with Zustand
+ * authStore.ts — Global auth state (Zustand).
+ *
+ * SECURITY: the access token lives in memory ONLY (never localStorage) and is
+ * short-lived. The refresh token is an httpOnly cookie the browser manages — it
+ * is never visible to JS. Only `user` + `isAuthenticated` are persisted (for a
+ * snappy reload); the access token is re-minted via a silent cookie refresh on
+ * load (see services/api.ts `bootstrapSession`). See AUTH.md.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -18,10 +24,12 @@ export interface User {
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
 
-  setAuth: (user: User, access: string, refresh: string) => void;
+  /** Set after login: user + fresh in-memory access token. */
+  setAuth: (user: User, access: string) => void;
+  /** Update just the in-memory access token (silent refresh). */
+  setAccess: (access: string) => void;
   setUser: (user: User) => void;
   logout: () => void;
 }
@@ -31,29 +39,22 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
 
-      setAuth: (user, accessToken, refreshToken) => {
-        localStorage.setItem('access_token', accessToken);
-        localStorage.setItem('refresh_token', refreshToken);
-        set({ user, accessToken, refreshToken, isAuthenticated: true });
-      },
+      setAuth: (user, access) =>
+        set({ user, accessToken: access, isAuthenticated: true }),
+
+      setAccess: (access) => set({ accessToken: access, isAuthenticated: true }),
 
       setUser: (user) => set({ user }),
 
-      logout: () => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
-      },
+      logout: () => set({ user: null, accessToken: null, isAuthenticated: false }),
     }),
     {
       name: 'interlaken-auth',
+      // Never persist the access token — memory only.
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

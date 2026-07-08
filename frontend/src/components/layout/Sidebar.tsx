@@ -1,5 +1,6 @@
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
 import {
   LayoutDashboard, CreditCard, Users, LogOut,
@@ -39,8 +40,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ role, open = false, onNavigate }: SidebarProps) {
-  const { user, logout } = useAuthStore();
-  const navigate = useNavigate();
+  const { user } = useAuthStore();
   const items = navByRole[role] ?? navByRole.parent;
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
 
@@ -96,7 +96,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           <div className="truncate text-[13px] font-semibold text-white">{user?.first_name} {user?.last_name}</div>
           <div className="truncate text-[11px] text-white/45">{user?.email}</div>
         </div>
-        <button aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => { logout(); navigate('/login'); }} className="flex h-11 w-11 items-center justify-center rounded-[10px] text-white/35 transition-colors hover:text-pink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60">
+        <button aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => { void authApi.logout(); }} className="flex h-11 w-11 items-center justify-center rounded-[10px] text-white/35 transition-colors hover:text-pink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60">
           <LogOut size={17} />
         </button>
       </div>

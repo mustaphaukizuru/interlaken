@@ -1,12 +1,27 @@
 /**
- * api.ts — Axios instance & all API calls for Interlaken
+ * api.ts — Axios instance & all API calls for Interlaken.
+ *
+ * AUTH MODEL (see AUTH.md): the access token is held in memory (authStore), the
+ * refresh token is an httpOnly cookie the browser sends automatically with
+ * `withCredentials`. Refresh/logout are protected by a double-submit CSRF token
+ * (a JS-readable cookie echoed in the `X-CSRF-Token` header). No token is ever
+ * read from localStorage or a URL.
  */
 import axios from 'axios';
 
-// Single source of truth: VITE_API_BASE_URL is the backend host (no path).
-// The REST API lives under /api/v1; the OAuth redirect lives under /auth.
-const API_HOST = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const BASE_URL = `${API_HOST}/api/v1`;
+import { useAuthStore } from '@/store/authStore';
+
+// Relative by default so the SPA is same-origin with the API (prod: served by
+// Django; dev: via the Vite proxy) — required for the auth cookies to be sent.
+// VITE_API_BASE_URL may override with an absolute host for split deployments.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const BASE_URL = `${API_BASE}/api/v1`;
+const CSRF_COOKIE = 'interlaken_csrf';
+
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -14,43 +29,92 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach JWT token to every request
+// Attach the in-memory access token + the double-submit CSRF header.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = useAuthStore.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const csrf = getCookie(CSRF_COOKIE);
+  if (csrf) config.headers['X-CSRF-Token'] = csrf;
   return config;
 });
 
-// Auto-refresh on 401
+/** Exchange the httpOnly refresh cookie for a new access token (no body token). */
+async function refreshAccess(): Promise<string> {
+  const csrf = getCookie(CSRF_COOKIE);
+  const { data } = await axios.post(
+    `${BASE_URL}/accounts/token/refresh/`,
+    {},
+    { withCredentials: true, headers: csrf ? { 'X-CSRF-Token': csrf } : {} },
+  );
+  return data.access as string;
+}
+
+// Coalesce concurrent refreshes so a burst of 401s triggers a single call.
+let refreshing: Promise<string> | null = null;
+
+// Silent refresh on 401.
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    const url: string = original?.url || '';
+    if (
+      error.response?.status === 401 &&
+      !original._retry &&
+      !url.includes('/token/refresh')
+    ) {
       original._retry = true;
       try {
-        const refresh = localStorage.getItem('refresh_token');
-        const { data } = await axios.post(`${BASE_URL}/accounts/token/refresh/`, { refresh });
-        localStorage.setItem('access_token', data.access);
-        original.headers.Authorization = `Bearer ${data.access}`;
+        refreshing = refreshing ?? refreshAccess();
+        const access = await refreshing;
+        refreshing = null;
+        useAuthStore.getState().setAccess(access);
+        original.headers.Authorization = `Bearer ${access}`;
         return api(original);
       } catch {
-        localStorage.clear();
-        window.location.href = '/login';
+        refreshing = null;
+        useAuthStore.getState().logout();
+        if (typeof window !== 'undefined') window.location.href = '/login';
       }
     }
     return Promise.reject(error);
   }
 );
 
+/** Restore a session on page load from the httpOnly refresh cookie. */
+export async function bootstrapSession(): Promise<boolean> {
+  try {
+    useAuthStore.getState().setAccess(await refreshAccess());
+    return true;
+  } catch {
+    useAuthStore.getState().logout();
+    return false;
+  }
+}
+
 // ── AUTH ──────────────────────────────────────────────────
 export const authApi = {
   googleLogin: () => {
-    window.location.href = `${API_HOST}/auth/google/`;
+    window.location.href = `${API_BASE}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
-  refresh: (refresh: string) => api.post('/accounts/token/refresh/', { refresh }),
-  logout: () => { localStorage.clear(); window.location.href = '/'; },
+  logout: async () => {
+    const csrf = getCookie(CSRF_COOKIE);
+    const token = useAuthStore.getState().accessToken;
+    try {
+      await axios.post(`${API_BASE}/auth/logout/`, {}, {
+        withCredentials: true,
+        headers: {
+          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } catch {
+      /* best-effort — clear locally regardless */
+    }
+    useAuthStore.getState().logout();
+    window.location.href = '/';
+  },
 };
 
 // ── ADMISSIONS ────────────────────────────────────────────

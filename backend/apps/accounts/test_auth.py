@@ -8,6 +8,7 @@ All Google network calls are mocked — the suite never touches the internet.
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 from django.urls import reverse
 
 from apps.accounts.factories import (
@@ -20,10 +21,27 @@ from apps.accounts.models import User
 
 pytestmark = pytest.mark.django_db
 
+REFRESH_COOKIE = settings.AUTH_REFRESH_COOKIE
+CSRF_COOKIE = settings.AUTH_CSRF_COOKIE
+
+
+def _login(api_client, email="login@test.mx"):
+    """Log in and return (access, csrf, refresh_value) reading the Set-Cookie jar."""
+    ParentFactory(email=email)
+    resp = api_client.post(
+        reverse("token-obtain"),
+        {"email": email, "password": DEFAULT_PASSWORD},
+        format="json",
+    )
+    assert resp.status_code == 200, resp.data
+    return (resp.data["access"],
+            resp.cookies[CSRF_COOKIE].value,
+            resp.cookies[REFRESH_COOKIE].value)
+
 
 # ── email/password token ──────────────────────────────────────────────────
 class TestTokenObtain:
-    def test_valid_credentials_return_token_pair(self, api_client):
+    def test_valid_credentials_return_access_and_set_httponly_refresh_cookie(self, api_client):
         ParentFactory(email="login@test.mx")
         resp = api_client.post(
             reverse("token-obtain"),
@@ -31,7 +49,13 @@ class TestTokenObtain:
             format="json",
         )
         assert resp.status_code == 200, resp.data
-        assert "access" in resp.data and "refresh" in resp.data
+        # Access is returned in the body; the refresh token is NOT (cookie only).
+        assert "access" in resp.data
+        assert "refresh" not in resp.data
+        # Refresh cookie is httpOnly; CSRF cookie is JS-readable (double-submit).
+        assert resp.cookies[REFRESH_COOKIE]["httponly"] is True
+        assert resp.cookies[REFRESH_COOKIE].value
+        assert not resp.cookies[CSRF_COOKIE]["httponly"]
 
     def test_wrong_password_is_rejected(self, api_client):
         ParentFactory(email="login@test.mx")
@@ -82,7 +106,10 @@ class TestGoogleCallback:
         assert resp.status_code == 302
         loc = resp["Location"]
         assert "/auth/callback" in loc
-        assert "access=" in loc and "refresh=" in loc
+        # No tokens are ever placed in the redirect URL — session is cookie-only.
+        assert "access=" not in loc and "refresh=" not in loc
+        assert resp.cookies[REFRESH_COOKIE]["httponly"] is True
+        assert resp.cookies[REFRESH_COOKIE].value
 
         user = User.objects.get(email="nuevo@test.mx")
         assert user.google_id == "google-uid-1"
@@ -96,34 +123,64 @@ class TestGoogleCallback:
         assert "error=token_exchange_failed" in resp["Location"]
 
 
-# ── logout blacklist ──────────────────────────────────────────────────────
-class TestLogoutBlacklist:
-    def _tokens(self, api_client, email="logout@test.mx"):
-        ParentFactory(email=email)
-        resp = api_client.post(
-            reverse("token-obtain"),
-            {"email": email, "password": DEFAULT_PASSWORD},
-            format="json",
-        )
-        return resp.data["access"], resp.data["refresh"]
+# ── cookie session: refresh rotation, CSRF, silent refresh, logout ─────────
+class TestCookieSession:
+    def _refresh(self, api_client, csrf, refresh_value=None, header=True):
+        """POST the cookie-refresh endpoint; the client resends stored cookies."""
+        if refresh_value is not None:
+            api_client.cookies[REFRESH_COOKIE] = refresh_value
+        api_client.cookies[CSRF_COOKIE] = csrf  # keep double-submit cookie in sync
+        extra = {"HTTP_X_CSRF_TOKEN": csrf} if header else {}
+        return api_client.post(reverse("token-refresh"), {}, format="json", **extra)
 
-    def test_logout_blacklists_refresh_token(self, api_client):
-        access, refresh = self._tokens(api_client)
+    def test_expired_access_triggers_silent_refresh(self, api_client):
+        access, csrf, _ = _login(api_client)
+        # Access token expired/absent → the SPA calls refresh (cookie) for a new one.
+        resp = self._refresh(api_client, csrf)
+        assert resp.status_code == 200, resp.data
+        assert "access" in resp.data and resp.data["access"] != access
+
+    def test_refresh_rotates_and_old_token_is_blacklisted(self, api_client):
+        _, csrf, old_refresh = _login(api_client)
+        r1 = self._refresh(api_client, csrf)
+        assert r1.status_code == 200
+        new_refresh = r1.cookies[REFRESH_COOKIE].value
+        new_csrf = r1.cookies[CSRF_COOKIE].value
+        assert new_refresh and new_refresh != old_refresh  # rotated
+
+        # Replaying the old (now blacklisted) refresh token fails.
+        replay = self._refresh(api_client, new_csrf, refresh_value=old_refresh)
+        assert replay.status_code == 401
+
+    def test_refresh_requires_csrf_double_submit(self, api_client):
+        _, csrf, _ = _login(api_client)
+        assert self._refresh(api_client, csrf, header=False).status_code == 403
+
+    def test_refresh_without_session_is_401(self, api_client):
+        # CSRF present but no refresh cookie → no session.
+        api_client.cookies[CSRF_COOKIE] = "abc"
+        resp = api_client.post(reverse("token-refresh"), {}, format="json",
+                               HTTP_X_CSRF_TOKEN="abc")
+        assert resp.status_code == 401
+
+    def test_logout_clears_cookies_and_revokes_refresh(self, api_client):
+        access, csrf, refresh_value = _login(api_client)
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
-
-        out = api_client.post(reverse("logout"), {"refresh": refresh}, format="json")
+        out = api_client.post(reverse("logout"), {}, format="json",
+                              HTTP_X_CSRF_TOKEN=csrf)
         assert out.status_code == 200, out.data
+        assert out.cookies[REFRESH_COOKIE].value == ""  # cleared
 
-        # The blacklisted refresh can no longer be exchanged for a new access token.
-        api_client.credentials()  # drop auth header
-        again = api_client.post(reverse("token-refresh"), {"refresh": refresh}, format="json")
-        assert again.status_code == 401
+        # The revoked refresh token can no longer mint an access token.
+        api_client.credentials()
+        replay = self._refresh(api_client, csrf, refresh_value=refresh_value)
+        assert replay.status_code == 401
 
-    def test_logout_requires_refresh_field(self, api_client):
-        access, _ = self._tokens(api_client, email="logout2@test.mx")
+    def test_logout_requires_csrf(self, api_client):
+        access, _, _ = _login(api_client)
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
-        out = api_client.post(reverse("logout"), {}, format="json")
-        assert out.status_code == 400
+        out = api_client.post(reverse("logout"), {}, format="json")  # no CSRF header
+        assert out.status_code == 403
 
 
 # ── students list permission gate ─────────────────────────────────────────

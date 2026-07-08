@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('@/services/api', () => ({
   api: { post: vi.fn() },
   authApi: { me: vi.fn(), googleLogin: vi.fn() },
+  bootstrapSession: vi.fn(),
 }));
 
 // Silence toast side-effects.
@@ -42,14 +43,14 @@ describe('LoginPage email/password submit', () => {
     useAuthStore.setState({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
     });
     vi.clearAllMocks();
   });
 
-  it('logs in on valid credentials and stores the session', async () => {
-    mockedPost.mockResolvedValueOnce({ data: { access: 'acc', refresh: 'ref' } } as never);
+  it('logs in on valid credentials and stores the session in memory', async () => {
+    // The server returns only an access token; the refresh token is an httpOnly cookie.
+    mockedPost.mockResolvedValueOnce({ data: { access: 'acc' } } as never);
     mockedMe.mockResolvedValueOnce({
       data: { id: 1, email: 'parent@test.mx', role: 'parent', full_name: 'P P' },
     } as never);
@@ -62,7 +63,9 @@ describe('LoginPage email/password submit', () => {
       email: 'parent@test.mx',
       password: 's3cret',
     });
-    expect(localStorage.getItem('access_token')).toBe('acc');
+    // Access token is in memory (store), never localStorage.
+    expect(useAuthStore.getState().accessToken).toBe('acc');
+    expect(localStorage.getItem('access_token')).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
 

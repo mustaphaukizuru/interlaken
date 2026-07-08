@@ -9,23 +9,17 @@ from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.core.ratelimit import ratelimit
 
+from .cookies import (clear_auth_cookies, csrf_ok, issue_session,
+                      new_csrf_token, set_csrf_cookie, set_refresh_cookie)
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer, UserSerializer
-
-
-def _get_tokens(user):
-    """Return JWT access + refresh token pair for a user."""
-    refresh = RefreshToken.for_user(user)
-    return {
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-    }
 
 
 class GoogleLoginView(APIView):
@@ -121,16 +115,12 @@ class GoogleCallbackView(APIView):
             if updated:
                 user.save(update_fields=['google_id', 'avatar'])
 
-        tokens = _get_tokens(user)
-
-        # Redirect to frontend with tokens in query params (stored immediately by JS)
-        frontend_redirect = (
-            f'{settings.FRONTEND_URL}/auth/callback'
-            f'?access={tokens["access"]}'
-            f'&refresh={tokens["refresh"]}'
-            f'&role={user.role}'
-        )
-        return redirect(frontend_redirect)
+        # Set the session as httpOnly cookies and redirect WITHOUT any token in
+        # the URL. The SPA lands on /auth/callback and silently calls the refresh
+        # endpoint to obtain an in-memory access token from the cookie.
+        response = redirect(f'{settings.FRONTEND_URL}/auth/callback?login=ok')
+        issue_session(user, response)
+        return response
 
 
 @method_decorator(ratelimit('google-token', '10/m', key='ip', method='POST'), name='dispatch')
@@ -174,37 +164,88 @@ class GoogleTokenView(APIView):
             'role': User.Role.PARENT,
         })
 
-        tokens = _get_tokens(user)
-        return Response({
-            'user': UserSerializer(user).data,
-            **tokens,
-        })
+        response = Response()
+        access = issue_session(user, response)
+        response.data = {'user': UserSerializer(user).data, 'access': access}
+        return response
 
 
 class LogoutView(APIView):
-    """POST /auth/logout/ — Blacklist the refresh token so it can't be reused."""
+    """POST /auth/logout/ — Blacklist the refresh cookie's token and clear cookies."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        refresh_token = request.data.get('refresh')
-        if not refresh_token:
-            return Response({'error': 'refresh token requerido.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        try:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        except TokenError:
-            # Token is invalid, expired, or already blacklisted.
-            return Response({'error': 'Token inválido o ya revocado.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not csrf_ok(request):
+            return Response({'detail': 'CSRF token inválido.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        raw = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE)
+        if raw:
+            try:
+                RefreshToken(raw).blacklist()
+            except TokenError:
+                pass  # already invalid/expired/blacklisted — still clear cookies
+        response = Response({'detail': 'Sesión cerrada correctamente.'})
+        clear_auth_cookies(response)
         logout(request)
-        return Response({'detail': 'Sesión cerrada correctamente.'})
+        return response
 
 
 @method_decorator(ratelimit('login', '10/m', key='ip', method='POST'), name='dispatch')
 class RateLimitedTokenObtainView(TokenObtainPairView):
-    """POST /api/v1/accounts/token/ — email/password login, IP rate-limited."""
-    pass
+    """POST /api/v1/accounts/token/ — email/password login, IP rate-limited.
+
+    On success the refresh token is set as an httpOnly cookie (+ CSRF cookie) and
+    stripped from the body; only the short-lived access token is returned.
+    """
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            refresh = response.data.get('refresh')
+            access = response.data.get('access')
+            response.data = {'access': access}
+            if refresh:
+                set_refresh_cookie(response, refresh)
+                set_csrf_cookie(response, new_csrf_token())
+        return response
+
+
+@method_decorator(ratelimit('token-refresh', '60/m', key='ip', method='POST'), name='dispatch')
+class CookieTokenRefreshView(APIView):
+    """POST /api/v1/accounts/token/refresh/ — rotate the httpOnly refresh cookie.
+
+    Reads the refresh token from the cookie (never the body), requires a valid
+    double-submit CSRF header, rotates (blacklisting the old token), re-sets the
+    cookie, and returns a fresh in-memory access token.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if not csrf_ok(request):
+            return Response({'detail': 'CSRF token inválido.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        raw = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE)
+        if not raw:
+            return Response({'detail': 'No hay sesión activa.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        # Reuse SimpleJWT's serializer so rotation + blacklist semantics are
+        # identical to the stock TokenRefreshView (a blacklisted/expired token
+        # raises here and the session is cleared).
+        serializer = TokenRefreshSerializer(data={'refresh': raw})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except (TokenError, InvalidToken):
+            response = Response({'detail': 'Sesión expirada.'},
+                                status=status.HTTP_401_UNAUTHORIZED)
+            clear_auth_cookies(response)
+            return response
+
+        data = serializer.validated_data
+        response = Response({'access': data['access']})
+        set_refresh_cookie(response, data.get('refresh', raw))
+        set_csrf_cookie(response, new_csrf_token())
+        return response
 
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):
