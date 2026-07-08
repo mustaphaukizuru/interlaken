@@ -59,6 +59,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
+    # Exposes the request so audit records can attribute the acting user (IK-SEC A3).
+    'apps.core.audit.AuditActorMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

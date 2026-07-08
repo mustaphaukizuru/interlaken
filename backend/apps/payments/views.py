@@ -140,6 +140,8 @@ class _WebhookProcessMixin:
 
     def _process(self, request, gateways):
         """Verify the request against ``gateways`` and apply the first that matches."""
+        from apps.core.audit import audit_context
+
         event = None
         for gateway in gateways:
             event = gateway.verify_webhook(request)
@@ -149,7 +151,9 @@ class _WebhookProcessMixin:
             return Response({'error': 'invalid_signature'},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-        http_status, body, notify_arg = self._apply_event(event)
+        # Automated money movement: attribute audit records to the gateway job.
+        with audit_context(actor_label='system:webhook'):
+            http_status, body, notify_arg = self._apply_event(event)
 
         # Email/notify outside the DB transaction (best-effort; never blocks the ack).
         if notify_arg is not None:
