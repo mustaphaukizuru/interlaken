@@ -24,6 +24,11 @@ const BookVisitPage   = lazy(() => import('./pages/public/BookVisitPage'));
 const ContactPage     = lazy(() => import('./pages/public/ContactPage'));
 const AvisoPrivacidadPage = lazy(() => import('./pages/public/AvisoPrivacidadPage'));
 const NotFoundPage    = lazy(() => import('./pages/public/NotFoundPage'));
+const NivelPage       = lazy(() => import('./pages/public/NivelPage'));
+const ModeloEducativoPage = lazy(() => import('./pages/public/ModeloEducativoPage'));
+const GaleriaPage     = lazy(() => import('./pages/public/GaleriaPage'));
+const PlataformasPage = lazy(() => import('./pages/public/PlataformasPage'));
+const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
@@ -98,6 +103,12 @@ export default function App() {
               <Route path="/agendar-visita" element={<BookVisitPage />} />
               <Route path="/contacto"      element={<ContactPage />} />
               <Route path="/aviso-de-privacidad" element={<AvisoPrivacidadPage />} />
+              {/* IA confirmada por el cliente (menú 2026-07) */}
+              <Route path="/modelo-educativo" element={<ModeloEducativoPage />} />
+              <Route path="/galeria"          element={<GaleriaPage />} />
+              <Route path="/niveles/:nivel"   element={<NivelPage />} />
+              <Route path="/comunidad/plataformas" element={<PlataformasPage />} />
+              <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
               <Route path="*" element={<NotFoundPage />} />
             </Route>
