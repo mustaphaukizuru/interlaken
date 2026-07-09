@@ -33,16 +33,18 @@ class SiteSettings(models.Model):
         'Correo de contacto', blank=True, default='colegio@interlaken.edu.mx')
     address = models.CharField(
         'Dirección', max_length=200, blank=True,
-        default='Tlalnepantla de Baz, Estado de México')
+        default='Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México')
     maps_url = models.URLField(
         'Enlace de Google Maps', blank=True,
-        default='https://maps.google.com/?q=Tlalnepantla+de+Baz')
+        default='https://maps.app.goo.gl/Xd241Sht8TmrMHUe6')
     office_hours = models.CharField(
         'Horario de oficina', max_length=100, blank=True,
         default='Lunes–Viernes 8:00–16:00 hrs')
 
     # ── Redes sociales (vacío = el ícono no se muestra) ───
-    facebook_url = models.URLField('Facebook', blank=True, default='')
+    # Confirmado por el cliente: la única red social del colegio es Facebook.
+    facebook_url = models.URLField(
+        'Facebook', blank=True, default='https://www.facebook.com/colegiointerlaken')
     instagram_url = models.URLField('Instagram', blank=True, default='')
     youtube_url = models.URLField('YouTube', blank=True, default='')
 

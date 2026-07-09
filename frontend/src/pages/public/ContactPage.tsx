@@ -20,6 +20,13 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+/** Directorio oficial por nivel (conmutador 5379-1188). */
+const DIRECTORY = [
+  { level: 'Preescolar', ext: '1', email: 'preescolar@interlaken.com.mx' },
+  { level: 'Primaria',   ext: '2', email: 'primaria@interlaken.com.mx' },
+  { level: 'Secundaria', ext: '3', email: 'secundaria@interlaken.com.mx' },
+];
+
 export default function ContactPage() {
   const settings = useSiteSettings();
   // Contact facts are admin-editable (Contenido del sitio → Ajustes del sitio);
@@ -173,6 +180,79 @@ export default function ContactPage() {
           </Reveal>
         </div>
       </Section>
+
+      {/* ── DIRECTORIO POR NIVEL ── */}
+      <Section bg="cream">
+        <div className="mx-auto w-full max-w-[1120px] px-6">
+          <span className="section-label-green inline-flex">Directorio</span>
+          <h2 className="mt-2 font-head text-fluid-xl font-bold text-ink">
+            Atención por nivel educativo
+          </h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {DIRECTORY.map((d) => (
+              <Reveal key={d.level}>
+                <div className="h-full rounded-xl2 border border-ink/10 bg-white p-5">
+                  <p className="font-head text-lg font-bold text-ink">{d.level}</p>
+                  <ul className="mt-3 space-y-2 text-sm">
+                    <li>
+                      <a
+                        href={`tel:${settings.phone_e164}`}
+                        className="flex items-center gap-2 text-ink/85 hover:text-green-dark"
+                      >
+                        <Phone size={15} className="text-green-dark" aria-hidden="true" />
+                        {settings.phone_display} · Ext {d.ext}
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href={`mailto:${d.email}`}
+                        className="flex items-center gap-2 break-all text-ink/85 hover:text-green-dark"
+                      >
+                        <Mail size={15} className="text-green-dark" aria-hidden="true" />
+                        {d.email}
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* ── MAPA ── */}
+      <section className="bg-white pb-14 pt-4">
+        <div className="mx-auto w-full max-w-[1120px] px-6">
+          <h2 className="font-head text-fluid-xl font-bold text-ink">Cómo llegar</h2>
+          <p className="mt-1 text-sm text-muted">
+            {settings.address}
+            {settings.maps_url && (
+              <>
+                {' · '}
+                <a
+                  href={settings.maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-green-dark underline"
+                >
+                  Abrir en Google Maps
+                </a>
+              </>
+            )}
+          </p>
+          <div className="mt-4 overflow-hidden rounded-xl2 border border-ink/10">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3759.6587772437156!2d-99.20946797478247!3d19.556257781749714!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d21d6c27c972e1%3A0x3c76d65bc761079b!2sCollege%20Interlaken%20%2F%20ADCE%20Education!5e0!3m2!1sen!2smx!4v1783605176683!5m2!1sen!2smx"
+              title="Mapa — Colegio Interlaken, Av. de los Reyes 67, Tlalnepantla"
+              className="h-[340px] w-full sm:h-[420px]"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

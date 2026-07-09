@@ -30,9 +30,12 @@ class TestPublicRead:
             'address', 'maps_url', 'office_hours',
             'facebook_url', 'instagram_url', 'youtube_url', 'updated_at',
         }
-        # Ships with the school's real number; socials start empty (icons hidden).
+        # Ships with the school's real contact data (confirmado por el cliente):
+        # Facebook es la única red social; Instagram/YouTube quedan ocultos.
         assert data['phone_display'] == '(55) 5379-1188'
-        assert data['facebook_url'] == ''
+        assert data['facebook_url'] == 'https://www.facebook.com/colegiointerlaken'
+        assert data['address'].startswith('Av. de los Reyes 67')
+        assert data['instagram_url'] == ''
 
     def test_first_read_creates_the_singleton(self, api_client):
         assert SiteSettings.objects.count() == 0
