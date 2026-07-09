@@ -329,6 +329,7 @@ ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
 # in both light and dark mode. Each stop is annotated with its source token —
 # no values exist here that are not already in the token layer.
 from django.templatetags.static import static as _static  # noqa: E402
+from django.urls import reverse_lazy  # noqa: E402
 
 UNFOLD = {
     'SITE_TITLE': 'Admin · Interlaken',
@@ -392,7 +393,112 @@ UNFOLD = {
     },
     'SIDEBAR': {
         'show_search': True,
+        # Plumbing models (JWT token blacklist, sessions, social-auth rows) are
+        # deliberately NOT listed below, which hides them from the default view.
         'show_all_applications': False,
-        'navigation': [],  # populated below (IK-ADMIN P1.2)
+        'navigation': [
+            {
+                'items': [
+                    {'title': 'Inicio', 'icon': 'home',
+                     'link': reverse_lazy('admin:index')},
+                ],
+            },
+            {
+                'title': 'Admisiones',
+                'separator': True,
+                'items': [
+                    {'title': 'Pre-registros', 'icon': 'how_to_reg',
+                     'link': reverse_lazy('admin:admissions_preregistration_changelist')},
+                    {'title': 'Inscripciones', 'icon': 'assignment_turned_in',
+                     'link': reverse_lazy('admin:admissions_registration_changelist')},
+                    {'title': 'Documentos', 'icon': 'folder_open',
+                     'link': reverse_lazy('admin:admissions_registrationdocument_changelist')},
+                    {'title': 'Puertas Abiertas', 'icon': 'meeting_room',
+                     'link': reverse_lazy('admin:admissions_openschoolday_changelist')},
+                    {'title': 'Disponibilidad de visitas', 'icon': 'event_available',
+                     'link': reverse_lazy('admin:bookings_availabilityslot_changelist')},
+                    {'title': 'Reservas de visita', 'icon': 'calendar_month',
+                     'link': reverse_lazy('admin:bookings_booking_changelist')},
+                ],
+            },
+            {
+                'title': 'Familias',
+                'separator': True,
+                'items': [
+                    {'title': 'Usuarios', 'icon': 'person',
+                     'link': reverse_lazy('admin:accounts_user_changelist')},
+                    {'title': 'Alumnos', 'icon': 'school',
+                     'link': reverse_lazy('admin:accounts_studentprofile_changelist')},
+                    {'title': 'Padres y tutores', 'icon': 'family_restroom',
+                     'link': reverse_lazy('admin:accounts_parentprofile_changelist')},
+                ],
+            },
+            {
+                'title': 'Cafetería',
+                'separator': True,
+                'items': [
+                    {'title': 'Saldos', 'icon': 'account_balance_wallet',
+                     'link': reverse_lazy('admin:cafeteria_cafeteriabalance_changelist')},
+                    {'title': 'Transacciones', 'icon': 'receipt_long',
+                     'link': reverse_lazy('admin:cafeteria_cafeteriatransaction_changelist')},
+                    {'title': 'Solicitudes de recarga', 'icon': 'add_card',
+                     'link': reverse_lazy('admin:cafeteria_topuprequest_changelist')},
+                    {'title': 'Ajustes de saldo', 'icon': 'published_with_changes',
+                     'link': reverse_lazy('admin:cafeteria_balanceadjustment_changelist')},
+                ],
+            },
+            {
+                'title': 'Pagos',
+                'separator': True,
+                'items': [
+                    {'title': 'Pagos en línea', 'icon': 'payments',
+                     'link': reverse_lazy('admin:payments_payment_changelist')},
+                    {'title': 'Colegiaturas (facturas)', 'icon': 'request_quote',
+                     'link': reverse_lazy('admin:finance_invoice_changelist')},
+                    {'title': 'Planes de colegiatura', 'icon': 'price_change',
+                     'link': reverse_lazy('admin:finance_feeschedule_changelist')},
+                    {'title': 'Descuentos y becas', 'icon': 'percent',
+                     'link': reverse_lazy('admin:finance_discount_changelist')},
+                    {'title': 'Pagos aplicados', 'icon': 'receipt',
+                     'link': reverse_lazy('admin:finance_invoicepayment_changelist')},
+                    {'title': 'Ajustes de factura', 'icon': 'edit_note',
+                     'link': reverse_lazy('admin:finance_invoiceadjustment_changelist')},
+                ],
+            },
+            {
+                'title': 'Comunicaciones',
+                'separator': True,
+                'items': [
+                    {'title': 'Comunicados', 'icon': 'campaign',
+                     'link': reverse_lazy('admin:portal_announcement_changelist')},
+                    {'title': 'Notificaciones', 'icon': 'notifications',
+                     'link': reverse_lazy('admin:portal_notification_changelist')},
+                    {'title': 'Mensajes de contacto', 'icon': 'mail',
+                     'link': reverse_lazy('admin:core_contactmessage_changelist')},
+                ],
+            },
+            {
+                'title': 'Legal y consentimientos',
+                'separator': True,
+                'items': [
+                    {'title': 'Aviso de privacidad', 'icon': 'policy',
+                     'link': reverse_lazy('admin:legal_privacynoticeversion_changelist')},
+                    {'title': 'Consentimientos', 'icon': 'fact_check',
+                     'link': reverse_lazy('admin:legal_consentrecord_changelist')},
+                    {'title': 'Solicitudes ARCO', 'icon': 'gavel',
+                     'link': reverse_lazy('admin:legal_arcorequest_changelist')},
+                ],
+            },
+            {
+                'title': 'Sistema',
+                'separator': True,
+                'items': [
+                    {'title': 'Auditoría', 'icon': 'history',
+                     'link': reverse_lazy('admin:core_auditlog_changelist')},
+                    {'title': 'Grupos de permisos', 'icon': 'group',
+                     'link': reverse_lazy('admin:auth_group_changelist')},
+                ],
+            },
+        ],
     },
 }
