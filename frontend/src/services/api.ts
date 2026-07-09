@@ -364,7 +364,7 @@ export const bookingsApi = {
     location?: string;
   }) => api.post('/bookings/availability/', data),
 
-  getAdminBookings: (params?: { type?: string; status?: string; date?: string; page?: number }) =>
+  getAdminBookings: (params?: { type?: string; status?: string; date?: string; q?: string; page?: number }) =>
     api.get('/bookings/admin/bookings/', { params }),
 
   bookingAction: (id: number, action: 'confirm' | 'cancel' | 'attended' | 'no_show') =>
@@ -376,7 +376,7 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number }) =>
+  getStudents: (params?: { page?: number; search?: string }) =>
     api.get('/accounts/students/', { params }),
 
   // Aggregated staff analytics (staff/admin only; server-cached 60s).

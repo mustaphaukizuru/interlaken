@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { admissionsApi } from '@/services/api';
 import { SITE_URL, SITE_NAME } from '@/lib/siteMeta';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { waHref } from '@/lib/siteContact';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -26,14 +28,12 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5215512345678';
-const WHATSAPP_TEXT = encodeURIComponent(
-  'Hola, me gustaría registrarme para un evento de Puertas Abiertas en el Colegio Interlaken.',
-);
+const WHATSAPP_TEXT = 'Hola, me gustaría registrarme para un evento de Puertas Abiertas en el Colegio Interlaken.';
 
 export default function OpenSchoolPage() {
   const [selectedEvent, setSelectedEvent] = useState<OpenSchoolEvent | null>(null);
   const [registered, setRegistered] = useState(false);
+  const { whatsapp_number } = useSiteSettings();
 
   const { data: events, isLoading } = useQuery<OpenSchoolEvent[]>({
     queryKey: ['open-school-events'],
@@ -215,13 +215,14 @@ export default function OpenSchoolPage() {
           </div>
 
           {/* WhatsApp fallback */}
+          {whatsapp_number && (
           <div className="mt-10 rounded-2xl border border-line bg-cream p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-muted text-center sm:text-left">
               <p className="font-semibold text-ink">¿Prefiere registrarse por WhatsApp?</p>
               <p>Escríbanos y con gusto le apartamos su lugar en el próximo evento.</p>
             </div>
             <a
-              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_TEXT}`}
+              href={waHref(whatsapp_number, WHATSAPP_TEXT)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap"
@@ -230,6 +231,7 @@ export default function OpenSchoolPage() {
               Reservar por WhatsApp
             </a>
           </div>
+          )}
           </>
         )}
       </div>

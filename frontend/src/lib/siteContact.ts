@@ -1,0 +1,44 @@
+/**
+ * siteContact.ts — defaults + pure helpers for admin-editable contact data
+ * (CMS Phase 1). The server values come from /api/v1/content/settings/ via
+ * useSiteSettings(); these defaults render instantly (no flicker) and keep
+ * the site meaningful if the API is unreachable. They mirror the backend
+ * model defaults — update both together.
+ */
+import type { SiteSettings } from '@/types/content';
+
+export const SITE_DEFAULTS: SiteSettings = {
+  phone_display: '(55) 1234-5678',
+  phone_e164: '+525512345678',
+  whatsapp_number: import.meta.env.VITE_WHATSAPP_NUMBER || '5215512345678',
+  contact_email: 'colegio@interlaken.edu.mx',
+  address: 'Tlalnepantla de Baz, Estado de México',
+  maps_url: 'https://maps.google.com/?q=Tlalnepantla+de+Baz',
+  office_hours: 'Lunes–Viernes 8:00–16:00 hrs',
+  // Empty = icon hidden. Real profiles are entered in the Django admin
+  // (Contenido del sitio → Ajustes del sitio).
+  facebook_url: '',
+  instagram_url: '',
+  youtube_url: '',
+};
+
+/** wa.me deep link; `message` is plain text (encoded here). */
+export function waHref(number: string, message: string): string {
+  return `https://wa.me/${number.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+}
+
+export interface SocialEntry {
+  key: 'facebook' | 'instagram' | 'youtube';
+  label: string;
+  href: string;
+}
+
+/** Only socials with a configured URL — placeholders never render. */
+export function socialEntries(s: SiteSettings): SocialEntry[] {
+  const all: SocialEntry[] = [
+    { key: 'facebook', label: 'Facebook', href: s.facebook_url },
+    { key: 'instagram', label: 'Instagram', href: s.instagram_url },
+    { key: 'youtube', label: 'YouTube', href: s.youtube_url },
+  ];
+  return all.filter((e) => e.href.trim() !== '');
+}

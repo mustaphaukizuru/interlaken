@@ -28,11 +28,9 @@ export const ORG = {
   // Approximate campus geo (Tlalnepantla de Baz centre) — refine when surveyed.
   latitude: 19.5407,
   longitude: -99.1955,
-  sameAs: [
-    'https://facebook.com',
-    'https://instagram.com',
-    'https://youtube.com',
-  ],
+  // Real profile URLs live in the admin-editable site settings (apps/content);
+  // an empty list here keeps placeholder links out of the structured data.
+  sameAs: [] as string[],
 } as const;
 
 export interface RouteMeta {

@@ -9,16 +9,15 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { bookingsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { waHref } from '@/lib/siteContact';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import type { AvailabilitySlot } from '@/types';
 
-const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5215512345678';
-const WHATSAPP_TEXT = encodeURIComponent(
-  'Hola, me gustaría agendar una visita individual al Colegio Interlaken.',
-);
+const WHATSAPP_TEXT = 'Hola, me gustaría agendar una visita individual al Colegio Interlaken.';
 
 const schema = z.object({
   parent_name:  z.string().min(3, 'Nombre requerido'),
@@ -37,6 +36,7 @@ export default function BookVisitPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [confirmed, setConfirmed] = useState<AvailabilitySlot | null>(null);
+  const { whatsapp_number } = useSiteSettings();
 
   const { data: slots, isLoading } = useQuery<AvailabilitySlot[]>({
     queryKey: ['availability', 'individual'],
@@ -236,13 +236,14 @@ export default function BookVisitPage() {
             </div>
 
             {/* WhatsApp fallback */}
+            {whatsapp_number && (
             <div className="mt-8 sm:mt-10 rounded-2xl border border-line bg-cream p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-muted text-center sm:text-left">
                 <p className="font-semibold text-ink">¿Prefiere agendar por WhatsApp?</p>
                 <p>Escríbanos y con gusto coordinamos su visita.</p>
               </div>
               <a
-                href={`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_TEXT}`}
+                href={waHref(whatsapp_number, WHATSAPP_TEXT)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-green-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
@@ -251,6 +252,7 @@ export default function BookVisitPage() {
                 Reservar por WhatsApp
               </a>
             </div>
+            )}
           </>
         )}
       </div>

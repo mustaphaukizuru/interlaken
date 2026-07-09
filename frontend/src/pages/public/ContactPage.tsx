@@ -8,6 +8,8 @@ import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { waHref } from '@/lib/siteContact';
 
 const schema = z.object({
   name:    z.string().min(2, 'Nombre requerido'),
@@ -18,14 +20,17 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const INFO = [
-  { icon: Phone,  label: 'Teléfono',           value: '(55) 1234-5678',                        href: 'tel:+525512345678' },
-  { icon: Mail,   label: 'Correo',             value: 'colegio@interlaken.edu.mx',             href: 'mailto:colegio@interlaken.edu.mx' },
-  { icon: MapPin, label: 'Dirección',          value: 'Tlalnepantla de Baz, Estado de México', href: 'https://maps.google.com/?q=Tlalnepantla+de+Baz' },
-  { icon: Clock,  label: 'Horario de oficina', value: 'Lunes–Viernes 8:00–16:00 hrs' },
-];
-
 export default function ContactPage() {
+  const settings = useSiteSettings();
+  // Contact facts are admin-editable (Contenido del sitio → Ajustes del sitio);
+  // entries without a value simply don't render.
+  const INFO = [
+    { icon: Phone,  label: 'Teléfono',           value: settings.phone_display, href: `tel:${settings.phone_e164}` },
+    { icon: Mail,   label: 'Correo',             value: settings.contact_email, href: `mailto:${settings.contact_email}` },
+    { icon: MapPin, label: 'Dirección',          value: settings.address,       href: settings.maps_url || undefined },
+    { icon: Clock,  label: 'Horario de oficina', value: settings.office_hours },
+  ].filter((item) => item.value);
+
   const {
     register,
     handleSubmit,
@@ -96,7 +101,7 @@ export default function ContactPage() {
 
             {/* Map placeholder */}
             <a
-              href="https://maps.google.com/?q=Tlalnepantla+de+Baz"
+              href={settings.maps_url || 'https://maps.google.com/?q=Tlalnepantla+de+Baz'}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Abrir ubicación en Google Maps"
@@ -106,14 +111,15 @@ export default function ContactPage() {
                 <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white shadow-purple">
                   <MapPin className="h-6 w-6" />
                 </div>
-                <span className="font-head text-sm font-bold">Tlalnepantla de Baz, Edo. de México</span>
+                <span className="font-head text-sm font-bold">{settings.address}</span>
                 <span className="text-[12.5px] text-muted">Ver ubicación en Google Maps</span>
               </div>
             </a>
 
+            {settings.whatsapp_number && (
             <div className="mt-[22px]">
               <a
-                href="https://wa.me/5215512345678?text=Hola%2C%20me%20gustar%C3%ADa%20obtener%20m%C3%A1s%20informaci%C3%B3n"
+                href={waHref(settings.whatsapp_number, 'Hola, me gustaría obtener más información')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
@@ -124,6 +130,7 @@ export default function ContactPage() {
                 Escribir por WhatsApp
               </a>
             </div>
+            )}
           </Reveal>
 
           {/* Contact form */}
