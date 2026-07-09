@@ -3,6 +3,12 @@
 **Generated:** 2026-07-07 · Master index + professional recommendations
 This ties together all planning docs and adds everything else worth doing, prioritized.
 
+> ## ⚡ Update 2026-07-09 — what remains (everything else below is done or superseded)
+> **Shipped since generation:** all P0/P1 fixes · cafeteria wallet (full) · tuition billing · bookings + Calendar + WhatsApp · legal/LFPDPPP · CMS Phase 1 · staff analytics · UI/UX refinements (frontend + unfold admin) · tests/CI/Sentry · SEO/PWA · API docs · DB backups · Dependabot · read receipts · Ctrl+K search · 404.
+> **Contract constraints:** payments locked to **Global Payments + Banorte** (no OXXO/SPEI/others) · **academics (D-section) permanently descoped.**
+> **Open — needs the client/owner:** SSL renewal (blocks go-live) · cPanel deploy execution · gateway + WABA + Loyverse credentials · Google SA key + redirect URI · real CMS data · legal review · secret rotation · `git push`.
+> **Open — buildable next:** bulk student/parent import · web-push send pipeline · CFDI 4.0 via PAC · academic-cycle backbone (Enrollment/TuitionAccount for 10/11-month billing) · 2FA · staging env · uptime monitoring · auto-recharge (two contracted gateways only) · emergency broadcast · CMS next phases (FAQ/Noticias/galería) · EN version.
+
 ## Document index (already written)
 | Doc | Covers |
 |---|---|
