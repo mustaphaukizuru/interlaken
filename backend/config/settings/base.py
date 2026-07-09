@@ -427,6 +427,10 @@ UNFOLD = {
     # KPI landing on the admin index (numbers + links only; charts live in the
     # staff dashboard app view). See apps/core/dashboard.py.
     'DASHBOARD_CALLBACK': 'apps.core.dashboard.dashboard_callback',
+    # Dev/prod marker: colored label by the user links + tab-title prefix, so a
+    # development admin can never be mistaken for production.
+    'ENVIRONMENT': 'apps.core.environment.environment_callback',
+    'ENVIRONMENT_TITLE_PREFIX': 'apps.core.environment.environment_title_prefix',
     'SIDEBAR': {
         'show_search': True,
         # Plumbing models (JWT token blacklist, sessions, social-auth rows) are
@@ -444,10 +448,14 @@ UNFOLD = {
                 'separator': True,
                 'items': [
                     {'title': 'Pre-registros', 'icon': 'how_to_reg',
+                     'badge': 'apps.core.badges.pending_preregistrations',
+                     'badge_variant': 'primary',
                      'link': reverse_lazy('admin:admissions_preregistration_changelist')},
                     {'title': 'Inscripciones', 'icon': 'assignment_turned_in',
                      'link': reverse_lazy('admin:admissions_registration_changelist')},
                     {'title': 'Documentos', 'icon': 'folder_open',
+                     'badge': 'apps.core.badges.documents_in_review',
+                     'badge_variant': 'warning',
                      'link': reverse_lazy('admin:admissions_registrationdocument_changelist')},
                     {'title': 'Puertas Abiertas', 'icon': 'meeting_room',
                      'link': reverse_lazy('admin:admissions_openschoolday_changelist')},
@@ -518,6 +526,8 @@ UNFOLD = {
                     {'title': 'Notificaciones', 'icon': 'notifications',
                      'link': reverse_lazy('admin:portal_notification_changelist')},
                     {'title': 'Mensajes de contacto', 'icon': 'mail',
+                     'badge': 'apps.core.badges.unhandled_contact_messages',
+                     'badge_variant': 'primary',
                      'link': reverse_lazy('admin:core_contactmessage_changelist')},
                 ],
             },
@@ -530,6 +540,7 @@ UNFOLD = {
                     {'title': 'Consentimientos', 'icon': 'fact_check',
                      'link': reverse_lazy('admin:legal_consentrecord_changelist')},
                     {'title': 'Solicitudes ARCO', 'icon': 'gavel',
+                     'badge': 'apps.core.badges.open_arco_requests',
                      'link': reverse_lazy('admin:legal_arcorequest_changelist')},
                 ],
             },
