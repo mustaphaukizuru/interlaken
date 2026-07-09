@@ -56,6 +56,7 @@ Shared cPanel hosting has **no Redis and no persistent worker processes**, so th
 | Generate monthly tuition invoices | `python manage.py generate_invoices` | monthly, 1st 06:00 |
 | Apply tuition late fees | `python manage.py apply_late_fees` | daily 06:30 |
 | Tuition payment reminders | `python manage.py send_payment_reminders` | daily 07:30 |
+| **Database backup (+rotation)** | `python manage.py backup_database` | daily 02:30 |
 
 Each cron entry activates the cPanel venv then runs the command, e.g.:
 `/home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances`
@@ -75,6 +76,7 @@ environment is unambiguous:
 0    6  1   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py generate_invoices >> /home/rene82/logs/finance.log 2>&1
 30   6  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py apply_late_fees >> /home/rene82/logs/finance.log 2>&1
 30   7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_payment_reminders >> /home/rene82/logs/finance.log 2>&1
+30   2  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py backup_database --output-dir /home/rene82/backups >> /home/rene82/logs/backup.log 2>&1
 ```
 
 - `sync_purchases` (Prompt 09) polls Loyverse receipts, idempotently records each new purchase (unique `loyverse_receipt_id`), debits the local balance, and notifies every linked parent (in-app + email); a purchase that crosses the low-balance threshold triggers a deduped alert. Safe to run every 5 min — re-runs never duplicate or re-notify.
@@ -346,3 +348,31 @@ WHATSAPP_API_VERSION=v19.0        # optional
        -H "Content-Type: application/json" -H "X-Hub-Signature-256: $SIG" -d "$BODY"
   ```
   An **unsigned** POST returns 403; a **signed** one is processed (200).
+
+---
+
+## 11. Backups & restore runbook
+
+**What runs:** `python manage.py backup_database` (cron §3, daily 02:30) writes a
+timestamped backup into `/home/rene82/backups/` and keeps the most recent **14**
+(`--keep N` to change). MySQL → gzipped `mysqldump --single-transaction` (password
+via `MYSQL_PWD` env, never argv); local SQLite dev → consistent copy via the
+sqlite3 online-backup API. The repo-level `backups/` dir is gitignored.
+
+**Off-site copy (strongly recommended):** the cPanel disk is a single point of
+failure. Periodically download `/home/rene82/backups/` via cPanel → File Manager
+or SFTP, or add a weekly cron that pushes the newest dump to external storage.
+
+**Restore — MySQL (production):**
+1. Put the site in maintenance (cPanel → disable the Python app or serve a static page).
+2. `gunzip -k /home/rene82/backups/db-<STAMP>.sql.gz`
+3. `mysql --user=rene82_interla -p rene82_interla < db-<STAMP>.sql`
+4. Re-enable the app; verify: log in, open `/admin/`, run one read (alumnos list)
+   and one write (test announcement), then delete the test row.
+
+**Restore — SQLite (dev):** stop `runserver`, replace `db_local.sqlite3` with the
+snapshot file, restart.
+
+**Rules:** rehearse a restore once per school term — a backup that has never been
+restored is not a backup. Always take a fresh manual backup **before** running
+migrations in production (`manage.py backup_database` then `migrate`).
