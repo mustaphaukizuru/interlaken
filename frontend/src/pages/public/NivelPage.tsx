@@ -108,8 +108,8 @@ export default function NivelPage() {
             <ul className="mt-3 divide-y divide-ink/10 text-[15px]">
               {[
                 { to: '/admisiones', label: 'Proceso de inscripción' },
-                { to: '/admisiones#documentacion', label: 'Documentación' },
-                { to: '/admisiones#costos', label: 'Costos y colegiaturas' },
+                { to: '/admisiones/documentacion', label: 'Documentación' },
+                { to: '/admisiones/costos', label: 'Costos y colegiaturas' },
                 { to: '/puertas-abiertas', label: 'Puertas Abiertas' },
                 { to: '/contacto', label: 'Contacto por nivel' },
               ].map((l) => (

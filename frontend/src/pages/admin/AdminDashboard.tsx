@@ -4,6 +4,7 @@ import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRig
 import { StatCard } from '@/components/ui/StatCard';
 import TopBar from '@/components/layout/TopBar';
 import { portalApi } from '@/services/api';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
 
 export default function AdminDashboard() {
@@ -14,7 +15,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">
-      <TopBar title="Panel de Administración" subtitle="Ciclo Escolar 2025–2026" />
+      <TopBar title="Panel de Administración" subtitle={`Ciclo Escolar ${CURRENT_CYCLE}`} />
       <div className="px-[clamp(16px,4vw,32px)] py-6">
         {/* Stats */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
