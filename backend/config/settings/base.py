@@ -35,6 +35,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'apps.core',
+    'apps.content',
     'apps.accounts',
     'apps.admissions',
     'apps.cafeteria',
@@ -478,6 +479,14 @@ UNFOLD = {
                      'link': reverse_lazy('admin:finance_invoicepayment_changelist')},
                     {'title': 'Ajustes de factura', 'icon': 'edit_note',
                      'link': reverse_lazy('admin:finance_invoiceadjustment_changelist')},
+                ],
+            },
+            {
+                'title': 'Contenido del sitio',
+                'separator': True,
+                'items': [
+                    {'title': 'Ajustes del sitio', 'icon': 'tune',
+                     'link': reverse_lazy('admin:content_sitesettings_changelist')},
                 ],
             },
             {

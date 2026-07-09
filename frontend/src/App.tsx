@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
@@ -23,6 +23,7 @@ const OpenSchoolPage  = lazy(() => import('./pages/public/OpenSchoolPage'));
 const BookVisitPage   = lazy(() => import('./pages/public/BookVisitPage'));
 const ContactPage     = lazy(() => import('./pages/public/ContactPage'));
 const AvisoPrivacidadPage = lazy(() => import('./pages/public/AvisoPrivacidadPage'));
+const NotFoundPage    = lazy(() => import('./pages/public/NotFoundPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
@@ -97,6 +98,8 @@ export default function App() {
               <Route path="/agendar-visita" element={<BookVisitPage />} />
               <Route path="/contacto"      element={<ContactPage />} />
               <Route path="/aviso-de-privacidad" element={<AvisoPrivacidadPage />} />
+              {/* 404 — honest not-found instead of a silent redirect home. */}
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
 
             {/* ── AUTH ────────────────────────────────────── */}
@@ -151,7 +154,6 @@ export default function App() {
               <Route path="alumnos"     element={<AdminStudents />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
         <CookieConsent />
