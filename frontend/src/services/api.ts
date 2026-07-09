@@ -387,6 +387,12 @@ export const portalApi = {
   markAnnouncementsRead: (ids: number[]) =>
     api.post('/portal/announcements/mark-read/', { ids }),
 
+  // Web push opt-in/out (subscription persisted per user+device).
+  subscribePush: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    api.post('/portal/push/subscribe/', sub),
+  unsubscribePush: (endpoint: string) =>
+    api.post('/portal/push/unsubscribe/', { endpoint }),
+
   // Bulk CSV import (admin): dry_run=true simulates and returns per-row results.
   importStudents: (file: File, dryRun: boolean) => {
     const form = new FormData();

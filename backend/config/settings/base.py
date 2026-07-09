@@ -210,6 +210,13 @@ EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@interlaken.edu.mx')
+
+# ── WEB PUSH (VAPID) ──────────────────────────────────────
+# Inert until keys are set. Generate once (see apps/portal/push.py docstring);
+# the public key is also exposed to the SPA as VITE_VAPID_PUBLIC_KEY.
+VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY', default='')
+VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='colegio@interlaken.edu.mx')
 # Where public contact-form messages are delivered (falls back to DEFAULT_FROM_EMAIL).
 CONTACT_EMAIL = env('CONTACT_EMAIL', default='')
 

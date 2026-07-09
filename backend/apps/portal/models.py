@@ -58,6 +58,24 @@ class Notification(models.Model):
         return f'{self.user.email} — {self.title}'
 
 
+class PushSubscription(models.Model):
+    """One browser/device Web-Push subscription for a user (opt-in)."""
+    user       = models.ForeignKey(
+                     settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                     related_name='push_subscriptions')
+    endpoint   = models.URLField(max_length=500, unique=True)
+    p256dh     = models.CharField(max_length=255)
+    auth       = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Suscripción push'
+        verbose_name_plural = 'Suscripciones push'
+
+    def __str__(self):
+        return f'{self.user.email} — {self.endpoint[:40]}…'
+
+
 class AnnouncementRead(models.Model):
     """One row per user per announcement — feeds the staff read-rate KPI."""
     announcement = models.ForeignKey(

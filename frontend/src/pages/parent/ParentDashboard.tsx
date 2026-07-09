@@ -6,6 +6,7 @@ import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
+import { PushOptIn } from '@/components/portal/PushOptIn';
 import type { DashboardData } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -40,6 +41,11 @@ export default function ParentDashboard() {
         subtitle={`Portal Familiar${firstChild ? ` · ${firstChild.name}` : ''}`}
       />
       <div className="px-[clamp(16px,4vw,32px)] py-6">
+        {/* Web-push opt-in (renders only when supported and not yet enabled) */}
+        <div className="mb-5">
+          <PushOptIn />
+        </div>
+
         {/* Low balance alert */}
         {hasLowBalance && (
           <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-pink bg-pink/5 px-4 py-3.5 text-pink-dark sm:flex-row sm:items-center sm:px-[18px]">

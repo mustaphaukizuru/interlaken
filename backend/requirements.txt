@@ -24,6 +24,9 @@ PyJWT==2.8.0
 Pillow==10.3.0
 python-magic==0.4.27
 
+# Web push notifications (VAPID) — inert until VAPID_* env keys are set.
+pywebpush==2.3.0
+
 # HTTP & APIs
 requests==2.31.0
 httpx==0.27.0

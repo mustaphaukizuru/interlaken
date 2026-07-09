@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import views
 from .analytics import StaffAnalyticsView
+from .push import PushSubscribeView, PushUnsubscribeView
 
 urlpatterns = [
     path('dashboard/',                   views.DashboardView.as_view(),             name='dashboard'),
@@ -10,4 +11,6 @@ urlpatterns = [
     path('announcements/mark-read/',     views.AnnouncementMarkReadView.as_view(),   name='announcements-mark-read'),
     path('notifications/',               views.NotificationListView.as_view(),       name='notifications'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(),   name='notification-read'),
+    path('push/subscribe/',              PushSubscribeView.as_view(),                name='push-subscribe'),
+    path('push/unsubscribe/',            PushUnsubscribeView.as_view(),              name='push-unsubscribe'),
 ]

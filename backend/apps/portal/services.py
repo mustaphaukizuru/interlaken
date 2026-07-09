@@ -72,6 +72,10 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     if email and getattr(user, 'email', ''):
         send_email(subject=title, message=message, recipients=[user.email])
 
+    # Web push: fail-soft, inert without VAPID keys or subscriptions.
+    from apps.portal.push import send_web_push
+    send_web_push(user, title, message)
+
     if whatsapp:
         # Prompt 14 wires the WhatsApp Business API. For now, record the intent.
         logger.info(f'WhatsApp notification requested for {user} (not yet enabled): {title}')
