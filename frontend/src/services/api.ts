@@ -409,4 +409,8 @@ export const contentApi = {
   // Public site settings — phone/social/contact data (server-cached 5 min).
   getSettings: () =>
     api.get('/content/settings/'),
+
+  // Costos por sección (editables por el colegio en el admin).
+  getCosts: () =>
+    api.get('/content/costs/'),
 };

@@ -18,6 +18,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const HomePage        = lazy(() => import('./pages/public/HomePage'));
 const AboutPage       = lazy(() => import('./pages/public/AboutPage'));
 const AdmissionsPage  = lazy(() => import('./pages/public/AdmissionsPage'));
+const DocumentacionPage = lazy(() => import('./pages/public/DocumentacionPage'));
+const CostosPage      = lazy(() => import('./pages/public/CostosPage'));
 const PreRegisterPage = lazy(() => import('./pages/public/PreRegisterPage'));
 const RegisterPage    = lazy(() => import('./pages/public/RegisterPage'));
 const OpenSchoolPage  = lazy(() => import('./pages/public/OpenSchoolPage'));
@@ -99,6 +101,8 @@ export default function App() {
               <Route path="/"              element={<HomePage />} />
               <Route path="/nosotros"      element={<AboutPage />} />
               <Route path="/admisiones"    element={<AdmissionsPage />} />
+              <Route path="/admisiones/documentacion" element={<DocumentacionPage />} />
+              <Route path="/admisiones/costos" element={<CostosPage />} />
               <Route path="/pre-registro"  element={<PreRegisterPage />} />
               <Route path="/inscripcion"   element={<RegisterPage />} />
               <Route path="/puertas-abiertas" element={<OpenSchoolPage />} />

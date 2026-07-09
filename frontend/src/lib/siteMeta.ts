@@ -17,6 +17,14 @@ export const SITE_NAME = 'Colegio Interlaken';
 export const FOUNDED_YEAR = 1981;
 export const SCHOOL_YEARS = new Date().getFullYear() - FOUNDED_YEAR;
 
+/**
+ * Ciclo escolar mexicano (agosto–junio). Las admisiones de un año natural
+ * corresponden al ciclo que inicia en agosto de ese año: en 2026 → «2026–2027»,
+ * y rueda solo cada 1° de enero.
+ */
+const _cycleStart = new Date().getFullYear();
+export const CURRENT_CYCLE = `${_cycleStart}–${_cycleStart + 1}`;
+
 export const DEFAULT_TITLE = 'Colegio Interlaken — Educación bilingüe en Tlalnepantla';
 export const DEFAULT_DESCRIPTION =
   `Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con ${SCHOOL_YEARS} años de trayectoria.`;
@@ -71,7 +79,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   '/pre-registro': {
     title: 'Pre-Registro en línea',
     description:
-      'Inicia tu pre-registro en línea para el ciclo escolar 2025–2026 en Colegio Interlaken. Un asesor te contactará en 2 días hábiles.',
+      `Inicia tu pre-registro en línea para el ciclo escolar ${CURRENT_CYCLE} en Colegio Interlaken. Un asesor te contactará en 2 días hábiles.`,
   },
   '/inscripcion': {
     title: 'Inscripción Formal',

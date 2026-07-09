@@ -10,7 +10,7 @@ import {
   MapPin, Heart, Mail, Send,
 } from 'lucide-react';
 import { admissionsApi, contactApi } from '@/services/api';
-import { SCHOOL_YEARS } from '@/lib/siteMeta';
+import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import type { OpenSchoolEvent } from '@/types';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
@@ -186,7 +186,7 @@ export default function HomePage() {
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
             {/* Text */}
             <div>
-              <span className="section-label-pink inline-flex">Ciclo Escolar 2025–2026 · Inscripciones Abiertas</span>
+              <span className="section-label-pink inline-flex">Ciclo Escolar {CURRENT_CYCLE} · Inscripciones Abiertas</span>
               <h1 className="mt-3.5 font-head font-black leading-[1.05] tracking-[-0.03em] text-fluid-5xl">
                 Formando Líderes<br />
                 <span style={{ background: 'linear-gradient(100deg, var(--pink) 0%, var(--purple-mid) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>con Excelencia</span>

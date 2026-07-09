@@ -36,8 +36,8 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
     label: 'Admisiones',
     items: [
       { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
-      { label: 'Documentación', to: '/admisiones#documentacion', icon: FileText },
-      { label: 'Costos', to: '/admisiones#costos', icon: CircleDollarSign },
+      { label: 'Documentación', to: '/admisiones/documentacion', icon: FileText },
+      { label: 'Costos', to: '/admisiones/costos', icon: CircleDollarSign },
       { label: 'Puertas Abiertas', to: '/puertas-abiertas', icon: DoorOpen },
       { label: 'Pre-Registro', to: '/pre-registro', icon: UserPlus },
     ],

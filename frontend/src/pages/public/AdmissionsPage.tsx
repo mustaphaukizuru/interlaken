@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays } from 'lucide-react';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
@@ -38,25 +39,8 @@ const STEPS = [
   },
 ];
 
-/** Documentación para el Examen de Valoración. Donde existe un trámite
- *  oficial en línea se enlaza directo para facilitarlo a las familias. */
-const DOCS: { label: string; href?: string; linkLabel?: string }[] = [
-  { label: 'Acta de nacimiento: 1 original (solo cotejo) y 2 copias actualizadas tamaño carta',
-    href: 'https://www.gob.mx/ActaNacimiento/', linkLabel: 'Obtener acta en línea' },
-  { label: 'CURP del alumno (2 copias, emitida por RENAPO)',
-    href: 'https://www.gob.mx/curp/', linkLabel: 'Consultar CURP' },
-  { label: 'CURP de cada padre o tutor (1 copia, RENAPO)',
-    href: 'https://www.gob.mx/curp/', linkLabel: 'Consultar CURP' },
-  { label: 'INE de cada padre o tutor (1 copia ampliada al 200%)',
-    href: 'https://www.ine.mx/credencial/', linkLabel: 'Trámites INE' },
-  { label: '1 fotografía reciente tamaño infantil del alumno' },
-  { label: 'Comprobante de domicilio vigente (menor a 3 meses, con dirección completa y C.P.)' },
-  { label: 'Boleta SEP del grado anterior (1 copia)' },
-  { label: 'Boletas internas de español e inglés del grado anterior y actual (1 copia c/u)' },
-  { label: 'Certificado de primaria, si ya lo obtuvo (1 copia — ingreso a secundaria)' },
-  { label: 'Carta de buena conducta' },
-  { label: 'Constancia de no adeudo' },
-];
+// Fuente única con /admisiones/documentacion (enlaces oficiales incluidos).
+import { ADMISSION_DOCS as DOCS } from '@/lib/admisionesDocs';
 
 /** Objection-handling FAQ — also emitted as FAQPage structured data below. */
 const FAQS = [
@@ -111,7 +95,7 @@ export default function AdmissionsPage() {
         <Blob tone="green" opacity={0.42} size={480} shape={2} className="hidden sm:block" style={{ top: -160, left: -120 }} />
         <Blob tone="pink" opacity={0.16} size={400} shape={1} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
         <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-[72px]">
-          <span className="section-label-pink inline-flex">Ciclo Escolar 2025–2026 · Inscripciones Abiertas</span>
+          <span className="section-label-pink inline-flex">Ciclo Escolar {CURRENT_CYCLE} · Inscripciones Abiertas</span>
           <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
             Admisiones
           </h1>

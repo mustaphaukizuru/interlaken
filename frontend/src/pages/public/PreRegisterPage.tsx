@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { CheckCircle } from 'lucide-react';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
@@ -85,7 +86,7 @@ export default function PreRegisterPage() {
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
           <span className="section-label-pink inline-flex">Admisiones</span>
           <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Pre-Registro</h1>
-          <p className="text-brand-100 text-fluid-base">Ciclo Escolar 2025–2026</p>
+          <p className="text-brand-100 text-fluid-base">Ciclo Escolar {CURRENT_CYCLE}</p>
         </div>
       </section>
 
