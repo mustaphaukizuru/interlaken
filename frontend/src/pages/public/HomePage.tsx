@@ -214,7 +214,7 @@ export default function HomePage() {
               <img
                 src="/assets/court-wide.webp"
                 alt="Colegio Interlaken"
-                fetchPriority="high"
+                {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
                 decoding="async"
                 width={800}
                 height={600}

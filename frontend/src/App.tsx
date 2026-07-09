@@ -102,7 +102,7 @@ export default function App() {
 
             {/* ── PARENT PORTAL ───────────────────────────── */}
             <Route path="/portal" element={
-              <ProtectedRoute roles={['parent', 'admin']}>
+              <ProtectedRoute roles={['parent', 'staff', 'admin']}>
                 <PortalLayout role="parent" />
               </ProtectedRoute>
             }>
