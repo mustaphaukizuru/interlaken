@@ -180,8 +180,8 @@ export default function CafeteriaPage() {
               value={topupGateway}
               onChange={(e) => setTopupGateway(e.target.value as any)}
             >
-              <option value="global_payments">Global Payments (tarjeta)</option>
-              <option value="banorte">Banorte (tarjeta / SPEI)</option>
+              <option value="global_payments">Global Payments</option>
+              <option value="banorte">Banorte</option>
             </select>
             <p className="mt-1 text-xs text-subtle">
               Será redirigido a la página segura de la pasarela para completar el pago.

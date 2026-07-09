@@ -90,7 +90,7 @@ Parent pays on gateway ──────────────► gateway ser
 - Parent picks a child, amount, and gateway; completes payment on the hosted page; balance reflects the top-up after webhook confirmation.
 - **Failure handling:** declined/failed → `Payment=failed`, `TopUpRequest=failed`, parent notified, **no** Loyverse credit.
 - **Security:** webhook must verify the gateway signature before trusting status (see R3).
-- Methods to support via gateways: **card**, plus Mexico-relevant **SPEI** and **OXXO** where offered (recommended).
+- **Payment methods are fixed by contract: Global Payments and Banorte only.** Whatever each gateway's hosted page natively offers is fine, but the platform integrates no third method (no OXXO, SPEI-standalone, Stripe, PayPal, etc.).
 
 ### F5 — Admin cafeteria console ("…and many more")
 - Roster with every student's **balance**, low-balance flag, last-synced, and Loyverse-linked state.
@@ -145,7 +145,7 @@ Most is reuse. Additions:
 6. **Spending controls** — daily/weekly spend cap per child; optional **allergen/category blocks** (e.g., no sugary drinks) if Loyverse item categories are available.
 7. **CFDI / factura** — issue Mexican tax invoices for top-ups (parents will ask); integrate a PAC/facturación provider.
 8. **Weekly/monthly digest email** — per-child spending summary; opt-in.
-9. **SPEI / OXXO payment methods** — cash-heavy market; offered by both gateways.
+9. ~~SPEI / OXXO payment methods~~ — **descoped 2026-07-09: payment methods are contractually limited to Global Payments and Banorte only.**
 
 **Operational / trust:**
 10. **Reconciliation dashboard + audit log** — every balance change traceable; nightly DB↔Loyverse drift check.
