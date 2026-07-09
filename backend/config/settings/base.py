@@ -317,6 +317,18 @@ if SENTRY_DSN:
         before_send=_scrub_sensitive,
     )
 
+# ── CACHE ─────────────────────────────────────────────────
+# Per-process in-memory cache. Today it backs the 60s micro-cache on the
+# staff analytics endpoint (apps/portal/analytics.py); on cPanel/Passenger
+# each process keeps its own copy, which is acceptable for short-TTL
+# read-only aggregates.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'interlaken-default',
+    }
+}
+
 # ── FILE UPLOAD ───────────────────────────────────────────
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024

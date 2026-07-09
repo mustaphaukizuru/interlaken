@@ -378,4 +378,8 @@ export const portalApi = {
 
   getStudents: (params?: { page?: number }) =>
     api.get('/accounts/students/', { params }),
+
+  // Aggregated staff analytics (staff/admin only; server-cached 60s).
+  getStaffAnalytics: () =>
+    api.get('/portal/analytics/'),
 };
