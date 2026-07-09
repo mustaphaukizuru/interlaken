@@ -72,7 +72,9 @@ class TestEmptySafety:
         assert data['admissions']['referrals'] == []
         assert data['payments']['this_month'] == {'total': 0.0, 'count': 0}
         assert data['payments']['overdue'] == {'count': 0, 'amount': 0.0}
-        # Full 30-day series of zeros.
+        # Full 30-day series of zeros (all three daily series).
+        assert len(data['admissions']['series']) == 30
+        assert len(data['payments']['series']) == 30
         assert len(data['cafeteria']['series']) == 30
         assert all(p['topups'] == 0.0 and p['purchases'] == 0.0
                    for p in data['cafeteria']['series'])
@@ -133,6 +135,8 @@ class TestAggregation:
         today_point = data['cafeteria']['series'][-1]
         assert today_point['topups'] == 200.0
         assert today_point['purchases'] == 45.5
+        assert data['admissions']['series'][-1]['count'] == 2
+        assert data['payments']['series'][-1]['total'] == 1500.0
         assert data['documents']['in_review'] == 1
 
 
@@ -154,7 +158,7 @@ class TestPerformanceAndCache:
                 loyverse_receipt_id=f't-bulk-{i}')
 
         api_client.force_authenticate(staff_user)
-        with django_assert_max_num_queries(12):
+        with django_assert_max_num_queries(14):
             assert api_client.get(URL).status_code == 200
 
     def test_second_call_served_from_cache(self, api_client, staff_user,

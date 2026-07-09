@@ -67,6 +67,15 @@ def build_payload():
         for row in PreRegistration.objects.exclude(referral_source='')
         .values('referral_source').annotate(n=Count('id')).order_by('-n')[:8]
     ]
+    prereg_by_day = dict(
+        PreRegistration.objects.filter(created_at__gte=since_30)
+        .annotate(day=TruncDate('created_at')).values_list('day')
+        .annotate(n=Count('id')))
+    admissions_series = [
+        {'date': (today - timedelta(days=offset)).isoformat(),
+         'count': prereg_by_day.get(today - timedelta(days=offset), 0)}
+        for offset in range(29, -1, -1)
+    ]
 
     # ── Payments: this month vs last + overdue exposure (3 queries) ──
     def month_window(start, end):
@@ -81,6 +90,16 @@ def build_payload():
     payments_prev = month_window(prev_month_start, month_start)
     overdue_row = Invoice.objects.filter(status=Invoice.Status.OVERDUE).aggregate(
         n=Count('id'), amount=Sum(F('amount') - F('amount_paid')))
+    pay_by_day = dict(
+        Payment.objects.filter(status=Payment.Status.SUCCESS,
+                               completed_at__gte=since_30)
+        .annotate(day=TruncDate('completed_at')).values_list('day')
+        .annotate(total=Sum('amount')))
+    payments_series = [
+        {'date': (today - timedelta(days=offset)).isoformat(),
+         'total': float(pay_by_day.get(today - timedelta(days=offset), 0))}
+        for offset in range(29, -1, -1)
+    ]
 
     # ── Cafeteria: top-ups vs consumption, 30-day daily series (1 query) ──
     tx_rows = (
@@ -127,6 +146,7 @@ def build_payload():
             'pre_funnel': _zero_filled(PreRegistration.Status.choices, pre_counts),
             'reg_funnel': _zero_filled(Registration.Status.choices, reg_counts),
             'referrals': referrals,
+            'series': admissions_series,
         },
         'payments': {
             'this_month': payments_this,
@@ -135,6 +155,7 @@ def build_payload():
                 'count': overdue_row['n'] or 0,
                 'amount': float(overdue_row['amount'] or 0),
             },
+            'series': payments_series,
         },
         'cafeteria': {'series': series},
         'documents': {'in_review': docs_in_review},
