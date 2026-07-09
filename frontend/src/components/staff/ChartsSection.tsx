@@ -86,6 +86,60 @@ function FunnelChart({ data }: { data: AnalyticsPayload }) {
   );
 }
 
+// ── 1b. Inscription (registration) funnel ─────────────────
+function RegFunnelChart({ data }: { data: AnalyticsPayload }) {
+  const { theme } = useTheme();
+  const f = data.admissions.reg_funnel;
+  const get = (k: string) => f[k] ?? 0;
+  const total = Object.values(f).reduce((s, n) => s + n, 0);
+  const inReview = get('submitted') + get('reviewing');
+
+  const rows = [
+    { stage: 'Borrador', value: get('draft'), color: theme.semantic.neutral },
+    { stage: 'Enviada', value: get('submitted'), color: theme.semantic.contacted },
+    { stage: 'En revisión', value: get('reviewing'), color: theme.semantic.pending },
+    { stage: 'Aprobada', value: get('approved'), color: theme.semantic.enrolled },
+    { stage: 'Rechazada', value: get('rejected'), color: theme.semantic.rejected },
+    { stage: 'Completa', value: get('complete'), color: theme.semantic.complete },
+  ];
+
+  const takeaway = total === 0
+    ? 'Aún no hay inscripciones formales'
+    : inReview > 0
+      ? `${fmtInt(inReview)} inscripciones esperan revisión del colegio`
+      : 'Ninguna inscripción pendiente de revisión';
+
+  return (
+    <StaffCard title={takeaway} subtitle="Inscripciones formales — expedientes por etapa">
+      {total === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title="Sin inscripciones"
+          description="Cuando un pre-registro avance a inscripción formal, su expediente aparecerá aquí."
+        />
+      ) : (
+        <div className="h-52">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={rows} layout="vertical"
+                      margin={{ top: 4, right: 40, bottom: 0, left: 8 }}>
+              <XAxis type="number" hide domain={[0, 'auto']} />
+              <YAxis type="category" dataKey="stage" width={86} axisLine={false}
+                     tickLine={false}
+                     tick={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
+              <Bar dataKey="value" radius={[0, 6, 6, 0]} isAnimationActive={false} barSize={18}>
+                {rows.map((r) => <Cell key={r.stage} fill={r.color} />)}
+                <LabelList dataKey="value" position="right"
+                           formatter={(v: unknown) => fmtInt(Number(v))}
+                           style={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </StaffCard>
+  );
+}
+
 // ── 2. Referral sources ───────────────────────────────────
 function ReferralsChart({ data }: { data: AnalyticsPayload }) {
   const { theme } = useTheme();
@@ -198,6 +252,7 @@ export default function ChartsSection({ data }: { data: AnalyticsPayload }) {
   return (
     <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
       <FunnelChart data={data} />
+      <RegFunnelChart data={data} />
       <ReferralsChart data={data} />
       <CafeteriaChart data={data} />
     </div>

@@ -64,7 +64,8 @@ class TestEmptySafety:
         data = api_client.get(URL).json()
 
         assert set(data) == {'admissions', 'payments', 'cafeteria', 'documents',
-                             'circulars', 'arco', 'generated_at'}
+                             'circulars', 'arco', 'range_days', 'generated_at'}
+        assert data['range_days'] == 30
         # Funnels are zero-filled with every status key present.
         assert data['admissions']['pre_funnel'] == {
             'pending': 0, 'contacted': 0, 'enrolled': 0, 'rejected': 0}
@@ -173,3 +174,28 @@ class TestPerformanceAndCache:
         before = AuditLog.objects.count()
         assert api_client.get(URL).status_code == 200
         assert AuditLog.objects.count() == before
+
+
+class TestRangeParam:
+    def test_seven_day_window(self, api_client, staff_user):
+        api_client.force_authenticate(staff_user)
+        data = api_client.get(URL, {'days': 7}).json()
+        assert data['range_days'] == 7
+        assert len(data['admissions']['series']) == 7
+        assert len(data['payments']['series']) == 7
+        assert len(data['cafeteria']['series']) == 7
+
+    def test_unknown_values_fall_back_to_30(self, api_client, staff_user):
+        api_client.force_authenticate(staff_user)
+        for bad in ('999', 'abc', '-7'):
+            data = api_client.get(URL, {'days': bad}).json()
+            assert data['range_days'] == 30
+
+    def test_ranges_are_cached_independently(self, api_client, staff_user,
+                                             django_assert_num_queries):
+        api_client.force_authenticate(staff_user)
+        assert api_client.get(URL, {'days': 7}).status_code == 200
+        assert api_client.get(URL, {'days': 90}).status_code == 200
+        with django_assert_num_queries(0):
+            assert api_client.get(URL, {'days': 7}).json()['range_days'] == 7
+            assert api_client.get(URL, {'days': 90}).json()['range_days'] == 90

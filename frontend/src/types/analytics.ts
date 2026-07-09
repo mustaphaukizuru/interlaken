@@ -21,5 +21,9 @@ export interface AnalyticsPayload {
   documents: { in_review: number };
   circulars: { active: number; read_rate: number | null };
   arco: { open: number; overdue: number };
+  /** Trend window actually served (7 | 30 | 90). */
+  range_days: number;
   generated_at: string;
 }
+
+export type AnalyticsRange = 7 | 30 | 90;

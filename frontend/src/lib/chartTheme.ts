@@ -22,6 +22,10 @@ export interface ChartTheme {
     inflow: string;
     outflow: string;
     primary: string;
+    /** Not-yet-in-play states (e.g. draft registrations). */
+    neutral: string;
+    /** Terminal success (e.g. inscripción completa). */
+    complete: string;
   };
   grid: string;
   axis: string;
@@ -49,6 +53,8 @@ export function getChartTheme(dark: boolean): ChartTheme {
       inflow: cssVar('--green'),
       outflow: cssVar('--coral'),
       primary: cssVar('--purple'),
+      neutral: cssVar('--text-light'),
+      complete: cssVar('--green-dark'),
     },
     grid: dark ? 'color-mix(in srgb, white 12%, transparent)' : cssVar('--border'),
     axis: dark ? 'color-mix(in srgb, white 45%, transparent)' : cssVar('--text-light'),

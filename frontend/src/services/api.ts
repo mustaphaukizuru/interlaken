@@ -379,9 +379,9 @@ export const portalApi = {
   getStudents: (params?: { page?: number; search?: string }) =>
     api.get('/accounts/students/', { params }),
 
-  // Aggregated staff analytics (staff/admin only; server-cached 60s).
-  getStaffAnalytics: () =>
-    api.get('/portal/analytics/'),
+  // Aggregated staff analytics (staff/admin only; server-cached 60s per range).
+  getStaffAnalytics: (days?: number) =>
+    api.get('/portal/analytics/', { params: days ? { days } : undefined }),
 
   // Idempotent read receipts — feeds the circulars read-rate KPI.
   markAnnouncementsRead: (ids: number[]) =>

@@ -82,8 +82,10 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
   const theme = getChartTheme(dark);
 
   const admissionsSeries = data.admissions.series;
-  const last15 = admissionsSeries.slice(15).reduce((s, p) => s + p.count, 0);
-  const prev15 = admissionsSeries.slice(0, 15).reduce((s, p) => s + p.count, 0);
+  // Momentum: second half of the selected window vs the first half.
+  const half = Math.floor(admissionsSeries.length / 2);
+  const lastHalf = admissionsSeries.slice(half).reduce((s, p) => s + p.count, 0);
+  const prevHalf = admissionsSeries.slice(0, half).reduce((s, p) => s + p.count, 0);
 
   const cards: KpiCardDef[] = [
     {
@@ -104,8 +106,8 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
       icon: UserPlus,
       title: 'Pre-registros pendientes',
       value: fmtInt(data.admissions.pre_funnel.pending),
-      deltaPct: pctChange(last15, prev15),
-      deltaLabel: 'nuevos vs 15 días previos',
+      deltaPct: pctChange(lastHalf, prevHalf),
+      deltaLabel: `nuevos vs ${half} días previos`,
       spark: {
         points: admissionsSeries.map((p) => ({ x: p.date, y: p.count })),
         color: theme.semantic.contacted,

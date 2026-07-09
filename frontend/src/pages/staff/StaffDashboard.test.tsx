@@ -36,6 +36,7 @@ function emptyPayload(): AnalyticsPayload {
     documents: { in_review: 0 },
     circulars: { active: 0, read_rate: null },
     arco: { open: 0, overdue: 0 },
+    range_days: 30,
     generated_at: '2026-07-08T00:00:00Z',
   };
 }

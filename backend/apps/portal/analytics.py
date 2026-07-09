@@ -22,8 +22,10 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 
-CACHE_KEY = 'staff-analytics-v1'
+CACHE_KEY_PREFIX = 'staff-analytics-v2'
 CACHE_TTL_SECONDS = 60
+# Whitelisted trend windows for ?days= (default 30).
+ALLOWED_RANGE_DAYS = (7, 30, 90)
 
 
 class IsStaffOrAdmin(permissions.BasePermission):
@@ -42,7 +44,7 @@ def _zero_filled(choices, counted):
     return {value: counted.get(value, 0) for value, _label in choices}
 
 
-def build_payload():
+def build_payload(days=30):
     from apps.admissions.models import (PreRegistration, Registration,
                                         RegistrationDocument)
     from apps.cafeteria.models import CafeteriaTransaction
@@ -55,7 +57,7 @@ def build_payload():
     today = timezone.localdate()
     month_start = today.replace(day=1)
     prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
-    since_30 = now - timedelta(days=30)
+    since = now - timedelta(days=days)
 
     # ── Admissions funnel + referral breakdown (3 queries) ──
     pre_counts = dict(
@@ -68,13 +70,13 @@ def build_payload():
         .values('referral_source').annotate(n=Count('id')).order_by('-n')[:8]
     ]
     prereg_by_day = dict(
-        PreRegistration.objects.filter(created_at__gte=since_30)
+        PreRegistration.objects.filter(created_at__gte=since)
         .annotate(day=TruncDate('created_at')).values_list('day')
         .annotate(n=Count('id')))
     admissions_series = [
         {'date': (today - timedelta(days=offset)).isoformat(),
          'count': prereg_by_day.get(today - timedelta(days=offset), 0)}
-        for offset in range(29, -1, -1)
+        for offset in range(days - 1, -1, -1)
     ]
 
     # ── Payments: this month vs last + overdue exposure (3 queries) ──
@@ -92,19 +94,19 @@ def build_payload():
         n=Count('id'), amount=Sum(F('amount') - F('amount_paid')))
     pay_by_day = dict(
         Payment.objects.filter(status=Payment.Status.SUCCESS,
-                               completed_at__gte=since_30)
+                               completed_at__gte=since)
         .annotate(day=TruncDate('completed_at')).values_list('day')
         .annotate(total=Sum('amount')))
     payments_series = [
         {'date': (today - timedelta(days=offset)).isoformat(),
          'total': float(pay_by_day.get(today - timedelta(days=offset), 0))}
-        for offset in range(29, -1, -1)
+        for offset in range(days - 1, -1, -1)
     ]
 
     # ── Cafeteria: top-ups vs consumption, 30-day daily series (1 query) ──
     tx_rows = (
         CafeteriaTransaction.objects
-        .filter(date__gte=since_30, transaction_type__in=[
+        .filter(date__gte=since, transaction_type__in=[
             CafeteriaTransaction.TxType.TOPUP,
             CafeteriaTransaction.TxType.PURCHASE,
         ])
@@ -120,7 +122,7 @@ def build_payload():
                == CafeteriaTransaction.TxType.TOPUP else 'purchases')
         bucket[key] += row['total'] or 0
     series = []
-    for offset in range(29, -1, -1):
+    for offset in range(days - 1, -1, -1):
         day = today - timedelta(days=offset)
         bucket = by_day.get(day, {})
         series.append({
@@ -177,17 +179,26 @@ def build_payload():
         'documents': {'in_review': docs_in_review},
         'circulars': {'active': active_circulars, 'read_rate': read_rate},
         'arco': {'open': arco_row['n'] or 0, 'overdue': arco_row['overdue'] or 0},
+        'range_days': days,
         'generated_at': now.isoformat(),
     }
 
 
 class StaffAnalyticsView(APIView):
-    """GET /api/v1/portal/analytics/ — aggregated dashboard payload."""
+    """GET /api/v1/portal/analytics/?days=7|30|90 — aggregated dashboard payload."""
     permission_classes = [IsStaffOrAdmin]
 
     def get(self, request):
-        payload = cache.get(CACHE_KEY)
+        try:
+            days = int(request.query_params.get('days', 30))
+        except (TypeError, ValueError):
+            days = 30
+        if days not in ALLOWED_RANGE_DAYS:
+            days = 30
+
+        cache_key = f'{CACHE_KEY_PREFIX}:{days}'
+        payload = cache.get(cache_key)
         if payload is None:
-            payload = build_payload()
-            cache.set(CACHE_KEY, payload, CACHE_TTL_SECONDS)
+            payload = build_payload(days)
+            cache.set(cache_key, payload, CACHE_TTL_SECONDS)
         return Response(payload)
