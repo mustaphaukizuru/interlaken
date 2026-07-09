@@ -48,8 +48,9 @@ python manage.py runserver 0.0.0.0:8000
 - Django admin: http://localhost:8000/admin/
 - API root: http://localhost:8000/api/v1/
 
-On Windows `cmd`, use `set VAR=value` instead of `export`. Helper scripts
-`start_backend.bat` and `start_frontend.bat` at the repo root do this for you.
+On Windows `cmd`, use `set VAR=value` instead of `export`. Helper scripts in
+[`scripts/`](scripts/) do this for you: `scripts\start_backend.bat` and
+`scripts\start_frontend.bat`, or `scripts\start_dev.ps1` to launch both at once.
 
 ### 3. Frontend (Vite)
 
@@ -81,18 +82,15 @@ pre-commit install                   # runs ruff + black + eslint on changed fil
 pre-commit run --all-files           # run against the whole tree once
 ```
 
-## Planning docs
+## Documentation
 
-High-level specs and status live at the repo root:
+Specs, status and ops notes live in [`docs/`](docs/):
 
-- `STATUS_REPORT.md` — current state, known issues, remediation order
-- `ROADMAP.md` — feature roadmap
-- `DEPLOYMENT.md` — cPanel/Passenger go-live notes
-- `UI_UX_ENHANCEMENT_PLAN.md` — design plan
-- `BRAND_LOGO_GUIDE.md` — brand & logo usage
-- `CAFETERIA_WALLET_SPEC.md`, `BOOKING_CALENDAR_SPEC.md` — feature specs
-
-## Implementation prompts
-
-Step-by-step implementation prompts (run in order, one per session) live in
-[`prompts/`](prompts/) — see [`prompts/README.md`](prompts/README.md) for the ordered index.
+- [`docs/STATUS_REPORT.md`](docs/STATUS_REPORT.md) — known issues, remediation order
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — feature roadmap
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — cPanel/Passenger go-live notes
+- [`docs/AUTH.md`](docs/AUTH.md) — auth/session model (httpOnly refresh + CSRF)
+- [`docs/DESIGN.md`](docs/DESIGN.md) — design system & tokens
+- [`docs/BRAND_LOGO_GUIDE.md`](docs/BRAND_LOGO_GUIDE.md) — brand & logo usage
+- [`docs/SECURITY-DECISIONS.md`](docs/SECURITY-DECISIONS.md) — security decision log
+- [`docs/CAFETERIA_WALLET_SPEC.md`](docs/CAFETERIA_WALLET_SPEC.md), [`docs/BOOKING_CALENDAR_SPEC.md`](docs/BOOKING_CALENDAR_SPEC.md) — feature specs

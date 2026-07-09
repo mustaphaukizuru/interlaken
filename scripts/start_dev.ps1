@@ -1,8 +1,8 @@
 <#
   Launch backend (Django, SQLite dev) + frontend (Vite) in two PowerShell windows.
-  Usage:  .\start_dev.ps1
+  Usage:  .\scripts\start_dev.ps1   (works from any directory)
 #>
-$root = $PSScriptRoot
+$root = Split-Path -Parent $PSScriptRoot
 
 # Backend — Django dev server on :8000 (SQLite)
 Start-Process powershell -ArgumentList @(

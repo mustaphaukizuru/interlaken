@@ -1,6 +1,6 @@
 # Colegio Interlaken — Cafeteria Wallet & Notifications Spec
 
-**Generated:** 2026-07-07 · Companion to [STATUS_REPORT.md](STATUS_REPORT.md) & [UI_UX_ENHANCEMENT_PLAN.md](UI_UX_ENHANCEMENT_PLAN.md)
+**Generated:** 2026-07-07 · Companion to [STATUS_REPORT.md](STATUS_REPORT.md) & [DESIGN.md](DESIGN.md)
 
 **Goal:** A prepaid cafeteria "wallet" for each student, powered by **Loyverse**, where:
 - a **parent** is **notified (in-app + email/WhatsApp)** the moment their child buys something,

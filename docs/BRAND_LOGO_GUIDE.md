@@ -1,6 +1,6 @@
 # Colegio Interlaken — Brand & Logo Usage Guide
 
-**Generated:** 2026-07-07 · Companion to [UI_UX_ENHANCEMENT_PLAN.md](UI_UX_ENHANCEMENT_PLAN.md)
+**Generated:** 2026-07-07 · Companion to [DESIGN.md](DESIGN.md)
 Purpose: use the **official Interlaken logos professionally** and consistently across the app.
 
 ---

@@ -8,7 +8,7 @@ This ties together all planning docs and adds everything else worth doing, prior
 |---|---|
 | [STATUS_REPORT.md](STATUS_REPORT.md) | Current state, confirmed bugs (login broken), security holes, hygiene |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | GoDaddy cPanel/Passenger, MySQL, cron, SSL, Google OAuth prod, go-live checklist |
-| [UI_UX_ENHANCEMENT_PLAN.md](UI_UX_ENHANCEMENT_PLAN.md) | Modern layout patterns, component system, motion, a11y |
+| [DESIGN.md](DESIGN.md) | Design system: tokens, component patterns, motion, a11y |
 | [BRAND_LOGO_GUIDE.md](BRAND_LOGO_GUIDE.md) | Official logo usage, favicon/PWA, palette reconciliation |
 | [CAFETERIA_WALLET_SPEC.md](CAFETERIA_WALLET_SPEC.md) | Loyverse wallet: purchase alerts, balance/history, top-ups |
 | [BOOKING_CALENDAR_SPEC.md](BOOKING_CALENDAR_SPEC.md) | Visit booking, Google Calendar, WhatsApp |
