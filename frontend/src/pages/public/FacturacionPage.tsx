@@ -22,8 +22,10 @@ export default function FacturacionPage() {
         description="Solicite la factura (CFDI) de colegiaturas, inscripciones y cafetería del Colegio Interlaken: datos requeridos y proceso de solicitud."
       />
 
-      <section className="bg-dark text-white">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+      <section className="relative overflow-hidden bg-dark text-white">
+        <img src="/assets/court-wide.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
+        <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
           <span className="section-label-green inline-flex">Comunidad</span>
           <h1 className="mt-3 font-head text-fluid-3xl font-black tracking-[-0.02em]">
             Facturación

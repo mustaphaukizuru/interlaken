@@ -4,6 +4,7 @@ import {
   Sparkles, ArrowRight, type LucideIcon,
 } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
+import { SCHOOL_YEARS } from '@/lib/siteMeta';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
 
@@ -23,7 +24,6 @@ const LEVELS = [
   { level: 'Preescolar',   grades: '1°–3°', age: '3–6 años',   color: 'bg-green-50 border-green-200 text-green-700' },
   { level: 'Primaria',     grades: '1°–6°', age: '6–12 años',  color: 'bg-brand-50 border-brand-200 text-brand-700' },
   { level: 'Secundaria',   grades: '1°–3°', age: '12–15 años', color: 'bg-coral-50 border-coral-200 text-coral-700' },
-  { level: 'Preparatoria', grades: '1°–3°', age: '15–18 años', color: 'bg-purple-light border-purple/30 text-purple-dark' },
 ];
 
 /**
@@ -50,7 +50,7 @@ export default function AboutPage() {
         <div className="relative mx-auto max-w-[1120px] px-6 py-14 sm:py-16 lg:py-[72px]">
           <span className="section-label-pink inline-flex">Nuestra Historia</span>
           <h1 className="mt-3 font-head font-black text-fluid-4xl leading-[1.08] tracking-[-0.04em]">
-            40 años formando<br />líderes en Tlalnepantla
+            {SCHOOL_YEARS} años formando<br />líderes en Tlalnepantla
           </h1>
           <p className="mt-4 max-w-xl text-fluid-base leading-relaxed text-white/60 sm:mt-[18px]">
             Colegio Interlaken es una institución educativa privada con más de cuatro décadas

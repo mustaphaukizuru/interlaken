@@ -84,10 +84,38 @@ export default function OpenSchoolPage() {
           <script type="application/ld+json">{JSON.stringify(eventsJsonLd)}</script>
         </Helmet>
       )}
-      <section className="bg-gradient-to-r from-brand-700 to-brand-600 py-12 text-white sm:py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h1 className="mb-2 font-head text-fluid-4xl font-bold">Puertas Abiertas</h1>
-          <p className="text-brand-100">Conozca nuestras instalaciones y equipo docente</p>
+      <section className="relative overflow-hidden bg-dark py-14 text-white sm:py-20">
+        <img
+          src="/assets/classroom.webp"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-30"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+          <span className="section-label-pink inline-flex">Clase Abierta</span>
+          <h1 className="mt-3 mb-2 font-head text-fluid-4xl font-bold">Puertas Abiertas</h1>
+          <p className="max-w-2xl text-fluid-base text-white/75">
+            Viva una <strong className="text-white">clase abierta</strong>: usted y su
+            hijo/a participan en una clase real, conocen a nuestros docentes en acción
+            y recorren las instalaciones del colegio.
+          </p>
+        </div>
+      </section>
+
+      {/* Qué incluye la clase abierta */}
+      <section className="border-b border-line bg-cream-2">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 px-4 py-5 text-sm text-ink sm:grid-cols-3 sm:px-6">
+          {[
+            'Su hijo/a vive una clase real con nuestro modelo bilingüe',
+            'Conozca a los docentes y el método en acción',
+            'Recorrido guiado por aulas e instalaciones',
+          ].map((t) => (
+            <div key={t} className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-dark" aria-hidden="true" />
+              <span>{t}</span>
+            </div>
+          ))}
         </div>
       </section>
 

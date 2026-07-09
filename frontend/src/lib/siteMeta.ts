@@ -9,9 +9,17 @@
 /** Absolute origin used for canonical URLs, OG tags and the sitemap. */
 export const SITE_URL = 'https://interlaken.edu.mx';
 export const SITE_NAME = 'Colegio Interlaken';
+
+/**
+ * Fundado en 1981 → "45 años" en 2026, y se actualiza solo cada año.
+ * Usar SIEMPRE `SCHOOL_YEARS` en el copy — nunca un número fijo.
+ */
+export const FOUNDED_YEAR = 1981;
+export const SCHOOL_YEARS = new Date().getFullYear() - FOUNDED_YEAR;
+
 export const DEFAULT_TITLE = 'Colegio Interlaken — Educación bilingüe en Tlalnepantla';
 export const DEFAULT_DESCRIPTION =
-  'Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con 40 años de trayectoria.';
+  `Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con ${SCHOOL_YEARS} años de trayectoria.`;
 export const OG_IMAGE = `${SITE_URL}/og-image.png`;
 export const LOCALE = 'es_MX';
 
@@ -53,7 +61,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   '/nosotros': {
     title: 'Nosotros',
     description:
-      'Conoce el modelo educativo bilingüe de Colegio Interlaken: 40 años formando líderes íntegros en Tlalnepantla con rigor académico y valores.',
+      `Conoce el modelo educativo bilingüe de Colegio Interlaken: ${SCHOOL_YEARS} años formando líderes íntegros en Tlalnepantla con rigor académico y valores.`,
   },
   '/admisiones': {
     title: 'Admisiones',

@@ -8,17 +8,24 @@ describe('siteContact helpers (CMS Phase 1)', () => {
     );
   });
 
-  it('socialEntries hides unset networks (placeholders never render)', () => {
-    expect(socialEntries(SITE_DEFAULTS)).toEqual([]);
-    const entries = socialEntries({
-      ...SITE_DEFAULTS,
-      facebook_url: 'https://www.facebook.com/colegiointerlaken',
-      youtube_url: '   ',
-    });
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({
+  it('socialEntries: Facebook default (cliente) renders; unset networks never do', () => {
+    // El cliente confirmó que la única red es Facebook — viaja como default.
+    const defaults = socialEntries(SITE_DEFAULTS);
+    expect(defaults).toHaveLength(1);
+    expect(defaults[0]).toMatchObject({
       key: 'facebook',
       href: 'https://www.facebook.com/colegiointerlaken',
     });
+
+    // Redes sin URL (o solo espacios) jamás se renderizan.
+    const entries = socialEntries({
+      ...SITE_DEFAULTS,
+      youtube_url: '   ',
+      instagram_url: '',
+    });
+    expect(entries.map((e) => e.key)).toEqual(['facebook']);
+
+    // Y si se borra el default, tampoco se muestra nada.
+    expect(socialEntries({ ...SITE_DEFAULTS, facebook_url: '' })).toEqual([]);
   });
 });

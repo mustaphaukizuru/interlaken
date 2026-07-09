@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -91,12 +92,42 @@ export default function BookVisitPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-r from-brand-700 to-brand-600 text-white py-10 sm:py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h1 className="text-fluid-4xl font-bold mb-2">Agendar Visita</h1>
-          <p className="text-brand-100 text-fluid-base">
-            Reserve un recorrido personalizado por nuestras instalaciones.
+      <section className="relative overflow-hidden bg-dark text-white py-12 sm:py-20">
+        <img
+          src="/assets/facade.webp"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-30"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <span className="section-label-pink inline-flex">Visita Individual</span>
+          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Agendar Visita</h1>
+          <p className="max-w-2xl text-brand-100 text-fluid-base">
+            Un recorrido personalizado para su familia: complete su pre-registro,
+            elija la fecha que le convenga y confirme su cita.
           </p>
+        </div>
+      </section>
+
+      {/* Cómo funciona: pre-registro → fecha → confirmación */}
+      <section className="border-b border-line bg-cream-2">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 gap-3 px-4 py-5 text-sm sm:grid-cols-3 sm:px-6">
+          {[
+            ['1', 'Complete su pre-registro con los datos de su hijo/a'],
+            ['2', 'Elija fecha y horario disponibles aquí mismo'],
+            ['3', 'Reciba la confirmación de su visita por correo'],
+          ].map(([n, t]) => (
+            <div key={n} className="flex items-start gap-2.5 text-ink">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green text-xs font-bold text-white">{n}</span>
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+        <div className="max-w-6xl mx-auto px-4 pb-5 sm:px-6">
+          <Link to="/pre-registro" className="text-sm font-semibold text-green-dark hover:underline">
+            ¿Aún no se pre-registra? Inicie su pre-registro aquí →
+          </Link>
         </div>
       </section>
 

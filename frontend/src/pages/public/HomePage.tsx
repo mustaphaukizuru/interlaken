@@ -10,6 +10,7 @@ import {
   MapPin, Heart, Mail, Send,
 } from 'lucide-react';
 import { admissionsApi, contactApi } from '@/services/api';
+import { SCHOOL_YEARS } from '@/lib/siteMeta';
 import type { OpenSchoolEvent } from '@/types';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
@@ -18,11 +19,11 @@ import { Reveal } from '@/components/ui/Reveal';
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
   { value: '80+', label: 'Maestros', color: 'var(--green)', icon: GraduationCap },
-  { value: '40', label: 'Años', color: 'var(--purple-mid)', icon: CalendarDays },
+  { value: String(SCHOOL_YEARS), label: 'Años', color: 'var(--purple-mid)', icon: CalendarDays },
   { value: '95%', label: 'Aprovechamiento', color: 'var(--green-mid)', icon: TrendingUp },
 ];
 
-const TRUST_BADGES = ['Bilingüe', '40 años', 'Certificación SEP', 'Grupos reducidos'];
+const TRUST_BADGES = ['Bilingüe', `${SCHOOL_YEARS} años`, 'Certificación SEP', 'Grupos reducidos'];
 
 const LEVELS = [
   { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: 'var(--green)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
@@ -78,8 +79,8 @@ const STRENGTHS = [
   {
     icon: Heart,
     color: 'var(--pink)',
-    title: '40 años de trayectoria',
-    body: 'Cuatro décadas formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.',
+    title: `${SCHOOL_YEARS} años de trayectoria`,
+    body: `${SCHOOL_YEARS} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.`,
   },
 ];
 
@@ -261,7 +262,7 @@ export default function HomePage() {
           <Reveal direction="right">
             <span className="section-label-purple inline-flex">Nuestra Comunidad</span>
             <h2 className="font-head font-extrabold text-fluid-4xl leading-tight tracking-[-0.03em] text-ink">
-              40 años formando familias en Tlalnepantla
+              {SCHOOL_YEARS} años formando familias en Tlalnepantla
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted">
               En Colegio Interlaken combinamos rigor académico, educación bilingüe y un ambiente cálido y seguro. Nuestros egresados destacan por su liderazgo, sus valores y su compromiso con la comunidad.

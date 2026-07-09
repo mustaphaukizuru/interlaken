@@ -3,17 +3,20 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
   Facebook, Instagram, Youtube,
+  School, GraduationCap, ClipboardList, Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { socialEntries, waHref } from '@/lib/siteContact';
+import { socialEntries } from '@/lib/siteContact';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs. */
-const MENU = [
+const MENU: { label: string; icon: LucideIcon; items: { label: string; to: string }[] }[] = [
   {
     label: 'El Colegio',
+    icon: School,
     items: [
       { label: 'Quiénes Somos', to: '/nosotros' },
       { label: 'Modelo Educativo', to: '/modelo-educativo' },
@@ -22,6 +25,7 @@ const MENU = [
   },
   {
     label: 'Niveles Educativos',
+    icon: GraduationCap,
     items: [
       { label: 'Preescolar', to: '/niveles/preescolar' },
       { label: 'Primaria', to: '/niveles/primaria' },
@@ -30,6 +34,7 @@ const MENU = [
   },
   {
     label: 'Admisiones',
+    icon: ClipboardList,
     items: [
       { label: 'Proceso de Inscripción', to: '/admisiones' },
       { label: 'Documentación', to: '/admisiones#documentacion' },
@@ -40,6 +45,7 @@ const MENU = [
   },
   {
     label: 'Comunidad',
+    icon: Users,
     items: [
       { label: 'Plataformas', to: '/comunidad/plataformas' },
       { label: 'Facturación', to: '/comunidad/facturacion' },
@@ -60,7 +66,7 @@ const SOCIAL_ICONS = {
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
-function NavDropdown({ label, items }: { label: string; items: { label: string; to: string }[] }) {
+function NavDropdown({ label, icon: Icon, items }: { label: string; icon: LucideIcon; items: { label: string; to: string }[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -97,10 +103,11 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+        className="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
       >
+        <Icon className="w-4 h-4 text-green-dark" aria-hidden="true" />
         {label}
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -152,18 +159,41 @@ export function PublicLayout() {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      {/* Top bar */}
-      <div className="hidden md:flex bg-brand-800 text-white text-xs px-6 py-1.5 justify-end gap-6">
-        {settings.phone_display && (
-          <a href={`tel:${settings.phone_e164}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
-            <Phone className="w-3 h-3" /> {settings.phone_display}
-          </a>
-        )}
-        {settings.contact_email && (
-          <a href={`mailto:${settings.contact_email}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
-            <Mail className="w-3 h-3" /> {settings.contact_email}
-          </a>
-        )}
+      {/* Preheader — solo escritorio/tablet. Mismo contenedor que la barra de
+          navegación: las redes quedan alineadas al borde del logo y el correo
+          termina al ras del botón «Portal». */}
+      <div className="hidden md:block bg-brand-800 text-white text-xs">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-1.5 sm:px-6">
+          <div className="flex items-center gap-2">
+            {socials.map(({ key, label, href }) => {
+              const Icon = SOCIAL_ICONS[key];
+              return (
+                <a
+                  key={key}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors hover:bg-white/25 hover:text-white"
+                >
+                  <Icon className="h-3 w-3" aria-hidden="true" />
+                </a>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-6">
+            {settings.phone_display && (
+              <a href={`tel:${settings.phone_e164}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
+                <Phone className="w-3 h-3" aria-hidden="true" /> {settings.phone_display}
+              </a>
+            )}
+            {settings.contact_email && (
+              <a href={`mailto:${settings.contact_email}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
+                <Mail className="w-3 h-3" aria-hidden="true" /> {settings.contact_email}
+              </a>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main nav */}
@@ -178,7 +208,7 @@ export function PublicLayout() {
           {/* Desktop nav — menú confirmado por el cliente */}
           <nav className="hidden lg:flex items-center gap-5">
             {MENU.map((group) => (
-              <NavDropdown key={group.label} label={group.label} items={group.items} />
+              <NavDropdown key={group.label} label={group.label} icon={group.icon} items={group.items} />
             ))}
             <NavLink
               to="/contacto"
@@ -224,7 +254,10 @@ export function PublicLayout() {
                   onClick={() => setOpenGroup((g) => (g === group.label ? null : group.label))}
                   className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  {group.label}
+                  <span className="flex items-center gap-2.5">
+                    <group.icon className="w-4 h-4 text-green-dark" aria-hidden="true" />
+                    {group.label}
+                  </span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${openGroup === group.label ? 'rotate-180' : ''}`} />
                 </button>
                 {openGroup === group.label && (
@@ -346,24 +379,19 @@ export function PublicLayout() {
                   <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
                 </li>
               )}
-              {settings.address && (
-                <li className="flex items-start gap-2">
-                  <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <span>{settings.address}</span>
-                </li>
-              )}
+              <li className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <a
+                  href={settings.maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={settings.address}
+                  className="hover:text-white transition-colors"
+                >
+                  Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                </a>
+              </li>
             </ul>
-            {settings.whatsapp_number && (
-            <a
-              href={waHref(settings.whatsapp_number, 'Hola, me gustaría obtener más información')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-4 text-xs bg-green-600 text-white px-3 py-1.5 rounded-full hover:bg-green-700 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              WhatsApp
-            </a>
-            )}
           </div>
         </div>
         <div className="border-t border-white/10">

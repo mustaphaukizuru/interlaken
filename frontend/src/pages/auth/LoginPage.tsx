@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
+import { SCHOOL_YEARS } from '@/lib/siteMeta';
 import toast from 'react-hot-toast';
 
 const ROLE_PATHS: Record<string, string> = {
@@ -94,7 +95,9 @@ export default function LoginPage() {
           <div className="absolute -bottom-[100px] -right-[80px] h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(71,160,40,0.22),rgba(8,5,22,0)_68%)]" />
 
           <div className="relative">
-            <Logo variant="stacked" size={120} theme="dark" eager />
+            <Link to="/" aria-label="Colegio Interlaken — Inicio">
+              <Logo variant="stacked" size={120} theme="dark" eager />
+            </Link>
           </div>
           <div className="relative">
             <div className="section-label-pink inline-flex">Portal Escolar</div>
@@ -107,7 +110,7 @@ export default function LoginPage() {
             </p>
           </div>
           <div className="relative flex gap-7">
-            {[['40', 'Años'], ['1,200+', 'Alumnos'], ['95%', 'Aprovechamiento']].map(([n, l]) => (
+            {[[String(SCHOOL_YEARS), 'Años'], ['1,200+', 'Alumnos'], ['95%', 'Aprovechamiento']].map(([n, l]) => (
               <div key={l}>
                 <div className="font-head text-2xl font-extrabold text-white">{n}</div>
                 <div className="text-xs text-white/50">{l}</div>
@@ -121,7 +124,9 @@ export default function LoginPage() {
           <div className="w-full max-w-[400px]">
             {/* Mobile logo */}
             <div className="mb-7 flex justify-center lg:hidden">
-              <Logo variant="stacked" size={96} theme="light" eager />
+              <Link to="/" aria-label="Colegio Interlaken — Inicio">
+                <Logo variant="stacked" size={96} theme="light" eager />
+              </Link>
             </div>
 
             <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">

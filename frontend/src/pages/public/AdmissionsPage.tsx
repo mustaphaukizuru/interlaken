@@ -96,6 +96,8 @@ export default function AdmissionsPage() {
       </Helmet>
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-dark text-white">
+        <img src="/assets/primaria-gate.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <Blob tone="green" opacity={0.42} size={480} shape={2} className="hidden sm:block" style={{ top: -160, left: -120 }} />
         <Blob tone="pink" opacity={0.16} size={400} shape={1} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
         <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-[72px]">
