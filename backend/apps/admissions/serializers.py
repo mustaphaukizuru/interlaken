@@ -15,6 +15,22 @@ class PreRegistrationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+class PreRegistrationAdminSerializer(serializers.ModelSerializer):
+    """Read-only list shape for the admin Admisiones console."""
+    child_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PreRegistration
+        fields = [
+            'id', 'child_name', 'level', 'grade_applying',
+            'parent_name', 'parent_email', 'parent_phone',
+            'status', 'created_at',
+        ]
+
+    def get_child_name(self, obj):
+        return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+
+
 class RegistrationDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegistrationDocument

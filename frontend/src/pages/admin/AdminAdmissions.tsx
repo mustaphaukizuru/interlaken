@@ -15,10 +15,11 @@ import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 interface PreReg {
   id: number;
   child_name: string;
+  level: string;
   grade_applying: string;
   parent_name: string;
-  email: string;
-  phone: string;
+  parent_email: string;
+  parent_phone: string;
   status: string;
   created_at: string;
 }
@@ -47,7 +48,7 @@ export default function AdminAdmissions() {
     !search ||
     p.child_name.toLowerCase().includes(search.toLowerCase()) ||
     p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
+    p.parent_email.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -102,11 +103,11 @@ export default function AdminAdmissions() {
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="text-muted">Correo</dt>
-                        <dd className="text-ink text-right break-all">{p.email}</dd>
+                        <dd className="text-ink text-right break-all">{p.parent_email}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="text-muted">Teléfono</dt>
-                        <dd className="text-ink text-right">{p.phone}</dd>
+                        <dd className="text-ink text-right">{p.parent_phone}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="text-muted">Fecha</dt>
@@ -140,8 +141,8 @@ export default function AdminAdmissions() {
                         <td className="text-muted">{p.grade_applying}</td>
                         <td className="text-muted">{p.parent_name}</td>
                         <td>
-                          <div className="text-muted">{p.email}</div>
-                          <div className="text-subtle text-xs">{p.phone}</div>
+                          <div className="text-muted">{p.parent_email}</div>
+                          <div className="text-subtle text-xs">{p.parent_phone}</div>
                         </td>
                         <td className="text-subtle whitespace-nowrap">
                           {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}

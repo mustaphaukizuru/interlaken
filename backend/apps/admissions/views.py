@@ -11,17 +11,26 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.models import User
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
 
-from .models import Registration, RegistrationDocument
+from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
+    PreRegistrationAdminSerializer,
     PreRegistrationSerializer,
     RegistrationDocumentSerializer,
     RegistrationSerializer,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
+
+
+class IsAdmin(permissions.BasePermission):
+    """Authenticated admin users only (matches bookings/cafeteria convention)."""
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 def _is_staff(request):
@@ -56,10 +65,20 @@ def authorize_registration(request, pk):
     return reg
 
 
-class PreRegistrationCreateView(generics.CreateAPIView):
-    """POST /api/v1/admissions/pre-register/ — Public, no auth."""
-    serializer_class = PreRegistrationSerializer
-    permission_classes = [permissions.AllowAny]
+class PreRegistrationListCreateView(generics.ListCreateAPIView):
+    """POST /api/v1/admissions/pre-register/ — Public, no auth.
+    GET — Admin-only paginated list for the Admisiones console."""
+    queryset = PreRegistration.objects.all()
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsAdmin()]
+        return [permissions.AllowAny()]
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return PreRegistrationAdminSerializer
+        return PreRegistrationSerializer
 
     def perform_create(self, serializer):
         instance = serializer.save()
