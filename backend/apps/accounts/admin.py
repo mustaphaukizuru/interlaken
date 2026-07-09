@@ -25,6 +25,8 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     list_filter = ('role', 'is_active', 'is_staff')
     search_fields = ('email', 'first_name', 'last_name')
     ordering = ('-date_joined',)
+    date_hierarchy = 'date_joined'
+    readonly_fields = ('last_login', 'date_joined')
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Información personal', {'fields': ('first_name', 'last_name', 'avatar', 'whatsapp')}),
@@ -38,11 +40,15 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(ModelAdmin):
-    list_display = ('user', 'student_id', 'grade', 'group', 'loyverse_id')
-    search_fields = ('user__email', 'student_id', 'loyverse_id')
+    list_display = ('user', 'student_id', 'grade', 'group', 'is_active', 'loyverse_id')
+    list_filter = ('grade', 'group', 'is_active')
+    search_fields = ('user__email', 'user__first_name', 'user__last_name',
+                     'student_id', 'loyverse_id')
     raw_id_fields = ('user', 'parents')
+    list_select_related = ('user',)
 
 @admin.register(ParentProfile)
 class ParentProfileAdmin(ModelAdmin):
     list_display = ('user', 'phone', 'relationship')
-    search_fields = ('user__email', 'phone')
+    search_fields = ('user__email', 'user__first_name', 'user__last_name', 'phone')
+    list_select_related = ('user',)

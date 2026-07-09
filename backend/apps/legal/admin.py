@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from .models import ArcoRequest, ConsentRecord, PrivacyNoticeVersion
@@ -13,6 +13,7 @@ class ArcoRequestAdmin(ModelAdmin):
     readonly_fields = ('requester', 'requester_email', 'request_type', 'details',
                        'statutory_deadline', 'created_at', 'updated_at', 'resolved_at')
     ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
 
 
 @admin.register(PrivacyNoticeVersion)
@@ -21,6 +22,7 @@ class PrivacyNoticeVersionAdmin(ModelAdmin):
     list_filter = ('is_active',)
     search_fields = ('version', 'title')
     ordering = ('-effective_date',)
+    readonly_fields = ('created_at',)
 
 
 @admin.register(ConsentRecord)
@@ -33,6 +35,9 @@ class ConsentRecordAdmin(ModelAdmin):
     readonly_fields = ('guardian', 'student', 'notice_version', 'purpose', 'granted',
                        'captured_at', 'capture_context', 'capture_ip')
     ordering = ('-captured_at',)
+    date_hierarchy = 'captured_at'
+    list_select_related = ('guardian', 'student__user', 'notice_version')
+    actions = None
 
     def has_add_permission(self, request):
         return False

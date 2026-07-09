@@ -20,8 +20,9 @@ class DiscountAdmin(ModelAdmin):
                     'start_period', 'end_period')
     list_filter = ('active', 'kind', 'method')
     search_fields = ('student__user__first_name', 'student__user__last_name', 'name')
-    autocomplete_fields = ()
     raw_id_fields = ('student',)
+    list_select_related = ('student__user',)
+    readonly_fields = ('created_at',)
 
 
 class InvoiceLineItemInline(TabularInline):
@@ -46,6 +47,7 @@ class InvoiceAdmin(ModelAdmin):
                      'student__student_id')
     raw_id_fields = ('student', 'fee_schedule')
     date_hierarchy = 'due_date'
+    list_select_related = ('student__user',)
     readonly_fields = ('subtotal', 'discount_total', 'late_fee_total', 'amount',
                        'amount_paid', 'paid_at', 'created_at', 'updated_at')
     inlines = [InvoiceLineItemInline, InvoiceAdjustmentInline]
@@ -53,13 +55,37 @@ class InvoiceAdmin(ModelAdmin):
 
 @admin.register(InvoicePayment)
 class InvoicePaymentAdmin(ModelAdmin):
+    """Read-only: rows are written by the payment-application service only."""
     list_display = ('invoice', 'payment', 'amount', 'created_at')
     raw_id_fields = ('invoice', 'payment')
+    list_select_related = ('invoice__student__user', 'payment')
+    readonly_fields = ('invoice', 'payment', 'amount', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(InvoiceAdjustment)
 class InvoiceAdjustmentAdmin(ModelAdmin):
+    """Read-only: adjustment rows are the tuition ledger's audit trail."""
     list_display = ('invoice', 'kind', 'amount', 'admin', 'created_at')
     list_filter = ('kind',)
-    readonly_fields = ('created_at',)
-    raw_id_fields = ('invoice', 'admin')
+    date_hierarchy = 'created_at'
+    list_select_related = ('invoice__student__user', 'admin')
+    readonly_fields = ('invoice', 'admin', 'kind', 'amount', 'reason', 'status_after',
+                       'amount_after', 'amount_paid_after', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

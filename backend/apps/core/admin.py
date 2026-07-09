@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from .models import AuditLog, ContactMessage
@@ -12,17 +12,21 @@ class ContactMessageAdmin(ModelAdmin):
     search_fields = ('name', 'email', 'subject', 'message')
     readonly_fields = ('name', 'email', 'subject', 'message', 'created_at')
     ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
 
 
 @admin.register(AuditLog)
 class AuditLogAdmin(ModelAdmin):
-    """Read-only view of the append-only audit trail."""
-    list_display = ('created_at', 'action', 'object_type', 'object_id', 'actor_label', 'context')
+    """Strictly read-only view of the append-only audit trail."""
+    list_display = ('created_at', 'action', 'object_type', 'object_id',
+                    'actor_label', 'context')
     list_filter = ('action', 'object_type', 'created_at')
     search_fields = ('object_type', 'object_id', 'actor_label', 'context')
     readonly_fields = ('actor', 'actor_label', 'action', 'object_type', 'object_id',
                        'changes', 'context', 'created_at')
     ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
+    actions = None
 
     def has_add_permission(self, request):
         return False
