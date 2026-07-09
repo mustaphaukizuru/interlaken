@@ -254,9 +254,12 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
 
 
 class StudentListView(generics.ListAPIView):
-    """GET /api/v1/accounts/students/ — List students (admin only or parent's own children)."""
+    """GET /api/v1/accounts/students/?search= — List students (admin only or parent's own children)."""
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # Powers the admin Ctrl+K palette (global SearchFilter backend applies).
+    search_fields = ['user__first_name', 'user__last_name', 'user__email',
+                     'student_id', 'grade']
 
     def get_queryset(self):
         user = self.request.user

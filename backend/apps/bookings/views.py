@@ -3,6 +3,7 @@ bookings/views.py — Public slot picker + booking, admin availability & managem
 """
 from datetime import datetime, timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import permissions, status
@@ -188,7 +189,7 @@ class BookingCancelView(APIView):
 
 
 class AdminBookingsView(APIView):
-    """GET /api/v1/bookings/admin/bookings/?type=&status=&date= — manage bookings."""
+    """GET /api/v1/bookings/admin/bookings/?type=&status=&date=&q= — manage bookings."""
     permission_classes = [IsAdmin]
 
     def get(self, request):
@@ -202,6 +203,12 @@ class AdminBookingsView(APIView):
         date = request.query_params.get('date')
         if date:
             qs = qs.filter(slot__date=date)
+        q = request.query_params.get('q')
+        if q:
+            # Powers the admin Ctrl+K palette.
+            qs = qs.filter(
+                Q(parent_name__icontains=q) | Q(parent_email__icontains=q)
+                | Q(child_name__icontains=q))
         return Response(BookingSerializer(qs, many=True).data)
 
 

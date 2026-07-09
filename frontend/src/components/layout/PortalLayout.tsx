@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
+import { CommandPalette } from '@/components/admin/CommandPalette';
 
 interface Props {
   role: 'parent' | 'student' | 'admin' | 'staff';
@@ -66,6 +67,9 @@ export function PortalLayout({ role }: Props) {
 
         {/* Sidebar: off-canvas drawer on mobile, static on desktop */}
         <Sidebar role={role} open={open} onNavigate={close} />
+
+        {/* Global search (Ctrl/Cmd+K) — admin workflows only */}
+        {role === 'admin' && <CommandPalette />}
 
         {/* Main */}
         <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
