@@ -9,7 +9,7 @@ const ROLE_PATHS: Record<string, string> = {
   parent: '/portal',
   student: '/alumno',
   admin: '/admin',
-  staff: '/portal',
+  staff: '/staff',
 };
 
 export default function LoginPage() {

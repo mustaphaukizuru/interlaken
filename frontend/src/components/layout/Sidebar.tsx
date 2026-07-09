@@ -7,7 +7,7 @@ import {
   Coffee, ClipboardList, BarChart3, CalendarClock, Receipt, type LucideIcon,
 } from 'lucide-react';
 
-type Role = 'parent' | 'student' | 'admin';
+type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 interface NavEntry { icon: LucideIcon; label: string; to: string; end?: boolean; badge?: number }
 
@@ -19,6 +19,10 @@ const navByRole: Record<Role, NavEntry[]> = {
     { icon: CalendarClock, label: 'Visitas',     to: '/admin/visitas' },
     { icon: Receipt,       label: 'Finanzas',    to: '/admin/finanzas' },
     { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
+  ],
+  staff: [
+    { icon: BarChart3,       label: 'Analítica', to: '/staff', end: true },
+    { icon: LayoutDashboard, label: 'Portal',    to: '/portal', end: true },
   ],
   parent: [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },

@@ -39,6 +39,9 @@ const ColegiaturaPaymentReturn = lazy(() => import('./pages/parent/ColegiaturaPa
 const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
 const StudentCafeteria  = lazy(() => import('./pages/student/StudentCafeteria'));
 
+// Staff dashboard
+const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
+
 // Admin portal
 const AdminDashboard  = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminAdmissions = lazy(() => import('./pages/admin/AdminAdmissions'));
@@ -122,6 +125,15 @@ export default function App() {
             }>
               <Route index            element={<StudentDashboard />} />
               <Route path="cafeteria" element={<StudentCafeteria />} />
+            </Route>
+
+            {/* ── STAFF ANALYTICS DASHBOARD ───────────────── */}
+            <Route path="/staff" element={
+              <ProtectedRoute roles={['staff', 'admin']}>
+                <PortalLayout role="staff" />
+              </ProtectedRoute>
+            }>
+              <Route index element={<StaffDashboard />} />
             </Route>
 
             {/* ── ADMIN PORTAL ────────────────────────────── */}

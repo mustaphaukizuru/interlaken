@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import Sidebar from './Sidebar';
 
 interface Props {
-  role: 'parent' | 'student' | 'admin';
+  role: 'parent' | 'student' | 'admin' | 'staff';
 }
 
 /**

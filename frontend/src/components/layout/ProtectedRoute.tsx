@@ -22,7 +22,7 @@ export function ProtectedRoute({ children, roles }: Props) {
       parent:  '/portal',
       student: '/alumno',
       admin:   '/admin',
-      staff:   '/portal',
+      staff:   '/staff',
     };
     return <Navigate to={rolePaths[user.role]} replace />;
   }
