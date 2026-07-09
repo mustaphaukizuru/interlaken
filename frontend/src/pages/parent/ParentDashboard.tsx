@@ -5,6 +5,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
+import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
 import type { DashboardData } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -24,6 +25,8 @@ export default function ParentDashboard() {
     queryFn: async () => (await portalApi.getDashboard()).data,
     staleTime: 1000 * 60 * 2,
   });
+
+  useAnnouncementsRead(data?.announcements);
 
   const firstChild = data?.children?.[0];
   const balanceObj = data?.cafeteria_balances?.[0];

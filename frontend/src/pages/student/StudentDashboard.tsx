@@ -4,6 +4,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
+import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
 import type { DashboardData } from '@/types';
 
 export default function StudentDashboard() {
@@ -12,6 +13,8 @@ export default function StudentDashboard() {
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
   });
+
+  useAnnouncementsRead(data?.announcements);
 
   return (
     <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">

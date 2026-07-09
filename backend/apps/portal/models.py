@@ -56,3 +56,22 @@ class Notification(models.Model):
 
     def __str__(self):
         return f'{self.user.email} — {self.title}'
+
+
+class AnnouncementRead(models.Model):
+    """One row per user per announcement — feeds the staff read-rate KPI."""
+    announcement = models.ForeignKey(
+                       Announcement, on_delete=models.CASCADE, related_name='reads')
+    user         = models.ForeignKey(
+                       settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                       related_name='announcement_reads')
+    read_at      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=['announcement', 'user'], name='uniq_announcement_read')]
+        verbose_name = 'Lectura de comunicado'
+        verbose_name_plural = 'Lecturas de comunicados'
+
+    def __str__(self):
+        return f'{self.user.email} → {self.announcement_id}'

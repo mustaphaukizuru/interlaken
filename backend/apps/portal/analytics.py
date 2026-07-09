@@ -132,8 +132,24 @@ def build_payload():
     # ── Document review queue (1 query) ──
     docs_in_review = RegistrationDocument.objects.filter(is_verified=False).count()
 
-    # ── Circulars: no read-tracking model exists → read_rate stays null ──
-    active_circulars = Announcement.objects.filter(is_active=True).count()
+    # ── Circulars: distinct eligible readers / eligible audience (2 queries) ──
+    audience_roles = {
+        Announcement.Audience.ALL:      [User.Role.PARENT, User.Role.STUDENT, User.Role.STAFF],
+        Announcement.Audience.PARENTS:  [User.Role.PARENT],
+        Announcement.Audience.STUDENTS: [User.Role.STUDENT],
+        Announcement.Audience.STAFF:    [User.Role.STAFF],
+    }
+    role_counts = dict(User.objects.filter(is_active=True)
+                       .values_list('role').annotate(n=Count('id')))
+    active_anns = list(Announcement.objects.filter(is_active=True)
+                       .annotate(readers=Count('reads__user', distinct=True)))
+    rates = []
+    for ann in active_anns:
+        eligible = sum(role_counts.get(r, 0) for r in audience_roles.get(ann.audience, []))
+        if eligible:
+            rates.append(min(ann.readers / eligible, 1.0))
+    read_rate = round(sum(rates) / len(rates), 3) if rates else None
+    active_circulars = len(active_anns)
 
     # ── ARCO (1 query) ──
     arco_row = ArcoRequest.objects.filter(status__in=[
@@ -159,7 +175,7 @@ def build_payload():
         },
         'cafeteria': {'series': series},
         'documents': {'in_review': docs_in_review},
-        'circulars': {'active': active_circulars, 'read_rate': None},
+        'circulars': {'active': active_circulars, 'read_rate': read_rate},
         'arco': {'open': arco_row['n'] or 0, 'overdue': arco_row['overdue'] or 0},
         'generated_at': now.isoformat(),
     }

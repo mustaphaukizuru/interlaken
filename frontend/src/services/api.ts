@@ -382,4 +382,15 @@ export const portalApi = {
   // Aggregated staff analytics (staff/admin only; server-cached 60s).
   getStaffAnalytics: () =>
     api.get('/portal/analytics/'),
+
+  // Idempotent read receipts — feeds the circulars read-rate KPI.
+  markAnnouncementsRead: (ids: number[]) =>
+    api.post('/portal/announcements/mark-read/', { ids }),
+};
+
+// ── CONTENT (CMS) ─────────────────────────────────────────
+export const contentApi = {
+  // Public site settings — phone/social/contact data (server-cached 5 min).
+  getSettings: () =>
+    api.get('/content/settings/'),
 };

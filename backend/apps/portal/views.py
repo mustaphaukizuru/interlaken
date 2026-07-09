@@ -11,7 +11,7 @@ from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
 
-from .models import Announcement, Notification
+from .models import Announcement, AnnouncementRead, Notification
 from .serializers import AnnouncementSerializer, NotificationSerializer
 
 # `User.Role` values are singular (`parent`) while `Announcement.Audience`
@@ -135,6 +135,31 @@ class NotificationListView(generics.ListAPIView):
 
     def get_queryset(self):
         return Notification.objects.filter(user=self.request.user)
+
+
+class AnnouncementMarkReadView(APIView):
+    """
+    POST /api/v1/portal/announcements/mark-read/  {"ids": [1, 2]}
+    Idempotent read receipts; only announcements the caller can actually
+    see (active + matching audience) are recorded.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        ids = request.data.get('ids')
+        if (not isinstance(ids, list) or not ids
+                or not all(isinstance(i, int) for i in ids)):
+            return Response({'error': 'ids debe ser una lista de enteros.'}, status=400)
+
+        visible = list(Announcement.objects.filter(
+            id__in=ids[:50], is_active=True,
+            audience__in=audiences_for_user(request.user),
+        ).values_list('id', flat=True))
+        AnnouncementRead.objects.bulk_create(
+            [AnnouncementRead(announcement_id=a, user=request.user) for a in visible],
+            ignore_conflicts=True,
+        )
+        return Response({'marked': len(visible)})
 
 
 class NotificationMarkReadView(APIView):
