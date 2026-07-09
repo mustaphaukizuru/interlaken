@@ -1,10 +1,11 @@
-from django.contrib import admin
+﻿from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from .models import Payment
 
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(ModelAdmin):
     list_display = ('user', 'amount', 'currency', 'payment_type', 'status', 'created_at')
     list_filter = ('status', 'payment_type', 'currency')
     search_fields = ('user__email', 'gateway_tx_id', 'description')

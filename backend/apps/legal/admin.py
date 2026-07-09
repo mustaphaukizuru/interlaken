@@ -1,10 +1,11 @@
-from django.contrib import admin
+﻿from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from .models import ArcoRequest, ConsentRecord, PrivacyNoticeVersion
 
 
 @admin.register(ArcoRequest)
-class ArcoRequestAdmin(admin.ModelAdmin):
+class ArcoRequestAdmin(ModelAdmin):
     list_display = ('created_at', 'request_type', 'requester_email', 'status',
                     'statutory_deadline', 'resolved_at')
     list_filter = ('request_type', 'status')
@@ -15,7 +16,7 @@ class ArcoRequestAdmin(admin.ModelAdmin):
 
 
 @admin.register(PrivacyNoticeVersion)
-class PrivacyNoticeVersionAdmin(admin.ModelAdmin):
+class PrivacyNoticeVersionAdmin(ModelAdmin):
     list_display = ('version', 'title', 'effective_date', 'is_active', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('version', 'title')
@@ -23,7 +24,7 @@ class PrivacyNoticeVersionAdmin(admin.ModelAdmin):
 
 
 @admin.register(ConsentRecord)
-class ConsentRecordAdmin(admin.ModelAdmin):
+class ConsentRecordAdmin(ModelAdmin):
     """Read-only: consent records are immutable (revocation is a new record)."""
     list_display = ('captured_at', 'guardian', 'student', 'purpose', 'granted',
                     'notice_version', 'capture_context')

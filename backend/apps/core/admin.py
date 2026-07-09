@@ -1,10 +1,11 @@
-from django.contrib import admin
+﻿from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from .models import AuditLog, ContactMessage
 
 
 @admin.register(ContactMessage)
-class ContactMessageAdmin(admin.ModelAdmin):
+class ContactMessageAdmin(ModelAdmin):
     list_display = ('name', 'email', 'subject', 'is_handled', 'created_at')
     list_filter = ('is_handled', 'created_at')
     list_editable = ('is_handled',)
@@ -14,7 +15,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
 
 
 @admin.register(AuditLog)
-class AuditLogAdmin(admin.ModelAdmin):
+class AuditLogAdmin(ModelAdmin):
     """Read-only view of the append-only audit trail."""
     list_display = ('created_at', 'action', 'object_type', 'object_id', 'actor_label', 'context')
     list_filter = ('action', 'object_type', 'created_at')

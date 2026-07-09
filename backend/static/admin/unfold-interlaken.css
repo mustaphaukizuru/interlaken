@@ -1,0 +1,13 @@
+/* Interlaken brand typography for the unfold admin (loaded via UNFOLD.STYLES —
+   a static asset, not a template override). Poppins = display, Inter = body,
+   mirroring the frontend token layer (docs/DESIGN.md §1.6). */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+h1, h2, h3,
+#site-header {
+  font-family: 'Poppins', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}

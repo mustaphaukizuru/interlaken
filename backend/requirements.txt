@@ -54,7 +54,9 @@ whitenoise==6.6.0
 # Monitoring (no-op unless SENTRY_DSN is configured)
 sentry-sdk==2.19.2
 
+# Admin skin (IK-ADMIN) — pinned to the release resolved against Django 4.2
+django-unfold==0.89.0
+
 # Dev
 pytest-django==4.8.0
 factory-boy==3.3.0
-django-jazzmin==3.0.5

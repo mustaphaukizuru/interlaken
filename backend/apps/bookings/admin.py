@@ -1,10 +1,11 @@
-from django.contrib import admin
+﻿from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from .models import AvailabilitySlot, Booking
 
 
 @admin.register(AvailabilitySlot)
-class AvailabilitySlotAdmin(admin.ModelAdmin):
+class AvailabilitySlotAdmin(ModelAdmin):
     list_display = ('date', 'start_time', 'end_time', 'visit_type', 'capacity', 'booked_count', 'is_active')
     list_filter = ('visit_type', 'is_active', 'date')
     ordering = ('-date', 'start_time')
@@ -16,7 +17,7 @@ class AvailabilitySlotAdmin(admin.ModelAdmin):
 
 
 @admin.register(Booking)
-class BookingAdmin(admin.ModelAdmin):
+class BookingAdmin(ModelAdmin):
     list_display = ('parent_name', 'parent_email', 'slot', 'num_attendees', 'status', 'source', 'created_at')
     list_filter = ('status', 'source', 'slot__visit_type')
     search_fields = ('parent_name', 'parent_email', 'parent_phone', 'child_name')

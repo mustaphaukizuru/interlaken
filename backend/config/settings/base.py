@@ -15,7 +15,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost'])
 
 # ── APPLICATIONS ──────────────────────────────────────────
 DJANGO_APPS = [
-    'jazzmin',
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -322,80 +322,77 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
 
-# ── JAZZMIN ADMIN SKIN ────────────────────────────────────
-JAZZMIN_SETTINGS = {
-    'site_title': 'Admin · Interlaken',
-    'site_header': 'Colegio Interlaken',
-    'site_brand': 'INTERLAKEN',
-    # Brand marks — served from backend/static/admin/ (copied from official logo assets)
-    'site_logo': 'admin/logo-isotipo.png',            # clock isotipo in the dark brand area
-    'site_logo_classes': 'interlaken-brand-logo',      # no forced circle (see interlaken_admin.css)
-    'site_icon': 'admin/logo-isotipo.png',             # favicon
-    'login_logo': 'admin/logo-vertical.png',           # colored, on the light login card
-    'login_logo_dark': 'admin/logo-vertical-white.png',
-    'welcome_sign': 'Panel de Administración — Colegio Interlaken',
-    'copyright': 'Colegio Interlaken',
-    'search_model': ['accounts.User'],
-    'topmenu_links': [
-        {'name': 'Portal Web', 'url': 'http://localhost:3000', 'new_window': True},
-        {'name': 'API', 'url': '/api/v1/', 'new_window': True},
-    ],
-    'icons': {
-        'auth': 'fas fa-shield-alt',
-        'auth.user': 'fas fa-user',
-        'accounts.user': 'fas fa-user-circle',
-        'accounts.studentprofile': 'fas fa-graduation-cap',
-        'admissions.preregistration': 'fas fa-file-alt',
-        'admissions.registration': 'fas fa-clipboard-list',
-        'admissions.openschoolday': 'fas fa-door-open',
-        'cafeteria.cafeteriabalance': 'fas fa-coffee',
-        'cafeteria.cafeteriatransaction': 'fas fa-receipt',
-        'payments.payment': 'fas fa-credit-card',
-        'portal.announcement': 'fas fa-bullhorn',
-        'portal.event': 'fas fa-calendar-star',
-        'bookings.availabilityslot': 'fas fa-calendar-check',
-        'bookings.booking': 'fas fa-user-clock',
-    },
-    'default_icon_parents': 'fas fa-chevron-circle-right',
-    'default_icon_children': 'fas fa-dot-circle',
-    'related_modal_active': True,
-    'custom_css': 'admin/interlaken_admin.css',
-    'custom_js': 'admin/interlaken_admin.js',
-    'use_google_fonts_cdn': True,
-    'show_ui_builder': False,
-    'changeform_format': 'horizontal_tabs',
-    'language_chooser': False,
-    'show_sidebar': True,
-    'navigation_expanded': True,
-}
+# ── UNFOLD ADMIN SKIN ─────────────────────────────────────
+# django-unfold configuration. Every color below is a project design token
+# (docs/DESIGN.md §1 / frontend/tailwind.config.js): the purple `brand` ramp
+# drives `primary`, and the cream/line/ink/dark neutrals drive `base` surfaces
+# in both light and dark mode. Each stop is annotated with its source token —
+# no values exist here that are not already in the token layer.
+from django.templatetags.static import static as _static  # noqa: E402
 
-JAZZMIN_UI_TWEAKS = {
-    'navbar_small_text': False,
-    'footer_small_text': True,
-    'body_small_text': False,
-    'brand_small_text': False,
-    'brand_colour': False,
-    'accent': 'accent-purple',
-    'navbar': 'navbar-dark',
-    'no_navbar_border': True,
-    'navbar_fixed': True,
-    'layout_boxed': False,
-    'footer_fixed': False,
-    'sidebar_fixed': True,
-    'sidebar': 'sidebar-dark-purple',
-    'sidebar_nav_small_text': False,
-    'sidebar_disable_expand': False,
-    'sidebar_nav_child_indent': True,
-    'sidebar_nav_compact_style': False,
-    'sidebar_nav_legacy_style': False,
-    'sidebar_nav_flat_style': False,
-    'theme': 'default',
-    'button_classes': {
-        'primary': 'btn-primary',
-        'secondary': 'btn-secondary',
-        'info': 'btn-outline-info',
-        'warning': 'btn-warning',
-        'danger': 'btn-danger',
-        'success': 'btn-success',
+UNFOLD = {
+    'SITE_TITLE': 'Admin · Interlaken',
+    'SITE_HEADER': 'Colegio Interlaken',
+    'SITE_SUBHEADER': 'Panel de Administración',
+    'SITE_URL': '/',
+    # Official clock isotipo works on light and dark surfaces alike.
+    'SITE_ICON': {
+        'light': lambda request: _static('admin/logo-isotipo.png'),
+        'dark': lambda request: _static('admin/logo-isotipo.png'),
+    },
+    'SITE_FAVICONS': [
+        {'rel': 'icon', 'sizes': '32x32', 'type': 'image/png',
+         'href': lambda request: _static('admin/logo-isotipo.png')},
+    ],
+    'SHOW_HISTORY': True,
+    'SHOW_VIEW_ON_SITE': False,
+    'STYLES': [
+        # Brand typography (Poppins display / Inter body) — static asset, not a
+        # template override; see backend/static/admin/unfold-interlaken.css.
+        lambda request: _static('admin/unfold-interlaken.css'),
+    ],
+    'COLORS': {
+        # Purple brand ramp = frontend `brand-*` scale (tailwind.config.js).
+        'primary': {
+            '50':  '#ede8f7',   # brand-50 / --purple-light
+            '100': '#e7e2f7',   # brand-100 / --purple-xlight
+            '200': '#d9cff0',   # brand-200
+            '300': '#b9a5e0',   # brand-300
+            '400': '#8f6fd0',   # brand-400
+            '500': '#5e3aad',   # brand-500 / --purple-mid
+            '600': '#401a8e',   # brand-600 / --purple (anchor)
+            '700': '#37167a',   # brand-700
+            '800': '#2c1163',   # brand-800
+            '900': '#1f0c47',   # brand-900
+            '950': '#1a1035',   # dark-3 (deep brand surface)
+        },
+        # Neutral/base ramp = cream, line, text and dark-surface tokens.
+        'base': {
+            '50':  '#FAF9FD',   # cream-2
+            '100': '#F5F4FA',   # cream
+            '200': '#EEEBF5',   # line-2 / --border-2
+            '300': '#ECEAF3',   # line / --border
+            '400': '#9A93AE',   # subtle / --text-light
+            '500': '#6E6885',   # muted / --text-muted
+            '600': '#2a2342',   # dark-card
+            '700': '#1A1130',   # ink / --text-main
+            '800': '#1a1035',   # dark-3
+            '900': '#0f0a24',   # dark-2
+            '950': '#080516',   # dark
+        },
+        # Text hierarchy mapped 1:1 to the text tokens.
+        'font': {
+            'subtle-light': '#9A93AE',      # --text-light
+            'subtle-dark': 'var(--color-base-400)',
+            'default-light': '#6E6885',     # --text-muted
+            'default-dark': 'var(--color-base-300)',
+            'important-light': '#1A1130',   # --text-main (ink)
+            'important-dark': 'var(--color-base-100)',
+        },
+    },
+    'SIDEBAR': {
+        'show_search': True,
+        'show_all_applications': False,
+        'navigation': [],  # populated below (IK-ADMIN P1.2)
     },
 }
