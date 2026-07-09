@@ -52,7 +52,7 @@ export function getChartTheme(dark: boolean): ChartTheme {
     },
     grid: dark ? 'color-mix(in srgb, white 12%, transparent)' : cssVar('--border'),
     axis: dark ? 'color-mix(in srgb, white 45%, transparent)' : cssVar('--text-light'),
-    tooltipBg: dark ? cssVar('--dark-card') : '#ffffff',
+    tooltipBg: dark ? cssVar('--dark-card') : 'white',  // cards are bg-white
     tooltipBorder: dark ? 'color-mix(in srgb, white 12%, transparent)' : cssVar('--border'),
     tooltipText: dark ? 'color-mix(in srgb, white 90%, transparent)' : cssVar('--text-main'),
     fontFamily: getComputedStyle(document.body).fontFamily,
