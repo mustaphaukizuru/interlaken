@@ -391,6 +391,9 @@ UNFOLD = {
             'important-dark': 'var(--color-base-100)',
         },
     },
+    # KPI landing on the admin index (numbers + links only; charts live in the
+    # staff dashboard app view). See apps/core/dashboard.py.
+    'DASHBOARD_CALLBACK': 'apps.core.dashboard.dashboard_callback',
     'SIDEBAR': {
         'show_search': True,
         # Plumbing models (JWT token blacklist, sessions, social-auth rows) are
