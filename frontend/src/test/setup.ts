@@ -9,6 +9,15 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// jsdom doesn't implement ResizeObserver; recharts' ResponsiveContainer needs it.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 // jsdom doesn't implement matchMedia; a few UI components read it.
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({
