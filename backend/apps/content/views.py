@@ -25,3 +25,18 @@ class PublicSiteSettingsView(APIView):
             data = SiteSettingsSerializer(SiteSettings.load()).data
             cache.set(SETTINGS_CACHE_KEY, data, CACHE_TTL_SECONDS)
         return Response(data)
+
+
+class PublicTuitionCostsView(APIView):
+    """GET /api/v1/content/costs/ — costos por sección (editables en el admin)."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .models import COSTS_CACHE_KEY, TuitionCost
+        from .serializers import TuitionCostSerializer
+        data = cache.get(COSTS_CACHE_KEY)
+        if data is None:
+            rows = TuitionCost.objects.filter(is_active=True)
+            data = TuitionCostSerializer(rows, many=True).data
+            cache.set(COSTS_CACHE_KEY, data, CACHE_TTL_SECONDS)
+        return Response(data)

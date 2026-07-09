@@ -1,7 +1,16 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from .models import SiteSettings
+from .models import SiteSettings, TuitionCost
+
+
+@admin.register(TuitionCost)
+class TuitionCostAdmin(ModelAdmin):
+    """Costos por sección — el colegio los actualiza cada ciclo escolar."""
+    list_display = ('section', 'inscripcion', 'colegiatura', 'order',
+                    'is_active', 'updated_at')
+    list_editable = ('inscripcion', 'colegiatura', 'order', 'is_active')
+    ordering = ('order',)
 
 
 @admin.register(SiteSettings)

@@ -67,3 +67,40 @@ class SiteSettings(models.Model):
     def load(cls) -> 'SiteSettings':
         obj, _created = cls.objects.get_or_create(pk=1)
         return obj
+
+
+COSTS_CACHE_KEY = 'content.tuition-costs.v1'
+
+
+class TuitionCost(models.Model):
+    """
+    Costos por sección (Admisiones → Costos), editables por el colegio en el
+    admin. `inscripcion` vacío se muestra como "SIN COSTO". El ciclo escolar
+    NO se guarda aquí: el sitio lo calcula solo (p. ej. 2026-2027) cada año.
+    """
+    section      = models.CharField('Sección', max_length=60)
+    inscripcion  = models.DecimalField(
+        'Inscripción / reinscripción (MXN)', max_digits=8, decimal_places=2,
+        null=True, blank=True,
+        help_text='Vacío = se muestra "SIN COSTO".')
+    colegiatura  = models.DecimalField(
+        'Colegiatura mensual (MXN)', max_digits=8, decimal_places=2)
+    order        = models.PositiveSmallIntegerField('Orden', default=0)
+    is_active    = models.BooleanField('Visible en el sitio', default=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'Costo por sección'
+        verbose_name_plural = 'Costos por sección'
+
+    def __str__(self):
+        return self.section
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        cache.delete(COSTS_CACHE_KEY)
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        cache.delete(COSTS_CACHE_KEY)

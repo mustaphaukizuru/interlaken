@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import SiteSettings
+from .models import SiteSettings, TuitionCost
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
@@ -12,4 +12,11 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             'facebook_url', 'instagram_url', 'youtube_url',
             'updated_at',
         ]
+        read_only_fields = fields
+
+
+class TuitionCostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TuitionCost
+        fields = ['section', 'inscripcion', 'colegiatura', 'order']
         read_only_fields = fields
