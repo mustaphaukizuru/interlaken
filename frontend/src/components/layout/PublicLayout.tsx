@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
   Facebook, Instagram, Youtube,
-  School, GraduationCap, ClipboardList, Users,
+  GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
+  FileText, CircleDollarSign, DoorOpen, UserPlus, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
@@ -12,43 +13,40 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { socialEntries } from '@/lib/siteContact';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 
-/** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs. */
-const MENU: { label: string; icon: LucideIcon; items: { label: string; to: string }[] }[] = [
+/** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
+ *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra. */
+const MENU: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }[] = [
   {
     label: 'El Colegio',
-    icon: School,
     items: [
-      { label: 'Quiénes Somos', to: '/nosotros' },
-      { label: 'Modelo Educativo', to: '/modelo-educativo' },
-      { label: 'Galería', to: '/galeria' },
+      { label: 'Quiénes Somos', to: '/nosotros', icon: Users },
+      { label: 'Modelo Educativo', to: '/modelo-educativo', icon: BookOpen },
+      { label: 'Galería', to: '/galeria', icon: Camera },
     ],
   },
   {
     label: 'Niveles Educativos',
-    icon: GraduationCap,
     items: [
-      { label: 'Preescolar', to: '/niveles/preescolar' },
-      { label: 'Primaria', to: '/niveles/primaria' },
-      { label: 'Secundaria', to: '/niveles/secundaria' },
+      { label: 'Preescolar', to: '/niveles/preescolar', icon: Blocks },
+      { label: 'Primaria', to: '/niveles/primaria', icon: Pencil },
+      { label: 'Secundaria', to: '/niveles/secundaria', icon: GraduationCap },
     ],
   },
   {
     label: 'Admisiones',
-    icon: ClipboardList,
     items: [
-      { label: 'Proceso de Inscripción', to: '/admisiones' },
-      { label: 'Documentación', to: '/admisiones#documentacion' },
-      { label: 'Costos', to: '/admisiones#costos' },
-      { label: 'Puertas Abiertas', to: '/puertas-abiertas' },
-      { label: 'Pre-Registro', to: '/pre-registro' },
+      { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
+      { label: 'Documentación', to: '/admisiones#documentacion', icon: FileText },
+      { label: 'Costos', to: '/admisiones#costos', icon: CircleDollarSign },
+      { label: 'Puertas Abiertas', to: '/puertas-abiertas', icon: DoorOpen },
+      { label: 'Pre-Registro', to: '/pre-registro', icon: UserPlus },
     ],
   },
   {
     label: 'Comunidad',
-    icon: Users,
     items: [
-      { label: 'Plataformas', to: '/comunidad/plataformas' },
-      { label: 'Facturación', to: '/comunidad/facturacion' },
+      { label: 'Plataformas', to: '/comunidad/plataformas', icon: MonitorSmartphone },
+      { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
     ],
   },
 ];
@@ -66,7 +64,7 @@ const SOCIAL_ICONS = {
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
-function NavDropdown({ label, icon: Icon, items }: { label: string; icon: LucideIcon; items: { label: string; to: string }[] }) {
+function NavDropdown({ label, items }: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -103,9 +101,8 @@ function NavDropdown({ label, icon: Icon, items }: { label: string; icon: Lucide
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
       >
-        <Icon className="w-4 h-4 text-green-dark" aria-hidden="true" />
         {label}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -114,18 +111,21 @@ function NavDropdown({ label, icon: Icon, items }: { label: string; icon: Lucide
         <div
           role="menu"
           aria-label={label}
-          className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-60"
+          className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-64"
         >
-          <ul className="rounded-2xl border border-line bg-white shadow-xl p-2 space-y-0.5">
+          <ul className="overflow-hidden rounded-2xl border border-line bg-white p-2 shadow-xl ring-1 ring-ink/5">
             {items.map((item) => (
               <li key={item.label}>
                 <Link
                   to={item.to}
                   role="menuitem"
                   onClick={() => setOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-sm text-ink hover:bg-brand-50 hover:text-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                  className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  {item.label}
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green group-hover:text-white">
+                    <item.icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="font-medium">{item.label}</span>
                 </Link>
               </li>
             ))}
@@ -140,7 +140,12 @@ export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const settings = useSiteSettings();
+  // Facebook viene confirmado por el cliente; Instagram se muestra siempre
+  // (petición del cliente) con enlace vacío hasta que entreguen la URL.
   const socials = socialEntries(settings);
+  const displaySocials = socials.some((s) => s.key === 'instagram')
+    ? socials
+    : [...socials, { key: 'instagram' as const, label: 'Instagram', href: settings.instagram_url || '#' }];
 
   // Lock body scroll while the mobile menu is open (prevents background scroll).
   useEffect(() => {
@@ -165,7 +170,7 @@ export function PublicLayout() {
       <div className="hidden md:block bg-brand-800 text-white text-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-1.5 sm:px-6">
           <div className="flex items-center gap-2">
-            {socials.map(({ key, label, href }) => {
+            {displaySocials.map(({ key, label, href }) => {
               const Icon = SOCIAL_ICONS[key];
               return (
                 <a
@@ -208,7 +213,7 @@ export function PublicLayout() {
           {/* Desktop nav — menú confirmado por el cliente */}
           <nav className="hidden lg:flex items-center gap-5">
             {MENU.map((group) => (
-              <NavDropdown key={group.label} label={group.label} icon={group.icon} items={group.items} />
+              <NavDropdown key={group.label} label={group.label} items={group.items} />
             ))}
             <NavLink
               to="/contacto"
@@ -254,21 +259,21 @@ export function PublicLayout() {
                   onClick={() => setOpenGroup((g) => (g === group.label ? null : group.label))}
                   className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  <span className="flex items-center gap-2.5">
-                    <group.icon className="w-4 h-4 text-green-dark" aria-hidden="true" />
-                    {group.label}
-                  </span>
+                  {group.label}
                   <ChevronDown className={`w-4 h-4 transition-transform ${openGroup === group.label ? 'rotate-180' : ''}`} />
                 </button>
                 {openGroup === group.label && (
-                  <div className="pl-3 space-y-0.5">
+                  <div className="space-y-0.5 pl-2">
                     {group.items.map((item) => (
                       <Link
                         key={item.label}
                         to={item.to}
                         onClick={() => setOpen(false)}
-                        className="block px-3 py-2 min-h-[44px] rounded-lg text-sm text-muted hover:bg-cream"
+                        className="flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-cream hover:text-ink"
                       >
+                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark">
+                          <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
                         {item.label}
                       </Link>
                     ))}
@@ -328,9 +333,9 @@ export function PublicLayout() {
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
               Tlalnepantla, Estado de México.
             </p>
-            {socials.length > 0 && (
+            {displaySocials.length > 0 && (
               <div className="flex items-center gap-3 mt-5">
-                {socials.map(({ key, label, href }) => {
+                {displaySocials.map(({ key, label, href }) => {
                   const Icon = SOCIAL_ICONS[key];
                   return (
                     <a

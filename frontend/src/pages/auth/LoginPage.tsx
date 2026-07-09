@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
 import { SCHOOL_YEARS } from '@/lib/siteMeta';
+import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ROLE_PATHS: Record<string, string> = {
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Handle the Google OAuth return. The backend set the session as httpOnly
@@ -161,32 +163,52 @@ export default function LoginPage() {
 
               <form onSubmit={handleSubmit}>
                 <label htmlFor="login-email" className="label">Correo electrónico</label>
-                <input
-                  id="login-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="correo@interlaken.edu.mx"
-                  className="input-field mb-3.5 min-h-[44px] text-base"
-                />
+                <div className="relative mb-3.5">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+                  <input
+                    id="login-email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="correo@interlaken.edu.mx"
+                    className="input-field min-h-[44px] pl-10 text-base"
+                  />
+                </div>
                 <label htmlFor="login-password" className="label">Contraseña</label>
-                <input
-                  id="login-password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="input-field mb-5 min-h-[44px] text-base"
-                />
+                <div className="relative mb-5">
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input-field min-h-[44px] pl-10 pr-11 text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
+                </div>
                 <button
                   type="submit"
                   disabled={submitting}
                   className="btn-pink min-h-[44px] w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-70"
                 >
-                  {submitting ? 'Ingresando…' : 'Ingresar'}
+                  {submitting ? 'Ingresando…' : (<><LogIn className="h-4 w-4" aria-hidden="true" /> Ingresar</>)}
                 </button>
+                <p className="mt-3.5 text-center text-[12px] text-subtle">
+                  ¿Problemas para ingresar?{' '}
+                  <Link to="/contacto" className="font-semibold text-purple hover:underline">Contacte al colegio</Link>
+                </p>
               </form>
             </div>
 

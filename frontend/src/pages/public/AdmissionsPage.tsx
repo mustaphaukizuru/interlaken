@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { FileText, ClipboardList, CheckCircle, ArrowRight, CalendarDays } from 'lucide-react';
+import { FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
@@ -38,14 +38,24 @@ const STEPS = [
   },
 ];
 
-const DOCS = [
-  'Acta de nacimiento (original y copia)',
-  'CURP del alumno',
-  'Fotografías (tamaño infantil)',
-  'Boleta o certificado del ciclo anterior',
-  'Cartilla de vacunación (preescolar)',
-  'Comprobante de domicilio',
-  'Identificación oficial del tutor',
+/** Documentación para el Examen de Valoración. Donde existe un trámite
+ *  oficial en línea se enlaza directo para facilitarlo a las familias. */
+const DOCS: { label: string; href?: string; linkLabel?: string }[] = [
+  { label: 'Acta de nacimiento: 1 original (solo cotejo) y 2 copias actualizadas tamaño carta',
+    href: 'https://www.gob.mx/ActaNacimiento/', linkLabel: 'Obtener acta en línea' },
+  { label: 'CURP del alumno (2 copias, emitida por RENAPO)',
+    href: 'https://www.gob.mx/curp/', linkLabel: 'Consultar CURP' },
+  { label: 'CURP de cada padre o tutor (1 copia, RENAPO)',
+    href: 'https://www.gob.mx/curp/', linkLabel: 'Consultar CURP' },
+  { label: 'INE de cada padre o tutor (1 copia ampliada al 200%)',
+    href: 'https://www.ine.mx/credencial/', linkLabel: 'Trámites INE' },
+  { label: '1 fotografía reciente tamaño infantil del alumno' },
+  { label: 'Comprobante de domicilio vigente (menor a 3 meses, con dirección completa y C.P.)' },
+  { label: 'Boleta SEP del grado anterior (1 copia)' },
+  { label: 'Boletas internas de español e inglés del grado anterior y actual (1 copia c/u)' },
+  { label: 'Certificado de primaria, si ya lo obtuvo (1 copia — ingreso a secundaria)' },
+  { label: 'Carta de buena conducta' },
+  { label: 'Constancia de no adeudo' },
 ];
 
 /** Objection-handling FAQ — also emitted as FAQPage structured data below. */
@@ -157,14 +167,33 @@ export default function AdmissionsPage() {
           <Reveal direction="right">
             <div className="card h-full">
               <h3 className="mb-4 font-head text-[19px] font-bold text-ink">Documentos requeridos</h3>
-              <ul className="space-y-2.5">
+              <ul className="space-y-3">
                 {DOCS.map((d) => (
-                  <li key={d} className="flex items-center gap-2.5 text-sm text-muted">
-                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
-                    {d}
+                  <li key={d.label} className="flex items-start gap-2.5 text-sm text-muted">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
+                    <span>
+                      {d.label}
+                      {d.href && (
+                        <>
+                          {' '}
+                          <a
+                            href={d.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 whitespace-nowrap font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green"
+                          >
+                            {d.linkLabel} <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                          </a>
+                        </>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
+              <p className="mt-4 rounded-lg bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+                Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE)
+                para obtener o consultar cada documento en línea.
+              </p>
             </div>
           </Reveal>
           <Reveal direction="left">

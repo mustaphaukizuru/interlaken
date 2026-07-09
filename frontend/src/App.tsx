@@ -12,6 +12,7 @@ import { PublicLayout } from './components/layout/PublicLayout';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { CookieConsent } from './components/CookieConsent';
 import { AnalyticsListener } from './components/analytics/AnalyticsListener';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Public pages — route-level code splitting (each becomes its own chunk).
 const HomePage        = lazy(() => import('./pages/public/HomePage'));
@@ -90,6 +91,7 @@ export default function App() {
       <BrowserRouter>
         <Toaster position="top-right" />
         <AnalyticsListener />
+        <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* ── PUBLIC SITE ─────────────────────────────── */}
@@ -167,6 +169,7 @@ export default function App() {
 
           </Routes>
         </Suspense>
+        </ErrorBoundary>
         <CookieConsent />
       </BrowserRouter>
     </QueryClientProvider>
