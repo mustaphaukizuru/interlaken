@@ -8,9 +8,9 @@
 import type { SiteSettings } from '@/types/content';
 
 export const SITE_DEFAULTS: SiteSettings = {
-  phone_display: '(55) 1234-5678',
-  phone_e164: '+525512345678',
-  whatsapp_number: import.meta.env.VITE_WHATSAPP_NUMBER || '5215512345678',
+  phone_display: '(55) 5379-1188',
+  phone_e164: '+525553791188',
+  whatsapp_number: import.meta.env.VITE_WHATSAPP_NUMBER || '5215553791188',
   contact_email: 'colegio@interlaken.edu.mx',
   address: 'Tlalnepantla de Baz, Estado de México',
   maps_url: 'https://maps.google.com/?q=Tlalnepantla+de+Baz',

@@ -8,6 +8,7 @@ import Logo from '@/components/ui/Logo';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { socialEntries, waHref } from '@/lib/siteContact';
+import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 
 const NAV_LINKS = [
   { to: '/nosotros',          label: 'Nosotros' },
@@ -304,6 +305,9 @@ export function PublicLayout() {
       >
         Pre-inscripción
       </Link>
+
+      {/* Floating WhatsApp bubble — right side, every public page. */}
+      <WhatsAppFloat />
 
       {/* Footer */}
       <footer className="bg-dark text-white/60 text-sm">

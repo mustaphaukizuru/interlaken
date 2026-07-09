@@ -30,8 +30,8 @@ class TestPublicRead:
             'address', 'maps_url', 'office_hours',
             'facebook_url', 'instagram_url', 'youtube_url', 'updated_at',
         }
-        # Ships with today's values; socials start empty (icons hidden).
-        assert data['phone_display'] == '(55) 1234-5678'
+        # Ships with the school's real number; socials start empty (icons hidden).
+        assert data['phone_display'] == '(55) 5379-1188'
         assert data['facebook_url'] == ''
 
     def test_first_read_creates_the_singleton(self, api_client):
@@ -60,7 +60,7 @@ class TestSingleton:
         assert SiteSettings.objects.get().phone_display == '555'
 
     def test_save_invalidates_the_public_cache(self, api_client):
-        assert api_client.get(URL).json()['phone_display'] == '(55) 1234-5678'
+        assert api_client.get(URL).json()['phone_display'] == '(55) 5379-1188'
         obj = SiteSettings.load()
         obj.phone_display = '(55) 9999-0000'
         obj.save()

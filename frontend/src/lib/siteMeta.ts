@@ -18,7 +18,7 @@ export const LOCALE = 'es_MX';
 /** Business/contact facts, reused by the LocalBusiness structured data. */
 export const ORG = {
   legalName: 'Colegio Interlaken',
-  telephone: '+52-55-1234-5678',
+  telephone: '+52-55-5379-1188',
   email: 'colegio@interlaken.edu.mx',
   streetAddress: 'Tlalnepantla de Baz',
   addressLocality: 'Tlalnepantla de Baz',

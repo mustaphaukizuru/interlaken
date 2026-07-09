@@ -17,17 +17,17 @@ class SiteSettings(models.Model):
     # ── Contacto ──────────────────────────────────────────
     phone_display = models.CharField(
         'Teléfono (texto visible)', max_length=50, blank=True,
-        default='(55) 1234-5678',
-        help_text='Como se muestra en pantalla, p. ej. “(55) 1234-5678”. '
+        default='(55) 5379-1188',
+        help_text='Como se muestra en pantalla, p. ej. “(55) 5379-1188”. '
                   'Vacío = se oculta el teléfono.')
     phone_e164 = models.CharField(
         'Teléfono (marcado)', max_length=25, blank=True,
-        default='+525512345678',
-        help_text='Formato internacional para enlaces tel:, p. ej. +525512345678.')
+        default='+525553791188',
+        help_text='Formato internacional para enlaces tel:, p. ej. +525553791188.')
     whatsapp_number = models.CharField(
         'WhatsApp', max_length=20, blank=True,
-        default='5215512345678',
-        help_text='Solo dígitos con lada de país, p. ej. 5215512345678 '
+        default='5215553791188',
+        help_text='Solo dígitos con lada de país, p. ej. 5215553791188 '
                   '(se usa en enlaces wa.me). Vacío = se ocultan los botones de WhatsApp.')
     contact_email = models.EmailField(
         'Correo de contacto', blank=True, default='colegio@interlaken.edu.mx')

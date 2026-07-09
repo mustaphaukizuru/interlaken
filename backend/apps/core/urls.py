@@ -11,7 +11,10 @@ from django.views.generic import TemplateView
 
 
 def whatsapp_redirect(request):
-    number = getattr(settings, 'WHATSAPP_NUMBER', '5215512345678')
+    # CMS-first (Contenido del sitio → Ajustes del sitio); env/default fallback.
+    from apps.content.models import SiteSettings
+    number = (SiteSettings.load().whatsapp_number
+              or getattr(settings, 'WHATSAPP_NUMBER', '5215553791188'))
     message = urllib.parse.quote('Hola, me gustaría obtener más información sobre el Colegio Interlaken.')
     return HttpResponseRedirect(f'https://wa.me/{number}?text={message}')
 

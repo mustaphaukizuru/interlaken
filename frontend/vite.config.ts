@@ -72,12 +72,14 @@ export default defineConfig(({ command }) => ({
   server: {
     port: 3000,
     proxy: {
+      // Backend dev server; override with DEV_API_TARGET when :8000 is taken
+      // (e.g. Windows dynamic port exclusions reserving 7901–8100).
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.DEV_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
       '/auth': {
-        target: 'http://localhost:8000',
+        target: process.env.DEV_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
     },
