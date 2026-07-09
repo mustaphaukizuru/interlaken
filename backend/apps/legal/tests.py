@@ -15,9 +15,12 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def notice(db):
+    # La migración 0003 siembra una versión activa (contenido institucional);
+    # se desactiva para que la versión de prueba sea la única vigente.
+    PrivacyNoticeVersion.objects.filter(is_active=True).update(is_active=False)
     return PrivacyNoticeVersion.objects.create(
-        version='2026.1', body='Aviso ADCE EDUCACIÓN A.C.',
-        effective_date='2026-01-01', is_active=True,
+        version='2026.1-test', body='Aviso ADCE EDUCACIÓN A.C.',
+        effective_date='2027-01-01', is_active=True,
     )
 
 
@@ -73,6 +76,8 @@ def test_consent_creation_is_audited(notice):
 
 
 def test_record_without_active_notice_raises():
+    # Sin NINGUNA versión activa (se desactiva también la sembrada en 0003).
+    PrivacyNoticeVersion.objects.filter(is_active=True).update(is_active=False)
     parent = ParentFactory()
     with pytest.raises(ValueError):
         record_consent(guardian=parent, purpose=ConsentPurpose.CAFETERIA, granted=True)

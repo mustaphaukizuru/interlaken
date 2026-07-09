@@ -14,19 +14,23 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def notice(db):
+    # La migración 0003 siembra una versión activa; se desactiva para que la
+    # versión de prueba sea la única vigente y las aserciones deterministas.
+    PrivacyNoticeVersion.objects.filter(is_active=True).update(is_active=False)
     return PrivacyNoticeVersion.objects.create(
-        version='2026.1', body='Aviso ADCE EDUCACIÓN A.C.',
-        effective_date='2026-01-01', is_active=True,
+        version='2026.1-test', body='Aviso ADCE EDUCACIÓN A.C.',
+        effective_date='2027-01-01', is_active=True,
     )
 
 
 def test_public_notice_endpoint(api_client, notice):
     resp = api_client.get(reverse('legal-notice'))
     assert resp.status_code == 200
-    assert resp.data['version'] == '2026.1'
+    assert resp.data['version'] == '2026.1-test'
 
 
 def test_notice_404_when_none(api_client):
+    PrivacyNoticeVersion.objects.filter(is_active=True).update(is_active=False)
     assert api_client.get(reverse('legal-notice')).status_code == 404
 
 
@@ -54,8 +58,8 @@ def test_new_notice_version_triggers_reacceptance(api_client, notice):
     assert api_client.get(reverse('legal-consent')).data['needs_acceptance'] is False
 
     # A material new version → must re-accept.
-    PrivacyNoticeVersion.objects.create(version='2026.2', body='v2',
-                                        effective_date='2026-06-01', is_active=True)
+    PrivacyNoticeVersion.objects.create(version='2026.3-test', body='v2',
+                                        effective_date='2027-06-01', is_active=True)
     assert api_client.get(reverse('legal-consent')).data['needs_acceptance'] is True
 
 
