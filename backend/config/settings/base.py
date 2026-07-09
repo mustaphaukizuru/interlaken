@@ -31,6 +31,7 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'django_filters',
     'social_django',
+    'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -145,6 +146,16 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Colegio Interlaken API',
+    'DESCRIPTION': 'REST API del portal escolar: admisiones, cafetería, '
+                   'colegiaturas, reservas de visitas, portal y legal.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api/v1',
 }
 
 from datetime import timedelta
