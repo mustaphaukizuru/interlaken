@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Users, Search } from 'lucide-react';
+import { Users, Search, FileUp } from 'lucide-react';
+import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -12,6 +13,7 @@ import type { StudentProfile } from '@/types';
 export default function AdminStudents() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-students', page],
@@ -33,10 +35,16 @@ export default function AdminStudents() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-fluid-xl font-bold text-ink">Alumnos</h1>
-        <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-fluid-xl font-bold text-ink">Alumnos</h1>
+          <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
+        </div>
+        <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
+          <FileUp size={16} aria-hidden="true" /> Importar CSV
+        </button>
       </div>
+      <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
 
       <Card title={`${count} alumnos registrados`}>
         <div className="relative mb-1">

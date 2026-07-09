@@ -386,6 +386,16 @@ export const portalApi = {
   // Idempotent read receipts — feeds the circulars read-rate KPI.
   markAnnouncementsRead: (ids: number[]) =>
     api.post('/portal/announcements/mark-read/', { ids }),
+
+  // Bulk CSV import (admin): dry_run=true simulates and returns per-row results.
+  importStudents: (file: File, dryRun: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('dry_run', dryRun ? '1' : '0');
+    return api.post('/accounts/admin/import-students/', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────
