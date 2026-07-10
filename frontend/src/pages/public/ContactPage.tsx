@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, Clock } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Navigation, ArrowRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -108,22 +108,40 @@ export default function ContactPage() {
               })}
             </div>
 
-            {/* Map placeholder */}
-            <a
-              href={settings.maps_url || 'https://maps.google.com/?q=Tlalnepantla+de+Baz'}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Abrir ubicación en Google Maps"
-              className="relative mt-6 block h-[220px] overflow-hidden rounded-[18px] border border-line bg-gradient-to-br from-purple-light to-green-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
-            >
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-purple">
-                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white shadow-purple">
-                  <MapPin className="h-6 w-6" />
+            {/* Ubicación — mapa interactivo real + CTA "Cómo llegar" */}
+            {settings.address && (
+              <div className="group mt-6 overflow-hidden rounded-[20px] border border-line bg-white shadow-card transition-shadow hover:shadow-purple">
+                <div className="relative aspect-[16/10] w-full bg-cream-2">
+                  <iframe
+                    title="Ubicación de Colegio Interlaken en Google Maps"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(settings.address)}&z=15&output=embed`}
+                    className="absolute inset-0 h-full w-full border-0 grayscale-[0.25] transition-[filter] duration-500 group-hover:grayscale-0 motion-reduce:transition-none"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                  />
                 </div>
-                <span className="font-head text-sm font-bold">{settings.address}</span>
-                <span className="text-[12.5px] text-muted">Ver ubicación en Google Maps</span>
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-purple/10 text-purple">
+                      <MapPin className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <p className="text-sm font-medium leading-snug text-ink">{settings.address}</p>
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(settings.address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Cómo llegar a ${settings.address} en Google Maps`}
+                    className="group/btn inline-flex min-h-[44px] flex-shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple to-purple-mid px-5 text-sm font-semibold text-white shadow-purple transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  >
+                    <Navigation className="h-4 w-4" aria-hidden="true" />
+                    Cómo llegar
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+                  </a>
+                </div>
               </div>
-            </a>
+            )}
 
             {settings.whatsapp_number && (
             <div className="mt-[22px]">
