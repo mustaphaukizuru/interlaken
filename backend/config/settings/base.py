@@ -1,6 +1,7 @@
 """
 Colegio Interlaken — Base Django Settings
 """
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -32,6 +33,7 @@ THIRD_PARTY_APPS = [
     'django_filters',
     'social_django',
     'drf_spectacular',
+    'axes',
 ]
 
 LOCAL_APPS = [
@@ -62,6 +64,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
+    # Turns axes lockout signals into a 429 response (brute-force protection).
+    'axes.middleware.AxesMiddleware',
     # Exposes the request so audit records can attribute the acting user (IK-SEC A3).
     'apps.core.audit.AuditActorMiddleware',
 ]
@@ -105,9 +109,22 @@ DATABASES = {
 AUTH_USER_MODEL = 'accounts.User'
 
 AUTHENTICATION_BACKENDS = [
+    # Axes must come first: it raises on locked-out credentials before any
+    # real backend sees them (brute-force protection, IK-SEC C2/C6).
+    'axes.backends.AxesStandaloneBackend',
     'social_core.backends.google.GoogleOAuth2',
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# ── LOGIN LOCKOUT (django-axes) ───────────────────────────
+# Counts failures on both the Django admin login and the JWT email/password
+# endpoint (simplejwt calls authenticate() with the DRF request). Lockout is
+# per username+IP pair, so an attacker can't lock a user out globally and a
+# shared school NAT doesn't lock out everyone at once.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+AXES_RESET_ON_SUCCESS = True
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET')
@@ -157,8 +174,6 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': '/api/v1',
 }
-
-from datetime import timedelta
 
 SIMPLE_JWT = {
     # Access token is short-lived and kept in memory on the client (never in

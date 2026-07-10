@@ -50,6 +50,8 @@ python-decouple==3.8
 
 # Security
 django-ratelimit==4.1.0
+# Login brute-force lockout (admin + JWT email/password) — IK-SEC C2/C6
+django-axes==8.3.1
 
 # Production
 gunicorn==21.2.0
