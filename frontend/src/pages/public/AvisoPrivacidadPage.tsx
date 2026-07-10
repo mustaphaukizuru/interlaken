@@ -1,10 +1,9 @@
-import { useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-  BellRing, Building2, ChevronDown, ExternalLink, FileText, Mail, Phone,
-  Printer, Share2, ShieldCheck, SlidersHorizontal, Target, Undo2,
+  BellRing, Building2, ChevronDown, ExternalLink, FileText, Phone,
+  Share2, ShieldCheck, SlidersHorizontal, Target, Undo2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { legalApi } from '@/services/api';
@@ -67,7 +66,6 @@ function sectionIcon(title: string): LucideIcon {
 }
 
 export default function AvisoPrivacidadPage() {
-  const bodyRef = useRef<HTMLDivElement>(null);
   const { data, isLoading, isError } = useQuery<PrivacyNotice>({
     queryKey: ['legal-notice'],
     queryFn: async () => {
@@ -80,15 +78,10 @@ export default function AvisoPrivacidadPage() {
   const parsed = data?.body ? parseNotice(data.body) : null;
   const structured = (parsed?.sections.length ?? 0) >= 3;
 
-  const printAll = () => {
-    bodyRef.current?.querySelectorAll('details').forEach((d) => { d.open = true; });
-    window.print();
-  };
-
   return (
     <div>
       <section className="relative overflow-hidden bg-dark text-white">
-        <div className="relative mx-auto max-w-[880px] px-6 py-12 sm:py-16">
+        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
           <span className="section-label-pink inline-flex">Legal</span>
           <h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]">
             {data?.title ?? 'Aviso de Privacidad'}
@@ -110,7 +103,9 @@ export default function AvisoPrivacidadPage() {
         </div>
       </section>
 
-      <Section bg="white" containerSize="md">
+      <Section bg="white" container={false}>
+        {/* Ancho de contenido igual al del pie de página y la barra de navegación (max-w-6xl). */}
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {isLoading ? (
           <div className="py-10">
             <LoadingSpinner />
@@ -121,7 +116,7 @@ export default function AvisoPrivacidadPage() {
             description="No fue posible cargar el Aviso de Privacidad en este momento. Intente de nuevo más tarde o escríbanos a colegio@interlaken.edu.mx."
           />
         ) : (
-          <div ref={bodyRef} className="mx-auto max-w-[820px]">
+          <div>
             {/* Resumen rápido — informativo; el texto oficial rige abajo */}
             <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3 print:hidden">
               {[
@@ -138,18 +133,9 @@ export default function AvisoPrivacidadPage() {
               ))}
             </div>
 
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
-              <p className="text-xs text-muted">
-                Resumen informativo — el texto oficial completo es el siguiente.
-              </p>
-              <button
-                type="button"
-                onClick={printAll}
-                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-ink/15 px-4 text-sm font-semibold text-muted transition-colors hover:border-green hover:text-green-dark"
-              >
-                <Printer className="h-4 w-4" aria-hidden="true" /> Imprimir / guardar PDF
-              </button>
-            </div>
+            <p className="mb-6 text-xs text-muted print:hidden">
+              Resumen informativo — el texto oficial completo es el siguiente.
+            </p>
 
             {structured && parsed ? (
               <>
@@ -209,6 +195,7 @@ export default function AvisoPrivacidadPage() {
             )}
           </div>
         )}
+        </div>
       </Section>
     </div>
   );
