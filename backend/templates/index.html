@@ -1,33 +1,87 @@
 <!DOCTYPE html>
-<html lang="es-mx">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Colegio Interlaken</title>
-  <style>
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-           background: #0f2e1d; color: #f5f5f0; display: flex; min-height: 100vh;
-           align-items: center; justify-content: center; text-align: center; }
-    .card { max-width: 34rem; padding: 2.5rem; }
-    h1 { color: #7ec36f; margin-bottom: .5rem; letter-spacing: .04em; }
-    p { line-height: 1.6; opacity: .85; }
-    a { color: #ff8a6b; }
-    code { background: rgba(255,255,255,.08); padding: .15rem .4rem; border-radius: .3rem; }
-  </style>
-</head>
-<body>
-  <!--
-    Placeholder SPA shell served by apps/core catch-all so the '/' route does
-    not raise TemplateDoesNotExist. In production this file is OVERWRITTEN by
-    the frontend build output (`cd frontend && npm run build`), which injects
-    the hashed React asset tags. See DEPLOYMENT.md §5.
-  -->
-  <div class="card">
-    <h1>Colegio Interlaken</h1>
-    <p>El portal web está en ejecución.</p>
-    <p>En desarrollo, la aplicación React se sirve desde
-       <code>http://localhost:3000</code>. Este archivo es reemplazado por la
-       compilación del frontend en producción.</p>
-  </div>
-</body>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Favicon / app icons (clock isotipo) -->
+    <link rel="icon" href="/static/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png" />
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+    <link rel="manifest" href="/static/site.webmanifest" />
+    <meta name="theme-color" content="#401a8e" />
+
+    <title>Colegio Interlaken — Educación bilingüe en Tlalnepantla</title>
+    <meta name="description" content="Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con 40 años de trayectoria." />
+    <link rel="canonical" href="https://interlaken.edu.mx/" />
+
+    <!-- Structured data: School / EducationalOrganization / LocalBusiness.
+         Static so it's always in the initial HTML for the Rich Results test. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": ["School", "EducationalOrganization", "LocalBusiness"],
+      "@id": "https://interlaken.edu.mx/#organization",
+      "name": "Colegio Interlaken",
+      "legalName": "Colegio Interlaken",
+      "url": "https://interlaken.edu.mx",
+      "logo": "https://interlaken.edu.mx/assets/logo-horizontal.png",
+      "image": "https://interlaken.edu.mx/og-image.png",
+      "description": "Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con 40 años de trayectoria.",
+      "telephone": "+52-55-5379-1188",
+      "email": "colegio@interlaken.edu.mx",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Tlalnepantla de Baz",
+        "addressLocality": "Tlalnepantla de Baz",
+        "addressRegion": "Estado de México",
+        "postalCode": "54000",
+        "addressCountry": "MX"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 19.5407,
+        "longitude": -99.1955
+      },
+      "sameAs": [
+        "https://facebook.com",
+        "https://instagram.com",
+        "https://youtube.com"
+      ],
+      "areaServed": "Tlalnepantla de Baz, Estado de México"
+    }
+    </script>
+
+    <!-- Open Graph / social preview -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Colegio Interlaken" />
+    <meta property="og:title" content="Colegio Interlaken" />
+    <meta property="og:description" content="Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Tiempo de educar, tiempo de aprender." />
+    <meta property="og:url" content="https://interlaken.edu.mx/" />
+    <meta property="og:image" content="https://interlaken.edu.mx/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="es_MX" />
+
+    <!-- Twitter card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Colegio Interlaken" />
+    <meta name="twitter:description" content="Educación bilingüe de excelencia en Tlalnepantla, Estado de México." />
+    <meta name="twitter:image" content="https://interlaken.edu.mx/og-image.png" />
+
+    <!-- Fonts: Poppins (display) + Inter (body), loaded once here -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="/static/assets/index-Q6NMDTsu.js"></script>
+    <link rel="modulepreload" crossorigin href="/static/assets/vendor-CqouS74J.js">
+    <link rel="modulepreload" crossorigin href="/static/assets/query-C4dVk4i1.js">
+    <link rel="stylesheet" crossorigin href="/static/assets/index-D4z5thEp.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

@@ -1,0 +1,1 @@
+function i(n,e={}){}const r={ViewAdmissions:"funnel_view_admisiones",StartPreRegister:"funnel_start_pre_registro",SubmitPreRegister:"funnel_submit_pre_registro",ViewInscripcion:"funnel_view_inscripcion",BookingConversion:"conversion_agendar_visita"};export{r as F,i as t};
