@@ -55,6 +55,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ── MIDDLEWARE ────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # CSP + Permissions-Policy on every response (apps/core/security_headers.py).
+    'apps.core.security_headers.SecurityHeadersMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -125,6 +127,13 @@ AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = timedelta(minutes=15)
 AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
 AXES_RESET_ON_SUCCESS = True
+
+# ── SECURITY HEADERS (IK-SEC C4) ──────────────────────────
+# CSP + Permissions-Policy via apps.core.security_headers; policies are
+# path-scoped (public/API strict; /admin relaxed for unfold's Alpine.js).
+CSP_ENABLED = env.bool('CSP_ENABLED', default=True)
+CSP_REPORT_ONLY = env.bool('CSP_REPORT_ONLY', default=False)
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET')
