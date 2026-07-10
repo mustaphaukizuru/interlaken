@@ -142,22 +142,39 @@ function FaqExplorer() {
           <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">
             Filtrar por tema
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {FAQ_TOPICS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={topic === t}
-                onClick={() => setTopic(t)}
-                className={`min-h-[36px] rounded-full px-3.5 text-sm font-semibold transition-colors ${
-                  topic === t
-                    ? 'bg-purple text-white'
-                    : 'bg-purple/[0.07] text-purple hover:bg-purple/15'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="mt-2 flex flex-col gap-1">
+            {FAQ_TOPICS.map((t) => {
+              const count = t === 'Todas' ? FAQS.length : FAQS.filter((f) => f.cat === t).length;
+              const active = topic === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setTopic(t)}
+                  className={`flex min-h-[42px] items-center justify-between gap-2 rounded-xl px-3 text-sm font-semibold transition-colors ${
+                    active
+                      ? 'bg-purple text-white shadow-purple'
+                      : 'text-ink/80 hover:bg-purple/[0.07] hover:text-purple'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-purple/40'}`}
+                      aria-hidden="true"
+                    />
+                    {t}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      active ? 'bg-white/20 text-white' : 'bg-purple/10 text-purple'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <p className="mt-5 border-t border-ink/5 pt-3 text-xs uppercase tracking-wide text-subtle">
