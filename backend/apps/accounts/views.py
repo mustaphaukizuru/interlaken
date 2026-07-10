@@ -1,6 +1,8 @@
 """
 Accounts views: Google OAuth flow, JWT token exchange, user profile, students list.
 """
+from urllib.parse import urlencode
+
 import requests
 from django.conf import settings
 from django.contrib.auth import logout
@@ -32,15 +34,20 @@ class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        google_auth_url = (
-            'https://accounts.google.com/o/oauth2/v2/auth'
-            f'?client_id={settings.GOOGLE_CLIENT_ID}'
-            '&response_type=code'
-            '&scope=openid%20email%20profile'
-            f'&redirect_uri={settings.GOOGLE_REDIRECT_URI}'
-            '&access_type=offline'
-        )
-        return redirect(google_auth_url)
+        # Build the consent URL with proper URL-encoding of every parameter.
+        # `redirect_uri` must EXACTLY match one of the "Authorized redirect URIs"
+        # registered on the OAuth client in Google Cloud Console (scheme, host,
+        # port and trailing slash all count) — otherwise Google returns
+        # Error 400: redirect_uri_mismatch. It is read from GOOGLE_REDIRECT_URI.
+        params = urlencode({
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+            'response_type': 'code',
+            'scope': 'openid email profile',
+            'access_type': 'offline',
+            'prompt': 'select_account',
+        })
+        return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{params}')
 
 
 @method_decorator(ratelimit('oauth-callback', '20/m', key='ip', method='GET'), name='dispatch')
