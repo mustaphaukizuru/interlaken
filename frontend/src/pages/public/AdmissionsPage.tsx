@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays } from 'lucide-react';
+import { FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, Plus } from 'lucide-react';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
@@ -42,25 +42,51 @@ const STEPS = [
 // Fuente única con /admisiones/documentacion (enlaces oficiales incluidos).
 import { ADMISSION_DOCS as DOCS } from '@/lib/admisionesDocs';
 
-/** Objection-handling FAQ — also emitted as FAQPage structured data below. */
-const FAQS = [
+/** Objection-handling FAQ — also emitted as FAQPage structured data below.
+ *  `cat` alimenta el filtro por tema del explorador de preguntas. */
+const FAQS: { cat: string; q: string; a: string }[] = [
   {
+    cat: 'Niveles',
     q: '¿Qué niveles educativos ofrece Colegio Interlaken?',
-    a: 'Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe en cada nivel.',
+    a: 'Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe (español–inglés) en cada nivel.',
   },
   {
-    q: '¿El colegio cuenta con incorporación oficial ante la SEP?',
-    a: 'Sí. Nuestros planes de estudio tienen reconocimiento y validez oficial ante la Secretaría de Educación Pública.',
+    cat: 'Niveles',
+    q: '¿En qué consiste el modelo bilingüe?',
+    a: 'Inglés intensivo desde el nivel inicial, con preparación para certificaciones internacionales de la Universidad de Cambridge en secundaria.',
   },
   {
+    cat: 'Inscripción',
     q: '¿Cuánto tarda el pre-registro en línea?',
     a: 'Menos de 5 minutos. Recibirá confirmación inmediata y un asesor le contactará en un plazo de 2 días hábiles.',
   },
   {
-    q: '¿Qué documentos necesito para inscribir a mi hijo?',
-    a: 'Acta de nacimiento, CURP del alumno, comprobante de domicilio, boleta o certificado del ciclo anterior e identificación del tutor, entre otros.',
+    cat: 'Inscripción',
+    q: '¿Cómo es el proceso de admisión?',
+    a: 'Pre-registro en línea, entrega de documentos, examen de valoración y confirmación de lugar. Un asesor le guía en cada paso.',
   },
   {
+    cat: 'Documentos',
+    q: '¿Qué documentos necesito para inscribir a mi hijo?',
+    a: 'Acta de nacimiento, CURP del alumno y de los tutores, INE del tutor, comprobante de domicilio, boletas del ciclo anterior, entre otros. Consulte la lista completa con enlaces oficiales en la sección de Documentación.',
+  },
+  {
+    cat: 'Costos',
+    q: '¿Cómo están estructurados los costos?',
+    a: 'Las colegiaturas se pagan en 11 mensualidades, de agosto a junio. Consulte el desglose por sección en la página de Costos.',
+  },
+  {
+    cat: 'Costos',
+    q: '¿Ofrecen becas o descuentos?',
+    a: 'Contamos con apoyos para hermanos y casos especiales. Escríbanos desde la sección de Contacto para conocer las opciones vigentes.',
+  },
+  {
+    cat: 'Oficial',
+    q: '¿El colegio cuenta con incorporación oficial ante la SEP?',
+    a: 'Sí. Nuestros planes de estudio tienen reconocimiento y validez oficial ante la Secretaría de Educación Pública.',
+  },
+  {
+    cat: 'Privacidad',
     q: '¿Cómo protege el colegio los datos de mi familia?',
     a: 'Tratamos sus datos personales conforme a la LFPDPPP. Consulte nuestro Aviso de Privacidad para conocer y ejercer sus derechos ARCO.',
   },
@@ -75,6 +101,109 @@ const faqJsonLd = {
     acceptedAnswer: { '@type': 'Answer', text: f.a },
   })),
 };
+
+const FAQ_TOPICS = ['Todas', ...Array.from(new Set(FAQS.map((f) => f.cat)))];
+
+/**
+ * Explorador de preguntas frecuentes: buscador + filtro por tema (barra
+ * lateral) y lista acordeón. Sin dependencias; mobile-first (la barra se
+ * apila sobre la lista en teléfonos).
+ */
+function FaqExplorer() {
+  const [query, setQuery] = useState('');
+  const [topic, setTopic] = useState('Todas');
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return FAQS.filter(
+      (f) =>
+        (topic === 'Todas' || f.cat === topic) &&
+        (!q || f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q)),
+    );
+  }, [query, topic]);
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
+      {/* Barra lateral */}
+      <aside className="self-start lg:sticky lg:top-24">
+        <div className="rounded-[20px] border border-ink/10 bg-white p-4 shadow-card sm:p-5">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar…"
+              aria-label="Buscar en preguntas frecuentes"
+              className="input-field min-h-[44px] pl-9 text-base"
+            />
+          </div>
+
+          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">
+            Filtrar por tema
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {FAQ_TOPICS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={topic === t}
+                onClick={() => setTopic(t)}
+                className={`min-h-[36px] rounded-full px-3.5 text-sm font-semibold transition-colors ${
+                  topic === t
+                    ? 'bg-purple text-white'
+                    : 'bg-purple/[0.07] text-purple hover:bg-purple/15'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <p className="mt-5 border-t border-ink/5 pt-3 text-xs uppercase tracking-wide text-subtle">
+            {visible.length} de {FAQS.length} preguntas
+          </p>
+        </div>
+      </aside>
+
+      {/* Lista de preguntas */}
+      <div className="min-w-0">
+        {visible.length === 0 ? (
+          <div className="rounded-[20px] border border-ink/10 bg-white p-8 text-center shadow-card">
+            <p className="text-sm text-muted">
+              No encontramos preguntas para su búsqueda.{' '}
+              <Link to="/contacto" className="font-semibold text-green-dark underline">
+                Contáctenos
+              </Link>{' '}
+              y con gusto le ayudamos.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-ink/5 overflow-hidden rounded-[20px] border border-ink/10 bg-white shadow-card">
+            {visible.map((f) => (
+              <details key={f.q} className="group">
+                <summary className="flex cursor-pointer items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-cream-2/60 sm:px-6 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-purple">
+                      {f.cat}
+                    </span>
+                    <span className="mt-0.5 block font-head text-[15.5px] font-bold leading-snug text-ink">
+                      {f.q}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple/10 text-purple transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none">
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                </summary>
+                <p className="px-5 pb-4 text-sm leading-relaxed text-muted sm:px-6">{f.a}</p>
+              </details>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function AdmissionsPage() {
   // Admissions funnel entry point (page views also cover this; the explicit
@@ -238,19 +367,7 @@ export default function AdmissionsPage() {
           <span className="section-label-green inline-flex">Preguntas frecuentes</span>
           <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">Resolvemos sus dudas</h2>
         </Reveal>
-        <div className="mx-auto max-w-[760px] space-y-3.5">
-          {FAQS.map((f, i) => (
-            <Reveal key={f.q} delay={i * 60}>
-              <details className="card group">
-                <summary className="flex cursor-pointer items-center justify-between gap-4 font-head text-[15.5px] font-bold text-ink [&::-webkit-details-marker]:hidden">
-                  {f.q}
-                  <ArrowRight size={18} className="flex-shrink-0 text-purple transition-transform group-open:rotate-90" />
-                </summary>
-                <p className="mt-3 text-sm leading-relaxed text-muted">{f.a}</p>
-              </details>
-            </Reveal>
-          ))}
-        </div>
+        <FaqExplorer />
       </Section>
     </div>
   );
