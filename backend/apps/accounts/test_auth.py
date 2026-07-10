@@ -105,7 +105,9 @@ class TestGoogleCallback:
         resp = api_client.get(reverse(self.url_name), {"code": "abc"})
         assert resp.status_code == 302
         loc = resp["Location"]
-        assert "/auth/callback" in loc
+        # Success lands on /login?login=ok (NOT /auth/*, which is backend-only).
+        assert "/login?login=ok" in loc
+        assert "/auth/callback" not in loc
         # No tokens are ever placed in the redirect URL — session is cookie-only.
         assert "access=" not in loc and "refresh=" not in loc
         assert resp.cookies[REFRESH_COOKIE]["httponly"] is True

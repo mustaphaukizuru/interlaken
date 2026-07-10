@@ -30,8 +30,11 @@ the header.
 ### Google OAuth
 1. Browser → `/auth/google/` → Google consent → `/auth/google/callback/`.
 2. The **callback sets the session cookies and 302-redirects to
-   `FRONTEND_URL/auth/callback?login=ok`** — no token in the URL.
-3. The SPA sees `?login=ok` and calls the refresh endpoint (below) to mint an
+   `FRONTEND_URL/login?login=ok`** — no token in the URL. (It must land on
+   `/login`, not `/auth/*`: the whole `/auth/*` prefix is reserved for the
+   backend — the Vite dev proxy and Django's SPA catch-all both route it to
+   Django, so an `/auth/callback` SPA route is unreachable.)
+3. `LoginPage` sees `?login=ok` and calls the refresh endpoint (below) to mint an
    in-memory access token from the cookie, then `/me`.
 
 ### Silent refresh (access expiry & reload)

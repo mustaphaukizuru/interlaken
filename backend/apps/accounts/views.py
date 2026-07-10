@@ -118,9 +118,11 @@ class GoogleCallbackView(APIView):
                 user.save(update_fields=['google_id', 'avatar'])
 
         # Set the session as httpOnly cookies and redirect WITHOUT any token in
-        # the URL. The SPA lands on /auth/callback and silently calls the refresh
-        # endpoint to obtain an in-memory access token from the cookie.
-        response = redirect(f'{settings.FRONTEND_URL}/auth/callback?login=ok')
+        # the URL. Land on /login (NOT /auth/*, which is reserved for the backend
+        # — the Vite proxy and the SPA catch-all both route /auth/* to Django);
+        # LoginPage sees ?login=ok and silently mints an in-memory access token
+        # from the cookie via the refresh endpoint.
+        response = redirect(f'{settings.FRONTEND_URL}/login?login=ok')
         issue_session(user, response)
         return response
 

@@ -120,8 +120,9 @@ export default function App() {
             </Route>
 
             {/* ── AUTH ────────────────────────────────────── */}
+            {/* Google OAuth returns to /login?login=ok — /auth/* is reserved for
+                the backend (Vite proxy + SPA catch-all both send it to Django). */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/auth/callback" element={<LoginPage />} />
 
             {/* ── PARENT PORTAL ───────────────────────────── */}
             <Route path="/portal" element={
