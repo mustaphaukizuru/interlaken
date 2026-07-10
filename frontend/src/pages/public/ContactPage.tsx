@@ -31,10 +31,11 @@ export default function ContactPage() {
   const settings = useSiteSettings();
   // Contact facts are admin-editable (Contenido del sitio → Ajustes del sitio);
   // entries without a value simply don't render.
+  // La dirección se muestra en la tarjeta con foto de la fachada (abajo),
+  // por eso no se repite aquí.
   const INFO = [
     { icon: Phone,  label: 'Teléfono',           value: settings.phone_display, href: `tel:${settings.phone_e164}` },
     { icon: Mail,   label: 'Correo',             value: settings.contact_email, href: `mailto:${settings.contact_email}` },
-    { icon: MapPin, label: 'Dirección',          value: settings.address,       href: settings.maps_url || undefined },
     { icon: Clock,  label: 'Horario de oficina', value: settings.office_hours },
   ].filter((item) => item.value);
 
