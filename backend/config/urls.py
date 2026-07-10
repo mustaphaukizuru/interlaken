@@ -9,7 +9,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAdminUser
 
-from apps.core.views import ContactCreateView
+from apps.core.views import ContactCreateView, HealthView
 
 # Staff-gated API docs: session auth so a Django-admin login is enough to
 # browse Swagger — the schema is never exposed anonymously.
@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/v1/legal/',       include('apps.legal.urls')),
     path('api/v1/content/',     include('apps.content.urls')),
     path('api/v1/contact/',     ContactCreateView.as_view(), name='contact-create'),
+    path('api/v1/health/',      HealthView.as_view(),        name='health'),
 
     # React SPA catch-all (serves index.html for all unmatched routes)
     path('', include('apps.core.urls')),
