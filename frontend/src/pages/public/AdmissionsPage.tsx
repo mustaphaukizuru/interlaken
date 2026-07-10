@@ -148,14 +148,25 @@ export default function AdmissionsPage() {
       {/* ── DOCUMENTS + CTA ── */}
       <Section bg="cream">
         <div className="grid gap-8 md:grid-cols-2">
+          {/* Documentos — tarjeta con encabezado, conteo y enlaces oficiales */}
           <Reveal direction="right">
-            <div className="card h-full">
-              <h3 className="mb-4 font-head text-[19px] font-bold text-ink">Documentos requeridos</h3>
-              <ul className="space-y-3">
+            <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-ink/10 bg-white shadow-card">
+              <div className="flex items-center gap-3 border-b border-ink/10 bg-green/5 px-5 py-4 sm:px-6">
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-green/15 text-green-dark">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h3 className="font-head text-[19px] font-bold text-ink">Documentos requeridos</h3>
+                  <p className="text-xs text-muted">
+                    {DOCS.length} documentos · {DOCS.filter((d) => d.href).length} con trámite oficial en línea
+                  </p>
+                </div>
+              </div>
+              <ul className="flex-1 divide-y divide-ink/5 px-5 sm:px-6">
                 {DOCS.map((d) => (
-                  <li key={d.label} className="flex items-start gap-2.5 text-sm text-muted">
-                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
-                    <span>
+                  <li key={d.label} className="flex items-start gap-3 py-3 text-sm">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" aria-hidden="true" />
+                    <span className="text-ink/90">
                       {d.label}
                       {d.href && (
                         <>
@@ -174,28 +185,47 @@ export default function AdmissionsPage() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 rounded-lg bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+              <p className="m-5 mt-2 rounded-lg bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted sm:mx-6">
                 Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE)
                 para obtener o consultar cada documento en línea.
               </p>
             </div>
           </Reveal>
+
+          {/* CTA con foto del salón — llena el espacio y motiva el pre-registro */}
           <Reveal direction="left">
-            <div className="card flex h-full flex-col justify-between border-brand-200 bg-brand-50">
-              <div>
-                <h3 className="mb-2 text-xl font-bold text-brand-800">¿Listo para comenzar?</h3>
-                <p className="mb-6 text-sm leading-relaxed text-brand-700">
-                  El proceso de pre-registro toma menos de 5 minutos. Recibirá confirmación inmediata
-                  y nos pondremos en contacto para coordinar los siguientes pasos.
+            <div className="group relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-[20px] shadow-card">
+              <img
+                src="/assets/classroom.webp"
+                alt="Salón de clases del Colegio Interlaken"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-dark via-dark/85 to-dark/25" />
+              <div className="absolute inset-0 bg-gradient-to-br from-purple/45 via-transparent to-transparent" />
+              <div className="relative p-6 text-white sm:p-8">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                  <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                  Inscripciones abiertas · Ciclo {CURRENT_CYCLE}
+                </span>
+                <h3 className="mt-4 font-head text-fluid-2xl font-extrabold leading-tight tracking-tight">
+                  ¿Listo para comenzar?
+                </h3>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85">
+                  El pre-registro toma menos de 5 minutos. Recibirá confirmación
+                  inmediata y le contactaremos para coordinar los siguientes pasos.
                 </p>
-              </div>
-              <div className="space-y-3">
-                <Link to="/pre-registro" className="btn-primary w-full justify-center">
-                  Inicie su pre-registro <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link to="/puertas-abiertas" className="btn-secondary w-full justify-center">
-                  Ver fechas de Puertas Abiertas
-                </Link>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <Link to="/pre-registro" className="btn-pink flex-1 justify-center">
+                    Inicie su pre-registro <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                  <Link
+                    to="/puertas-abiertas"
+                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border-2 border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  >
+                    Ver Puertas Abiertas
+                  </Link>
+                </div>
               </div>
             </div>
           </Reveal>
