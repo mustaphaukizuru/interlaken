@@ -6,11 +6,20 @@ from .models import SiteSettings, TuitionCost
 
 @admin.register(TuitionCost)
 class TuitionCostAdmin(ModelAdmin):
-    """Costos por sección — el colegio los actualiza cada ciclo escolar."""
+    """Costos INFORMATIVOS del sitio público — el colegio los actualiza cada
+    ciclo. Los precios que se facturan viven en Finanzas → Planes de cobro."""
     list_display = ('section', 'inscripcion', 'colegiatura', 'order',
                     'is_active', 'updated_at')
     list_editable = ('inscripcion', 'colegiatura', 'order', 'is_active')
     ordering = ('order',)
+
+    def changelist_view(self, request, extra_context=None):
+        from django.contrib import messages
+        messages.info(request, 'Estos costos son informativos (sitio público). '
+                               'Los precios que se facturan se configuran en '
+                               '«Finanzas → Planes de cobro»; mantenga ambos '
+                               'en sincronía.')
+        return super().changelist_view(request, extra_context)
 
 
 @admin.register(SiteSettings)

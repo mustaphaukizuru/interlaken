@@ -7,11 +7,20 @@ from .models import (Discount, FeeSchedule, Invoice, InvoiceAdjustment,
 
 @admin.register(FeeSchedule)
 class FeeScheduleAdmin(ModelAdmin):
+    """Precios que se FACTURAN. Al cambiarlos, actualice también los costos
+    informativos del sitio público en Contenido → Costos por sección."""
     list_display = ('name', 'grade', 'level', 'monthly_amount', 'due_day',
                     'late_fee_type', 'active')
     list_filter = ('active', 'late_fee_type', 'level')
     search_fields = ('name', 'grade', 'level')
     list_editable = ('active',)
+
+    def changelist_view(self, request, extra_context=None):
+        from django.contrib import messages
+        messages.info(request, 'Recuerde: al actualizar precios, actualice '
+                               'también «Contenido → Costos por sección» '
+                               '(los costos que muestra el sitio público).')
+        return super().changelist_view(request, extra_context)
 
 
 @admin.register(Discount)
