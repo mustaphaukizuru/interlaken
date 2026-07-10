@@ -108,18 +108,18 @@ export default function ContactPage() {
               })}
             </div>
 
-            {/* Ubicación — mapa interactivo real + CTA "Cómo llegar" */}
+            {/* Foto de la fachada + dirección y CTA "Cómo llegar".
+                El mapa interactivo preciso vive en su propia sección más abajo. */}
             {settings.address && (
               <div className="group mt-6 overflow-hidden rounded-[20px] border border-line bg-white shadow-card transition-shadow hover:shadow-purple">
-                <div className="relative aspect-[16/10] w-full bg-cream-2">
-                  <iframe
-                    title="Ubicación de Colegio Interlaken en Google Maps"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(settings.address)}&z=15&output=embed`}
-                    className="absolute inset-0 h-full w-full border-0 grayscale-[0.25] transition-[filter] duration-500 group-hover:grayscale-0 motion-reduce:transition-none"
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream-2">
+                  <img
+                    src="/assets/facade.webp"
+                    alt="Fachada del Colegio Interlaken en Tlalnepantla"
                     loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    allowFullScreen
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-dark/25 to-transparent" />
                 </div>
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-2.5">
