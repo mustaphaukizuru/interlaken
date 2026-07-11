@@ -537,13 +537,13 @@ function AuditTrailModal({ invoice, onClose }: { invoice: Invoice | null; onClos
                 <tbody>
                   {adjustments.map((a) => (
                     <tr key={a.id}>
-                      <td className="whitespace-nowrap text-muted">{fmt(a.created_at)}</td>
-                      <td><Badge variant="info">{a.kind_display}</Badge></td>
-                      <td className={`num font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
+                      <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmt(a.created_at)}</td>
+                      <td data-label="Tipo"><Badge variant="info">{a.kind_display}</Badge></td>
+                      <td data-label="Monto" className={`num font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
                         {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
                       </td>
-                      <td className="text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
-                      <td className="text-muted">{a.admin_name || '—'}</td>
+                      <td data-label="Motivo" className="text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
+                      <td data-label="Admin" className="text-muted">{a.admin_name || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

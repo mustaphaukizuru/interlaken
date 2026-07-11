@@ -325,18 +325,20 @@ function DepositsTab() {
             <tbody>
               {data.map((d) => (
                 <tr key={d.id}>
-                  <td className="whitespace-nowrap text-muted">{fmtDate(d.created_at)}</td>
-                  <td className="font-medium text-ink">
-                    <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
-                      {d.student_name}
-                    </Link>
-                    <span className="block text-xs text-subtle">{d.student_code}</span>
+                  <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmtDate(d.created_at)}</td>
+                  <td data-label="Alumno" className="font-medium text-ink">
+                    <span className="block">
+                      <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
+                        {d.student_name}
+                      </Link>
+                      <span className="block text-xs text-subtle">{d.student_code}</span>
+                    </span>
                   </td>
-                  <td className="num font-semibold text-ink">${parseFloat(d.amount).toFixed(2)}</td>
-                  <td className="text-muted">{d.method_display}</td>
-                  <td className="text-muted">{d.gateway || '—'}</td>
-                  <td><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
-                  <td className="text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
+                  <td data-label="Monto" className="num font-semibold text-ink">${parseFloat(d.amount).toFixed(2)}</td>
+                  <td data-label="Método" className="text-muted">{d.method_display}</td>
+                  <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
+                  <td data-label="Estado"><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
+                  <td data-label="Referencia" className="text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -412,18 +414,20 @@ function ReconcileTab() {
                 <tbody>
                   {data.results.map((r) => (
                     <tr key={r.student_id}>
-                      <td className="font-medium text-ink">
-                        <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>
-                        <span className="block text-xs text-subtle">{r.student_code}</span>
+                      <td data-label="Alumno" className="font-medium text-ink">
+                        <span className="block">
+                          <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>
+                          <span className="block text-xs text-subtle">{r.student_code}</span>
+                        </span>
                       </td>
-                      <td className="num text-ink">${parseFloat(r.local_balance).toFixed(2)}</td>
-                      <td className="num text-muted">
+                      <td data-label="Saldo local" className="num text-ink">${parseFloat(r.local_balance).toFixed(2)}</td>
+                      <td data-label="Loyverse" className="num text-muted">
                         {r.loyverse_balance !== null ? `$${parseFloat(r.loyverse_balance).toFixed(2)}` : '—'}
                       </td>
-                      <td className="num font-medium text-ink">
+                      <td data-label="Diferencia" className="num font-medium text-ink">
                         {r.drift !== null ? `$${parseFloat(r.drift).toFixed(2)}` : '—'}
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         {r.error ? (
                           <Badge variant="error">Error</Badge>
                         ) : r.in_sync ? (
@@ -480,15 +484,15 @@ function LowBalanceTab() {
               <tbody>
                 {data.map((b) => (
                   <tr key={b.id}>
-                    <td className="font-medium text-ink">
+                    <td data-label="Alumno" className="font-medium text-ink">
                       <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
                         {b.student.user.full_name}
                       </Link>
                     </td>
-                    <td className="text-muted">{b.student.student_id}</td>
-                    <td className="num font-semibold text-amber">${parseFloat(b.balance).toFixed(2)}</td>
-                    <td className="num text-muted">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
-                    <td className="text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
+                    <td data-label="Matrícula" className="text-muted">{b.student.student_id}</td>
+                    <td data-label="Saldo" className="num font-semibold text-amber">${parseFloat(b.balance).toFixed(2)}</td>
+                    <td data-label="Umbral" className="num text-muted">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
+                    <td data-label="Últ. sinc." className="text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
                   </tr>
                 ))}
               </tbody>

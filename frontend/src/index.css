@@ -187,4 +187,33 @@
   .admin-table tbody tr { @apply border-t border-line; }
   .admin-table tbody tr:hover { @apply bg-cream; }
   .admin-table .num { @apply text-right tabular-nums; }
+
+  /* Mobile (<768px): dense tables that ship no bespoke card list collapse into
+     stacked cards. Scoped with :not(.hidden) so tables that already pair a
+     `md:hidden <ul>` with a `hidden md:block` desktop table are left alone —
+     they're display:none here and render their own cards. Each row becomes a
+     card and each cell a label/value line driven by the td's data-label. */
+  @media (max-width: 767px) {
+    .admin-table-wrap:not(.hidden) { max-height: none; overflow: visible; border: 0; border-radius: 0; }
+    .admin-table-wrap:not(.hidden) .admin-table,
+    .admin-table-wrap:not(.hidden) tbody,
+    .admin-table-wrap:not(.hidden) tr { display: block; width: 100%; }
+    .admin-table-wrap:not(.hidden) thead { display: none; }
+    .admin-table-wrap:not(.hidden) tbody tr { @apply mb-3 rounded-xl2 border border-line bg-white p-1.5 shadow-card; }
+    .admin-table-wrap:not(.hidden) tbody tr:last-child { @apply mb-0; }
+    .admin-table-wrap:not(.hidden) tbody tr:hover { @apply bg-white; }
+    .admin-table-wrap:not(.hidden) tbody td {
+      @apply flex items-center justify-between gap-4 border-t border-cream px-3 py-2 text-right;
+      min-height: 42px;
+    }
+    .admin-table-wrap:not(.hidden) tbody td:first-child { @apply border-t-0; }
+    .admin-table-wrap:not(.hidden) tbody td:empty { display: none; }
+    .admin-table-wrap:not(.hidden) tbody td::before {
+      content: attr(data-label);
+      @apply flex-shrink-0 text-left font-head text-[10.5px] font-bold uppercase tracking-wide text-muted;
+    }
+    .admin-table-wrap:not(.hidden) tbody td:not([data-label]) { @apply justify-end; }
+    .admin-table-wrap:not(.hidden) tbody td:not([data-label])::before { content: none; }
+    .admin-table-wrap:not(.hidden) .num { @apply text-right; }
+  }
 }

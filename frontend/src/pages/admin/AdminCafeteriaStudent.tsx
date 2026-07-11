@@ -184,13 +184,13 @@ export default function AdminCafeteriaStudent() {
               <tbody>
                 {transactions.map((t) => (
                   <tr key={t.id}>
-                    <td className="whitespace-nowrap text-muted">{fmtDate(t.date)}</td>
-                    <td>
+                    <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmtDate(t.date)}</td>
+                    <td data-label="Tipo">
                       <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span>
                     </td>
-                    <td className="text-muted max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
-                    <td className="num font-medium text-ink">${parseFloat(t.amount).toFixed(2)}</td>
-                    <td className="num text-muted">
+                    <td data-label="Descripción" className="text-muted max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
+                    <td data-label="Monto" className="num font-medium text-ink">${parseFloat(t.amount).toFixed(2)}</td>
+                    <td data-label="Saldo" className="num text-muted">
                       {t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—'}
                     </td>
                     <td className="num">
@@ -233,16 +233,16 @@ export default function AdminCafeteriaStudent() {
               <tbody>
                 {adjustments.map((a) => (
                   <tr key={a.id}>
-                    <td className="whitespace-nowrap text-muted">{fmtDate(a.created_at)}</td>
-                    <td>
+                    <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmtDate(a.created_at)}</td>
+                    <td data-label="Tipo">
                       <Badge variant={a.kind === 'refund' ? 'info' : 'neutral'}>{a.kind_display}</Badge>
                     </td>
-                    <td className={`num font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
+                    <td data-label="Monto" className={`num font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
                       {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
                     </td>
-                    <td className="text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
-                    <td className="text-muted">{a.admin_name || '—'}</td>
-                    <td className="num text-muted">
+                    <td data-label="Motivo" className="text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
+                    <td data-label="Admin" className="text-muted">{a.admin_name || '—'}</td>
+                    <td data-label="Saldo" className="num text-muted">
                       {a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—'}
                     </td>
                   </tr>
