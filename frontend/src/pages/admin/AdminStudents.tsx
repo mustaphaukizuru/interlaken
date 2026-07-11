@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Users, Search, FileUp } from 'lucide-react';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { Card } from '@/components/ui/Card';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
@@ -62,7 +62,7 @@ export default function AdminStudents() {
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
-          <LoadingSpinner />
+          <TableSkeleton />
         ) : !filtered?.length ? (
           <EmptyState
             icon={Users}

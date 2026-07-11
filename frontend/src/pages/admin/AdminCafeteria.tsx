@@ -11,7 +11,7 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
@@ -150,7 +150,7 @@ function RosterTab() {
       <p className="-mt-2 mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
       {isLoading ? (
-        <LoadingSpinner />
+        <TableSkeleton />
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
       ) : !filtered?.length ? (
@@ -303,7 +303,7 @@ function DepositsTab() {
       </div>
 
       {isLoading ? (
-        <LoadingSpinner />
+        <TableSkeleton />
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
       ) : !data?.length ? (
@@ -381,7 +381,7 @@ function ReconcileTab() {
       </div>
 
       {isLoading || isFetching ? (
-        <LoadingSpinner />
+        <TableSkeleton />
       ) : !data ? (
         <EmptyState icon={Scale} title="Ejecuta la reconciliación" description="Presiona «Reconciliar» para comparar con Loyverse." />
       ) : (
@@ -464,7 +464,7 @@ function LowBalanceTab() {
   return (
     <Card>
       {isLoading ? (
-        <LoadingSpinner />
+        <TableSkeleton />
       ) : !data?.length ? (
         <EmptyState icon={CheckCircle2} title="Ningún alumno con saldo bajo" />
       ) : (

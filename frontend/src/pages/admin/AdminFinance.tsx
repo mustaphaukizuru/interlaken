@@ -10,7 +10,7 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
@@ -235,7 +235,7 @@ export default function AdminFinance() {
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
-          <LoadingSpinner />
+          <TableSkeleton />
         ) : !invoices?.length ? (
           <EmptyState
             icon={Receipt}
@@ -524,7 +524,7 @@ function AuditTrailModal({ invoice, onClose }: { invoice: Invoice | null; onClos
           {isError ? (
             <ErrorState onRetry={() => refetch()} />
           ) : isLoading ? (
-            <LoadingSpinner />
+            <TableSkeleton rows={4} />
           ) : !adjustments.length ? (
             <EmptyState icon={History} title="Sin ajustes registrados" />
           ) : (

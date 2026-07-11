@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
@@ -72,7 +72,7 @@ export default function AdminAdmissions() {
         <p className="mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
         {isLoading ? (
-          <LoadingSpinner />
+          <TableSkeleton />
         ) : isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : !filtered?.length ? (

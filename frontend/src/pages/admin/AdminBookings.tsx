@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -274,7 +274,7 @@ export default function AdminBookings() {
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
-          <LoadingSpinner />
+          <TableSkeleton />
         ) : !bookings?.length ? (
           <EmptyState
             icon={CalendarClock}
