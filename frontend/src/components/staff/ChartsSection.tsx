@@ -1,10 +1,11 @@
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList,
          ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ClipboardList, Megaphone } from 'lucide-react';
+import { ClipboardList, Megaphone, Receipt } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StaffCard } from '@/components/staff/StaffShell';
 import { fmtDay, fmtInt, fmtMXN, fmtMXNCompact, getChartTheme } from '@/lib/chartTheme';
 import { usePrefersDark, useReducedMotion } from '@/hooks/useMediaQuery';
+import { useChartEntrance } from '@/hooks/useChartEntrance';
 import type { AnalyticsPayload } from '@/types/analytics';
 
 /**
@@ -12,10 +13,11 @@ import type { AnalyticsPayload } from '@/types/analytics';
  * max 6 categorical colors, bars start at zero, no pies, direct labels instead
  * of legends, es-MX numbers/dates, every chart titled with its takeaway.
  *
- * Entry animations are OFF by design: they depend on requestAnimationFrame,
- * which throttled/background/battery-saver tabs may never fire — leaving
- * charts blank exactly when a director glances at a backgrounded phone tab.
- * Interaction motion (tooltip) stays on unless prefers-reduced-motion.
+ * Entry animations are gated through useChartEntrance: they play only on a
+ * foreground mount (a backgrounded tab never fires requestAnimationFrame, which
+ * would otherwise leave a chart stuck blank), respect prefers-reduced-motion,
+ * and run first-render-only so the 60s refetch never replays them. Interaction
+ * motion (tooltip) stays on unless prefers-reduced-motion.
  */
 
 const AXIS_FONT = 11;
@@ -39,6 +41,7 @@ function tooltipStyle(theme: ReturnType<typeof getChartTheme>) {
 // ── 1. Admissions funnel ──────────────────────────────────
 function FunnelChart({ data }: { data: AnalyticsPayload }) {
   const { theme } = useTheme();
+  const entrance = useChartEntrance();
   const f = data.admissions.pre_funnel;
   const total = f.pending + f.contacted + f.enrolled + f.rejected;
 
@@ -72,7 +75,7 @@ function FunnelChart({ data }: { data: AnalyticsPayload }) {
               <YAxis type="category" dataKey="stage" width={86} axisLine={false}
                      tickLine={false}
                      tick={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]} isAnimationActive={false} barSize={22}>
+              <Bar dataKey="value" radius={[0, 6, 6, 0]} {...entrance} barSize={22}>
                 {rows.map((r) => <Cell key={r.stage} fill={r.color} />)}
                 <LabelList dataKey="value" position="right"
                            formatter={(v: unknown) => fmtInt(Number(v))}
@@ -89,6 +92,7 @@ function FunnelChart({ data }: { data: AnalyticsPayload }) {
 // ── 1b. Inscription (registration) funnel ─────────────────
 function RegFunnelChart({ data }: { data: AnalyticsPayload }) {
   const { theme } = useTheme();
+  const entrance = useChartEntrance();
   const f = data.admissions.reg_funnel;
   const get = (k: string) => f[k] ?? 0;
   const total = Object.values(f).reduce((s, n) => s + n, 0);
@@ -126,7 +130,7 @@ function RegFunnelChart({ data }: { data: AnalyticsPayload }) {
               <YAxis type="category" dataKey="stage" width={86} axisLine={false}
                      tickLine={false}
                      tick={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]} isAnimationActive={false} barSize={18}>
+              <Bar dataKey="value" radius={[0, 6, 6, 0]} {...entrance} barSize={18}>
                 {rows.map((r) => <Cell key={r.stage} fill={r.color} />)}
                 <LabelList dataKey="value" position="right"
                            formatter={(v: unknown) => fmtInt(Number(v))}
@@ -143,6 +147,7 @@ function RegFunnelChart({ data }: { data: AnalyticsPayload }) {
 // ── 2. Referral sources ───────────────────────────────────
 function ReferralsChart({ data }: { data: AnalyticsPayload }) {
   const { theme } = useTheme();
+  const entrance = useChartEntrance();
   const rows = data.admissions.referrals;
 
   const takeaway = rows.length === 0
@@ -167,7 +172,7 @@ function ReferralsChart({ data }: { data: AnalyticsPayload }) {
                      tickLine={false}
                      tick={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
               <Bar dataKey="count" fill={theme.categorical[1]} radius={[0, 6, 6, 0]}
-                   isAnimationActive={false} barSize={18}>
+                   {...entrance} barSize={18}>
                 <LabelList dataKey="count" position="right"
                            formatter={(v: unknown) => fmtInt(Number(v))}
                            style={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
@@ -183,6 +188,7 @@ function ReferralsChart({ data }: { data: AnalyticsPayload }) {
 // ── 3. Cafeteria: top-ups vs consumption ──────────────────
 function CafeteriaChart({ data }: { data: AnalyticsPayload }) {
   const { theme, reduced } = useTheme();
+  const entrance = useChartEntrance();
   const series = data.cafeteria.series;
   const topups = series.reduce((s, p) => s + p.topups, 0);
   const purchases = series.reduce((s, p) => s + p.purchases, 0);
@@ -234,15 +240,76 @@ function CafeteriaChart({ data }: { data: AnalyticsPayload }) {
                 <Area type="monotone" dataKey="topups" name="topups"
                       stroke={theme.semantic.inflow} strokeWidth={2}
                       fill={theme.semantic.inflow} fillOpacity={0.14}
-                      isAnimationActive={false} dot={false} />
+                      {...entrance} dot={false} />
                 <Area type="monotone" dataKey="purchases" name="purchases"
                       stroke={theme.semantic.outflow} strokeWidth={2}
                       fill={theme.semantic.outflow} fillOpacity={0.1}
-                      isAnimationActive={false} dot={false} />
+                      {...entrance} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </>
+      )}
+    </StaffCard>
+  );
+}
+
+// ── 4. Daily revenue trend ────────────────────────────────
+function RevenueTrendChart({ data }: { data: AnalyticsPayload }) {
+  const { theme, reduced } = useTheme();
+  const entrance = useChartEntrance();
+  const series = data.payments.series;
+  const total = series.reduce((s, p) => s + p.total, 0);
+  const peak = series.reduce((m, p) => (p.total > m.total ? p : m), { date: '', total: 0 });
+
+  const takeaway = total === 0
+    ? `Sin cobros registrados en ${data.range_days} días`
+    : peak.total > 0
+      ? `${fmtMXN(total)} cobrados en ${data.range_days} días · pico el ${fmtDay(peak.date)}`
+      : `${fmtMXN(total)} cobrados en ${data.range_days} días`;
+
+  const stroke = theme.categorical[0];
+  const interval = Math.floor(series.length / 6);
+
+  return (
+    <StaffCard title={takeaway} subtitle="Ingresos diarios — colegiaturas y otros cobros">
+      {total === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="Sin cobros en el periodo"
+          description="Cada pago registrado en Finanzas alimenta esta tendencia diaria."
+        />
+      ) : (
+        <div className="h-52">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={series} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+              <defs>
+                <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={stroke} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={stroke} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={theme.grid} vertical={false} />
+              <XAxis dataKey="date" tickFormatter={fmtDay} interval={interval}
+                     axisLine={false} tickLine={false}
+                     tick={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
+              <YAxis tickFormatter={(v: number) => fmtMXNCompact(v)} width={64}
+                     domain={[0, 'auto']} axisLine={false} tickLine={false}
+                     tick={{ fill: theme.axis, fontSize: AXIS_FONT, fontFamily: theme.fontFamily }} />
+              <Tooltip
+                contentStyle={tooltipStyle(theme)}
+                isAnimationActive={!reduced}
+                labelFormatter={(label) => fmtDay(String(label))}
+                formatter={(value) => [fmtMXN(Number(value)), 'Cobrado']}
+              />
+              <Area type="monotone" dataKey="total" name="total"
+                    stroke={stroke} strokeWidth={2}
+                    fill="url(#revenueFill)"
+                    {...entrance} dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </StaffCard>
   );
@@ -254,6 +321,7 @@ export default function ChartsSection({ data }: { data: AnalyticsPayload }) {
       <FunnelChart data={data} />
       <RegFunnelChart data={data} />
       <ReferralsChart data={data} />
+      <RevenueTrendChart data={data} />
       <CafeteriaChart data={data} />
     </div>
   );
