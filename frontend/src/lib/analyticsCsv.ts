@@ -23,8 +23,8 @@ export function analyticsToCsv(data: AnalyticsPayload): string {
 }
 
 export function downloadAnalyticsCsv(data: AnalyticsPayload): void {
-  // '﻿' = UTF-8 BOM so Excel (es-MX) detects the encoding.
-  const blob = new Blob(['﻿' + analyticsToCsv(data)],
+  // '\uFEFF' = UTF-8 BOM so Excel (es-MX) detects the CSV encoding.
+  const blob = new Blob(['\uFEFF' + analyticsToCsv(data)],
     { type: 'text/csv;charset=utf-8' });
   downloadBlob(blob, `analitica-interlaken-${data.range_days}d.csv`);
 }
