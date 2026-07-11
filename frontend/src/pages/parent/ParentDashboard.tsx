@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
+import { ErrorState } from '@/components/ui/ErrorState';
 import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
@@ -22,7 +23,7 @@ const payBadge = (s: string) => {
 
 export default function ParentDashboard() {
   const { user } = useAuthStore();
-  const { data, isLoading } = useQuery<DashboardData>({
+  const { data, isLoading, isError, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
     staleTime: 1000 * 60 * 2,
@@ -63,6 +64,10 @@ export default function ParentDashboard() {
           </div>
         )}
 
+        {isError ? (
+          <div className="card"><ErrorState onRetry={() => refetch()} /></div>
+        ) : (
+        <>
         {/* Stats */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
           {isLoading ? (
@@ -130,6 +135,8 @@ export default function ParentDashboard() {
             </div>
           </Reveal>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

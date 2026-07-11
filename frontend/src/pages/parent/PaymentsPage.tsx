@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { paymentsApi } from '@/services/api';
 import type { Payment } from '@/types';
@@ -41,7 +42,7 @@ export default function PaymentsPage() {
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ amount: '', payment_type: 'tuition', description: '' });
 
-  const { data: payments, isLoading } = useQuery<Payment[]>({
+  const { data: payments, isLoading, isError, refetch } = useQuery<Payment[]>({
     queryKey: ['payments'],
     queryFn: async () => {
       const { data } = await paymentsApi.getMyPayments();
@@ -130,7 +131,9 @@ export default function PaymentsPage() {
 
       {/* Payments list */}
       <Card>
-        {!payments?.length ? (
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : !payments?.length ? (
           <EmptyState icon={CreditCard} title="Sin pagos" description="Los pagos realizados aparecerán aquí." />
         ) : (
           <div className="divide-y divide-cream">

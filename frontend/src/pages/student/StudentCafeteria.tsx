@@ -5,11 +5,12 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 
 export default function StudentCafeteria() {
-  const { data: balanceData, isLoading: balanceLoading } = useQuery<CafeteriaBalance>({
+  const { data: balanceData, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalance } = useQuery<CafeteriaBalance>({
     queryKey: ['cafeteria-balance-student'],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getMyBalance();
@@ -17,7 +18,7 @@ export default function StudentCafeteria() {
     },
   });
 
-  const { data: transactions, isLoading: txLoading } = useQuery<CafeteriaTransaction[]>({
+  const { data: transactions, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<CafeteriaTransaction[]>({
     queryKey: ['cafeteria-transactions-student'],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTransactions();
@@ -26,6 +27,18 @@ export default function StudentCafeteria() {
   });
 
   if (balanceLoading) return <LoadingSpinner size="lg" className="mt-20" />;
+
+  if (balanceError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Mi Cafetería</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Saldo y movimientos de su cuenta de cafetería.</p>
+        </div>
+        <Card><ErrorState onRetry={() => refetchBalance()} /></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -51,7 +64,9 @@ export default function StudentCafeteria() {
 
       {/* Transactions */}
       <Card title="Últimos movimientos">
-        {txLoading ? (
+        {txError ? (
+          <ErrorState onRetry={() => refetchTx()} />
+        ) : txLoading ? (
           <LoadingSpinner />
         ) : !transactions?.length ? (
           <EmptyState icon={Coffee} title="Sin movimientos" description="Sus compras y recargas aparecerán aquí." />

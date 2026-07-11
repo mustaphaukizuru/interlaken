@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
+import { ErrorState } from '@/components/ui/ErrorState';
 import TopBar from '@/components/layout/TopBar';
 import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
 
 export default function AdminDashboard() {
-  const { data, isLoading } = useQuery<DashboardData>({
+  const { data, isLoading, isError, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
   });
@@ -19,20 +20,24 @@ export default function AdminDashboard() {
       <TopBar title="Panel de Administración" subtitle={`Ciclo Escolar ${CURRENT_CYCLE}`} />
       <div className="px-[clamp(16px,4vw,32px)] py-6">
         {/* Stats */}
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
-          {isLoading ? (
-            [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
-          ) : (
-            [
-              <StatCard key="a" title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
-              <StatCard key="b" title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />,
-              <StatCard key="c" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
-              <StatCard key="d" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />,
-            ].map((card, i) => (
-              <Reveal key={i} delay={i * 70}>{card}</Reveal>
-            ))
-          )}
-        </div>
+        {isError ? (
+          <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
+        ) : (
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
+            {isLoading ? (
+              [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
+            ) : (
+              [
+                <StatCard key="a" title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
+                <StatCard key="b" title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />,
+                <StatCard key="c" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
+                <StatCard key="d" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />,
+              ].map((card, i) => (
+                <Reveal key={i} delay={i * 70}>{card}</Reveal>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Quick actions */}
         <div className="mb-6 flex flex-wrap gap-3">
@@ -42,6 +47,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent activity */}
+        {!isError && (
         <Reveal delay={60} className="card !p-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4 sm:px-[22px]">
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
@@ -77,6 +83,7 @@ export default function AdminDashboard() {
             </table>
           </div>
         </Reveal>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { portalApi } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
@@ -15,7 +16,7 @@ export default function AdminStudents() {
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-students', page],
     queryFn: async () => toPaged<StudentProfile>((await portalApi.getStudents({ page })).data),
     placeholderData: keepPreviousData,
@@ -58,7 +59,9 @@ export default function AdminStudents() {
         </div>
         <p className="mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
-        {isLoading ? (
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
           <LoadingSpinner />
         ) : !filtered?.length ? (
           <EmptyState

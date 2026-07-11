@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pagination } from '@/components/ui/Pagination';
 import { bookingsApi } from '@/services/api';
@@ -216,7 +217,7 @@ export default function AdminBookings() {
   const [page, setPage] = useState(1);
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-bookings', statusFilter, page],
     queryFn: async () =>
       toPaged<Booking>(
@@ -270,7 +271,9 @@ export default function AdminBookings() {
           </select>
         }
       >
-        {isLoading ? (
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
           <LoadingSpinner />
         ) : !bookings?.length ? (
           <EmptyState

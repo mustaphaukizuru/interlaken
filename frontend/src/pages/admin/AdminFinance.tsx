@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pagination } from '@/components/ui/Pagination';
@@ -76,7 +77,7 @@ export default function AdminFinance() {
     queryFn: async () => (await financeApi.getDashboard(period)).data,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['finance-admin-invoices', period, statusFilter, search, page],
     queryFn: async () =>
       toPaged<Invoice>(
@@ -231,7 +232,9 @@ export default function AdminFinance() {
           </div>
         )}
 
-        {isLoading ? (
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
           <LoadingSpinner />
         ) : !invoices?.length ? (
           <EmptyState
@@ -502,7 +505,7 @@ function KpiCard({ icon: Icon, label, value, tone }: {
 
 /** Audit trail (who/what/when/why) for one invoice — InvoiceAdjustment feed. */
 function AuditTrailModal({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
-  const { data, isLoading } = useQuery<{ adjustments: InvoiceAdjustment[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ adjustments: InvoiceAdjustment[] }>({
     queryKey: ['finance-admin-invoice-detail', invoice?.id],
     queryFn: async () => (await financeApi.getAdminInvoice(invoice!.id)).data,
     enabled: !!invoice,
@@ -518,7 +521,9 @@ function AuditTrailModal({ invoice, onClose }: { invoice: Invoice | null; onClos
           <p className="text-sm text-muted">
             {invoice.student_name} · {invoice.period_label}
           </p>
-          {isLoading ? (
+          {isError ? (
+            <ErrorState onRetry={() => refetch()} />
+          ) : isLoading ? (
             <LoadingSpinner />
           ) : !adjustments.length ? (
             <EmptyState icon={History} title="Sin ajustes registrados" />

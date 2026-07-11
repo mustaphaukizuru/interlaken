@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
@@ -41,7 +42,7 @@ export default function CafeteriaPage() {
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
 
-  const { data: balances, isLoading: balancesLoading } = useQuery<CafeteriaBalance[]>({
+  const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getMyBalance();
@@ -49,7 +50,7 @@ export default function CafeteriaPage() {
     },
   });
 
-  const { data: transactions, isLoading: txLoading } = useQuery<CafeteriaTransaction[]>({
+  const { data: transactions, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<CafeteriaTransaction[]>({
     queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTransactions({
@@ -93,6 +94,18 @@ export default function CafeteriaPage() {
   };
 
   if (balancesLoading) return <LoadingSpinner size="lg" className="mt-20" />;
+
+  if (balancesError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-fluid-xl font-bold text-ink">Cafetería</h1>
+          <p className="mt-0.5 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+        </div>
+        <Card><ErrorState onRetry={() => refetchBalances()} /></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -246,7 +259,9 @@ export default function CafeteriaPage() {
           />
         </div>
 
-        {txLoading ? (
+        {txError ? (
+          <ErrorState onRetry={() => refetchTx()} />
+        ) : txLoading ? (
           <LoadingSpinner />
         ) : !transactions?.length ? (
           <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />

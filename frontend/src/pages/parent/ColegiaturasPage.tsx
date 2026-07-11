@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { financeApi, downloadBlob } from '@/services/api';
 import type { Invoice } from '@/types';
@@ -32,7 +33,7 @@ export default function ColegiaturasPage() {
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   const [gateway, setGateway] = useState('global_payments');
 
-  const { data: invoices, isLoading } = useQuery<Invoice[]>({
+  const { data: invoices, isLoading, isError, refetch } = useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: async () => {
       const { data } = await financeApi.getInvoices();
@@ -120,7 +121,9 @@ export default function ColegiaturasPage() {
 
       {/* Invoice list */}
       <Card>
-        {!invoices?.length ? (
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : !invoices?.length ? (
           <EmptyState icon={Receipt} title="Sin colegiaturas" description="Las colegiaturas emitidas aparecerán aquí." />
         ) : (
           <div className="divide-y divide-cream">

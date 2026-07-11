@@ -16,6 +16,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaStudentDetail, CafeteriaTransaction } from '@/types';
 
@@ -48,7 +49,7 @@ export default function AdminCafeteriaStudent() {
   const [refundTx, setRefundTx] = useState<CafeteriaTransaction | null>(null);
   const [refundReason, setRefundReason] = useState('');
 
-  const { data, isLoading } = useQuery<CafeteriaStudentDetail>({
+  const { data, isLoading, isError, refetch } = useQuery<CafeteriaStudentDetail>({
     queryKey: ['admin-cafeteria-student', id],
     queryFn: async () => (await cafeteriaApi.getStudentDetail(id)).data,
     enabled: !!id,
@@ -99,6 +100,7 @@ export default function AdminCafeteriaStudent() {
   };
 
   if (isLoading) return <LoadingSpinner />;
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
   const { balance, parents, transactions, adjustments } = data;
