@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
+import { RouteTransition } from './RouteTransition';
 import { CommandPalette } from '@/components/admin/CommandPalette';
 
 interface Props {
@@ -74,7 +75,7 @@ export function PortalLayout({ role }: Props) {
         {/* Main */}
         <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
           <div className="flex-1 px-[clamp(16px,4vw,32px)] py-6">
-            <Outlet />
+            <RouteTransition><Outlet /></RouteTransition>
           </div>
         </main>
       </div>

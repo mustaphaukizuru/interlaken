@@ -154,6 +154,12 @@
   .hover-lift:hover { transform: translateY(-6px); box-shadow: 0 26px 50px -22px rgba(64,26,142,0.4); }
   @media (prefers-reduced-motion: reduce) { .hover-lift:hover { transform: none; } }
 
+  /* Route entrance — content of each page fades + lifts in on navigation
+     (RouteTransition keys this by pathname so it replays). */
+  @keyframes route-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .route-enter { animation: route-enter 0.32s cubic-bezier(0.4,0,0.2,1) both; }
+  @media (prefers-reduced-motion: reduce) { .route-enter { animation: none; } }
+
   /* Navigation portal items */
   .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.58); transition: var(--transition); cursor: pointer; }
   .nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }

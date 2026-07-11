@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { socialEntries } from '@/lib/siteContact';
@@ -307,7 +308,7 @@ export function PublicLayout() {
 
       {/* Page content */}
       <main id="contenido" className="flex-1">
-        <Outlet />
+        <RouteTransition><Outlet /></RouteTransition>
       </main>
 
       {/* Sticky mobile CTA — el CTA principal del cliente, solo en teléfonos. */}
