@@ -122,7 +122,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right form panel */}
-        <div className="flex flex-1 items-center justify-center bg-cream px-6 py-8 sm:px-8 sm:py-10">
+        <main id="contenido" className="flex flex-1 items-center justify-center bg-cream px-6 py-8 sm:px-8 sm:py-10">
           <div className="w-full max-w-[400px]">
             {/* Mobile logo */}
             <div className="mb-7 flex justify-center lg:hidden">
@@ -217,7 +217,7 @@ export default function LoginPage() {
               <Link to="/pre-registro" className="font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">Inicie su pre-registro</Link>
             </p>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );
