@@ -382,6 +382,8 @@ function ReconcileTab() {
 
       {isLoading || isFetching ? (
         <TableSkeleton />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : !data ? (
         <EmptyState icon={Scale} title="Ejecuta la reconciliación" description="Presiona «Reconciliar» para comparar con Loyverse." />
       ) : (

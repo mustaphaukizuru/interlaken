@@ -217,8 +217,9 @@ export default function OpenSchoolPage() {
                   />
 
                   <div>
-                    <label className="label">Número de asistentes</label>
+                    <label className="label" htmlFor="os-children-count">Número de asistentes</label>
                     <select
+                      id="os-children-count"
                       className="input-field text-base"
                       {...register('children_count', { valueAsNumber: true })}
                     >

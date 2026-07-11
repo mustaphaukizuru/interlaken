@@ -60,12 +60,16 @@ function Lightbox({
   }, [onClose, prev, next]);
 
   return (
+    // Backdrop click-to-dismiss (only on the backdrop itself, not its children)
+    // is a supplementary pointer affordance; keyboard users close via Escape or
+    // arrows (window keydown handler above) and the visible close button.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <div
       role="dialog"
       aria-modal="true"
       aria-label={`Fotografía ${index + 1} de ${photos.length}`}
       className="fixed inset-0 z-[80] flex items-center justify-center bg-dark/95 p-4"
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <button
         ref={closeRef}
@@ -86,7 +90,7 @@ function Lightbox({
         <ChevronLeft className="h-6 w-6" aria-hidden="true" />
       </button>
 
-      <figure className="max-h-full" onClick={(e) => e.stopPropagation()}>
+      <figure className="max-h-full">
         <img
           src={photos[index].src}
           alt={`Vida escolar en el Colegio Interlaken — fotografía ${index + 1}`}

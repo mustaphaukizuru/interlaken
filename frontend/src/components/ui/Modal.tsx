@@ -78,6 +78,10 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
   if (!open) return null;
 
   return (
+    // Backdrop mousedown-to-dismiss (backdrop only, not children) is a
+    // supplementary pointer affordance; keyboard users close via Escape (the
+    // document keydown handler above) or the close button.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
       onMouseDown={(e) => {

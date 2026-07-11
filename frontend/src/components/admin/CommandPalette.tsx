@@ -131,21 +131,27 @@ export function CommandPalette() {
     } else if (e.key === 'Enter' && items[active]) {
       e.preventDefault();
       go(items[active]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
     }
   };
 
   let lastGroup = '';
   return (
+    // Backdrop click-to-dismiss (backdrop only, not children) is a supplementary
+    // pointer affordance; keyboard users close via Escape (onInputKey) or the
+    // close button.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/40 p-4 pt-[12vh]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Búsqueda global"
-      onClick={() => setOpen(false)}
+      onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
     >
       <div
         className="w-full max-w-lg overflow-hidden rounded-xl2 bg-white shadow-card"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Búsqueda global"
       >
         <div className="flex items-center gap-2 border-b border-ink/10 px-4">
           <Search size={17} className="shrink-0 text-muted" aria-hidden="true" />

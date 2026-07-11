@@ -98,8 +98,8 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
         />
       </div>
 
-      <div>
-        <label className="label">Días de la semana</label>
+      <div role="group" aria-label="Días de la semana">
+        <span className="label">Días de la semana</span>
         <div className="flex flex-wrap gap-2">
           {WEEKDAYS.map((d) => (
             <button
@@ -135,8 +135,9 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
 
       <div className="grid sm:grid-cols-3 gap-4">
         <div>
-          <label className="label">Duración (min)</label>
+          <label className="label" htmlFor="slot-interval">Duración (min)</label>
           <select
+            id="slot-interval"
             className="input-field"
             value={form.interval_minutes}
             onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })}
