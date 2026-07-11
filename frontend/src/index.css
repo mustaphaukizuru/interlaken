@@ -146,6 +146,9 @@
   .btn-green { @apply btn; background: var(--green); color: #fff; box-shadow: var(--shadow-green); }
   .btn-green:hover { background: var(--green-dark); transform: translateY(-1px); }
   .btn-lg { padding: 16px 32px; font-size: 15px; }
+  /* Tactile press — overrides any hover-lift while the button is held. */
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  @media (prefers-reduced-motion: reduce) { .btn:active:not(:disabled) { transform: none; } }
 
   /* Cards */
   .card-dark { background: var(--dark-card); border: 1px solid rgba(124,77,214,0.25); border-radius: var(--radius); }
