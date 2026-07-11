@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
@@ -64,8 +64,6 @@ export default function PaymentsPage() {
     },
     onError: () => toast.error('No fue posible iniciar el pago.'),
   });
-
-  if (isLoading) return <LoadingSpinner size="lg" className="mt-20" />;
 
   return (
     <div className="space-y-6">
@@ -133,6 +131,8 @@ export default function PaymentsPage() {
       <Card>
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
+          <ListSkeleton />
         ) : !payments?.length ? (
           <EmptyState icon={CreditCard} title="Sin pagos" description="Los pagos realizados aparecerán aquí." />
         ) : (

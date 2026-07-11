@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
@@ -63,8 +63,6 @@ export default function ColegiaturasPage() {
     },
     onError: () => toast.error('No fue posible descargar el comprobante.'),
   });
-
-  if (isLoading) return <LoadingSpinner size="lg" className="mt-20" />;
 
   const outstanding = (invoices ?? [])
     .filter((i) => i.status !== 'paid' && i.status !== 'cancelled')
@@ -123,6 +121,8 @@ export default function ColegiaturasPage() {
       <Card>
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
+          <ListSkeleton />
         ) : !invoices?.length ? (
           <EmptyState icon={Receipt} title="Sin colegiaturas" description="Las colegiaturas emitidas aparecerán aquí." />
         ) : (

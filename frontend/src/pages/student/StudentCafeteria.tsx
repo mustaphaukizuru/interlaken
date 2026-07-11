@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { cafeteriaApi } from '@/services/api';
@@ -67,7 +68,7 @@ export default function StudentCafeteria() {
         {txError ? (
           <ErrorState onRetry={() => refetchTx()} />
         ) : txLoading ? (
-          <LoadingSpinner />
+          <ListSkeleton />
         ) : !transactions?.length ? (
           <EmptyState icon={Coffee} title="Sin movimientos" description="Sus compras y recargas aparecerán aquí." />
         ) : (

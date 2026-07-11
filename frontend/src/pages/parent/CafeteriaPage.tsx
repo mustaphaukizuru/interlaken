@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
@@ -262,7 +263,7 @@ export default function CafeteriaPage() {
         {txError ? (
           <ErrorState onRetry={() => refetchTx()} />
         ) : txLoading ? (
-          <LoadingSpinner />
+          <ListSkeleton />
         ) : !transactions?.length ? (
           <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />
         ) : (
