@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
+import { Reveal } from '@/components/ui/Reveal';
 import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
@@ -67,18 +68,20 @@ export default function ParentDashboard() {
           {isLoading ? (
             [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
           ) : (
-            <>
-              <StatCard title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />
-              <StatCard title="Saldo Cafetería" value={`$${balanceObj?.balance ?? '0.00'}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />
-              <StatCard title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="pink" />
-              <StatCard title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="green" />
-            </>
+            [
+              <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
+              <StatCard key="b" title="Saldo Cafetería" value={`$${balanceObj?.balance ?? '0.00'}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
+              <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="pink" />,
+              <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="green" />,
+            ].map((card, i) => (
+              <Reveal key={i} delay={i * 70}>{card}</Reveal>
+            ))
           )}
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* Recent payments */}
-          <div className="card !p-0 overflow-hidden">
+          <Reveal delay={40} className="card !p-0 overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4">
               <h2 className="font-head text-[15px] font-bold text-ink">Últimos Pagos</h2>
               <Link
@@ -107,10 +110,10 @@ export default function ParentDashboard() {
                 );
               })}
             </div>
-          </div>
+          </Reveal>
 
           {/* Announcements */}
-          <div className="card !p-0 overflow-hidden">
+          <Reveal delay={110} className="card !p-0 overflow-hidden">
             <div className="border-b border-cream px-5 py-4">
               <h2 className="font-head text-[15px] font-bold text-ink">Avisos Escolares</h2>
             </div>
@@ -125,7 +128,7 @@ export default function ParentDashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </div>

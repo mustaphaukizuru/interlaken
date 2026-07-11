@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Coffee, Bell, GraduationCap } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
+import { Reveal } from '@/components/ui/Reveal';
 import TopBar from '@/components/layout/TopBar';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
@@ -24,21 +25,24 @@ export default function StudentDashboard() {
           {isLoading ? (
             [0, 1].map(i => <div key={i} className="skeleton h-[148px]" />)
           ) : (
-            <>
+            [
               <StatCard
+                key="a"
                 title="Saldo Cafetería"
                 value={`$${parseFloat(data?.cafeteria_balance ?? '0').toFixed(2)}`}
                 icon={Coffee}
                 color={data?.is_low_balance ? 'amber' : 'green'}
                 subtitle={data?.is_low_balance ? 'Saldo bajo — solicita recarga' : undefined}
-              />
-              <StatCard title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />
-            </>
+              />,
+              <StatCard key="b" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />,
+            ].map((card, i) => (
+              <Reveal key={i} delay={i * 70}>{card}</Reveal>
+            ))
           )}
         </div>
 
         {/* Student info */}
-        <div className="card mb-5">
+        <Reveal delay={40} className="card mb-5">
           <div className="mb-4 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple/10">
               <GraduationCap size={20} className="text-purple" />
@@ -53,11 +57,11 @@ export default function StudentDashboard() {
               </div>
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* Announcements */}
         {!!data?.announcements?.length && (
-          <div className="card !p-0 overflow-hidden">
+          <Reveal delay={90} className="card !p-0 overflow-hidden">
             <div className="border-b border-cream px-5 py-4">
               <h2 className="font-head text-[15px] font-bold text-ink">Avisos Escolares</h2>
             </div>
@@ -67,7 +71,7 @@ export default function StudentDashboard() {
                 <div className="mt-0.5 text-[12.5px] text-muted">{a.body}</div>
               </div>
             ))}
-          </div>
+          </Reveal>
         )}
       </div>
     </div>

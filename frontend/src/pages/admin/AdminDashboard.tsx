@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
+import { Reveal } from '@/components/ui/Reveal';
 import TopBar from '@/components/layout/TopBar';
 import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
@@ -22,12 +23,14 @@ export default function AdminDashboard() {
           {isLoading ? (
             [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
           ) : (
-            <>
-              <StatCard title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />
-              <StatCard title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />
-              <StatCard title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />
-              <StatCard title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />
-            </>
+            [
+              <StatCard key="a" title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
+              <StatCard key="b" title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />,
+              <StatCard key="c" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
+              <StatCard key="d" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />,
+            ].map((card, i) => (
+              <Reveal key={i} delay={i * 70}>{card}</Reveal>
+            ))
           )}
         </div>
 
@@ -39,7 +42,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent activity */}
-        <div className="card !p-0 overflow-hidden">
+        <Reveal delay={60} className="card !p-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4 sm:px-[22px]">
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
             <Link
@@ -73,7 +76,7 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Reveal>
       </div>
     </div>
   );
