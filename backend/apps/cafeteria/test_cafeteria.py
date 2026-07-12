@@ -67,6 +67,42 @@ class TestBalanceSync:
         assert CafeteriaBalance.objects.get(student=ok_student).balance == Decimal("40")
         assert not CafeteriaBalance.objects.filter(student=bad_student).exists()
 
+    @patch("apps.cafeteria.services.get_customer_by_id")
+    def test_seed_is_once_and_never_overwrites_local_ledger(self, mock_get):
+        """R1: Loyverse seeds the OPENING balance once; the local ledger then owns
+        it. A later sync must not overwrite — nor even call Loyverse again."""
+        mock_get.return_value = {"total_points": 100}
+        student = StudentProfileFactory()
+
+        assert services.sync_student_balance(student) == Decimal("100")   # seed
+
+        # Any ledger activity (here, a top-up) lifts the local balance to 600.
+        cb = CafeteriaBalance.objects.get(student=student)
+        cb.balance = Decimal("600")
+        cb.save(update_fields=["balance"])
+
+        # Loyverse still reads 100 (can't be written per R1). A re-sync must keep
+        # the local 600 and skip the API entirely.
+        mock_get.reset_mock()
+        mock_get.return_value = {"total_points": 100}
+        assert services.sync_student_balance(student) == Decimal("600")
+        mock_get.assert_not_called()
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("600")
+
+    @patch("apps.cafeteria.services.get_customer_by_id")
+    def test_cron_sync_does_not_clobber_topped_up_student(self, mock_get):
+        """The scheduled sync_balances must never erase an online top-up."""
+        mock_get.return_value = {"total_points": 50}
+        student = StudentProfileFactory(loyverse_id="loy-x")
+
+        services.sync_all_balances()                 # seeds opening 50
+        cb = CafeteriaBalance.objects.get(student=student)
+        cb.balance = Decimal("550")                  # +500 online top-up (local)
+        cb.save(update_fields=["balance"])
+
+        services.sync_all_balances()                 # cron runs again → no-op
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("550")
+
     def test_low_balance_flag(self):
         student = StudentProfileFactory()
         cb = CafeteriaBalance.objects.create(
@@ -227,7 +263,9 @@ class TestApplyTopUp:
         assert topup.status == TopUpRequest.Status.COMPLETED
         assert topup.processed_at is not None
         mock_add.assert_called_once()
-        mock_sync.assert_called_once_with(student)
+        # The credit must NOT be followed by a Loyverse balance re-pull — that would
+        # overwrite the just-applied credit with the (un-writable) Loyverse points.
+        mock_sync.assert_not_called()
 
     def test_apply_twice_is_rejected(self, api_client):
         student = StudentProfileFactory(loyverse_id="loy-1")

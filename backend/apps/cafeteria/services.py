@@ -363,47 +363,72 @@ def sync_purchases():
 
 
 def sync_student_balance(student_profile) -> Decimal:
-    """
-    Sync a student's Loyverse balance into the DB.
-    Returns the current balance in MXN pesos.
+    """SEED a student's opening cafeteria balance from Loyverse — exactly once.
+
+    Per spec **R1** the local ``CafeteriaBalance`` is the source of truth: top-ups,
+    purchase syncs, adjustments and refunds all own the balance. Loyverse
+    ``total_points`` is used ONLY to establish the *opening* balance the first time
+    we ever touch a student — after that we must never overwrite it, or an online
+    top-up (which R1 can't push to Loyverse) would be clobbered and POS purchases
+    double-counted (once here, once by ``sync_purchases``).
+
+    ``last_synced is None`` is the "never seeded" signal — every ledger mutation
+    sets it — so an already-seeded student is a no-op (no overwrite, no Loyverse
+    call). Returns the current balance in MXN. The points fetch runs outside the
+    row lock; a re-check under ``select_for_update`` guards the onboarding race
+    with a concurrent first top-up/purchase.
     """
     from apps.cafeteria.models import CafeteriaBalance
 
+    # Fast path: already seeded / locally owned — no overwrite, no Loyverse call.
+    existing = CafeteriaBalance.objects.filter(student=student_profile).first()
+    if existing is not None and existing.last_synced is not None:
+        return existing.balance
+
+    # Fetch the opening points BEFORE creating any row, so a failed seed leaves no
+    # empty balance behind.
     try:
         customer = get_customer_by_id(student_profile.loyverse_id)
         balance = get_balance_from_customer(customer)
+    except LoyverseError as e:
+        logger.error(f'Opening-balance seed failed for {student_profile}: {e}')
+        raise
 
-        cb, _ = CafeteriaBalance.objects.get_or_create(student=student_profile)
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student_profile)
+        if cb.last_synced is not None:
+            return cb.balance      # seeded/credited while we were fetching
         cb.balance = balance
         cb.last_synced = timezone.now()
         cb.save(update_fields=['balance', 'last_synced'])
 
-        logger.info(f'Synced balance for {student_profile}: {balance}')
-        return balance
-
-    except LoyverseError as e:
-        logger.error(f'Balance sync failed for {student_profile}: {e}')
-        raise
+    logger.info(f'Seeded opening balance for {student_profile}: {balance}')
+    return balance
 
 
 def sync_all_balances():
-    """Sync balances for all active students. Called by the ``sync_balances`` cron command."""
+    """Seed opening balances for every linked student — the ``sync_balances`` cron.
+
+    Idempotent by design (see ``sync_student_balance``): newly-linked students get
+    their opening balance from Loyverse; already-seeded students are a no-op, so
+    this is safe to run on a schedule without ever clobbering the local ledger.
+    """
     from apps.accounts.models import StudentProfile
 
     students = StudentProfile.objects.filter(
         is_active=True
     ).exclude(loyverse_id='')
 
-    synced, failed = 0, 0
+    seeded, failed = 0, 0
     for student in students:
         try:
             sync_student_balance(student)
-            synced += 1
+            seeded += 1
         except LoyverseError:
             failed += 1
 
-    logger.info(f'Balance sync complete: {synced} synced, {failed} failed')
-    return {'synced': synced, 'failed': failed}
+    logger.info(f'Opening-balance seed complete: {seeded} ok, {failed} failed')
+    return {'synced': seeded, 'failed': failed}
 
 
 def _topup_reference(payment) -> str:

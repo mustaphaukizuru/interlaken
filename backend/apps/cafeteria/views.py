@@ -222,7 +222,9 @@ class AdminApplyTopUpView(APIView):
         topup.status = TopUpRequest.Status.COMPLETED
         topup.processed_at = timezone.now()
         topup.save(update_fields=['status', 'processed_at'])
-        sync_student_balance(student)
+        # NB: do NOT re-pull the balance from Loyverse here — add_points_to_customer
+        # already credited the local ledger (the source of truth per R1); a sync
+        # would overwrite that credit with the (un-writable) Loyverse points.
 
         return Response({'detail': 'Recarga aplicada correctamente.'})
 

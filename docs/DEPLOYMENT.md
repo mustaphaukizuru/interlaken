@@ -48,7 +48,7 @@ Shared cPanel hosting has **no Redis and no persistent worker processes**, so th
 
 | Job | Command | Suggested cron |
 |---|---|---|
-| Sync cafeteria balances | `python manage.py sync_balances` | every 10 min |
+| Seed opening cafeteria balances | `python manage.py sync_balances` | every 10 min |
 | Poll Loyverse purchases → notify | `python manage.py sync_purchases` | every 5 min |
 | Low-balance alerts | `python manage.py low_balance_alerts` | daily 07:00 |
 | Booking reminders | `python manage.py send_booking_reminders` | daily 08:00 |
@@ -79,6 +79,7 @@ environment is unambiguous:
 30   2  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py backup_database --output-dir /home/rene82/backups >> /home/rene82/logs/backup.log 2>&1
 ```
 
+- `sync_balances` **seeds each newly-linked student's OPENING balance** from Loyverse points, then never touches it again — the local `CafeteriaBalance` is the source of truth (spec R1: Loyverse `total_points` can't be written, so online top-ups live only in our ledger). Already-seeded students are a no-op, so a 10-min schedule is safe and won't clobber top-ups/adjustments. Onboarding order matters: **seed before purchases start syncing.** Online top-ups create ledger↔Loyverse drift (money we can't push to Loyverse) — run `reconcile` to see it, and staff load that amount into the Loyverse POS manually so the child can spend it.
 - `sync_purchases` (Prompt 09) polls Loyverse receipts, idempotently records each new purchase (unique `loyverse_receipt_id`), debits the local balance, and notifies every linked parent (in-app + email); a purchase that crosses the low-balance threshold triggers a deduped alert. Safe to run every 5 min — re-runs never duplicate or re-notify.
 - `low_balance_alerts` self-dedups (7-day cooldown, cleared on recovery), so a daily schedule won't spam parents; add `--force` only for a manual one-off sweep.
 - `sync_calendar` (Prompt 13) retries Google Calendar creation for active bookings whose event failed at booking time (empty `google_event_id`), and clears events left on cancelled bookings. It's a **clean no-op** when calendar is unconfigured, so it's safe to schedule unconditionally. Requires the §8 service-account setup to actually create events.
