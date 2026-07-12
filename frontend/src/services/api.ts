@@ -141,8 +141,8 @@ export const admissionsApi = {
   updateRegistration: (id: number, data: unknown, sessionToken?: string) =>
     api.patch(`/admissions/register/${id}/`, data, sessionHeaders(sessionToken)),
 
-  submitRegistration: (id: number, sessionToken?: string) =>
-    api.post(`/admissions/register/${id}/submit/`, {}, sessionHeaders(sessionToken)),
+  submitRegistration: (id: number, sessionToken?: string, acceptPrivacy = true) =>
+    api.post(`/admissions/register/${id}/submit/`, { accept_privacy: acceptPrivacy }, sessionHeaders(sessionToken)),
 
   uploadDocument: (registrationId: number, file: File, docType: string, sessionToken?: string) => {
     const form = new FormData();
