@@ -49,8 +49,19 @@ async function refreshAccess(): Promise<string> {
   return data.access as string;
 }
 
-// Coalesce concurrent refreshes so a burst of 401s triggers a single call.
+// Coalesce concurrent refreshes so a burst of 401s — or a StrictMode/boot double
+// mount — triggers a single network call. Critical with refresh-token rotation +
+// blacklisting: two concurrent refreshes would rotate once and 401 the loser,
+// spuriously logging the user out. Every caller MUST go through this, including
+// bootstrapSession (a direct refreshAccess there was the source of that race).
 let refreshing: Promise<string> | null = null;
+
+function coalescedRefresh(): Promise<string> {
+  if (!refreshing) {
+    refreshing = refreshAccess().finally(() => { refreshing = null; });
+  }
+  return refreshing;
+}
 
 // Silent refresh on 401.
 api.interceptors.response.use(
@@ -65,14 +76,11 @@ api.interceptors.response.use(
     ) {
       original._retry = true;
       try {
-        refreshing = refreshing ?? refreshAccess();
-        const access = await refreshing;
-        refreshing = null;
+        const access = await coalescedRefresh();
         useAuthStore.getState().setAccess(access);
         original.headers.Authorization = `Bearer ${access}`;
         return api(original);
       } catch {
-        refreshing = null;
         useAuthStore.getState().logout();
         if (typeof window !== 'undefined') window.location.href = '/login';
       }
@@ -84,7 +92,7 @@ api.interceptors.response.use(
 /** Restore a session on page load from the httpOnly refresh cookie. */
 export async function bootstrapSession(): Promise<boolean> {
   try {
-    useAuthStore.getState().setAccess(await refreshAccess());
+    useAuthStore.getState().setAccess(await coalescedRefresh());
     return true;
   } catch {
     useAuthStore.getState().logout();
@@ -161,6 +169,31 @@ export const admissionsApi = {
 
   signUpOpenSchool: (data: unknown) =>
     api.post('/admissions/open-school/signup/', data),
+};
+
+// ── ADMISSIONS (admin console) ────────────────────────────
+// Staff (JWT) actions for the Admisiones console: issue enrollment invites and
+// review registrations + documents. Staff bypass the session-token gate.
+export const admissionsAdminApi = {
+  /** #2 — issue a pre-filled enrollment invite for a pre-registration. */
+  invitePreRegistration: (preId: number) =>
+    api.post(`/admissions/pre-register/${preId}/invite/`),
+
+  /** #1 — paginated registrations list for the review console. */
+  listRegistrations: (page = 1) =>
+    api.get('/admissions/register/', { params: { page } }),
+
+  /** Full registration (medical gated on consent) — no session token as admin. */
+  getRegistration: (id: number) =>
+    api.get(`/admissions/register/${id}/`),
+
+  /** Move a registration through review (approved / rejected / …) + notes. */
+  updateRegistrationStatus: (id: number, data: { status: string; admin_notes?: string }) =>
+    api.patch(`/admissions/register/${id}/status/`, data),
+
+  /** Mark an uploaded document verified (or clear it). */
+  verifyDocument: (docId: number, isVerified: boolean) =>
+    api.patch(`/admissions/documents/${docId}/verify/`, { is_verified: isVerified }),
 };
 
 // ── CAFETERIA ─────────────────────────────────────────────

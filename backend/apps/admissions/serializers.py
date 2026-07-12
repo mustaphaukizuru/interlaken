@@ -108,6 +108,48 @@ class RegistrationDocumentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'uploaded_at', 'is_verified']
 
 
+class DocumentVerifySerializer(serializers.ModelSerializer):
+    """Admin write: mark an uploaded document as verified (or un-verify)."""
+    class Meta:
+        model = RegistrationDocument
+        fields = ['id', 'is_verified']
+
+
+class RegistrationAdminListSerializer(serializers.ModelSerializer):
+    """Light list shape for the admin Inscripciones console.
+
+    Deliberately excludes the encrypted medical fields — the list never needs to
+    decrypt them, and they stay gated behind the detail view + consent check.
+    """
+    child_name  = serializers.SerializerMethodField()
+    doc_count   = serializers.SerializerMethodField()
+    doc_verified = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Registration
+        fields = [
+            'id', 'child_name', 'level', 'grade_applying', 'cycle',
+            'parent1_name', 'parent1_email', 'parent1_phone',
+            'status', 'submitted_at', 'created_at', 'doc_count', 'doc_verified',
+        ]
+
+    def get_child_name(self, obj):
+        return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+
+    def get_doc_count(self, obj):
+        return obj.documents.count()
+
+    def get_doc_verified(self, obj):
+        return sum(1 for d in obj.documents.all() if d.is_verified)
+
+
+class RegistrationStatusSerializer(serializers.ModelSerializer):
+    """Admin write: move a registration through review (approve/reject) + notes."""
+    class Meta:
+        model = Registration
+        fields = ['id', 'status', 'admin_notes']
+
+
 MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes', 'estatura', 'peso')
 
 

@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle, ArrowRight, ArrowLeft, UploadCloud, FileText } from 'lucide-react';
+import { CheckCircle, ArrowRight, ArrowLeft, UploadCloud, FileText, MailCheck, AlertTriangle } from 'lucide-react';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -54,6 +54,11 @@ const selectClass =
   'input-field text-base min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1';
 
 export default function RegisterPage() {
+  const [params] = useSearchParams();
+  const inviteRid = Number(params.get('rid')) || null;
+  const inviteToken = params.get('token') || '';
+  const isInvited = !!(inviteRid && inviteToken);
+
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<Form>(EMPTY);
   const [regId, setRegId] = useState<number | null>(null);
@@ -62,13 +67,56 @@ export default function RegisterPage() {
   const [privacyOk, setPrivacyOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
+  // Invite flow (#2): booting = exchanging the link's token; inviteError = expired/used.
+  const [booting, setBooting] = useState(isInvited);
+  const [inviteError, setInviteError] = useState(false);
+  const [invited, setInvited] = useState(false);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const hasMedical = !!(form.blood_type || form.allergies || form.medical_notes);
 
-  // ── Step 1: create the registration + open a session ────────────────────
-  async function startRegistration() {
+  // ── Invite mode: exchange the admin-issued link for a session + prefill ──
+  // The invite token is SINGLE-USE, so this must fire exactly once. A ref guard
+  // (not a cleanup ignore-flag) is essential: under StrictMode/double-mount an
+  // ignore-flag would still let a second request consume-and-401 the token.
+  const exchangeStarted = useRef(false);
+  useEffect(() => {
+    if (!isInvited || exchangeStarted.current) return;
+    exchangeStarted.current = true;
+    (async () => {
+      try {
+        const { data: sess } = await admissionsApi.exchangeAccess(inviteRid!, inviteToken);
+        const r = sess.registration ?? {};
+        setForm((f) => ({
+          ...f,
+          child_first_name: r.child_first_name || '',
+          child_last_name: r.child_last_name || '',
+          child_dob: r.child_dob || '',
+          child_curp: r.child_curp || '',
+          child_nationality: r.child_nationality || 'Mexicana',
+          grade_applying: r.grade_applying || '',
+          parent1_name: r.parent1_name || '',
+          parent1_email: r.parent1_email || '',
+          parent1_phone: r.parent1_phone || '',
+          parent1_occupation: r.parent1_occupation || '',
+          parent2_name: r.parent2_name || '', parent2_email: r.parent2_email || '', parent2_phone: r.parent2_phone || '',
+          emergency_name: r.emergency_name || '', emergency_phone: r.emergency_phone || '', emergency_rel: r.emergency_rel || '',
+        }));
+        setRegId(inviteRid);
+        setSession(sess.session_token);
+        setInvited(true);
+      } catch {
+        setInviteError(true);
+      } finally {
+        setBooting(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Step 1: create the registration (or, when invited, save edits) ──────
+  async function submitStep1() {
     if (!form.child_first_name || !form.child_last_name || !form.child_dob ||
         !form.grade_applying || !form.parent1_name || !form.parent1_email || !form.parent1_phone) {
       toast.error('Complete los campos obligatorios.');
@@ -76,21 +124,28 @@ export default function RegisterPage() {
     }
     setBusy(true);
     try {
-      const { data } = await admissionsApi.createRegistration({
+      const step1 = {
         child_first_name: form.child_first_name,
         child_last_name: form.child_last_name,
         child_dob: form.child_dob,
         child_nationality: form.child_nationality || 'Mexicana',
         level: deriveLevel(form.grade_applying),
         grade_applying: form.grade_applying,
-        cycle: CURRENT_CYCLE.replace('–', '-'),
         parent1_name: form.parent1_name,
         parent1_email: form.parent1_email,
         parent1_phone: form.parent1_phone,
-      });
-      const { data: sess } = await admissionsApi.exchangeAccess(data.id, data.invite_token);
-      setRegId(data.id);
-      setSession(sess.session_token);
+      };
+      if (regId) {
+        // Invited: the draft already exists — persist any corrections.
+        await admissionsApi.updateRegistration(regId, step1, session);
+      } else {
+        const { data } = await admissionsApi.createRegistration({
+          ...step1, cycle: CURRENT_CYCLE.replace('–', '-'),
+        });
+        const { data: sess } = await admissionsApi.exchangeAccess(data.id, data.invite_token);
+        setRegId(data.id);
+        setSession(sess.session_token);
+      }
       setStep(2);
     } catch {
       toast.error('No se pudo iniciar la inscripción. Verifique los datos.');
@@ -167,6 +222,39 @@ export default function RegisterPage() {
     );
   }
 
+  // Invite link is being exchanged for a session — brief, blocking state.
+  if (booting) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
+        <div className="text-center text-muted">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-line border-t-purple" />
+          Validando su invitación…
+        </div>
+      </div>
+    );
+  }
+
+  // Invite token expired, already used, or invalid.
+  if (inviteError) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-coral/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-8 h-8 text-coral-dark" />
+          </div>
+          <h2 className="text-fluid-2xl font-bold text-ink mb-3">Invitación no válida</h2>
+          <p className="text-muted mb-6">
+            El enlace de inscripción no es válido o ha expirado. Solicite uno nuevo al equipo
+            de admisiones, o inicie su pre-registro.
+          </p>
+          <Link to="/pre-registro" className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2">
+            Ir al pre-registro
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const STEPS = ['Alumno y tutor', 'Datos adicionales', 'Salud y documentos'];
 
   return (
@@ -182,6 +270,16 @@ export default function RegisterPage() {
       </section>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {invited && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl2 border border-brand-600/25 bg-brand-50 px-4 py-3">
+            <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
+            <p className="text-sm text-ink">
+              <strong>Invitación de inscripción</strong> — precargamos sus datos del pre-registro.
+              Revíselos, complete la información y adjunte los documentos.
+            </p>
+          </div>
+        )}
+
         {/* Stepper */}
         <ol className="mb-8 flex items-center gap-2" aria-label="Progreso de inscripción">
           {STEPS.map((label, i) => {
@@ -233,7 +331,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={startRegistration} loading={busy} size="lg" className="min-h-[44px] justify-center">
+                <Button onClick={submitStep1} loading={busy} size="lg" className="min-h-[44px] justify-center">
                   Siguiente <ArrowRight className="w-4 h-4" />
                 </Button>
               </div>

@@ -18,12 +18,16 @@ from apps.bookings.services import SlotUnavailable, create_booking
 
 from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
+    DocumentVerifySerializer,
+    current_school_cycle,
     PreRegistrationAdminSerializer,
     PreRegistrationSerializer,
     PreRegistrationStatusSerializer,
     PublicPreRegistrationSerializer,
+    RegistrationAdminListSerializer,
     RegistrationDocumentSerializer,
     RegistrationSerializer,
+    RegistrationStatusSerializer,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
@@ -131,10 +135,85 @@ class PreRegistrationDetailView(generics.UpdateAPIView):
     http_method_names = ['patch']
 
 
-class RegistrationCreateView(generics.CreateAPIView):
-    """POST /api/v1/admissions/register/ — Start a registration (no auth)."""
-    serializer_class = RegistrationSerializer
-    permission_classes = [permissions.AllowAny]
+class PreRegistrationInviteView(APIView):
+    """POST /api/v1/admissions/pre-register/<pk>/invite/ — admin issues an
+    enrollment invite for a pre-registration.
+
+    Creates (or reuses) a DRAFT Registration pre-filled from the pre-registration,
+    mints a fresh single-use invite token, and returns a ready-to-share link
+    (``/inscripcion?rid=&token=``). The invite is also emailed to the applicant
+    (fail-soft). Idempotent: re-inviting the same pre-registration refreshes the
+    token on the existing draft rather than spawning duplicates.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        pre = get_object_or_404(PreRegistration, pk=pk)
+
+        reg = pre.registrations.filter(status=Registration.Status.DRAFT).first()
+        if reg is None:
+            reg = Registration(pre_registration=pre)
+        # (Re)seed the draft from the pre-registration so the applicant lands on a
+        # pre-filled form. Only overwrite while still a fresh draft.
+        reg.child_first_name = pre.child_first_name
+        reg.child_last_name = pre.child_last_name
+        reg.child_dob = pre.child_dob
+        reg.level = pre.level
+        reg.grade_applying = pre.grade_applying
+        reg.cycle = pre.cycle or current_school_cycle()
+        reg.parent1_name = pre.parent_name
+        reg.parent1_email = pre.parent_email
+        reg.parent1_phone = pre.parent_phone
+        reg.save()
+
+        raw = issue_invite(reg)
+        invite_url = f'{settings.FRONTEND_URL}/inscripcion?rid={reg.id}&token={raw}'
+
+        # Issuing an invite means admissions has engaged the family — advance the
+        # pre-registration out of "pending" so the pipeline reflects reality.
+        if pre.status == PreRegistration.Status.PENDING:
+            pre.status = PreRegistration.Status.CONTACTED
+            pre.save(update_fields=['status'])
+
+        self._email_invite(reg, invite_url)
+        return Response({
+            'registration_id': reg.id,
+            'invite_token': raw,
+            'invite_url': invite_url,
+            'expires_at': reg.invite_expires_at,
+        }, status=status.HTTP_201_CREATED)
+
+    def _email_invite(self, reg, invite_url):
+        send_mail(
+            subject='Invitación de inscripción — Colegio Interlaken',
+            message=(
+                f'Estimado/a {reg.parent1_name},\n\n'
+                f'Le invitamos a completar la inscripción de {reg.child_first_name} '
+                f'{reg.child_last_name} para el ciclo {reg.cycle}.\n\n'
+                f'Ingrese al siguiente enlace para continuar:\n{invite_url}\n\n'
+                f'El enlace es personal y expira en 14 días.\n\n'
+                f'Colegio Interlaken'
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[reg.parent1_email],
+            fail_silently=True,
+        )
+
+
+class RegistrationListCreateView(generics.ListCreateAPIView):
+    """POST /api/v1/admissions/register/ — Start a registration (no auth).
+    GET — Admin-only paginated list for the Inscripciones console."""
+    queryset = Registration.objects.all().prefetch_related('documents')
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsAdmin()]
+        return [permissions.AllowAny()]
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return RegistrationAdminListSerializer
+        return RegistrationSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -146,6 +225,53 @@ class RegistrationCreateView(generics.CreateAPIView):
         data = dict(serializer.data)
         data['invite_token'] = issue_invite(serializer.instance)
         return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class RegistrationStatusView(generics.UpdateAPIView):
+    """PATCH /api/v1/admissions/register/<pk>/status/ — admin review action.
+
+    Moves a registration through review (reviewing → approved / rejected /
+    complete) and records admin notes. On an approve/reject the applicant is
+    emailed the outcome (fail-soft).
+    """
+    queryset = Registration.objects.all()
+    serializer_class = RegistrationStatusSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['patch']
+
+    def perform_update(self, serializer):
+        before = serializer.instance.status
+        reg = serializer.save()
+        if reg.status != before and reg.status in (
+                Registration.Status.APPROVED, Registration.Status.REJECTED):
+            self._email_outcome(reg)
+
+    def _email_outcome(self, reg):
+        approved = reg.status == Registration.Status.APPROVED
+        subject = ('Inscripción aprobada' if approved else
+                   'Actualización de su inscripción') + ' — Colegio Interlaken'
+        body = (
+            f'Estimado/a {reg.parent1_name},\n\n'
+            + (f'Nos complace informarle que la inscripción de {reg.child_first_name} '
+               f'{reg.child_last_name} ha sido APROBADA. En breve le compartiremos los '
+               f'siguientes pasos.\n\n'
+               if approved else
+               f'Hemos revisado la solicitud de inscripción de {reg.child_first_name} '
+               f'{reg.child_last_name}. Un asesor de admisiones se pondrá en contacto con '
+               f'usted para darle más información.\n\n')
+            + 'Colegio Interlaken'
+        )
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL,
+                  [reg.parent1_email], fail_silently=True)
+
+
+class DocumentVerifyView(generics.UpdateAPIView):
+    """PATCH /api/v1/admissions/documents/<pk>/verify/ — admin marks a document
+    verified (or clears verification)."""
+    queryset = RegistrationDocument.objects.all()
+    serializer_class = DocumentVerifySerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['patch']
 
 
 class RegistrationAccessView(APIView):
