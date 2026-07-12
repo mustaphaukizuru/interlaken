@@ -1,10 +1,10 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ClipboardList, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -39,6 +39,17 @@ export default function AdminAdmissions() {
     queryKey: ['admin-preregistrations', page],
     queryFn: async () => toPaged<PreReg>((await api.get('/admissions/pre-register/', { params: { page } })).data),
     placeholderData: keepPreviousData,
+  });
+
+  const qc = useQueryClient();
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      api.patch(`/admissions/pre-register/${id}/`, { status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-preregistrations'] });
+      toast.success('Estado actualizado.');
+    },
+    onError: () => toast.error('No se pudo actualizar el estado.'),
   });
 
   const preRegs = data?.results;
@@ -94,7 +105,7 @@ export default function AdminAdmissions() {
                         <p className="font-medium text-ink">{p.child_name}</p>
                         <p className="text-xs text-subtle">Grado: {p.grade_applying}</p>
                       </div>
-                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                      <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
                     </div>
                     <dl className="mt-3 space-y-1 text-sm">
                       <div className="flex justify-between gap-3">
@@ -148,7 +159,7 @@ export default function AdminAdmissions() {
                           {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
                         </td>
                         <td>
-                          <Badge variant={meta.variant}>{meta.label}</Badge>
+                          <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
                         </td>
                       </tr>
                     );
@@ -162,5 +173,31 @@ export default function AdminAdmissions() {
         <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="pre-registros" />
       </Card>
     </div>
+  );
+}
+
+const VARIANT_CLASS: Record<string, string> = {
+  warning: 'border-amber/40 text-amber',
+  info:    'border-purple/40 text-purple',
+  success: 'border-green/50 text-green-dark',
+  error:   'border-coral/50 text-coral-dark',
+};
+
+/** Inline status control — moves a pre-registration through the pipeline. */
+function StatusSelect({ value, variant, onChange, disabled }: {
+  value: string; variant: string; onChange: (v: string) => void; disabled?: boolean;
+}) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label="Cambiar estado del pre-registro"
+      className={`rounded-lg border bg-white px-2 py-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50 ${VARIANT_CLASS[variant] ?? 'border-line text-muted'}`}
+    >
+      {Object.entries(statusMeta).map(([k, m]) => (
+        <option key={k} value={k}>{m.label}</option>
+      ))}
+    </select>
   );
 }

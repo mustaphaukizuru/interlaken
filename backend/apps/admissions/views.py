@@ -20,6 +20,7 @@ from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
     PreRegistrationAdminSerializer,
     PreRegistrationSerializer,
+    PreRegistrationStatusSerializer,
     PublicPreRegistrationSerializer,
     RegistrationDocumentSerializer,
     RegistrationSerializer,
@@ -116,6 +117,18 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
             recipient_list=[recipient],
             fail_silently=True,
         )
+
+
+class PreRegistrationDetailView(generics.UpdateAPIView):
+    """PATCH /api/v1/admissions/pre-register/<pk>/ — admin: update status/notes.
+
+    Lets staff move a pre-registration through the pipeline
+    (pending → contacted → enrolled/rejected) straight from the console.
+    """
+    queryset = PreRegistration.objects.all()
+    serializer_class = PreRegistrationStatusSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['patch']
 
 
 class RegistrationCreateView(generics.CreateAPIView):

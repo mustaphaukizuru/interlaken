@@ -6,6 +6,7 @@ the public contract that broke in production (frontend/serializer mismatch).
 import pytest
 from django.urls import reverse
 
+from apps.accounts.factories import AdminFactory
 from apps.admissions.models import PreRegistration
 
 
@@ -68,3 +69,31 @@ class TestPublicPreRegistration:
         resp = api_client.post(self.url, payload, format='json')
         assert resp.status_code == 400
         assert 'email' in resp.json()
+
+
+@pytest.mark.django_db
+class TestPreRegistrationStatusUpdate:
+    """Admin moves a pre-registration through the pipeline from the console."""
+
+    def _pre(self):
+        return PreRegistration.objects.create(
+            child_first_name='A', child_last_name='B', child_dob='2011-01-01',
+            level=PreRegistration.Level.PRIMARY, grade_applying='Primaria 1°',
+            parent_name='P', parent_email='p@t.mx', parent_phone='5551234567')
+
+    def test_admin_can_update_status(self, api_client):
+        pre = self._pre()
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.patch(reverse('pre-register-detail', args=[pre.id]),
+                                {'status': 'enrolled'}, format='json')
+        assert resp.status_code == 200, resp.content
+        pre.refresh_from_db()
+        assert pre.status == PreRegistration.Status.ENROLLED
+
+    def test_anonymous_cannot_update_status(self, api_client):
+        pre = self._pre()
+        resp = api_client.patch(reverse('pre-register-detail', args=[pre.id]),
+                                {'status': 'enrolled'}, format='json')
+        assert resp.status_code in (401, 403)
+        pre.refresh_from_db()
+        assert pre.status == PreRegistration.Status.PENDING

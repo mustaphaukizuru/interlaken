@@ -87,11 +87,18 @@ class PreRegistrationAdminSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'child_name', 'level', 'grade_applying',
             'parent_name', 'parent_email', 'parent_phone',
-            'status', 'created_at',
+            'status', 'notes', 'created_at',
         ]
 
     def get_child_name(self, obj):
         return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+
+
+class PreRegistrationStatusSerializer(serializers.ModelSerializer):
+    """Admin write: move a pre-registration through the pipeline + jot notes."""
+    class Meta:
+        model = PreRegistration
+        fields = ['id', 'status', 'notes']
 
 
 class RegistrationDocumentSerializer(serializers.ModelSerializer):
