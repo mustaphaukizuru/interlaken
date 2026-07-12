@@ -54,6 +54,10 @@ export default function LoginPage() {
       case 'no_code': return 'No se recibió autorización de Google.';
       case 'no_email': return 'No fue posible obtener su correo de Google.';
       case 'token_exchange_failed': return 'Error al comunicarse con Google. Intente de nuevo.';
+      case 'userinfo_failed': return 'No fue posible obtener su perfil de Google. Intente de nuevo.';
+      case 'google_unreachable': return 'No fue posible comunicarse con Google. Intente de nuevo.';
+      case 'google_unavailable': return 'El acceso con Google no está disponible ahora. Use su correo y contraseña.';
+      case 'backend_unreachable': return 'El servicio no está disponible en este momento. Intente más tarde.';
       default: return oauthError ? 'Ocurrió un error. Intente de nuevo.' : null;
     }
   })();

@@ -8,7 +8,9 @@ All Google network calls are mocked — the suite never touches the internet.
 from unittest.mock import patch
 
 import pytest
+import requests
 from django.conf import settings
+from django.test import override_settings
 from django.urls import reverse
 
 from apps.accounts.factories import (
@@ -77,6 +79,28 @@ class _FakeResponse:
         return self._payload
 
 
+@pytest.mark.django_db
+class TestGoogleLogin:
+    """GET /auth/google/ — the OAuth initiation (never a raw 500)."""
+
+    url_name = "google-login"
+
+    @override_settings(GOOGLE_CLIENT_ID="cid", GOOGLE_CLIENT_SECRET="sec")
+    def test_configured_redirects_to_google(self, api_client):
+        resp = api_client.get(reverse(self.url_name))
+        assert resp.status_code == 302
+        assert resp["Location"].startswith("https://accounts.google.com/")
+
+    @override_settings(GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="")
+    def test_unconfigured_fails_gracefully_to_login(self, api_client):
+        # No credentials → bounce to the SPA login with a clear error, NOT a
+        # 500 or a confusing Google error page.
+        resp = api_client.get(reverse(self.url_name))
+        assert resp.status_code == 302
+        assert "error=google_unavailable" in resp["Location"]
+        assert "accounts.google.com" not in resp["Location"]
+
+
 class TestGoogleCallback:
     url_name = "google-callback"
 
@@ -84,6 +108,14 @@ class TestGoogleCallback:
         resp = api_client.get(reverse(self.url_name))
         assert resp.status_code == 302
         assert "error=no_code" in resp["Location"]
+
+    @patch("apps.accounts.views.requests.post", side_effect=requests.ConnectionError)
+    def test_network_error_redirects_gracefully(self, _mock_post, api_client):
+        # Google unreachable / timeout during the token exchange → graceful
+        # redirect, not a raw 500.
+        resp = api_client.get(reverse(self.url_name), {"code": "abc"})
+        assert resp.status_code == 302
+        assert "error=google_unreachable" in resp["Location"]
 
     @patch("apps.accounts.views.requests.get")
     @patch("apps.accounts.views.requests.post")

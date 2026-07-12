@@ -34,6 +34,12 @@ class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        # Fail gracefully to the SPA login instead of sending the user to Google
+        # with blank credentials (which yields a confusing Google error page)
+        # when OAuth isn't configured in this environment.
+        if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
+            return redirect(f'{settings.FRONTEND_URL}/login?error=google_unavailable')
+
         # Build the consent URL with proper URL-encoding of every parameter.
         # `redirect_uri` must EXACTLY match one of the "Authorized redirect URIs"
         # registered on the OAuth client in Google Cloud Console (scheme, host,
@@ -64,36 +70,35 @@ class GoogleCallbackView(APIView):
         if not code:
             return redirect(f'{settings.FRONTEND_URL}/login?error=no_code')
 
-        # Exchange code for tokens
-        token_response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'code': code,
-                'client_id': settings.GOOGLE_CLIENT_ID,
-                'client_secret': settings.GOOGLE_CLIENT_SECRET,
-                'redirect_uri': settings.GOOGLE_REDIRECT_URI,
-                'grant_type': 'authorization_code',
-            },
-            timeout=10,
-        )
+        # Exchange code → token → userinfo. Any network failure or malformed
+        # response redirects to the login with an error rather than a raw 500.
+        try:
+            token_response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data={
+                    'code': code,
+                    'client_id': settings.GOOGLE_CLIENT_ID,
+                    'client_secret': settings.GOOGLE_CLIENT_SECRET,
+                    'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+                    'grant_type': 'authorization_code',
+                },
+                timeout=10,
+            )
+            if token_response.status_code != 200:
+                return redirect(f'{settings.FRONTEND_URL}/login?error=token_exchange_failed')
+            access_token = token_response.json().get('access_token')
 
-        if token_response.status_code != 200:
-            return redirect(f'{settings.FRONTEND_URL}/login?error=token_exchange_failed')
-
-        token_data = token_response.json()
-        access_token = token_data.get('access_token')
-
-        # Get user info from Google
-        userinfo_response = requests.get(
-            'https://www.googleapis.com/oauth2/v3/userinfo',
-            headers={'Authorization': f'Bearer {access_token}'},
-            timeout=10,
-        )
-
-        if userinfo_response.status_code != 200:
-            return redirect(f'{settings.FRONTEND_URL}/login?error=userinfo_failed')
-
-        userinfo = userinfo_response.json()
+            # Get user info from Google
+            userinfo_response = requests.get(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=10,
+            )
+            if userinfo_response.status_code != 200:
+                return redirect(f'{settings.FRONTEND_URL}/login?error=userinfo_failed')
+            userinfo = userinfo_response.json()
+        except (requests.RequestException, ValueError):
+            return redirect(f'{settings.FRONTEND_URL}/login?error=google_unreachable')
         google_id = userinfo.get('sub')
         email = userinfo.get('email')
         first_name = userinfo.get('given_name', '')

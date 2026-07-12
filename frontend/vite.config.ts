@@ -77,10 +77,34 @@ export default defineConfig(({ command }) => ({
       '/api': {
         target: process.env.DEV_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
+        configure: (proxy) => {
+          // Backend unreachable in dev → JSON 502 the SPA's data layer surfaces
+          // (ErrorState), instead of Vite's raw HTML 500.
+          proxy.on('error', (_err, _req, res) => {
+            if ('writeHead' in res && !res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ detail: 'Backend no disponible (dev). ¿Está corriendo en :8000?' }));
+            }
+          });
+        },
       },
       '/auth': {
         target: process.env.DEV_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
+        configure: (proxy) => {
+          // A full-page nav to a down backend (e.g. /auth/google/) should land on
+          // the SPA login with a friendly error, not a raw browser 500.
+          proxy.on('error', (_err, req, res) => {
+            if (!('writeHead' in res) || res.headersSent) return;
+            if ((req.headers?.accept || '').includes('text/html')) {
+              res.writeHead(302, { Location: '/login?error=backend_unreachable' });
+              res.end();
+            } else {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ detail: 'Backend no disponible (dev).' }));
+            }
+          });
+        },
       },
     },
   },
