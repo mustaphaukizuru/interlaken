@@ -435,6 +435,10 @@ export const portalApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+  // Roster ↔ Loyverse linking (admin): commit=false previews the plan, true persists.
+  linkLoyverse: (commit: boolean) =>
+    api.post('/accounts/admin/link-loyverse/', { commit: commit ? '1' : '0' }),
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────

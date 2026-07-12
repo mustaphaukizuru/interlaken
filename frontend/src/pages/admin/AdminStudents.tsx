@@ -1,7 +1,8 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Users, Search, FileUp } from 'lucide-react';
+import { Users, Search, FileUp, Link2 } from 'lucide-react';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
+import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
 import { Card } from '@/components/ui/Card';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -15,6 +16,7 @@ export default function AdminStudents() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-students', page],
@@ -41,11 +43,17 @@ export default function AdminStudents() {
           <h1 className="text-fluid-xl font-bold text-ink">Alumnos</h1>
           <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
         </div>
-        <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
-          <FileUp size={16} aria-hidden="true" /> Importar CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-outline" onClick={() => setLinkOpen(true)}>
+            <Link2 size={16} aria-hidden="true" /> Vincular Loyverse
+          </button>
+          <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
+            <FileUp size={16} aria-hidden="true" /> Importar CSV
+          </button>
+        </div>
       </div>
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
+      <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
 
       <Card title={`${count} alumnos registrados`}>
         <div className="relative mb-1">

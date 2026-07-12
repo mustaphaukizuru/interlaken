@@ -96,6 +96,25 @@ def get_customer_by_email(email: str) -> dict | None:
     return customers[0] if customers else None
 
 
+def get_all_customers(limit: int = 250, max_pages: int = 40) -> list:
+    """Fetch every customer store-wide, following Loyverse's cursor.
+
+    Powers ``link_loyverse`` (roster ↔ Loyverse linking): one pass builds a
+    ``customer_code → id`` map for the whole school. ``max_pages`` caps the poll
+    (250 × 40 = 10k customers) as a runaway guard.
+    """
+    customers: list = []
+    cursor = None
+    for _ in range(max_pages):
+        params = {'cursor': cursor, 'limit': limit} if cursor else {'limit': limit}
+        data = _get('/customers', params=params)
+        customers.extend(data.get('customers', []) or [])
+        cursor = data.get('cursor')
+        if not cursor:
+            break
+    return customers
+
+
 def get_balance_from_customer(customer: dict) -> Decimal:
     """
     Extract balance from Loyverse customer object.
@@ -835,3 +854,89 @@ def reconcile_balances():
             row['error'] = str(e)
         rows.append(row)
     return rows
+
+
+# ── Roster ↔ Loyverse linking ────────────────────────────────────────────────
+#
+# A student's purchases/balance only sync once StudentProfile.loyverse_id holds
+# the Loyverse customer's internal **id (UUID)** — NOT the visible customer_code
+# or barcode. Collecting each UUID by hand for the whole school is impractical, so
+# this matches customers to students by matrícula (== customer_code) and backfills
+# every id in one pass. Matching is EXACT (stripped) to avoid mis-linking one
+# child's spending onto another; an email fallback covers rosters keyed that way.
+
+
+def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> dict:
+    """Match Loyverse ``customers`` to students and backfill ``loyverse_id``.
+
+    Pure over the given ``customers`` list (no API calls here — the command/endpoint
+    fetches them via ``get_all_customers``), so it is fully unit-testable offline.
+    Matches by exact matrícula (``StudentProfile.student_id`` == ``customer_code``),
+    falling back to exact email. Only fills EMPTY ids unless ``overwrite``; writes
+    only when ``commit`` (default is a dry-run preview).
+
+    Returns a report: ``{customers, students, linked, already_linked,
+    skipped_conflict, unmatched_students[], unmatched_customer_count,
+    duplicate_codes[], commit, changes[]}``.
+    """
+    from apps.accounts.models import StudentProfile
+
+    by_code, by_email, dup_codes = {}, {}, set()
+    for c in customers:
+        code = (c.get('customer_code') or '').strip()
+        if code:
+            if code in by_code:
+                dup_codes.add(code)
+            else:
+                by_code[code] = c
+        email = (c.get('email') or '').strip().lower()
+        if email and email not in by_email:
+            by_email[email] = c
+
+    report = {
+        'customers': len(customers), 'students': 0,
+        'linked': 0, 'already_linked': 0, 'skipped_conflict': 0,
+        'unmatched_students': [], 'unmatched_customer_count': 0,
+        'duplicate_codes': sorted(dup_codes), 'commit': commit, 'changes': [],
+    }
+
+    matched_ids = set()
+    students = StudentProfile.objects.filter(is_active=True).select_related('user')
+    report['students'] = students.count()
+
+    for s in students:
+        code = (s.student_id or '').strip()
+        email = (s.user.email or '').strip().lower()
+
+        cust, matched_by = by_code.get(code), 'código'
+        if cust is None and email:
+            cust, matched_by = by_email.get(email), 'correo'
+        if cust is None:
+            report['unmatched_students'].append(
+                {'matricula': s.student_id, 'name': s.user.full_name})
+            continue
+
+        uuid = cust.get('id')
+        matched_ids.add(uuid)
+
+        if s.loyverse_id == uuid:
+            report['already_linked'] += 1
+            continue
+        if s.loyverse_id and not overwrite:
+            # Already linked to a DIFFERENT id — never silently repoint (privacy).
+            report['skipped_conflict'] += 1
+            continue
+
+        report['linked'] += 1
+        report['changes'].append({
+            'matricula': s.student_id, 'name': s.user.full_name,
+            'loyverse_id': uuid, 'matched_by': matched_by,
+            'was': s.loyverse_id or None,
+        })
+        if commit:
+            s.loyverse_id = uuid
+            s.save(update_fields=['loyverse_id'])
+
+    report['unmatched_customer_count'] = sum(
+        1 for c in customers if c.get('id') not in matched_ids)
+    return report
