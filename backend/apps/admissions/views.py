@@ -20,6 +20,7 @@ from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
     PreRegistrationAdminSerializer,
     PreRegistrationSerializer,
+    PublicPreRegistrationSerializer,
     RegistrationDocumentSerializer,
     RegistrationSerializer,
 )
@@ -78,7 +79,8 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return PreRegistrationAdminSerializer
-        return PreRegistrationSerializer
+        # POST is the public form — accept its payload and map it internally.
+        return PublicPreRegistrationSerializer
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -100,6 +102,9 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
         )
 
     def _notify_admin(self, obj):
+        # Deliver to the school's contact inbox (NOT EMAIL_HOST_USER, which is the
+        # SMTP auth user and is empty by default), mirroring the contact form.
+        recipient = getattr(settings, 'CONTACT_EMAIL', '') or settings.DEFAULT_FROM_EMAIL
         send_mail(
             subject=f'[Interlaken] Nuevo pre-registro: {obj.child_first_name} {obj.child_last_name}',
             message=(
@@ -108,7 +113,7 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
                 f'Teléfono: {obj.parent_phone}'
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[settings.EMAIL_HOST_USER],
+            recipient_list=[recipient],
             fail_silently=True,
         )
 
