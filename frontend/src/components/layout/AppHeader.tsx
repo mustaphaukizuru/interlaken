@@ -15,7 +15,7 @@ export default function AppHeader() {
   return (
     <>
       <div className="accent-bar" />
-      <header className="sticky top-[3px] z-30 flex items-center gap-3 border-b border-line bg-cream/90 px-4 py-3 backdrop-blur-[14px] sm:gap-4 sm:px-6 lg:px-8">
+      <header className="z-30 flex items-center gap-3 border-b border-line bg-cream/95 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
         {/* Mobile hamburger — the single source of drawer access on every page */}
         <button
           type="button"

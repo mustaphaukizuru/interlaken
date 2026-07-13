@@ -1,5 +1,5 @@
-import { Outlet } from 'react-router-dom';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Sidebar from './Sidebar';
 import AppHeader from './AppHeader';
 import MobileTabBar from './MobileTabBar';
@@ -35,6 +35,12 @@ export function PortalLayout({ role }: Props) {
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
+  // Only the content column scrolls (the sidebar + header stay fixed), so reset
+  // it to the top on each navigation — otherwise a new page opens mid-scroll.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [pathname]);
+
   // Lock body scroll while the drawer is open.
   useEffect(() => {
     if (!open) return;
@@ -57,7 +63,7 @@ export function PortalLayout({ role }: Props) {
 
   return (
     <MobileNavContext.Provider value={{ open, toggle, close }}>
-      <div className="flex min-h-screen bg-cream">
+      <div className="flex h-[100dvh] overflow-hidden bg-cream">
         <a href="#contenido" className="skip-link">Saltar al contenido</a>
         {/* Off-canvas backdrop (mobile only) */}
         <div
@@ -74,11 +80,13 @@ export function PortalLayout({ role }: Props) {
         {/* Global search (Ctrl/Cmd+K) — admin workflows only */}
         {role === 'admin' && <CommandPalette />}
 
-        {/* Main */}
-        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+        {/* Main — sidebar + header stay fixed; only this content column scrolls */}
+        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <AppHeader />
-          <div className="mx-auto w-full max-w-[1400px] flex-1 px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
-            <RouteTransition><Outlet /></RouteTransition>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="mx-auto w-full max-w-[1400px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
+              <RouteTransition><Outlet /></RouteTransition>
+            </div>
           </div>
         </main>
 
