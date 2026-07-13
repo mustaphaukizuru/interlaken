@@ -1,5 +1,6 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Users, Search, FileUp, Link2 } from 'lucide-react';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
@@ -88,7 +89,7 @@ export default function AdminStudents() {
                       {s.user.first_name[0]}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium text-ink truncate">{s.user.full_name}</p>
+                      <Link to={`/admin/alumnos/${s.id}`} className="block truncate font-medium text-ink hover:text-purple hover:underline">{s.user.full_name}</Link>
                       <p className="text-subtle text-xs truncate">{s.user.email}</p>
                     </div>
                   </div>
@@ -130,7 +131,7 @@ export default function AdminStudents() {
                           <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                             {s.user.first_name[0]}
                           </div>
-                          <span className="font-medium text-ink">{s.user.full_name}</span>
+                          <Link to={`/admin/alumnos/${s.id}`} className="font-medium text-ink hover:text-purple hover:underline">{s.user.full_name}</Link>
                         </div>
                       </td>
                       <td className="text-muted">{s.student_id}</td>
