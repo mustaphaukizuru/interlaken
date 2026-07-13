@@ -68,7 +68,7 @@ export default function ColegiaturasPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Colegiaturas</h1>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Colegiaturas</h1>
           <p className="mt-0.5 text-fluid-sm text-muted">
             Consulte y pague las colegiaturas mensuales de sus hijos.
           </p>

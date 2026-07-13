@@ -150,7 +150,7 @@ export default function AdminFinance() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Finanzas — Colegiaturas</h1>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Finanzas — Colegiaturas</h1>
           <p className="text-muted text-sm mt-0.5">
             Facturación mensual, cobranza y estado de cuenta.
           </p>

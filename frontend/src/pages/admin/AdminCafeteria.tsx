@@ -38,8 +38,8 @@ export default function AdminCafeteria() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Cafetería — Admin</h1>
-          <p className="text-muted text-sm mt-0.5">
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería — Admin</h1>
+          <p className="mt-1 text-sm text-muted">
             Saldos, depósitos, ajustes, devoluciones y reconciliación.
           </p>
         </div>

@@ -101,8 +101,8 @@ export default function CafeteriaPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Cafetería</h1>
-          <p className="mt-0.5 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
+          <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
         </div>
         <Card><ErrorState onRetry={() => refetchBalances()} /></Card>
       </div>
@@ -113,8 +113,8 @@ export default function CafeteriaPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Cafetería</h1>
-          <p className="mt-0.5 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
+          <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
         </div>
         <Button variant="secondary" size="sm" onClick={refresh} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
           <RefreshCw className="w-3 h-3" /> Actualizar

@@ -244,7 +244,7 @@ export default function AdminBookings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-fluid-xl font-bold text-ink">Visitas</h1>
+        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Visitas</h1>
         <p className="text-muted text-sm mt-0.5">
           Publique disponibilidad y gestione las visitas individuales.
         </p>

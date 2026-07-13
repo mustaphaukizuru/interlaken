@@ -119,7 +119,7 @@ export default function AdminCafeteriaStudent() {
       {/* Header: student + balance + actions */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">{balance.student.user.full_name}</h1>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{balance.student.user.full_name}</h1>
           <p className="text-muted text-sm mt-0.5">
             Matrícula {balance.student.student_id} · {balance.student.grade} {balance.student.group}
           </p>
