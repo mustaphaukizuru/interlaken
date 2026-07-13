@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 from apps.core.ratelimit import ratelimit
 
 from .gateways import get_gateway, iter_gateways
+from .gateways.base import WebhookEvent
 from .models import Payment
 from .serializers import PaymentInitiateSerializer, PaymentSerializer
 
@@ -201,6 +202,54 @@ class BanorteWebhookView(_WebhookProcessMixin, APIView):
 
     def post(self, request):
         return self._process(request, [get_gateway('banorte')])
+
+
+def _sandbox_payments_enabled() -> bool:
+    """Sandbox payment completion is DEV-ONLY (DEBUG or SQLITE_LOCAL). In
+    production the real gateway webhook settles payments and this is disabled."""
+    import os
+
+    from django.conf import settings
+    return bool(settings.DEBUG or os.getenv('SQLITE_LOCAL'))
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SandboxCompleteView(_WebhookProcessMixin, APIView):
+    """POST /api/v1/payments/sandbox/complete/ — DEV-ONLY.
+
+    Lets the mock hosted-payment page finish the flow end-to-end without a live
+    gateway. Reuses the EXACT webhook completion path (mark success/fail, credit
+    the cafeteria ledger / mark the invoice paid, notify the family) — only the
+    HMAC signature check is skipped — so sandbox behaviour matches production.
+    Returns 404 unless DEBUG/SQLITE_LOCAL.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if not _sandbox_payments_enabled():
+            return Response({'error': 'not_found'}, status=status.HTTP_404_NOT_FOUND)
+
+        order_id = request.data.get('order_id')
+        result = 'success' if request.data.get('result', 'success') == 'success' else 'failed'
+        event = WebhookEvent(
+            payment_id=order_id, status=result,
+            transaction_id=f'SANDBOX-{order_id}',
+            raw={'sandbox': True, 'result': result},
+        )
+
+        from apps.core.audit import audit_context
+        with audit_context(actor_label='system:sandbox'):
+            http_status, body, notify_arg = self._apply_event(event)
+
+        if notify_arg is not None:
+            payment, success = notify_arg
+            if payment.payment_type == Payment.Type.CAFETERIA:
+                from apps.cafeteria.services import notify_topup_result
+                notify_topup_result(payment, success=success)
+            elif payment.payment_type == Payment.Type.TUITION:
+                from apps.finance.services import notify_invoice_result
+                notify_invoice_result(payment, success=success)
+        return Response(body, status=http_status)
 
 
 class PaymentDetailView(generics.RetrieveAPIView):

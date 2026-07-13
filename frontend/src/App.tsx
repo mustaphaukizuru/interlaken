@@ -35,6 +35,7 @@ const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
+const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
 
 // Parent portal
 const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
@@ -123,6 +124,8 @@ export default function App() {
             {/* Google OAuth returns to /login?login=ok — /auth/* is reserved for
                 the backend (Vite proxy + SPA catch-all both send it to Django). */}
             <Route path="/login" element={<LoginPage />} />
+            {/* Mock hosted-payment page (sandbox/dev only — stands in for the bank) */}
+            <Route path="/pago/simulado" element={<SandboxCheckout />} />
 
             {/* ── PARENT PORTAL ───────────────────────────── */}
             <Route path="/portal" element={

@@ -187,3 +187,50 @@ class TestTopUpWebhookCredit:
         assert not CafeteriaTransaction.objects.filter(student=student).exists()
         assert CafeteriaBalance.objects.filter(
             student=student, balance__gt=0).count() == 0
+
+
+class TestSandboxComplete:
+    """The DEV-only mock-checkout completion reuses the webhook path (no signature),
+    so a sandbox 'success' credits the ledger exactly like production does."""
+
+    def test_sandbox_success_completes_and_credits(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup, payment = _make_online_topup(parent, student)
+
+        resp = api_client.post(
+            reverse("payment-sandbox-complete"),
+            {"order_id": payment.id, "result": "success"}, format="json")
+        assert resp.status_code == 200, resp.data
+
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.SUCCESS
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("200.00")
+        assert Notification.objects.filter(
+            user=parent, notif_type=Notification.NotifType.PAYMENT).count() == 1
+
+    def test_sandbox_failed_credits_nothing(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup, payment = _make_online_topup(parent, student)
+
+        resp = api_client.post(
+            reverse("payment-sandbox-complete"),
+            {"order_id": payment.id, "result": "failed"}, format="json")
+        assert resp.status_code == 200
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.FAILED
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+
+    def test_sandbox_disabled_returns_404(self, api_client, monkeypatch):
+        """In production (no DEBUG/SQLITE_LOCAL) the endpoint must not exist."""
+        monkeypatch.setattr("apps.payments.views._sandbox_payments_enabled", lambda: False)
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        _, payment = _make_online_topup(parent, student)
+        resp = api_client.post(
+            reverse("payment-sandbox-complete"),
+            {"order_id": payment.id, "result": "success"}, format="json")
+        assert resp.status_code == 404
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.PENDING
