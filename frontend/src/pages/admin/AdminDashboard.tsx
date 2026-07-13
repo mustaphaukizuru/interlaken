@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight } from 'lucide-react';
@@ -8,11 +9,21 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
+import type { AnalyticsPayload } from '@/types/analytics';
+
+// Recharts loads only when this dashboard renders (keeps it off the main bundle).
+const ChartsSection = lazy(() => import('@/components/staff/ChartsSection'));
 
 export default function AdminDashboard() {
   const { data, isLoading, isError, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
+  });
+
+  const { data: analytics } = useQuery<AnalyticsPayload>({
+    queryKey: ['staff-analytics', 30],
+    queryFn: async () => (await portalApi.getStaffAnalytics(30)).data,
+    staleTime: 60_000,
   });
 
   return (
@@ -44,6 +55,21 @@ export default function AdminDashboard() {
           <Link to="/admin/admisiones" className="btn bg-purple text-white"><UserPlus size={16} /> Nueva Admisión</Link>
           <Link to="/admin/alumnos" className="btn-outline"><Users size={16} /> Ver Alumnos</Link>
         </div>
+
+        {/* Analytics — reuses the staff chart suite (real data-viz on the landing) */}
+        {analytics && (
+          <div className="mb-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="font-head text-[15px] font-bold text-ink">Indicadores · últimos 30 días</h2>
+              <Link to="/staff" className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">
+                Analítica completa <ArrowRight size={13} />
+              </Link>
+            </div>
+            <Suspense fallback={<div className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />}>
+              <ChartsSection data={analytics} />
+            </Suspense>
+          </div>
+        )}
 
         {/* Recent activity */}
         {!isError && (
