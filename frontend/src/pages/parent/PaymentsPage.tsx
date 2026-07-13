@@ -1,16 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { CreditCard, CheckCircle, Clock, XCircle, Plus } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { CreditCard, CheckCircle, Clock, XCircle, Receipt, Coffee, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { Modal } from '@/components/ui/Modal';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { paymentsApi } from '@/services/api';
 import type { Payment } from '@/types';
 
@@ -37,11 +35,11 @@ const paymentTypeLabel: Record<string, string> = {
   other:      'Otro',
 };
 
+/** Pagos is a HUB: real payments happen in Colegiaturas (invoice-linked) and
+ * Cafetería (top-up-linked), each with gateway selection + secure redirect. The
+ * old free-amount "Realizar pago" modal never redirected, so it created orphan
+ * PENDING rows that settled nothing — it's replaced by these action cards. */
 export default function PaymentsPage() {
-  const queryClient = useQueryClient();
-  const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ amount: '', payment_type: 'tuition', description: '' });
-
   const { data: payments, isLoading, isError, refetch } = useQuery<Payment[]>({
     queryKey: ['payments'],
     queryFn: async () => {
@@ -50,85 +48,28 @@ export default function PaymentsPage() {
     },
   });
 
-  const initiateMutation = useMutation({
-    mutationFn: () =>
-      paymentsApi.initiatePayment({
-        amount: parseFloat(form.amount),
-        payment_type: form.payment_type,
-        description: form.description || paymentTypeLabel[form.payment_type],
-      }),
-    onSuccess: () => {
-      toast.success('Pago iniciado correctamente.');
-      setShowNew(false);
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-    },
-    onError: () => toast.error('No fue posible iniciar el pago.'),
-  });
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Pagos</h1>
-          <p className="mt-0.5 text-fluid-sm text-muted">Historial de pagos y colegiaturas.</p>
-        </div>
-        <Button onClick={() => setShowNew(true)} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
-          <Plus className="w-4 h-4" /> Nuevo pago
-        </Button>
+    <>
+      <PageHeader title="Pagos" subtitle="Realiza pagos con tarjeta y consulta tu historial." />
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <ActionCard
+          to="/portal/colegiaturas"
+          icon={Receipt}
+          title="Pagar colegiaturas"
+          desc="Consulta y paga las mensualidades de tus hijos con tarjeta."
+          gradient="from-pink to-purple"
+        />
+        <ActionCard
+          to="/portal/cafeteria"
+          icon={Coffee}
+          title="Recargar cafetería"
+          desc="Agrega saldo a la cuenta de cafetería de tus hijos."
+          gradient="from-green to-green-dark"
+        />
       </div>
 
-      {/* New payment modal */}
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="Realizar pago">
-        <div>
-          <label className="label" htmlFor="payment-type">Tipo de pago</label>
-          <select
-            id="payment-type"
-            className="input-field min-h-[44px] text-base"
-            value={form.payment_type}
-            onChange={(e) => setForm((f) => ({ ...f, payment_type: e.target.value }))}
-          >
-            {Object.entries(paymentTypeLabel).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="payment-amount">Monto (MXN)</label>
-          <input
-            id="payment-amount"
-            type="number"
-            inputMode="decimal"
-            className="input-field min-h-[44px] text-base"
-            placeholder="0.00"
-            value={form.amount}
-            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="payment-description">Descripción (opcional)</label>
-          <input
-            id="payment-description"
-            className="input-field min-h-[44px] text-base"
-            placeholder="Ej. Colegiatura Agosto 2025"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="secondary" onClick={() => setShowNew(false)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
-          <Button
-            loading={initiateMutation.isPending}
-            onClick={() => initiateMutation.mutate()}
-            disabled={!form.amount || parseFloat(form.amount) <= 0}
-            className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
-          >
-            Pagar
-          </Button>
-        </div>
-      </Modal>
-
-      {/* Payments list */}
-      <Card>
+      <Card title="Historial de pagos">
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
@@ -164,6 +105,26 @@ export default function PaymentsPage() {
           </div>
         )}
       </Card>
-    </div>
+    </>
+  );
+}
+
+function ActionCard({ to, icon: Icon, title, desc, gradient }: {
+  to: string; icon: any; title: string; desc: string; gradient: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+    >
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-purple`}>
+        <Icon className="h-6 w-6" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-head text-base font-bold text-ink">{title}</span>
+        <span className="mt-0.5 block text-sm text-muted">{desc}</span>
+      </span>
+      <ArrowRight className="h-5 w-5 shrink-0 text-subtle transition group-hover:translate-x-1 group-hover:text-purple" />
+    </Link>
   );
 }

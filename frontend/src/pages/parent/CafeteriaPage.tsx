@@ -12,6 +12,7 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
+import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 
@@ -172,6 +173,22 @@ export default function CafeteriaPage() {
             onChange={(e) => setTopupAmount(e.target.value)}
           />
           <p className="mt-1 text-xs text-subtle">Mínimo $50 · Máximo $2,000</p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {[100, 200, 300, 500].map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => setTopupAmount(String(amt))}
+                className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
+                  topupAmount === String(amt)
+                    ? 'border-purple bg-purple text-white'
+                    : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
+                }`}
+              >
+                ${amt}
+              </button>
+            ))}
+          </div>
         </div>
         <div>
           <label className="label" htmlFor="topup-method">Método de pago</label>
@@ -186,21 +203,11 @@ export default function CafeteriaPage() {
           </select>
         </div>
         {topupMethod === 'online' && (
-          <div>
-            <label className="label" htmlFor="topup-gateway">Pasarela de pago</label>
-            <select
-              id="topup-gateway"
-              className="input-field min-h-[44px] text-base"
-              value={topupGateway}
-              onChange={(e) => setTopupGateway(e.target.value as any)}
-            >
-              <option value="global_payments">Global Payments</option>
-              <option value="banorte">Banorte</option>
-            </select>
-            <p className="mt-1 text-xs text-subtle">
-              Será redirigido a la página segura de la pasarela para completar el pago.
-            </p>
-          </div>
+          <PaymentMethodPicker
+            value={topupGateway}
+            onChange={(v) => setTopupGateway(v as any)}
+            disabled={topupMutation.isPending}
+          />
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button variant="secondary" onClick={() => setShowTopup(false)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>

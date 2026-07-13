@@ -13,6 +13,7 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
+import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { financeApi, downloadBlob } from '@/services/api';
 import type { Invoice } from '@/types';
 
@@ -22,11 +23,6 @@ const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
   overdue:   { label: 'Vencida',   variant: 'error',   icon: AlertTriangle },
   cancelled: { label: 'Cancelada', variant: 'neutral', icon: XCircle },
 };
-
-const GATEWAYS = [
-  { value: 'global_payments', label: 'Tarjeta (Global Payments)' },
-  { value: 'banorte', label: 'Banorte Pago en Línea' },
-];
 
 export default function ColegiaturasPage() {
   const queryClient = useQueryClient();
@@ -94,23 +90,11 @@ export default function ColegiaturasPage() {
               <div className="mt-1 flex justify-between gap-3"><span className="text-muted">Periodo</span><span className="font-medium text-ink">{payInvoice.period_label}</span></div>
               <div className="mt-1 flex justify-between gap-3"><span className="text-muted">Monto a pagar</span><span className="font-bold text-ink">${parseFloat(payInvoice.balance_due).toFixed(2)} {payInvoice.currency}</span></div>
             </div>
-            <div>
-              <label className="label" htmlFor="pay-gateway">Método de pago</label>
-              <select
-                id="pay-gateway"
-                className="input-field min-h-[44px] text-base"
-                value={gateway}
-                onChange={(e) => setGateway(e.target.value)}
-              >
-                {GATEWAYS.map((g) => (
-                  <option key={g.value} value={g.value}>{g.label}</option>
-                ))}
-              </select>
-            </div>
+            <PaymentMethodPicker value={gateway} onChange={setGateway} disabled={payMutation.isPending} />
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="secondary" onClick={() => setPayInvoice(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
               <Button loading={payMutation.isPending} onClick={() => payMutation.mutate()} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">
-                <CreditCard className="w-4 h-4" /> Pagar en línea
+                <CreditCard className="w-4 h-4" /> Pagar ${parseFloat(payInvoice.balance_due).toFixed(2)}
               </Button>
             </div>
           </div>
