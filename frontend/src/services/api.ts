@@ -320,6 +320,12 @@ export const financeApi = {
   adminUpdateFee: (id: number, data: Record<string, unknown>) => api.patch(`/finance/admin/fee-schedules/${id}/`, data),
   adminDeleteFee: (id: number) => api.delete(`/finance/admin/fee-schedules/${id}/`),
 
+  // Per-student becas / descuentos CRUD.
+  adminListDiscounts: (studentId: number) => api.get('/finance/admin/discounts/', { params: { student: studentId } }),
+  adminCreateDiscount: (data: Record<string, unknown>) => api.post('/finance/admin/discounts/', data),
+  adminUpdateDiscount: (id: number, data: Record<string, unknown>) => api.patch(`/finance/admin/discounts/${id}/`, data),
+  adminDeleteDiscount: (id: number) => api.delete(`/finance/admin/discounts/${id}/`),
+
   markPaid: (id: number, reason?: string, method?: string) =>
     api.post(`/finance/admin/invoices/${id}/mark-paid/`, { reason, method }),
 

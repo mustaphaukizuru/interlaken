@@ -17,6 +17,15 @@ class FeeScheduleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'updated_at']
 
 
+class DiscountSerializer(serializers.ModelSerializer):
+    """Admin CRUD for per-student becas / descuentos."""
+    class Meta:
+        model = Discount
+        fields = ['id', 'student', 'name', 'kind', 'method', 'value', 'active',
+                  'start_period', 'end_period', 'note', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
 class InvoiceLineItemSerializer(serializers.ModelSerializer):
     kind_display = serializers.CharField(source='get_kind_display', read_only=True)
 

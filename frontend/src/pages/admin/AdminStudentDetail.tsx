@@ -9,6 +9,7 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { StudentDiscounts } from '@/components/admin/StudentDiscounts';
 import { financeApi } from '@/services/api';
 
 const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
@@ -109,6 +110,8 @@ export default function AdminStudentDetail() {
           </div>
         )}
       </Card>
+
+      {s && <div className="mt-6"><StudentDiscounts studentId={s.id} /></div>}
     </>
   );
 }

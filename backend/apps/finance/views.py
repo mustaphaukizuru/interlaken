@@ -17,12 +17,12 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 
 from . import services
-from .models import FeeSchedule, Invoice
+from .models import Discount, FeeSchedule, Invoice
 from .serializers import (AdjustInvoiceInputSerializer, CancelInvoiceInputSerializer,
-                          FeeScheduleSerializer, GenerateInvoicesInputSerializer,
-                          InvoiceAdjustmentSerializer, InvoiceListSerializer,
-                          InvoicePayInputSerializer, InvoiceSerializer,
-                          MarkPaidInputSerializer)
+                          DiscountSerializer, FeeScheduleSerializer,
+                          GenerateInvoicesInputSerializer, InvoiceAdjustmentSerializer,
+                          InvoiceListSerializer, InvoicePayInputSerializer,
+                          InvoiceSerializer, MarkPaidInputSerializer)
 
 
 class IsAdmin(permissions.BasePermission):
@@ -44,6 +44,25 @@ class AdminFeeScheduleDetailView(generics.RetrieveUpdateDestroyAPIView):
     """PATCH (edit / toggle active) or DELETE a tuition plan."""
     queryset = FeeSchedule.objects.all()
     serializer_class = FeeScheduleSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
+
+
+class AdminDiscountListCreateView(generics.ListCreateAPIView):
+    """GET (?student=<id>) / POST /api/v1/finance/admin/discounts/ — becas & descuentos."""
+    serializer_class = DiscountSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        qs = Discount.objects.select_related('student__user').order_by('-active', '-created_at')
+        student = self.request.query_params.get('student')
+        return qs.filter(student_id=student) if student else qs
+
+
+class AdminDiscountDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH (edit / toggle) or DELETE a beca / descuento."""
+    queryset = Discount.objects.all()
+    serializer_class = DiscountSerializer
     permission_classes = [IsAdmin]
     http_method_names = ['get', 'patch', 'delete']
 
