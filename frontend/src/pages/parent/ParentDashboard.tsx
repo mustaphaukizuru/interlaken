@@ -53,14 +53,14 @@ export default function ParentDashboard() {
 
         {/* Low balance alert */}
         {hasLowBalance && (
-          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-pink bg-pink/5 px-4 py-3.5 text-pink-dark sm:flex-row sm:items-center sm:px-[18px]">
-            <AlertTriangle size={20} className="shrink-0" />
-            <div className="flex-1 text-[13.5px]">
-              <strong>Saldo bajo en cafetería.</strong> Recargue el saldo para continuar usando los servicios.
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber/30 bg-amber/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:px-[18px]">
+            <AlertTriangle size={20} className="shrink-0 text-amber" />
+            <div className="flex-1 text-[13.5px] text-ink">
+              <strong className="font-semibold text-amber">Saldo bajo en cafetería.</strong> Recargue el saldo para continuar usando los servicios.
             </div>
             <Link
               to="/portal/cafeteria"
-              className="whitespace-nowrap text-[12.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/40 rounded"
+              className="whitespace-nowrap rounded text-[12.5px] font-bold text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
             >
               Recargar →
             </Link>
@@ -79,8 +79,8 @@ export default function ParentDashboard() {
             [
               <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
               <StatCard key="b" title="Saldo Cafetería" value={`$${totalBalance.toFixed(2)}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
-              <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="pink" />,
-              <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="green" />,
+              <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="coral" />,
+              <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />,
             ].map((card, i) => (
               <Reveal key={i} delay={i * 70}>{card}</Reveal>
             ))
@@ -107,7 +107,10 @@ export default function ParentDashboard() {
             </div>
             <div>
               {!data?.recent_payments?.length ? (
-                <p className="p-7 text-center text-[13px] text-subtle">Sin pagos registrados</p>
+                <div className="flex flex-col items-center gap-2 px-5 py-9 text-center">
+                  <Receipt className="h-6 w-6 text-subtle" aria-hidden="true" />
+                  <p className="text-[13px] text-subtle">Sin pagos registrados</p>
+                </div>
               ) : data.recent_payments.slice(0, 5).map((p, i) => {
                 const b = payBadge(p.status);
                 return (
@@ -133,7 +136,10 @@ export default function ParentDashboard() {
             </div>
             <div>
               {!data?.announcements?.length ? (
-                <p className="p-7 text-center text-[13px] text-subtle">Sin avisos</p>
+                <div className="flex flex-col items-center gap-2 px-5 py-9 text-center">
+                  <Bell className="h-6 w-6 text-subtle" aria-hidden="true" />
+                  <p className="text-[13px] text-subtle">Sin avisos</p>
+                </div>
               ) : data.announcements.slice(0, 4).map((a, i) => (
                 <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
                   <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
@@ -158,7 +164,7 @@ function QuickAction({ to, icon: Icon, title, desc, gradient }: {
       to={to}
       className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
     >
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-purple`}>
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white`}>
         <Icon className="h-6 w-6" />
       </span>
       <span className="min-w-0 flex-1">
