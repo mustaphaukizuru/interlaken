@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight } from 'lucide-react';
+import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -21,6 +21,10 @@ const payBadge = (s: string) => {
   return { cls: 'badge-amber', label: 'Pendiente' };
 };
 
+const paymentTypeLabel: Record<string, string> = {
+  tuition: 'Colegiatura', enrollment: 'Inscripción', cafeteria: 'Cafetería', other: 'Otro',
+};
+
 export default function ParentDashboard() {
   const { user } = useAuthStore();
   const { data, isLoading, isError, refetch } = useQuery<DashboardData>({
@@ -32,7 +36,7 @@ export default function ParentDashboard() {
   useAnnouncementsRead(data?.announcements);
 
   const firstChild = data?.children?.[0];
-  const balanceObj = data?.cafeteria_balances?.[0];
+  const totalBalance = (data?.cafeteria_balances ?? []).reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const hasLowBalance = data?.cafeteria_balances?.some(b => b.low);
   const pendingPayments = data?.recent_payments?.filter(p => p.status === 'pending').length ?? 0;
 
@@ -74,13 +78,19 @@ export default function ParentDashboard() {
           ) : (
             [
               <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
-              <StatCard key="b" title="Saldo Cafetería" value={`$${balanceObj?.balance ?? '0.00'}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
+              <StatCard key="b" title="Saldo Cafetería" value={`$${totalBalance.toFixed(2)}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
               <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="pink" />,
               <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="green" />,
             ].map((card, i) => (
               <Reveal key={i} delay={i * 70}>{card}</Reveal>
             ))
           )}
+        </div>
+
+        {/* Quick actions — the two things parents do most */}
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
+          <QuickAction to="/portal/colegiaturas" icon={Receipt} title="Pagar colegiaturas" desc="Consulta y paga las mensualidades." gradient="from-pink to-purple" />
+          <QuickAction to="/portal/cafeteria" icon={Coffee} title="Recargar cafetería" desc="Agrega saldo con tarjeta." gradient="from-green to-green-dark" />
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -103,7 +113,7 @@ export default function ParentDashboard() {
                 return (
                   <div key={p.id} className={`flex items-center justify-between px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
                     <div>
-                      <div className="text-[13.5px] font-semibold capitalize text-ink">{p.type}</div>
+                      <div className="text-[13.5px] font-semibold text-ink">{paymentTypeLabel[p.type] ?? p.type}</div>
                       <div className="text-[12px] text-subtle">{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
                     </div>
                     <div className="text-right">
@@ -137,5 +147,25 @@ export default function ParentDashboard() {
         </>
         )}
     </>
+  );
+}
+
+function QuickAction({ to, icon: Icon, title, desc, gradient }: {
+  to: string; icon: any; title: string; desc: string; gradient: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+    >
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-purple`}>
+        <Icon className="h-6 w-6" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-head text-base font-bold text-ink">{title}</span>
+        <span className="mt-0.5 block text-sm text-muted">{desc}</span>
+      </span>
+      <ArrowRight className="h-5 w-5 shrink-0 text-subtle transition group-hover:translate-x-1 group-hover:text-purple" />
+    </Link>
   );
 }
