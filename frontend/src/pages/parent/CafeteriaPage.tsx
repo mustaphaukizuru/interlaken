@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw } from 'lucide-react';
+import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -95,6 +95,18 @@ export default function CafeteriaPage() {
     toast.success('Actualizando saldos y movimientos…');
   };
 
+  // History filters: track whether any is active so we can give feedback and a
+  // one-tap reset (the list auto-applies filters, so without this a filter that
+  // matches nothing looks like a dead end).
+  const filtersActive =
+    filterType !== '' || filterFrom !== '' || filterTo !== '' || filterStudent !== 'all';
+  const clearFilters = () => {
+    setFilterType('');
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterStudent('all');
+  };
+
   if (balancesLoading) return <LoadingSpinner size="lg" className="mt-20" />;
 
   if (balancesError) {
@@ -163,6 +175,17 @@ export default function CafeteriaPage() {
         })}
       </div>
 
+      {/* No cafeteria accounts linked — explain instead of showing a blank page. */}
+      {balances && balances.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={Coffee}
+            title="Sin cuentas de cafetería"
+            description="Aún no hay alumnos con servicio de cafetería vinculados a tu cuenta. Si crees que es un error, contacta al colegio."
+          />
+        </Card>
+      )}
+
       {/* Top-up modal */}
       <Modal open={showTopup} onClose={() => setShowTopup(false)} title="Solicitar recarga">
         <div>
@@ -229,7 +252,8 @@ export default function CafeteriaPage() {
         </div>
       </Modal>
 
-      {/* Transactions */}
+      {/* Transactions — only when the family actually has cafeteria accounts */}
+      {balances && balances.length > 0 && (
       <Card title="Historial de movimientos">
         {/* Filters */}
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
@@ -271,6 +295,16 @@ export default function CafeteriaPage() {
             onChange={(e) => setFilterTo(e.target.value)}
             aria-label="Hasta"
           />
+          {filtersActive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="min-h-[44px] text-muted lg:w-auto"
+            >
+              <X className="h-3.5 w-3.5" /> Limpiar filtros
+            </Button>
+          )}
         </div>
 
         {txError ? (
@@ -278,9 +312,23 @@ export default function CafeteriaPage() {
         ) : txLoading ? (
           <ListSkeleton />
         ) : !transactions?.length ? (
-          <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />
+          filtersActive ? (
+            <EmptyState
+              icon={Search}
+              title="Sin resultados"
+              description="Ningún movimiento coincide con los filtros seleccionados. Ajusta o limpia los filtros para ver más."
+              action={<Button variant="secondary" size="sm" onClick={clearFilters}>Limpiar filtros</Button>}
+            />
+          ) : (
+            <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />
+          )
         ) : (
-          <div className="divide-y divide-cream">
+          <>
+            <p className="mb-3 text-xs text-subtle">
+              {transactions.length} movimiento{transactions.length === 1 ? '' : 's'}
+              {filtersActive ? ' · filtros aplicados' : ''}
+            </p>
+            <div className="divide-y divide-cream">
             {transactions.map((tx) => (
               <div key={tx.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="flex min-w-0 items-start gap-3">
@@ -313,9 +361,11 @@ export default function CafeteriaPage() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </Card>
+      )}
     </div>
   );
 }
