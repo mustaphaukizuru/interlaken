@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import type { AvailabilitySlot } from '@/types';
 
 const WHATSAPP_TEXT = 'Hola, me gustaría agendar una visita individual al Colegio Interlaken.';
@@ -47,7 +48,7 @@ export default function BookVisitPage() {
     },
   });
 
-  // Group open slots by date for the month/day → time picker.
+  // Group open slots by date for the calendar → time picker.
   const byDate = useMemo(() => {
     const map = new Map<string, AvailabilitySlot[]>();
     (slots ?? []).forEach((s) => {
@@ -55,8 +56,20 @@ export default function BookVisitPage() {
       list.push(s);
       map.set(s.date, list);
     });
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+    return map;
   }, [slots]);
+
+  // Available days (with slot counts) for the month calendar.
+  const calendarDays = useMemo(
+    () => [...byDate.entries()]
+      .map(([date, list]) => ({ date, count: list.length }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [byDate],
+  );
+
+  const daySlots = selectedDate
+    ? [...(byDate.get(selectedDate) ?? [])].sort((a, b) => a.start_time.localeCompare(b.start_time))
+    : [];
 
   const {
     register,
@@ -156,68 +169,50 @@ export default function BookVisitPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Slot picker */}
+              {/* Slot picker — month calendar + time chips */}
               <div>
                 <h2 className="font-semibold text-fluid-lg text-ink mb-4">Elija una fecha y horario</h2>
                 {isLoading ? (
-                  <LoadingSpinner />
-                ) : !byDate.length ? (
-                  <p className="text-muted text-sm">
+                  <div className="flex justify-center py-10"><LoadingSpinner /></div>
+                ) : !calendarDays.length ? (
+                  <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
                     No hay horarios disponibles por el momento. Escríbanos por WhatsApp y
                     con gusto le agendamos.
-                  </p>
+                  </div>
                 ) : (
                   <div className="space-y-4">
-                    {byDate.map(([date, daySlots]) => (
-                      <div key={date}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedDate((d) => (d === date ? null : date))
-                          }
-                          className={`w-full text-left card border-2 min-h-[44px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
-                            selectedDate === date
-                              ? 'border-brand-500 bg-brand-50'
-                              : 'border-line hover:border-brand-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <CalendarDays className="w-5 h-5 text-brand-600" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-ink text-sm capitalize">
-                                {format(parseISO(date), "EEEE d 'de' MMMM", { locale: es })}
-                              </p>
-                              <p className="text-xs text-muted">
-                                {daySlots.length} horario{daySlots.length !== 1 ? 's' : ''} disponible
-                                {daySlots.length !== 1 ? 's' : ''}
-                              </p>
-                            </div>
-                          </div>
-                        </button>
+                    <MonthCalendar
+                      days={calendarDays}
+                      selectedDate={selectedDate}
+                      countLabel="horarios"
+                      onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }}
+                    />
 
-                        {selectedDate === date && (
-                          <div className="flex flex-wrap gap-2 mt-3 pl-2">
-                            {daySlots.map((slot) => (
-                              <button
-                                key={slot.id}
-                                type="button"
-                                onClick={() => setSelectedSlot(slot)}
-                                className={`flex items-center gap-1.5 text-sm px-3 py-2 min-h-[44px] rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
-                                  selectedSlot?.id === slot.id
-                                    ? 'border-brand-500 bg-brand-500 text-white'
-                                    : 'border-line text-ink hover:border-brand-400'
-                                }`}
-                              >
-                                <Clock className="w-3.5 h-3.5" />
-                                {slot.start_time.slice(0, 5)}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                    {selectedDate && (
+                      <div className="rounded-xl2 border border-line bg-white p-4 shadow-card">
+                        <p className="mb-3 flex items-center gap-2 text-sm font-semibold capitalize text-ink">
+                          <CalendarDays className="h-4 w-4 text-purple" aria-hidden="true" />
+                          {format(parseISO(selectedDate), "EEEE d 'de' MMMM", { locale: es })}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {daySlots.map((slot) => (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              onClick={() => setSelectedSlot(slot)}
+                              className={`flex min-h-[44px] items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
+                                selectedSlot?.id === slot.id
+                                  ? 'border-purple bg-purple text-white shadow-purple'
+                                  : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50'
+                              }`}
+                            >
+                              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                              {slot.start_time.slice(0, 5)}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>

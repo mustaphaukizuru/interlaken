@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
-import { CalendarDays, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
+import { Clock, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { admissionsApi } from '@/services/api';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import type { OpenSchoolEvent } from '@/types';
 
 const schema = z.object({
@@ -32,6 +33,7 @@ const WHATSAPP_TEXT = 'Hola, me gustaría registrarme para un evento de Puertas 
 
 export default function OpenSchoolPage() {
   const [selectedEvent, setSelectedEvent] = useState<OpenSchoolEvent | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
   const { whatsapp_number } = useSiteSettings();
 
@@ -42,6 +44,30 @@ export default function OpenSchoolPage() {
       return data;
     },
   });
+
+  // Group events by calendar day (a day may hold more than one event).
+  const byDate = useMemo(() => {
+    const map = new Map<string, OpenSchoolEvent[]>();
+    (events ?? []).forEach((e) => {
+      const key = format(new Date(e.date), 'yyyy-MM-dd');
+      const list = map.get(key) ?? [];
+      list.push(e);
+      map.set(key, list);
+    });
+    return map;
+  }, [events]);
+
+  const calendarDays = useMemo(
+    () => [...byDate.entries()]
+      .map(([date, list]) => ({ date, count: list.length }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [byDate],
+  );
+
+  const dayEvents = selectedDate
+    ? [...(byDate.get(selectedDate) ?? [])].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    : [];
 
   const {
     register,
@@ -133,52 +159,56 @@ export default function OpenSchoolPage() {
         ) : (
           <>
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {/* Events list */}
+            {/* Fechas — month calendar + event picker */}
             <div>
-              <h2 className="font-semibold text-ink mb-4">Próximas fechas</h2>
+              <h2 className="font-semibold text-ink mb-4">Elija una fecha</h2>
               {isLoading ? (
-                <LoadingSpinner />
-              ) : !events?.length ? (
-                <p className="text-muted text-sm">No hay eventos programados actualmente.</p>
+                <div className="flex justify-center py-10"><LoadingSpinner /></div>
+              ) : !calendarDays.length ? (
+                <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
+                  No hay eventos programados actualmente. Escríbanos por WhatsApp y le
+                  avisamos de la próxima fecha.
+                </div>
               ) : (
-                <div className="space-y-3">
-                  {events.map((event) => (
-                    <button
-                      key={event.id}
-                      onClick={() => setSelectedEvent(event)}
-                      className={`card w-full border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 ${
-                        selectedEvent?.id === event.id
-                          ? 'border-brand-500 bg-brand-50'
-                          : 'border-line hover:border-brand-300'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <CalendarDays className="w-5 h-5 text-brand-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-ink text-sm">{event.title}</p>
-                          <p className="text-xs text-muted mt-0.5">
-                            {format(
-                              new Date(event.date),
-                              "EEEE d 'de' MMMM, yyyy · HH:mm",
-                              { locale: es },
-                            )}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2 text-xs text-subtle">
+                <div className="space-y-4">
+                  <MonthCalendar
+                    days={calendarDays}
+                    selectedDate={selectedDate}
+                    countLabel="eventos"
+                    onSelect={(date) => { setSelectedDate(date); setSelectedEvent(null); }}
+                  />
+
+                  {selectedDate && (
+                    <div className="space-y-2">
+                      {dayEvents.map((event) => (
+                        <button
+                          key={event.id}
+                          onClick={() => setSelectedEvent(event)}
+                          className={`w-full rounded-xl2 border-2 p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1 ${
+                            selectedEvent?.id === event.id
+                              ? 'border-purple bg-brand-50'
+                              : 'border-line hover:border-brand-300'
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-ink">{event.title}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
                             <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
+                              <Clock className="h-3 w-3" aria-hidden="true" />
+                              {format(new Date(event.date), 'HH:mm', { locale: es })} h
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" aria-hidden="true" />
                               {event.location}
                             </span>
                             <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
+                              <Users className="h-3 w-3" aria-hidden="true" />
                               {event.spots_remaining} lugares
                             </span>
                           </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -188,7 +218,7 @@ export default function OpenSchoolPage() {
               <h2 className="font-semibold text-ink mb-4">Registrar asistencia</h2>
               {!selectedEvent ? (
                 <div className="card bg-cream border-dashed border-2 border-line text-center py-10 text-subtle text-sm">
-                  Seleccione una fecha a la izquierda
+                  Elija una fecha y un evento para continuar
                 </div>
               ) : (
                 <form onSubmit={handleSubmit(onSubmit)} className="card space-y-4">
