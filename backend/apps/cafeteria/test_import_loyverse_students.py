@@ -61,6 +61,9 @@ class TestImport:
         assert p.grade == '6° Primaria' and p.group == 'A'
         assert p.loyverse_id == 'uuid-10184'
         assert p.user.role == User.Role.STUDENT
+        # Student email == parent email, so the account is its own guardian
+        # (purchase notifications fan out over student.parents).
+        assert p.user in p.parents.all()
         cb = CafeteriaBalance.objects.get(student=p)
         assert cb.balance == Decimal('160') and cb.last_synced is not None
         assert r['balance_seeded'] == Decimal('160')

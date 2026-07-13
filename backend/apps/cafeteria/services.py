@@ -1112,6 +1112,12 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
                         group=group, loyverse_id=uuid)
                     report['created'] += 1
 
+                # At Interlaken the family logs in with the student's OWN email
+                # (student email == parent email), so the account is its own
+                # guardian — this routes purchase/low-balance notifications, which
+                # fan out over ``student.parents``, to the family. Idempotent.
+                profile.parents.add(u)
+
                 if seed_balances and points > 0:
                     cb, _ = CafeteriaBalance.objects.get_or_create(student=profile)
                     if cb.last_synced is None:      # seed-once (never clobber a topup)
