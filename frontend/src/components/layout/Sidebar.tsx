@@ -2,39 +2,8 @@ import { NavLink, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import {
-  LayoutDashboard, CreditCard, Users, LogOut,
-  Coffee, ClipboardList, BarChart3, CalendarClock, Receipt, type LucideIcon,
-} from 'lucide-react';
-
-type Role = 'parent' | 'student' | 'admin' | 'staff';
-
-interface NavEntry { icon: LucideIcon; label: string; to: string; end?: boolean; badge?: number }
-
-const navByRole: Record<Role, NavEntry[]> = {
-  admin: [
-    { icon: BarChart3,     label: 'Dashboard',   to: '/admin', end: true },
-    { icon: Users,         label: 'Alumnos',     to: '/admin/alumnos' },
-    { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
-    { icon: CalendarClock, label: 'Visitas',     to: '/admin/visitas' },
-    { icon: Receipt,       label: 'Finanzas',    to: '/admin/finanzas' },
-    { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
-  ],
-  staff: [
-    { icon: BarChart3,       label: 'Analítica', to: '/staff', end: true },
-    { icon: LayoutDashboard, label: 'Portal',    to: '/portal', end: true },
-  ],
-  parent: [
-    { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
-    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
-    { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
-    { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
-  ],
-  student: [
-    { icon: LayoutDashboard, label: 'Inicio',    to: '/alumno', end: true },
-    { icon: Coffee,          label: 'Cafetería', to: '/alumno/cafeteria' },
-  ],
-};
+import { Users, LogOut } from 'lucide-react';
+import { navByRole, type Role } from './navConfig';
 
 interface SidebarProps {
   role: Role;

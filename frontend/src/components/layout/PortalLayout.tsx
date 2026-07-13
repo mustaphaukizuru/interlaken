@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import AppHeader from './AppHeader';
+import MobileTabBar from './MobileTabBar';
 import { RouteTransition } from './RouteTransition';
 import { CommandPalette } from '@/components/admin/CommandPalette';
 
@@ -74,12 +75,15 @@ export function PortalLayout({ role }: Props) {
         {role === 'admin' && <CommandPalette />}
 
         {/* Main */}
-        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-0">
+        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
           <AppHeader />
-          <div className="mx-auto w-full max-w-[1400px] flex-1 px-[clamp(16px,4vw,32px)] py-6">
+          <div className="mx-auto w-full max-w-[1400px] flex-1 px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
             <RouteTransition><Outlet /></RouteTransition>
           </div>
         </main>
+
+        {/* Always-visible primary nav on phones (staff has its own shell) */}
+        {role !== 'staff' && <MobileTabBar role={role} />}
       </div>
     </MobileNavContext.Provider>
   );

@@ -129,7 +129,11 @@
     @apply block w-full min-h-[44px] rounded-xl border border-[#ECEAF3] bg-white px-3.5 py-2.5 text-base text-ink shadow-sm placeholder:text-subtle focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/15 transition-colors;
   }
   .card {
-    @apply rounded-xl2 border border-[#ECEAF3] bg-white p-6 shadow-card;
+    @apply rounded-xl2 border border-[#E6E3F0] bg-white p-6;
+    box-shadow:
+      0 1px 2px rgba(16, 12, 40, 0.05),
+      0 10px 30px -14px rgba(64, 26, 142, 0.20),
+      0 2px 6px -3px rgba(16, 12, 40, 0.05);
   }
   .label {
     @apply block text-sm font-medium text-muted mb-1.5;
