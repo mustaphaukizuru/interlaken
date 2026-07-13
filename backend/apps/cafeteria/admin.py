@@ -2,7 +2,33 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
-                     TopUpRequest)
+                     LoyverseProfile, TopUpRequest)
+
+
+@admin.register(LoyverseProfile)
+class LoyverseProfileAdmin(ModelAdmin):
+    """Read-only mirror of the full Loyverse customer record (synced by
+    ``sync_loyverse_profiles``); never hand-edited."""
+    list_display = ('customer_code', 'name', 'total_visits', 'total_spent',
+                    'total_points', 'last_visit', 'synced_at')
+    list_filter = ('last_visit', 'synced_at')
+    search_fields = ('customer_code', 'name', 'email', 'loyverse_id',
+                     'student__user__email')
+    date_hierarchy = 'last_visit'
+    list_select_related = ('student__user',)
+    readonly_fields = ('student', 'loyverse_id', 'customer_code', 'name', 'email',
+                       'phone_number', 'address_code', 'note', 'first_visit',
+                       'last_visit', 'total_visits', 'total_spent', 'total_points',
+                       'loyverse_created_at', 'loyverse_updated_at', 'raw', 'synced_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(CafeteriaBalance)

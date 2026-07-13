@@ -141,3 +141,46 @@ class BalanceAdjustment(models.Model):
 
     def __str__(self):
         return f'{self.student} — {self.get_kind_display()} ${self.amount}'
+
+
+class LoyverseProfile(models.Model):
+    """Full snapshot of a student's Loyverse customer record.
+
+    Loyverse holds more about each student than we mirror onto StudentProfile —
+    the visit history (first/last visit, total visits) and lifetime spend shown
+    on the POS customer card. This model captures the *complete* customer object
+    (parsed columns for querying + the raw JSON for anything not modelled),
+    refreshed by ``sync_loyverse_profiles``. It never drives spending — the
+    prepaid wallet is CafeteriaBalance; this is read-only reference data.
+    """
+    student        = models.OneToOneField(
+                         StudentProfile, on_delete=models.CASCADE,
+                         related_name='loyverse_profile')
+    loyverse_id    = models.CharField('ID de Loyverse', max_length=100, db_index=True)
+    customer_code  = models.CharField('Matrícula (Loyverse)', max_length=40, blank=True)
+    name           = models.CharField('Nombre en Loyverse', max_length=200, blank=True)
+    email          = models.EmailField('Correo', blank=True)
+    phone_number   = models.CharField('Teléfono', max_length=40, blank=True)
+    address_code   = models.CharField('Código de grado (address)', max_length=40, blank=True)
+    note           = models.TextField('Nota', blank=True)
+
+    first_visit    = models.DateTimeField('Primera visita', null=True, blank=True)
+    last_visit     = models.DateTimeField('Última visita', null=True, blank=True)
+    total_visits   = models.PositiveIntegerField('Visitas', default=0)
+    total_spent    = models.DecimalField('Gasto total', max_digits=12, decimal_places=2, default=0)
+    total_points   = models.DecimalField('Puntos / saldo', max_digits=12, decimal_places=2, default=0)
+
+    loyverse_created_at = models.DateTimeField('Alta en Loyverse', null=True, blank=True)
+    loyverse_updated_at = models.DateTimeField('Última actualización (Loyverse)', null=True, blank=True)
+    # The complete customer object as returned by the API — future-proofs against
+    # fields we don't model yet, without another migration.
+    raw            = models.JSONField('Datos completos (Loyverse)', default=dict, blank=True)
+    synced_at      = models.DateTimeField('Sincronizado', default=timezone.now)
+
+    class Meta:
+        verbose_name = 'Perfil de Loyverse'
+        verbose_name_plural = 'Perfiles de Loyverse'
+        ordering = ['-last_visit']
+
+    def __str__(self):
+        return f'{self.name or self.customer_code} — {self.total_visits} visitas'

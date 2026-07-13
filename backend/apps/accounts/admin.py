@@ -2,10 +2,23 @@ from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, StackedInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from .models import ParentProfile, StudentProfile, User
+
+
+class LoyverseProfileInline(StackedInline):
+    """Read-only Loyverse snapshot shown on the student page (synced separately)."""
+    from apps.cafeteria.models import LoyverseProfile
+    model = LoyverseProfile
+    can_delete = False
+    extra = 0
+    max_num = 0  # never add from here — populated by sync_loyverse_profiles
+    fields = ('customer_code', 'name', 'email', 'phone_number', 'address_code',
+              'first_visit', 'last_visit', 'total_visits', 'total_spent',
+              'total_points', 'synced_at')
+    readonly_fields = fields
 
 # Re-register Group with the unfold skin so auth plumbing renders consistently.
 admin.site.unregister(Group)
@@ -46,6 +59,7 @@ class StudentProfileAdmin(ModelAdmin):
                      'student_id', 'loyverse_id')
     raw_id_fields = ('user', 'parents')
     list_select_related = ('user',)
+    inlines = [LoyverseProfileInline]
 
 @admin.register(ParentProfile)
 class ParentProfileAdmin(ModelAdmin):

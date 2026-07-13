@@ -519,6 +519,8 @@ UNFOLD = {
                      'link': reverse_lazy('admin:cafeteria_topuprequest_changelist')},
                     {'title': 'Ajustes de saldo', 'icon': 'published_with_changes',
                      'link': reverse_lazy('admin:cafeteria_balanceadjustment_changelist')},
+                    {'title': 'Perfiles de Loyverse', 'icon': 'badge',
+                     'link': reverse_lazy('admin:cafeteria_loyverseprofile_changelist')},
                 ],
             },
             {
