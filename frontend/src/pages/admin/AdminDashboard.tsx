@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight } from 'lucide-react';
+import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight, Bell } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -102,7 +102,14 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {!isLoading && !(data?.announcements ?? []).length && (
-                  <tr><td colSpan={4} className="p-8 text-center text-[13px] text-subtle">Sin actividad reciente</td></tr>
+                  <tr>
+                    <td colSpan={4} className="px-5 py-10">
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <Bell className="h-6 w-6 text-subtle" aria-hidden="true" />
+                        <p className="text-[13px] text-subtle">Sin actividad reciente</p>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
