@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Coffee, Bell, GraduationCap } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
+import { SectionCard } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -65,16 +66,15 @@ export default function StudentDashboard() {
 
         {/* Announcements */}
         {!!data?.announcements?.length && (
-          <Reveal delay={90} className="card !p-0 overflow-hidden">
-            <div className="border-b border-cream px-5 py-4">
-              <h2 className="font-head text-[15px] font-bold text-ink">Avisos Escolares</h2>
-            </div>
-            {data.announcements.map((a, i) => (
-              <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
-                <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
-                <div className="mt-0.5 text-[12.5px] text-muted">{a.body}</div>
-              </div>
-            ))}
+          <Reveal delay={90}>
+            <SectionCard title="Avisos Escolares">
+              {data.announcements.map((a, i) => (
+                <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
+                  <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
+                  <div className="mt-0.5 text-[12.5px] text-muted">{a.body}</div>
+                </div>
+              ))}
+            </SectionCard>
           </Reveal>
         )}
         </>

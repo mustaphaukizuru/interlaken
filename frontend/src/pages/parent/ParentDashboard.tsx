@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
+import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -95,59 +96,49 @@ export default function ParentDashboard() {
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* Recent payments */}
-          <Reveal delay={40} className="card !p-0 overflow-hidden">
-            <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4">
-              <h2 className="font-head text-[15px] font-bold text-ink">Últimos Pagos</h2>
-              <Link
-                to="/portal/pagos"
-                className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded"
-              >
-                Ver todos <ArrowRight size={13} />
-              </Link>
-            </div>
-            <div>
+          <Reveal delay={40} className="h-full">
+            <SectionCard title="Últimos Pagos" action={{ to: '/portal/pagos', label: 'Ver todos' }} className="h-full">
               {!data?.recent_payments?.length ? (
-                <div className="flex flex-col items-center gap-2 px-5 py-9 text-center">
-                  <Receipt className="h-6 w-6 text-subtle" aria-hidden="true" />
-                  <p className="text-[13px] text-subtle">Sin pagos registrados</p>
+                <SectionEmpty icon={Receipt}>Sin pagos registrados</SectionEmpty>
+              ) : (
+                <div>
+                  {data.recent_payments.slice(0, 5).map((p, i) => {
+                    const b = payBadge(p.status);
+                    return (
+                      <div key={p.id} className={`flex items-center justify-between px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
+                        <div>
+                          <div className="text-[13.5px] font-semibold text-ink">{paymentTypeLabel[p.type] ?? p.type}</div>
+                          <div className="text-[12px] text-subtle">{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-head text-[14px] font-bold text-ink">${p.amount}</div>
+                          <span className={`${b.cls} mt-[3px]`}>{b.label}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : data.recent_payments.slice(0, 5).map((p, i) => {
-                const b = payBadge(p.status);
-                return (
-                  <div key={p.id} className={`flex items-center justify-between px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
-                    <div>
-                      <div className="text-[13.5px] font-semibold text-ink">{paymentTypeLabel[p.type] ?? p.type}</div>
-                      <div className="text-[12px] text-subtle">{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-head text-[14px] font-bold text-ink">${p.amount}</div>
-                      <span className={`${b.cls} mt-[3px]`}>{b.label}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              )}
+            </SectionCard>
           </Reveal>
 
           {/* Announcements */}
-          <Reveal delay={110} className="card !p-0 overflow-hidden">
-            <div className="border-b border-cream px-5 py-4">
-              <h2 className="font-head text-[15px] font-bold text-ink">Avisos Escolares</h2>
-            </div>
-            <div>
+          <Reveal delay={110} className="h-full">
+            <SectionCard title="Avisos Escolares" className="h-full">
               {!data?.announcements?.length ? (
-                <div className="flex flex-col items-center gap-2 px-5 py-9 text-center">
-                  <Bell className="h-6 w-6 text-subtle" aria-hidden="true" />
-                  <p className="text-[13px] text-subtle">Sin avisos</p>
+                <SectionEmpty icon={Bell}>Sin avisos</SectionEmpty>
+              ) : (
+                <div>
+                  {data.announcements.slice(0, 4).map((a, i) => (
+                    <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
+                      <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
+                      <div className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{a.body}</div>
+                      <div className="mt-1 text-[11.5px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
+                    </div>
+                  ))}
                 </div>
-              ) : data.announcements.slice(0, 4).map((a, i) => (
-                <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
-                  <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
-                  <div className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{a.body}</div>
-                  <div className="mt-1 text-[11.5px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
-                </div>
-              ))}
-            </div>
+              )}
+            </SectionCard>
           </Reveal>
         </div>
         </>
