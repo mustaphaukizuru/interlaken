@@ -41,12 +41,14 @@ function StatValue({ value }: { value: string | number }) {
   return <>{parsed.prefix}{body}{parsed.suffix}</>;
 }
 
-const theme: Record<Color, { bg: string; color: string; shadow: string }> = {
-  purple: { bg: 'rgba(64,26,142,0.1)',  color: 'var(--purple)',     shadow: '0 12px 28px -10px rgba(64,26,142,0.28)' },
-  pink:   { bg: 'rgba(239,37,88,0.1)',   color: 'var(--pink)',       shadow: '0 12px 28px -10px rgba(239,37,88,0.25)' },
-  coral:  { bg: 'rgba(221,38,34,0.1)',   color: 'var(--coral-dark)', shadow: '0 12px 28px -10px rgba(221,38,34,0.28)' },
-  green:  { bg: 'rgba(71,160,24,0.1)',   color: 'var(--green-dark)', shadow: 'var(--shadow-card)' },
-  amber:  { bg: 'rgba(217,119,6,0.1)',   color: 'var(--amber)',      shadow: 'var(--shadow-card)' },
+// Colored icon chip only — the resting shadow is the shared light token so
+// every tile matches the restrained surface language (no per-color glow).
+const theme: Record<Color, { bg: string; color: string }> = {
+  purple: { bg: 'rgba(64,26,142,0.1)',  color: 'var(--purple)' },
+  pink:   { bg: 'rgba(239,37,88,0.1)',   color: 'var(--pink)' },
+  coral:  { bg: 'rgba(221,38,34,0.1)',   color: 'var(--coral-dark)' },
+  green:  { bg: 'rgba(71,160,24,0.1)',   color: 'var(--green-dark)' },
+  amber:  { bg: 'rgba(217,119,6,0.1)',   color: 'var(--amber)' },
 };
 
 interface StatCardProps {
@@ -62,7 +64,7 @@ interface StatCardProps {
 export function StatCard({ title, value, suffix, icon: Icon, color, trend, subtitle }: StatCardProps) {
   const t = theme[color];
   return (
-    <div className="hover-lift" style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 18, padding: '22px', boxShadow: t.shadow, position: 'relative', overflow: 'hidden' }}>
+    <div className="hover-lift" style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 18, padding: '22px', boxShadow: 'var(--shadow-card)', position: 'relative', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={22} color={t.color} />

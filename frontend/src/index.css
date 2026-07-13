@@ -165,7 +165,7 @@
   .card-dark { background: var(--dark-card); border: 1px solid rgba(124,77,214,0.25); border-radius: var(--radius); }
   /* Hover lift — subtle raise + deeper shadow on interactive cards */
   .hover-lift { transition: transform var(--transition), box-shadow var(--transition); }
-  .hover-lift:hover { transform: translateY(-6px); box-shadow: 0 26px 50px -22px rgba(64,26,142,0.4); }
+  .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 18px 36px -20px rgba(64,26,142,0.22); }
   @media (prefers-reduced-motion: reduce) { .hover-lift:hover { transform: none; } }
 
   /* Route entrance — content of each page fades + lifts in on navigation
