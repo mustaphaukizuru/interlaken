@@ -111,6 +111,14 @@
   border-radius: 12px;
 }
 
+/* Hide scrollbar while keeping scrollability (dark sidebar nav, etc.) */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* Header dropdown entrance */
+@keyframes dropdown-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .animate-\[dropdown-in_0\.16s_ease-out\] { animation: none; } }
+
 @layer components {
   /* ── Legacy component classes (kept so existing pages stay intact) ── */
   .btn-primary {

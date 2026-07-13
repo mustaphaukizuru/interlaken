@@ -20,7 +20,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   return (
     <aside
       aria-label="Navegación del portal"
-      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[268px] flex-shrink-0 flex-col gap-5 overflow-y-auto bg-dark px-4 py-6 shadow-[0_0_60px_-10px_rgba(64,26,142,0.5)_inset] transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[268px] flex-shrink-0 flex-col gap-5 overflow-hidden bg-dark px-4 py-6 shadow-[0_0_60px_-10px_rgba(64,26,142,0.5)_inset] transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
@@ -45,7 +45,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       </div>
 
       {/* Navigation */}
-      <nav aria-label="Menú del portal" className="relative flex flex-1 flex-col gap-0.5">
+      <nav aria-label="Menú del portal" className="scrollbar-none relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         <div className="sidebar-section-label">MENÚ</div>
         {items.map(({ icon: Icon, label, to, end, badge }) => (
           <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => (isActive ? 'nav-item nav-item-active' : 'nav-item') + ' no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60'}>

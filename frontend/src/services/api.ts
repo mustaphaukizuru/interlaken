@@ -432,6 +432,10 @@ export const portalApi = {
   markAnnouncementsRead: (ids: number[]) =>
     api.post('/portal/announcements/mark-read/', { ids }),
 
+  // Personal notifications (header bell menu).
+  getNotifications: () => api.get('/portal/notifications/'),
+  markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),
+
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
   adminCreateAnnouncement: (data: { title: string; body: string; audience: string; is_active?: boolean }) =>
