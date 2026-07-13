@@ -459,4 +459,9 @@ export const contentApi = {
   // Costos por sección (editables por el colegio en el admin).
   getCosts: () =>
     api.get('/content/costs/'),
+
+  // Admin CMS — edit the public contact/social data.
+  adminGetSettings: () => api.get('/content/admin/settings/'),
+  adminUpdateSettings: (data: Record<string, unknown>) =>
+    api.patch('/content/admin/settings/', data),
 };

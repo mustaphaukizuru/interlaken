@@ -55,6 +55,7 @@ const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
 // Admin portal
 const AdminDashboard  = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
+const AdminSettings   = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminAdmissions = lazy(() => import('./pages/admin/AdminAdmissions'));
 const AdminCafeteria  = lazy(() => import('./pages/admin/AdminCafeteria'));
 const AdminCafeteriaStudent = lazy(() => import('./pages/admin/AdminCafeteriaStudent'));
@@ -177,6 +178,7 @@ export default function App() {
               <Route path="alumnos"     element={<AdminStudents />} />
               <Route path="alumnos/:studentId" element={<AdminStudentDetail />} />
               <Route path="comunicados" element={<AdminAnnouncements />} />
+              <Route path="ajustes"     element={<AdminSettings />} />
             </Route>
 
           </Routes>

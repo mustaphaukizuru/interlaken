@@ -10,9 +10,31 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import SETTINGS_CACHE_KEY, SiteSettings
-from .serializers import SiteSettingsSerializer
+from .serializers import AdminSiteSettingsSerializer, SiteSettingsSerializer
 
 CACHE_TTL_SECONDS = 300
+
+
+class _IsAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(u and u.is_authenticated and getattr(u, 'role', '') == 'admin')
+
+
+class AdminSiteSettingsView(APIView):
+    """GET/PATCH /api/v1/content/admin/settings/ — edit the public site settings
+    (contact info, WhatsApp, socials) shown on the marketing site. A save
+    invalidates the public read cache (SiteSettings.save)."""
+    permission_classes = [_IsAdmin]
+
+    def get(self, request):
+        return Response(AdminSiteSettingsSerializer(SiteSettings.load()).data)
+
+    def patch(self, request):
+        ser = AdminSiteSettingsSerializer(SiteSettings.load(), data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data)
 
 
 class PublicSiteSettingsView(APIView):

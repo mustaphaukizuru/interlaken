@@ -15,6 +15,18 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class AdminSiteSettingsSerializer(serializers.ModelSerializer):
+    """Writable settings for the admin CMS editor (public data on the marketing site)."""
+    class Meta:
+        model = SiteSettings
+        fields = [
+            'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
+            'address', 'maps_url', 'office_hours',
+            'facebook_url', 'instagram_url', 'youtube_url', 'updated_at',
+        ]
+        read_only_fields = ['updated_at']
+
+
 class TuitionCostSerializer(serializers.ModelSerializer):
     class Meta:
         model = TuitionCost
