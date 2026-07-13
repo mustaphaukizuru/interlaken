@@ -210,6 +210,10 @@ export const cafeteriaApi = {
   }) =>
     api.get('/cafeteria/transactions/', { params }),
 
+  // Daily spending (purchases) time-series for the caller's students — parent dashboard trend.
+  getSpendingTrend: (days = 30) =>
+    api.get('/cafeteria/spending-trend/', { params: { days } }),
+
   requestTopUp: (
     studentId: number,
     amount: number,

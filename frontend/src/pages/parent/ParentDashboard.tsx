@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt } from 'lucide-react';
@@ -13,6 +14,10 @@ import { PushOptIn } from '@/components/portal/PushOptIn';
 import type { DashboardData } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Recharts (heavy) stays out of the dashboard's main chunk — loaded only when a
+// cafeteria-using family renders the trend.
+const CafeteriaTrendCard = lazy(() => import('@/components/portal/CafeteriaTrendCard'));
 
 const payBadge = (s: string) => {
   if (s === 'success' || s === 'completed') return { cls: 'badge-green', label: 'Completado' };
@@ -93,6 +98,15 @@ export default function ParentDashboard() {
           <QuickAction to="/portal/colegiaturas" icon={Receipt} title="Pagar colegiaturas" desc="Consulta y paga las mensualidades." gradient="from-pink to-purple" />
           <QuickAction to="/portal/cafeteria" icon={Coffee} title="Recargar cafetería" desc="Agrega saldo con tarjeta." gradient="from-green to-green-dark" />
         </div>
+
+        {/* Cafeteria spending trend — only for families that use the cafeteria */}
+        {!!data?.cafeteria_balances?.length && (
+          <Reveal delay={20} className="mb-6">
+            <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
+              <CafeteriaTrendCard />
+            </Suspense>
+          </Reveal>
+        )}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* Recent payments */}

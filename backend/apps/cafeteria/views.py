@@ -2,8 +2,10 @@
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
 import logging
+from datetime import timedelta
 
 from django.db import models
+from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -116,6 +118,61 @@ class MyTransactionsView(generics.ListAPIView):
             qs = qs.filter(date__date__lte=date_to)
 
         return qs
+
+
+class MySpendingTrendView(APIView):
+    """GET /api/v1/cafeteria/spending-trend/?days=30
+
+    Daily cafeteria spending (purchases) for the caller's students over the last
+    N days (clamped 7-90), zero-filled so the series is continuous. Powers the
+    parent dashboard sparkline; scoped by role like the other 'my' endpoints.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        try:
+            days = int(request.query_params.get('days', 30))
+        except (TypeError, ValueError):
+            days = 30
+        days = max(7, min(days, 90))
+
+        if user.role == User.Role.STUDENT:
+            students = StudentProfile.objects.filter(user=user)
+        elif user.role == User.Role.PARENT:
+            students = StudentProfile.objects.filter(parents=user)
+        elif user.role == User.Role.ADMIN:
+            students = StudentProfile.objects.all()
+        else:
+            students = StudentProfile.objects.none()
+
+        today = timezone.localdate()
+        start = today - timedelta(days=days - 1)
+
+        rows = (
+            CafeteriaTransaction.objects
+            .filter(student__in=students,
+                    transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                    date__date__gte=start)
+            .annotate(day=TruncDate('date'))
+            .values('day')
+            .annotate(total=models.Sum('amount'))
+        )
+        by_day = {r['day']: float(r['total'] or 0) for r in rows}
+
+        series, total = [], 0.0
+        for i in range(days):
+            d = start + timedelta(days=i)
+            amt = round(by_day.get(d, 0.0), 2)
+            total += amt
+            series.append({'date': d.isoformat(), 'amount': amt})
+
+        return Response({
+            'days': days,
+            'total': round(total, 2),
+            'average': round(total / days, 2) if days else 0.0,
+            'series': series,
+        })
 
 
 @method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')
