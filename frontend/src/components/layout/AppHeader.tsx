@@ -10,12 +10,16 @@ import { AccountMenu } from './AccountMenu';
  * titles live in the content area via <PageHeader>.
  */
 export default function AppHeader() {
-  const { open, toggle } = useMobileNav();
+  const { open, toggle, scrolled } = useMobileNav();
 
   return (
     <>
       <div className="accent-bar" />
-      <header className="z-30 flex items-center gap-3 border-b border-line bg-cream/95 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
+      <header
+        className={`z-30 flex items-center gap-3 border-b border-line bg-cream/95 px-4 py-3 transition-shadow duration-200 sm:gap-4 sm:px-6 lg:px-8 ${
+          scrolled ? 'shadow-[0_10px_24px_-18px_rgba(16,12,40,0.55)]' : ''
+        }`}
+      >
         {/* Mobile hamburger — the single source of drawer access on every page */}
         <button
           type="button"
