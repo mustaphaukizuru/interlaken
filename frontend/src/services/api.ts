@@ -420,6 +420,15 @@ export const portalApi = {
   markAnnouncementsRead: (ids: number[]) =>
     api.post('/portal/announcements/mark-read/', { ids }),
 
+  // Admin comunicados (announcements) CRUD.
+  adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  adminCreateAnnouncement: (data: { title: string; body: string; audience: string; is_active?: boolean }) =>
+    api.post('/portal/admin/announcements/', data),
+  adminUpdateAnnouncement: (id: number, data: Record<string, unknown>) =>
+    api.patch(`/portal/admin/announcements/${id}/`, data),
+  adminDeleteAnnouncement: (id: number) =>
+    api.delete(`/portal/admin/announcements/${id}/`),
+
   // Web push opt-in/out (subscription persisted per user+device).
   subscribePush: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
     api.post('/portal/push/subscribe/', sub),

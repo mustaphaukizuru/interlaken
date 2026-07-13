@@ -12,7 +12,8 @@ from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
 
 from .models import Announcement, AnnouncementRead, Notification
-from .serializers import AnnouncementSerializer, NotificationSerializer
+from .serializers import (AnnouncementAdminSerializer, AnnouncementSerializer,
+                          NotificationSerializer)
 
 # `User.Role` values are singular (`parent`) while `Announcement.Audience`
 # values are plural (`parents`); map between them so audience filters match.
@@ -126,6 +127,31 @@ class AnnouncementListView(generics.ListAPIView):
             is_active=True,
             audience__in=audiences_for_user(self.request.user),
         )
+
+
+class _IsAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(u and u.is_authenticated and getattr(u, 'role', '') == User.Role.ADMIN)
+
+
+class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
+    """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive).
+    POST — compose a new audience-targeted comunicado (author = current admin)."""
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementAdminSerializer
+    permission_classes = [_IsAdmin]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH (edit / toggle active) or DELETE a comunicado (admin)."""
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementAdminSerializer
+    permission_classes = [_IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
 
 
 class NotificationListView(generics.ListAPIView):
