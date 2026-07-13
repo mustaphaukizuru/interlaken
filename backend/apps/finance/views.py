@@ -17,11 +17,12 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 
 from . import services
-from .models import Invoice
+from .models import FeeSchedule, Invoice
 from .serializers import (AdjustInvoiceInputSerializer, CancelInvoiceInputSerializer,
-                          GenerateInvoicesInputSerializer, InvoiceAdjustmentSerializer,
-                          InvoiceListSerializer, InvoicePayInputSerializer,
-                          InvoiceSerializer, MarkPaidInputSerializer)
+                          FeeScheduleSerializer, GenerateInvoicesInputSerializer,
+                          InvoiceAdjustmentSerializer, InvoiceListSerializer,
+                          InvoicePayInputSerializer, InvoiceSerializer,
+                          MarkPaidInputSerializer)
 
 
 class IsAdmin(permissions.BasePermission):
@@ -30,6 +31,21 @@ class IsAdmin(permissions.BasePermission):
         # AnonymousUser is truthy but has no `.role`; `is_authenticated` is the
         # correct guard (a bare truthiness check would raise AttributeError -> 500).
         return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
+
+
+class AdminFeeScheduleListCreateView(generics.ListCreateAPIView):
+    """GET/POST /api/v1/finance/admin/fee-schedules/ — tuition plans (Planes)."""
+    queryset = FeeSchedule.objects.all().order_by('-active', 'level', 'grade', 'name')
+    serializer_class = FeeScheduleSerializer
+    permission_classes = [IsAdmin]
+
+
+class AdminFeeScheduleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH (edit / toggle active) or DELETE a tuition plan."""
+    queryset = FeeSchedule.objects.all()
+    serializer_class = FeeScheduleSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
 
 
 def _parent_invoices(user):

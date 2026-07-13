@@ -314,6 +314,12 @@ export const financeApi = {
   getStudentLedger: (studentId: number) =>
     api.get(`/finance/admin/student/${studentId}/`),
 
+  // Tuition plans (Planes de Colegiatura) CRUD.
+  adminListFees: () => api.get('/finance/admin/fee-schedules/'),
+  adminCreateFee: (data: Record<string, unknown>) => api.post('/finance/admin/fee-schedules/', data),
+  adminUpdateFee: (id: number, data: Record<string, unknown>) => api.patch(`/finance/admin/fee-schedules/${id}/`, data),
+  adminDeleteFee: (id: number) => api.delete(`/finance/admin/fee-schedules/${id}/`),
+
   markPaid: (id: number, reason?: string, method?: string) =>
     api.post(`/finance/admin/invoices/${id}/mark-paid/`, { reason, method }),
 

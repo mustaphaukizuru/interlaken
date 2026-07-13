@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList,
-  BarChart3, CalendarClock, Receipt, Megaphone, Settings, type LucideIcon,
+  BarChart3, CalendarClock, Receipt, Megaphone, Settings, Wallet, type LucideIcon,
 } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
@@ -22,6 +22,7 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
     { icon: CalendarClock, label: 'Visitas',     to: '/admin/visitas' },
     { icon: Receipt,       label: 'Finanzas',    to: '/admin/finanzas' },
+    { icon: Wallet,        label: 'Planes',      to: '/admin/planes' },
     { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
     { icon: Megaphone,     label: 'Comunicados', to: '/admin/comunicados' },
     { icon: Settings,      label: 'Ajustes',     to: '/admin/ajustes' },
