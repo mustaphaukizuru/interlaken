@@ -20,39 +20,49 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   return (
     <aside
       aria-label="Navegación del portal"
-      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[268px] flex-shrink-0 flex-col gap-5 overflow-hidden bg-dark px-4 py-6 shadow-[0_0_60px_-10px_rgba(64,26,142,0.5)_inset] transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-5 overflow-hidden border-r border-line bg-white px-4 py-6 transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
-      {/* purple glow orbs */}
-      <div className="pointer-events-none absolute -top-[100px] -left-20 h-[340px] w-[340px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.55), rgba(8,5,22,0) 68%)' }} />
-      <div className="pointer-events-none absolute -bottom-20 -right-[60px] h-60 w-60 rounded-full" style={{ background: 'radial-gradient(circle, rgba(239,37,88,0.12), rgba(8,5,22,0) 70%)' }} />
-
       {/* Logo */}
-      <Link to="/" className="relative flex justify-center px-1 pb-2 pt-1" aria-label="Colegio Interlaken — Inicio">
-        <Logo variant="stacked" size={92} theme="dark" eager />
+      <Link to="/" className="flex justify-center px-1 pb-1 pt-1" aria-label="Colegio Interlaken — Inicio">
+        <Logo variant="stacked" size={84} theme="light" eager />
       </Link>
 
       {/* Role badge */}
-      <div className="relative flex items-center gap-2.5 rounded-[14px] border border-purple-mid/40 bg-gradient-to-br from-purple/50 to-pink/[0.28] px-3.5 py-2.5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-white/10">
-          <Users size={17} className="text-white" />
+      <div className="flex items-center gap-2.5 rounded-[14px] border border-purple/10 bg-purple/[0.055] px-3.5 py-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-purple/10 text-purple">
+          <Users size={17} />
         </div>
         <div>
-          <div className="font-head text-[9px] font-bold uppercase tracking-[1.8px] text-white/45">Portal</div>
-          <div className="font-head text-[13px] font-bold capitalize tracking-[0.5px] text-white">{role}</div>
+          <div className="font-head text-[9px] font-bold uppercase tracking-[1.8px] text-purple/55">Portal</div>
+          <div className="font-head text-[13px] font-bold capitalize tracking-[0.5px] text-ink">{role}</div>
         </div>
       </div>
 
       {/* Navigation */}
       <nav aria-label="Menú del portal" className="scrollbar-none relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        <div className="sidebar-section-label">MENÚ</div>
+        <div className="px-3.5 pb-1 pt-2 font-head text-[9.5px] font-bold uppercase tracking-[1.8px] text-subtle">
+          Menú
+        </div>
         {items.map(({ icon: Icon, label, to, end, badge }) => (
-          <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => (isActive ? 'nav-item nav-item-active' : 'nav-item') + ' no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60'}>
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13.5px] font-medium no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+                isActive
+                  ? 'bg-purple text-white shadow-[0_6px_16px_-9px_rgba(64,26,142,0.65)]'
+                  : 'text-muted hover:bg-cream-2 hover:text-ink'
+              }`
+            }
+          >
             <Icon size={19} className="flex-shrink-0" />
             <span className="flex-1">{label}</span>
             {badge && (
-              <span className="flex h-[19px] min-w-[20px] items-center justify-center rounded-full bg-pink px-1.5 text-[11px] font-bold text-white">
+              <span className="flex h-[19px] min-w-[20px] items-center justify-center rounded-full bg-coral px-1.5 text-[11px] font-bold text-white">
                 {badge}
               </span>
             )}
@@ -61,15 +71,20 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
       </nav>
 
       {/* User profile */}
-      <div className="relative flex items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
+      <div className="flex items-center gap-2.5 rounded-[14px] border border-line bg-cream-2 px-3 py-2.5">
         <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-pink to-purple font-head text-[13px] font-bold text-white">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-semibold text-white">{user?.first_name} {user?.last_name}</div>
-          <div className="truncate text-[11px] text-white/45">{user?.email}</div>
+          <div className="truncate text-[13px] font-semibold text-ink">{user?.first_name} {user?.last_name}</div>
+          <div className="truncate text-[11px] text-subtle">{user?.email}</div>
         </div>
-        <button aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => { void authApi.logout(); }} className="flex h-11 w-11 items-center justify-center rounded-[10px] text-white/35 transition-colors hover:text-pink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/60">
+        <button
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
+          onClick={() => { void authApi.logout(); }}
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] text-subtle transition-colors hover:bg-coral/10 hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
+        >
           <LogOut size={17} />
         </button>
       </div>

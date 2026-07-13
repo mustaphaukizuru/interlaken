@@ -88,7 +88,7 @@ export default {
       },
       borderRadius: { xl2: '18px', xl3: '24px', xl4: '32px' },
       boxShadow: {
-        card:   '0 1px 2px rgba(16,12,40,0.05), 0 8px 24px -12px rgba(64,26,142,0.16)',
+        card:   '0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10)',
         purple: '0 12px 28px -10px rgba(64,26,142,0.38)',
         pink:   '0 12px 28px -10px rgba(239,37,88,0.3)',
         green:  '0 12px 28px -10px rgba(71,160,40,0.32)',

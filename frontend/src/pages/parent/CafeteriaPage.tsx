@@ -123,38 +123,44 @@ export default function CafeteriaPage() {
 
       {/* Balance cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {balances?.map((b) => (
-          <Card key={b.id} className="relative">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50">
-                <Coffee className="h-5 w-5 text-green-700" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
-                <p className="text-xs text-muted">{b.student.grade} · Grupo {b.student.group}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="text-fluid-2xl font-bold text-ink">${parseFloat(b.balance).toFixed(2)}</span>
-                  {parseFloat(b.balance) < parseFloat(b.low_balance_threshold ?? '50') && (
-                    <Badge variant="warning">Saldo bajo</Badge>
-                  )}
+        {balances?.map((b) => {
+          const isLow = parseFloat(b.balance) < parseFloat(b.low_balance_threshold ?? '50');
+          return (
+            <Card key={b.id} className="flex flex-col">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+                  <Coffee className="h-5 w-5" />
                 </div>
-                <p className="mt-0.5 text-xs text-subtle">
-                  Actualizado {b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
+                  <p className="truncate text-xs text-muted">{b.student.grade} · Grupo {b.student.group}</p>
+                </div>
+                {isLow && <Badge variant="warning">Saldo bajo</Badge>}
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-subtle">Saldo</p>
+                  <p className={`font-head text-2xl font-bold ${isLow ? 'text-amber' : 'text-ink'}`}>
+                    ${parseFloat(b.balance).toFixed(2)}
+                  </p>
+                </div>
+                <p className="pb-1 text-right text-[11px] leading-tight text-subtle">
+                  Actualizado<br />{b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
                 </p>
               </div>
-            </div>
-            <div className="mt-4 flex gap-2">
+
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
-                className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
               >
-                <Plus className="w-3 h-3" /> Recargar
+                <Plus className="w-3.5 h-3.5" /> Recargar
               </Button>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {/* Top-up modal */}
