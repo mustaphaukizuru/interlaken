@@ -173,6 +173,26 @@ class TestSyncPurchases:
         assert second["created"] == 0
 
     @patch("apps.cafeteria.services.get_receipts")
+    def test_first_run_does_not_backfill_history(self, mock_receipts):
+        """First run (no prior purchase) must bound the poll — never since=None —
+        or historical receipts would double-debit the seeded opening balance."""
+        StudentProfileFactory(loyverse_id="loy-x")
+        mock_receipts.return_value = []
+        services.sync_purchases()
+        _, kwargs = mock_receipts.call_args
+        assert kwargs.get("since") is not None
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_go_live_watermark_bounds_first_poll(self, mock_receipts, settings):
+        """The configured go-live watermark is the floor for the first poll."""
+        settings.CAFETERIA_SYNC_PURCHASES_SINCE = "2026-08-01T00:00:00Z"
+        StudentProfileFactory(loyverse_id="loy-x")
+        mock_receipts.return_value = []
+        services.sync_purchases()
+        _, kwargs = mock_receipts.call_args
+        assert kwargs["since"] == "2026-08-01T00:00:00Z"
+
+    @patch("apps.cafeteria.services.get_receipts")
     def test_refund_credits_balance(self, mock_receipts, mailoutbox):
         parent = ParentFactory()
         student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])

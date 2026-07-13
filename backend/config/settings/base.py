@@ -247,6 +247,12 @@ CONTACT_EMAIL = env('CONTACT_EMAIL', default='')
 # ── LOYVERSE ──────────────────────────────────────────────
 LOYVERSE_API_TOKEN = env('LOYVERSE_API_TOKEN', default='')
 LOYVERSE_BASE_URL = 'https://api.loyverse.com/v1.0'
+# Go-live watermark for cafeteria purchase polling. On the FIRST sync_purchases run
+# (no purchases recorded yet) the poll starts here instead of backfilling all
+# history — opening balances are seeded from Loyverse points, which already include
+# past spend, so a backfill would double-debit. Set to the go-live moment as an
+# ISO-8601 datetime (e.g. 2026-08-01T00:00:00Z); blank → start from "now".
+CAFETERIA_SYNC_PURCHASES_SINCE = env('CAFETERIA_SYNC_PURCHASES_SINCE', default='')
 
 # ── PAYMENTS ──────────────────────────────────────────────
 # Which gateway a top-up defaults to when the client doesn't specify one.

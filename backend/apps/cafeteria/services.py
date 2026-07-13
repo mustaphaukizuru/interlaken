@@ -16,7 +16,7 @@ Notes for maintainers:
   remote write. It is intentionally **not** on the money-in critical path.
 """
 import logging
-from datetime import timedelta
+from datetime import timedelta, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
 import requests
@@ -157,6 +157,14 @@ def get_receipts(since: str | None = None, limit: int = 250, max_pages: int = 20
         if not cursor:
             break
     return receipts
+
+
+def _loyverse_ts(dt) -> str:
+    """Format a datetime for Loyverse's ``created_at_min`` — RFC3339 with a ``Z``
+    suffix and no microseconds. A raw ``.isoformat()`` (``+00:00`` offset) is
+    rejected by the API with a 400."""
+    return (dt.astimezone(dt_timezone.utc).replace(microsecond=0)
+            .isoformat().replace('+00:00', 'Z'))
 
 
 def _to_decimal(value) -> Decimal:
@@ -327,7 +335,15 @@ def sync_purchases():
     last = (CafeteriaTransaction.objects
             .filter(transaction_type=CafeteriaTransaction.TxType.PURCHASE)
             .order_by('-date').first())
-    since = (last.date - timedelta(minutes=5)).isoformat() if last and last.date else None
+    if last and last.date:
+        since = _loyverse_ts(last.date - timedelta(minutes=5))
+    else:
+        # FIRST RUN — must NOT backfill history. The opening balance was seeded
+        # from Loyverse points, which ALREADY reflect every past purchase, so
+        # replaying historical receipts would double-debit (spec R1). Start from
+        # the configured go-live moment (CAFETERIA_SYNC_PURCHASES_SINCE), or now.
+        since = (getattr(settings, 'CAFETERIA_SYNC_PURCHASES_SINCE', '') or '').strip() \
+            or _loyverse_ts(timezone.now())
 
     receipts = get_receipts(since=since)
 
