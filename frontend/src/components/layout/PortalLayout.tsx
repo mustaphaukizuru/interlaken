@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
+import AppHeader from './AppHeader';
 import { RouteTransition } from './RouteTransition';
 import { CommandPalette } from '@/components/admin/CommandPalette';
 
@@ -73,8 +74,9 @@ export function PortalLayout({ role }: Props) {
         {role === 'admin' && <CommandPalette />}
 
         {/* Main */}
-        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-          <div className="flex-1 px-[clamp(16px,4vw,32px)] py-6">
+        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-x-hidden pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-0">
+          <AppHeader />
+          <div className="mx-auto w-full max-w-[1400px] flex-1 px-[clamp(16px,4vw,32px)] py-6">
             <RouteTransition><Outlet /></RouteTransition>
           </div>
         </main>

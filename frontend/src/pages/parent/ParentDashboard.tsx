@@ -4,7 +4,7 @@ import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight } fr
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
-import TopBar from '@/components/layout/TopBar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
@@ -37,12 +37,11 @@ export default function ParentDashboard() {
   const pendingPayments = data?.recent_payments?.filter(p => p.status === 'pending').length ?? 0;
 
   return (
-    <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">
-      <TopBar
+    <>
+      <PageHeader
         title={`Bienvenido/a, ${user?.first_name ?? ''}`}
         subtitle={`Portal Familiar${firstChild ? ` · ${firstChild.name}` : ''}`}
       />
-      <div className="px-[clamp(16px,4vw,32px)] py-6">
         {/* Web-push opt-in (renders only when supported and not yet enabled) */}
         <div className="mb-5">
           <PushOptIn />
@@ -137,7 +136,6 @@ export default function ParentDashboard() {
         </div>
         </>
         )}
-      </div>
-    </div>
+    </>
   );
 }

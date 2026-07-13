@@ -4,7 +4,7 @@ import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRig
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
-import TopBar from '@/components/layout/TopBar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
@@ -16,9 +16,8 @@ export default function AdminDashboard() {
   });
 
   return (
-    <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">
-      <TopBar title="Panel de Administración" subtitle={`Ciclo Escolar ${CURRENT_CYCLE}`} />
-      <div className="px-[clamp(16px,4vw,32px)] py-6">
+    <>
+      <PageHeader title="Panel de Administración" subtitle={`Ciclo Escolar ${CURRENT_CYCLE}`} />
         {/* Stats */}
         {isError ? (
           <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
@@ -84,7 +83,6 @@ export default function AdminDashboard() {
           </div>
         </Reveal>
         )}
-      </div>
-    </div>
+    </>
   );
 }

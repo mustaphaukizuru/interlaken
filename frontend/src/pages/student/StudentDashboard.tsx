@@ -3,7 +3,7 @@ import { Coffee, Bell, GraduationCap } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
-import TopBar from '@/components/layout/TopBar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
@@ -19,9 +19,8 @@ export default function StudentDashboard() {
   useAnnouncementsRead(data?.announcements);
 
   return (
-    <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">
-      <TopBar title={`Hola, ${user?.first_name ?? ''}`} subtitle="Portal del Alumno" />
-      <div className="px-[clamp(16px,4vw,32px)] py-6">
+    <>
+      <PageHeader title={`Hola, ${user?.first_name ?? ''}`} subtitle="Portal del Alumno" />
         {isError ? (
           <div className="card"><ErrorState onRetry={() => refetch()} /></div>
         ) : (
@@ -80,7 +79,6 @@ export default function StudentDashboard() {
         )}
         </>
         )}
-      </div>
-    </div>
+    </>
   );
 }
