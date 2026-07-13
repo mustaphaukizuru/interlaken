@@ -965,3 +965,145 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
     report['unmatched_customer_count'] = sum(
         1 for c in customers if c.get('id') not in matched_ids)
     return report
+
+
+# ── Import students FROM Loyverse ─────────────────────────────────────────────
+#
+# The whole roster already lives in Loyverse (name, matrícula = customer_code,
+# grade encoded in the address like "6APRI", the customer id/UUID, and current
+# points). This creates the StudentProfiles directly from those customers so the
+# cafeteria works for everyone in one pass — no CSV needed. Parents aren't in
+# Loyverse, so guardian linkage is added separately (CSV/manual) afterward.
+
+_LEVEL_ABBR = {'PRE': 'Preescolar', 'KIN': 'Kinder', 'MAT': 'Maternal',
+               'PRI': 'Primaria', 'SEC': 'Secundaria', 'PREP': 'Preparatoria'}
+
+
+def _is_loyverse_student(c) -> bool:
+    """A Loyverse customer is a student iff it has a numeric matrícula and the
+    school's student email shape ``ci<digits>@interlaken.com.mx`` — this cleanly
+    excludes staff (name-based emails, ``ZP-`` prefixes) and test/junk records."""
+    code = (c.get('customer_code') or '').strip()
+    email = (c.get('email') or '').strip().lower()
+    return (code.isdigit()
+            and email.startswith('ci')
+            and email.endswith('@interlaken.com.mx'))
+
+
+def _parse_grade_code(addr):
+    """Decode Loyverse's grade code → (grade, group). ``6APRI`` → ("6° Primaria", "A")."""
+    import re
+    m = re.match(r'^\s*(\d)\s*([A-Za-z])\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', (addr or '').upper())
+    if not m:
+        return '', ''
+    num, group, lvl = m.groups()
+    return f'{num}° {_LEVEL_ABBR.get(lvl, lvl.title())}', group
+
+
+def _split_loyverse_name(name):
+    """Split a Loyverse name into (first_name, last_name). Mexican convention puts
+    the two apellidos first, then the nombres — so the first two words are the
+    last name and the rest are the first name (a heuristic; admin can correct
+    the rare single-apellido case)."""
+    parts = (name or '').split()
+    if not parts:
+        return 'Alumno', ''
+    if len(parts) == 1:
+        return parts[0], ''
+    if len(parts) == 2:
+        return parts[1], parts[0]          # [apellido, nombre]
+    return ' '.join(parts[2:]), ' '.join(parts[:2])
+
+
+def import_students_from_loyverse(customers, *, commit=False, seed_balances=True) -> dict:
+    """Create/refresh StudentProfiles from Loyverse customers (students only).
+
+    Pure over the given ``customers`` list (no API calls), so unit-testable
+    offline. Idempotent, keyed by matrícula (``student_id`` == ``customer_code``):
+    an existing student is updated (name/grade/loyverse_id), a new one is created
+    with a student ``User`` (unusable password). When ``seed_balances`` and the
+    customer has points, the opening balance is seeded **once** (respects the
+    seed-once rule: only when the balance was never touched). Writes only when
+    ``commit`` (default is a dry-run preview).
+
+    Returns a report: ``{total_customers, candidates, created, updated,
+    skipped_non_student, balance_seeded, errors[], commit, samples[]}``.
+    """
+    from django.db import transaction as _txn
+
+    from apps.accounts.models import StudentProfile, User
+    from apps.cafeteria.models import CafeteriaBalance
+
+    report = {
+        'total_customers': len(customers), 'candidates': 0,
+        'created': 0, 'updated': 0, 'skipped_non_student': 0,
+        'balance_seeded': Decimal('0'), 'errors': [], 'commit': commit, 'samples': [],
+    }
+
+    for c in customers:
+        if not _is_loyverse_student(c):
+            report['skipped_non_student'] += 1
+            continue
+        report['candidates'] += 1
+
+        code = (c.get('customer_code') or '').strip()
+        email = (c.get('email') or '').strip().lower()
+        uuid = c.get('id') or ''
+        first, last = _split_loyverse_name(c.get('name'))
+        grade, group = _parse_grade_code(c.get('address'))
+        points = _to_decimal(c.get('total_points'))
+
+        try:
+            existing = (StudentProfile.objects.filter(student_id=code)
+                        .select_related('user').first())
+            is_new = existing is None
+            if len(report['samples']) < 10:
+                report['samples'].append({
+                    'matricula': code, 'name': f'{first} {last}'.strip(),
+                    'grade': grade or '—', 'group': group or '—',
+                    'points': str(points), 'action': 'crear' if is_new else 'actualizar'})
+
+            if not commit:
+                report['created' if is_new else 'updated'] += 1
+                continue
+
+            with _txn.atomic():
+                if existing:
+                    profile = existing
+                    u = profile.user
+                    u.first_name, u.last_name = first, last
+                    u.save(update_fields=['first_name', 'last_name'])
+                    if grade:
+                        profile.grade = grade
+                    if group:
+                        profile.group = group
+                    profile.loyverse_id = uuid
+                    profile.save()
+                    report['updated'] += 1
+                else:
+                    u = User.objects.filter(email=email).first()
+                    if u is None:
+                        u = User.objects.create_user(
+                            email=email, password=None, first_name=first,
+                            last_name=last, role=User.Role.STUDENT)
+                        u.set_unusable_password()
+                        u.save(update_fields=['password'])
+                    else:
+                        u.first_name, u.last_name, u.role = first, last, User.Role.STUDENT
+                        u.save()
+                    profile = StudentProfile.objects.create(
+                        user=u, student_id=code, grade=grade or 'N/D',
+                        group=group, loyverse_id=uuid)
+                    report['created'] += 1
+
+                if seed_balances and points > 0:
+                    cb, _ = CafeteriaBalance.objects.get_or_create(student=profile)
+                    if cb.last_synced is None:      # seed-once (never clobber a topup)
+                        cb.balance = points
+                        cb.last_synced = timezone.now()
+                        cb.save(update_fields=['balance', 'last_synced'])
+                        report['balance_seeded'] += points
+        except Exception as exc:                     # per-row isolation
+            report['errors'].append({'matricula': code, 'error': str(exc)[:150]})
+
+    return report
