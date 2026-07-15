@@ -1,8 +1,10 @@
 import { Bell, Info, AlertTriangle, Receipt, Coffee, Check, type LucideIcon } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 
 interface Notif {
@@ -47,6 +49,25 @@ export function NotificationsMenu() {
     onSuccess: invalidate,
   });
 
+  // Where a notification takes you when tapped (role-aware) — a notification with
+  // no relevant destination just marks read in place.
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const destFor = (type: Notif['notif_type']): string | null => {
+    if (user?.role === 'student') return type === 'cafeteria' ? '/alumno/cafeteria' : null;
+    if (type === 'payment') return '/portal/pagos';
+    if (type === 'cafeteria') return '/portal/cafeteria';
+    return null;
+  };
+  const openNotif = (n: Notif, close: () => void) => {
+    if (!n.is_read) markRead.mutate(n.id);
+    const dest = destFor(n.notif_type);
+    if (dest) {
+      navigate(dest);
+      close();
+    }
+  };
+
   return (
     <Dropdown
       width={370}
@@ -68,7 +89,7 @@ export function NotificationsMenu() {
         </button>
       )}
     >
-      {() => (
+      {({ close }) => (
         <>
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
@@ -96,7 +117,7 @@ export function NotificationsMenu() {
                   <button
                     key={n.id}
                     type="button"
-                    onClick={() => !n.is_read && markRead.mutate(n.id)}
+                    onClick={() => openNotif(n, close)}
                     className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition-colors last:border-0 hover:bg-cream ${
                       n.is_read ? '' : 'bg-purple/[0.035]'
                     }`}
