@@ -279,8 +279,13 @@ export default function AdminBookings() {
         ) : !bookings?.length ? (
           <EmptyState
             icon={CalendarClock}
-            title="Sin reservas"
-            description="Las visitas agendadas aparecerán aquí."
+            title={statusFilter ? 'Sin resultados' : 'Sin reservas'}
+            description={statusFilter
+              ? 'Ninguna reserva coincide con el estado seleccionado.'
+              : 'Las visitas agendadas aparecerán aquí.'}
+            action={statusFilter
+              ? <Button variant="secondary" size="sm" onClick={() => { setStatusFilter(''); setPage(1); }}>Ver todas</Button>
+              : undefined}
           />
         ) : (
           <>

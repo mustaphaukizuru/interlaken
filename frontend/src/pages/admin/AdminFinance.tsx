@@ -245,6 +245,11 @@ export default function AdminFinance() {
                 ? 'Ninguna colegiatura coincide con los filtros.'
                 : 'Genere las colegiaturas del periodo con el botón «Generar».'
             }
+            action={
+              search || statusFilter
+                ? <Button variant="secondary" size="sm" onClick={() => onFilter(() => { setSearch(''); setStatusFilter(''); })}>Limpiar filtros</Button>
+                : undefined
+            }
           />
         ) : (
           <>
