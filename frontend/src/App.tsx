@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
@@ -44,10 +44,6 @@ const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupRet
 const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
 const ColegiaturasPage = lazy(() => import('./pages/parent/ColegiaturasPage'));
 const ColegiaturaPaymentReturn = lazy(() => import('./pages/parent/ColegiaturaPaymentReturn'));
-
-// Student portal
-const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
-const StudentCafeteria  = lazy(() => import('./pages/student/StudentCafeteria'));
 
 // Staff dashboard
 const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
@@ -133,7 +129,7 @@ export default function App() {
 
             {/* ── PARENT PORTAL ───────────────────────────── */}
             <Route path="/portal" element={
-              <ProtectedRoute roles={['parent', 'staff', 'admin']}>
+              <ProtectedRoute roles={['parent', 'student', 'staff', 'admin']}>
                 <PortalLayout role="parent" />
               </ProtectedRoute>
             }>
@@ -145,15 +141,8 @@ export default function App() {
               <Route path="pagos"     element={<PaymentsPage />} />
             </Route>
 
-            {/* ── STUDENT PORTAL ──────────────────────────── */}
-            <Route path="/alumno" element={
-              <ProtectedRoute roles={['student', 'admin']}>
-                <PortalLayout role="student" />
-              </ProtectedRoute>
-            }>
-              <Route index            element={<StudentDashboard />} />
-              <Route path="cafeteria" element={<StudentCafeteria />} />
-            </Route>
+            {/* Student portal merged into the family portal — /alumno* redirects. */}
+            <Route path="/alumno/*" element={<Navigate to="/portal" replace />} />
 
             {/* ── STAFF ANALYTICS DASHBOARD ───────────────── */}
             <Route path="/staff" element={

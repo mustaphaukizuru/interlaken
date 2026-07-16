@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 
 const HOME: Record<string, string> = {
-  admin: '/admin', staff: '/staff', student: '/alumno', parent: '/portal',
+  admin: '/admin', staff: '/staff', student: '/portal', parent: '/portal',
 };
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',

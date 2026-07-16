@@ -41,8 +41,12 @@ class DashboardView(APIView):
         user = request.user
         data = {}
 
-        if user.role == User.Role.PARENT:
-            students = StudentProfile.objects.filter(parents=user).select_related('user')
+        # student == family login (shared account): a self-guardian student is in
+        # its own `parents` set, so anyone who guards students — a parent OR a
+        # self-guardian student — gets the full family dashboard.
+        family_students = StudentProfile.objects.filter(parents=user).select_related('user')
+        if user.role in (User.Role.PARENT, User.Role.STUDENT) and family_students.exists():
+            students = family_students
             balances = CafeteriaBalance.objects.filter(student__in=students)
             recent_payments = Payment.objects.filter(user=user).order_by('-created_at')[:5]
 

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Dropdown } from '@/components/ui/Dropdown';
-import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 
 interface Notif {
@@ -49,12 +48,10 @@ export function NotificationsMenu() {
     onSuccess: invalidate,
   });
 
-  // Where a notification takes you when tapped (role-aware) — a notification with
-  // no relevant destination just marks read in place.
+  // Where a notification takes you when tapped — a notification with no relevant
+  // destination just marks read in place. (Students use the family /portal too.)
   const navigate = useNavigate();
-  const { user } = useAuthStore();
   const destFor = (type: Notif['notif_type']): string | null => {
-    if (user?.role === 'student') return type === 'cafeteria' ? '/alumno/cafeteria' : null;
     if (type === 'payment') return '/portal/pagos';
     if (type === 'cafeteria') return '/portal/cafeteria';
     return null;

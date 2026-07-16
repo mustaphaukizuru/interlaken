@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 const ROLE_PATHS: Record<string, string> = {
   parent: '/portal',
-  student: '/alumno',
+  student: '/portal', // student == family login (shared account) → the family portal
   admin: '/admin',
   staff: '/staff',
 };

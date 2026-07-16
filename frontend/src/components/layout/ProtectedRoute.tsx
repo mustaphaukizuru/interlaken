@@ -20,7 +20,7 @@ export function ProtectedRoute({ children, roles }: Props) {
     // Redirect to the user's home portal based on role
     const rolePaths: Record<User['role'], string> = {
       parent:  '/portal',
-      student: '/alumno',
+      student: '/portal', // student == family login → the shared family portal
       admin:   '/admin',
       staff:   '/staff',
     };
