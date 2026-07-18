@@ -10,12 +10,19 @@ const GATEWAY_NAME: Record<string, string> = {
   banorte: 'Banorte Pago en Línea',
 };
 
+// Only a same-origin relative path (single leading slash) — never an absolute,
+// scheme, or protocol-relative URL — so return_url can't be used as an open
+// redirect even though this page is DEV-only.
+function safeReturn(raw: string | null): string {
+  return raw && /^\/(?!\/)/.test(raw) ? raw : '/';
+}
+
 export default function SandboxCheckout() {
   const [params] = useSearchParams();
   const orderId = params.get('order_id') || params.get('reference') || '';
   const amount = params.get('amount') || '0.00';
   const currency = params.get('currency') || 'MXN';
-  const returnUrl = params.get('return_url') || '/';
+  const returnUrl = safeReturn(params.get('return_url'));
   const gateway = params.get('gateway') || 'global_payments';
   const [busy, setBusy] = useState<'success' | 'failed' | null>(null);
 

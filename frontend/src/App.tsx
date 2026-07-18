@@ -124,8 +124,13 @@ export default function App() {
             {/* Google OAuth returns to /login?login=ok — /auth/* is reserved for
                 the backend (Vite proxy + SPA catch-all both send it to Django). */}
             <Route path="/login" element={<LoginPage />} />
-            {/* Mock hosted-payment page (sandbox/dev only — stands in for the bank) */}
-            <Route path="/pago/simulado" element={<SandboxCheckout />} />
+            {/* Mock hosted-payment page — DEV only. It's a neutral bank-styled
+                page with an attacker-controllable amount/return_url, so mounting
+                it in production would be an open-redirect + phishing surface; in
+                prod the real gateway's hosted page is used instead. */}
+            {import.meta.env.DEV && (
+              <Route path="/pago/simulado" element={<SandboxCheckout />} />
+            )}
 
             {/* ── PARENT PORTAL ───────────────────────────── */}
             <Route path="/portal" element={

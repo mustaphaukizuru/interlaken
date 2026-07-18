@@ -35,3 +35,6 @@ frontend/assets/*
 !frontend/assets/logo-vertical.png
 !frontend/assets/logo-40 anos.png
 backups/
+
+# Rate-limit file cache (created at runtime in production)
+.ratelimit-cache/
