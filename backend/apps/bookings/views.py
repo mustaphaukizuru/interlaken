@@ -45,9 +45,14 @@ def _can_access_booking(user, booking):
         booking.parent_email.strip().lower() == (user.email or '').strip().lower()
 
 
+def _slot_start(slot):
+    """The slot's start as a timezone-aware (school-local) datetime."""
+    return timezone.make_aware(datetime.combine(slot.date, slot.start_time))
+
+
 def _open_slots_qs(params):
     """Filter active, non-past slots by optional ?type=&from=&to=."""
-    today = timezone.now().date()
+    today = timezone.localdate()  # school-local day, not the UTC calendar date
     qs = AvailabilitySlot.objects.filter(is_active=True, date__gte=today)
 
     visit_type = params.get('type')
@@ -76,7 +81,9 @@ class AvailabilityView(APIView):
         return [permissions.AllowAny()]
 
     def get(self, request):
-        slots = [s for s in _open_slots_qs(request.query_params) if not s.is_full]
+        now = timezone.now()
+        slots = [s for s in _open_slots_qs(request.query_params)
+                 if not s.is_full and _slot_start(s) >= now]  # hide already-started
         return Response(AvailabilitySlotSerializer(slots, many=True).data)
 
     def post(self, request):

@@ -178,3 +178,62 @@ class CalendarFailSoftTests(TestCase):
         out = StringIO()
         call_command('sync_calendar', stdout=out)
         self.assertIn('not configured', out.getvalue())
+
+
+class BookingTimeGuardTests(TestCase):
+    """The past-slot guard compares the slot's LOCAL start datetime to now —
+    not just the date, and not the UTC date (America/Mexico_City is UTC-6)."""
+
+    def _slot_at(self, start_dt, capacity=5):
+        end_dt = start_dt + timedelta(minutes=30)
+        return AvailabilitySlot.objects.create(
+            visit_type=AvailabilitySlot._meta.get_field('visit_type').default,
+            date=start_dt.date(),
+            start_time=start_dt.time().replace(microsecond=0),
+            end_time=end_dt.time().replace(microsecond=0),
+            capacity=capacity, location='Campus')
+
+    def test_elapsed_slot_is_rejected(self):
+        from .services import SlotUnavailable, create_booking
+        slot = self._slot_at(timezone.localtime() - timedelta(minutes=1))
+        with self.assertRaises(SlotUnavailable):
+            create_booking(slot_id=slot.id, parent_name='Ana', parent_email='a@x.mx')
+
+    def test_future_slot_is_bookable(self):
+        from .services import create_booking
+        slot = self._slot_at(timezone.localtime() + timedelta(hours=1))
+        booking = create_booking(slot_id=slot.id, parent_name='Ana',
+                                 parent_email='a@x.mx')
+        self.assertEqual(booking.status, Booking.Status.CONFIRMED)
+
+
+class OpenSchoolSignupTests(APITestCase):
+    """The public open-school signup route shares the booking-create rate limit
+    and only accepts open_class slots (finding: it bypassed both)."""
+
+    def _slot(self, visit_type=None, capacity=100):
+        from .models import VisitType
+        start = timezone.localtime() + timedelta(days=2)
+        return AvailabilitySlot.objects.create(
+            visit_type=visit_type or VisitType.OPEN_CLASS, date=start.date(),
+            start_time='10:00', end_time='11:00', capacity=capacity, location='Campus')
+
+    def test_signup_rejects_non_open_class_slot(self):
+        from .models import VisitType
+        slot = self._slot(visit_type=VisitType.INDIVIDUAL, capacity=1)
+        resp = self.client.post(reverse('open-school-signup'),
+                                {'slot': slot.id, 'name': 'X', 'email': 'x@x.mx', 'phone': '5'})
+        self.assertEqual(resp.status_code, 400, resp.data)
+        self.assertFalse(Booking.objects.filter(slot=slot).exists())
+
+    @override_settings(RATELIMIT_ENABLE=True)
+    def test_signup_is_rate_limited(self):
+        from django.core.cache import cache
+        cache.clear()
+        slot = self._slot(capacity=100)
+        codes = [self.client.post(
+            reverse('open-school-signup'),
+            {'slot': slot.id, 'name': f'P{i}', 'email': f'p{i}@x.mx', 'phone': '5'},
+        ).status_code for i in range(12)]
+        self.assertIn(429, codes)                 # the shared limit engaged
+        self.assertEqual(codes[:10], [201] * 10)  # first 10 allowed

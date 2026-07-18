@@ -7,6 +7,8 @@ capacity, then fires the fail-soft side effects (branded email + Google Calendar
 Raises ``SlotUnavailable`` (a plain 400-worthy error) when the slot is gone,
 inactive, in the past, or already full.
 """
+from datetime import datetime
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -34,7 +36,13 @@ def create_booking(*, slot_id, parent_name, parent_email='', parent_phone='',
             slot = AvailabilitySlot.objects.select_for_update().get(pk=slot_id)
         except AvailabilitySlot.DoesNotExist:
             raise SlotUnavailable('El horario seleccionado no existe.')
-        if not slot.is_active or slot.date < timezone.now().date():
+        # Compare the slot's LOCAL start datetime against now — not just the
+        # date, and not the UTC date. slot.date < now().date() used the UTC
+        # calendar day (America/Mexico_City is UTC-6), which both rejected valid
+        # same-day evening slots (18:00-23:59 local) and accepted a slot whose
+        # start time had already elapsed earlier today.
+        slot_start = timezone.make_aware(datetime.combine(slot.date, slot.start_time))
+        if not slot.is_active or slot_start < timezone.now():
             raise SlotUnavailable('Este horario ya no está disponible.')
         if slot.spots_remaining < num_attendees:
             raise SlotUnavailable('El horario seleccionado ya no tiene cupo disponible.')

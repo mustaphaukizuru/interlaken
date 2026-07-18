@@ -1,12 +1,17 @@
 """
 admissions/views.py — Public forms API (no auth required)
 """
+from datetime import datetime
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
+
+from apps.core.ratelimit import ratelimit
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -461,16 +466,19 @@ class OpenSchoolDayListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        today = timezone.now().date()
+        today = timezone.localdate()  # school-local day, not the UTC date
+        now = timezone.now()
         slots = [
             s for s in AvailabilitySlot.objects.filter(
                 visit_type=VisitType.OPEN_CLASS, is_active=True, date__gte=today,
             ).order_by('date', 'start_time')
             if not s.is_full
+            and timezone.make_aware(datetime.combine(s.date, s.start_time)) >= now
         ]
         return Response(OpenClassEventSerializer(slots, many=True).data)
 
 
+@method_decorator(ratelimit('booking-create', '10/m', method='POST'), name='dispatch')
 class OpenSchoolDaySignUpView(APIView):
     """POST /api/v1/admissions/open-school/signup/ — book an open-class event.
 
@@ -479,8 +487,13 @@ class OpenSchoolDaySignUpView(APIView):
     confirmation email (fail-soft). Accepts either the unified field names
     (``slot/parent_name/parent_email/parent_phone/num_attendees``) or the legacy
     frontend names (``event/name/email/phone/children_count``).
+
+    Shares the ``booking-create`` rate-limit bucket with the main booking
+    endpoint: without it this parallel public route defeated that limit and let
+    an unauthenticated caller exhaust slot capacity.
     """
     permission_classes = [permissions.AllowAny]
+    MAX_ATTENDEES = 20  # a family signup, not a bulk reservation
 
     def post(self, request):
         d = request.data
@@ -492,13 +505,21 @@ class OpenSchoolDaySignUpView(APIView):
             num = int(d.get('num_attendees') or d.get('children_count') or 1)
         except (TypeError, ValueError):
             num = 1
+        num = min(max(1, num), self.MAX_ATTENDEES)
+
+        # This route is for open-class events only — don't let it be used to
+        # consume individual (1:1) visit slots.
+        slot = AvailabilitySlot.objects.filter(pk=slot_id).first()
+        if slot is None or slot.visit_type != VisitType.OPEN_CLASS:
+            return Response({'detail': 'Evento no válido.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
             booking = create_booking(
                 slot_id=slot_id,
                 parent_name=d.get('parent_name') or d.get('name') or '',
                 parent_email=d.get('parent_email') or d.get('email') or '',
                 parent_phone=d.get('parent_phone') or d.get('phone') or '',
-                num_attendees=max(1, num),
+                num_attendees=num,
                 source=Booking.Source.WEB,
             )
         except SlotUnavailable as exc:
