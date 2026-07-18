@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.accounts.serializers import StudentProfileSerializer
@@ -39,6 +41,14 @@ class CafeteriaTransactionSerializer(serializers.ModelSerializer):
 
 
 class TopUpRequestSerializer(serializers.ModelSerializer):
+    # The model DecimalField has no validators, so without this floor a parent
+    # could POST amount=0 or a NEGATIVE value; a later admin "apply" would then
+    # DEBIT the child's balance (add_points_to_customer(points<0)). Match the
+    # payment-initiation floor and add a sane ceiling against fat-finger typos.
+    amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2,
+        min_value=Decimal('1.00'), max_value=Decimal('50000.00'))
+
     class Meta:
         model = TopUpRequest
         fields = ['id', 'student', 'amount', 'method', 'status', 'created_at', 'processed_at']

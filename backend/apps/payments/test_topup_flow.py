@@ -185,6 +185,25 @@ class TestTopUpWebhookCredit:
         assert payment.status == Payment.Status.FAILED
         assert topup.status == TopUpRequest.Status.FAILED
         assert not CafeteriaTransaction.objects.filter(student=student).exists()
+
+    def test_credit_is_skipped_if_topup_already_finalised(self):
+        # Defence in depth: if an admin already applied this top-up manually
+        # (status flipped away from PENDING) before the webhook arrives, the
+        # webhook credit must be a no-op — the reference guard alone only catches
+        # a replay of the same payment, not a separate manual credit.
+        from apps.cafeteria.services import complete_online_topup
+
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup, payment = _make_online_topup(parent, student)
+        topup.status = TopUpRequest.Status.COMPLETED
+        topup.save(update_fields=["status"])
+        payment.status = Payment.Status.SUCCESS
+        payment.save(update_fields=["status"])
+
+        assert complete_online_topup(payment) is None
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+        assert not CafeteriaBalance.objects.filter(student=student).exists()
         assert CafeteriaBalance.objects.filter(
             student=student, balance__gt=0).count() == 0
 

@@ -479,6 +479,14 @@ def complete_online_topup(payment):
     if topup is None:
         return None
 
+    # Defence in depth against a double-credit: if this top-up was already
+    # finalised (e.g. an admin mistakenly applied it manually before the webhook
+    # landed), don't credit again. The per-payment reference guard below only
+    # catches a replay of the *same* payment, not a separate manual credit.
+    if topup.status != TopUpRequest.Status.PENDING:
+        logger.info(f'Top-up #{topup.id} already {topup.status} — webhook credit no-op.')
+        return None
+
     student = topup.student
     amount = Decimal(str(payment.amount))
     reference = _topup_reference(payment)

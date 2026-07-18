@@ -15,6 +15,7 @@ from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileF
 from apps.cafeteria import services
 from apps.cafeteria.models import (CafeteriaBalance, CafeteriaTransaction,
                                    TopUpRequest)
+from apps.cafeteria.serializers import TopUpRequestSerializer
 from apps.portal.models import Notification
 
 pytestmark = pytest.mark.django_db
@@ -304,3 +305,47 @@ class TestApplyTopUp:
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.post(reverse("admin-apply-topup", args=[topup.id]))
         assert resp.status_code == 400
+
+    def test_apply_online_topup_is_rejected(self, api_client):
+        # ONLINE top-ups settle via the signed webhook only; applying one here
+        # would double-credit once the webhook lands (no shared idempotency key).
+        student = StudentProfileFactory(loyverse_id="loy-1")
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("300"),
+            method=TopUpRequest.Method.ONLINE)
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.post(reverse("admin-apply-topup", args=[topup.id]))
+        assert resp.status_code == 400
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.PENDING  # untouched
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+
+    @patch("apps.cafeteria.services._session")  # neutralise the best-effort remote write
+    def test_apply_office_writes_ledger_row_and_credits_once(self, _session, api_client):
+        # Regression: the manual apply used to credit with no `reference`, so no
+        # CafeteriaTransaction was written — the balance rose with no ledger line.
+        student = StudentProfileFactory(loyverse_id="loy-1")
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("300"),
+            method=TopUpRequest.Method.OFFICE)
+        api_client.force_authenticate(user=AdminFactory())
+
+        resp = api_client.post(reverse("admin-apply-topup", args=[topup.id]))
+        assert resp.status_code == 200, resp.data
+
+        txs = CafeteriaTransaction.objects.filter(
+            student=student, transaction_type=CafeteriaTransaction.TxType.TOPUP)
+        assert txs.count() == 1
+        assert txs.first().amount == Decimal("300")
+        assert txs.first().loyverse_receipt_id == f"topup-request-{topup.id}"
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("300")
+
+    def test_serializer_rejects_nonpositive_amount(self):
+        # A zero/negative top-up must be rejected at the boundary — otherwise an
+        # applied negative "top-up" would DEBIT the child's balance.
+        student = StudentProfileFactory()
+        for bad in (Decimal("0"), Decimal("-500")):
+            s = TopUpRequestSerializer(
+                data={"student": student.id, "amount": bad, "method": "office"})
+            assert not s.is_valid()
+            assert "amount" in s.errors

@@ -264,15 +264,38 @@ class AdminApplyTopUpView(APIView):
         if topup.status != TopUpRequest.Status.PENDING:
             return Response({'error': 'Esta recarga ya fue procesada.'}, status=400)
 
+        # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
+        # top-ups are credited exclusively by the signed gateway webhook
+        # (complete_online_topup); applying one here would double-credit once the
+        # webhook later settles the same payment — the two paths share no
+        # idempotency key.
+        if topup.method != TopUpRequest.Method.OFFICE:
+            return Response(
+                {'error': 'Las recargas en línea se acreditan automáticamente al '
+                          'confirmarse el pago; no se aplican manualmente.'},
+                status=400)
+
+        # Guard against a non-positive request slipping through (older rows, or a
+        # request created before the serializer floor existed): a negative amount
+        # would DEBIT the child's balance.
+        if topup.amount is None or topup.amount <= 0:
+            return Response({'error': 'El monto de la recarga debe ser positivo.'},
+                            status=400)
+
         student = topup.student
         if not student.loyverse_id:
             return Response({'error': 'Alumno sin ID de Loyverse configurado.'}, status=400)
 
         try:
+            # Pass a stable reference so the credit writes a TOPUP ledger row and
+            # is idempotent (re-applying the same request is a no-op) — without it
+            # the balance moved with no CafeteriaTransaction, breaking the
+            # balance-equals-ledger invariant and leaving no audit trail.
             add_points_to_customer(
                 loyverse_customer_id=student.loyverse_id,
-                points=float(topup.amount),
-                note=f'Recarga portal — #{topup.id}',
+                points=topup.amount,
+                note=f'Recarga en caja — #{topup.id}',
+                reference=f'topup-request-{topup.id}',
             )
         except Exception as e:
             return Response({'error': str(e)}, status=502)
