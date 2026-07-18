@@ -277,11 +277,15 @@ class StudentListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        # Stable ordering so pagination never skips/duplicates rows across pages
+        # (StudentProfile has no Meta.ordering).
+        order = ('user__last_name', 'user__first_name', 'id')
         if user.role == User.Role.ADMIN:
-            return StudentProfile.objects.select_related('user').all()
+            return StudentProfile.objects.select_related('user').order_by(*order)
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
-            return StudentProfile.objects.filter(parents=user).select_related('user')
+            return (StudentProfile.objects.filter(parents=user)
+                    .select_related('user').order_by(*order))
         return StudentProfile.objects.none()
 
 

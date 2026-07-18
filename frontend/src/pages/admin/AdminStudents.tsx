@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Search, FileUp, Link2 } from 'lucide-react';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { portalApi } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { StudentProfile } from '@/types';
 
 export default function AdminStudents() {
@@ -19,23 +20,23 @@ export default function AdminStudents() {
   const [importOpen, setImportOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
+  // Debounced so typing fires one server search, not one per keystroke.
+  const debouncedSearch = useDebouncedValue(search.trim(), 350);
+
+  // A new search always starts from page 1.
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-students', page],
-    queryFn: async () => toPaged<StudentProfile>((await portalApi.getStudents({ page })).data),
+    queryKey: ['admin-students', page, debouncedSearch],
+    queryFn: async () =>
+      toPaged<StudentProfile>(
+        (await portalApi.getStudents({ page, search: debouncedSearch || undefined })).data),
     placeholderData: keepPreviousData,
   });
 
+  // Server-side search across the whole roster (SearchFilter on the viewset).
   const students = data?.results;
   const count = data?.count ?? 0;
-
-  // Server-side search needs `search_fields` on the viewset (follow-up); today the
-  // box filters the loaded page only.
-  const filtered = students?.filter((s) =>
-    !search ||
-    s.user.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.student_id.toLowerCase().includes(search.toLowerCase()) ||
-    s.grade.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -61,28 +62,28 @@ export default function AdminStudents() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
           <input
             className="input-field pl-9"
-            placeholder="Buscar por nombre, matrícula o grado…"
+            placeholder="Buscar por nombre, matrícula, correo o grado…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <p className="mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
+        <p className="mb-4 text-xs text-subtle">Busca en todo el directorio de alumnos.</p>
 
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
           <TableSkeleton />
-        ) : !filtered?.length ? (
+        ) : !students?.length ? (
           <EmptyState
             icon={Users}
-            title={search ? 'Sin resultados' : 'Sin alumnos'}
-            description={search ? 'Ningún alumno coincide en esta página.' : 'Los alumnos registrados aparecerán aquí.'}
+            title={debouncedSearch ? 'Sin resultados' : 'Sin alumnos'}
+            description={debouncedSearch ? 'Ningún alumno coincide con la búsqueda.' : 'Los alumnos registrados aparecerán aquí.'}
           />
         ) : (
           <>
             {/* Mobile: stacked cards */}
             <ul className="space-y-3 md:hidden">
-              {filtered.map((s) => (
+              {students.map((s) => (
                 <li key={s.id} className="rounded-xl2 border border-line p-4">
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold flex-shrink-0">
@@ -124,7 +125,7 @@ export default function AdminStudents() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((s) => (
+                  {students.map((s) => (
                     <tr key={s.id}>
                       <td>
                         <div className="flex items-center gap-2.5">
