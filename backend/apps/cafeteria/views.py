@@ -23,6 +23,7 @@ from .serializers import (
     BalanceAdjustmentSerializer,
     CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
+    LoyverseProfileSerializer,
     RefundInputSerializer,
     TopUpLogSerializer,
     TopUpRequestSerializer,
@@ -359,7 +360,7 @@ class AdminStudentDetailView(APIView):
 
     def get(self, request, pk):
         student = get_object_or_404(
-            StudentProfile.objects.select_related('user'), pk=pk)
+            StudentProfile.objects.select_related('user', 'loyverse_profile'), pk=pk)
         balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
         transactions = CafeteriaTransaction.objects.filter(student=student)[:200]
         adjustments = BalanceAdjustment.objects.filter(student=student)
@@ -369,11 +370,16 @@ class AdminStudentDetailView(APIView):
             for p in student.parents.all()
         ]
 
+        # Full Loyverse customer snapshot (visit history + lifetime spend), if
+        # synced (sync_loyverse_profiles). Null when never synced.
+        loyverse = getattr(student, 'loyverse_profile', None)
+
         return Response({
             'balance': CafeteriaBalanceSerializer(balance).data,
             'parents': parents,
             'transactions': CafeteriaTransactionSerializer(transactions, many=True).data,
             'adjustments': BalanceAdjustmentSerializer(adjustments, many=True).data,
+            'loyverse': LoyverseProfileSerializer(loyverse).data if loyverse else None,
         })
 
 

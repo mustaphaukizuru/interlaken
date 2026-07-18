@@ -3,7 +3,19 @@ from rest_framework import serializers
 from apps.accounts.serializers import StudentProfileSerializer
 
 from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
-                     TopUpRequest)
+                     LoyverseProfile, TopUpRequest)
+
+
+class LoyverseProfileSerializer(serializers.ModelSerializer):
+    """Read-only Loyverse customer snapshot for the admin student console."""
+    class Meta:
+        model = LoyverseProfile
+        fields = [
+            'customer_code', 'name', 'email', 'phone_number', 'address_code',
+            'note', 'first_visit', 'last_visit', 'total_visits', 'total_spent',
+            'total_points', 'loyverse_created_at', 'synced_at',
+        ]
+        read_only_fields = fields
 
 
 class CafeteriaBalanceSerializer(serializers.ModelSerializer):

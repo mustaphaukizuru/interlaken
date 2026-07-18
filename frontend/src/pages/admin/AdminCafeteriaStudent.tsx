@@ -103,7 +103,7 @@ export default function AdminCafeteriaStudent() {
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
-  const { balance, parents, transactions, adjustments } = data;
+  const { balance, parents, transactions, adjustments, loyverse } = data;
   const isLow = parseFloat(balance.balance) <= parseFloat(balance.low_balance_threshold ?? '50');
   const refundable = (t: CafeteriaTransaction) =>
     t.transaction_type === 'purchase' || t.transaction_type === 'topup';
@@ -164,6 +164,35 @@ export default function AdminCafeteriaStudent() {
           )}
         </Card>
       </div>
+
+      {/* Loyverse customer snapshot — full visit history + lifetime spend */}
+      {loyverse && (
+        <Card>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-ink">Información de Loyverse</h2>
+            <span className="text-[11px] text-subtle">
+              Sincronizado {fmtDate(loyverse.synced_at)}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+            {[
+              { label: 'Visitas', value: loyverse.total_visits.toLocaleString('es-MX') },
+              { label: 'Gasto total', value: `$${parseFloat(loyverse.total_spent).toFixed(2)}` },
+              { label: 'Puntos', value: parseFloat(loyverse.total_points).toFixed(2) },
+              { label: 'Grado (Loyverse)', value: loyverse.address_code || '—' },
+              { label: 'Primera visita', value: loyverse.first_visit ? fmtDate(loyverse.first_visit) : '—' },
+              { label: 'Última visita', value: loyverse.last_visit ? fmtDate(loyverse.last_visit) : '—' },
+              { label: 'Teléfono', value: loyverse.phone_number || '—' },
+              { label: 'Alta en Loyverse', value: loyverse.loyverse_created_at ? fmtDate(loyverse.loyverse_created_at) : '—' },
+            ].map((f) => (
+              <div key={f.label}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-subtle">{f.label}</p>
+                <p className="mt-0.5 text-sm font-medium text-ink">{f.value}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Transactions */}
       <Card>
