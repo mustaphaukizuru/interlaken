@@ -327,9 +327,12 @@ def start_invoice_payment(invoice, user, gateway_name=None):
 def complete_invoice_payment(payment):
     """Mark the linked invoice paid for a confirmed tuition ``Payment`` (webhook).
 
-    Atomic + idempotent: a replayed/duplicate webhook is a no-op (guarded by the
-    invoice already being settled and the ``InvoicePayment`` amount). Returns the
-    ``Invoice`` (or ``None`` when the payment isn't linked to one).
+    Atomic + idempotent **per payment** (guarded by the locked
+    ``InvoicePayment.applied_at``): a replay of the same payment is a no-op,
+    while a distinct second payment on an already-settled invoice is credited as
+    an overpayment (``balance_due`` goes negative, logged for refund) rather than
+    silently dropped. Returns the ``Invoice`` (or ``None`` when the payment isn't
+    linked to one).
     """
     link = getattr(payment, 'invoice_payment', None)
     if link is None:

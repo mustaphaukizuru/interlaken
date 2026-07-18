@@ -717,6 +717,12 @@ def adjust_balance(student, amount, reason: str, admin=None):
             description=(f'Ajuste manual: {reason}' if reason else 'Ajuste manual'),
             balance_after=cb.balance,
         )
+        # loyverse_receipt_id is unique=True; leaving it '' means only ONE such
+        # row can ever exist system-wide, so the second manual adjustment (any
+        # student) would hit an IntegrityError. Stamp a unique synthetic
+        # reference, mirroring the refund-tx-<id> / topup-* convention.
+        tx.loyverse_receipt_id = f'adjust-tx-{tx.id}'
+        tx.save(update_fields=['loyverse_receipt_id'])
         adj = BalanceAdjustment.objects.create(
             student=student,
             admin=admin,
