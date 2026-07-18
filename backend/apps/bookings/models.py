@@ -96,6 +96,8 @@ class Booking(models.Model):
     # Per-booking Google Calendar event — populated in Prompt 13.
     google_event_id   = models.CharField(max_length=255, blank=True, default='')
     confirmation_sent = models.BooleanField(default=False)
+    # Day-before reminder (send_booking_reminders cron) — one per booking.
+    reminder_sent     = models.BooleanField(default=False)
     notes             = models.TextField(blank=True, verbose_name='Notas')
     created_at        = models.DateTimeField(default=timezone.now)
     updated_at        = models.DateTimeField(auto_now=True)

@@ -65,3 +65,42 @@ def send_booking_confirmation(booking):
     booking.confirmation_sent = True
     booking.save(update_fields=['confirmation_sent'])
     return True
+
+
+def send_booking_reminder(booking):
+    """Send the day-before reminder email (with the .ics) and flag it as sent.
+
+    Best-effort and idempotent per booking via ``reminder_sent`` (the caller
+    filters on it). Same fail-soft contract as the confirmation.
+    """
+    slot = booking.slot
+    subject = 'Recordatorio: su visita es mañana — Colegio Interlaken'
+    body = (
+        f'Estimado/a {booking.parent_name},\n\n'
+        f'Le recordamos su visita programada para MAÑANA:\n\n'
+        f'  • Tipo: {_visit_type_label(booking)}\n'
+        f'  • Fecha: {slot.date:%d/%m/%Y}\n'
+        f'  • Horario: {slot.start_time:%H:%M} - {slot.end_time:%H:%M}\n'
+        f'  • Lugar: {slot.location or "Campus Interlaken"}\n'
+        f'  • Asistentes: {booking.num_attendees}\n\n'
+        f'Si ya no puede asistir, por favor avísenos respondiendo a este correo.\n\n'
+        f'¡Le esperamos!\nColegio Interlaken'
+    )
+
+    email = EmailMessage(
+        subject=subject,
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[booking.parent_email],
+    )
+    try:
+        email.attach('visita-interlaken.ics', build_ics(booking),
+                     'text/calendar; charset=utf-8; method=PUBLISH')
+    except Exception as exc:  # pragma: no cover - defensive; never block on ics
+        logger.warning('No se pudo generar el .ics para el recordatorio %s: %s',
+                       booking.pk, exc)
+    email.send(fail_silently=True)
+
+    booking.reminder_sent = True
+    booking.save(update_fields=['reminder_sent'])
+    return True
