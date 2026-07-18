@@ -3,6 +3,7 @@ admissions/views.py — Public forms API (no auth required)
 """
 from django.conf import settings
 from django.core.mail import send_mail
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
@@ -272,6 +273,48 @@ class DocumentVerifyView(generics.UpdateAPIView):
     serializer_class = DocumentVerifySerializer
     permission_classes = [IsAdmin]
     http_method_names = ['patch']
+
+
+class DocumentDownloadView(APIView):
+    """GET /api/v1/admissions/documents/<pk>/download/ — stream an uploaded
+    registration document to an authorized caller.
+
+    Production serves no ``/media/`` path (Django serves it only under DEBUG,
+    and the deploy fronts /api,/auth,/admin,/static via Passenger — never
+    /media), so this authenticated view IS the download path. That keeps
+    minors' documents (birth certificates, CURP, photos) off any guessable,
+    unauthenticated URL — do NOT "fix" the download gap by aliasing /media/ in
+    Apache, which would expose them publicly.
+
+    Authorization mirrors the upload/act gate (``authorize_registration``):
+    staff (JWT) may fetch any document; an anonymous applicant may fetch only
+    their own registration's documents with a valid session token. The file is
+    always sent as an attachment, never rendered inline.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+        doc = (RegistrationDocument.objects
+               .select_related('registration')
+               .filter(pk=pk).first())
+        # Don't reveal document existence to anonymous callers — mirror
+        # authorize_registration's uniform 401 (anti-enumeration). Staff, being
+        # authenticated, get a plain 404 for a genuinely missing document.
+        if doc is None:
+            if _is_staff(request):
+                raise Http404('Documento no encontrado.')
+            raise AuthenticationFailed('Sesión de inscripción inválida.')
+
+        # Staff bypass, or the owning applicant's session token for THIS
+        # registration; anyone else gets a uniform 401.
+        authorize_registration(request, doc.registration_id)
+
+        try:
+            fh = doc.file.open('rb')
+        except (FileNotFoundError, ValueError):
+            raise Http404('Archivo no disponible.')
+        return FileResponse(fh, as_attachment=True,
+                            filename=doc.filename or 'documento')
 
 
 class RegistrationAccessView(APIView):

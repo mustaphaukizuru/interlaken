@@ -1,3 +1,4 @@
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -102,10 +103,18 @@ class PreRegistrationStatusSerializer(serializers.ModelSerializer):
 
 
 class RegistrationDocumentSerializer(serializers.ModelSerializer):
+    # Authenticated download path (never the raw /media/ URL, which prod does
+    # not serve). The client fetches this with auth and saves the blob.
+    download_url = serializers.SerializerMethodField()
+
     class Meta:
         model = RegistrationDocument
-        fields = ['id', 'doc_type', 'filename', 'file_size', 'uploaded_at', 'is_verified']
-        read_only_fields = ['id', 'uploaded_at', 'is_verified']
+        fields = ['id', 'doc_type', 'filename', 'file_size', 'uploaded_at',
+                  'is_verified', 'download_url']
+        read_only_fields = ['id', 'uploaded_at', 'is_verified', 'download_url']
+
+    def get_download_url(self, obj):
+        return reverse('document-download', args=[obj.id])
 
 
 class DocumentVerifySerializer(serializers.ModelSerializer):

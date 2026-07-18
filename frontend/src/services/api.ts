@@ -194,6 +194,11 @@ export const admissionsAdminApi = {
   /** Mark an uploaded document verified (or clear it). */
   verifyDocument: (docId: number, isVerified: boolean) =>
     api.patch(`/admissions/documents/${docId}/verify/`, { is_verified: isVerified }),
+
+  /** Download an uploaded document as a blob (prod serves no /media/, so this
+   *  authenticated endpoint carries the JWT and streams the file). */
+  downloadDocument: (docId: number) =>
+    api.get(`/admissions/documents/${docId}/download/`, { responseType: 'blob' }),
 };
 
 // ── CAFETERIA ─────────────────────────────────────────────

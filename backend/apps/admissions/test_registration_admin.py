@@ -176,3 +176,56 @@ class TestDocumentUploadValidation:
         resp = self._upload(api_client, reg, name='evil.svg', content=b'<svg/>')
         assert resp.status_code == 400
         assert not RegistrationDocument.objects.filter(registration=reg).exists()
+
+
+@pytest.mark.django_db
+class TestDocumentDownload:
+    """Authenticated download — prod serves no /media/, so this view IS the
+    download path; it must be authorized (staff or owning applicant) and must
+    not leak document existence to anonymous callers."""
+
+    def _doc(self, reg, content=b'%PDF-1.4 secret'):
+        return RegistrationDocument.objects.create(
+            registration=reg, doc_type=RegistrationDocument.DocType.BIRTH_CERT,
+            file=SimpleUploadedFile('acta.pdf', content, content_type='application/pdf'),
+            filename='acta.pdf', file_size=len(content))
+
+    def test_staff_can_download_as_attachment(self, api_client):
+        doc = self._doc(_reg())
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.get(reverse('document-download', args=[doc.id]))
+        assert resp.status_code == 200
+        assert b''.join(resp.streaming_content) == b'%PDF-1.4 secret'
+        assert 'attachment' in resp['Content-Disposition']
+
+    def test_owning_applicant_can_download_with_session_token(self, api_client):
+        from apps.admissions.tokens import issue_session
+        reg = _reg()
+        doc = self._doc(reg)
+        resp = api_client.get(reverse('document-download', args=[doc.id]),
+                              HTTP_X_SESSION_TOKEN=issue_session(reg))
+        assert resp.status_code == 200
+
+    def test_anonymous_without_token_is_rejected(self, api_client):
+        doc = self._doc(_reg())
+        resp = api_client.get(reverse('document-download', args=[doc.id]))
+        assert resp.status_code == 401
+
+    def test_session_token_for_another_registration_is_rejected(self, api_client):
+        from apps.admissions.tokens import issue_session
+        reg_a, reg_b = _reg(), _reg(child_first_name='Otro')
+        doc_b = self._doc(reg_b)
+        resp = api_client.get(reverse('document-download', args=[doc_b.id]),
+                              HTTP_X_SESSION_TOKEN=issue_session(reg_a))
+        assert resp.status_code == 401
+
+    def test_missing_doc_is_uniform_401_for_anon(self, api_client):
+        # Anti-enumeration: a missing document is a 401 (same as unauthorized),
+        # not a 404, so anon can't probe which document ids exist.
+        resp = api_client.get(reverse('document-download', args=[999999]))
+        assert resp.status_code == 401
+
+    def test_missing_doc_is_404_for_staff(self, api_client):
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.get(reverse('document-download', args=[999999]))
+        assert resp.status_code == 404

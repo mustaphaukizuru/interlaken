@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, FileText, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Circle, Download, FileText, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +16,7 @@ const DOC_LABELS: Record<string, string> = {
   vaccination: 'Cartilla de Vacunación', other: 'Otro Documento',
 };
 
-interface Doc { id: number; doc_type: string; filename: string; is_verified: boolean }
+interface Doc { id: number; doc_type: string; filename: string; is_verified: boolean; download_url: string }
 interface Reg {
   id: number; child_first_name: string; child_last_name: string; child_dob: string;
   child_curp: string; child_nationality: string; level: string; grade_applying: string; cycle: string;
@@ -40,6 +40,28 @@ export function RegistrationReviewModal({ id, open, onClose }: {
 
   const [status, setStatus] = useState('submitted');
   const [notes, setNotes] = useState('');
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  // Prod serves no /media/, so we fetch the file with auth (JWT via the api
+  // client) and save the returned blob rather than linking to a URL.
+  const handleDownload = async (doc: Doc) => {
+    setDownloadingId(doc.id);
+    try {
+      const resp = await admissionsAdminApi.downloadDocument(doc.id);
+      const url = URL.createObjectURL(resp.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.filename || 'documento';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('No se pudo descargar el documento.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Sync local controls whenever a different registration loads.
   useEffect(() => {
@@ -129,17 +151,29 @@ export function RegistrationReviewModal({ id, open, onClose }: {
                       <span className="truncate">{DOC_LABELS[d.doc_type] ?? d.doc_type}</span>
                       <span className="truncate text-xs text-subtle">· {d.filename}</span>
                     </span>
-                    <button
-                      type="button"
-                      disabled={verifyDoc.isPending}
-                      onClick={() => verifyDoc.mutate({ docId: d.id, next: !d.is_verified })}
-                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${
-                        d.is_verified ? 'bg-green-50 text-green-700' : 'bg-cream text-muted hover:bg-line'
-                      }`}
-                    >
-                      {d.is_verified ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-                      {d.is_verified ? 'Verificado' : 'Verificar'}
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={downloadingId === d.id}
+                        onClick={() => handleDownload(d)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-cream px-2.5 py-1 text-xs font-semibold text-muted transition hover:bg-line disabled:opacity-50"
+                        aria-label={`Descargar ${d.filename}`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        {downloadingId === d.id ? '…' : 'Ver'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={verifyDoc.isPending}
+                        onClick={() => verifyDoc.mutate({ docId: d.id, next: !d.is_verified })}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                          d.is_verified ? 'bg-green-50 text-green-700' : 'bg-cream text-muted hover:bg-line'
+                        }`}
+                      >
+                        {d.is_verified ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+                        {d.is_verified ? 'Verificado' : 'Verificar'}
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

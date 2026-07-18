@@ -13,6 +13,7 @@ urlpatterns = [
     path('register/<int:pk>/submit/',  views.RegistrationSubmitView.as_view(),      name='register-submit'),
     path('register/<int:pk>/documents/', views.DocumentUploadView.as_view(),        name='register-docs'),
     path('documents/<int:pk>/verify/', views.DocumentVerifyView.as_view(),          name='document-verify'),
+    path('documents/<int:pk>/download/', views.DocumentDownloadView.as_view(),      name='document-download'),
     path('open-school/',               views.OpenSchoolDayListView.as_view(),       name='open-school-list'),
     path('open-school/signup/',        views.OpenSchoolDaySignUpView.as_view(),     name='open-school-signup'),
 ]
