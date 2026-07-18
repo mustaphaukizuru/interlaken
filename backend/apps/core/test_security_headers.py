@@ -32,6 +32,16 @@ class TestSecurityHeaders:
         csp = resp.headers.get('Content-Security-Policy', '')
         assert "'unsafe-eval'" not in csp
 
+    def test_bare_admin_no_slash_is_public_and_gets_strict_csp(self, client):
+        # The admin is mounted at 'admin/' and the SPA catch-all only excludes
+        # 'admin/' (with slash) — so '/admin' (no slash) is served the SPA, a
+        # PUBLIC page. It must get the strict policy, never the admin's
+        # unsafe-eval, otherwise the whole SPA runs under a relaxed CSP there.
+        resp = client.get('/admin')
+        assert b'<!doctype html>' in resp.content.lower() or resp.status_code == 200
+        csp = resp.headers.get('Content-Security-Policy', '')
+        assert "'unsafe-eval'" not in csp
+
     def test_permissions_policy_everywhere(self, api_client):
         resp = api_client.get(reverse('health'))
         pp = resp.headers.get('Permissions-Policy', '')

@@ -81,8 +81,13 @@ class SecurityHeadersMiddleware:
 
     @staticmethod
     def _is_admin(path):
-        # Match the real Django admin mount only. A bare startswith('/admin')
-        # would also match public SPA paths like /administracion or /admin-foo
-        # (served index.html by the catch-all) and hand them the relaxed
-        # unsafe-eval admin policy — mirror the catch-all's own 'admin/' guard.
-        return path == '/admin' or path.startswith('/admin/')
+        # Match the real Django admin mount only. The admin is mounted at
+        # path('admin/', …) so it lives exclusively under '/admin/'; a bare
+        # startswith('/admin') would also match public SPA paths like
+        # /administracion or /admin-foo (served index.html by the catch-all)
+        # and hand them the relaxed unsafe-eval policy. Note '/admin' with NO
+        # trailing slash is ALSO a public SPA route — the catch-all's negative
+        # lookahead only excludes 'admin/', so bare 'admin' falls through to
+        # index.html — hence it too must get the strict policy. Key solely on
+        # the '/admin/' prefix, mirroring the catch-all's own guard.
+        return path.startswith('/admin/')
