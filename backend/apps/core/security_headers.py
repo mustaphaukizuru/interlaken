@@ -75,8 +75,14 @@ class SecurityHeadersMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         if self.enabled and self.header not in response:
-            policy = (ADMIN_CSP if request.path.startswith('/admin')
-                      else PUBLIC_CSP)
-            response[self.header] = policy
+            response[self.header] = ADMIN_CSP if self._is_admin(request.path) else PUBLIC_CSP
         response.setdefault('Permissions-Policy', PERMISSIONS_POLICY)
         return response
+
+    @staticmethod
+    def _is_admin(path):
+        # Match the real Django admin mount only. A bare startswith('/admin')
+        # would also match public SPA paths like /administracion or /admin-foo
+        # (served index.html by the catch-all) and hand them the relaxed
+        # unsafe-eval admin policy — mirror the catch-all's own 'admin/' guard.
+        return path == '/admin' or path.startswith('/admin/')

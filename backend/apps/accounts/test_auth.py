@@ -101,6 +101,20 @@ class TestGoogleLogin:
         assert "accounts.google.com" not in resp["Location"]
 
 
+def _armed_state(api_client, state="teststate"):
+    """Simulate GoogleLoginView having stashed the CSRF state in the session."""
+    s = api_client.session
+    s["google_oauth_state"] = state
+    s.save()
+    return state
+
+
+_VERIFIED_USERINFO = {
+    "sub": "google-uid-1", "email": "nuevo@test.mx", "email_verified": True,
+    "given_name": "Nuevo", "family_name": "Usuario", "picture": "http://img/x.png",
+}
+
+
 class TestGoogleCallback:
     url_name = "google-callback"
 
@@ -109,11 +123,25 @@ class TestGoogleCallback:
         assert resp.status_code == 302
         assert "error=no_code" in resp["Location"]
 
+    def test_state_mismatch_rejected(self, api_client):
+        # A code with no/incorrect state must be refused (login-CSRF defense).
+        _armed_state(api_client, "the-real-state")
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": "forged"})
+        assert resp.status_code == 302
+        assert "error=state_mismatch" in resp["Location"]
+
+    def test_missing_session_state_rejected(self, api_client):
+        # No state was ever armed (e.g. replayed callback) → refuse.
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": "x"})
+        assert resp.status_code == 302
+        assert "error=state_mismatch" in resp["Location"]
+
     @patch("apps.accounts.views.requests.post", side_effect=requests.ConnectionError)
     def test_network_error_redirects_gracefully(self, _mock_post, api_client):
         # Google unreachable / timeout during the token exchange → graceful
         # redirect, not a raw 500.
-        resp = api_client.get(reverse(self.url_name), {"code": "abc"})
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": state})
         assert resp.status_code == 302
         assert "error=google_unreachable" in resp["Location"]
 
@@ -123,18 +151,10 @@ class TestGoogleCallback:
         self, mock_post, mock_get, api_client
     ):
         mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
-        mock_get.return_value = _FakeResponse(
-            200,
-            {
-                "sub": "google-uid-1",
-                "email": "nuevo@test.mx",
-                "given_name": "Nuevo",
-                "family_name": "Usuario",
-                "picture": "http://img/x.png",
-            },
-        )
+        mock_get.return_value = _FakeResponse(200, _VERIFIED_USERINFO)
 
-        resp = api_client.get(reverse(self.url_name), {"code": "abc"})
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": state})
         assert resp.status_code == 302
         loc = resp["Location"]
         # Success lands on /login?login=ok (NOT /auth/*, which is backend-only).
@@ -149,10 +169,26 @@ class TestGoogleCallback:
         assert user.google_id == "google-uid-1"
         assert user.role == User.Role.PARENT  # default role on first login
 
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_unverified_email_rejected(self, mock_post, mock_get, api_client):
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(
+            200, {**_VERIFIED_USERINFO, "email": "victim@interlaken.edu.mx",
+                  "email_verified": False})
+
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": state})
+        assert resp.status_code == 302
+        assert "error=email_unverified" in resp["Location"]
+        # No account was created/matched for the unverified address.
+        assert not User.objects.filter(email="victim@interlaken.edu.mx").exists()
+
     @patch("apps.accounts.views.requests.post")
     def test_token_exchange_failure_redirects_with_error(self, mock_post, api_client):
         mock_post.return_value = _FakeResponse(400, {})
-        resp = api_client.get(reverse(self.url_name), {"code": "abc"})
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": state})
         assert resp.status_code == 302
         assert "error=token_exchange_failed" in resp["Location"]
 
@@ -162,7 +198,7 @@ class TestGoogleTokenExchange:
     @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
     def test_valid_credential_sets_cookie_and_returns_access(self, mock_verify, api_client):
         mock_verify.return_value = {
-            "sub": "g-1", "email": "gtoken@test.mx",
+            "sub": "g-1", "email": "gtoken@test.mx", "email_verified": True,
             "given_name": "G", "family_name": "T",
         }
         resp = api_client.post(reverse("google-token"), {"credential": "fake"}, format="json")
@@ -172,6 +208,15 @@ class TestGoogleTokenExchange:
         # Verification is local — the credential is passed to the audience check,
         # never placed in an outbound URL.
         mock_verify.assert_called_once()
+
+    @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
+    def test_unverified_email_credential_is_401(self, mock_verify, api_client):
+        mock_verify.return_value = {
+            "sub": "g-2", "email": "admin@interlaken.edu.mx", "email_verified": False,
+        }
+        resp = api_client.post(reverse("google-token"), {"credential": "fake"}, format="json")
+        assert resp.status_code == 401
+        assert not User.objects.filter(email="admin@interlaken.edu.mx").exists()
 
     @patch("apps.accounts.views.google_id_token.verify_oauth2_token",
            side_effect=ValueError("invalid"))

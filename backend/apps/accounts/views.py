@@ -1,6 +1,7 @@
 """
 Accounts views: Google OAuth flow, JWT token exchange, user profile, students list.
 """
+import secrets
 from urllib.parse import urlencode
 
 import requests
@@ -40,6 +41,13 @@ class GoogleLoginView(APIView):
         if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
             return redirect(f'{settings.FRONTEND_URL}/login?error=google_unavailable')
 
+        # CSRF defense (RFC 6749 §10.12): mint a random `state`, stash it in the
+        # session, and require the callback to echo it back — otherwise an
+        # attacker could feed a victim their own authorization code and silently
+        # log the victim into the attacker's account.
+        state = secrets.token_urlsafe(32)
+        request.session['google_oauth_state'] = state
+
         # Build the consent URL with proper URL-encoding of every parameter.
         # `redirect_uri` must EXACTLY match one of the "Authorized redirect URIs"
         # registered on the OAuth client in Google Cloud Console (scheme, host,
@@ -52,8 +60,18 @@ class GoogleLoginView(APIView):
             'scope': 'openid email profile',
             'access_type': 'offline',
             'prompt': 'select_account',
+            'state': state,
         })
         return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{params}')
+
+
+def _email_is_verified(info: dict) -> bool:
+    """Google returns email_verified as a bool (userinfo) or occasionally the
+    string 'true' (some ID-token encodings). Treat anything else as unverified —
+    an unverified email must never be trusted as an account identity key, or an
+    attacker could take over a privileged account sharing that address."""
+    v = info.get('email_verified')
+    return v is True or v == 'true'
 
 
 @method_decorator(ratelimit('oauth-callback', '20/m', key='ip', method='GET'), name='dispatch')
@@ -69,6 +87,11 @@ class GoogleCallbackView(APIView):
         code = request.GET.get('code')
         if not code:
             return redirect(f'{settings.FRONTEND_URL}/login?error=no_code')
+
+        # Verify the CSRF state set in GoogleLoginView (single-use: pop it).
+        expected_state = request.session.pop('google_oauth_state', None)
+        if not expected_state or request.GET.get('state') != expected_state:
+            return redirect(f'{settings.FRONTEND_URL}/login?error=state_mismatch')
 
         # Exchange code → token → userinfo. Any network failure or malformed
         # response redirects to the login with an error rather than a raw 500.
@@ -107,6 +130,8 @@ class GoogleCallbackView(APIView):
 
         if not email:
             return redirect(f'{settings.FRONTEND_URL}/login?error=no_email')
+        if not _email_is_verified(userinfo):
+            return redirect(f'{settings.FRONTEND_URL}/login?error=email_unverified')
 
         # Create or update user
         user, created = User.objects.get_or_create(email=email, defaults={
@@ -165,6 +190,8 @@ class GoogleTokenView(APIView):
         email = payload.get('email')
         if not email:
             return Response({'error': 'no_email'}, status=status.HTTP_400_BAD_REQUEST)
+        if not _email_is_verified(payload):
+            return Response({'error': 'email_unverified'}, status=status.HTTP_401_UNAUTHORIZED)
 
         user, _ = User.objects.get_or_create(email=email, defaults={
             'first_name': payload.get('given_name', ''),

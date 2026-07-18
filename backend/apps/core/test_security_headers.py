@@ -25,6 +25,13 @@ class TestSecurityHeaders:
         assert "'unsafe-eval'" in csp          # Alpine.js (unfold)
         assert "frame-ancestors 'none'" in csp
 
+    def test_admin_lookalike_public_path_gets_strict_csp(self, client):
+        # /administracion is a public SPA route (catch-all serves index.html),
+        # NOT Django admin — it must get the strict policy, never unsafe-eval.
+        resp = client.get('/administracion')
+        csp = resp.headers.get('Content-Security-Policy', '')
+        assert "'unsafe-eval'" not in csp
+
     def test_permissions_policy_everywhere(self, api_client):
         resp = api_client.get(reverse('health'))
         pp = resp.headers.get('Permissions-Policy', '')
