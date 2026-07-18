@@ -63,6 +63,11 @@ class TestParse:
         assert s['total_spent'] == Decimal('0')
         assert s['first_visit'] is None
 
+    def test_malformed_total_visits_falls_back_to_zero(self):
+        # A junk counter must not raise ValueError up into the balance cron.
+        s = parse_customer_snapshot({**SAMPLE, 'total_visits': 'not-a-number'})
+        assert s['total_visits'] == 0
+
 
 class TestUpsert:
     def test_creates_then_refreshes_in_place(self):
@@ -109,6 +114,51 @@ class TestRefreshAll:
         assert report['matched'] == 0
         assert report['unmatched'] == 1
 
+    def test_blank_customer_code_does_not_bind_a_student(self):
+        # A customer with a blank code must not match a student — an empty
+        # matrícula key would otherwise collide on ''.strip() == ''.
+        StudentProfileFactory(student_id='09824', loyverse_id='')
+        report = refresh_all_profiles(
+            [{**SAMPLE, 'id': 'z', 'customer_code': ''},
+             {**SAMPLE, 'id': 'y', 'customer_code': None}])
+        assert report['matched'] == 0
+        assert report['unmatched'] == 2
+        assert LoyverseProfile.objects.count() == 0
+
+    def test_duplicate_customer_code_binds_student_once(self):
+        # Two customers claiming the same matrícula: the student (OneToOne) is
+        # bound to the first only — no overwrite, no inflated counters.
+        student = StudentProfileFactory(student_id='09824', loyverse_id='')
+        customers = [
+            {**SAMPLE, 'id': 'first', 'customer_code': '09824', 'total_visits': 10},
+            {**SAMPLE, 'id': 'second', 'customer_code': '09824', 'total_visits': 99},
+        ]
+        report = refresh_all_profiles(customers)
+        assert report['matched'] == 1
+        assert report['created'] == 1
+        assert LoyverseProfile.objects.count() == 1
+        assert LoyverseProfile.objects.get(student=student).total_visits == 10
+
+    def test_one_bad_customer_does_not_abort_the_batch(self, monkeypatch):
+        good = StudentProfileFactory(student_id='09824', loyverse_id='')
+        StudentProfileFactory(student_id='11111', loyverse_id='')
+        real_upsert = upsert_loyverse_profile
+
+        def _flaky(student, customer):
+            if customer.get('id') == 'boom':
+                raise RuntimeError('transient db error')
+            return real_upsert(student, customer)
+
+        monkeypatch.setattr(
+            'apps.cafeteria.loyverse_profile.upsert_loyverse_profile', _flaky)
+        report = refresh_all_profiles([
+            {**SAMPLE, 'id': 'boom', 'customer_code': '11111'},
+            {**SAMPLE, 'id': 'ok', 'customer_code': '09824'},
+        ])
+        assert report['errors'] == 1
+        assert report['matched'] == 1
+        assert LoyverseProfile.objects.filter(student=good).exists()
+
 
 class TestThrottle:
     def test_skips_when_fresh(self, monkeypatch):
@@ -145,3 +195,29 @@ class TestThrottle:
         result = refresh_profiles_if_stale()
         assert result['skipped'] is True
         assert result['reason'] == 'loyverse-error'
+
+    def test_no_students_skips_without_fetching(self, monkeypatch):
+        # Launch state: no roster yet → the heavy fetch must not fire at all,
+        # otherwise it repeats every 10-min cron forever (nothing ever writes a
+        # profile row, so the freshness throttle never engages).
+        def _boom(*a, **k):
+            raise AssertionError('get_all_customers must not be called')
+        monkeypatch.setattr('apps.cafeteria.services.get_all_customers', _boom)
+
+        result = refresh_profiles_if_stale()
+        assert result['skipped'] is True
+        assert result['reason'] == 'no-students'
+
+    def test_refresh_error_is_soft(self, monkeypatch):
+        StudentProfileFactory(student_id='09824')
+        monkeypatch.setattr('apps.cafeteria.services.get_all_customers',
+                            lambda *a, **k: [SAMPLE])
+
+        def _blow_up(customers):
+            raise RuntimeError('unexpected orm error')
+        monkeypatch.setattr(
+            'apps.cafeteria.loyverse_profile.refresh_all_profiles', _blow_up)
+
+        result = refresh_profiles_if_stale()
+        assert result['skipped'] is True
+        assert result['reason'] == 'refresh-error'
