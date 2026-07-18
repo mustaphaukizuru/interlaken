@@ -51,8 +51,14 @@ class Command(BaseCommand):
                     f"  {b.slot.start_time:%H:%M}  {b.parent_name}  <{b.parent_email}>")
                 continue
             try:
-                send_booking_reminder(b)
-                sent += 1
+                if send_booking_reminder(b):
+                    sent += 1
+                else:
+                    # Silent SMTP failure — reminder_sent stays False, so the
+                    # next run retries. Report it instead of miscounting a send.
+                    failed += 1
+                    self.stderr.write(self.style.ERROR(
+                        f"  ! {b.parent_email}: envío fallido (reintentará)"))
             except Exception as e:  # pragma: no cover - fail-soft per booking
                 failed += 1
                 self.stderr.write(self.style.ERROR(f"  ! {b.parent_email}: {e}"))

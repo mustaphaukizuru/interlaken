@@ -74,3 +74,22 @@ class TestReminderCommand:
         _booking(target)
         call_command('send_booking_reminders', '--date', '2026-12-15')
         assert len(mail.outbox) == 1
+
+    def test_failed_send_is_not_flagged_and_retries(self, monkeypatch):
+        # A silent SMTP failure (send() returns 0) must leave reminder_sent
+        # False so the next run retries — not swallow it as delivered.
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        b = _booking(tomorrow)
+
+        from django.core.mail import EmailMessage
+        monkeypatch.setattr(EmailMessage, 'send', lambda self, **kw: 0)
+        call_command('send_booking_reminders')
+        b.refresh_from_db()
+        assert b.reminder_sent is False
+
+        # A later run where the backend recovers actually sends + flags it.
+        monkeypatch.undo()
+        call_command('send_booking_reminders')
+        b.refresh_from_db()
+        assert b.reminder_sent is True
+        assert len(mail.outbox) == 1

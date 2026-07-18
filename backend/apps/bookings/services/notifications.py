@@ -60,11 +60,18 @@ def send_booking_confirmation(booking):
     except Exception as exc:  # pragma: no cover - defensive; never block on ics
         logger.warning('No se pudo generar el .ics para la reserva %s: %s',
                        booking.pk, exc)
-    email.send(fail_silently=True)
 
-    booking.confirmation_sent = True
-    booking.save(update_fields=['confirmation_sent'])
-    return True
+    # send() returns the number of messages delivered (0 on a silent failure).
+    # Only flag it sent when it actually went out, so a transient SMTP failure
+    # doesn't permanently mark an unsent confirmation as delivered.
+    delivered = bool(email.send(fail_silently=True))
+    if delivered:
+        booking.confirmation_sent = True
+        booking.save(update_fields=['confirmation_sent'])
+    else:
+        logger.warning('No se pudo enviar la confirmación de la reserva %s a %s',
+                       booking.pk, booking.parent_email)
+    return delivered
 
 
 def send_booking_reminder(booking):
@@ -99,8 +106,15 @@ def send_booking_reminder(booking):
     except Exception as exc:  # pragma: no cover - defensive; never block on ics
         logger.warning('No se pudo generar el .ics para el recordatorio %s: %s',
                        booking.pk, exc)
-    email.send(fail_silently=True)
 
-    booking.reminder_sent = True
-    booking.save(update_fields=['reminder_sent'])
-    return True
+    # Gate the flag on real delivery: a failed send must leave reminder_sent
+    # False so the next cron run retries it (and is counted as a failure),
+    # instead of silently swallowing it and reporting "0 fallidos".
+    delivered = bool(email.send(fail_silently=True))
+    if delivered:
+        booking.reminder_sent = True
+        booking.save(update_fields=['reminder_sent'])
+    else:
+        logger.warning('No se pudo enviar el recordatorio de la reserva %s a %s',
+                       booking.pk, booking.parent_email)
+    return delivered
