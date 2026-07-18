@@ -3,6 +3,24 @@
 from django.db import migrations, models
 
 
+def backfill_applied_at(apps, schema_editor):
+    """Mark historical links whose payment already succeeded as applied.
+
+    complete_invoice_payment now keys idempotency on applied_at instead of
+    invoice status. Any InvoicePayment whose payment already settled has, by
+    definition, already been credited — stamp applied_at so it can never be
+    re-credited if a future code path calls the function again (the only
+    current caller, the FINAL_STATUSES-guarded webhook, never would). Pending/
+    failed links stay NULL so a genuine later settlement still applies.
+    """
+    InvoicePayment = apps.get_model('finance', 'InvoicePayment')
+    # 'success' matches payments.Payment.Status.SUCCESS; use the raw value so the
+    # migration doesn't import the (historical) enum.
+    (InvoicePayment.objects
+     .filter(payment__status='success', applied_at__isnull=True)
+     .update(applied_at=models.F('created_at')))
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -15,4 +33,5 @@ class Migration(migrations.Migration):
             name='applied_at',
             field=models.DateTimeField(blank=True, null=True),
         ),
+        migrations.RunPython(backfill_applied_at, migrations.RunPython.noop),
     ]
