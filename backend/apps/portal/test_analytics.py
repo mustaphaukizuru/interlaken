@@ -2,7 +2,7 @@
 Staff analytics endpoint (IK-ADMIN items 6/9): access control, payload shape,
 empty-safety, aggregation correctness, query budget and the 60s cache.
 """
-from datetime import timedelta
+from datetime import datetime, time as dt_time, timedelta
 from decimal import Decimal
 
 import pytest
@@ -72,6 +72,7 @@ class TestEmptySafety:
         assert data['admissions']['reg_funnel']['draft'] == 0
         assert data['admissions']['referrals'] == []
         assert data['payments']['this_month'] == {'total': 0.0, 'count': 0}
+        assert data['payments']['last_month_to_date'] == {'total': 0.0, 'count': 0}
         assert data['payments']['overdue'] == {'count': 0, 'amount': 0.0}
         # Full 30-day series of zeros (all three daily series).
         assert len(data['admissions']['series']) == 30
@@ -139,6 +140,35 @@ class TestAggregation:
         assert data['admissions']['series'][-1]['count'] == 2
         assert data['payments']['series'][-1]['total'] == 1500.0
         assert data['documents']['in_review'] == 1
+
+
+class TestMonthOverMonthWindow:
+    """The MoM delta must compare this month-to-date against the SAME span of
+    last month, not the full prior month (which fakes a decline early on)."""
+
+    def _pay(self, day, amount):
+        Payment.objects.create(
+            amount=Decimal(amount), status=Payment.Status.SUCCESS,
+            payment_type='tuition',
+            completed_at=timezone.make_aware(datetime.combine(day, dt_time(12, 0))))
+
+    def test_prev_month_to_date_is_a_clamped_prefix(self, api_client, staff_user):
+        today = timezone.localdate()
+        month_start = today.replace(day=1)
+        prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+        last_day_prev = month_start - timedelta(days=1)
+
+        self._pay(prev_month_start, '1000.00')  # first day → always in-window
+        self._pay(last_day_prev, '500.00')      # last day → only when late in month
+
+        api_client.force_authenticate(staff_user)
+        pay = api_client.get(URL).json()['payments']
+
+        # Full prior month sees both; to-date is a prefix that always includes
+        # day 1 and never exceeds the full month.
+        assert pay['last_month']['total'] == 1500.0
+        assert pay['last_month_to_date']['total'] >= 1000.0
+        assert pay['last_month_to_date']['total'] <= pay['last_month']['total']
 
 
 class TestPerformanceAndCache:

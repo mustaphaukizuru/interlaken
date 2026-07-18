@@ -49,6 +49,37 @@ class TestBuildIcs:
         assert f'UID:booking-{b.pk}@interlaken.edu.mx' in build_ics(b)
 
 
+def _long_booking():
+    slot = AvailabilitySlot.objects.create(
+        visit_type=VisitType.INDIVIDUAL, title='Visita', date=date(2026, 7, 20),
+        start_time=time(9, 0), end_time=time(9, 30), capacity=5,
+        location='Campus Interlaken Sur, Avenida de los Educadores 1234, '
+                 'Colonia Benito Juárez, Ciudad de México')
+    return Booking.objects.create(
+        slot=slot, num_attendees=2, parent_email='ana@example.com',
+        parent_name='María José de la Concepción Fernández Ñoño Güemez Iturbide')
+
+
+def _unfold(ics: str) -> str:
+    """Reverse RFC 5545 folding (CRLF + a single leading space/tab)."""
+    return ics.replace('\r\n ', '').replace('\r\n\t', '')
+
+
+class TestFolding:
+    def test_no_content_line_exceeds_75_octets(self):
+        ics = build_ics(_long_booking())
+        for ln in ics.split('\r\n'):
+            assert len(ln.encode('utf-8')) <= 75, f'over-length line: {ln!r}'
+
+    def test_folding_is_reversible_and_keeps_accents_intact(self):
+        # Unfolding must reconstruct the logical value with no multi-byte char
+        # cut across the 75-octet boundary.
+        unfolded = _unfold(build_ics(_long_booking()))
+        assert ('María José de la Concepción Fernández Ñoño Güemez Iturbide'
+                in unfolded)
+        assert 'Ciudad de México' in unfolded
+
+
 class TestConfirmationEmail:
     def test_email_has_ics_attachment(self):
         b = _booking()

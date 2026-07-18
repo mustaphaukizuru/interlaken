@@ -156,7 +156,7 @@ Automate steps 2–4 in a `deploy` script or a management command. (Alternative:
 ## 7. Go-live checklist (ordered)
 
 1. **cPanel → SSL/TLS → AutoSSL** for interlaken.edu.mx → verify HTTPS green. *(unblocks everything)*
-2. cPanel → **MySQL** → create DB `rene82_interla` + user; note credentials.
+2. cPanel → **MySQL** → create DB `rene82_interla` + user; note credentials. **⚠️ Load the MySQL time-zone tables** — see the *Timezone tables* note after step 10; without them the staff dashboard reads all zeros.
 3. cPanel → **Setup Python App** → Python 3.11, app root, URL = interlaken.edu.mx.
 4. Apply code fixes: `GOOGLE_*`/`FRONTEND_URL` settings, `token/` login route, ALLOWED_HOSTS, `SECURE_PROXY_SSL_HEADER`, drop Celery/Redis.
 5. Upload `backend/`, create server `.env` (§4 values), `pip install -r requirements.txt` in the cPanel venv.
@@ -165,6 +165,29 @@ Automate steps 2–4 in a `deploy` script or a management command. (Alternative:
 8. Set cron jobs (§3). Switch email to SMTP; send a test.
 9. Configure Google Calendar service account (§8) so confirmed bookings create events.
 10. Rotate secrets (§6).
+
+> **⚠️ Timezone tables (MySQL) — required, easy to miss.** The app runs
+> `USE_TZ=True` with `TIME_ZONE='America/Mexico_City'`, so every date-bucketed
+> query the staff dashboard issues (`TruncDate`, `completed_at__date`, the daily
+> series → MySQL `CONVERT_TZ(col,'UTC','America/Mexico_City')`) depends on the
+> server's **named** time-zone tables being loaded. If they're missing,
+> `CONVERT_TZ` returns **NULL** and the day series, month-to-date payments and
+> admissions trend all silently read as **zero** — the dashboard looks "empty"
+> with a full database. Verify on the prod DB:
+>
+> ```sql
+> SELECT CONVERT_TZ(NOW(), 'UTC', 'America/Mexico_City');  -- NULL ⇒ tables missing
+> ```
+>
+> Load them once (needs write access to the `mysql` system DB):
+>
+> ```bash
+> mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root mysql
+> ```
+>
+> On shared hosting where you can't write to the `mysql` DB yourself, ask
+> GoDaddy support to load the zoneinfo tables (a standard, server-wide request —
+> not per-database). The `SELECT` above is the go/no-go check; re-run it after.
 
 ---
 

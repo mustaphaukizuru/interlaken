@@ -79,7 +79,7 @@ def build_payload(days=30):
         for offset in range(days - 1, -1, -1)
     ]
 
-    # ── Payments: this month vs last + overdue exposure (3 queries) ──
+    # ── Payments: this month vs last (full + to-date) + overdue (4 queries) ──
     def month_window(start, end):
         row = Payment.objects.filter(
             status=Payment.Status.SUCCESS,
@@ -90,6 +90,15 @@ def build_payload(days=30):
 
     payments_this = month_window(month_start, today + timedelta(days=1))
     payments_prev = month_window(prev_month_start, month_start)
+    # Prev-month-to-date: the same number of days into last month as we are into
+    # this one, so the month-over-month delta compares like for like. Without
+    # it, MTD-vs-full-prior-month shows a false ~90% "decline" on the 3rd, etc.
+    # Clamp the end at this month's start so a long month (day 31) never spills
+    # a shorter prior month (Feb) into the current one.
+    days_into_month = (today - month_start).days + 1
+    prev_to_date_end = min(prev_month_start + timedelta(days=days_into_month),
+                           month_start)
+    payments_prev_to_date = month_window(prev_month_start, prev_to_date_end)
     overdue_row = Invoice.objects.filter(status=Invoice.Status.OVERDUE).aggregate(
         n=Count('id'), amount=Sum(F('amount') - F('amount_paid')))
     pay_by_day = dict(
@@ -169,6 +178,7 @@ def build_payload(days=30):
         'payments': {
             'this_month': payments_this,
             'last_month': payments_prev,
+            'last_month_to_date': payments_prev_to_date,
             'overdue': {
                 'count': overdue_row['n'] or 0,
                 'amount': float(overdue_row['amount'] or 0),

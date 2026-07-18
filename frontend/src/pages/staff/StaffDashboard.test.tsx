@@ -29,6 +29,7 @@ function emptyPayload(): AnalyticsPayload {
     payments: {
       this_month: { total: 0, count: 0 },
       last_month: { total: 0, count: 0 },
+      last_month_to_date: { total: 0, count: 0 },
       overdue: { count: 0, amount: 0 },
       series: days.map((date) => ({ date, total: 0 })),
     },

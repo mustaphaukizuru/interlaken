@@ -29,6 +29,31 @@ def _utc(dt_local: datetime) -> str:
     return dt_local.astimezone(_UTC).strftime('%Y%m%dT%H%M%SZ')
 
 
+def _fold(line: str) -> str:
+    """Fold a content line to ≤75 octets per RFC 5545 §3.1.
+
+    Long lines (a long parent name / location easily pushes DESCRIPTION past
+    75) are split with CRLF + a single leading space; continuation lines carry
+    that space so their own payload budget is 74 octets. Splits fall on
+    character boundaries so a multi-byte UTF-8 char (é, ñ) is never cut in half.
+    """
+    if len(line.encode('utf-8')) <= 75:
+        return line
+    chunks, current = [], b''
+    for ch in line:
+        ch_bytes = ch.encode('utf-8')
+        budget = 75 if not chunks else 74  # continuations lose 1 octet to space
+        if current and len(current) + len(ch_bytes) > budget:
+            chunks.append(current)
+            current = ch_bytes
+        else:
+            current += ch_bytes
+    chunks.append(current)
+    first = chunks[0].decode('utf-8')
+    rest = (' ' + c.decode('utf-8') for c in chunks[1:])
+    return '\r\n'.join([first, *rest])
+
+
 def build_ics(booking) -> str:
     """Return an RFC-5545 VCALENDAR/VEVENT string for ``booking``."""
     slot = booking.slot
@@ -63,5 +88,6 @@ def build_ics(booking) -> str:
         'END:VEVENT',
         'END:VCALENDAR',
     ]
-    # iCalendar requires CRLF line breaks.
-    return '\r\n'.join(lines) + '\r\n'
+    # iCalendar requires CRLF line breaks, and each content line folded to
+    # ≤75 octets (RFC 5545 §3.1) — short lines pass through _fold unchanged.
+    return '\r\n'.join(_fold(line) for line in lines) + '\r\n'

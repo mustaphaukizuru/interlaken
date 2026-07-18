@@ -93,7 +93,9 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
       icon: CreditCard,
       title: 'Cobrado este mes',
       value: fmtMXN(data.payments.this_month.total),
-      deltaPct: pctChange(data.payments.this_month.total, data.payments.last_month.total),
+      // Compare month-to-date against the SAME span of last month, not the full
+      // prior month — otherwise early in the month it's always a false decline.
+      deltaPct: pctChange(data.payments.this_month.total, data.payments.last_month_to_date.total),
       deltaLabel: 'vs mes anterior',
       spark: {
         points: data.payments.series.map((p) => ({ x: p.date, y: p.total })),

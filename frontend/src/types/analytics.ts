@@ -14,6 +14,8 @@ export interface AnalyticsPayload {
   payments: {
     this_month: { total: number; count: number };
     last_month: { total: number; count: number };
+    /** Prev month through the same day — for a like-for-like MoM delta. */
+    last_month_to_date: { total: number; count: number };
     overdue: { count: number; amount: number };
     series: PaymentsDayPoint[];
   };
