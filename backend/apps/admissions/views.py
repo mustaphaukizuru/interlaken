@@ -374,12 +374,27 @@ class DocumentUploadView(APIView):
             return Response({'error': 'file and doc_type are required'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # Validate doc_type against the model's choices — create() skips
+        # full_clean(), so without this any string is stored.
+        if doc_type not in RegistrationDocument.DocType.values:
+            return Response({'error': 'doc_type no válido.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         # Validate extension
         import os
         ext = os.path.splitext(file.name)[1].lower()
         if ext not in settings.ALLOWED_DOCUMENT_EXTENSIONS:
             return Response({'error': f'File type {ext} not allowed'},
                             status=status.HTTP_400_BAD_REQUEST)
+
+        # Cap the size — the *_MAX_MEMORY_SIZE settings don't bound uploads, so
+        # without this an invited session-holder could fill the disk (DoS).
+        max_size = getattr(settings, 'MAX_DOCUMENT_UPLOAD_SIZE', 10 * 1024 * 1024)
+        if file.size > max_size:
+            return Response(
+                {'error': f'El archivo excede el tamaño máximo de '
+                          f'{max_size // (1024 * 1024)} MB.'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         doc = RegistrationDocument.objects.create(
             registration=reg,

@@ -138,3 +138,41 @@ class TestRegistrationAdminReview:
         assert resp.status_code == 403
         doc.refresh_from_db()
         assert doc.is_verified is False
+
+
+@pytest.mark.django_db
+class TestDocumentUploadValidation:
+    """Upload input-validation hardening (pre-go-live review): size cap +
+    doc_type + extension. Staff JWT bypasses authorize_registration."""
+
+    def _upload(self, api_client, reg, *, name='acta.pdf', content=b'%PDF-1.4 data',
+                doc_type=RegistrationDocument.DocType.BIRTH_CERT):
+        api_client.force_authenticate(AdminFactory())
+        f = SimpleUploadedFile(name, content, content_type='application/pdf')
+        return api_client.post(reverse('register-docs', args=[reg.id]),
+                               {'file': f, 'doc_type': doc_type}, format='multipart')
+
+    def test_valid_upload_succeeds(self, api_client):
+        reg = _reg()
+        resp = self._upload(api_client, reg)
+        assert resp.status_code == 201, resp.content
+        assert RegistrationDocument.objects.filter(registration=reg).count() == 1
+
+    def test_oversized_file_is_rejected(self, api_client, settings):
+        settings.MAX_DOCUMENT_UPLOAD_SIZE = 1024  # 1 KB cap for the test
+        reg = _reg()
+        resp = self._upload(api_client, reg, content=b'x' * 4096)
+        assert resp.status_code == 400
+        assert not RegistrationDocument.objects.filter(registration=reg).exists()
+
+    def test_invalid_doc_type_is_rejected(self, api_client):
+        reg = _reg()
+        resp = self._upload(api_client, reg, doc_type='not_a_real_type')
+        assert resp.status_code == 400
+        assert not RegistrationDocument.objects.filter(registration=reg).exists()
+
+    def test_disallowed_extension_is_rejected(self, api_client):
+        reg = _reg()
+        resp = self._upload(api_client, reg, name='evil.svg', content=b'<svg/>')
+        assert resp.status_code == 400
+        assert not RegistrationDocument.objects.filter(registration=reg).exists()

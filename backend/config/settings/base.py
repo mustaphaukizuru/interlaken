@@ -381,9 +381,14 @@ CACHES = {
 }
 
 # ── FILE UPLOAD ───────────────────────────────────────────
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB (memory-vs-temp threshold)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
+# Hard cap on an admissions document upload. The *_MAX_MEMORY_SIZE settings
+# above are NOT size limits (Django excludes file fields from DATA_UPLOAD and
+# FILE_UPLOAD only picks memory vs temp file), so the upload view must enforce
+# this itself — otherwise an invited applicant could fill the disk.
+MAX_DOCUMENT_UPLOAD_SIZE = 10 * 1024 * 1024      # 10 MB per file
 
 # ── UNFOLD ADMIN SKIN ─────────────────────────────────────
 # django-unfold configuration. Every color below is a project design token
