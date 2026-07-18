@@ -75,3 +75,66 @@ def upsert_loyverse_profile(student, customer: dict):
     profile, created = LoyverseProfile.objects.update_or_create(
         student=student, defaults=values)
     return profile, created
+
+
+def refresh_all_profiles(customers):
+    """Upsert LoyverseProfile snapshots for every matched student.
+
+    Pure over ``customers`` (no API call), so it's cheap to unit-test. Matches
+    by Loyverse id first, then matrícula (customer_code == student_id).
+    Returns ``{matched, created, updated, unmatched}``.
+    """
+    from apps.accounts.models import StudentProfile
+
+    by_id, by_code = {}, {}
+    for s in StudentProfile.objects.select_related('user').all():
+        if s.loyverse_id:
+            by_id[s.loyverse_id] = s
+        if s.student_id:
+            by_code[s.student_id.strip()] = s
+
+    report = {'matched': 0, 'created': 0, 'updated': 0, 'unmatched': 0}
+    for c in customers:
+        student = by_id.get(c.get('id')) or by_code.get(
+            (c.get('customer_code') or '').strip())
+        if student is None:
+            report['unmatched'] += 1
+            continue
+        report['matched'] += 1
+        _, created = upsert_loyverse_profile(student, c)
+        report['created' if created else 'updated'] += 1
+    return report
+
+
+def refresh_profiles_if_stale(max_age_hours=20):
+    """Refresh all Loyverse profiles, but only if the last sync is stale.
+
+    Lets a frequent cron (e.g. sync_balances every 10 min) also keep the full
+    customer snapshots fresh without a separate cron entry, while doing the
+    heavy all-customers fetch at most ~once/day. Fail-soft: a Loyverse hiccup
+    is reported, never raised, so it can't break the balance cron.
+
+    Returns a report dict (``skipped`` True when still fresh, ``error`` set on
+    a transient failure).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from .models import LoyverseProfile
+    from .services import LoyverseError, get_all_customers
+
+    newest = (LoyverseProfile.objects.order_by('-synced_at')
+              .values_list('synced_at', flat=True).first())
+    if newest and timezone.now() - newest < timedelta(hours=max_age_hours):
+        return {'skipped': True, 'reason': 'fresh', 'last_sync': newest}
+
+    try:
+        customers = get_all_customers()
+    except LoyverseError as e:
+        return {'skipped': True, 'reason': 'loyverse-error', 'error': str(e)}
+
+    report = refresh_all_profiles(customers)
+    report['skipped'] = False
+    report['total_customers'] = len(customers)
+    return report

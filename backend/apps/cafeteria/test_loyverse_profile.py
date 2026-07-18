@@ -10,6 +10,8 @@ import pytest
 
 from apps.accounts.factories import StudentProfileFactory
 from apps.cafeteria.loyverse_profile import (parse_customer_snapshot,
+                                             refresh_all_profiles,
+                                             refresh_profiles_if_stale,
                                              upsert_loyverse_profile)
 from apps.cafeteria.models import LoyverseProfile
 
@@ -81,3 +83,65 @@ class TestUpsert:
         assert profile2.pk == profile.pk
         assert profile2.total_visits == 37
         assert profile2.total_spent == Decimal('61.50')
+
+
+class TestRefreshAll:
+    def test_matches_by_id_then_code(self):
+        s_by_id = StudentProfileFactory(student_id='11111',
+                                        loyverse_id='2076c9a6-6e8a-4be2-b892-ed594020447b')
+        s_by_code = StudentProfileFactory(student_id='09824', loyverse_id='')
+        # First customer matches s_by_id (by loyverse id, code differs);
+        # second matches s_by_code (by matrícula).
+        customers = [
+            SAMPLE,
+            {**SAMPLE, 'id': 'other-uuid', 'customer_code': '09824',
+             'total_visits': 5},
+        ]
+        report = refresh_all_profiles(customers)
+        assert report['matched'] == 2
+        assert report['created'] == 2
+        assert report['unmatched'] == 0
+        assert LoyverseProfile.objects.filter(student=s_by_id).exists()
+        assert LoyverseProfile.objects.get(student=s_by_code).total_visits == 5
+
+    def test_unmatched_customers_counted(self):
+        report = refresh_all_profiles([{**SAMPLE, 'id': 'x', 'customer_code': '99999'}])
+        assert report['matched'] == 0
+        assert report['unmatched'] == 1
+
+
+class TestThrottle:
+    def test_skips_when_fresh(self, monkeypatch):
+        student = StudentProfileFactory(student_id='09824')
+        upsert_loyverse_profile(student, SAMPLE)  # synced_at = now (fresh)
+
+        def _boom(*a, **k):
+            raise AssertionError('get_all_customers must not be called when fresh')
+        monkeypatch.setattr('apps.cafeteria.services.get_all_customers', _boom)
+
+        result = refresh_profiles_if_stale(max_age_hours=20)
+        assert result['skipped'] is True
+        assert result['reason'] == 'fresh'
+
+    def test_runs_when_stale(self, monkeypatch):
+        StudentProfileFactory(student_id='09824')  # no profile yet → stale
+        monkeypatch.setattr('apps.cafeteria.services.get_all_customers',
+                            lambda *a, **k: [SAMPLE])
+
+        result = refresh_profiles_if_stale()
+        assert result['skipped'] is False
+        assert result['matched'] == 1
+        assert result['total_customers'] == 1
+        assert LoyverseProfile.objects.count() == 1
+
+    def test_loyverse_error_is_soft(self, monkeypatch):
+        StudentProfileFactory(student_id='09824')
+        from apps.cafeteria.services import LoyverseError
+
+        def _fail(*a, **k):
+            raise LoyverseError('timeout')
+        monkeypatch.setattr('apps.cafeteria.services.get_all_customers', _fail)
+
+        result = refresh_profiles_if_stale()
+        assert result['skipped'] is True
+        assert result['reason'] == 'loyverse-error'
