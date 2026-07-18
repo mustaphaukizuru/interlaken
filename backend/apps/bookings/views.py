@@ -94,7 +94,12 @@ class AvailabilityView(APIView):
         created, skipped = 0, 0
         current = d['start_date']
         while current <= d['end_date']:
-            if current.weekday() in d['weekdays']:
+            # The frontend day-picker sends JS getDay() values (Sun=0, Mon=1 …
+            # Sat=6); Python's date.weekday() is Mon=0 … Sun=6. Convert so the
+            # generated slots land on the days the admin actually selected
+            # (without this, "Lun–Vie" produced Tue–Sat — every day shifted +1).
+            js_weekday = (current.weekday() + 1) % 7
+            if js_weekday in d['weekdays']:
                 cursor = datetime.combine(current, d['window_start'])
                 window_end = datetime.combine(current, d['window_end'])
                 step = timedelta(minutes=d['interval_minutes'])

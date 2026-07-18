@@ -107,7 +107,9 @@ class SlotGeneratorSerializer(serializers.Serializer):
     weekdays         = serializers.ListField(
         child=serializers.IntegerField(min_value=0, max_value=6),
         allow_empty=False,
-        help_text='0=Lunes … 6=Domingo',
+        # JS getDay() convention, matching the frontend day-picker; the view
+        # converts each date to this scheme before comparing.
+        help_text='0=Domingo, 1=Lunes … 6=Sábado (JS getDay)',
     )
     window_start     = serializers.TimeField()
     window_end       = serializers.TimeField()

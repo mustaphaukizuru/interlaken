@@ -237,3 +237,29 @@ class OpenSchoolSignupTests(APITestCase):
         ).status_code for i in range(12)]
         self.assertIn(429, codes)                 # the shared limit engaged
         self.assertEqual(codes[:10], [201] * 10)  # first 10 allowed
+
+
+class SlotGeneratorWeekdayTests(APITestCase):
+    """The day-picker sends JS getDay() values (Sun=0, Mon=1 … Sat=6); the
+    generator must land slots on the selected day, not Python's weekday()+1."""
+
+    def test_slots_land_on_the_selected_js_weekday(self):
+        from datetime import date, timedelta
+        from apps.accounts.models import User
+        admin = User.objects.create_user(
+            email='wdadmin@x.mx', password='x', first_name='A', last_name='D',
+            role=User.Role.ADMIN, is_staff=True)
+        self.client.force_authenticate(admin)
+        start = date(2026, 7, 20)  # a Monday
+        resp = self.client.post(reverse('bookings-availability'), {
+            'visit_type': 'individual',
+            'start_date': start.isoformat(),
+            'end_date': (start + timedelta(days=6)).isoformat(),
+            'weekdays': [1],  # JS Monday
+            'window_start': '09:00', 'window_end': '10:00',
+            'interval_minutes': 30, 'capacity': 1, 'location': 'Campus',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        py_weekdays = {s.date.weekday() for s in AvailabilitySlot.objects.all()}
+        # Every generated slot must fall on Monday (python weekday()==0).
+        self.assertEqual(py_weekdays, {0})
