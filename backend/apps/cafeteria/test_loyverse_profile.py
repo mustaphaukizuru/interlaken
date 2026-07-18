@@ -221,3 +221,26 @@ class TestThrottle:
         result = refresh_profiles_if_stale()
         assert result['skipped'] is True
         assert result['reason'] == 'refresh-error'
+
+    def test_zero_match_run_still_throttles_next_call(self, monkeypatch):
+        # Onboarding window: students exist but none match any customer yet, so
+        # no profile row is written. The heavy fetch must still self-throttle —
+        # a persisted last-attempt marker, not the (empty) profile table, gates
+        # the next 10-min cron tick. Without this it re-fetched every tick.
+        StudentProfileFactory(student_id='09824', loyverse_id='')
+        calls = {'n': 0}
+
+        def _fetch(*a, **k):
+            calls['n'] += 1
+            return [{**SAMPLE, 'id': 'x', 'customer_code': '99999'}]  # matches nobody
+        monkeypatch.setattr('apps.cafeteria.services.get_all_customers', _fetch)
+
+        first = refresh_profiles_if_stale()
+        assert first['skipped'] is False
+        assert first['matched'] == 0
+        assert LoyverseProfile.objects.count() == 0  # nothing written
+
+        second = refresh_profiles_if_stale()
+        assert second['skipped'] is True
+        assert second['reason'] == 'fresh'
+        assert calls['n'] == 1  # the expensive fetch ran only once

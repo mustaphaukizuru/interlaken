@@ -151,21 +151,28 @@ def refresh_profiles_if_stale(max_age_hours=20):
 
     from apps.accounts.models import StudentProfile
 
-    from .models import LoyverseProfile
+    from .models import LoyverseProfile, LoyverseSyncState
     from .services import LoyverseError, get_all_customers
 
     # Nothing to match against → don't burn the (paginated, up-to-10k-customer)
-    # fetch on every 10-min cron. This is the launch state before any roster is
-    # imported: without this guard the throttle below never engages (no profile
-    # rows are ever written, so `newest` stays None) and the heavy call repeats
-    # indefinitely.
+    # fetch on every 10-min cron. Launch state before any roster is imported.
     if not StudentProfile.objects.exists():
         return {'skipped': True, 'reason': 'no-students'}
 
-    newest = (LoyverseProfile.objects.order_by('-synced_at')
-              .values_list('synced_at', flat=True).first())
-    if newest and timezone.now() - newest < timedelta(hours=max_age_hours):
-        return {'skipped': True, 'reason': 'fresh', 'last_sync': newest}
+    # Freshness throttle. Key off the most recent of (a) the last *successful*
+    # full fetch — recorded even when it matched zero students — and (b) the
+    # newest profile row. (a) is essential: during the onboarding window a
+    # roster exists but its matrículas aren't linked to Loyverse customer_codes
+    # yet, so a fetch writes no rows; without a persisted attempt marker the
+    # (b)-only gate would never engage and the heavy fetch would repeat every
+    # tick. LocMemCache can't hold this — each cron run is a fresh process.
+    state = LoyverseSyncState.load()
+    newest_profile = (LoyverseProfile.objects.order_by('-synced_at')
+                      .values_list('synced_at', flat=True).first())
+    stamps = [t for t in (state.last_full_fetch_at, newest_profile) if t]
+    last = max(stamps) if stamps else None
+    if last and timezone.now() - last < timedelta(hours=max_age_hours):
+        return {'skipped': True, 'reason': 'fresh', 'last_sync': last}
 
     try:
         customers = get_all_customers()
@@ -179,6 +186,12 @@ def refresh_profiles_if_stale(max_age_hours=20):
         report = refresh_all_profiles(customers)
     except Exception as e:  # noqa: BLE001 — fail-soft, protects the cron
         return {'skipped': True, 'reason': 'refresh-error', 'error': str(e)}
+
+    # Record the successful fetch so the throttle engages regardless of how many
+    # students matched — this is what closes the zero-match re-run loop.
+    state.last_full_fetch_at = timezone.now()
+    state.save(update_fields=['last_full_fetch_at'])
+
     report['skipped'] = False
     report['total_customers'] = len(customers)
     return report

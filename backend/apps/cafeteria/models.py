@@ -184,3 +184,35 @@ class LoyverseProfile(models.Model):
 
     def __str__(self):
         return f'{self.name or self.customer_code} — {self.total_visits} visitas'
+
+
+class LoyverseSyncState(models.Model):
+    """Singleton bookkeeping for the throttled full-customer profile refresh.
+
+    The refresh piggybacks on the 10-min balance cron and must run the heavy,
+    paginated all-customers fetch at most ~once/day. The freshness gate can't
+    key off ``LoyverseProfile.synced_at`` alone: a run that matches zero
+    students (the launch/onboarding window — a roster exists but its matrículas
+    aren't linked to Loyverse customer_codes yet) writes no profile rows, so
+    that gate would never engage and the fetch would repeat every tick. This
+    row records the last *successful* fetch (regardless of match count), and —
+    unlike the per-process ``LocMemCache`` — survives across cron processes.
+    """
+    last_full_fetch_at = models.DateTimeField(
+        'Última descarga completa', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Estado de sincronización Loyverse'
+        verbose_name_plural = 'Estado de sincronización Loyverse'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # enforce a single row
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return f'Loyverse sync — última descarga: {self.last_full_fetch_at or "nunca"}'
