@@ -47,7 +47,7 @@ export function CookieConsent() {
           <p className="text-sm text-muted leading-relaxed">
             Usamos cookies para medir el uso del sitio y mejorar tu experiencia.
             No se activa ninguna analítica hasta que aceptes.{' '}
-            <Link to="/contacto" className="text-brand-600 underline hover:text-brand-700">
+            <Link to="/aviso-de-privacidad" className="text-brand-600 underline hover:text-brand-700">
               Más información
             </Link>
             .
