@@ -81,3 +81,60 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
         logger.info(f'WhatsApp notification requested for {user} (not yet enabled): {title}')
 
     return notification
+
+
+# Audience value → the roles it targets (inverse of audiences_for_user).
+_AUDIENCE_ROLES = None
+
+
+def _audience_roles():
+    global _AUDIENCE_ROLES
+    if _AUDIENCE_ROLES is None:
+        from apps.accounts.models import User
+        from apps.portal.models import Announcement
+        _AUDIENCE_ROLES = {
+            Announcement.Audience.ALL:      [User.Role.PARENT, User.Role.STUDENT, User.Role.STAFF],
+            Announcement.Audience.PARENTS:  [User.Role.PARENT],
+            Announcement.Audience.STUDENTS: [User.Role.STUDENT],
+            Announcement.Audience.STAFF:    [User.Role.STAFF],
+        }
+    return _AUDIENCE_ROLES
+
+
+def fanout_announcement(announcement) -> int:
+    """Create an in-app ``Notification`` for every active user in the
+    announcement's audience, so a newly published comunicado actually alerts the
+    people it targets (they could already *find* it in the announcements list,
+    but nothing notified them).
+
+    Deliberately in-app only and bulk (one INSERT, fast): a school-wide email +
+    web-push blast to thousands of parents can't run inline on this queue-less
+    (no Celery) host without timing out the request — that belongs in a batched
+    cron over unsent notifications. Fail-soft is the caller's job. Returns the
+    number of notifications created.
+    """
+    from django.utils.text import Truncator
+
+    from apps.accounts.models import User
+    from apps.portal.models import Notification
+
+    if not getattr(announcement, 'is_active', False):
+        return 0
+    roles = _audience_roles().get(announcement.audience, [])
+    if not roles:
+        return 0
+
+    user_ids = list(
+        User.objects.filter(is_active=True, role__in=roles)
+        .values_list('id', flat=True))
+    if not user_ids:
+        return 0
+
+    message = Truncator(announcement.body or '').chars(280)
+    Notification.objects.bulk_create(
+        [Notification(user_id=uid, notif_type=Notification.NotifType.INFO,
+                      title=announcement.title, message=message)
+         for uid in user_ids],
+        batch_size=500,
+    )
+    return len(user_ids)

@@ -1,6 +1,8 @@
 """
 Portal views: role-aware dashboard, announcements, notifications.
 """
+import logging
+
 from django.db.models import Sum
 from rest_framework import generics, permissions
 from rest_framework.response import Response
@@ -12,6 +14,7 @@ from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
 
 from .models import Announcement, AnnouncementRead, Notification
+from .services import fanout_announcement
 from .serializers import (AnnouncementAdminSerializer, AnnouncementSerializer,
                           NotificationSerializer)
 
@@ -147,7 +150,15 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
     permission_classes = [_IsAdmin]
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        announcement = serializer.save(created_by=self.request.user)
+        # Alert the audience (in-app). Fail-soft: a fan-out hiccup must never
+        # turn a saved comunicado into a 500. Drafts (is_active=False) notify
+        # nobody until published; publishing a draft later is a known follow-up.
+        try:
+            fanout_announcement(announcement)
+        except Exception:  # noqa: BLE001 — best-effort notification
+            logging.getLogger(__name__).exception(
+                'Announcement %s fan-out failed', announcement.pk)
 
 
 class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):

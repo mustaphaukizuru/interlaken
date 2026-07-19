@@ -5,8 +5,10 @@ delete — admin-only. The public list stays audience-filtered + active-only.
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import AdminFactory, ParentFactory
-from apps.portal.models import Announcement
+from apps.accounts.factories import (AdminFactory, ParentFactory,
+                                     StudentUserFactory, UserFactory)
+from apps.accounts.models import User
+from apps.portal.models import Announcement, Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -27,6 +29,31 @@ class TestAnnouncementAdminCRUD:
         assert a.audience == 'parents'
         assert a.created_by_id == admin.id
         assert a.is_active is True
+
+    def test_publishing_fans_out_notifications_to_the_audience(self, api_client):
+        # Publishing an active comunicado must alert its audience in-app; before
+        # the fix, perform_create notified nobody.
+        p1, p2 = ParentFactory(), ParentFactory()
+        StudentUserFactory()                       # wrong audience
+        UserFactory(role=User.Role.STAFF)          # wrong audience
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.post(LIST_URL, {
+            'title': 'Junta de padres', 'body': 'Mañana a las 5 pm.',
+            'audience': 'parents',
+        }, format='json')
+        assert resp.status_code == 201, resp.content
+        notified = set(Notification.objects.values_list('user_id', flat=True))
+        assert notified == {p1.id, p2.id}          # parents only
+        assert Notification.objects.get(user=p1).title == 'Junta de padres'
+
+    def test_draft_announcement_notifies_nobody(self, api_client):
+        ParentFactory()
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.post(LIST_URL, {
+            'title': 'Borrador', 'body': 'x', 'audience': 'all', 'is_active': False,
+        }, format='json')
+        assert resp.status_code == 201, resp.content
+        assert Notification.objects.count() == 0
 
     def test_admin_lists_all_including_inactive(self, api_client):
         Announcement.objects.create(title='A', body='x', is_active=True)
