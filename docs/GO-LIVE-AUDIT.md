@@ -8,6 +8,16 @@ _Whole-system audit by a virtual team (Test / Fullstack / UI-UX), each finding i
 
 Baseline: backend test suite green (~340 tests); frontend `tsc` clean; `eslint` 0 errors. No go-live blockers found - the list below is the ranked finish-work backlog. Items tagged _(credential/config-gated)_ are pending client-supplied secrets, not code defects.
 
+### ✅ Fixed in the 2026-07-18 pass (with tests)
+
+- **Major** — slot-generator weekday off-by-one (#12); payment history showed paid as "Pendiente" (#7); public pre-register/register unthrottled (#3); announcement publish now fans out in-app notifications to the audience (#16, in-app only — email/push blast deferred to a batched cron).
+- **Minor/polish** — child DOB future/implausible dates rejected on both public forms (+ `max=today` inputs); finance bulk "remind" skips paid/cancelled invoices; cookie-consent "Más información" → Aviso de Privacidad; stale "40 años" SEO copy replaced with drift-proof phrasing.
+
+### ⚠️ Needs a client decision (not fixed — would be a blind guess)
+
+- **Contact email domain** (#19): the school uses BOTH `@interlaken.com.mx` (real Loyverse student mailboxes + legal notice) and `@interlaken.edu.mx` (site defaults + structured data + website domain). Which domain has the real monitored *contact* inboxes (colegio@, preescolar@, primaria@, secundaria@) is a factual question only the client can answer — picking wrong sends parents' emails nowhere. Left as-is pending that answer.
+- **Instagram placeholder**: the empty-URL Instagram icon is a *documented client request* ("se muestra siempre hasta que entreguen la URL"), not a defect — pending the client's Instagram URL.
+
 ## Blockers
 
 _None - no go-live-stopping defects found._
