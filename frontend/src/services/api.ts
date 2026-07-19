@@ -423,6 +423,14 @@ export const bookingsApi = {
 
   bookingAction: (id: number, action: 'confirm' | 'cancel' | 'attended' | 'no_show') =>
     api.post(`/bookings/admin/bookings/${id}/${action}/`),
+
+  // Slot management (view / edit / deactivate / delete published availability).
+  getAdminSlots: (params?: { type?: string; active?: 'true' | 'false'; from?: string; to?: string; page?: number }) =>
+    api.get('/bookings/admin/slots/', { params }),
+  updateSlot: (id: number, data: { capacity?: number; location?: string; title?: string; is_active?: boolean }) =>
+    api.patch(`/bookings/admin/slots/${id}/`, data),
+  deleteSlot: (id: number) =>
+    api.delete(`/bookings/admin/slots/${id}/`),
 };
 
 // ── PORTAL ────────────────────────────────────────────────

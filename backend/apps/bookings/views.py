@@ -15,6 +15,7 @@ from apps.core.ratelimit import ratelimit
 
 from .models import AvailabilitySlot, Booking
 from .serializers import (
+    AdminSlotSerializer,
     AvailabilitySlotSerializer,
     BookingCreateSerializer,
     BookingSerializer,
@@ -259,3 +260,46 @@ class AdminBookingActionView(APIView):
         elif action == 'cancel':
             calendar.sync_booking_cancelled(booking)
         return Response(BookingSerializer(booking).data)
+
+
+class AdminSlotListView(generics.ListAPIView):
+    """GET /api/v1/bookings/admin/slots/?type=&active=&from=&to= — every
+    published slot (incl. inactive/past), paginated, so the console can view
+    and manage availability (the admin could previously only generate slots)."""
+    serializer_class = AdminSlotSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        qs = AvailabilitySlot.objects.order_by('-date', '-start_time')
+        p = self.request.query_params
+        if p.get('type'):
+            qs = qs.filter(visit_type=p['type'])
+        active = p.get('active')
+        if active in ('true', 'false'):
+            qs = qs.filter(is_active=(active == 'true'))
+        if p.get('from'):
+            qs = qs.filter(date__gte=p['from'])
+        if p.get('to'):
+            qs = qs.filter(date__lte=p['to'])
+        return qs
+
+
+class AdminSlotDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PATCH/DELETE /api/v1/bookings/admin/slots/<id>/ — edit (capacity,
+    location, title, is_active) or delete a slot. Deleting is refused when any
+    booking references the slot (CASCADE would erase that history); deactivate
+    instead."""
+    queryset = AvailabilitySlot.objects.all()
+    serializer_class = AdminSlotSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
+
+    def destroy(self, request, *args, **kwargs):
+        slot = self.get_object()
+        booked = slot.bookings.count()
+        if booked:
+            return Response(
+                {'detail': f'No se puede eliminar: {booked} reserva(s) asociada(s). '
+                           f'Desactive el horario para ocultarlo sin perder el historial.'},
+                status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)

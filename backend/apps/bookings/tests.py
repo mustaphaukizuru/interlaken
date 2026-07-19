@@ -309,3 +309,57 @@ class AdminBookingsConsoleTests(APITestCase):
         resp = self.client.post(
             reverse('bookings-admin-action', args=[self.booking.id, 'frobnicate']))
         self.assertEqual(resp.status_code, 400)
+
+
+class AdminSlotManagementTests(APITestCase):
+    """Admin can view / edit / deactivate / delete published slots (new)."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email='asm@x.mx', password='x', first_name='A', last_name='D',
+            role=User.Role.ADMIN, is_staff=True)
+        self.client.force_authenticate(self.admin)
+        self.slot = AvailabilitySlot.objects.create(
+            visit_type='open_class', date=timezone.now().date() + timedelta(days=5),
+            start_time='10:00', end_time='11:00', capacity=5, location='Auditorio')
+
+    def test_list_is_paginated_and_admin_only(self):
+        AvailabilitySlot.objects.create(
+            visit_type='individual', date=timezone.now().date() + timedelta(days=6),
+            start_time='09:00', end_time='09:30', capacity=1, is_active=False)
+        resp = self.client.get(reverse('bookings-admin-slots'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('results', resp.data)
+        self.assertEqual(resp.data['count'], 2)   # inactive included
+        self.client.force_authenticate(None)
+        self.assertIn(self.client.get(reverse('bookings-admin-slots')).status_code, (401, 403))
+
+    def test_deactivate_slot(self):
+        url = reverse('bookings-admin-slot-detail', args=[self.slot.id])
+        resp = self.client.patch(url, {'is_active': False}, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.slot.refresh_from_db()
+        self.assertFalse(self.slot.is_active)
+
+    def test_capacity_cannot_drop_below_booked(self):
+        Booking.objects.create(slot=self.slot, parent_name='A', parent_email='a@x.mx',
+                               parent_phone='5', num_attendees=3,
+                               status=Booking.Status.CONFIRMED)
+        url = reverse('bookings-admin-slot-detail', args=[self.slot.id])
+        resp = self.client.patch(url, {'capacity': 2}, format='json')
+        self.assertEqual(resp.status_code, 400)
+        # a valid raise still works
+        self.assertEqual(self.client.patch(url, {'capacity': 8}, format='json').status_code, 200)
+
+    def test_delete_empty_slot_ok_but_booked_slot_refused(self):
+        empty = AvailabilitySlot.objects.create(
+            visit_type='individual', date=timezone.now().date() + timedelta(days=7),
+            start_time='09:00', end_time='09:30', capacity=1)
+        self.assertEqual(self.client.delete(
+            reverse('bookings-admin-slot-detail', args=[empty.id])).status_code, 204)
+
+        Booking.objects.create(slot=self.slot, parent_name='A', parent_email='a@x.mx',
+                               parent_phone='5', num_attendees=1)
+        resp = self.client.delete(reverse('bookings-admin-slot-detail', args=[self.slot.id]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertTrue(AvailabilitySlot.objects.filter(pk=self.slot.id).exists())

@@ -212,6 +212,89 @@ function BookingActions({
   );
 }
 
+interface AdminSlot {
+  id: number; visit_type: string; title: string; date: string;
+  start_time: string; end_time: string; capacity: number; location: string;
+  is_active: boolean; booked_count: number; spots_remaining: number; is_full: boolean;
+}
+
+const VISIT_TYPE_LABEL: Record<string, string> = {
+  individual: 'Individual', open_class: 'Puertas Abiertas',
+};
+
+/** View / deactivate / delete published availability slots. */
+function SlotManager() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [deleteFor, setDeleteFor] = useState<AdminSlot | null>(null);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-slots', page],
+    queryFn: async () => toPaged<AdminSlot>((await bookingsApi.getAdminSlots({ page })).data),
+    placeholderData: keepPreviousData,
+  });
+  const slots = data?.results;
+  const count = data?.count ?? 0;
+
+  const toggleActive = useMutation({
+    mutationFn: (s: AdminSlot) => bookingsApi.updateSlot(s.id, { is_active: !s.is_active }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-slots'] }); toast.success('Horario actualizado.'); },
+    onError: () => toast.error('No se pudo actualizar el horario.'),
+  });
+  const del = useMutation({
+    mutationFn: (id: number) => bookingsApi.deleteSlot(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-slots'] }); setDeleteFor(null); toast.success('Horario eliminado.'); },
+    onError: (e: any) => { toast.error(e?.response?.data?.detail ?? 'No se pudo eliminar el horario.'); setDeleteFor(null); },
+  });
+
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (isLoading) return <TableSkeleton />;
+  if (!slots?.length) return <EmptyState icon={CalendarClock} title="Sin horarios" description="Genere disponibilidad con el formulario de arriba." />;
+
+  return (
+    <>
+      <div className="divide-y divide-line">
+        {slots.map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">
+                {format(parseISO(s.date), 'EEE d MMM yyyy', { locale: es })} · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
+              </p>
+              <p className="text-xs text-subtle">
+                {VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type} · {s.booked_count}/{s.capacity} reservas · {s.location || 'Campus'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={s.is_active ? 'success' : 'neutral'}>{s.is_active ? 'Activo' : 'Inactivo'}</Badge>
+              <Button variant="secondary" size="sm" onClick={() => toggleActive.mutate(s)} disabled={toggleActive.isPending}>
+                {s.is_active ? 'Desactivar' : 'Activar'}
+              </Button>
+              <Button variant="ghost" size="sm" className="text-coral-600" onClick={() => setDeleteFor(s)}>
+                Eliminar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="horarios" />
+      <ConfirmDialog
+        open={!!deleteFor}
+        title="¿Eliminar horario?"
+        confirmLabel="Eliminar"
+        loading={del.isPending}
+        onClose={() => setDeleteFor(null)}
+        onConfirm={() => deleteFor && del.mutate(deleteFor.id)}
+        message={
+          <>
+            Se eliminará este horario de forma permanente. Los horarios con
+            reservas no pueden eliminarse — use <span className="font-semibold text-ink">Desactivar</span> para ocultarlos sin perder el historial.
+          </>
+        }
+      />
+    </>
+  );
+}
+
 export default function AdminBookings() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -251,7 +334,14 @@ export default function AdminBookings() {
       </div>
 
       <Card title="Publicar disponibilidad" subtitle="Genere horarios recurrentes para visitas individuales.">
-        <SlotGenerator onDone={() => qc.invalidateQueries({ queryKey: ['admin-bookings'] })} />
+        <SlotGenerator onDone={() => {
+          qc.invalidateQueries({ queryKey: ['admin-bookings'] });
+          qc.invalidateQueries({ queryKey: ['admin-slots'] });
+        }} />
+      </Card>
+
+      <Card title="Horarios publicados" subtitle="Active, desactive o elimine los horarios de disponibilidad.">
+        <SlotManager />
       </Card>
 
       <Card
