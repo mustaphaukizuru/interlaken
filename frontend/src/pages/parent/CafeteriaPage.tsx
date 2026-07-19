@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -13,8 +13,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
+import { Pagination } from '@/components/ui/Pagination';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
+
+const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 
 const txIcon = (type: string) => {
   if (type === 'topup')   return <ArrowUpCircle className="w-4 h-4 text-green-600" />;
@@ -38,11 +41,15 @@ export default function CafeteriaPage() {
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
 
-  // History filters
+  // History filters + pagination
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
   const [filterType, setFilterType] = useState<TypeFilter>('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
+  const [page, setPage] = useState(1);
+
+  // Any filter change resets to the first page (stale page would show empty).
+  useEffect(() => { setPage(1); }, [filterStudent, filterType, filterFrom, filterTo]);
 
   const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
@@ -52,18 +59,25 @@ export default function CafeteriaPage() {
     },
   });
 
-  const { data: transactions, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<CafeteriaTransaction[]>({
-    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo],
+  const { data: txData, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<{
+    results: CafeteriaTransaction[]; count: number;
+  }>({
+    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, page],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTransactions({
         student: filterStudent === 'all' ? undefined : filterStudent,
         type: filterType || undefined,
         from: filterFrom || undefined,
         to: filterTo || undefined,
+        page,
       });
-      return data.results ?? data;
+      const results = data.results ?? data;
+      return { results, count: data.count ?? results.length };
     },
+    placeholderData: keepPreviousData,
   });
+  const transactions = txData?.results;
+  const txCount = txData?.count ?? 0;
 
   const topupMutation = useMutation({
     mutationFn: () =>
@@ -325,7 +339,7 @@ export default function CafeteriaPage() {
         ) : (
           <>
             <p className="mb-3 text-xs text-subtle">
-              {transactions.length} movimiento{transactions.length === 1 ? '' : 's'}
+              {txCount} movimiento{txCount === 1 ? '' : 's'}
               {filtersActive ? ' · filtros aplicados' : ''}
             </p>
             <div className="divide-y divide-cream">
@@ -362,6 +376,8 @@ export default function CafeteriaPage() {
               </div>
             ))}
             </div>
+            <Pagination page={page} pageSize={TX_PAGE_SIZE} count={txCount}
+                        onChange={setPage} itemLabel="movimientos" />
           </>
         )}
       </Card>
