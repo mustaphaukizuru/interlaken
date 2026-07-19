@@ -46,6 +46,19 @@ class TestPublicPreRegistration:
         # Cycle is stamped as "YYYY-YYYY+1" (matches the advertised form cycle).
         assert p.cycle.count('-') == 1 and len(p.cycle) == 9
 
+    def test_public_pre_register_is_rate_limited(self, api_client, settings):
+        # The public form must not accept unbounded anonymous POSTs — each one
+        # creates a row and emails the caller-supplied address + the admin.
+        settings.RATELIMIT_ENABLE = True
+        from django.core.cache import cache
+        cache.clear()
+        codes = [
+            api_client.post(self.url, _payload(email=f'r{i}@test.mx'), format='json').status_code
+            for i in range(7)
+        ]
+        assert codes[:5] == [201] * 5      # 5/m allowed
+        assert 429 in codes[5:]            # then throttled
+
     @pytest.mark.parametrize('grade,expected', [
         ('Preescolar 1°', PreRegistration.Level.PRESCHOOL),
         ('Primaria 4°', PreRegistration.Level.PRIMARY),

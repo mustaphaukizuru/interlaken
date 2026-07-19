@@ -77,6 +77,7 @@ def authorize_registration(request, pk):
     return reg
 
 
+@method_decorator(ratelimit('admissions-submit', '5/m', method='POST'), name='dispatch')
 class PreRegistrationListCreateView(generics.ListCreateAPIView):
     """POST /api/v1/admissions/pre-register/ — Public, no auth.
     GET — Admin-only paginated list for the Admisiones console."""
@@ -206,6 +207,7 @@ class PreRegistrationInviteView(APIView):
         )
 
 
+@method_decorator(ratelimit('admissions-submit', '5/m', method='POST'), name='dispatch')
 class RegistrationListCreateView(generics.ListCreateAPIView):
     """POST /api/v1/admissions/register/ — Start a registration (no auth).
     GET — Admin-only paginated list for the Inscripciones console."""
