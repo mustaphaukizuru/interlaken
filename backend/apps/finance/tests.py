@@ -238,6 +238,23 @@ class TestAdmin:
         assert resp.data["outstanding"] == "3000.00"
         assert resp.data["collection_rate"] == 50.0
 
+    def test_bulk_remind_skips_settled_invoices(self, admin_client):
+        # A "$0.00 saldo" reminder must not go to a paid/cancelled invoice
+        # included in the selection.
+        _schedule()
+        s1, s2 = StudentProfileFactory(), StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        paid = Invoice.objects.get(student=s1, period=PERIOD)
+        unpaid = Invoice.objects.get(student=s2, period=PERIOD)
+        services.mark_invoice_paid(paid)
+
+        resp = admin_client.post(reverse("finance-admin-bulk"), {
+            "action": "remind", "invoice_ids": [paid.id, unpaid.id],
+        }, format="json")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["done"] == 1       # only the unpaid invoice reminded
+        assert resp.data["skipped"] == 1    # the paid invoice skipped
+
     def test_mark_paid_is_audited(self, admin_client, admin_user):
         _schedule()
         student = StudentProfileFactory()

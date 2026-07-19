@@ -308,7 +308,7 @@ export default function RegisterPage() {
                 <Input label="Apellidos" className="text-base min-h-[44px]" value={form.child_last_name} onChange={(e) => set('child_last_name', e.target.value)} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Fecha de nacimiento" type="date" className="text-base min-h-[44px]" value={form.child_dob} onChange={(e) => set('child_dob', e.target.value)} />
+                <Input label="Fecha de nacimiento" type="date" max={new Date().toISOString().slice(0, 10)} className="text-base min-h-[44px]" value={form.child_dob} onChange={(e) => set('child_dob', e.target.value)} />
                 <div>
                   <label htmlFor="grade" className="label">Grado al que aplica</label>
                   <select id="grade" className={selectClass} value={form.grade_applying} onChange={(e) => set('grade_applying', e.target.value)}>

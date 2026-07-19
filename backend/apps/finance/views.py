@@ -310,14 +310,18 @@ class AdminBulkActionView(APIView):
             return Response({'error': 'Acción no válida.'}, status=400)
 
         invoices = Invoice.objects.select_related('student__user').filter(pk__in=ids)
-        done = failed = 0
+        done = failed = skipped = 0
         for invoice in invoices:
             try:
                 if action == 'mark_paid':
                     services.mark_invoice_paid(invoice, reason=reason, admin=request.user)
                 elif action == 'cancel':
                     services.cancel_invoice(invoice, reason=reason, admin=request.user)
-                else:  # remind
+                else:  # remind — only invoices that actually owe money
+                    if (invoice.status == Invoice.Status.CANCELLED
+                            or invoice.balance_due <= 0):
+                        skipped += 1
+                        continue  # don't send a "$0.00 saldo" reminder
                     services._notify_invoice(
                         invoice, 'Recordatorio de colegiatura',
                         (f'Le recordamos que la colegiatura de '
@@ -327,4 +331,5 @@ class AdminBulkActionView(APIView):
                 done += 1
             except ValueError:
                 failed += 1
-        return Response({'action': action, 'done': done, 'failed': failed})
+        return Response({'action': action, 'done': done, 'failed': failed,
+                         'skipped': skipped})

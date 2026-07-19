@@ -109,6 +109,7 @@ export default function PreRegisterPage() {
             <Input
               label="Fecha de nacimiento"
               type="date"
+              max={new Date().toISOString().slice(0, 10)}
               error={errors.child_dob?.message}
               className="text-base min-h-[44px]"
               {...register('child_dob')}

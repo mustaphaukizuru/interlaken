@@ -1,8 +1,21 @@
+from datetime import timedelta
+
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
 
 from .models import OpenSchoolDay, PreRegistration, Registration, RegistrationDocument
+
+
+def _validate_child_dob(value):
+    """A child's date of birth can't be in the future, and a school applicant
+    isn't plausibly older than ~25 years — both public forms accepted anything."""
+    today = timezone.localdate()
+    if value > today:
+        raise serializers.ValidationError('La fecha de nacimiento no puede ser futura.')
+    if value < today - timedelta(days=365 * 25):
+        raise serializers.ValidationError('La fecha de nacimiento no es válida.')
+    return value
 
 
 def current_school_cycle() -> str:
@@ -34,7 +47,7 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
     deriving `level` from the grade, and stamping the running cycle.
     """
     child_name       = serializers.CharField(max_length=200)
-    child_dob        = serializers.DateField()
+    child_dob        = serializers.DateField(validators=[_validate_child_dob])
     grade_applying   = serializers.CharField(max_length=30)
     parent_name      = serializers.CharField(max_length=200)
     email            = serializers.EmailField()
@@ -179,6 +192,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'status', 'submitted_at', 'created_at', 'documents',
                             'privacy_accepted_at']
+
+    def validate_child_dob(self, value):
+        return _validate_child_dob(value)
 
     def _can_read_medical(self, instance) -> bool:
         """Medical fields are readable only by the owning applicant (valid session)

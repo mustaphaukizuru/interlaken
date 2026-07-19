@@ -46,6 +46,11 @@ class TestPublicPreRegistration:
         # Cycle is stamped as "YYYY-YYYY+1" (matches the advertised form cycle).
         assert p.cycle.count('-') == 1 and len(p.cycle) == 9
 
+    def test_future_child_dob_is_rejected(self, api_client):
+        resp = api_client.post(self.url, _payload(child_dob='2099-01-01'), format='json')
+        assert resp.status_code == 400
+        assert 'child_dob' in resp.json()
+
     def test_public_pre_register_is_rate_limited(self, api_client, settings):
         # The public form must not accept unbounded anonymous POSTs — each one
         # creates a row and emails the caller-supplied address + the admin.
