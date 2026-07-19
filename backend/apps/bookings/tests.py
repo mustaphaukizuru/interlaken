@@ -263,3 +263,49 @@ class SlotGeneratorWeekdayTests(APITestCase):
         py_weekdays = {s.date.weekday() for s in AvailabilitySlot.objects.all()}
         # Every generated slot must fall on Monday (python weekday()==0).
         self.assertEqual(py_weekdays, {0})
+
+
+class AdminBookingsConsoleTests(APITestCase):
+    """Admin bookings list (now paginated) + status actions — previously untested."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email='abk@x.mx', password='x', first_name='A', last_name='D',
+            role=User.Role.ADMIN, is_staff=True)
+        self.slot = AvailabilitySlot.objects.create(
+            visit_type='individual', date=timezone.now().date() + timedelta(days=3),
+            start_time='09:00', end_time='09:30', capacity=5, location='Campus')
+        self.booking = Booking.objects.create(
+            slot=self.slot, parent_name='Ana', parent_email='ana@x.mx',
+            parent_phone='5', num_attendees=1)
+
+    def test_admin_list_is_paginated_envelope(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get(reverse('bookings-admin-list'))
+        self.assertEqual(resp.status_code, 200)
+        # DRF paginated envelope, not a bare list.
+        self.assertIn('count', resp.data)
+        self.assertIn('results', resp.data)
+        self.assertEqual(resp.data['count'], 1)
+
+    def test_admin_list_requires_admin(self):
+        self.assertIn(self.client.get(reverse('bookings-admin-list')).status_code, (401, 403))
+
+    def test_admin_list_filters_by_status(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get(reverse('bookings-admin-list'), {'status': 'cancelled'})
+        self.assertEqual(resp.data['count'], 0)  # the booking isn't cancelled
+
+    def test_admin_action_confirm_sets_status(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.post(
+            reverse('bookings-admin-action', args=[self.booking.id, 'confirm']))
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.Status.CONFIRMED)
+
+    def test_admin_action_invalid_is_400(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.post(
+            reverse('bookings-admin-action', args=[self.booking.id, 'frobnicate']))
+        self.assertEqual(resp.status_code, 400)

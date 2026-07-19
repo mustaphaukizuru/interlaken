@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from rest_framework import permissions, status
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -200,28 +200,34 @@ class BookingCancelView(APIView):
         return Response(BookingSerializer(booking).data)
 
 
-class AdminBookingsView(APIView):
-    """GET /api/v1/bookings/admin/bookings/?type=&status=&date=&q= — manage bookings."""
+class AdminBookingsView(generics.ListAPIView):
+    """GET /api/v1/bookings/admin/bookings/?type=&status=&date=&q= — manage
+    bookings. Paginated (DRF PageNumberPagination) so the admin console's pager
+    is real: previously this returned every booking in one list, making the
+    frontend pager inert and the counts wrong."""
+    serializer_class = BookingSerializer
     permission_classes = [IsAdmin]
 
-    def get(self, request):
-        qs = Booking.objects.select_related('slot').all()
-        visit_type = request.query_params.get('type')
+    def get_queryset(self):
+        qs = (Booking.objects.select_related('slot')
+              .order_by('-slot__date', '-slot__start_time', '-id'))
+        params = self.request.query_params
+        visit_type = params.get('type')
         if visit_type:
             qs = qs.filter(slot__visit_type=visit_type)
-        booking_status = request.query_params.get('status')
+        booking_status = params.get('status')
         if booking_status:
             qs = qs.filter(status=booking_status)
-        date = request.query_params.get('date')
+        date = params.get('date')
         if date:
             qs = qs.filter(slot__date=date)
-        q = request.query_params.get('q')
+        q = params.get('q')
         if q:
             # Powers the admin Ctrl+K palette.
             qs = qs.filter(
                 Q(parent_name__icontains=q) | Q(parent_email__icontains=q)
                 | Q(child_name__icontains=q))
-        return Response(BookingSerializer(qs, many=True).data)
+        return qs
 
 
 class AdminBookingActionView(APIView):
