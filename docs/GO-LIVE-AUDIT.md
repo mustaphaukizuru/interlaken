@@ -10,7 +10,7 @@ Baseline: backend test suite green (~340 tests); frontend `tsc` clean; `eslint` 
 
 ### ✅ Fixed in the 2026-07-18 pass (with tests)
 
-- **Major** — slot-generator weekday off-by-one (#12); payment history showed paid as "Pendiente" (#7); public pre-register/register unthrottled (#3); announcement publish now fans out in-app notifications to the audience (#16, in-app only — email/push blast deferred to a batched cron).
+- **Major** — slot-generator weekday off-by-one (#12); payment history showed paid as "Pendiente" (#7); public pre-register/register unthrottled (#3); announcement publish now fans out in-app notifications to the audience (#16, in-app only — email/push blast deferred to a batched cron); **parent cafeteria history now paginated**; **admin bookings list paginated (pager was inert)** + first tests for the admin booking endpoints; **admin slot management built (view/edit/deactivate/delete)** with tests.
 - **Minor/polish** — child DOB future/implausible dates rejected on both public forms (+ `max=today` inputs); finance bulk "remind" skips paid/cancelled invoices; cookie-consent "Más información" → Aviso de Privacidad; stale "40 años" SEO copy replaced with drift-proof phrasing.
 
 ### ⚠️ Needs a client decision (not fixed — would be a blind guess)
