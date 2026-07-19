@@ -21,7 +21,10 @@ function RotateCcw({ className }: { className?: string }) {
 }
 
 const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
-  completed:  { label: 'Completado',  variant: 'success', icon: CheckCircle },
+  // Key MUST match the backend Payment.Status values ('success', not
+  // 'completed') — otherwise a paid payment falls through to the 'pending'
+  // default and shows "Pendiente".
+  success:    { label: 'Completado',  variant: 'success', icon: CheckCircle },
   pending:    { label: 'Pendiente',   variant: 'warning', icon: Clock },
   failed:     { label: 'Fallido',     variant: 'error',   icon: XCircle },
   processing: { label: 'Procesando',  variant: 'info',    icon: Clock },
