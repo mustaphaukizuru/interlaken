@@ -137,7 +137,7 @@ export default function LoginPage() {
 
             <div className="rounded-[22px] border border-line bg-white px-6 py-8 shadow-[0_20px_50px_-24px_rgba(64,26,142,0.35)] sm:px-7 sm:py-9">
               <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">Iniciar Sesión</h2>
-              <p className="mb-6 mt-1 text-center text-[13px] text-muted">Bienvenido de vuelta a Interlaken</p>
+              <p className="mb-6 mt-1 text-center text-[13px] text-muted">Acceso para familias y personal del colegio</p>
 
               {alertMsg && (
                 <div className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark">
