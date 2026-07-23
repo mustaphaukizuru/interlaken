@@ -1,0 +1,40 @@
+# Render Blueprint — one Docker web service on the free plan.
+# After first deploy: fill the `sync:false` vars in the Render dashboard with your
+# Supabase connection + the app's public URL. See docs/DEPLOY_RENDER.md.
+services:
+  - type: web
+    name: interlaken
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/v1/health/
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: SECRET_KEY
+        generateValue: true          # Render generates a strong secret
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # ── Supabase Postgres (set these in the dashboard) ──────────────────
+      - key: DB_ENGINE
+        value: django.db.backends.postgresql
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        sync: false                  # postgres
+      - key: DB_USER
+        sync: false                  # postgres.<project-ref>  (Supabase pooler user)
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false                  # aws-0-<region>.pooler.supabase.com
+      # ── Public URL wiring (set after Render assigns the domain) ─────────
+      - key: ALLOWED_HOSTS
+        sync: false                  # interlaken.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false                  # https://interlaken.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false                  # https://interlaken.onrender.com
+      - key: FRONTEND_URL
+        sync: false                  # https://interlaken.onrender.com

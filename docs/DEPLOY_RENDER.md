@@ -1,0 +1,98 @@
+# Deploy free: Render (web) + Supabase (Postgres)
+
+One Render **Docker** web service (free) serves the API **and** the React SPA
+(whitenoise); **Supabase** is the free Postgres; **GitHub Actions** runs the
+Loyverse sync so balances stay fresh even while the free web service sleeps.
+
+Repo files that make this work: `Dockerfile`, `render.yaml`, `backend/entrypoint.sh`,
+`.dockerignore`, `.github/workflows/loyverse-sync.yml`. The Django settings are
+already env-driven (DB, hosts, secret) — no code changes needed to switch to Postgres.
+
+---
+
+## 1 · Supabase — create the database
+1. **New project** → name it, pick a **region near Mexico** (e.g. `us-east-1`), set a
+   strong **database password** and save it.
+2. Wait ~2 min for provisioning.
+3. **Project Settings → Database → Connection pooler → Session mode** — copy:
+
+   | Field | Value |
+   |---|---|
+   | Host | `aws-0-<region>.pooler.supabase.com` |
+   | Port | `5432` |
+   | Database | `postgres` |
+   | User | `postgres.<project-ref>` |
+   | Password | *(the one you set)* |
+
+   > ⚠️ Use the **pooler** host (IPv4). The "Direct connection" `db.<ref>.supabase.co`
+   > is IPv6-only and Render can't reach it.
+
+## 2 · Push the repo
+Push the branch you want Render to deploy (these deploy files must be on it).
+
+## 3 · Render — create the web service
+1. **New → Blueprint** → connect the GitHub repo → pick the branch → Render reads
+   `render.yaml` and proposes the **interlaken** Docker service (free).
+2. Fill the env vars it asks for (`sync:false` in the blueprint):
+   - `DB_NAME` = `postgres`
+   - `DB_USER` = `postgres.<project-ref>`
+   - `DB_PASSWORD` = *(Supabase password)*
+   - `DB_HOST` = `aws-0-<region>.pooler.supabase.com`
+   - **First-deploy admin** (Render free has no shell): `DJANGO_SUPERUSER_EMAIL`,
+     `DJANGO_SUPERUSER_PASSWORD`, `DJANGO_SUPERUSER_FIRST_NAME`,
+     `DJANGO_SUPERUSER_LAST_NAME`.
+   - Leave `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` / `CORS_ALLOWED_ORIGINS` /
+     `FRONTEND_URL` blank for now (step 4).
+3. **Create** → Render builds the image (~6 min) and boots (entrypoint runs
+   `migrate` + creates the superuser). Note the assigned URL, e.g.
+   `https://interlaken.onrender.com`.
+
+## 4 · Wire the public URL
+In the Render service → **Environment**, set (uses the real URL from step 3), which
+triggers a redeploy:
+```
+ALLOWED_HOSTS=interlaken.onrender.com
+CSRF_TRUSTED_ORIGINS=https://interlaken.onrender.com
+CORS_ALLOWED_ORIGINS=https://interlaken.onrender.com
+FRONTEND_URL=https://interlaken.onrender.com
+```
+
+## 5 · Verify
+- `https://<url>/api/v1/health/` → `{"status":"ok", ...}`
+- `https://<url>/` → the app · `https://<url>/admin/` → log in as the superuser.
+- Then **delete the `DJANGO_SUPERUSER_*` env vars** (no longer needed).
+
+## 6 · Load the data
+The prod DB starts empty. Populate it against the **prod DB** (run once) — either
+locally with the Supabase env exported, or as a one-off `workflow_dispatch` run:
+```
+python manage.py import_loyverse_students   # roster
+python manage.py link_loyverse --commit     # roster ↔ Loyverse
+python manage.py sync_balances              # seed opening balances (once)
+```
+
+## 7 · Loyverse sync cron (GitHub Actions)
+Repo → **Settings → Secrets and variables → Actions → New secret** for each:
+`SECRET_KEY` (copy Render's generated one), `DB_NAME`, `DB_USER`, `DB_PASSWORD`,
+`DB_HOST`, `DB_PORT` (`5432`), `ALLOWED_HOSTS`, `LOYVERSE_API_TOKEN`, and
+**`CAFETERIA_SYNC_PURCHASES_SINCE`** = your go-live datetime (ISO-8601). The workflow
+then runs every 30 min (edit the cron in the workflow file).
+
+> ⚠️ Set `CAFETERIA_SYNC_PURCHASES_SINCE` **before** the first purchase sync or it
+> backfills history and double-debits balances.
+
+## 8 · Google OAuth (when ready)
+Google Cloud Console → your OAuth client → **add redirect URI**
+`https://<url>/auth/google/callback/`. Set in Render: `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI=https://<url>/auth/google/callback/`.
+
+## Limits to expect (free)
+- **Render free sleeps** after ~15 min idle → first hit is a ~30–60s cold start.
+  The Actions cron keeps the *data* fresh regardless.
+- **Supabase free pauses** after ~1 week with zero DB activity — the 30-min cron
+  keeps it awake.
+- **Custom domain** (e.g. `colegiointerlaken.…`) — hosting is free; the domain name
+  isn't. If you own it (GoDaddy), point a CNAME to Render (free) and add it to
+  `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`.
+- Payments/WhatsApp stay in sandbox until you set their env vars + register the
+  webhooks at `https://<url>/api/v1/payments/webhook/...`.

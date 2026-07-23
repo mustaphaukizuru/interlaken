@@ -14,6 +14,9 @@ mysqlclient==2.2.4
 # Pure-Python MySQL driver installed as MySQLdb in config/__init__.py — the
 # actual runtime driver on cPanel and in CI (no libmysqlclient build needed).
 PyMySQL==1.1.1
+# PostgreSQL driver — the Render + Supabase free-tier deploy sets
+# DB_ENGINE=django.db.backends.postgresql.
+psycopg2-binary==2.9.9
 
 # Auth
 social-auth-app-django==5.4.1
@@ -36,8 +39,9 @@ httpx==0.27.0
 google-api-python-client==2.137.0
 google-auth==2.32.0
 
-# Payments
-globalpayments-api==1.0.0
+# Payments: Global Payments + Banorte are custom HPP redirect + HMAC-signed
+# webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
+# globalpayments-api==1.0.0 pin was unused and isn't even on PyPI.)
 
 # Email
 django-anymail==10.3

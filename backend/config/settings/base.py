@@ -135,8 +135,10 @@ CSP_ENABLED = env.bool('CSP_ENABLED', default=True)
 CSP_REPORT_ONLY = env.bool('CSP_REPORT_ONLY', default=False)
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET')
+# Default '' so the app boots without Google OAuth configured (email/password
+# login still works); social-auth's Google backend simply stays inactive until set.
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID', default='')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
@@ -214,6 +216,11 @@ FIELD_ENCRYPTION_KEY = env('FIELD_ENCRYPTION_KEY', default='')
 # ── CORS ──────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True
+
+# HTTPS origins Django trusts for unsafe (POST) requests — needed by the Django
+# admin form on the deployed domain (the same-origin SPA + JWT API don't need
+# it). Comma-separated, full scheme, e.g. https://interlaken.onrender.com
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 # ── STATIC & MEDIA ────────────────────────────────────────
 STATIC_URL = '/static/'
