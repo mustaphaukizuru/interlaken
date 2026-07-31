@@ -38,3 +38,16 @@ CACHES = {
     },
 }
 RATELIMIT_USE_CACHE = 'ratelimit'
+
+# ── WhiteNoise: serve the SPA's public assets at the web ROOT ──────────────
+# The built React app references public files by root-absolute paths — campus
+# photos and the logo as /assets/*.webp, plus /icon-192.png, /favicon.ico,
+# /site.webmanifest, /robots.txt. Vite's base='/static/' only rewrites *bundled*
+# (hashed) asset URLs, NOT these hardcoded public paths, so in production they
+# 404 past whitenoise's /static/ handler and fall through to the SPA catch-all —
+# which returns index.html (a 200 of the wrong bytes), leaving every image blank.
+# WHITENOISE_ROOT serves the built tree (Dockerfile copies dist/ → ./static/) at
+# the root URL too, so /assets/foo.webp and /icon-192.png resolve to real files.
+# index.html was removed from ./static/ in the image build, so '/' still falls
+# through to the Django SPA view (this only adds the missing root file routes).
+WHITENOISE_ROOT = BASE_DIR / 'static'
