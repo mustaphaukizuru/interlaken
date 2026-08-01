@@ -1,0 +1,84 @@
+name: Scheduled tasks (finance / cafetería / bookings)
+
+# Free "cron" for the app's recurring jobs, run against Supabase directly so they
+# fire even while the Render free web service is asleep. Without this, tuition is
+# never billed and reminders/alerts never send. GitHub cron is best-effort (a few
+# min of jitter). Public repos get unlimited Action minutes; a private repo gets
+# 2000/mo — these jobs are ~1 min/day, negligible.
+#
+# ⚠️ The email-sending jobs (reminders, low-balance & booking alerts) need the
+# SendGrid secrets (EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD) set, or
+# they'll error on send. generate_invoices / apply_late_fees send no mail.
+
+on:
+  schedule:
+    - cron: '0 9 * * *'    # daily  ~03:00 America/Mexico_City (UTC-6)
+    - cron: '0 8 1 * *'    # monthly 1st ~02:00 CT — invoice generation
+  workflow_dispatch: {}
+
+concurrency:
+  group: scheduled-tasks
+  cancel-in-progress: false
+
+env:
+  DJANGO_SETTINGS_MODULE: config.settings.production
+  SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
+  DB_ENGINE: django.db.backends.postgresql
+  DB_NAME: ${{ secrets.DB_NAME }}
+  DB_USER: ${{ secrets.DB_USER }}
+  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+  DB_HOST: ${{ secrets.DB_HOST }}
+  DB_PORT: ${{ secrets.DB_PORT }}
+  ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+  FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+  EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+  EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+  EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+  DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+
+jobs:
+  # Daily jobs (also run on manual dispatch). Skipped on the monthly cron tick.
+  daily:
+    if: github.event.schedule != '0 8 1 * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Apply late fees (no email)
+        working-directory: backend
+        run: python manage.py apply_late_fees
+      - name: Send tuition reminders
+        working-directory: backend
+        run: python manage.py send_payment_reminders
+      - name: Low-balance cafetería alerts
+        working-directory: backend
+        run: python manage.py low_balance_alerts
+      - name: Visit reminders
+        working-directory: backend
+        run: python manage.py send_booking_reminders
+
+  # Monthly invoice generation — 1st of the month (and on manual dispatch).
+  monthly-invoices:
+    if: github.event.schedule == '0 8 1 * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Generate monthly tuition invoices
+        working-directory: backend
+        run: python manage.py generate_invoices

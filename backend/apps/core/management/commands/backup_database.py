@@ -1,15 +1,17 @@
 """
-backup_database — timestamped DB backup with rotation, for cPanel cron.
+backup_database — timestamped DB backup with rotation.
 
-MySQL (prod)  → gzipped mysqldump (password passed via MYSQL_PWD env, never argv).
-SQLite (dev)  → consistent copy via sqlite3's online backup API.
+Postgres (prod) → gzipped pg_dump (password via PGPASSWORD env, never argv).
+MySQL (legacy)  → gzipped mysqldump (password via MYSQL_PWD env, never argv).
+SQLite (dev)    → consistent copy via sqlite3's online backup API.
 
 Usage:
     python manage.py backup_database [--output-dir DIR] [--keep N]
 
-Cron (see docs/DEPLOYMENT.md §Backups): daily at 02:30, keep 14.
-Restores are documented in the same section — a backup that has never been
-restored is not a backup.
+The production Supabase Postgres DB is also backed up off-site nightly by the
+`db-backup` GitHub Actions workflow (pg_dump → uploaded artifact). This command
+covers local/manual backups and any host with the app + a DB client on PATH.
+Restores: a backup that has never been restored is not a backup.
 """
 import gzip
 import shutil
@@ -45,6 +47,9 @@ class Command(BaseCommand):
         if 'sqlite' in engine:
             target = out_dir / f"db-{stamp}.sqlite3"
             self._backup_sqlite(Path(db['NAME']), target)
+        elif 'postgresql' in engine:
+            target = out_dir / f"db-{stamp}.sql.gz"
+            self._backup_postgres(db, target)
         elif 'mysql' in engine:
             target = out_dir / f"db-{stamp}.sql.gz"
             self._backup_mysql(db, target)
@@ -68,6 +73,28 @@ class Command(BaseCommand):
         finally:
             dst.close()
             src.close()
+
+    def _backup_postgres(self, db: dict, target: Path):
+        pg_dump = shutil.which('pg_dump')
+        if not pg_dump:
+            raise CommandError('pg_dump not found on PATH.')
+        cmd = [
+            pg_dump,
+            '--no-owner', '--no-privileges',
+            f"--host={db.get('HOST') or 'localhost'}",
+            f"--port={db.get('PORT') or '5432'}",
+            f"--username={db['USER']}",
+            db['NAME'],
+        ]
+        import os
+        # Password via PGPASSWORD env, never argv (visible in process list).
+        env = {**os.environ, 'PGPASSWORD': db.get('PASSWORD') or ''}
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, env=env)
+        if proc.returncode != 0:
+            raise CommandError(f'pg_dump failed: {proc.stderr.decode()[:400]}')
+        with gzip.open(target, 'wb') as fh:
+            fh.write(proc.stdout)
 
     def _backup_mysql(self, db: dict, target: Path):
         mysqldump = shutil.which('mysqldump')
