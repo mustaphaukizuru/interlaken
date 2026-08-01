@@ -215,9 +215,15 @@ export const cafeteriaApi = {
   }) =>
     api.get('/cafeteria/transactions/', { params }),
 
-  // Daily spending (purchases) time-series for the caller's students — parent dashboard trend.
-  getSpendingTrend: (days = 30) =>
-    api.get('/cafeteria/spending-trend/', { params: { days } }),
+  // Daily spending (purchases) time-series — optionally scoped to one child.
+  getSpendingTrend: (days = 30, student?: number) =>
+    api.get('/cafeteria/spending-trend/', {
+      params: { days, ...(student ? { student } : {}) },
+    }),
+
+  // Family sets the saldo-bajo warning level for one of their children.
+  updateLowBalanceThreshold: (studentId: number, threshold: number) =>
+    api.patch(`/cafeteria/balance/${studentId}/threshold/`, { threshold }),
 
   requestTopUp: (
     studentId: number,

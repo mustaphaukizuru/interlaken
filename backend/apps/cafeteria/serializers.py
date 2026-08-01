@@ -111,6 +111,13 @@ class BalanceAdjustmentSerializer(serializers.ModelSerializer):
         ]
 
 
+class LowBalanceThresholdSerializer(serializers.Serializer):
+    """Validates a family-set low-balance (saldo bajo) warning level."""
+    threshold = serializers.DecimalField(
+        max_digits=8, decimal_places=2,
+        min_value=Decimal('0.00'), max_value=Decimal('100000.00'))
+
+
 class AdjustmentInputSerializer(serializers.Serializer):
     """Validates a manual adjustment request (signed amount + reason)."""
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)

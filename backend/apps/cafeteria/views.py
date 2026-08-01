@@ -23,6 +23,7 @@ from .serializers import (
     BalanceAdjustmentSerializer,
     CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
+    LowBalanceThresholdSerializer,
     LoyverseProfileSerializer,
     RefundInputSerializer,
     TopUpLogSerializer,
@@ -147,6 +148,13 @@ class MySpendingTrendView(APIView):
         else:
             students = StudentProfile.objects.none()
 
+        # Optional per-child scoping (multi-kid families) — `students` is already
+        # family-scoped, so an id outside the family yields an empty queryset
+        # (no cross-family leakage).
+        student_id = request.query_params.get('student')
+        if student_id:
+            students = students.filter(id=student_id)
+
         today = timezone.localdate()
         start = today - timedelta(days=days - 1)
 
@@ -174,6 +182,33 @@ class MySpendingTrendView(APIView):
             'average': round(total / days, 2) if days else 0.0,
             'series': series,
         })
+
+
+class UpdateLowBalanceThresholdView(APIView):
+    """PATCH /api/v1/cafeteria/balance/<student_pk>/threshold/  ``{threshold}``
+
+    Lets a family set the saldo-bajo warning level for their own child (default
+    $50). Scoped: a parent/student may only change their own children's
+    threshold; admins may change any.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, student_pk):
+        user = request.user
+        student = get_object_or_404(StudentProfile, pk=student_pk)
+
+        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+            if not student.parents.filter(pk=user.pk).exists():
+                return Response({'error': 'No autorizado para este alumno.'}, status=403)
+        elif user.role != User.Role.ADMIN:
+            return Response({'error': 'No autorizado.'}, status=403)
+
+        serializer = LowBalanceThresholdSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
+        balance.low_balance_threshold = serializer.validated_data['threshold']
+        balance.save(update_fields=['low_balance_threshold'])
+        return Response(CafeteriaBalanceSerializer(balance).data)
 
 
 @method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')
