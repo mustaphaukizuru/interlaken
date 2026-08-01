@@ -55,6 +55,22 @@ def _jsonable(value):
     return value
 
 
+# Fields whose plaintext must never be persisted into the (unencrypted) audit
+# log — e.g. Fernet-encrypted medical data. `.values()`/`getattr` yield the
+# DECRYPTED value, so change detection still works in memory, but the stored
+# `changes` payload keeps only a redaction marker (who / when / which-field —
+# never the value). Without this, PHI is re-exposed in the DB and every backup
+# (IK-LEGAL B4 / LFPDPPP), defeating EncryptedTextField at-rest protection.
+_REDACTED = '[redacted]'
+
+
+def _redact(field, value, sensitive):
+    """Return the stored representation for one field value, masking PHI."""
+    if field in sensitive and value not in (None, ''):
+        return _REDACTED
+    return _jsonable(value)
+
+
 def record(action, instance, changes=None, *, actor=None, actor_label='', context=''):
     """Write one immutable AuditLog row for a mutation on `instance`."""
     from .models import AuditLog
@@ -93,9 +109,14 @@ class AuditActorMiddleware:
 _TRACKED = {}
 
 
-def register_audit(model, fields, context_label=''):
-    """Auto-record create/update(diff)/delete on `model` for `fields`."""
-    _TRACKED[model] = (list(fields), context_label)
+def register_audit(model, fields, context_label='', sensitive=()):
+    """Auto-record create/update(diff)/delete on `model` for `fields`.
+
+    `sensitive` names fields whose values must not be persisted in cleartext
+    (e.g. encrypted medical data): change detection still runs, but the stored
+    diff keeps only a redaction marker in place of the old/new values.
+    """
+    _TRACKED[model] = (list(fields), context_label, set(sensitive))
     uid = f'audit:{model._meta.label}'
     pre_save.connect(_pre_save, sender=model, dispatch_uid=uid + ':pre')
     post_save.connect(_post_save, sender=model, dispatch_uid=uid + ':post')
@@ -118,15 +139,15 @@ def _pre_save(sender, instance, **kwargs):
     if not instance.pk:
         instance._audit_old = None
         return
-    fields, _ = _TRACKED[sender]
+    fields, _, _ = _TRACKED[sender]
     instance._audit_old = sender.objects.filter(pk=instance.pk).values(*fields).first()
 
 
 def _post_save(sender, instance, created, **kwargs):
-    fields, label = _TRACKED[sender]
+    fields, label, sensitive = _TRACKED[sender]
     if created:
         record('create', instance,
-               {f: [None, _jsonable(getattr(instance, f))] for f in fields},
+               {f: [None, _redact(f, getattr(instance, f), sensitive)] for f in fields},
                context=label)
         return
     old = getattr(instance, '_audit_old', None) or {}
@@ -134,13 +155,13 @@ def _post_save(sender, instance, created, **kwargs):
     for f in fields:
         new = getattr(instance, f)
         if old.get(f) != new:
-            diff[f] = [_jsonable(old.get(f)), _jsonable(new)]
+            diff[f] = [_redact(f, old.get(f), sensitive), _redact(f, new, sensitive)]
     if diff:
         record('update', instance, diff, context=label)
 
 
 def _post_delete(sender, instance, **kwargs):
-    _, label = _TRACKED[sender]
+    _, label, _ = _TRACKED[sender]
     record('delete', instance, context=label)
 
 
@@ -172,7 +193,8 @@ def connect_default_tracking():
     register_audit(StudentProfile, ['grade', 'group', 'loyverse_id', 'is_active'],
                    'student.personal')
     register_audit(Registration, ['blood_type', 'allergies', 'medical_notes'],
-                   'student.medical')
+                   'student.medical',
+                   sensitive=['blood_type', 'allergies', 'medical_notes'])
     # Role + permission changes.
     register_audit(User, ['role', 'is_staff', 'is_superuser', 'is_active'],
                    'account.permission')

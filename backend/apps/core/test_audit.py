@@ -106,3 +106,33 @@ class TestMinorAndRoleDiffs:
         entry = _logs_for(student).latest("created_at")
         assert entry.actor_id == admin.id
         assert entry.actor_label == admin.email
+
+
+class TestMedicalRedaction:
+    """PHI (encrypted medical fields) must never land in the plain audit log —
+    the diff records that a change happened, never the value (IK-LEGAL B4)."""
+
+    BASE = {
+        "child_first_name": "Niño", "child_last_name": "Prueba", "child_dob": "2018-05-01",
+        "level": "primaria", "grade_applying": "1° Primaria",
+        "parent1_name": "Madre", "parent1_email": "madre@test.mx", "parent1_phone": "5512345678",
+    }
+
+    def test_create_redacts_medical_values(self):
+        from apps.admissions.models import Registration
+        reg = Registration.objects.create(**self.BASE, blood_type="O+", allergies="Penicilina")
+        entry = _logs_for(reg).filter(action="create").latest("created_at")
+        assert entry.changes["blood_type"] == [None, "[redacted]"]
+        assert entry.changes["allergies"] == [None, "[redacted]"]
+        blob = json.dumps(entry.changes)
+        assert "O+" not in blob and "Penicilina" not in blob
+
+    def test_update_redacts_both_sides(self):
+        from apps.admissions.models import Registration
+        reg = Registration.objects.create(**self.BASE, blood_type="O+")
+        reg.blood_type = "A-"
+        reg.save()
+        entry = _logs_for(reg).filter(action="update").latest("created_at")
+        assert entry.changes["blood_type"] == ["[redacted]", "[redacted]"]
+        blob = json.dumps(entry.changes)
+        assert "O+" not in blob and "A-" not in blob
