@@ -92,10 +92,13 @@ def _audience_roles():
     if _AUDIENCE_ROLES is None:
         from apps.accounts.models import User
         from apps.portal.models import Announcement
+        # Families are a merged parent/student account, so PARENTS- and
+        # STUDENTS-targeted comunicados both fan out to every family login
+        # (either role) — mirroring audiences_for_user on the read side.
         _AUDIENCE_ROLES = {
             Announcement.Audience.ALL:      [User.Role.PARENT, User.Role.STUDENT, User.Role.STAFF],
-            Announcement.Audience.PARENTS:  [User.Role.PARENT],
-            Announcement.Audience.STUDENTS: [User.Role.STUDENT],
+            Announcement.Audience.PARENTS:  [User.Role.PARENT, User.Role.STUDENT],
+            Announcement.Audience.STUDENTS: [User.Role.PARENT, User.Role.STUDENT],
             Announcement.Audience.STAFF:    [User.Role.STAFF],
         }
     return _AUDIENCE_ROLES

@@ -46,14 +46,24 @@ class TestMarkRead:
         assert AnnouncementRead.objects.filter(
             announcement=ann, user=parent_user).count() == 1
 
-    def test_audience_guard(self, api_client, student_user):
-        """A student cannot record a read on a parents-only circular."""
+    def test_audience_guard(self, api_client):
+        """Staff can't record a read on a parents-only circular (wrong audience);
+        a family (student-role) account CAN — parent/student are merged."""
         parents_only = _announcement(audience=Announcement.Audience.PARENTS)
-        api_client.force_authenticate(student_user)
+
+        staff = UserFactory(role=User.Role.STAFF)
+        api_client.force_authenticate(staff)
         resp = api_client.post(MARK_URL, {'ids': [parents_only.id]}, format='json')
         assert resp.status_code == 200
         assert resp.json()['marked'] == 0
         assert AnnouncementRead.objects.count() == 0
+
+        # A family (student-role) account sees parent-targeted comunicados.
+        student = UserFactory(role=User.Role.STUDENT)
+        api_client.force_authenticate(student)
+        assert api_client.post(
+            MARK_URL, {'ids': [parents_only.id]}, format='json'
+        ).json()['marked'] == 1
 
     def test_inactive_not_recorded(self, api_client, parent_user):
         inactive = _announcement(is_active=False)

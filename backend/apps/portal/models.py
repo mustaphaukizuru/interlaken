@@ -93,3 +93,32 @@ class AnnouncementRead(models.Model):
 
     def __str__(self):
         return f'{self.user.email} → {self.announcement_id}'
+
+
+class AnnouncementComment(models.Model):
+    """A reply from a family (or staff) on a comunicado.
+
+    Families are a merged parent/student account (a self-guardian student is in
+    its own ``parents`` set), so any authenticated family member who can see the
+    comunicado can reply. Comments are soft-moderated: an admin can hide one
+    (``is_hidden``) without deleting the thread. ``author`` is SET_NULL so
+    removing a user never erases the discussion.
+    """
+    announcement = models.ForeignKey(
+                       Announcement, on_delete=models.CASCADE, related_name='comments')
+    author       = models.ForeignKey(
+                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+                       related_name='announcement_comments')
+    body         = models.TextField()
+    is_hidden    = models.BooleanField(default=False)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Comentario de comunicado'
+        verbose_name_plural = 'Comentarios de comunicados'
+        indexes = [models.Index(fields=['announcement', 'created_at'])]
+
+    def __str__(self):
+        who = self.author.email if self.author else 'anónimo'
+        return f'{who} → {self.announcement_id}'

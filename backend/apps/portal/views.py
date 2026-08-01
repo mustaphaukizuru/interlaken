@@ -3,7 +3,8 @@ Portal views: role-aware dashboard, announcements, notifications.
 """
 import logging
 
-from django.db.models import Sum
+from django.db.models import Count, Q, Sum
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,26 +14,31 @@ from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
 
-from .models import Announcement, AnnouncementRead, Notification
+from .models import (Announcement, AnnouncementComment, AnnouncementRead,
+                     Notification)
 from .services import fanout_announcement
-from .serializers import (AnnouncementAdminSerializer, AnnouncementSerializer,
-                          NotificationSerializer)
-
-# `User.Role` values are singular (`parent`) while `Announcement.Audience`
-# values are plural (`parents`); map between them so audience filters match.
-ROLE_TO_AUDIENCE = {
-    User.Role.PARENT:  Announcement.Audience.PARENTS,
-    User.Role.STUDENT: Announcement.Audience.STUDENTS,
-    User.Role.STAFF:   Announcement.Audience.STAFF,
-}
+from .serializers import (AnnouncementAdminSerializer, AnnouncementCommentSerializer,
+                          AnnouncementSerializer, NotificationSerializer)
 
 
 def audiences_for_user(user):
-    """Return the announcement audiences visible to `user` (always includes 'all')."""
+    """Announcement audiences visible to ``user`` (always includes 'all').
+
+    Families are a merged parent/student login (a self-guardian student is in
+    its own ``parents`` set), so a family account sees BOTH parent- and
+    student-targeted comunicados regardless of the single role it carries —
+    otherwise a parent-role family silently misses 'Alumnos' avisos and a
+    student-role family misses 'Padres' ones. Staff/admin oversee every audience.
+    """
     audiences = [Announcement.Audience.ALL]
-    mapped = ROLE_TO_AUDIENCE.get(user.role)
-    if mapped:
-        audiences.append(mapped)
+    role = getattr(user, 'role', None)
+    if role in (User.Role.PARENT, User.Role.STUDENT):
+        audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS]
+    elif role == User.Role.STAFF:
+        audiences.append(Announcement.Audience.STAFF)
+    elif role == User.Role.ADMIN:
+        audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS,
+                      Announcement.Audience.STAFF]
     return audiences
 
 
@@ -133,7 +139,50 @@ class AnnouncementListView(generics.ListAPIView):
         return Announcement.objects.filter(
             is_active=True,
             audience__in=audiences_for_user(self.request.user),
+        ).annotate(
+            visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
         )
+
+
+class AnnouncementDetailView(generics.RetrieveAPIView):
+    """GET /api/v1/portal/announcements/<pk>/ — one comunicado (audience-scoped)."""
+    serializer_class = AnnouncementSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Announcement.objects.filter(
+            is_active=True,
+            audience__in=audiences_for_user(self.request.user),
+        ).annotate(
+            visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
+        )
+
+
+class AnnouncementCommentListCreateView(generics.ListCreateAPIView):
+    """GET / POST /api/v1/portal/announcements/<pk>/comments/
+
+    Families can read and post replies on any comunicado they can see; hidden
+    (moderated) comments are never listed. The author is the current user.
+    """
+    serializer_class = AnnouncementCommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _announcement(self):
+        # 404s (not 403) if the comunicado isn't visible to this family — never
+        # leaks the existence of an announcement targeted at another audience.
+        return get_object_or_404(
+            Announcement.objects.filter(
+                is_active=True,
+                audience__in=audiences_for_user(self.request.user)),
+            pk=self.kwargs['pk'])
+
+    def get_queryset(self):
+        return AnnouncementComment.objects.filter(
+            announcement=self._announcement(), is_hidden=False,
+        ).select_related('author')
+
+    def perform_create(self, serializer):
+        serializer.save(announcement=self._announcement(), author=self.request.user)
 
 
 class _IsAdmin(permissions.BasePermission):

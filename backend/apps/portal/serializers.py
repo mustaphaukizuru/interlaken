@@ -1,12 +1,35 @@
 from rest_framework import serializers
 
-from .models import Announcement, Notification
+from .models import Announcement, AnnouncementComment, Notification
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
+    comment_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Announcement
-        fields = ['id', 'title', 'body', 'audience', 'created_at']
+        fields = ['id', 'title', 'body', 'audience', 'created_at', 'comment_count']
+
+    def get_comment_count(self, obj):
+        # Prefer the annotation set by the list/detail queryset (avoids N+1);
+        # fall back to a count for callers that don't annotate (e.g. dashboard).
+        annotated = getattr(obj, 'visible_comment_count', None)
+        if annotated is not None:
+            return annotated
+        return obj.comments.filter(is_hidden=False).count()
+
+
+class AnnouncementCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    body = serializers.CharField(max_length=2000, trim_whitespace=True)
+
+    class Meta:
+        model = AnnouncementComment
+        fields = ['id', 'body', 'author_name', 'created_at']
+        read_only_fields = ['id', 'author_name', 'created_at']
+
+    def get_author_name(self, obj):
+        return obj.author.full_name if obj.author else 'Usuario'
 
 
 class AnnouncementAdminSerializer(serializers.ModelSerializer):

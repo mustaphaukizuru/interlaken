@@ -593,6 +593,8 @@ UNFOLD = {
                      'link': reverse_lazy('admin:portal_announcement_changelist')},
                     {'title': 'Notificaciones', 'icon': 'notifications',
                      'link': reverse_lazy('admin:portal_notification_changelist')},
+                    {'title': 'Comentarios', 'icon': 'forum',
+                     'link': reverse_lazy('admin:portal_announcementcomment_changelist')},
                     {'title': 'Mensajes de contacto', 'icon': 'mail',
                      'badge': 'apps.core.badges.unhandled_contact_messages',
                      'badge_variant': 'primary',
