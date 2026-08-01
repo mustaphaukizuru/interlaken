@@ -38,3 +38,26 @@ services:
         sync: false                  # https://interlaken.onrender.com
       - key: FRONTEND_URL
         sync: false                  # https://interlaken.onrender.com
+      # ── Durable media storage (Supabase Storage, S3-compatible) ─────────
+      # Render's disk is EPHEMERAL; without these, uploaded admissions
+      # documents are lost on every redeploy. Create a PRIVATE bucket + S3
+      # access keys in Supabase (Storage → S3 Connection).
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false                  # e.g. documents
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false                  # https://<project-ref>.supabase.co/storage/v1/s3
+      - key: AWS_S3_REGION_NAME
+        sync: false                  # e.g. ca-central-1
+      # ── At-rest encryption for medical data — PIN ONCE, NEVER ROTATE ────
+      # Dedicated Fernet key so rotating SECRET_KEY can't make encrypted
+      # medical fields unreadable. Must match the value in the cron workflow's
+      # secrets. If unset it derives from SECRET_KEY (dev only).
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      # ── Error monitoring (no-op until set) ──────────────────────────────
+      - key: SENTRY_DSN
+        sync: false                  # DSN from sentry.io project settings

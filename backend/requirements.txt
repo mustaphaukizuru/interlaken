@@ -26,6 +26,11 @@ PyJWT==2.8.0
 # Storage & Files
 Pillow==10.3.0
 python-magic==0.4.27
+# Durable object storage for uploaded media (admissions documents) — Render's
+# container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
+# unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
+django-storages==1.14.4
+boto3==1.34.162
 
 # Web push notifications (VAPID) — inert until VAPID_* env keys are set.
 pywebpush==2.3.0

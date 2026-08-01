@@ -231,6 +231,30 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = env('MEDIA_URL', default='/media/')
 MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 
+# ── OBJECT STORAGE FOR MEDIA (uploaded documents) ─────────
+# Render's container filesystem is EPHEMERAL — anything written to MEDIA_ROOT
+# (admissions documents: birth certificates, CURP, proof of address — legally
+# retained, ARCO-scoped) is wiped on every deploy/restart/spin-down. Set the
+# S3-compatible env vars below to store uploads in durable object storage.
+# Supabase Storage is S3-compatible: create a PRIVATE bucket + S3 access keys in
+# the Supabase dashboard (Storage → S3 Connection) and point AWS_S3_ENDPOINT_URL
+# at https://<project-ref>.supabase.co/storage/v1/s3. Empty bucket name → local
+# disk (dev/test/CI). Files stay private; DocumentDownloadView proxies them
+# behind the existing role + MEDICAL_DATA consent checks.
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default='')
+if AWS_STORAGE_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
+    AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
+    AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL', default='')
+    AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME', default='')
+    # Custom S3-compatible endpoints (Supabase / MinIO) need path-style addressing.
+    AWS_S3_ADDRESSING_STYLE = env('AWS_S3_ADDRESSING_STYLE', default='path')
+    AWS_DEFAULT_ACL = None            # rely on the bucket's private policy
+    AWS_S3_FILE_OVERWRITE = False     # never clobber a same-named upload
+    AWS_QUERYSTRING_AUTH = True       # signed, expiring URLs for private objects
+    AWS_QUERYSTRING_EXPIRE = env.int('AWS_QUERYSTRING_EXPIRE', default=3600)
+
 # ── EMAIL ─────────────────────────────────────────────────
 # Env-driven so the documented EMAIL_BACKEND key works (development.py still
 # forces the console backend locally).
