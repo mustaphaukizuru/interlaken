@@ -36,6 +36,7 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
   ],
   student: [
     { icon: LayoutDashboard, label: 'Inicio',    to: '/alumno', end: true },

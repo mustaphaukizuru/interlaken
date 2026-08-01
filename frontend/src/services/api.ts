@@ -449,6 +449,14 @@ export const portalApi = {
   markAnnouncementsRead: (ids: number[]) =>
     api.post('/portal/announcements/mark-read/', { ids }),
 
+  // Comunicados (announcements) for families — list, detail, and replies.
+  getAnnouncements: () => api.get('/portal/announcements/'),
+  getAnnouncement: (id: number) => api.get(`/portal/announcements/${id}/`),
+  getAnnouncementComments: (id: number) =>
+    api.get(`/portal/announcements/${id}/comments/`),
+  postAnnouncementComment: (id: number, body: string) =>
+    api.post(`/portal/announcements/${id}/comments/`, { body }),
+
   // Personal notifications (header bell menu).
   getNotifications: () => api.get('/portal/notifications/'),
   markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),

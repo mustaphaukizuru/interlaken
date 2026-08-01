@@ -138,17 +138,21 @@ export default function ParentDashboard() {
 
           {/* Announcements */}
           <Reveal delay={110} className="h-full">
-            <SectionCard title="Avisos Escolares" className="h-full">
+            <SectionCard title="Avisos Escolares" action={{ to: '/portal/comunicados', label: 'Ver todos' }} className="h-full">
               {!data?.announcements?.length ? (
                 <SectionEmpty icon={Bell}>Sin avisos</SectionEmpty>
               ) : (
                 <div>
                   {data.announcements.slice(0, 4).map((a, i) => (
-                    <div key={a.id} className={`px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
+                    <Link
+                      key={a.id}
+                      to={`/portal/comunicados/${a.id}`}
+                      className={`block px-5 py-[13px] transition hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/30 ${i === 0 ? '' : 'border-t border-cream'}`}
+                    >
                       <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
                       <div className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{a.body}</div>
                       <div className="mt-1 text-[11.5px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
