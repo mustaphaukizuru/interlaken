@@ -13,8 +13,9 @@ class CafeteriaBalance(models.Model):
     Cached balance from Loyverse loyalty points.
     Synced periodically via Loyverse API.
     """
+    # PROTECT: the wallet balance is financial state; never cascade-delete it.
     student              = models.OneToOneField(
-                               StudentProfile, on_delete=models.CASCADE,
+                               StudentProfile, on_delete=models.PROTECT,
                                related_name='cafeteria_balance')
     balance              = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     low_balance_threshold= models.DecimalField(max_digits=8, decimal_places=2, default=50)
@@ -43,8 +44,10 @@ class CafeteriaTransaction(models.Model):
         REFUND     = 'refund',     'Devolución'
         ADJUSTMENT = 'adjustment', 'Ajuste'
 
+    # PROTECT: the wallet ledger is immutable financial history — deleting a
+    # student with transactions must fail loudly, not erase the ledger.
     student             = models.ForeignKey(
-                              StudentProfile, on_delete=models.CASCADE,
+                              StudentProfile, on_delete=models.PROTECT,
                               related_name='cafeteria_transactions')
     transaction_type    = models.CharField(max_length=20, choices=TxType.choices)
     amount              = models.DecimalField(max_digits=10, decimal_places=2)
@@ -79,8 +82,9 @@ class TopUpRequest(models.Model):
         ONLINE = 'online', 'Pago en Línea'
         OFFICE = 'office', 'Caja Escolar'
 
+    # PROTECT: top-up requests are part of the money trail.
     student      = models.ForeignKey(
-                       StudentProfile, on_delete=models.CASCADE,
+                       StudentProfile, on_delete=models.PROTECT,
                        related_name='topup_requests')
     amount       = models.DecimalField(max_digits=10, decimal_places=2)
     method       = models.CharField(max_length=20, choices=Method.choices, default=Method.OFFICE)
@@ -113,8 +117,9 @@ class BalanceAdjustment(models.Model):
         ADJUSTMENT = 'adjustment', 'Ajuste manual'
         REFUND     = 'refund',     'Devolución'
 
+    # PROTECT: manual balance adjustments are audited financial mutations.
     student       = models.ForeignKey(
-                        StudentProfile, on_delete=models.CASCADE,
+                        StudentProfile, on_delete=models.PROTECT,
                         related_name='balance_adjustments')
     admin         = models.ForeignKey(
                         'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,

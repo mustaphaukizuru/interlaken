@@ -158,7 +158,9 @@ class Invoice(models.Model):
         OVERDUE   = 'overdue',   'Vencida'
         CANCELLED = 'cancelled', 'Cancelada'
 
-    student       = models.ForeignKey(StudentProfile, on_delete=models.CASCADE,
+    # PROTECT: tuition history must survive a student delete — deleting a student
+    # with invoices raises ProtectedError instead of silently erasing the record.
+    student       = models.ForeignKey(StudentProfile, on_delete=models.PROTECT,
                                       related_name='invoices')
     fee_schedule  = models.ForeignKey(FeeSchedule, on_delete=models.SET_NULL,
                                       null=True, blank=True, related_name='invoices')
