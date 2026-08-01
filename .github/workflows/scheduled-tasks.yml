@@ -64,6 +64,9 @@ jobs:
       - name: Visit reminders
         working-directory: backend
         run: python manage.py send_booking_reminders
+      - name: Deliver pending notifications (email + push)
+        working-directory: backend
+        run: python manage.py dispatch_notifications
 
   # Monthly invoice generation — 1st of the month (and on manual dispatch).
   monthly-invoices:

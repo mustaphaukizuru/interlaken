@@ -47,6 +47,11 @@ class Notification(models.Model):
     title      = models.CharField(max_length=200)
     message    = models.TextField()
     is_read    = models.BooleanField(default=False)
+    # NULL until email + web-push for this notification have been dispatched.
+    # notify() (per-user) sends inline and stamps this immediately; bulk fan-out
+    # (fanout_announcement) leaves it NULL for the dispatch_notifications cron to
+    # deliver in batches — a school-wide blast can't run inside a web request.
+    delivered_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

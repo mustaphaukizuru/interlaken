@@ -9,9 +9,11 @@ WhatsApp is a placeholder wired for Prompt 14 — passing ``whatsapp=True`` toda
 just logs an intent; no message is sent.
 """
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +64,14 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     if user is None:
         return None
 
+    # Per-user notify() delivers email + push inline below, so stamp it dispatched
+    # immediately — the dispatch_notifications cron only picks up bulk fan-out rows.
     notification = Notification.objects.create(
         user=user,
         notif_type=notif_type,
         title=title,
         message=message,
+        delivered_at=timezone.now(),
     )
 
     if email and getattr(user, 'email', ''):
@@ -141,3 +146,39 @@ def fanout_announcement(announcement) -> int:
         batch_size=500,
     )
     return len(user_ids)
+
+
+def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> int:
+    """Deliver email + web-push for notifications not yet dispatched.
+
+    Bulk fan-out (``fanout_announcement``) creates in-app rows with
+    ``delivered_at=NULL``; this batched, capped pass (run from the
+    ``dispatch_notifications`` cron) sends the out-of-band channels so a
+    school-wide comunicado actually reaches inboxes without blocking the publish
+    request. Rows older than ``max_age_days`` are marked delivered *without*
+    sending, so a cron that was down for a while can't fire a surprise blast of
+    stale announcements. Returns the number actually sent.
+    """
+    from apps.portal.models import Notification
+    from apps.portal.push import send_web_push
+
+    now = timezone.now()
+    cutoff = now - timedelta(days=max_age_days)
+    pending = list(
+        Notification.objects.filter(delivered_at__isnull=True)
+        .select_related('user').order_by('created_at')[:limit])
+    if not pending:
+        return 0
+
+    sent, handled_ids = 0, []
+    for n in pending:
+        handled_ids.append(n.id)
+        if n.created_at < cutoff:
+            continue  # too old — mark delivered below, don't send
+        if getattr(n.user, 'email', ''):
+            send_email(subject=n.title, message=n.message, recipients=[n.user.email])
+        send_web_push(n.user, n.title, n.message)
+        sent += 1
+
+    Notification.objects.filter(id__in=handled_ids).update(delivered_at=now)
+    return sent
