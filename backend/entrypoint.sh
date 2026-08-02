@@ -5,12 +5,12 @@ set -e
 
 python manage.py migrate --noinput
 
-# One-time admin bootstrap (Render free has no shell): set DJANGO_SUPERUSER_EMAIL,
-# _PASSWORD, _FIRST_NAME, _LAST_NAME on the first deploy, then remove them. No-op
-# if the user already exists.
-if [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ] && [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ]; then
-  python manage.py createsuperuser --noinput 2>/dev/null || true
-fi
+# Admin bootstrap: idempotently reconcile the superuser declared by the
+# DJANGO_SUPERUSER_* env vars (create if missing, else ensure it is an active
+# admin). Pointing DJANGO_SUPERUSER_EMAIL at a new address provisions that admin
+# on the next deploy — Render free has no persistent shell. Safe every boot; a
+# no-op when DJANGO_SUPERUSER_EMAIL is unset.
+python manage.py ensure_superuser
 
 exec gunicorn config.wsgi:application \
   --bind "0.0.0.0:${PORT:-8000}" \

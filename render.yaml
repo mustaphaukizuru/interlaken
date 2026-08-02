@@ -61,3 +61,15 @@ services:
       # ── Error monitoring (no-op until set) ──────────────────────────────
       - key: SENTRY_DSN
         sync: false                  # DSN from sentry.io project settings
+      # ── Admin bootstrap (reconciled every deploy by ensure_superuser) ───
+      # Point DJANGO_SUPERUSER_EMAIL at the desired admin address; the next
+      # deploy creates/ensures that admin. Password is applied on create (or
+      # when DJANGO_SUPERUSER_FORCE_PASSWORD=1).
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false                  # e.g. mustaphaukizuru@interlaken.com.mx
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: DJANGO_SUPERUSER_FIRST_NAME
+        sync: false
+      - key: DJANGO_SUPERUSER_LAST_NAME
+        sync: false
