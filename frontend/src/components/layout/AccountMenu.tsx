@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { LogOut, Settings, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, ChevronDown, User as UserIcon } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
@@ -64,6 +64,13 @@ export function AccountMenu() {
               className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream"
             >
               <LayoutDashboard size={16} className="text-muted" /> Mi panel
+            </Link>
+            <Link
+              to="/portal/perfil"
+              onClick={close}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream"
+            >
+              <UserIcon size={16} className="text-muted" /> Mi información
             </Link>
             {role === 'admin' && (
               <Link

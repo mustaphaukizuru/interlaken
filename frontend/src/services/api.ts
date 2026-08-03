@@ -106,6 +106,8 @@ export const authApi = {
     window.location.href = `${API_BASE}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
+  updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
+    api.patch('/accounts/me/', data),
   logout: async () => {
     const csrf = getCookie(CSRF_COOKIE);
     const token = useAuthStore.getState().accessToken;

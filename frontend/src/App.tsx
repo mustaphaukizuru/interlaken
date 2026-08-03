@@ -46,6 +46,7 @@ const ColegiaturasPage = lazy(() => import('./pages/parent/ColegiaturasPage'));
 const ColegiaturaPaymentReturn = lazy(() => import('./pages/parent/ColegiaturaPaymentReturn'));
 const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
 const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
+const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
 
 // Staff dashboard
 const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
@@ -148,6 +149,7 @@ export default function App() {
               <Route path="pagos"     element={<PaymentsPage />} />
               <Route path="comunicados" element={<ComunicadosPage />} />
               <Route path="comunicados/:id" element={<ComunicadoDetailPage />} />
+              <Route path="perfil"    element={<ProfilePage />} />
             </Route>
 
             {/* Student portal merged into the family portal — /alumno* redirects. */}
