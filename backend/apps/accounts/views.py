@@ -8,9 +8,9 @@ import requests
 from django.conf import settings
 from django.contrib.auth import logout
 from django.shortcuts import redirect
+from django.utils.decorators import method_decorator
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -21,8 +21,14 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.core.ratelimit import ratelimit
 
-from .cookies import (clear_auth_cookies, csrf_ok, issue_session,
-                      new_csrf_token, set_csrf_cookie, set_refresh_cookie)
+from .cookies import (
+    clear_auth_cookies,
+    csrf_ok,
+    issue_session,
+    new_csrf_token,
+    set_csrf_cookie,
+    set_refresh_cookie,
+)
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer, UserSerializer
 

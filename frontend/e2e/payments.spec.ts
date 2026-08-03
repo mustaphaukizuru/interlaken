@@ -38,7 +38,9 @@ test('paying a tuition invoice initiates the gateway redirect with the chosen ga
   // Log in as a parent (lands on /portal) and navigate client-side via the
   // sidebar — no full reload, so in-memory auth persists (robust on cold CI).
   await login(page, DEV_PARENT);
-  await page.getByRole('link', { name: 'Colegiaturas' }).click();
+  // exact: true — the dashboard "Pagar colegiaturas" QuickAction card shares the
+  // accessible name, so scope to the sidebar nav link.
+  await page.getByRole('link', { name: 'Colegiaturas', exact: true }).click();
   await expect(page).toHaveURL(/\/portal\/colegiaturas/);
 
   await expect(page.getByText('Agosto 2026 · Test Alumno')).toBeVisible();

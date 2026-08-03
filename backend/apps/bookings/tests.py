@@ -245,6 +245,7 @@ class SlotGeneratorWeekdayTests(APITestCase):
 
     def test_slots_land_on_the_selected_js_weekday(self):
         from datetime import date, timedelta
+
         from apps.accounts.models import User
         admin = User.objects.create_user(
             email='wdadmin@x.mx', password='x', first_name='A', last_name='D',

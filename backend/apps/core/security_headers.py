@@ -48,7 +48,7 @@ PUBLIC_CSP = '; '.join([
 # Confined strictly to /admin/ paths.
 ADMIN_CSP = '; '.join([
     "default-src 'self'",
-    f"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     f"style-src 'self' 'unsafe-inline' {_FONT_STYLES}",
     f"font-src 'self' {_FONT_FILES}",
     "img-src 'self' data: blob:",

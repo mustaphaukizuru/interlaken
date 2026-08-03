@@ -16,8 +16,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 from apps.core.ratelimit import ratelimit
 
-from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
-                     TopUpRequest)
+from .models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from .serializers import (
     AdjustmentInputSerializer,
     BalanceAdjustmentSerializer,
@@ -29,8 +28,14 @@ from .serializers import (
     TopUpLogSerializer,
     TopUpRequestSerializer,
 )
-from .services import (add_points_to_customer, adjust_balance, reconcile_balances,
-                       refund_transaction, sync_all_balances, sync_student_balance)
+from .services import (
+    add_points_to_customer,
+    adjust_balance,
+    reconcile_balances,
+    refund_transaction,
+    sync_all_balances,
+    sync_student_balance,
+)
 
 logger = logging.getLogger(__name__)
 

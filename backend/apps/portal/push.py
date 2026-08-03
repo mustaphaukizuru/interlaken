@@ -40,7 +40,7 @@ def send_web_push(user, title: str, message: str, url: str = '/portal') -> int:
     """
     if not push_configured() or user is None:
         return 0
-    from pywebpush import WebPushException, webpush   # imported lazily
+    from pywebpush import WebPushException, webpush  # imported lazily
 
     payload = json.dumps({'title': title, 'body': message, 'url': url})
     delivered = 0

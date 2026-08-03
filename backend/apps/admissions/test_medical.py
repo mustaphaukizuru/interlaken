@@ -9,7 +9,7 @@ from django.core.management import call_command
 from django.db import connection
 from django.urls import reverse
 
-from apps.accounts.factories import AdminFactory, ParentFactory
+from apps.accounts.factories import AdminFactory
 from apps.admissions.models import Registration
 
 pytestmark = pytest.mark.django_db

@@ -21,8 +21,7 @@ from django.utils import timezone
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.finance import services
-from apps.finance.models import (Discount, FeeSchedule, Invoice,
-                                 InvoiceLineItem, InvoicePayment)
+from apps.finance.models import Discount, FeeSchedule, Invoice, InvoiceLineItem, InvoicePayment
 from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db

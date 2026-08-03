@@ -46,19 +46,24 @@ class Command(BaseCommand):
 
         changed = []
         if not user.is_staff:
-            user.is_staff = True; changed.append('is_staff')
+            user.is_staff = True
+            changed.append('is_staff')
         if not user.is_superuser:
-            user.is_superuser = True; changed.append('is_superuser')
+            user.is_superuser = True
+            changed.append('is_superuser')
         if user.role != User.Role.ADMIN:
-            user.role = User.Role.ADMIN; changed.append('role')
+            user.role = User.Role.ADMIN
+            changed.append('role')
         if not user.is_active:
-            user.is_active = True; changed.append('is_active')
+            user.is_active = True
+            changed.append('is_active')
 
         # Password is set on creation; on an existing account only when explicitly
         # forced (so a routine redeploy never silently resets a rotated password).
         force = os.environ.get('DJANGO_SUPERUSER_FORCE_PASSWORD') == '1'
         if password and (created or force):
-            user.set_password(password); changed.append('password')
+            user.set_password(password)
+            changed.append('password')
 
         if created or changed:
             user.save()

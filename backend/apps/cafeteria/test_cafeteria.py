@@ -13,8 +13,7 @@ from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.cafeteria import services
-from apps.cafeteria.models import (CafeteriaBalance, CafeteriaTransaction,
-                                   TopUpRequest)
+from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from apps.cafeteria.serializers import TopUpRequestSerializer
 from apps.portal.models import Notification
 

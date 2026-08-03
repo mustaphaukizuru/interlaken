@@ -7,9 +7,8 @@ attempts lock the username+IP pair — after that even the CORRECT password is
 rejected until the cooloff (or an explicit reset).
 """
 import pytest
-from django.urls import reverse
-
 from axes.utils import reset as axes_reset
+from django.urls import reverse
 
 pytestmark = pytest.mark.django_db
 

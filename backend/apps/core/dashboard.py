@@ -11,8 +11,7 @@ from django.utils import formats, timezone
 def dashboard_callback(request, context):
     # Imports at call time so settings can reference this module dotted-path
     # without import-order issues at boot.
-    from apps.admissions.models import (PreRegistration, Registration,
-                                        RegistrationDocument)
+    from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
     from apps.core.models import AuditLog
     from apps.legal.models import ArcoRequest
     from apps.payments.models import Payment

@@ -4,8 +4,13 @@ from rest_framework import serializers
 
 from apps.accounts.serializers import StudentProfileSerializer
 
-from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
-                     LoyverseProfile, TopUpRequest)
+from .models import (
+    BalanceAdjustment,
+    CafeteriaBalance,
+    CafeteriaTransaction,
+    LoyverseProfile,
+    TopUpRequest,
+)
 
 
 class LoyverseProfileSerializer(serializers.ModelSerializer):

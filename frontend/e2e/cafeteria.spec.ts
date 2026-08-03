@@ -37,7 +37,9 @@ test('an online cafeteria top-up initiates the gateway redirect', async ({ page 
   // Log in as a parent (lands on /portal) and navigate client-side via the
   // sidebar — no full reload, so in-memory auth persists (robust on cold CI).
   await login(page, DEV_PARENT);
-  await page.getByRole('link', { name: 'Cafetería' }).click();
+  // exact: true — the dashboard "Recargar cafetería" QuickAction card shares the
+  // accessible name, so scope to the sidebar nav link.
+  await page.getByRole('link', { name: 'Cafetería', exact: true }).click();
   await expect(page).toHaveURL(/\/portal\/cafeteria/);
 
   await expect(page.getByText('Test Alumno')).toBeVisible();

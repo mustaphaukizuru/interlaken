@@ -17,8 +17,7 @@ add them afterward via the CSV import or the console.
 """
 from django.core.management.base import BaseCommand
 
-from apps.cafeteria.services import (LoyverseError, get_all_customers,
-                                     import_students_from_loyverse)
+from apps.cafeteria.services import LoyverseError, get_all_customers, import_students_from_loyverse
 
 
 class Command(BaseCommand):

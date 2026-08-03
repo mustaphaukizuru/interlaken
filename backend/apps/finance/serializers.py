@@ -3,27 +3,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import (Discount, FeeSchedule, Invoice, InvoiceAdjustment,
-                     InvoiceLineItem)
-
-
-class FeeScheduleSerializer(serializers.ModelSerializer):
-    """Admin CRUD for tuition plans (Planes de Colegiatura)."""
-    class Meta:
-        model = FeeSchedule
-        fields = ['id', 'name', 'level', 'grade', 'monthly_amount', 'currency',
-                  'due_day', 'late_fee_type', 'late_fee_amount', 'late_fee_grace_days',
-                  'active', 'updated_at']
-        read_only_fields = ['id', 'updated_at']
-
-
-class DiscountSerializer(serializers.ModelSerializer):
-    """Admin CRUD for per-student becas / descuentos."""
-    class Meta:
-        model = Discount
-        fields = ['id', 'student', 'name', 'kind', 'method', 'value', 'active',
-                  'start_period', 'end_period', 'note', 'created_at']
-        read_only_fields = ['id', 'created_at']
+from .models import Discount, FeeSchedule, Invoice, InvoiceAdjustment, InvoiceLineItem
 
 
 class InvoiceLineItemSerializer(serializers.ModelSerializer):

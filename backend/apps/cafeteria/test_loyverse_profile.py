@@ -9,10 +9,12 @@ from decimal import Decimal
 import pytest
 
 from apps.accounts.factories import StudentProfileFactory
-from apps.cafeteria.loyverse_profile import (parse_customer_snapshot,
-                                             refresh_all_profiles,
-                                             refresh_profiles_if_stale,
-                                             upsert_loyverse_profile)
+from apps.cafeteria.loyverse_profile import (
+    parse_customer_snapshot,
+    refresh_all_profiles,
+    refresh_profiles_if_stale,
+    upsert_loyverse_profile,
+)
 from apps.cafeteria.models import LoyverseProfile
 
 pytestmark = pytest.mark.django_db

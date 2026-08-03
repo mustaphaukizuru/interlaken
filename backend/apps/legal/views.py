@@ -10,10 +10,13 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 
 from .models import ArcoRequest, PrivacyNoticeVersion
-from .serializers import (ArcoRequestSerializer, ArcoStatusInputSerializer,
-                          ConsentInputSerializer, PrivacyNoticeSerializer)
-from .services import (consent_state, export_household_data, needs_acceptance,
-                       record_consent)
+from .serializers import (
+    ArcoRequestSerializer,
+    ArcoStatusInputSerializer,
+    ConsentInputSerializer,
+    PrivacyNoticeSerializer,
+)
+from .services import consent_state, export_household_data, needs_acceptance, record_consent
 
 
 class IsAdmin(permissions.BasePermission):

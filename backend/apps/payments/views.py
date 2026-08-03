@@ -98,10 +98,8 @@ class _WebhookProcessMixin:
         ``(payment, success)`` when a top-up notification should be sent **after**
         commit, or ``None``.
         """
-        from apps.cafeteria.services import (complete_online_topup,
-                                             fail_online_topup)
-        from apps.finance.services import (complete_invoice_payment,
-                                           fail_invoice_payment)
+        from apps.cafeteria.services import complete_online_topup, fail_online_topup
+        from apps.finance.services import complete_invoice_payment, fail_invoice_payment
 
         notify_arg = None
         with db_transaction.atomic():

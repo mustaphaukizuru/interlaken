@@ -1,8 +1,14 @@
 ﻿from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline
 
-from .models import (Discount, FeeSchedule, Invoice, InvoiceAdjustment,
-                     InvoiceLineItem, InvoicePayment)
+from .models import (
+    Discount,
+    FeeSchedule,
+    Invoice,
+    InvoiceAdjustment,
+    InvoiceLineItem,
+    InvoicePayment,
+)
 
 
 @admin.register(FeeSchedule)

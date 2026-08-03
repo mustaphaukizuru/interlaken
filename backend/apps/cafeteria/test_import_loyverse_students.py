@@ -10,9 +10,12 @@ import pytest
 
 from apps.accounts.models import StudentProfile, User
 from apps.cafeteria.models import CafeteriaBalance
-from apps.cafeteria.services import (_is_loyverse_student, _parse_grade_code,
-                                     _split_loyverse_name,
-                                     import_students_from_loyverse)
+from apps.cafeteria.services import (
+    _is_loyverse_student,
+    _parse_grade_code,
+    _split_loyverse_name,
+    import_students_from_loyverse,
+)
 
 
 def _cust(code, name, email, addr='', pts=0, cid=None):

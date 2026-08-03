@@ -10,7 +10,6 @@ CSV is produced with the stdlib ``csv`` module; PDF reuses the dependency-free
 ``django.http.HttpResponse`` with the right content-type and download filename.
 """
 import csv
-import io
 from decimal import Decimal
 
 from django.http import HttpResponse
@@ -83,7 +82,7 @@ def student_statement_pdf(student) -> HttpResponse:
     widths = [17, 12, 34, 11, 11]
 
     def _line(cells):
-        return ''.join(str(c)[:w - 1].ljust(w) for c, w in zip(cells, widths))
+        return ''.join(str(c)[:w - 1].ljust(w) for c, w in zip(cells, widths, strict=False))
 
     lines = [
         f'Alumno: {student.user.full_name}   Matrícula: {student.student_id}',
@@ -140,7 +139,7 @@ def school_statement_pdf() -> HttpResponse:
 
     def _line(cells):
         # Last column (last-synced) is free-width at the end.
-        fixed = ''.join(str(c)[:w - 1].ljust(w) for c, w in zip(cells, widths))
+        fixed = ''.join(str(c)[:w - 1].ljust(w) for c, w in zip(cells, widths, strict=False))
         return fixed + str(cells[-1]) if len(cells) > len(widths) else fixed
 
     lines = [

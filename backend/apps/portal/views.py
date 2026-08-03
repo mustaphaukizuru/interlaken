@@ -14,11 +14,14 @@ from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
 
-from .models import (Announcement, AnnouncementComment, AnnouncementRead,
-                     Notification)
+from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification
+from .serializers import (
+    AnnouncementAdminSerializer,
+    AnnouncementCommentSerializer,
+    AnnouncementSerializer,
+    NotificationSerializer,
+)
 from .services import fanout_announcement
-from .serializers import (AnnouncementAdminSerializer, AnnouncementCommentSerializer,
-                          AnnouncementSerializer, NotificationSerializer)
 
 
 def audiences_for_user(user):

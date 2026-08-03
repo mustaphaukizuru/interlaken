@@ -16,17 +16,17 @@ Notes for maintainers:
   remote write. It is intentionally **not** on the money-in critical path.
 """
 import logging
-from datetime import timedelta, timezone as dt_timezone
+from datetime import timedelta
+from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -472,8 +472,7 @@ def complete_online_topup(payment):
     """
     from django.utils import timezone as _tz
 
-    from apps.cafeteria.models import (CafeteriaBalance, CafeteriaTransaction,
-                                       TopUpRequest)
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 
     topup = getattr(payment, 'related_topup', None)
     if topup is None:
@@ -683,8 +682,7 @@ def adjust_balance(student, amount, reason: str, admin=None):
     Returns the created ``BalanceAdjustment``. Raises ``ValueError`` on a zero
     amount or a debit that would overdraw the balance below zero.
     """
-    from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
-                                       CafeteriaTransaction)
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
 
     amount = Decimal(str(amount)).quantize(Decimal('0.01'))
     if amount == 0:
@@ -790,8 +788,7 @@ def refund_transaction(tx, reason: str = '', admin=None):
     transaction can't be refunded (already refunded, is itself a reversal, or the
     debit would overdraw the balance).
     """
-    from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
-                                       CafeteriaTransaction)
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
     from apps.payments.models import Payment
 
     if tx.transaction_type in (CafeteriaTransaction.TxType.REFUND,

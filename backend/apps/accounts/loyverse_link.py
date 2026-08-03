@@ -13,8 +13,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.cafeteria.services import (LoyverseError, get_all_customers,
-                                     link_students_to_loyverse)
+from apps.cafeteria.services import LoyverseError, get_all_customers, link_students_to_loyverse
 
 from .import_students import IsAdmin
 

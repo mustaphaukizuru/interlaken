@@ -23,7 +23,7 @@ class Command(BaseCommand):
                 year, month = period.split('-')
                 assert 1 <= int(month) <= 12 and len(year) == 4
             except (ValueError, AssertionError):
-                raise CommandError('--period must be YYYY-MM (e.g. 2025-08).')
+                raise CommandError('--period must be YYYY-MM (e.g. 2025-08).') from None
 
         result = generate_invoices(period)
         self.stdout.write(self.style.SUCCESS(

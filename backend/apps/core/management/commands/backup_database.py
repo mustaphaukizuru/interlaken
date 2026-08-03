@@ -89,8 +89,7 @@ class Command(BaseCommand):
         import os
         # Password via PGPASSWORD env, never argv (visible in process list).
         env = {**os.environ, 'PGPASSWORD': db.get('PASSWORD') or ''}
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, env=env)
+        proc = subprocess.run(cmd, capture_output=True, env=env)
         if proc.returncode != 0:
             raise CommandError(f'pg_dump failed: {proc.stderr.decode()[:400]}')
         with gzip.open(target, 'wb') as fh:
@@ -110,8 +109,7 @@ class Command(BaseCommand):
         ]
         import os
         env = {**os.environ, 'MYSQL_PWD': db['PASSWORD']}
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, env=env)
+        proc = subprocess.run(cmd, capture_output=True, env=env)
         if proc.returncode != 0:
             raise CommandError(f'mysqldump failed: {proc.stderr.decode()[:400]}')
         with gzip.open(target, 'wb') as fh:

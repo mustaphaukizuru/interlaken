@@ -2,7 +2,8 @@
 Staff analytics endpoint (IK-ADMIN items 6/9): access control, payload shape,
 empty-safety, aggregation correctness, query budget and the 60s cache.
 """
-from datetime import datetime, time as dt_time, timedelta
+from datetime import datetime, timedelta
+from datetime import time as dt_time
 from decimal import Decimal
 
 import pytest
@@ -10,7 +11,7 @@ from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts.factories import AdminFactory, StudentProfileFactory, UserFactory
+from apps.accounts.factories import StudentProfileFactory, UserFactory
 from apps.accounts.models import User
 from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
 from apps.cafeteria.models import CafeteriaTransaction

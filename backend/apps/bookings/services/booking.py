@@ -35,7 +35,7 @@ def create_booking(*, slot_id, parent_name, parent_email='', parent_phone='',
         try:
             slot = AvailabilitySlot.objects.select_for_update().get(pk=slot_id)
         except AvailabilitySlot.DoesNotExist:
-            raise SlotUnavailable('El horario seleccionado no existe.')
+            raise SlotUnavailable('El horario seleccionado no existe.') from None
         # Compare the slot's LOCAL start datetime against now — not just the
         # date, and not the UTC date. slot.date < now().date() used the UTC
         # calendar day (America/Mexico_City is UTC-6), which both rejected valid

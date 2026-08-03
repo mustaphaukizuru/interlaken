@@ -7,8 +7,7 @@ import pytest
 
 from apps.accounts.factories import ParentFactory
 from apps.portal.models import Announcement, Notification
-from apps.portal.services import (dispatch_pending_notifications,
-                                  fanout_announcement, notify)
+from apps.portal.services import dispatch_pending_notifications, fanout_announcement, notify
 
 pytestmark = pytest.mark.django_db
 

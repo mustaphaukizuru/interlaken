@@ -93,7 +93,7 @@ class TestImport:
 
     def test_missing_required_headers_400(self, api_client, admin_user):
         api_client.force_authenticate(admin_user)
-        f = io.BytesIO('matricula,nombre\nX,Y'.encode('utf-8'))
+        f = io.BytesIO(b'matricula,nombre\nX,Y')
         f.name = 'malo.csv'
         resp = _post(api_client, f, '0')
         assert resp.status_code == 400

@@ -45,8 +45,7 @@ def _zero_filled(choices, counted):
 
 
 def build_payload(days=30):
-    from apps.admissions.models import (PreRegistration, Registration,
-                                        RegistrationDocument)
+    from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
     from apps.cafeteria.models import CafeteriaTransaction
     from apps.finance.models import Invoice
     from apps.legal.models import ArcoRequest

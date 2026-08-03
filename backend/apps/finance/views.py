@@ -18,11 +18,18 @@ from apps.accounts.models import StudentProfile, User
 
 from . import services
 from .models import Discount, FeeSchedule, Invoice
-from .serializers import (AdjustInvoiceInputSerializer, CancelInvoiceInputSerializer,
-                          DiscountSerializer, FeeScheduleSerializer,
-                          GenerateInvoicesInputSerializer, InvoiceAdjustmentSerializer,
-                          InvoiceListSerializer, InvoicePayInputSerializer,
-                          InvoiceSerializer, MarkPaidInputSerializer)
+from .serializers import (
+    AdjustInvoiceInputSerializer,
+    CancelInvoiceInputSerializer,
+    DiscountSerializer,
+    FeeScheduleSerializer,
+    GenerateInvoicesInputSerializer,
+    InvoiceAdjustmentSerializer,
+    InvoiceListSerializer,
+    InvoicePayInputSerializer,
+    InvoiceSerializer,
+    MarkPaidInputSerializer,
+)
 
 
 class IsAdmin(permissions.BasePermission):

@@ -12,11 +12,14 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import (AdminFactory, ParentFactory,
-                                     StudentProfileFactory)
+from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.cafeteria import services
-from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
-                                   CafeteriaTransaction, TopUpRequest)
+from apps.cafeteria.models import (
+    BalanceAdjustment,
+    CafeteriaBalance,
+    CafeteriaTransaction,
+    TopUpRequest,
+)
 from apps.payments.models import Payment
 from apps.portal.models import Notification
 

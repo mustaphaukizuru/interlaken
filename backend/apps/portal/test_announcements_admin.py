@@ -5,8 +5,7 @@ delete — admin-only. The public list stays audience-filtered + active-only.
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import (AdminFactory, ParentFactory,
-                                     StudentUserFactory, UserFactory)
+from apps.accounts.factories import AdminFactory, ParentFactory, StudentUserFactory, UserFactory
 from apps.accounts.models import User
 from apps.portal.models import Announcement, Notification
 

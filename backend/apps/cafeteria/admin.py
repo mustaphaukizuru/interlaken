@@ -1,8 +1,13 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from .models import (BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction,
-                     LoyverseProfile, TopUpRequest)
+from .models import (
+    BalanceAdjustment,
+    CafeteriaBalance,
+    CafeteriaTransaction,
+    LoyverseProfile,
+    TopUpRequest,
+)
 
 
 @admin.register(LoyverseProfile)

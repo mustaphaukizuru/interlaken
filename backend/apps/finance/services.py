@@ -23,8 +23,14 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from .models import (Discount, FeeSchedule, Invoice, InvoiceAdjustment,
-                     InvoiceLineItem, InvoicePayment, q2)
+from .models import (
+    FeeSchedule,
+    Invoice,
+    InvoiceAdjustment,
+    InvoiceLineItem,
+    InvoicePayment,
+    q2,
+)
 
 logger = logging.getLogger(__name__)
 

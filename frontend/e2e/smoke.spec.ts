@@ -86,8 +86,10 @@ test('staff analytics home renders', async ({ page }) => {
 
 test('student portal renders', async ({ page }) => {
   await login(page, DEV_ADMIN);
+  // The student portal was merged into the family portal — /alumno* redirects
+  // to /portal, so the nav lands on the /portal cafetería route.
   await page.goto('/alumno');
   await expect(page).not.toHaveURL(/\/login/);
   await expectMainSettled(page);
-  await clickNavAndSettle(page, 'Cafetería', /\/alumno\/cafeteria/);
+  await clickNavAndSettle(page, 'Cafetería', /\/portal\/cafeteria/);
 });

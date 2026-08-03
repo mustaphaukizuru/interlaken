@@ -10,8 +10,6 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
-
-from apps.core.ratelimit import ratelimit
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -21,19 +19,19 @@ from apps.accounts.models import User
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
+from apps.core.ratelimit import ratelimit
 
 from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
     DocumentVerifySerializer,
-    current_school_cycle,
     PreRegistrationAdminSerializer,
-    PreRegistrationSerializer,
     PreRegistrationStatusSerializer,
     PublicPreRegistrationSerializer,
     RegistrationAdminListSerializer,
     RegistrationDocumentSerializer,
     RegistrationSerializer,
     RegistrationStatusSerializer,
+    current_school_cycle,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
@@ -71,7 +69,7 @@ def authorize_registration(request, pk):
     try:
         reg = Registration.objects.get(pk=pk)
     except Registration.DoesNotExist:
-        raise AuthenticationFailed('Sesión de inscripción inválida.')
+        raise AuthenticationFailed('Sesión de inscripción inválida.') from None
     if not session_valid(reg, _session_token(request)):
         raise AuthenticationFailed('Sesión de inscripción inválida.')
     return reg
@@ -319,7 +317,7 @@ class DocumentDownloadView(APIView):
         try:
             fh = doc.file.open('rb')
         except (FileNotFoundError, ValueError):
-            raise Http404('Archivo no disponible.')
+            raise Http404('Archivo no disponible.') from None
         return FileResponse(fh, as_attachment=True,
                             filename=doc.filename or 'documento')
 
@@ -337,7 +335,7 @@ class RegistrationAccessView(APIView):
         try:
             reg = Registration.objects.get(pk=pk)
         except Registration.DoesNotExist:
-            raise AuthenticationFailed('Invitación inválida o expirada.')
+            raise AuthenticationFailed('Invitación inválida o expirada.') from None
         token = request.data.get('token', '')
         if not redeem_invite(reg, token):
             raise AuthenticationFailed('Invitación inválida o expirada.')

@@ -16,8 +16,7 @@ nothing. Loyverse/credential failures are reported, not fatal.
 """
 from django.core.management.base import BaseCommand
 
-from apps.cafeteria.services import (LoyverseError, get_all_customers,
-                                     link_students_to_loyverse)
+from apps.cafeteria.services import LoyverseError, get_all_customers, link_students_to_loyverse
 
 
 class Command(BaseCommand):
