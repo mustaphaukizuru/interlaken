@@ -45,7 +45,9 @@ test('paying a tuition invoice initiates the gateway redirect with the chosen ga
 
   await expect(page.getByText('Agosto 2026 · Test Alumno')).toBeVisible();
   await page.getByRole('button', { name: /^pagar$/i }).click();       // open pay modal
-  await page.getByRole('button', { name: /pagar en línea/i }).click(); // default gateway
+  // Submit — the redesigned modal defaults the gateway to global_payments and
+  // its submit button reads "Pagar $<amount>" (PaymentMethodPicker sits above).
+  await page.getByRole('button', { name: /pagar \$/i }).click();
 
   await page.waitForURL('**/pago-simulado');
   expect(payload).toEqual({ gateway: 'global_payments' });
