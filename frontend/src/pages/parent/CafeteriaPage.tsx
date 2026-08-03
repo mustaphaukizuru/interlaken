@@ -40,6 +40,8 @@ export default function CafeteriaPage() {
   const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
+  const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
+  const [thresholdValue, setThresholdValue] = useState('');
 
   // History filters + pagination
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
@@ -101,6 +103,19 @@ export default function CafeteriaPage() {
       queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
     },
     onError: () => toast.error('No fue posible procesar la recarga. Intente nuevamente.'),
+  });
+
+  // Family-set low-balance alert threshold (#12).
+  const thresholdMutation = useMutation({
+    mutationFn: () =>
+      cafeteriaApi.updateLowBalanceThreshold(
+        thresholdStudent!.student.id, parseFloat(thresholdValue)),
+    onSuccess: () => {
+      toast.success('Alerta de saldo bajo actualizada.');
+      setThresholdStudent(null);
+      queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
+    },
+    onError: () => toast.error('No se pudo actualizar la alerta. Intente nuevamente.'),
   });
 
   const refresh = () => {
@@ -184,6 +199,17 @@ export default function CafeteriaPage() {
               >
                 <Plus className="w-3.5 h-3.5" /> Recargar
               </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setThresholdStudent(b);
+                  setThresholdValue(parseFloat(b.low_balance_threshold ?? '50').toFixed(0));
+                }}
+                className="mt-2 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+              >
+                Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '50').toFixed(0)}</span> · Cambiar
+              </button>
             </Card>
           );
         })}
@@ -264,6 +290,46 @@ export default function CafeteriaPage() {
             {topupMethod === 'online' ? 'Continuar al pago' : 'Solicitar recarga'}
           </Button>
         </div>
+      </Modal>
+
+      {/* Low-balance alert threshold modal (#12) */}
+      <Modal open={!!thresholdStudent} onClose={() => setThresholdStudent(null)} title="Alerta de saldo bajo">
+        {thresholdStudent && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Te avisaremos cuando el saldo de{' '}
+              <span className="font-semibold text-ink">{thresholdStudent.student.user.full_name}</span>{' '}
+              baje de este monto.
+            </p>
+            <div>
+              <label className="label" htmlFor="threshold-amount">Monto de alerta (MXN)</label>
+              <input
+                id="threshold-amount"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="10"
+                className="input-field min-h-[44px] text-base"
+                placeholder="Ej. 50"
+                value={thresholdValue}
+                onChange={(e) => setThresholdValue(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-subtle">Predeterminado: $50</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="secondary" onClick={() => setThresholdStudent(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
+              <Button
+                variant="primary"
+                loading={thresholdMutation.isPending}
+                onClick={() => thresholdMutation.mutate()}
+                disabled={thresholdValue === '' || parseFloat(thresholdValue) < 0}
+                className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
+              >
+                Guardar
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Transactions — only when the family actually has cafeteria accounts */}

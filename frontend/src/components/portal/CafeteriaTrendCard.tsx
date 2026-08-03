@@ -1,4 +1,5 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Coffee } from 'lucide-react';
 import { cafeteriaApi } from '@/services/api';
@@ -24,9 +25,26 @@ export default function CafeteriaTrendCard() {
   const theme = getChartTheme(dark);
   const entrance = useChartEntrance();
 
+  const [student, setStudent] = useState<number | 'all'>('all');
+
+  // Children (from balances) power the per-child switcher; shares the balances
+  // cache with the cafetería page.
+  const { data: children } = useQuery({
+    queryKey: ['cafeteria-balances'],
+    queryFn: async () => {
+      const { data } = await cafeteriaApi.getMyBalance();
+      const arr = Array.isArray(data) ? data : [data];
+      return arr.map((b: { student: { id: number; user: { full_name: string } } }) => ({
+        id: b.student.id, name: b.student.user.full_name,
+      }));
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['cafeteria-spending-trend', 30],
-    queryFn: async () => (await cafeteriaApi.getSpendingTrend(30)).data as TrendResp,
+    queryKey: ['cafeteria-spending-trend', 30, student],
+    queryFn: async () =>
+      (await cafeteriaApi.getSpendingTrend(30, student === 'all' ? undefined : student)).data as TrendResp,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -37,17 +55,30 @@ export default function CafeteriaTrendCard() {
 
   return (
     <div className="card overflow-hidden !p-0">
-      <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cream px-5 py-4">
         <div>
           <h2 className="font-head text-[15px] font-bold text-ink">Consumo de cafetería</h2>
           <p className="text-[12px] text-subtle">Últimos 30 días</p>
         </div>
-        {total > 0 && (
-          <div className="text-right">
-            <div className="font-head text-[15px] font-bold text-ink">{fmtMXN(total)}</div>
-            <div className="text-[11px] text-subtle">total gastado</div>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {(children?.length ?? 0) > 1 && (
+            <select
+              value={student}
+              onChange={(e) => setStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              aria-label="Filtrar consumo por alumno"
+              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
+            >
+              <option value="all">Todos</option>
+              {children!.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          {total > 0 && (
+            <div className="text-right">
+              <div className="font-head text-[15px] font-bold text-ink">{fmtMXN(total)}</div>
+              <div className="text-[11px] text-subtle">total gastado</div>
+            </div>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
