@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Maximize2 } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 
 type Category = 'instalaciones' | 'vida';
@@ -9,12 +9,31 @@ interface Photo {
   cat: Category;
 }
 
+const altFor = (cat: Category) =>
+  cat === 'vida'
+    ? 'Vida escolar en el Colegio Interlaken'
+    : 'Instalaciones del Colegio Interlaken';
+
+// Real campus / school-life photos only. The brand logos that were mixed into
+// this set (vertical & horizontal wordmarks, the 40-años mark and the bare
+// isotipo — files 5, 6, 8, 9) were removed, along with a duplicate court shot,
+// so the gallery reads as photography rather than a logo sheet.
 const PHOTOS: Photo[] = [
-  ...Array.from({ length: 19 }, (_, i): Photo => ({
-    src: `/assets/interlaken-image (${i + 1}).webp`,
-    cat: 'vida',
-  })),
-  { src: '/assets/campus-court.webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (1).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (2).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (3).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (4).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (7).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (10).webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (11).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (12).webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (13).webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (14).webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (15).webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (17).webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (18).webp', cat: 'instalaciones' },
+  { src: '/assets/interlaken-image (19).webp', cat: 'instalaciones' },
+  { src: '/assets/campus-court.webp', cat: 'vida' },
   { src: '/assets/campus-mural.webp', cat: 'instalaciones' },
   { src: '/assets/classroom.webp', cat: 'instalaciones' },
   { src: '/assets/facade.webp', cat: 'instalaciones' },
@@ -93,7 +112,7 @@ function Lightbox({
       <figure className="max-h-full">
         <img
           src={photos[index].src}
-          alt={`Vida escolar en el Colegio Interlaken — fotografía ${index + 1}`}
+          alt={altFor(photos[index].cat)}
           className="max-h-[82vh] w-auto max-w-full rounded-xl2 object-contain"
         />
         <figcaption className="mt-3 text-center text-sm text-white/70">
@@ -163,25 +182,34 @@ export default function GaleriaPage() {
             ))}
           </div>
 
-          {/* Grid — cada foto abre el lightbox */}
-          <div className="columns-2 gap-3 sm:columns-3 lg:columns-4">
+          <p className="mb-5 text-[13px] font-medium text-subtle">
+            {visible.length} {visible.length === 1 ? 'fotografía' : 'fotografías'}
+          </p>
+
+          {/* Masonry grid — cada foto abre el lightbox */}
+          <div className="columns-2 gap-4 sm:columns-3 lg:columns-4">
             {visible.map((photo, i) => (
               <button
                 key={photo.src}
                 type="button"
                 onClick={() => setOpen(i)}
-                aria-label={`Ampliar fotografía ${i + 1} de ${visible.length}`}
-                className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-xl2 border border-ink/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
+                aria-label={`Ampliar imagen ${i + 1} de ${visible.length}`}
+                className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-2xl bg-cream shadow-card ring-1 ring-ink/5 transition-shadow duration-300 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
               >
                 <img
                   src={photo.src}
-                  alt={`Vida escolar en el Colegio Interlaken — fotografía ${i + 1}`}
-                  loading={i < 4 ? 'eager' : 'lazy'}
+                  alt={altFor(photo.cat)}
+                  loading={i < 6 ? 'eager' : 'lazy'}
                   width={480}
                   height={360}
-                  className="w-full object-cover transition-transform duration-200 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                  className="w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   onError={(e) => (((e.target as HTMLImageElement).closest('button') as HTMLButtonElement).style.display = 'none')}
                 />
+                {/* Hover affordance: gradient wash + "Ampliar" pill */}
+                <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/0 to-ink/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex translate-y-1.5 items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-bold text-ink opacity-0 shadow-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
+                  <Maximize2 className="h-3 w-3 text-green-dark" /> Ampliar
+                </span>
               </button>
             ))}
           </div>
