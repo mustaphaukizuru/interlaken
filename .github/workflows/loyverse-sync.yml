@@ -9,10 +9,10 @@ name: Loyverse cafeteria sync
 # parent/admin "Actualizar / Sincronizar" buttons which poll Loyverse on demand.
 #
 # Required repo secrets: SECRET_KEY, LOYVERSE_API_TOKEN, DB_HOST, DB_NAME,
-# DB_USER, DB_PASSWORD, DB_PORT, ALLOWED_HOSTS. Optional: CAFETERIA_SYNC_PURCHASES_SINCE
-# (ISO-8601 go-live watermark). Without a watermark the first purchase sync starts
-# from "now" (safe) — never backfill history or you double-debit balances already
-# seeded from Loyverse points. DB_ENGINE is pinned to Postgres (Supabase).
+# DB_USER, DB_PASSWORD, DB_PORT, ALLOWED_HOSTS, DB_ENGINE, DB_SSLMODE.
+# Optional: CAFETERIA_SYNC_PURCHASES_SINCE (ISO-8601 go-live watermark).
+# Without a watermark the first purchase sync starts from "now" (safe) — never
+# backfill history or you double-debit balances already seeded from Loyverse.
 #
 # Free-minutes note: private repos get 2000 Action-min/month. At ~1 min/run the
 # 5-min cadence is ~8640 min/mo — make the repo public (unlimited), keep Render
@@ -29,9 +29,6 @@ concurrency:
 
 jobs:
   sync:
-    # Skip quietly until repo secrets are provisioned — otherwise every cron
-    # fails with ImproperlyConfigured(SECRET_KEY empty) and burns Action minutes.
-    if: ${{ secrets.SECRET_KEY != '' && secrets.LOYVERSE_API_TOKEN != '' && secrets.DB_HOST != '' }}
     runs-on: ubuntu-latest
     env:
       DJANGO_SETTINGS_MODULE: config.settings.production
@@ -47,16 +44,37 @@ jobs:
       LOYVERSE_API_TOKEN: ${{ secrets.LOYVERSE_API_TOKEN }}
       CAFETERIA_SYNC_PURCHASES_SINCE: ${{ secrets.CAFETERIA_SYNC_PURCHASES_SINCE }}
     steps:
+      # secrets.* cannot be used in job-level `if:` — gate here instead.
+      - name: Require sync secrets
+        id: gate
+        run: |
+          missing=0
+          for v in SECRET_KEY LOYVERSE_API_TOKEN DB_HOST DB_NAME DB_USER DB_PASSWORD DB_ENGINE; do
+            if [ -z "${!v}" ]; then
+              echo "::warning::$v is not set in repo secrets"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping sync — configure GitHub Actions secrets first."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
       - uses: actions/setup-python@v5
+        if: steps.gate.outputs.skip != 'true'
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Install backend deps
+        if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: pip install -r requirements.txt
       - name: Seed balances + poll purchases (fast path)
+        if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: |
           python manage.py sync_balances --no-profiles
