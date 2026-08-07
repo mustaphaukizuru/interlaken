@@ -118,10 +118,27 @@ export default function CafeteriaPage() {
     onError: () => toast.error('No se pudo actualizar la alerta. Intente nuevamente.'),
   });
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
-    queryClient.invalidateQueries({ queryKey: ['cafeteria-transactions'] });
-    toast.success('Actualizando saldos y movimientos…');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await cafeteriaApi.refreshFromLoyverse();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] }),
+        queryClient.invalidateQueries({ queryKey: ['cafeteria-transactions'] }),
+      ]);
+      const created = data?.created ?? 0;
+      toast.success(
+        created > 0
+          ? `Actualizado — ${created} compra(s) nueva(s) desde Loyverse.`
+          : 'Saldos y movimientos actualizados desde Loyverse.',
+      );
+    } catch {
+      toast.error('No se pudo sincronizar con Loyverse. Intente de nuevo.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // History filters: track whether any is active so we can give feedback and a
@@ -157,7 +174,7 @@ export default function CafeteriaPage() {
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
           <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={refresh} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
+        <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
           <RefreshCw className="w-3 h-3" /> Actualizar
         </Button>
       </div>

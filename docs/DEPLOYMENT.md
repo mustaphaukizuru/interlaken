@@ -48,8 +48,9 @@ Shared cPanel hosting has **no Redis and no persistent worker processes**, so th
 
 | Job | Command | Suggested cron |
 |---|---|---|
-| Seed opening cafeteria balances | `python manage.py sync_balances` | every 10 min |
-| Poll Loyverse purchases → notify | `python manage.py sync_purchases` | every 5 min |
+| Seed opening cafeteria balances | `python manage.py sync_balances` | every 5 min |
+| Poll Loyverse purchases → notify | `python manage.py sync_purchases` | **every 1 min** |
+| One-shot full Loyverse refresh | `python manage.py refresh_loyverse` | on demand / after go-live |
 | Low-balance alerts | `python manage.py low_balance_alerts` | daily 07:00 |
 | Booking reminders | `python manage.py send_booking_reminders` | daily 08:00 |
 | Retry booking → Calendar events | `python manage.py sync_calendar` | every 15 min |
@@ -68,8 +69,9 @@ environment is unambiguous:
 
 ```cron
 # m  h  dom mon dow   command
-*/10 *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances >> /home/rene82/logs/cafeteria.log 2>&1
-*/5  *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_purchases >> /home/rene82/logs/cafeteria.log 2>&1
+# Cafeteria — keep purchases near real-time (1 min) so parents see POS spend fast.
+*/5  *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_balances --no-profiles >> /home/rene82/logs/cafeteria.log 2>&1
+*    *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_purchases >> /home/rene82/logs/cafeteria.log 2>&1
 0    7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py low_balance_alerts >> /home/rene82/logs/cafeteria.log 2>&1
 0    8  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_booking_reminders >> /home/rene82/logs/bookings.log 2>&1
 */15 *  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py sync_calendar >> /home/rene82/logs/bookings.log 2>&1
@@ -78,6 +80,11 @@ environment is unambiguous:
 30   7  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py send_payment_reminders >> /home/rene82/logs/finance.log 2>&1
 30   2  *   *   *   DJANGO_SETTINGS_MODULE=config.settings.production /home/rene82/virtualenv/<app>/3.11/bin/python /home/rene82/<app>/manage.py backup_database --output-dir /home/rene82/backups >> /home/rene82/logs/backup.log 2>&1
 ```
+
+> **Go-live tip:** after linking the Loyverse token, run once:
+> `python manage.py refresh_loyverse --import-students`
+> Then rely on the 1-min `sync_purchases` cron. Parents can also hit **Actualizar**
+> in `/portal/cafeteria` to force an immediate Loyverse poll (rate-limited).
 
 - `sync_balances` **seeds each newly-linked student's OPENING balance** from Loyverse points, then never touches it again — the local `CafeteriaBalance` is the source of truth (spec R1: Loyverse `total_points` can't be written, so online top-ups live only in our ledger). Already-seeded students are a no-op, so a 10-min schedule is safe and won't clobber top-ups/adjustments. Onboarding order matters: **seed before purchases start syncing.** Online top-ups create ledger↔Loyverse drift (money we can't push to Loyverse) — run `reconcile` to see it, and staff load that amount into the Loyverse POS manually so the child can spend it. This command also **self-throttles a full Loyverse profile refresh** (visit history + lifetime spend → `LoyverseProfile`) at most ~once/day, so no separate cron entry is needed; pass `--no-profiles` to skip it. (The standalone `sync_loyverse_profiles --commit` does the same on demand.)
 - `sync_purchases` (Prompt 09) polls Loyverse receipts, idempotently records each new purchase (unique `loyverse_receipt_id`), debits the local balance, and notifies every linked parent (in-app + email); a purchase that crosses the low-balance threshold triggers a deduped alert. Safe to run every 5 min — re-runs never duplicate or re-notify. **⚠️ Before scheduling this cron, set `CAFETERIA_SYNC_PURCHASES_SINCE` to your go-live datetime** (ISO-8601). The first run must not backfill history: opening balances were seeded from Loyverse points, which already include past spend, so replaying old receipts would double-debit. With no watermark the first run starts from "now".

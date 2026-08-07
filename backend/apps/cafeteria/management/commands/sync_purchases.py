@@ -24,8 +24,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--watch', action='store_true',
                             help='Loop forever, re-polling every --interval seconds (dev/demo).')
-        parser.add_argument('--interval', type=int, default=60,
-                            help='Seconds between polls in --watch mode (default 60).')
+        parser.add_argument('--interval', type=int, default=30,
+                            help='Seconds between polls in --watch mode (default 30).')
 
     def handle(self, *args, **options):
         if not options['watch']:

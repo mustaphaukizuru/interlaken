@@ -267,6 +267,37 @@ class TestAdminPermissions:
         resp = api_client.get(reverse("admin-balances"))
         assert resp.status_code == 200
 
+    @patch("apps.cafeteria.views.sync_purchases")
+    @patch("apps.cafeteria.views.sync_all_balances")
+    def test_admin_sync_all_also_polls_purchases(self, mock_balances, mock_purchases, api_client):
+        mock_balances.return_value = {"synced": 3, "failed": 0}
+        mock_purchases.return_value = {
+            "students": 3, "receipts": 2, "created": 1, "notified": 2,
+        }
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.post(reverse("admin-sync-all"))
+        assert resp.status_code == 200, resp.data
+        assert resp.data["purchases_created"] == 1
+        assert resp.data["receipts"] == 2
+        mock_balances.assert_called_once()
+        mock_purchases.assert_called_once()
+
+
+class TestRefreshFromLoyverse:
+    @patch("apps.cafeteria.views.sync_purchases")
+    def test_parent_can_refresh(self, mock_sync, api_client):
+        mock_sync.return_value = {
+            "students": 2, "receipts": 1, "created": 1, "notified": 1,
+        }
+        api_client.force_authenticate(user=ParentFactory())
+        resp = api_client.post(reverse("cafeteria-refresh"))
+        assert resp.status_code == 200, resp.data
+        assert resp.data["created"] == 1
+        mock_sync.assert_called_once()
+
+    def test_anonymous_cannot_refresh(self, api_client):
+        assert api_client.post(reverse("cafeteria-refresh")).status_code in (401, 403)
+
 
 class TestApplyTopUp:
     @patch("apps.cafeteria.views.sync_student_balance")

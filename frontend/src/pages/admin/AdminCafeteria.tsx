@@ -108,8 +108,13 @@ function RosterTab() {
 
   const syncAll = useMutation({
     mutationFn: () => cafeteriaApi.syncAll(),
-    onSuccess: () => {
-      toast.success('Sincronización completada.');
+    onSuccess: ({ data }) => {
+      const created = data?.purchases_created ?? 0;
+      toast.success(
+        created > 0
+          ? `Sincronización completada — ${created} compra(s) nueva(s) desde Loyverse.`
+          : 'Sincronización completada (saldos + compras Loyverse).',
+      );
       queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-balances'] });
     },
     onError: () => toast.error('Error al sincronizar.'),

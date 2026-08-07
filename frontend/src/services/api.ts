@@ -235,6 +235,16 @@ export const cafeteriaApi = {
   ) =>
     api.post('/cafeteria/topup/', { student: studentId, amount, method, gateway }),
 
+  /** On-demand Loyverse purchase poll (parents/staff). Rate-limited server-side. */
+  refreshFromLoyverse: () =>
+    api.post<{
+      detail: string;
+      receipts: number;
+      created: number;
+      notified: number;
+      students: number;
+    }>('/cafeteria/refresh/'),
+
   // Admin
   getAllBalances: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/balances/', { params }),
@@ -246,7 +256,14 @@ export const cafeteriaApi = {
     api.post(`/cafeteria/admin/sync/${studentId}/`),
 
   syncAll: () =>
-    api.post('/cafeteria/admin/sync-all/'),
+    api.post<{
+      detail: string;
+      balances_ok?: number;
+      balances_failed?: number;
+      receipts?: number;
+      purchases_created?: number;
+      notified?: number;
+    }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
   getTopUpLog: (params?: { status?: string; method?: string; from?: string; to?: string; page?: number }) =>

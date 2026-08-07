@@ -34,6 +34,7 @@ from .services import (
     reconcile_balances,
     refund_transaction,
     sync_all_balances,
+    sync_purchases,
     sync_student_balance,
 )
 
@@ -350,6 +351,31 @@ class AdminApplyTopUpView(APIView):
         return Response({'detail': 'Recarga aplicada correctamente.'})
 
 
+@method_decorator(ratelimit('cafeteria-refresh', '6/m', key='user', method='POST'), name='dispatch')
+class RefreshFromLoyverseView(APIView):
+    """POST /api/v1/cafeteria/refresh/
+
+    On-demand Loyverse purchase poll so parents/staff can pull the latest POS
+    spend without waiting for cron. Rate-limited (6/min/user) to protect the
+    Loyverse API. Idempotent — safe to spam.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            result = sync_purchases()
+        except Exception as e:
+            logger.exception('cafeteria refresh failed')
+            return Response({'error': str(e)}, status=502)
+        return Response({
+            'detail': 'Sincronización con Loyverse completada.',
+            'receipts': result.get('receipts', 0),
+            'created': result.get('created', 0),
+            'notified': result.get('notified', 0),
+            'students': result.get('students', 0),
+        })
+
+
 class AdminSyncBalanceView(APIView):
     """POST /api/v1/cafeteria/admin/sync/<pk>/"""
     permission_classes = [IsAdmin]
@@ -358,19 +384,36 @@ class AdminSyncBalanceView(APIView):
         student = get_object_or_404(StudentProfile, pk=pk)
         try:
             new_balance = sync_student_balance(student)
-            return Response({'balance': str(new_balance)})
+            # Also pull any new POS purchases so the admin detail stays fresh.
+            purchases = sync_purchases()
+            return Response({
+                'balance': str(new_balance),
+                'purchases_created': purchases.get('created', 0),
+            })
         except Exception as e:
             return Response({'error': str(e)}, status=502)
 
 
 class AdminSyncAllView(APIView):
-    """POST /api/v1/cafeteria/admin/sync-all/"""
+    """POST /api/v1/cafeteria/admin/sync-all/
+
+    Seeds any missing opening balances AND polls Loyverse receipts so purchases
+    + parent alerts catch up immediately (not just on the next cron tick).
+    """
     permission_classes = [IsAdmin]
 
     def post(self, request):
         try:
-            sync_all_balances()
-            return Response({'detail': 'Sincronización completada.'})
+            balances = sync_all_balances()
+            purchases = sync_purchases()
+            return Response({
+                'detail': 'Sincronización completada.',
+                'balances_ok': balances.get('synced', 0),
+                'balances_failed': balances.get('failed', 0),
+                'receipts': purchases.get('receipts', 0),
+                'purchases_created': purchases.get('created', 0),
+                'notified': purchases.get('notified', 0),
+            })
         except Exception as e:
             return Response({'error': str(e)}, status=502)
 

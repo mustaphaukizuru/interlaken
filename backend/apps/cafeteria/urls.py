@@ -8,6 +8,8 @@ urlpatterns = [
     path('spending-trend/',              views.MySpendingTrendView.as_view(),     name='cafeteria-spending-trend'),
     path('balance/<int:student_pk>/threshold/', views.UpdateLowBalanceThresholdView.as_view(), name='cafeteria-threshold'),
     path('topup/',                       views.TopUpRequestCreateView.as_view(),  name='cafeteria-topup'),
+    # On-demand Loyverse poll (parents/staff) — does not wait for cron.
+    path('refresh/',                     views.RefreshFromLoyverseView.as_view(), name='cafeteria-refresh'),
     path('admin/balances/',              views.AdminBalancesView.as_view(),       name='admin-balances'),
     path('admin/topup/<int:pk>/apply/',  views.AdminApplyTopUpView.as_view(),     name='admin-apply-topup'),
     path('admin/sync/<int:pk>/',         views.AdminSyncBalanceView.as_view(),    name='admin-sync-balance'),

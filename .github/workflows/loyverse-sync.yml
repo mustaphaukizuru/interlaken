@@ -2,19 +2,24 @@ name: Loyverse cafeteria sync
 
 # Free "cron" for the cafeteria sync: runs the management commands against the
 # Supabase DB directly, so balances/purchases stay fresh even while the Render
-# free web service is asleep. GitHub cron granularity is ~5 min and best-effort.
+# free web service is asleep. GitHub cron granularity is ~5 min (best-effort).
+#
+# Cadence: every 5 minutes (fastest reliable GitHub Actions schedule). For
+# faster updates on cPanel use the 1-minute cron in docs/DEPLOYMENT.md, or the
+# parent/admin "Actualizar / Sincronizar" buttons which poll Loyverse on demand.
 #
 # ⚠️ Before enabling: set the CAFETERIA_SYNC_PURCHASES_SINCE secret to your
 # go-live datetime (ISO-8601, e.g. 2026-08-01T00:00:00Z). Without a watermark the
-# first purchase sync would backfill history and double-debit balances.
+# first purchase sync starts from "now" (safe) — never backfill history or you
+# double-debit balances already seeded from Loyverse points.
 #
 # Free-minutes note: private repos get 2000 Action-min/month. At ~1 min/run the
-# 30-min cadence below is ~2160 min — bump to '0 * * * *' (hourly) to stay under,
-# or make the repo public (unlimited), or trigger via cron-job.org instead.
+# 5-min cadence is ~8640 min/mo — make the repo public (unlimited), keep Render
+# cron, or use cPanel cron / cron-job.org if minutes matter.
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
 concurrency:
@@ -46,8 +51,8 @@ jobs:
       - name: Install backend deps
         working-directory: backend
         run: pip install -r requirements.txt
-      - name: Seed balances (once per student) + poll purchases
+      - name: Seed balances + poll purchases (fast path)
         working-directory: backend
         run: |
-          python manage.py sync_balances
+          python manage.py sync_balances --no-profiles
           python manage.py sync_purchases
