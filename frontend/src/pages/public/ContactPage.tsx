@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, Clock } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Navigation, ArrowRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,9 @@ import { contactApi } from '@/services/api';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
+import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { waHref } from '@/lib/siteContact';
 
 const schema = z.object({
   name:    z.string().min(2, 'Nombre requerido'),
@@ -17,14 +20,25 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const INFO = [
-  { icon: Phone,  label: 'Teléfono',           value: '(55) 1234-5678',                        href: 'tel:+525512345678' },
-  { icon: Mail,   label: 'Correo',             value: 'colegio@interlaken.edu.mx',             href: 'mailto:colegio@interlaken.edu.mx' },
-  { icon: MapPin, label: 'Dirección',          value: 'Tlalnepantla de Baz, Estado de México', href: 'https://maps.google.com/?q=Tlalnepantla+de+Baz' },
-  { icon: Clock,  label: 'Horario de oficina', value: 'Lunes–Viernes 8:00–16:00 hrs' },
+/** Directorio oficial por nivel (conmutador 5379-1188). */
+const DIRECTORY = [
+  { level: 'Preescolar', ext: '1', email: 'preescolar@interlaken.com.mx' },
+  { level: 'Primaria',   ext: '2', email: 'primaria@interlaken.com.mx' },
+  { level: 'Secundaria', ext: '3', email: 'secundaria@interlaken.com.mx' },
 ];
 
 export default function ContactPage() {
+  const settings = useSiteSettings();
+  // Contact facts are admin-editable (Contenido del sitio → Ajustes del sitio);
+  // entries without a value simply don't render.
+  // La dirección se muestra en la tarjeta con foto de la fachada (abajo),
+  // por eso no se repite aquí.
+  const INFO = [
+    { icon: Phone,  label: 'Teléfono',           value: settings.phone_display, href: `tel:${settings.phone_e164}` },
+    { icon: Mail,   label: 'Correo',             value: settings.contact_email, href: `mailto:${settings.contact_email}` },
+    { icon: Clock,  label: 'Horario de oficina', value: settings.office_hours },
+  ].filter((item) => item.value);
+
   const {
     register,
     handleSubmit,
@@ -46,15 +60,17 @@ export default function ContactPage() {
     <div>
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-dark text-white">
+        <img src="/assets/facade-sign.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <Blob tone="pink" opacity={0.4} size={460} shape={1} className="hidden sm:block" style={{ top: -150, left: -110 }} />
         <Blob tone="purple" opacity={0.4} size={420} shape={0} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
         <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-16">
-          <span className="section-label-pink inline-flex">Estamos para ayudarte</span>
+          <span className="section-label-pink inline-flex">Estamos para ayudarle</span>
           <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
             Contacto
           </h1>
           <p className="mt-4 max-w-[520px] text-base leading-relaxed text-white/60 sm:text-[17px]">
-            Resolvemos tus dudas sobre admisiones, costos y nuestro modelo educativo. Escríbenos y te contactaremos pronto.
+            Resolvemos sus dudas sobre admisiones, costos y nuestro modelo educativo. Escríbanos y le contactaremos pronto.
           </p>
         </div>
       </section>
@@ -93,26 +109,45 @@ export default function ContactPage() {
               })}
             </div>
 
-            {/* Map placeholder */}
-            <a
-              href="https://maps.google.com/?q=Tlalnepantla+de+Baz"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Abrir ubicación en Google Maps"
-              className="relative mt-6 block h-[220px] overflow-hidden rounded-[18px] border border-[#ECEAF3] bg-gradient-to-br from-purple-light to-green-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
-            >
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-purple">
-                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white shadow-purple">
-                  <MapPin className="h-6 w-6" />
+            {/* Foto de la fachada + dirección y CTA "Cómo llegar".
+                El mapa interactivo preciso vive en su propia sección más abajo. */}
+            {settings.address && (
+              <div className="group mt-6 overflow-hidden rounded-[20px] border border-line bg-white shadow-card transition-shadow hover:shadow-purple">
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream-2">
+                  <img
+                    src="/assets/facade.webp"
+                    alt="Fachada del Colegio Interlaken en Tlalnepantla"
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-dark/25 to-transparent" />
                 </div>
-                <span className="font-head text-sm font-bold">Tlalnepantla de Baz, Edo. de México</span>
-                <span className="text-[12.5px] text-muted">Ver ubicación en Google Maps</span>
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-purple/10 text-purple">
+                      <MapPin className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <p className="text-sm font-medium leading-snug text-ink">{settings.address}</p>
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(settings.address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Cómo llegar a ${settings.address} en Google Maps`}
+                    className="group/btn inline-flex min-h-[44px] flex-shrink-0 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple to-purple-mid px-5 text-sm font-semibold text-white shadow-purple transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  >
+                    <Navigation className="h-4 w-4" aria-hidden="true" />
+                    Cómo llegar
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+                  </a>
+                </div>
               </div>
-            </a>
+            )}
 
+            {settings.whatsapp_number && (
             <div className="mt-[22px]">
               <a
-                href="https://wa.me/5215512345678?text=Hola%2C%20me%20gustar%C3%ADa%20obtener%20m%C3%A1s%20informaci%C3%B3n"
+                href={waHref(settings.whatsapp_number, 'Hola, me gustaría obtener más información')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
@@ -123,12 +158,13 @@ export default function ContactPage() {
                 Escribir por WhatsApp
               </a>
             </div>
+            )}
           </Reveal>
 
           {/* Contact form */}
           <Reveal direction="left">
             <div className="card">
-              <h2 className="mb-[18px] font-head text-fluid-xl font-extrabold tracking-tight text-ink">Envíanos un mensaje</h2>
+              <h2 className="mb-[18px] font-head text-fluid-xl font-extrabold tracking-tight text-ink">Envíenos un mensaje</h2>
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
                 <div>
                   <label className="label" htmlFor="contact-name">Nombre</label>
@@ -156,6 +192,7 @@ export default function ContactPage() {
                   />
                   {errors.message && <p className="mt-1.5 text-xs text-red-600">{errors.message.message}</p>}
                 </div>
+                <PrivacyNote />
                 <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center disabled:opacity-60">
                   {isSubmitting ? 'Enviando…' : 'Enviar mensaje'}
                 </button>
@@ -164,6 +201,79 @@ export default function ContactPage() {
           </Reveal>
         </div>
       </Section>
+
+      {/* ── DIRECTORIO POR NIVEL ── */}
+      <Section bg="cream">
+        <div className="mx-auto w-full max-w-[1120px] px-6">
+          <span className="section-label-green inline-flex">Directorio</span>
+          <h2 className="mt-2 font-head text-fluid-xl font-bold text-ink">
+            Atención por nivel educativo
+          </h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {DIRECTORY.map((d) => (
+              <Reveal key={d.level}>
+                <div className="h-full rounded-xl2 border border-ink/10 bg-white p-5">
+                  <p className="font-head text-lg font-bold text-ink">{d.level}</p>
+                  <ul className="mt-3 space-y-2 text-sm">
+                    <li>
+                      <a
+                        href={`tel:${settings.phone_e164}`}
+                        className="flex items-center gap-2 text-ink/85 hover:text-green-dark"
+                      >
+                        <Phone size={15} className="text-green-dark" aria-hidden="true" />
+                        {settings.phone_display} · Ext {d.ext}
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href={`mailto:${d.email}`}
+                        className="flex items-center gap-2 break-all text-ink/85 hover:text-green-dark"
+                      >
+                        <Mail size={15} className="text-green-dark" aria-hidden="true" />
+                        {d.email}
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* ── MAPA ── */}
+      <section className="bg-white pb-14 pt-4">
+        <div className="mx-auto w-full max-w-[1120px] px-6">
+          <h2 className="font-head text-fluid-xl font-bold text-ink">Cómo llegar</h2>
+          <p className="mt-1 text-sm text-muted">
+            {settings.address}
+            {settings.maps_url && (
+              <>
+                {' · '}
+                <a
+                  href={settings.maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-green-dark underline"
+                >
+                  Abrir en Google Maps
+                </a>
+              </>
+            )}
+          </p>
+          <div className="mt-4 overflow-hidden rounded-xl2 border border-ink/10">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3759.6587772437156!2d-99.20946797478247!3d19.556257781749714!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d21d6c27c972e1%3A0x3c76d65bc761079b!2sCollege%20Interlaken%20%2F%20ADCE%20Education!5e0!3m2!1sen!2smx!4v1783605176683!5m2!1sen!2smx"
+              title="Mapa — Colegio Interlaken, Av. de los Reyes 67, Tlalnepantla"
+              className="h-[340px] w-full sm:h-[420px]"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

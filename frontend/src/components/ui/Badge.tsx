@@ -2,12 +2,14 @@ import { clsx } from 'clsx';
 
 type Variant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
+// Semantic states mapped to Interlaken brand tokens (no raw Tailwind palette):
+// success→green · warning→amber · error→coral · info→brand(purple) · neutral→cream/muted.
 const variants: Record<Variant, string> = {
-  success: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  warning: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  error:   'bg-red-50 text-red-700 ring-red-600/20',
-  info:    'bg-blue-50 text-blue-700 ring-blue-600/20',
-  neutral: 'bg-slate-100 text-slate-700 ring-slate-500/20',
+  success: 'bg-green-50 text-green-700 ring-green-600/20',
+  warning: 'bg-amber/10 text-amber ring-amber/30',
+  error:   'bg-coral-50 text-coral-700 ring-coral-600/20',
+  info:    'bg-brand-50 text-brand-700 ring-brand-600/20',
+  neutral: 'bg-cream text-muted ring-subtle/25',
 };
 
 interface BadgeProps {

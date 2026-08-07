@@ -64,3 +64,30 @@ export async function unsubscribeFromPush(): Promise<boolean> {
   const sub = await registration.pushManager.getSubscription();
   return sub ? sub.unsubscribe() : false;
 }
+
+/**
+ * Full opt-in: browser subscription + persist it on the backend so
+ * portal notifications (cafetería, pagos, avisos) reach this device.
+ * Call from a click handler. Returns true when the server stored it.
+ */
+export async function enablePush(): Promise<boolean> {
+  const sub = await subscribeToPush();
+  if (!sub) return false;
+  const { portalApi } = await import('@/services/api');
+  await portalApi.subscribePush(sub.toJSON() as {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  });
+  return true;
+}
+
+/** Full opt-out: remove on the backend first, then locally. */
+export async function disablePush(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return false;
+  const registration = await navigator.serviceWorker.ready;
+  const sub = await registration.pushManager.getSubscription();
+  if (!sub) return false;
+  const { portalApi } = await import('@/services/api');
+  await portalApi.unsubscribePush(sub.endpoint).catch(() => {});
+  return sub.unsubscribe();
+}

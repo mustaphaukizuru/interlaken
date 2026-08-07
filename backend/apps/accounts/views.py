@@ -1,31 +1,36 @@
 """
 Accounts views: Google OAuth flow, JWT token exchange, user profile, students list.
 """
+import secrets
+from urllib.parse import urlencode
+
 import requests
 from django.conf import settings
 from django.contrib.auth import logout
 from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.core.ratelimit import ratelimit
 
+from .cookies import (
+    clear_auth_cookies,
+    csrf_ok,
+    issue_session,
+    new_csrf_token,
+    set_csrf_cookie,
+    set_refresh_cookie,
+)
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer, UserSerializer
-
-
-def _get_tokens(user):
-    """Return JWT access + refresh token pair for a user."""
-    refresh = RefreshToken.for_user(user)
-    return {
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-    }
 
 
 class GoogleLoginView(APIView):
@@ -36,15 +41,43 @@ class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        google_auth_url = (
-            'https://accounts.google.com/o/oauth2/v2/auth'
-            f'?client_id={settings.GOOGLE_CLIENT_ID}'
-            '&response_type=code'
-            '&scope=openid%20email%20profile'
-            f'&redirect_uri={settings.GOOGLE_REDIRECT_URI}'
-            '&access_type=offline'
-        )
-        return redirect(google_auth_url)
+        # Fail gracefully to the SPA login instead of sending the user to Google
+        # with blank credentials (which yields a confusing Google error page)
+        # when OAuth isn't configured in this environment.
+        if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
+            return redirect(f'{settings.FRONTEND_URL}/login?error=google_unavailable')
+
+        # CSRF defense (RFC 6749 §10.12): mint a random `state`, stash it in the
+        # session, and require the callback to echo it back — otherwise an
+        # attacker could feed a victim their own authorization code and silently
+        # log the victim into the attacker's account.
+        state = secrets.token_urlsafe(32)
+        request.session['google_oauth_state'] = state
+
+        # Build the consent URL with proper URL-encoding of every parameter.
+        # `redirect_uri` must EXACTLY match one of the "Authorized redirect URIs"
+        # registered on the OAuth client in Google Cloud Console (scheme, host,
+        # port and trailing slash all count) — otherwise Google returns
+        # Error 400: redirect_uri_mismatch. It is read from GOOGLE_REDIRECT_URI.
+        params = urlencode({
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+            'response_type': 'code',
+            'scope': 'openid email profile',
+            'access_type': 'offline',
+            'prompt': 'select_account',
+            'state': state,
+        })
+        return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{params}')
+
+
+def _email_is_verified(info: dict) -> bool:
+    """Google returns email_verified as a bool (userinfo) or occasionally the
+    string 'true' (some ID-token encodings). Treat anything else as unverified —
+    an unverified email must never be trusted as an account identity key, or an
+    attacker could take over a privileged account sharing that address."""
+    v = info.get('email_verified')
+    return v is True or v == 'true'
 
 
 @method_decorator(ratelimit('oauth-callback', '20/m', key='ip', method='GET'), name='dispatch')
@@ -61,36 +94,40 @@ class GoogleCallbackView(APIView):
         if not code:
             return redirect(f'{settings.FRONTEND_URL}/login?error=no_code')
 
-        # Exchange code for tokens
-        token_response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'code': code,
-                'client_id': settings.GOOGLE_CLIENT_ID,
-                'client_secret': settings.GOOGLE_CLIENT_SECRET,
-                'redirect_uri': settings.GOOGLE_REDIRECT_URI,
-                'grant_type': 'authorization_code',
-            },
-            timeout=10,
-        )
+        # Verify the CSRF state set in GoogleLoginView (single-use: pop it).
+        expected_state = request.session.pop('google_oauth_state', None)
+        if not expected_state or request.GET.get('state') != expected_state:
+            return redirect(f'{settings.FRONTEND_URL}/login?error=state_mismatch')
 
-        if token_response.status_code != 200:
-            return redirect(f'{settings.FRONTEND_URL}/login?error=token_exchange_failed')
+        # Exchange code → token → userinfo. Any network failure or malformed
+        # response redirects to the login with an error rather than a raw 500.
+        try:
+            token_response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data={
+                    'code': code,
+                    'client_id': settings.GOOGLE_CLIENT_ID,
+                    'client_secret': settings.GOOGLE_CLIENT_SECRET,
+                    'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+                    'grant_type': 'authorization_code',
+                },
+                timeout=10,
+            )
+            if token_response.status_code != 200:
+                return redirect(f'{settings.FRONTEND_URL}/login?error=token_exchange_failed')
+            access_token = token_response.json().get('access_token')
 
-        token_data = token_response.json()
-        access_token = token_data.get('access_token')
-
-        # Get user info from Google
-        userinfo_response = requests.get(
-            'https://www.googleapis.com/oauth2/v3/userinfo',
-            headers={'Authorization': f'Bearer {access_token}'},
-            timeout=10,
-        )
-
-        if userinfo_response.status_code != 200:
-            return redirect(f'{settings.FRONTEND_URL}/login?error=userinfo_failed')
-
-        userinfo = userinfo_response.json()
+            # Get user info from Google
+            userinfo_response = requests.get(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=10,
+            )
+            if userinfo_response.status_code != 200:
+                return redirect(f'{settings.FRONTEND_URL}/login?error=userinfo_failed')
+            userinfo = userinfo_response.json()
+        except (requests.RequestException, ValueError):
+            return redirect(f'{settings.FRONTEND_URL}/login?error=google_unreachable')
         google_id = userinfo.get('sub')
         email = userinfo.get('email')
         first_name = userinfo.get('given_name', '')
@@ -99,6 +136,8 @@ class GoogleCallbackView(APIView):
 
         if not email:
             return redirect(f'{settings.FRONTEND_URL}/login?error=no_email')
+        if not _email_is_verified(userinfo):
+            return redirect(f'{settings.FRONTEND_URL}/login?error=email_unverified')
 
         # Create or update user
         user, created = User.objects.get_or_create(email=email, defaults={
@@ -121,16 +160,14 @@ class GoogleCallbackView(APIView):
             if updated:
                 user.save(update_fields=['google_id', 'avatar'])
 
-        tokens = _get_tokens(user)
-
-        # Redirect to frontend with tokens in query params (stored immediately by JS)
-        frontend_redirect = (
-            f'{settings.FRONTEND_URL}/auth/callback'
-            f'?access={tokens["access"]}'
-            f'&refresh={tokens["refresh"]}'
-            f'&role={user.role}'
-        )
-        return redirect(frontend_redirect)
+        # Set the session as httpOnly cookies and redirect WITHOUT any token in
+        # the URL. Land on /login (NOT /auth/*, which is reserved for the backend
+        # — the Vite proxy and the SPA catch-all both route /auth/* to Django);
+        # LoginPage sees ?login=ok and silently mints an in-memory access token
+        # from the cookie via the refresh endpoint.
+        response = redirect(f'{settings.FRONTEND_URL}/login?login=ok')
+        issue_session(user, response)
+        return response
 
 
 @method_decorator(ratelimit('google-token', '10/m', key='ip', method='POST'), name='dispatch')
@@ -147,24 +184,20 @@ class GoogleTokenView(APIView):
         if not credential:
             return Response({'error': 'credential required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Verify the ID token with Google
-        verify_response = requests.get(
-            f'https://oauth2.googleapis.com/tokeninfo?id_token={credential}',
-            timeout=10,
-        )
-
-        if verify_response.status_code != 200:
+        # Verify the ID token LOCALLY (signature + audience + expiry) instead of
+        # GETting Google's tokeninfo endpoint with the credential in the URL
+        # (IK-SEC A4: no token in a URL). Raises ValueError on any invalid token.
+        try:
+            payload = google_id_token.verify_oauth2_token(
+                credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+        except ValueError:
             return Response({'error': 'invalid_token'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        payload = verify_response.json()
-
-        # Validate audience
-        if payload.get('aud') != settings.GOOGLE_CLIENT_ID:
-            return Response({'error': 'token_audience_mismatch'}, status=status.HTTP_401_UNAUTHORIZED)
 
         email = payload.get('email')
         if not email:
             return Response({'error': 'no_email'}, status=status.HTTP_400_BAD_REQUEST)
+        if not _email_is_verified(payload):
+            return Response({'error': 'email_unverified'}, status=status.HTTP_401_UNAUTHORIZED)
 
         user, _ = User.objects.get_or_create(email=email, defaults={
             'first_name': payload.get('given_name', ''),
@@ -174,37 +207,88 @@ class GoogleTokenView(APIView):
             'role': User.Role.PARENT,
         })
 
-        tokens = _get_tokens(user)
-        return Response({
-            'user': UserSerializer(user).data,
-            **tokens,
-        })
+        response = Response()
+        access = issue_session(user, response)
+        response.data = {'user': UserSerializer(user).data, 'access': access}
+        return response
 
 
 class LogoutView(APIView):
-    """POST /auth/logout/ — Blacklist the refresh token so it can't be reused."""
+    """POST /auth/logout/ — Blacklist the refresh cookie's token and clear cookies."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        refresh_token = request.data.get('refresh')
-        if not refresh_token:
-            return Response({'error': 'refresh token requerido.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        try:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        except TokenError:
-            # Token is invalid, expired, or already blacklisted.
-            return Response({'error': 'Token inválido o ya revocado.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not csrf_ok(request):
+            return Response({'detail': 'CSRF token inválido.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        raw = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE)
+        if raw:
+            try:
+                RefreshToken(raw).blacklist()
+            except TokenError:
+                pass  # already invalid/expired/blacklisted — still clear cookies
+        response = Response({'detail': 'Sesión cerrada correctamente.'})
+        clear_auth_cookies(response)
         logout(request)
-        return Response({'detail': 'Sesión cerrada correctamente.'})
+        return response
 
 
 @method_decorator(ratelimit('login', '10/m', key='ip', method='POST'), name='dispatch')
 class RateLimitedTokenObtainView(TokenObtainPairView):
-    """POST /api/v1/accounts/token/ — email/password login, IP rate-limited."""
-    pass
+    """POST /api/v1/accounts/token/ — email/password login, IP rate-limited.
+
+    On success the refresh token is set as an httpOnly cookie (+ CSRF cookie) and
+    stripped from the body; only the short-lived access token is returned.
+    """
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            refresh = response.data.get('refresh')
+            access = response.data.get('access')
+            response.data = {'access': access}
+            if refresh:
+                set_refresh_cookie(response, refresh)
+                set_csrf_cookie(response, new_csrf_token())
+        return response
+
+
+@method_decorator(ratelimit('token-refresh', '60/m', key='ip', method='POST'), name='dispatch')
+class CookieTokenRefreshView(APIView):
+    """POST /api/v1/accounts/token/refresh/ — rotate the httpOnly refresh cookie.
+
+    Reads the refresh token from the cookie (never the body), requires a valid
+    double-submit CSRF header, rotates (blacklisting the old token), re-sets the
+    cookie, and returns a fresh in-memory access token.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if not csrf_ok(request):
+            return Response({'detail': 'CSRF token inválido.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        raw = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE)
+        if not raw:
+            return Response({'detail': 'No hay sesión activa.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        # Reuse SimpleJWT's serializer so rotation + blacklist semantics are
+        # identical to the stock TokenRefreshView (a blacklisted/expired token
+        # raises here and the session is cleared).
+        serializer = TokenRefreshSerializer(data={'refresh': raw})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except (TokenError, InvalidToken):
+            response = Response({'detail': 'Sesión expirada.'},
+                                status=status.HTTP_401_UNAUTHORIZED)
+            clear_auth_cookies(response)
+            return response
+
+        data = serializer.validated_data
+        response = Response({'access': data['access']})
+        set_refresh_cookie(response, data.get('refresh', raw))
+        set_csrf_cookie(response, new_csrf_token())
+        return response
 
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):
@@ -217,17 +301,24 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
 
 
 class StudentListView(generics.ListAPIView):
-    """GET /api/v1/accounts/students/ — List students (admin only or parent's own children)."""
+    """GET /api/v1/accounts/students/?search= — List students (admin only or parent's own children)."""
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+    # Powers the admin Ctrl+K palette (global SearchFilter backend applies).
+    search_fields = ['user__first_name', 'user__last_name', 'user__email',
+                     'student_id', 'grade']
 
     def get_queryset(self):
         user = self.request.user
+        # Stable ordering so pagination never skips/duplicates rows across pages
+        # (StudentProfile has no Meta.ordering).
+        order = ('user__last_name', 'user__first_name', 'id')
         if user.role == User.Role.ADMIN:
-            return StudentProfile.objects.select_related('user').all()
+            return StudentProfile.objects.select_related('user').order_by(*order)
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
-            return StudentProfile.objects.filter(parents=user).select_related('user')
+            return (StudentProfile.objects.filter(parents=user)
+                    .select_related('user').order_by(*order))
         return StudentProfile.objects.none()
 
 

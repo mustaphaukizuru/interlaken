@@ -1,0 +1,54 @@
+/* Interlaken brand layer for the unfold admin (loaded via UNFOLD.STYLES — a
+   static asset, not a template override). Poppins = display, Inter = body,
+   mirroring the frontend token layer (docs/DESIGN.md §1.6). Colours come from
+   UNFOLD.COLORS; this file only adds typography + a few tasteful refinements
+   that unfold's config can't express. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap');
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3,
+#site-header {
+  font-family: 'Poppins', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Dashboard KPI cards (templates/admin/index.html adds .interlaken-kpi) ──
+   Bring the admin landing in line with the frontend StatCards: a bigger
+   display-font number, a subtle hover-lift, and a brand-tinted icon watermark
+   instead of a flat grey one. */
+.interlaken-kpi {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s, border-color 0.2s;
+}
+.interlaken-kpi:hover {
+  transform: translateY(-3px);
+}
+.interlaken-kpi .text-2xl {
+  font-family: 'Poppins', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.9rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+/* Watermark icon: faint brand purple in light, faint white in dark. */
+.interlaken-kpi .material-symbols-outlined {
+  color: rgba(64, 26, 142, 0.13);
+}
+.dark .interlaken-kpi .material-symbols-outlined {
+  color: rgba(255, 255, 255, 0.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interlaken-kpi:hover { transform: none; }
+}
+
+/* Mobile: unfold's flex component hardcodes `flex-row`, which beats the
+   template's `flex-col` in the cascade and squishes the 5 KPI cards into one
+   unreadable 375px row. Force a proper column stack (full-width cards) below
+   the md breakpoint; the md:* utilities take over from 768px up. */
+@media (max-width: 767px) {
+  .interlaken-kpi-row { flex-direction: column; }
+  .interlaken-kpi { width: 100%; }
+}

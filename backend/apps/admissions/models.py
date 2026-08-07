@@ -6,6 +6,8 @@ from uuid import uuid4
 from django.db import models
 from django.utils import timezone
 
+from apps.core.fields import EncryptedTextField
+
 
 class PreRegistration(models.Model):
     """Public pre-registration form — no login required."""
@@ -69,10 +71,19 @@ class Registration(models.Model):
         REJECTED   = 'rejected',   'Rechazado'
         COMPLETE   = 'complete',   'Inscripción Completa'
 
-    # Unguessable capability token issued at creation. Anonymous applicants must
-    # present it (query param or X-Access-Token header) to read/update their own
-    # registration; staff (JWT) bypass it. Never exposed in list endpoints.
+    # Internal opaque id (no longer a secret capability — see the hashed tokens
+    # below). Kept for stable admin/reference URLs.
     access_token = models.UUIDField(default=uuid4, editable=False, unique=True)
+
+    # ── Access tokens (IK-SEC A2) ─────────────────────────────────────────────
+    # Only SHA-256 hashes are stored. The one-time INVITE token is returned once
+    # at creation and exchanged (POST) for a short-lived SESSION token that gates
+    # subsequent steps. Tokens never appear in a URL. See admissions/tokens.py.
+    invite_token_hash  = models.CharField(max_length=64, blank=True, default='')
+    invite_expires_at  = models.DateTimeField(null=True, blank=True)
+    invite_used_at     = models.DateTimeField(null=True, blank=True)
+    session_token_hash = models.CharField(max_length=64, blank=True, default='')
+    session_expires_at = models.DateTimeField(null=True, blank=True)
 
     # Link to pre-registration if available
     pre_registration = models.ForeignKey(PreRegistration, null=True, blank=True,
@@ -104,10 +115,13 @@ class Registration(models.Model):
     emergency_phone  = models.CharField(max_length=20, blank=True)
     emergency_rel    = models.CharField(max_length=50, blank=True)
 
-    # Medical
-    blood_type       = models.CharField(max_length=5, blank=True)
-    allergies        = models.TextField(blank=True)
-    medical_notes    = models.TextField(blank=True)
+    # Medical — sensitive personal data, ENCRYPTED AT REST (IK-LEGAL B4) and gated
+    # on MEDICAL_DATA consent + role in the serializer.
+    blood_type       = EncryptedTextField(blank=True, default='')
+    allergies        = EncryptedTextField(blank=True, default='')
+    medical_notes    = EncryptedTextField(blank=True, default='')
+    estatura         = EncryptedTextField(blank=True, default='', verbose_name='Estatura')
+    peso             = EncryptedTextField(blank=True, default='', verbose_name='Peso')
 
     # Status
     status       = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -115,6 +129,17 @@ class Registration(models.Model):
     created_at   = models.DateTimeField(default=timezone.now)
     updated_at   = models.DateTimeField(auto_now=True)
     admin_notes  = models.TextField(blank=True)
+
+    # ── Consent (IK-LEGAL B2) — captured on the anonymous registration itself ─────
+    # (Applicants aren't guardian User accounts yet, so LFPDPPP acceptance is
+    # recorded here, tied to the exact notice version; medical fields are gated on
+    # consent_medical_data at submit.)
+    privacy_notice_version = models.ForeignKey('legal.PrivacyNoticeVersion', null=True,
+                                               blank=True, on_delete=models.SET_NULL,
+                                               related_name='+')
+    privacy_accepted_at    = models.DateTimeField(null=True, blank=True)
+    consent_photos_media   = models.BooleanField(default=False)
+    consent_medical_data   = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Inscripción'

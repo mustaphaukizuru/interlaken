@@ -1,55 +1,43 @@
 import { Link } from 'react-router-dom';
 import {
   Target, Eye, Heart, Award, Users, Globe2,
-  Sparkles, Quote, ArrowRight, type LucideIcon,
+  Sparkles, ArrowRight, type LucideIcon,
 } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
+import { SCHOOL_YEARS } from '@/lib/siteMeta';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
 
 const VALUES: { icon: LucideIcon; title: string; desc: string; color: string }[] = [
-  { icon: Award,   title: 'Excelencia académica', desc: 'Formación rigurosa con enfoque humanista y pensamiento crítico.', color: '#401a8e' },
-  { icon: Globe2,  title: 'Bilingüismo real',      desc: 'Inglés intensivo desde el nivel inicial con certificaciones internacionales.', color: '#47a028' },
-  { icon: Heart,   title: 'Formación en valores',  desc: 'Ciudadanía, empatía y responsabilidad como parte de la vida diaria.', color: '#ef2558' },
-  { icon: Sparkles, title: 'Innovación educativa', desc: 'Tecnología, ciencia y creatividad integradas al aula.', color: '#48a018' },
-  { icon: Users,   title: 'Comunidad integrada',   desc: 'Un ambiente cálido e inclusivo donde cada familia pertenece.', color: '#8f6fd0' },
-  { icon: Target,  title: 'Acompañamiento',        desc: 'Apoyo psicopedagógico personalizado para cada alumno.', color: '#d97706' },
+  { icon: Award,   title: 'Excelencia académica', desc: 'Formación rigurosa con enfoque humanista y pensamiento crítico.', color: 'var(--purple)' },
+  { icon: Globe2,  title: 'Bilingüismo real',      desc: 'Inglés intensivo desde el nivel inicial con certificaciones internacionales.', color: 'var(--green)' },
+  { icon: Heart,   title: 'Formación en valores',  desc: 'Ciudadanía, empatía y responsabilidad como parte de la vida diaria.', color: 'var(--pink)' },
+  { icon: Sparkles, title: 'Innovación educativa', desc: 'Tecnología, ciencia y creatividad integradas al aula.', color: 'var(--green)' },
+  { icon: Users,   title: 'Comunidad integrada',   desc: 'Un ambiente cálido e inclusivo donde cada familia pertenece.', color: 'var(--purple-mid)' },
+  { icon: Target,  title: 'Acompañamiento',        desc: 'Apoyo psicopedagógico personalizado para cada alumno.', color: 'var(--amber)' },
 ];
 
+// Levels use brand scales/tokens (green/brand/coral have numeric ramps; the
+// 4th uses the purple token pair). Mirrors the levels offered in the
+// pre-registro grade picker.
 const LEVELS = [
-  { level: 'Preescolar',   grades: '1°–3°', age: '3–6 años',   color: 'bg-purple-50 border-purple-200 text-purple-700' },
+  { level: 'Preescolar',   grades: '1°–3°', age: '3–6 años',   color: 'bg-green-50 border-green-200 text-green-700' },
   { level: 'Primaria',     grades: '1°–6°', age: '6–12 años',  color: 'bg-brand-50 border-brand-200 text-brand-700' },
-  { level: 'Secundaria',   grades: '1°–3°', age: '12–15 años', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  { level: 'Preparatoria', grades: '1°–3°', age: '15–18 años', color: 'bg-amber-50 border-amber-200 text-amber-700' },
+  { level: 'Secundaria',   grades: '1°–3°', age: '12–15 años', color: 'bg-coral-50 border-coral-200 text-coral-700' },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: 'Mariana Gómez',
-    relation: 'Mamá de Primaria',
-    color: '#401a8e',
-    quote: 'Interlaken se siente como una familia. Mis hijos llegan felices y su inglés ha mejorado muchísimo en solo un año.',
-  },
-  {
-    name: 'Roberto Salas',
-    relation: 'Papá de Secundaria',
-    color: '#47a028',
-    quote: 'El acompañamiento de los maestros es excepcional. Se nota que conocen a cada alumno por su nombre y su historia.',
-  },
-  {
-    name: 'Andrea Ríos',
-    relation: 'Egresada, generación 2015',
-    color: '#ef2558',
-    quote: 'Los valores y la disciplina que aprendí aquí me acompañan hasta hoy en la universidad. Siempre agradecida con mi colegio.',
-  },
+/**
+ * Institutional credentials — defensible facts that replace prior placeholder
+ * testimonials (fabricated social proof is banned by the copy standard).
+ */
+const CREDENTIALS: { icon: LucideIcon; title: string; desc: string; color: string }[] = [
+  { icon: Award,  title: 'Incorporación oficial SEP', desc: 'Estudios con reconocimiento y validez oficial ante la Secretaría de Educación Pública.', color: 'var(--purple)' },
+  { icon: Globe2, title: 'Certificaciones de inglés',  desc: 'Preparamos a los alumnos para exámenes de certificación internacional de inglés.', color: 'var(--green)' },
+  { icon: Users,  title: 'Más de 2,500 egresados',     desc: 'Cuatro décadas de comunidad que respaldan nuestra trayectoria en Tlalnepantla.', color: 'var(--pink)' },
 ];
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   (e.target as HTMLImageElement).style.display = 'none';
-}
-
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 }
 
 export default function AboutPage() {
@@ -62,7 +50,7 @@ export default function AboutPage() {
         <div className="relative mx-auto max-w-[1120px] px-6 py-14 sm:py-16 lg:py-[72px]">
           <span className="section-label-pink inline-flex">Nuestra Historia</span>
           <h1 className="mt-3 font-head font-black text-fluid-4xl leading-[1.08] tracking-[-0.04em]">
-            40 años formando<br />líderes en Tlalnepantla
+            {SCHOOL_YEARS} años formando<br />líderes en Tlalnepantla
           </h1>
           <p className="mt-4 max-w-xl text-fluid-base leading-relaxed text-white/60 sm:mt-[18px]">
             Colegio Interlaken es una institución educativa privada con más de cuatro décadas
@@ -82,7 +70,7 @@ export default function AboutPage() {
               </h2>
               <div className="mt-6 flex gap-4">
                 <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-purple/10">
-                  <Target size={22} color="#401a8e" />
+                  <Target size={22} color="var(--purple)" />
                 </div>
                 <div>
                   <h3 className="font-head text-[17px] font-bold text-ink">Misión</h3>
@@ -94,7 +82,7 @@ export default function AboutPage() {
               </div>
               <div className="mt-5 flex gap-4">
                 <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-green/10">
-                  <Eye size={22} color="#47a028" />
+                  <Eye size={22} color="var(--green)" />
                 </div>
                 <div>
                   <h3 className="font-head text-[17px] font-bold text-ink">Visión</h3>
@@ -116,9 +104,9 @@ export default function AboutPage() {
               <img src="/assets/campus-mural.webp" alt="Mural del campus" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
-            <div className="absolute -bottom-5 -left-2.5 flex items-center gap-3 rounded-2xl border border-[#ECEAF3] bg-white px-4 py-3.5 shadow-purple sm:-left-2.5">
+            <div className="absolute -bottom-5 -left-2.5 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-left-2.5">
               <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-pink/10">
-                <Award size={20} color="#ef2558" />
+                <Award size={20} color="var(--pink)" />
               </div>
               <div>
                 <div className="font-head text-xl font-extrabold leading-none text-ink">+2,500</div>
@@ -141,7 +129,7 @@ export default function AboutPage() {
               <div className="card hover-lift h-full">
                 <div
                   className="flex h-[46px] w-[46px] items-center justify-center rounded-xl2"
-                  style={{ background: `${v.color}18` }}
+                  style={{ background: `color-mix(in srgb, ${v.color} 9%, transparent)` }}
                 >
                   <v.icon size={22} color={v.color} />
                 </div>
@@ -172,30 +160,21 @@ export default function AboutPage() {
         </div>
       </Section>
 
-      {/* ── TESTIMONIOS ── */}
+      {/* ── RESPALDO ── */}
       <Section bg="cream">
         <Reveal className="mb-10 text-center sm:mb-11">
-          <span className="section-label-pink inline-flex">Testimonios</span>
-          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">Lo que dicen nuestras familias</h2>
+          <span className="section-label-pink inline-flex">Nuestro respaldo</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">Certificaciones y trayectoria que dan certeza</h2>
         </Reveal>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {TESTIMONIALS.map((t, i) => (
-            <Reveal key={t.name} delay={i * 90}>
+          {CREDENTIALS.map((c, i) => (
+            <Reveal key={c.title} delay={i * 90}>
               <div className="card hover-lift flex h-full flex-col gap-[18px]">
-                <Quote size={30} color={t.color} className="opacity-50" />
-                <p className="flex-1 text-[15px] leading-relaxed text-[#3d3654]">“{t.quote}”</p>
-                <div className="mt-1 flex items-center gap-3">
-                  <div
-                    className="flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full font-head text-[15px] font-bold text-white"
-                    style={{ background: t.color }}
-                  >
-                    {initials(t.name)}
-                  </div>
-                  <div>
-                    <div className="font-head text-[15px] font-bold text-ink">{t.name}</div>
-                    <div className="text-[12.5px] text-muted">{t.relation}</div>
-                  </div>
+                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${c.color} 12%, transparent)` }}>
+                  <c.icon size={26} color={c.color} />
                 </div>
+                <h3 className="font-head text-[19px] font-bold text-ink">{c.title}</h3>
+                <p className="flex-1 text-[15px] leading-relaxed text-muted">{c.desc}</p>
               </div>
             </Reveal>
           ))}
@@ -204,10 +183,10 @@ export default function AboutPage() {
 
       {/* ── CTA ── */}
       <Section bg="gradient" spacing="sm" className="text-center">
-        <h2 className="font-head text-fluid-3xl font-black tracking-[-0.025em]">¿Quieres conocernos de cerca?</h2>
-        <p className="mx-auto mt-3 max-w-xl text-fluid-base opacity-90">Agenda una visita o inicia tu pre-inscripción en línea en solo unos minutos.</p>
+        <h2 className="font-head text-fluid-3xl font-black tracking-[-0.025em]">¿Desea conocernos de cerca?</h2>
+        <p className="mx-auto mt-3 max-w-xl text-fluid-base opacity-90">Agende una visita o inicie su pre-registro en línea en solo unos minutos.</p>
         <div className="mt-7 flex flex-wrap justify-center gap-3.5">
-          <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Iniciar Pre-registro <ArrowRight size={17} /></Link>
+          <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Inicie su pre-registro <ArrowRight size={17} /></Link>
           <Link to="/puertas-abiertas" className="btn-ghost btn-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Puertas Abiertas</Link>
         </div>
       </Section>

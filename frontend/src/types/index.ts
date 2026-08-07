@@ -86,11 +86,29 @@ export interface ReconcileRow {
   error: string | null;
 }
 
+export interface LoyverseProfile {
+  customer_code: string;
+  name: string;
+  email: string;
+  phone_number: string;
+  address_code: string;
+  note: string;
+  first_visit: string | null;
+  last_visit: string | null;
+  total_visits: number;
+  total_spent: string;
+  total_points: string;
+  loyverse_created_at: string | null;
+  synced_at: string;
+}
+
 export interface CafeteriaStudentDetail {
   balance: CafeteriaBalance;
   parents: Array<{ id: number; full_name: string; email: string; whatsapp: string }>;
   transactions: CafeteriaTransaction[];
   adjustments: BalanceAdjustment[];
+  /** Full Loyverse customer snapshot; null when never synced. */
+  loyverse: LoyverseProfile | null;
 }
 
 export interface Payment {

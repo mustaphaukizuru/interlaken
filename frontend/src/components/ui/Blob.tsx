@@ -3,11 +3,11 @@ import { type CSSProperties } from 'react';
 type Tone = 'purple' | 'pink' | 'coral' | 'green' | 'amber';
 
 const TONE: Record<Tone, string> = {
-  purple: '#401a8e',
-  pink: '#ef2558',
-  coral: '#dd2622',
-  green: '#47a028',
-  amber: '#d97706',
+  purple: 'var(--purple)',
+  pink: 'var(--pink)',
+  coral: 'var(--coral)',
+  green: 'var(--green)',
+  amber: 'var(--amber)',
 };
 
 /** A few soft organic paths so blobs don't all read as the same shape. */

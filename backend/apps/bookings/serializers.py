@@ -18,6 +18,33 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
         ]
 
 
+class AdminSlotSerializer(serializers.ModelSerializer):
+    """Admin management view of a slot: capacity/location/title/is_active are
+    editable; the identity fields (visit_type/date/times) are read-only so an
+    edit can't silently move a slot that families already booked."""
+    booked_count    = serializers.IntegerField(read_only=True)
+    spots_remaining = serializers.IntegerField(read_only=True)
+    is_full         = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = AvailabilitySlot
+        fields = [
+            'id', 'visit_type', 'title', 'date', 'start_time', 'end_time',
+            'capacity', 'location', 'is_active',
+            'booked_count', 'spots_remaining', 'is_full',
+        ]
+        read_only_fields = ['id', 'visit_type', 'date', 'start_time', 'end_time',
+                            'booked_count', 'spots_remaining', 'is_full']
+
+    def validate_capacity(self, value):
+        # On edit, capacity can't drop below what's already booked.
+        if self.instance and value < self.instance.booked_count:
+            raise serializers.ValidationError(
+                f'La capacidad no puede ser menor que las '
+                f'{self.instance.booked_count} reservas ya registradas.')
+        return value
+
+
 class OpenClassEventSerializer(serializers.ModelSerializer):
     """Open-class ("Puertas Abiertas") slot mapped to the public event shape.
 
@@ -107,7 +134,9 @@ class SlotGeneratorSerializer(serializers.Serializer):
     weekdays         = serializers.ListField(
         child=serializers.IntegerField(min_value=0, max_value=6),
         allow_empty=False,
-        help_text='0=Lunes … 6=Domingo',
+        # JS getDay() convention, matching the frontend day-picker; the view
+        # converts each date to this scheme before comparing.
+        help_text='0=Domingo, 1=Lunes … 6=Sábado (JS getDay)',
     )
     window_start     = serializers.TimeField()
     window_end       = serializers.TimeField()

@@ -29,6 +29,14 @@ function renderAt(path: string, roles?: User['role'][]) {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute roles={['staff', 'admin']}>
+              <div>STAFF DASHBOARD</div>
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -39,7 +47,6 @@ describe('ProtectedRoute', () => {
     useAuthStore.setState({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
     });
   });
@@ -71,5 +78,37 @@ describe('ProtectedRoute', () => {
     useAuthStore.setState({ user: adminUser, isAuthenticated: true });
     renderAt('/admin');
     expect(screen.getByText('ADMIN CONTENT')).toBeInTheDocument();
+  });
+
+  // /staff guard (IK-ADMIN item 9): staff and admin in, everyone else out.
+  it('lets staff into /staff', () => {
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'staff' },
+      isAuthenticated: true,
+    });
+    renderAt('/staff');
+    expect(screen.getByText('STAFF DASHBOARD')).toBeInTheDocument();
+  });
+
+  it('lets admin into /staff', () => {
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true });
+    renderAt('/staff');
+    expect(screen.getByText('STAFF DASHBOARD')).toBeInTheDocument();
+  });
+
+  it('redirects a parent away from /staff to their portal', () => {
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'parent' },
+      isAuthenticated: true,
+    });
+    renderAt('/staff');
+    expect(screen.getByText('PORTAL HOME')).toBeInTheDocument();
+    expect(screen.queryByText('STAFF DASHBOARD')).not.toBeInTheDocument();
+  });
+
+  it('redirects anonymous visitors of /staff to /login', () => {
+    renderAt('/staff');
+    expect(screen.getByText('LOGIN PAGE')).toBeInTheDocument();
+    expect(screen.queryByText('STAFF DASHBOARD')).not.toBeInTheDocument();
   });
 });

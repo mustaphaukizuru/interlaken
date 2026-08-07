@@ -64,3 +64,17 @@ class Payment(models.Model):
         self.gateway_raw = raw_response or {}
         self.completed_at = timezone.now()
         self.save()
+
+    def mark_failed(self, error='', stage=''):
+        """Mark the payment failed, preserving the error for reconciliation.
+
+        Used when a gateway call fails during checkout creation so we never leave
+        an unreachable PENDING row (no hosted-page URL was ever issued).
+        """
+        self.status = self.Status.FAILED
+        raw = dict(self.gateway_raw or {})
+        raw['error'] = str(error)
+        if stage:
+            raw['stage'] = stage
+        self.gateway_raw = raw
+        self.save(update_fields=['status', 'gateway_raw', 'updated_at'])

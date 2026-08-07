@@ -41,13 +41,17 @@
   --grad-bar: linear-gradient(90deg, #401a8e 0%, #9a1185 30%, #ef2558 60%, #47a028 100%);
   --grad-cta: linear-gradient(120deg, #ef2558 0%, #401a8e 100%);
   --grad-purple: linear-gradient(100deg, #401a8e, #5a27b8);
-  --shadow-card: 0 1px 2px rgba(16,12,40,0.04), 0 8px 24px -12px rgba(64,26,142,0.12);
+  --shadow-card: 0 1px 2px rgba(16,12,40,0.03), 0 4px 14px -10px rgba(64,26,142,0.10);
   --shadow-purple: 0 12px 28px -10px rgba(64,26,142,0.38);
   --shadow-pink: 0 12px 28px -10px rgba(239,37,88,0.3);
   --shadow-green: 0 12px 28px -10px rgba(71,160,40,0.32);
   --shadow-coral: 0 12px 28px -10px rgba(221,38,34,0.3);
   --radius: 18px;
-  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+  /* Motion scale — standard easing; fast 150ms / base 200ms / slow 300ms (max). */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s var(--ease);
+  --transition: 0.2s var(--ease);
+  --transition-slow: 0.3s var(--ease);
 }
 
 @layer base {
@@ -107,6 +111,14 @@
   border-radius: 12px;
 }
 
+/* Hide scrollbar while keeping scrollability (dark sidebar nav, etc.) */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* Header dropdown entrance */
+@keyframes dropdown-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .animate-\[dropdown-in_0\.16s_ease-out\] { animation: none; } }
+
 @layer components {
   /* ── Legacy component classes (kept so existing pages stay intact) ── */
   .btn-primary {
@@ -125,7 +137,10 @@
     @apply block w-full min-h-[44px] rounded-xl border border-[#ECEAF3] bg-white px-3.5 py-2.5 text-base text-ink shadow-sm placeholder:text-subtle focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/15 transition-colors;
   }
   .card {
-    @apply rounded-xl2 border border-[#ECEAF3] bg-white p-6 shadow-card;
+    @apply rounded-xl2 border border-line bg-white p-6;
+    box-shadow:
+      0 1px 2px rgba(16, 12, 40, 0.03),
+      0 6px 18px -12px rgba(64, 26, 142, 0.10);
   }
   .label {
     @apply block text-sm font-medium text-muted mb-1.5;
@@ -142,13 +157,22 @@
   .btn-green { @apply btn; background: var(--green); color: #fff; box-shadow: var(--shadow-green); }
   .btn-green:hover { background: var(--green-dark); transform: translateY(-1px); }
   .btn-lg { padding: 16px 32px; font-size: 15px; }
+  /* Tactile press — overrides any hover-lift while the button is held. */
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  @media (prefers-reduced-motion: reduce) { .btn:active:not(:disabled) { transform: none; } }
 
   /* Cards */
   .card-dark { background: var(--dark-card); border: 1px solid rgba(124,77,214,0.25); border-radius: var(--radius); }
   /* Hover lift — subtle raise + deeper shadow on interactive cards */
   .hover-lift { transition: transform var(--transition), box-shadow var(--transition); }
-  .hover-lift:hover { transform: translateY(-6px); box-shadow: 0 26px 50px -22px rgba(64,26,142,0.4); }
+  .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 18px 36px -20px rgba(64,26,142,0.22); }
   @media (prefers-reduced-motion: reduce) { .hover-lift:hover { transform: none; } }
+
+  /* Route entrance — content of each page fades + lifts in on navigation
+     (RouteTransition keys this by pathname so it replays). */
+  @keyframes route-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .route-enter { animation: route-enter 0.32s cubic-bezier(0.4,0,0.2,1) both; }
+  @media (prefers-reduced-motion: reduce) { .route-enter { animation: none; } }
 
   /* Navigation portal items */
   .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.58); transition: var(--transition); cursor: pointer; }
@@ -169,4 +193,47 @@
   .section-label-green  { @apply badge-green;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
   .section-label-coral  { @apply badge-coral;  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
   .section-label-pink   { @apply badge-pink;   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
+
+  /* ── Admin data tables (DENSE variant — single source of admin table density) ──
+     Sticky header works because the wrapper is a bounded scroll container. On
+     mobile these tables are replaced by card stacks, so internal scroll is
+     desktop-only by design. */
+  .admin-table-wrap { @apply w-full overflow-auto rounded-xl2 border border-line; max-height: 68vh; }
+  .admin-table { @apply w-full border-collapse text-sm; }
+  .admin-table thead th {
+    @apply sticky top-0 z-10 whitespace-nowrap bg-cream-2 px-3 py-2.5 text-left font-head text-[11px] font-bold uppercase tracking-wider text-muted;
+  }
+  .admin-table tbody td { @apply px-3 py-2.5 align-middle; }
+  .admin-table tbody tr { @apply border-t border-line; }
+  .admin-table tbody tr:hover { @apply bg-cream; }
+  .admin-table .num { @apply text-right tabular-nums; }
+
+  /* Mobile (<768px): dense tables that ship no bespoke card list collapse into
+     stacked cards. Scoped with :not(.hidden) so tables that already pair a
+     `md:hidden <ul>` with a `hidden md:block` desktop table are left alone —
+     they're display:none here and render their own cards. Each row becomes a
+     card and each cell a label/value line driven by the td's data-label. */
+  @media (max-width: 767px) {
+    .admin-table-wrap:not(.hidden) { max-height: none; overflow: visible; border: 0; border-radius: 0; }
+    .admin-table-wrap:not(.hidden) .admin-table,
+    .admin-table-wrap:not(.hidden) tbody,
+    .admin-table-wrap:not(.hidden) tr { display: block; width: 100%; }
+    .admin-table-wrap:not(.hidden) thead { display: none; }
+    .admin-table-wrap:not(.hidden) tbody tr { @apply mb-3 rounded-xl2 border border-line bg-white p-1.5 shadow-card; }
+    .admin-table-wrap:not(.hidden) tbody tr:last-child { @apply mb-0; }
+    .admin-table-wrap:not(.hidden) tbody tr:hover { @apply bg-white; }
+    .admin-table-wrap:not(.hidden) tbody td {
+      @apply flex items-center justify-between gap-4 border-t border-cream px-3 py-2 text-right;
+      min-height: 42px;
+    }
+    .admin-table-wrap:not(.hidden) tbody td:first-child { @apply border-t-0; }
+    .admin-table-wrap:not(.hidden) tbody td:empty { display: none; }
+    .admin-table-wrap:not(.hidden) tbody td::before {
+      content: attr(data-label);
+      @apply flex-shrink-0 text-left font-head text-[10.5px] font-bold uppercase tracking-wide text-muted;
+    }
+    .admin-table-wrap:not(.hidden) tbody td:not([data-label]) { @apply justify-end; }
+    .admin-table-wrap:not(.hidden) tbody td:not([data-label])::before { content: none; }
+    .admin-table-wrap:not(.hidden) .num { @apply text-right; }
+  }
 }

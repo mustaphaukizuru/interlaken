@@ -4,8 +4,10 @@ import { z } from 'zod';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { CheckCircle } from 'lucide-react';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
 import type { PreRegistrationData } from '@/types';
@@ -27,7 +29,6 @@ const GRADES = [
   'Preescolar 1°', 'Preescolar 2°', 'Preescolar 3°',
   'Primaria 1°', 'Primaria 2°', 'Primaria 3°', 'Primaria 4°', 'Primaria 5°', 'Primaria 6°',
   'Secundaria 1°', 'Secundaria 2°', 'Secundaria 3°',
-  'Preparatoria 1°', 'Preparatoria 2°', 'Preparatoria 3°',
 ];
 
 // Full-width, ≥16px inputs prevent iOS zoom on focus; brand focus-visible ring.
@@ -79,10 +80,13 @@ export default function PreRegisterPage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-r from-brand-700 to-brand-600 text-white py-10 sm:py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h1 className="text-fluid-4xl font-bold mb-2">Pre-Registro</h1>
-          <p className="text-brand-100 text-fluid-base">Ciclo Escolar 2025–2026</p>
+      <section className="relative overflow-hidden bg-dark text-white py-10 sm:py-16">
+        <img src="/assets/hopscotch.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" loading="eager" />
+        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <span className="section-label-pink inline-flex">Admisiones</span>
+          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Pre-Registro</h1>
+          <p className="text-brand-100 text-fluid-base">Ciclo Escolar {CURRENT_CYCLE}</p>
         </div>
       </section>
 
@@ -105,6 +109,7 @@ export default function PreRegisterPage() {
             <Input
               label="Fecha de nacimiento"
               type="date"
+              max={new Date().toISOString().slice(0, 10)}
               error={errors.child_dob?.message}
               className="text-base min-h-[44px]"
               {...register('child_dob')}
@@ -123,7 +128,7 @@ export default function PreRegisterPage() {
             </div>
           </div>
 
-          <hr className="border-[#ECEAF3]" />
+          <hr className="border-line" />
 
           <div>
             <h2 className="font-semibold text-fluid-lg text-ink mb-1">Datos del tutor</h2>
@@ -179,8 +184,10 @@ export default function PreRegisterPage() {
             />
           </div>
 
+          <PrivacyNote />
+
           <Button type="submit" loading={isSubmitting} size="lg" className="w-full justify-center min-h-[44px]">
-            Enviar Pre-Registro
+            Enviar pre-registro
           </Button>
         </form>
       </div>

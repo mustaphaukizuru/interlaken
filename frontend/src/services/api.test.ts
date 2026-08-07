@@ -2,15 +2,20 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { api } from './api';
+import { useAuthStore } from '@/store/authStore';
 
 // Two mock layers: one on the shared `api` instance (business requests) and one
-// on the default axios (the standalone refresh call inside the 401 interceptor).
+// on the default axios (the standalone cookie-refresh call in the 401 interceptor).
 let apiMock: MockAdapter;
 let axiosMock: MockAdapter;
 
-describe('api 401 → refresh interceptor', () => {
+function resetAuth(access: string | null) {
+  useAuthStore.setState({ user: null, accessToken: access, isAuthenticated: !!access });
+}
+
+describe('api 401 → cookie refresh interceptor', () => {
   beforeEach(() => {
-    localStorage.clear();
+    resetAuth(null);
     apiMock = new MockAdapter(api);
     axiosMock = new MockAdapter(axios);
   });
@@ -20,25 +25,26 @@ describe('api 401 → refresh interceptor', () => {
     axiosMock.restore();
   });
 
-  it('refreshes the token on a 401 and retries the original request', async () => {
-    localStorage.setItem('access_token', 'stale-token');
-    localStorage.setItem('refresh_token', 'refresh-token');
+  it('silently refreshes on a 401 and retries the original request', async () => {
+    resetAuth('stale-token');
 
     // First hit 401, then succeed on the retry.
     apiMock.onGet('/accounts/me/').replyOnce(401);
     apiMock.onGet('/accounts/me/').reply(200, { id: 1, role: 'parent' });
+    // Cookie refresh (no body token) returns a fresh access token.
     axiosMock.onPost(/\/accounts\/token\/refresh\/$/).reply(200, { access: 'fresh-token' });
 
     const res = await api.get('/accounts/me/');
 
     expect(res.status).toBe(200);
     expect(res.data).toEqual({ id: 1, role: 'parent' });
-    // The new access token is persisted for subsequent requests.
-    expect(localStorage.getItem('access_token')).toBe('fresh-token');
+    // The fresh access token is kept in memory (store), never localStorage.
+    expect(useAuthStore.getState().accessToken).toBe('fresh-token');
+    expect(localStorage.getItem('access_token')).toBeNull();
   });
 
-  it('attaches the stored bearer token to outgoing requests', async () => {
-    localStorage.setItem('access_token', 'my-token');
+  it('attaches the in-memory bearer token to outgoing requests', async () => {
+    resetAuth('my-token');
     let seenAuth: string | undefined;
     apiMock.onGet('/accounts/me/').reply((config) => {
       seenAuth = config.headers?.Authorization as string | undefined;

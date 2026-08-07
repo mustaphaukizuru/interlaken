@@ -7,34 +7,35 @@ import toast from 'react-hot-toast';
 import {
   ArrowRight, Award, TrendingUp, Star, Check, Users, GraduationCap,
   CalendarDays, Sparkles, Languages, Trophy, Palette, FlaskConical,
-  MapPin, Quote, Heart, Mail, Send,
+  MapPin, Heart, Mail, Send,
 } from 'lucide-react';
 import { admissionsApi, contactApi } from '@/services/api';
+import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import type { OpenSchoolEvent } from '@/types';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
 import { Reveal } from '@/components/ui/Reveal';
 
 const STATS = [
-  { value: '1,200+', label: 'Alumnos', color: '#ef2558', icon: Users },
-  { value: '80+', label: 'Maestros', color: '#47a028', icon: GraduationCap },
-  { value: '40', label: 'Años', color: '#8f6fd0', icon: CalendarDays },
-  { value: '95%', label: 'Aprovechamiento', color: '#48d06a', icon: TrendingUp },
+  { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
+  { value: '80+', label: 'Maestros', color: 'var(--green)', icon: GraduationCap },
+  { value: String(SCHOOL_YEARS), label: 'Años', color: 'var(--purple-mid)', icon: CalendarDays },
+  { value: '95%', label: 'Aprovechamiento', color: 'var(--green-mid)', icon: TrendingUp },
 ];
 
-const TRUST_BADGES = ['Bilingüe', '40 años', 'Certificación SEP', 'Grupos reducidos'];
+const TRUST_BADGES = ['Bilingüe', `${SCHOOL_YEARS} años`, 'Certificación SEP', 'Grupos reducidos'];
 
 const LEVELS = [
-  { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: '#47a028', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
-  { name: 'Primaria', img: '/assets/facade.webp', accent: '#401a8e', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
-  { name: 'Secundaria', img: '/assets/secundaria.webp', accent: '#ef2558', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
+  { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: 'var(--green)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
+  { name: 'Primaria', img: '/assets/facade.webp', accent: 'var(--purple)', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
+  { name: 'Secundaria', img: '/assets/secundaria.webp', accent: 'var(--pink)', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
 ];
 
 const PROGRAMS = [
-  { name: 'Inglés', img: '/assets/classroom.webp', accent: '#401a8e', icon: Languages },
-  { name: 'Deportes', img: '/assets/campus-court.webp', accent: '#47a028', icon: Trophy },
-  { name: 'Arte y Música', img: '/assets/campus-mural.webp', accent: '#ef2558', icon: Palette },
-  { name: 'Ciencia y Robótica', img: '/assets/secundaria.webp', accent: '#48a018', icon: FlaskConical },
+  { name: 'Inglés', img: '/assets/classroom.webp', accent: 'var(--purple)', icon: Languages },
+  { name: 'Deportes', img: '/assets/campus-court.webp', accent: 'var(--green)', icon: Trophy },
+  { name: 'Arte y Música', img: '/assets/campus-mural.webp', accent: 'var(--pink)', icon: Palette },
+  { name: 'Ciencia y Robótica', img: '/assets/secundaria.webp', accent: 'var(--green)', icon: FlaskConical },
 ];
 
 const PROMOS = [
@@ -43,8 +44,8 @@ const PROMOS = [
     title: 'Inglés desde preescolar, todos los días',
     desc: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.',
     to: '/nosotros',
-    cta: 'Conoce el modelo',
-    grad: 'linear-gradient(135deg, #401a8e 0%, #5e3aad 100%)',
+    cta: 'Conozca el modelo',
+    grad: 'linear-gradient(135deg, var(--purple) 0%, var(--purple-mid) 100%)',
     icon: Languages,
   },
   {
@@ -53,29 +54,33 @@ const PROMOS = [
     desc: 'Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.',
     to: '/nosotros',
     cta: 'Nuestra comunidad',
-    grad: 'linear-gradient(135deg, #ef2558 0%, #ec1f7f 100%)',
+    grad: 'linear-gradient(135deg, var(--pink) 0%, var(--pink-hot) 100%)',
     icon: Heart,
   },
 ];
 
-const TESTIMONIALS = [
+/**
+ * Institutional strengths — defensible, verifiable school credentials that
+ * replace prior placeholder testimonials (fabricated social proof is banned).
+ */
+const STRENGTHS = [
   {
-    name: 'Mariana Gómez',
-    relation: 'Mamá de Primaria',
-    color: '#401a8e',
-    quote: 'Interlaken se siente como una familia. Mis hijos llegan felices y su inglés ha mejorado muchísimo en solo un año.',
+    icon: Award,
+    color: 'var(--purple)',
+    title: 'Incorporación oficial SEP',
+    body: 'Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública.',
   },
   {
-    name: 'Roberto Salas',
-    relation: 'Papá de Secundaria',
-    color: '#47a028',
-    quote: 'El acompañamiento de los maestros es excepcional. Se nota que conocen a cada alumno por su nombre y su historia.',
+    icon: Languages,
+    color: 'var(--green)',
+    title: 'Certificaciones internacionales',
+    body: 'Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente.',
   },
   {
-    name: 'Andrea Ríos',
-    relation: 'Egresada, generación 2015',
-    color: '#ef2558',
-    quote: 'Los valores y la disciplina que aprendí aquí me acompañan hasta hoy en la universidad. Siempre agradecida con mi colegio.',
+    icon: Heart,
+    color: 'var(--pink)',
+    title: `${SCHOOL_YEARS} años de trayectoria`,
+    body: `${SCHOOL_YEARS} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.`,
   },
 ];
 
@@ -83,10 +88,6 @@ const GALLERY = Array.from({ length: 8 }, (_, i) => `/assets/interlaken-image ($
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   (e.target as HTMLImageElement).style.display = 'none';
-}
-
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 }
 
 function NewsletterCTA() {
@@ -122,13 +123,13 @@ function NewsletterCTA() {
         <div className="mx-auto mb-4 inline-flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-white/[0.14]">
           <Mail size={24} />
         </div>
-        <h2 className="font-head font-extrabold text-fluid-3xl tracking-tight">Solicita Informes</h2>
+        <h2 className="font-head font-extrabold text-fluid-3xl tracking-tight">Solicite informes</h2>
         <p className="mt-2.5 text-base leading-relaxed opacity-90">
-          Déjanos tus datos y un asesor te compartirá costos, fechas y todo lo que necesitas saber sobre Interlaken.
+          Déjenos sus datos y un asesor le compartirá costos, fechas y todo lo que necesita saber sobre Interlaken.
         </p>
         {done ? (
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#48d06a]/20 px-5 py-3 font-semibold">
-            <Check size={18} color="#48d06a" strokeWidth={3} /> ¡Solicitud recibida! Te contactaremos pronto.
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-green-400/20 px-5 py-3 font-semibold">
+            <Check size={18} color="var(--green-mid)" strokeWidth={3} /> ¡Solicitud recibida! Le contactaremos pronto.
           </div>
         ) : (
           <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 sm:mt-6 sm:flex-row">
@@ -137,8 +138,8 @@ function NewsletterCTA() {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Tu nombre"
-              aria-label="Tu nombre"
+              placeholder="Nombre completo"
+              aria-label="Nombre completo"
               className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_180px]"
             />
             <input
@@ -146,8 +147,8 @@ function NewsletterCTA() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Tu correo electrónico"
-              aria-label="Tu correo electrónico"
+              placeholder="Correo electrónico"
+              aria-label="Correo electrónico"
               className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_220px]"
             />
             <button
@@ -178,17 +179,17 @@ export default function HomePage() {
   return (
     <div>
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden bg-[#080516] text-white">
+      <section className="relative overflow-hidden bg-dark text-white">
         <div className="pointer-events-none absolute -top-40 -left-28 hidden h-[520px] w-[520px] rounded-full sm:block" style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.55), rgba(8,5,22,0) 68%)' }} />
         <div className="pointer-events-none absolute -bottom-36 -right-24 hidden h-[420px] w-[420px] rounded-full sm:block" style={{ background: 'radial-gradient(circle, rgba(71,160,40,0.2), rgba(8,5,22,0) 66%)' }} />
         <Container className="relative grid gap-10 !py-14 sm:!py-16 lg:!py-[72px]">
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
             {/* Text */}
             <div>
-              <span className="section-label-pink inline-flex">Ciclo Escolar 2025–2026 · Inscripciones Abiertas</span>
+              <span className="section-label-pink inline-flex">Ciclo Escolar {CURRENT_CYCLE} · Inscripciones Abiertas</span>
               <h1 className="mt-3.5 font-head font-black leading-[1.05] tracking-[-0.03em] text-fluid-5xl">
                 Formando Líderes<br />
-                <span style={{ background: 'linear-gradient(100deg, #ef2558 0%, #b13bbf 55%, #5e3aad 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>con Excelencia</span>
+                <span style={{ background: 'linear-gradient(100deg, var(--pink) 0%, var(--purple-mid) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>con Excelencia</span>
               </h1>
               <p className="mt-[18px] max-w-[520px] text-[17px] leading-relaxed text-white/60">
                 Educación bilingüe de excelencia en Tlalnepantla. Desde preescolar hasta secundaria, formamos personas íntegras y preparadas para el mundo.
@@ -197,16 +198,16 @@ export default function HomePage() {
               <div className="mt-6 flex flex-wrap gap-2.5">
                 {TRUST_BADGES.map((b) => (
                   <span key={b} className="inline-flex items-center gap-[7px] rounded-full border border-white/[0.14] bg-white/[0.06] px-3.5 py-[7px] text-[13px] font-semibold text-white/[0.86]">
-                    <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#48d06a]/[0.18]">
-                      <Check size={12} color="#48d06a" strokeWidth={3} />
+                    <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-green-400/[0.18]">
+                      <Check size={12} color="var(--green-mid)" strokeWidth={3} />
                     </span>
                     {b}
                   </span>
                 ))}
               </div>
               <div className="mt-7 flex flex-wrap gap-3.5">
-                <Link to="/pre-registro" className="btn-pink btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#080516]">Pre-inscripción <ArrowRight size={17} /></Link>
-                <Link to="/login" className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#080516]">Portal Familias</Link>
+                <Link to="/pre-registro" className="btn-pink btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark">Inicie su pre-registro <ArrowRight size={17} /></Link>
+                <Link to="/login" className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark">Portal Familias</Link>
               </div>
             </div>
             {/* Image + floating cards */}
@@ -214,7 +215,7 @@ export default function HomePage() {
               <img
                 src="/assets/court-wide.webp"
                 alt="Colegio Interlaken"
-                fetchPriority="high"
+                {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
                 decoding="async"
                 width={800}
                 height={600}
@@ -222,11 +223,11 @@ export default function HomePage() {
                 onError={hideOnError}
               />
               <div className="absolute top-4 left-2 flex items-center gap-2.5 rounded-[14px] bg-white px-4 py-3 text-ink shadow-[0_16px_30px_-12px_rgba(0,0,0,0.4)] sm:-left-3.5">
-                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-amber/10"><Award size={18} color="#d97706" /></div>
-                <div><div className="font-head text-sm font-extrabold">Top 5 Colegios</div><div className="text-[11px] text-muted">Zona Norte CDMX</div></div>
+                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-amber/10"><Award size={18} color="var(--amber)" /></div>
+                <div><div className="font-head text-sm font-extrabold">Incorporado a la SEP</div><div className="text-[11px] text-muted">Validez oficial</div></div>
               </div>
               <div className="absolute bottom-4 right-2 flex items-center gap-2.5 rounded-[14px] bg-white px-4 py-3 text-ink shadow-[0_16px_30px_-12px_rgba(0,0,0,0.4)] sm:-right-3.5">
-                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-[#48a018]/10"><TrendingUp size={18} color="#48a018" /></div>
+                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-green-500/10"><TrendingUp size={18} color="var(--green)" /></div>
                 <div><div className="font-head text-sm font-extrabold">Promedio 9.2</div><div className="text-[11px] text-muted">Ciclo anterior</div></div>
               </div>
             </div>
@@ -235,13 +236,13 @@ export default function HomePage() {
       </section>
 
       {/* ── STAT BANNER ── */}
-      <section className="bg-[#0f0a24] py-10 text-white">
+      <section className="bg-dark-2 py-10 text-white">
         <Container>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {STATS.map((s, i) => (
               <Reveal key={s.label} delay={i * 80} direction="up">
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px]" style={{ background: `${s.color}22` }}>
+                  <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${s.color} 13%, transparent)` }}>
                     <s.icon size={24} color={s.color} />
                   </div>
                   <div>
@@ -261,12 +262,12 @@ export default function HomePage() {
           <Reveal direction="right">
             <span className="section-label-purple inline-flex">Nuestra Comunidad</span>
             <h2 className="font-head font-extrabold text-fluid-4xl leading-tight tracking-[-0.03em] text-ink">
-              40 años formando familias en Tlalnepantla
+              {SCHOOL_YEARS} años formando familias en Tlalnepantla
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted">
               En Colegio Interlaken combinamos rigor académico, educación bilingüe y un ambiente cálido y seguro. Nuestros egresados destacan por su liderazgo, sus valores y su compromiso con la comunidad.
             </p>
-            <Link to="/nosotros" className="btn-outline mt-6 focus-visible:ring-2 focus-visible:ring-purple focus-visible:ring-offset-2">Conócenos <ArrowRight size={16} /></Link>
+            <Link to="/nosotros" className="btn-outline mt-6 focus-visible:ring-2 focus-visible:ring-purple focus-visible:ring-offset-2">Conózcanos <ArrowRight size={16} /></Link>
           </Reveal>
           <Reveal direction="left" className="relative">
             <div className="grid grid-cols-2 gap-3.5">
@@ -275,8 +276,8 @@ export default function HomePage() {
               <img src="/assets/hopscotch.webp" alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
-            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-[#ECEAF3] bg-white px-4 py-3.5 shadow-[0_20px_40px_-16px_rgba(64,26,142,0.35)] sm:-right-2">
-              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-purple/10"><Star size={20} color="#401a8e" /></div>
+            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-right-2">
+              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-purple/10"><Star size={20} color="var(--purple)" /></div>
               <div>
                 <div className="font-head text-xl font-extrabold leading-none text-ink">+2,500</div>
                 <div className="text-[11.5px] text-muted">Egresados</div>
@@ -298,12 +299,12 @@ export default function HomePage() {
               <div className="card hover-lift overflow-hidden !p-0">
                 <div className="relative h-[180px]">
                   <img src={l.img} alt={l.name} loading="lazy" decoding="async" width={400} height={180} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
-                  <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, ${l.accent}dd 100%)` }} />
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, color-mix(in srgb, ${l.accent} 87%, transparent) 100%)` }} />
                   <h3 className="absolute bottom-3.5 left-[18px] font-head text-[22px] font-extrabold text-white">{l.name}</h3>
                 </div>
                 <div className="px-5 py-[18px]">
                   <p className="text-sm leading-relaxed text-muted">{l.desc}</p>
-                  <Link to="/admisiones" className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold focus-visible:ring-2 focus-visible:ring-offset-2 rounded" style={{ color: l.accent }}>Más información <ArrowRight size={14} /></Link>
+                  <Link to="/admisiones" className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold focus-visible:ring-2 focus-visible:ring-offset-2 rounded" style={{ color: l.accent }}>Ver admisiones <ArrowRight size={14} /></Link>
                 </div>
               </div>
             </Reveal>
@@ -321,12 +322,12 @@ export default function HomePage() {
           {PROGRAMS.map((p, i) => (
             <Reveal key={p.name} delay={i * 80} className="text-center">
               <div className="relative mx-auto h-[150px] w-[150px] max-w-full">
-                <div className="absolute inset-0 rounded-full" style={{ background: `${p.accent}14` }} />
-                <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px ${p.accent}88` }}>
+                <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${p.accent} 8%, transparent)` }} />
+                <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${p.accent} 53%, transparent)` }}>
                   <img src={p.img} alt={p.name} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
                 </div>
                 <div className="absolute bottom-0.5 right-0.5 flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]" style={{ background: p.accent }}>
-                  <p.icon size={19} color="#fff" />
+                  <p.icon size={19} color="white" />
                 </div>
               </div>
               <h3 className="mt-[18px] font-head text-[17px] font-bold text-ink">{p.name}</h3>
@@ -355,25 +356,21 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* ── TESTIMONIOS ── */}
+      {/* ── RESPALDO / POR QUÉ INTERLAKEN ── */}
       <Section bg="white">
         <Reveal className="mb-11 text-center">
-          <span className="section-label-purple inline-flex">Testimonios</span>
-          <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Lo que dicen nuestras familias</h2>
+          <span className="section-label-purple inline-flex">Por qué Interlaken</span>
+          <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Respaldo que da certeza a su familia</h2>
         </Reveal>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {TESTIMONIALS.map((t, i) => (
-            <Reveal key={t.name} delay={i * 90}>
+          {STRENGTHS.map((s, i) => (
+            <Reveal key={s.title} delay={i * 90}>
               <div className="card hover-lift flex h-full flex-col gap-[18px]">
-                <Quote size={30} color={t.color} className="opacity-50" />
-                <p className="flex-1 text-[15px] leading-relaxed text-[#3d3654]">“{t.quote}”</p>
-                <div className="mt-1 flex items-center gap-3">
-                  <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full font-head text-[15px] font-bold text-white" style={{ background: t.color }}>{initials(t.name)}</div>
-                  <div>
-                    <div className="font-head text-[15px] font-bold text-ink">{t.name}</div>
-                    <div className="text-[12.5px] text-muted">{t.relation}</div>
-                  </div>
+                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${s.color} 12%, transparent)` }}>
+                  <s.icon size={26} color={s.color} />
                 </div>
+                <h3 className="font-head text-[19px] font-bold text-ink">{s.title}</h3>
+                <p className="flex-1 text-[15px] leading-relaxed text-muted">{s.body}</p>
               </div>
             </Reveal>
           ))}
@@ -387,7 +384,7 @@ export default function HomePage() {
             <div className="relative min-h-[220px] lg:min-h-[240px]">
               <img src="/assets/facade-sign.webp" alt="Puertas Abiertas Colegio Interlaken" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full max-w-full object-cover" onError={hideOnError} />
             </div>
-            <div className="flex flex-col justify-center px-6 py-10 text-white sm:px-10 sm:py-11" style={{ background: 'linear-gradient(135deg, #47a028 0%, #401a8e 100%)' }}>
+            <div className="flex flex-col justify-center px-6 py-10 text-white sm:px-10 sm:py-11" style={{ background: 'linear-gradient(135deg, var(--green) 0%, var(--purple) 100%)' }}>
               <span className="inline-flex items-center gap-[7px] self-start rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[1px]">
                 <Sparkles size={13} /> Próximo Evento
               </span>
@@ -418,7 +415,7 @@ export default function HomePage() {
                 </p>
               )}
               <Link to="/puertas-abiertas" className="btn btn-lg mt-6 self-start bg-white text-purple focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">
-                Reservar mi lugar <ArrowRight size={17} />
+                Reserve su lugar <ArrowRight size={17} />
               </Link>
             </div>
           </div>
@@ -448,10 +445,10 @@ export default function HomePage() {
       {/* ── CTA ── */}
       <Section bg="gradient" spacing="sm" className="text-center">
         <Star size={28} className="mx-auto mb-3" />
-        <h2 className="font-head font-black text-fluid-4xl tracking-[-0.03em]">Comienza el futuro de tu hijo hoy</h2>
-        <p className="mx-auto mt-3 max-w-[560px] text-[17px] opacity-90">Agenda una visita o inicia tu pre-inscripción en línea en solo unos minutos.</p>
+        <h2 className="font-head font-black text-fluid-4xl tracking-[-0.03em]">Comience el futuro de su hijo hoy</h2>
+        <p className="mx-auto mt-3 max-w-[560px] text-[17px] opacity-90">Agende una visita o inicie su pre-registro en línea en solo unos minutos.</p>
         <div className="mt-7 flex flex-wrap justify-center gap-3.5">
-          <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Iniciar Pre-registro <ArrowRight size={17} /></Link>
+          <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Inicie su pre-registro <ArrowRight size={17} /></Link>
           <Link to="/puertas-abiertas" className="btn-ghost btn-lg focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Puertas Abiertas</Link>
         </div>
       </Section>

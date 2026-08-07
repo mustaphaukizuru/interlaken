@@ -9,6 +9,7 @@ urlpatterns = [
          name='payment-webhook-global-payments'),
     path('webhook/banorte/',         views.BanorteWebhookView.as_view(),
          name='payment-webhook-banorte'),
+    path('sandbox/complete/', views.SandboxCompleteView.as_view(), name='payment-sandbox-complete'),
     path('history/',    views.PaymentHistoryView.as_view(),   name='payment-history'),
     path('<int:pk>/',   views.PaymentDetailView.as_view(),    name='payment-detail'),
 ]

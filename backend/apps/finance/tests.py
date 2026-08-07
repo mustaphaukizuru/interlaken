@@ -21,8 +21,7 @@ from django.utils import timezone
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.finance import services
-from apps.finance.models import (Discount, FeeSchedule, Invoice,
-                                 InvoiceLineItem, InvoicePayment)
+from apps.finance.models import Discount, FeeSchedule, Invoice, InvoiceLineItem, InvoicePayment
 from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
@@ -188,6 +187,38 @@ class TestPaymentWebhook:
         invoice.refresh_from_db()
         assert invoice.amount_paid == invoice.amount  # credited once, not twice
 
+    def test_second_distinct_payment_is_recorded_as_overpayment(self, api_client, settings):
+        # Two checkouts opened for one invoice (e.g. two browser tabs), both
+        # paid at the gateway. The second real charge must be recorded — as an
+        # overpayment that can be refunded — not silently absorbed.
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+        invoice, parent = self._invoice_with_parent()
+        pay_a, _ = services.start_invoice_payment(invoice, parent)
+        pay_b, _ = services.start_invoice_payment(invoice, parent)
+
+        url = reverse("payment-webhook")
+        for p, tx in ((pay_a, "tx-a"), (pay_b, "tx-b")):
+            body = json.dumps({"order_id": p.id, "status": "CAPTURED", "id": tx}).encode()
+            assert api_client.post(url, data=body, content_type="application/json",
+                                   HTTP_X_WEBHOOK_SIGNATURE=_sign(body)).status_code == 200
+
+        invoice.refresh_from_db()
+        assert invoice.status == Invoice.Status.PAID
+        assert invoice.amount_paid == invoice.amount * 2   # both charges recorded
+        assert invoice.balance_due < 0                     # visible, refundable overpayment
+
+    def test_completing_the_same_payment_twice_credits_once(self, settings):
+        # Per-payment idempotency guard (applied_at): a second completion of the
+        # SAME payment is a no-op even called directly (bypassing the webhook's
+        # own final-status guard).
+        invoice, parent = self._invoice_with_parent()
+        payment, _ = services.start_invoice_payment(invoice, parent)
+
+        services.complete_invoice_payment(payment)
+        services.complete_invoice_payment(payment)
+        invoice.refresh_from_db()
+        assert invoice.amount_paid == invoice.amount
+
 
 # ── admin ─────────────────────────────────────────────────────────────────────
 
@@ -205,6 +236,23 @@ class TestAdmin:
         assert resp.data["collected"] == "3000.00"
         assert resp.data["outstanding"] == "3000.00"
         assert resp.data["collection_rate"] == 50.0
+
+    def test_bulk_remind_skips_settled_invoices(self, admin_client):
+        # A "$0.00 saldo" reminder must not go to a paid/cancelled invoice
+        # included in the selection.
+        _schedule()
+        s1, s2 = StudentProfileFactory(), StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        paid = Invoice.objects.get(student=s1, period=PERIOD)
+        unpaid = Invoice.objects.get(student=s2, period=PERIOD)
+        services.mark_invoice_paid(paid)
+
+        resp = admin_client.post(reverse("finance-admin-bulk"), {
+            "action": "remind", "invoice_ids": [paid.id, unpaid.id],
+        }, format="json")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["done"] == 1       # only the unpaid invoice reminded
+        assert resp.data["skipped"] == 1    # the paid invoice skipped
 
     def test_mark_paid_is_audited(self, admin_client, admin_user):
         _schedule()

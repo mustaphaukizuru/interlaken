@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { CalendarClock, CalendarPlus, Check, X, UserCheck } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,9 +8,13 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Pagination } from '@/components/ui/Pagination';
 import { bookingsApi } from '@/services/api';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { Booking } from '@/types';
 
 const statusMeta: Record<string, { label: string; variant: any }> = {
@@ -94,8 +98,8 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
         />
       </div>
 
-      <div>
-        <label className="label">Días de la semana</label>
+      <div role="group" aria-label="Días de la semana">
+        <span className="label">Días de la semana</span>
         <div className="flex flex-wrap gap-2">
           {WEEKDAYS.map((d) => (
             <button
@@ -105,7 +109,7 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
               className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                 weekdays.includes(d.value)
                   ? 'border-brand-500 bg-brand-500 text-white'
-                  : 'border-slate-200 text-slate-600 hover:border-brand-400'
+                  : 'border-line text-muted hover:border-brand-400'
               }`}
             >
               {d.label}
@@ -131,8 +135,9 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
 
       <div className="grid sm:grid-cols-3 gap-4">
         <div>
-          <label className="label">Duración (min)</label>
+          <label className="label" htmlFor="slot-interval">Duración (min)</label>
           <select
+            id="slot-interval"
             className="input-field"
             value={form.interval_minutes}
             onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })}
@@ -166,16 +171,17 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
 type BookingAct = 'confirm' | 'cancel' | 'attended' | 'no_show';
 
 function BookingActions({
-  id,
-  parentName,
+  booking,
   onAction,
+  onCancelRequest,
 }: {
-  id: number;
-  parentName: string;
+  booking: Booking;
   onAction: (v: { id: number; act: BookingAct }) => void;
+  onCancelRequest: (b: Booking) => void;
 }) {
+  const { id, parent_name: parentName } = booking;
   const base =
-    'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+    'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
   return (
     <>
       <button
@@ -197,8 +203,8 @@ function BookingActions({
       <button
         title="Cancelar"
         aria-label={`Cancelar la reserva de ${parentName}`}
-        onClick={() => onAction({ id, act: 'cancel' })}
-        className={`${base} hover:bg-red-50 hover:text-red-600`}
+        onClick={() => onCancelRequest(booking)}
+        className={`${base} hover:bg-coral-50 hover:text-coral-600`}
       >
         <X className="w-4 h-4" />
       </button>
@@ -206,19 +212,106 @@ function BookingActions({
   );
 }
 
+interface AdminSlot {
+  id: number; visit_type: string; title: string; date: string;
+  start_time: string; end_time: string; capacity: number; location: string;
+  is_active: boolean; booked_count: number; spots_remaining: number; is_full: boolean;
+}
+
+const VISIT_TYPE_LABEL: Record<string, string> = {
+  individual: 'Individual', open_class: 'Puertas Abiertas',
+};
+
+/** View / deactivate / delete published availability slots. */
+function SlotManager() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [deleteFor, setDeleteFor] = useState<AdminSlot | null>(null);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-slots', page],
+    queryFn: async () => toPaged<AdminSlot>((await bookingsApi.getAdminSlots({ page })).data),
+    placeholderData: keepPreviousData,
+  });
+  const slots = data?.results;
+  const count = data?.count ?? 0;
+
+  const toggleActive = useMutation({
+    mutationFn: (s: AdminSlot) => bookingsApi.updateSlot(s.id, { is_active: !s.is_active }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-slots'] }); toast.success('Horario actualizado.'); },
+    onError: () => toast.error('No se pudo actualizar el horario.'),
+  });
+  const del = useMutation({
+    mutationFn: (id: number) => bookingsApi.deleteSlot(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-slots'] }); setDeleteFor(null); toast.success('Horario eliminado.'); },
+    onError: (e: any) => { toast.error(e?.response?.data?.detail ?? 'No se pudo eliminar el horario.'); setDeleteFor(null); },
+  });
+
+  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (isLoading) return <TableSkeleton />;
+  if (!slots?.length) return <EmptyState icon={CalendarClock} title="Sin horarios" description="Genere disponibilidad con el formulario de arriba." />;
+
+  return (
+    <>
+      <div className="divide-y divide-line">
+        {slots.map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">
+                {format(parseISO(s.date), 'EEE d MMM yyyy', { locale: es })} · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
+              </p>
+              <p className="text-xs text-subtle">
+                {VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type} · {s.booked_count}/{s.capacity} reservas · {s.location || 'Campus'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={s.is_active ? 'success' : 'neutral'}>{s.is_active ? 'Activo' : 'Inactivo'}</Badge>
+              <Button variant="secondary" size="sm" onClick={() => toggleActive.mutate(s)} disabled={toggleActive.isPending}>
+                {s.is_active ? 'Desactivar' : 'Activar'}
+              </Button>
+              <Button variant="ghost" size="sm" className="text-coral-600" onClick={() => setDeleteFor(s)}>
+                Eliminar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="horarios" />
+      <ConfirmDialog
+        open={!!deleteFor}
+        title="¿Eliminar horario?"
+        confirmLabel="Eliminar"
+        loading={del.isPending}
+        onClose={() => setDeleteFor(null)}
+        onConfirm={() => deleteFor && del.mutate(deleteFor.id)}
+        message={
+          <>
+            Se eliminará este horario de forma permanente. Los horarios con
+            reservas no pueden eliminarse — use <span className="font-semibold text-ink">Desactivar</span> para ocultarlos sin perder el historial.
+          </>
+        }
+      />
+    </>
+  );
+}
+
 export default function AdminBookings() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [cancelFor, setCancelFor] = useState<Booking | null>(null);
 
-  const { data: bookings, isLoading } = useQuery<Booking[]>({
-    queryKey: ['admin-bookings', statusFilter],
-    queryFn: async () => {
-      const { data } = await bookingsApi.getAdminBookings(
-        statusFilter ? { status: statusFilter } : undefined,
-      );
-      return data.results ?? data;
-    },
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-bookings', statusFilter, page],
+    queryFn: async () =>
+      toPaged<Booking>(
+        (await bookingsApi.getAdminBookings({ ...(statusFilter ? { status: statusFilter } : {}), page })).data,
+      ),
+    placeholderData: keepPreviousData,
   });
+
+  const bookings = data?.results;
+  const count = data?.count ?? 0;
 
   const action = useMutation({
     mutationFn: ({ id, act }: { id: number; act: 'confirm' | 'cancel' | 'attended' | 'no_show' }) =>
@@ -226,6 +319,7 @@ export default function AdminBookings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-bookings'] });
       toast.success('Reserva actualizada.');
+      setCancelFor(null);
     },
     onError: () => toast.error('No fue posible actualizar la reserva.'),
   });
@@ -233,14 +327,21 @@ export default function AdminBookings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-fluid-xl font-bold text-slate-900">Visitas</h1>
-        <p className="text-slate-500 text-sm mt-0.5">
+        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Visitas</h1>
+        <p className="text-muted text-sm mt-0.5">
           Publique disponibilidad y gestione las visitas individuales.
         </p>
       </div>
 
       <Card title="Publicar disponibilidad" subtitle="Genere horarios recurrentes para visitas individuales.">
-        <SlotGenerator onDone={() => qc.invalidateQueries({ queryKey: ['admin-bookings'] })} />
+        <SlotGenerator onDone={() => {
+          qc.invalidateQueries({ queryKey: ['admin-bookings'] });
+          qc.invalidateQueries({ queryKey: ['admin-slots'] });
+        }} />
+      </Card>
+
+      <Card title="Horarios publicados" subtitle="Active, desactive o elimine los horarios de disponibilidad.">
+        <SlotManager />
       </Card>
 
       <Card
@@ -248,8 +349,9 @@ export default function AdminBookings() {
         action={
           <select
             className="input-field text-sm py-1.5"
+            aria-label="Filtrar por estado"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           >
             <option value="">Todas</option>
             <option value="confirmed">Confirmadas</option>
@@ -260,13 +362,20 @@ export default function AdminBookings() {
           </select>
         }
       >
-        {isLoading ? (
-          <LoadingSpinner />
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
+          <TableSkeleton />
         ) : !bookings?.length ? (
           <EmptyState
             icon={CalendarClock}
-            title="Sin reservas"
-            description="Las visitas agendadas aparecerán aquí."
+            title={statusFilter ? 'Sin resultados' : 'Sin reservas'}
+            description={statusFilter
+              ? 'Ninguna reserva coincide con el estado seleccionado.'
+              : 'Las visitas agendadas aparecerán aquí.'}
+            action={statusFilter
+              ? <Button variant="secondary" size="sm" onClick={() => { setStatusFilter(''); setPage(1); }}>Ver todas</Button>
+              : undefined}
           />
         ) : (
           <>
@@ -275,75 +384,75 @@ export default function AdminBookings() {
               {bookings.map((b) => {
                 const meta = statusMeta[b.status] ?? statusMeta.pending;
                 return (
-                  <li key={b.id} className="rounded-xl2 border border-slate-100 p-4">
+                  <li key={b.id} className="rounded-xl2 border border-line p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-900">
+                        <p className="font-medium text-ink">
                           {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
                         </p>
-                        <p className="text-slate-400 text-xs">
+                        <p className="text-subtle text-xs">
                           {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
                         </p>
                       </div>
                       <Badge variant={meta.variant}>{meta.label}</Badge>
                     </div>
                     <div className="mt-3 text-sm">
-                      <p className="text-slate-700">{b.parent_name}</p>
+                      <p className="text-muted">{b.parent_name}</p>
                       {b.child_name && (
-                        <p className="text-slate-400 text-xs">Alumno: {b.child_name}</p>
+                        <p className="text-subtle text-xs">Alumno: {b.child_name}</p>
                       )}
-                      <p className="text-slate-500 mt-1 break-words">{b.parent_email}</p>
-                      <p className="text-slate-400 text-xs">{b.parent_phone}</p>
+                      <p className="text-muted mt-1 break-words">{b.parent_email}</p>
+                      <p className="text-subtle text-xs">{b.parent_phone}</p>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1">
-                      <BookingActions id={b.id} parentName={b.parent_name} onAction={action.mutate} />
+                      <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
                     </div>
                   </li>
                 );
               })}
             </ul>
 
-            {/* Desktop: table */}
-            <div className="hidden md:block w-full overflow-x-auto">
-              <table className="w-full text-sm">
+            {/* Desktop: dense table */}
+            <div className="admin-table-wrap hidden md:block">
+              <table className="admin-table">
                 <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Fecha</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Tutor</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Contacto</th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500">Estado</th>
-                    <th className="text-left py-2 text-xs font-semibold text-slate-500">Acciones</th>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Tutor</th>
+                    <th>Contacto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody>
                   {bookings.map((b) => {
                     const meta = statusMeta[b.status] ?? statusMeta.pending;
                     return (
-                      <tr key={b.id} className="hover:bg-slate-50/50">
-                        <td className="py-3 pr-4 whitespace-nowrap">
-                          <div className="font-medium text-slate-900">
+                      <tr key={b.id}>
+                        <td className="whitespace-nowrap">
+                          <div className="font-medium text-ink">
                             {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
                           </div>
-                          <div className="text-slate-400 text-xs">
+                          <div className="text-subtle text-xs">
                             {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
                           </div>
                         </td>
-                        <td className="py-3 pr-4 text-slate-700">
+                        <td className="text-muted">
                           {b.parent_name}
                           {b.child_name && (
-                            <div className="text-slate-400 text-xs">Alumno: {b.child_name}</div>
+                            <div className="text-subtle text-xs">Alumno: {b.child_name}</div>
                           )}
                         </td>
-                        <td className="py-3 pr-4">
-                          <div className="text-slate-500">{b.parent_email}</div>
-                          <div className="text-slate-400 text-xs">{b.parent_phone}</div>
+                        <td>
+                          <div className="text-muted">{b.parent_email}</div>
+                          <div className="text-subtle text-xs">{b.parent_phone}</div>
                         </td>
-                        <td className="py-3 pr-4">
+                        <td>
                           <Badge variant={meta.variant}>{meta.label}</Badge>
                         </td>
-                        <td className="py-3">
+                        <td>
                           <div className="flex items-center gap-1">
-                            <BookingActions id={b.id} parentName={b.parent_name} onAction={action.mutate} />
+                            <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
                           </div>
                         </td>
                       </tr>
@@ -354,7 +463,30 @@ export default function AdminBookings() {
             </div>
           </>
         )}
+
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="reservas" />
       </Card>
+
+      <ConfirmDialog
+        open={!!cancelFor}
+        title="Cancelar visita"
+        confirmLabel="Cancelar visita"
+        loading={action.isPending}
+        onClose={() => setCancelFor(null)}
+        onConfirm={() => cancelFor && action.mutate({ id: cancelFor.id, act: 'cancel' })}
+        message={
+          cancelFor && (
+            <>
+              Esto cancelará la visita de{' '}
+              <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
+              <span className="font-semibold text-ink">
+                {format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}
+              </span>{' '}
+              a las {cancelFor.slot_start_time.slice(0, 5)}. Se liberará el cupo y se notificará al tutor.
+            </>
+          )
+        }
+      />
     </div>
   );
 }

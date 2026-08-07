@@ -78,6 +78,10 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
   if (!open) return null;
 
   return (
+    // Backdrop mousedown-to-dismiss (backdrop only, not children) is a
+    // supplementary pointer affordance; keyboard users close via Escape (the
+    // document keydown handler above) or the close button.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:px-4"
       onMouseDown={(e) => {
@@ -94,12 +98,12 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
         style={{ maxWidth }}
       >
         <div className="flex items-start justify-between gap-4">
-          <h3 id={titleId} className="font-semibold text-slate-900">{title}</h3>
+          <h3 id={titleId} className="font-semibold text-ink">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="-mr-1.5 -mt-1.5 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple/30"
+            className="-mr-1.5 -mt-1.5 rounded-lg p-1.5 text-subtle hover:bg-cream hover:text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
           >
             <X className="h-4 w-4" />
           </button>

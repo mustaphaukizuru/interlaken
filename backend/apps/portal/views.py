@@ -1,7 +1,10 @@
 """
 Portal views: role-aware dashboard, announcements, notifications.
 """
-from django.db.models import Sum
+import logging
+
+from django.db.models import Count, Q, Sum
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,24 +14,34 @@ from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.payments.models import Payment
 
-from .models import Announcement, Notification
-from .serializers import AnnouncementSerializer, NotificationSerializer
-
-# `User.Role` values are singular (`parent`) while `Announcement.Audience`
-# values are plural (`parents`); map between them so audience filters match.
-ROLE_TO_AUDIENCE = {
-    User.Role.PARENT:  Announcement.Audience.PARENTS,
-    User.Role.STUDENT: Announcement.Audience.STUDENTS,
-    User.Role.STAFF:   Announcement.Audience.STAFF,
-}
+from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification
+from .serializers import (
+    AnnouncementAdminSerializer,
+    AnnouncementCommentSerializer,
+    AnnouncementSerializer,
+    NotificationSerializer,
+)
+from .services import fanout_announcement
 
 
 def audiences_for_user(user):
-    """Return the announcement audiences visible to `user` (always includes 'all')."""
+    """Announcement audiences visible to ``user`` (always includes 'all').
+
+    Families are a merged parent/student login (a self-guardian student is in
+    its own ``parents`` set), so a family account sees BOTH parent- and
+    student-targeted comunicados regardless of the single role it carries —
+    otherwise a parent-role family silently misses 'Alumnos' avisos and a
+    student-role family misses 'Padres' ones. Staff/admin oversee every audience.
+    """
     audiences = [Announcement.Audience.ALL]
-    mapped = ROLE_TO_AUDIENCE.get(user.role)
-    if mapped:
-        audiences.append(mapped)
+    role = getattr(user, 'role', None)
+    if role in (User.Role.PARENT, User.Role.STUDENT):
+        audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS]
+    elif role == User.Role.STAFF:
+        audiences.append(Announcement.Audience.STAFF)
+    elif role == User.Role.ADMIN:
+        audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS,
+                      Announcement.Audience.STAFF]
     return audiences
 
 
@@ -40,8 +53,12 @@ class DashboardView(APIView):
         user = request.user
         data = {}
 
-        if user.role == User.Role.PARENT:
-            students = StudentProfile.objects.filter(parents=user).select_related('user')
+        # student == family login (shared account): a self-guardian student is in
+        # its own `parents` set, so anyone who guards students — a parent OR a
+        # self-guardian student — gets the full family dashboard.
+        family_students = StudentProfile.objects.filter(parents=user).select_related('user')
+        if user.role in (User.Role.PARENT, User.Role.STUDENT) and family_students.exists():
+            students = family_students
             balances = CafeteriaBalance.objects.filter(student__in=students)
             recent_payments = Payment.objects.filter(user=user).order_by('-created_at')[:5]
 
@@ -125,7 +142,83 @@ class AnnouncementListView(generics.ListAPIView):
         return Announcement.objects.filter(
             is_active=True,
             audience__in=audiences_for_user(self.request.user),
+        ).annotate(
+            visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
         )
+
+
+class AnnouncementDetailView(generics.RetrieveAPIView):
+    """GET /api/v1/portal/announcements/<pk>/ — one comunicado (audience-scoped)."""
+    serializer_class = AnnouncementSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Announcement.objects.filter(
+            is_active=True,
+            audience__in=audiences_for_user(self.request.user),
+        ).annotate(
+            visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
+        )
+
+
+class AnnouncementCommentListCreateView(generics.ListCreateAPIView):
+    """GET / POST /api/v1/portal/announcements/<pk>/comments/
+
+    Families can read and post replies on any comunicado they can see; hidden
+    (moderated) comments are never listed. The author is the current user.
+    """
+    serializer_class = AnnouncementCommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _announcement(self):
+        # 404s (not 403) if the comunicado isn't visible to this family — never
+        # leaks the existence of an announcement targeted at another audience.
+        return get_object_or_404(
+            Announcement.objects.filter(
+                is_active=True,
+                audience__in=audiences_for_user(self.request.user)),
+            pk=self.kwargs['pk'])
+
+    def get_queryset(self):
+        return AnnouncementComment.objects.filter(
+            announcement=self._announcement(), is_hidden=False,
+        ).select_related('author')
+
+    def perform_create(self, serializer):
+        serializer.save(announcement=self._announcement(), author=self.request.user)
+
+
+class _IsAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(u and u.is_authenticated and getattr(u, 'role', '') == User.Role.ADMIN)
+
+
+class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
+    """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive).
+    POST — compose a new audience-targeted comunicado (author = current admin)."""
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementAdminSerializer
+    permission_classes = [_IsAdmin]
+
+    def perform_create(self, serializer):
+        announcement = serializer.save(created_by=self.request.user)
+        # Alert the audience (in-app). Fail-soft: a fan-out hiccup must never
+        # turn a saved comunicado into a 500. Drafts (is_active=False) notify
+        # nobody until published; publishing a draft later is a known follow-up.
+        try:
+            fanout_announcement(announcement)
+        except Exception:  # noqa: BLE001 — best-effort notification
+            logging.getLogger(__name__).exception(
+                'Announcement %s fan-out failed', announcement.pk)
+
+
+class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH (edit / toggle active) or DELETE a comunicado (admin)."""
+    queryset = Announcement.objects.all()
+    serializer_class = AnnouncementAdminSerializer
+    permission_classes = [_IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
 
 
 class NotificationListView(generics.ListAPIView):
@@ -135,6 +228,31 @@ class NotificationListView(generics.ListAPIView):
 
     def get_queryset(self):
         return Notification.objects.filter(user=self.request.user)
+
+
+class AnnouncementMarkReadView(APIView):
+    """
+    POST /api/v1/portal/announcements/mark-read/  {"ids": [1, 2]}
+    Idempotent read receipts; only announcements the caller can actually
+    see (active + matching audience) are recorded.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        ids = request.data.get('ids')
+        if (not isinstance(ids, list) or not ids
+                or not all(isinstance(i, int) for i in ids)):
+            return Response({'error': 'ids debe ser una lista de enteros.'}, status=400)
+
+        visible = list(Announcement.objects.filter(
+            id__in=ids[:50], is_active=True,
+            audience__in=audiences_for_user(request.user),
+        ).values_list('id', flat=True))
+        AnnouncementRead.objects.bulk_create(
+            [AnnouncementRead(announcement_id=a, user=request.user) for a in visible],
+            ignore_conflicts=True,
+        )
+        return Response({'marked': len(visible)})
 
 
 class NotificationMarkReadView(APIView):

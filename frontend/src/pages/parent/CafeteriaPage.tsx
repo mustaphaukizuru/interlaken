@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,10 +8,16 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
+import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
+import { Pagination } from '@/components/ui/Pagination';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
+
+const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 
 const txIcon = (type: string) => {
   if (type === 'topup')   return <ArrowUpCircle className="w-4 h-4 text-green-600" />;
@@ -34,14 +40,20 @@ export default function CafeteriaPage() {
   const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
+  const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
+  const [thresholdValue, setThresholdValue] = useState('');
 
-  // History filters
+  // History filters + pagination
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
   const [filterType, setFilterType] = useState<TypeFilter>('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
+  const [page, setPage] = useState(1);
 
-  const { data: balances, isLoading: balancesLoading } = useQuery<CafeteriaBalance[]>({
+  // Any filter change resets to the first page (stale page would show empty).
+  useEffect(() => { setPage(1); }, [filterStudent, filterType, filterFrom, filterTo]);
+
+  const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getMyBalance();
@@ -49,18 +61,25 @@ export default function CafeteriaPage() {
     },
   });
 
-  const { data: transactions, isLoading: txLoading } = useQuery<CafeteriaTransaction[]>({
-    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo],
+  const { data: txData, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<{
+    results: CafeteriaTransaction[]; count: number;
+  }>({
+    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, page],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTransactions({
         student: filterStudent === 'all' ? undefined : filterStudent,
         type: filterType || undefined,
         from: filterFrom || undefined,
         to: filterTo || undefined,
+        page,
       });
-      return data.results ?? data;
+      const results = data.results ?? data;
+      return { results, count: data.count ?? results.length };
     },
+    placeholderData: keepPreviousData,
   });
+  const transactions = txData?.results;
+  const txCount = txData?.count ?? 0;
 
   const topupMutation = useMutation({
     mutationFn: () =>
@@ -86,61 +105,143 @@ export default function CafeteriaPage() {
     onError: () => toast.error('No fue posible procesar la recarga. Intente nuevamente.'),
   });
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
-    queryClient.invalidateQueries({ queryKey: ['cafeteria-transactions'] });
-    toast.success('Actualizando saldos y movimientos…');
+  // Family-set low-balance alert threshold (#12).
+  const thresholdMutation = useMutation({
+    mutationFn: () =>
+      cafeteriaApi.updateLowBalanceThreshold(
+        thresholdStudent!.student.id, parseFloat(thresholdValue)),
+    onSuccess: () => {
+      toast.success('Alerta de saldo bajo actualizada.');
+      setThresholdStudent(null);
+      queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
+    },
+    onError: () => toast.error('No se pudo actualizar la alerta. Intente nuevamente.'),
+  });
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await cafeteriaApi.refreshFromLoyverse();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] }),
+        queryClient.invalidateQueries({ queryKey: ['cafeteria-transactions'] }),
+      ]);
+      const created = data?.created ?? 0;
+      toast.success(
+        created > 0
+          ? `Actualizado — ${created} compra(s) nueva(s) desde Loyverse.`
+          : 'Saldos y movimientos actualizados desde Loyverse.',
+      );
+    } catch {
+      toast.error('No se pudo sincronizar con Loyverse. Intente de nuevo.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // History filters: track whether any is active so we can give feedback and a
+  // one-tap reset (the list auto-applies filters, so without this a filter that
+  // matches nothing looks like a dead end).
+  const filtersActive =
+    filterType !== '' || filterFrom !== '' || filterTo !== '' || filterStudent !== 'all';
+  const clearFilters = () => {
+    setFilterType('');
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterStudent('all');
   };
 
   if (balancesLoading) return <LoadingSpinner size="lg" className="mt-20" />;
+
+  if (balancesError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
+          <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+        </div>
+        <Card><ErrorState onRetry={() => refetchBalances()} /></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Cafetería</h1>
-          <p className="mt-0.5 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
+          <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={refresh} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
+        <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
           <RefreshCw className="w-3 h-3" /> Actualizar
         </Button>
       </div>
 
       {/* Balance cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {balances?.map((b) => (
-          <Card key={b.id} className="relative">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50">
-                <Coffee className="h-5 w-5 text-green-700" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
-                <p className="text-xs text-muted">{b.student.grade} · Grupo {b.student.group}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="text-fluid-2xl font-bold text-ink">${parseFloat(b.balance).toFixed(2)}</span>
-                  {parseFloat(b.balance) < parseFloat(b.low_balance_threshold ?? '50') && (
-                    <Badge variant="warning">Saldo bajo</Badge>
-                  )}
+        {balances?.map((b) => {
+          const isLow = parseFloat(b.balance) < parseFloat(b.low_balance_threshold ?? '50');
+          return (
+            <Card key={b.id} className="flex flex-col">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+                  <Coffee className="h-5 w-5" />
                 </div>
-                <p className="mt-0.5 text-xs text-subtle">
-                  Actualizado {b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
+                  <p className="truncate text-xs text-muted">{b.student.grade} · Grupo {b.student.group}</p>
+                </div>
+                {isLow && <Badge variant="warning">Saldo bajo</Badge>}
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-subtle">Saldo</p>
+                  <p className={`font-head text-2xl font-bold ${isLow ? 'text-amber' : 'text-ink'}`}>
+                    ${parseFloat(b.balance).toFixed(2)}
+                  </p>
+                </div>
+                <p className="pb-1 text-right text-[11px] leading-tight text-subtle">
+                  Actualizado<br />{b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
                 </p>
               </div>
-            </div>
-            <div className="mt-4 flex gap-2">
+
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
-                className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
               >
-                <Plus className="w-3 h-3" /> Recargar
+                <Plus className="w-3.5 h-3.5" /> Recargar
               </Button>
-            </div>
-          </Card>
-        ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setThresholdStudent(b);
+                  setThresholdValue(parseFloat(b.low_balance_threshold ?? '50').toFixed(0));
+                }}
+                className="mt-2 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+              >
+                Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '50').toFixed(0)}</span> · Cambiar
+              </button>
+            </Card>
+          );
+        })}
       </div>
+
+      {/* No cafeteria accounts linked — explain instead of showing a blank page. */}
+      {balances && balances.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={Coffee}
+            title="Sin cuentas de cafetería"
+            description="Aún no hay alumnos con servicio de cafetería vinculados a tu cuenta. Si crees que es un error, contacta al colegio."
+          />
+        </Card>
+      )}
 
       {/* Top-up modal */}
       <Modal open={showTopup} onClose={() => setShowTopup(false)} title="Solicitar recarga">
@@ -158,6 +259,22 @@ export default function CafeteriaPage() {
             onChange={(e) => setTopupAmount(e.target.value)}
           />
           <p className="mt-1 text-xs text-subtle">Mínimo $50 · Máximo $2,000</p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {[100, 200, 300, 500].map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => setTopupAmount(String(amt))}
+                className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
+                  topupAmount === String(amt)
+                    ? 'border-purple bg-purple text-white'
+                    : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
+                }`}
+              >
+                ${amt}
+              </button>
+            ))}
+          </div>
         </div>
         <div>
           <label className="label" htmlFor="topup-method">Método de pago</label>
@@ -172,21 +289,11 @@ export default function CafeteriaPage() {
           </select>
         </div>
         {topupMethod === 'online' && (
-          <div>
-            <label className="label" htmlFor="topup-gateway">Pasarela de pago</label>
-            <select
-              id="topup-gateway"
-              className="input-field min-h-[44px] text-base"
-              value={topupGateway}
-              onChange={(e) => setTopupGateway(e.target.value as any)}
-            >
-              <option value="global_payments">Global Payments (tarjeta)</option>
-              <option value="banorte">Banorte (tarjeta / SPEI)</option>
-            </select>
-            <p className="mt-1 text-xs text-subtle">
-              Será redirigido a la página segura de la pasarela para completar el pago.
-            </p>
-          </div>
+          <PaymentMethodPicker
+            value={topupGateway}
+            onChange={(v) => setTopupGateway(v as any)}
+            disabled={topupMutation.isPending}
+          />
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button variant="secondary" onClick={() => setShowTopup(false)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
@@ -202,7 +309,48 @@ export default function CafeteriaPage() {
         </div>
       </Modal>
 
-      {/* Transactions */}
+      {/* Low-balance alert threshold modal (#12) */}
+      <Modal open={!!thresholdStudent} onClose={() => setThresholdStudent(null)} title="Alerta de saldo bajo">
+        {thresholdStudent && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Te avisaremos cuando el saldo de{' '}
+              <span className="font-semibold text-ink">{thresholdStudent.student.user.full_name}</span>{' '}
+              baje de este monto.
+            </p>
+            <div>
+              <label className="label" htmlFor="threshold-amount">Monto de alerta (MXN)</label>
+              <input
+                id="threshold-amount"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="10"
+                className="input-field min-h-[44px] text-base"
+                placeholder="Ej. 50"
+                value={thresholdValue}
+                onChange={(e) => setThresholdValue(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-subtle">Predeterminado: $50</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="secondary" onClick={() => setThresholdStudent(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
+              <Button
+                variant="primary"
+                loading={thresholdMutation.isPending}
+                onClick={() => thresholdMutation.mutate()}
+                disabled={thresholdValue === '' || parseFloat(thresholdValue) < 0}
+                className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
+              >
+                Guardar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Transactions — only when the family actually has cafeteria accounts */}
+      {balances && balances.length > 0 && (
       <Card title="Historial de movimientos">
         {/* Filters */}
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
@@ -244,14 +392,40 @@ export default function CafeteriaPage() {
             onChange={(e) => setFilterTo(e.target.value)}
             aria-label="Hasta"
           />
+          {filtersActive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="min-h-[44px] text-muted lg:w-auto"
+            >
+              <X className="h-3.5 w-3.5" /> Limpiar filtros
+            </Button>
+          )}
         </div>
 
-        {txLoading ? (
-          <LoadingSpinner />
+        {txError ? (
+          <ErrorState onRetry={() => refetchTx()} />
+        ) : txLoading ? (
+          <ListSkeleton />
         ) : !transactions?.length ? (
-          <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />
+          filtersActive ? (
+            <EmptyState
+              icon={Search}
+              title="Sin resultados"
+              description="Ningún movimiento coincide con los filtros seleccionados. Ajusta o limpia los filtros para ver más."
+              action={<Button variant="secondary" size="sm" onClick={clearFilters}>Limpiar filtros</Button>}
+            />
+          ) : (
+            <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />
+          )
         ) : (
-          <div className="divide-y divide-cream">
+          <>
+            <p className="mb-3 text-xs text-subtle">
+              {txCount} movimiento{txCount === 1 ? '' : 's'}
+              {filtersActive ? ' · filtros aplicados' : ''}
+            </p>
+            <div className="divide-y divide-cream">
             {transactions.map((tx) => (
               <div key={tx.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="flex min-w-0 items-start gap-3">
@@ -284,9 +458,13 @@ export default function CafeteriaPage() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+            <Pagination page={page} pageSize={TX_PAGE_SIZE} count={txCount}
+                        onChange={setPage} itemLabel="movimientos" />
+          </>
         )}
       </Card>
+      )}
     </div>
   );
 }

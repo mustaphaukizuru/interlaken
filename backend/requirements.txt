@@ -5,12 +5,18 @@ djangorestframework-simplejwt==5.3.1
 django-cors-headers==4.3.1
 django-environ==0.11.2
 django-filter==23.5
+drf-spectacular==0.30.0
+# At-rest encryption for sensitive fields (medical data — IK-LEGAL B4).
+cryptography==44.0.3
 
 # Database
 mysqlclient==2.2.4
 # Pure-Python MySQL driver installed as MySQLdb in config/__init__.py — the
 # actual runtime driver on cPanel and in CI (no libmysqlclient build needed).
 PyMySQL==1.1.1
+# PostgreSQL driver — the Render + Supabase free-tier deploy sets
+# DB_ENGINE=django.db.backends.postgresql.
+psycopg2-binary==2.9.9
 
 # Auth
 social-auth-app-django==5.4.1
@@ -20,6 +26,14 @@ PyJWT==2.8.0
 # Storage & Files
 Pillow==10.3.0
 python-magic==0.4.27
+# Durable object storage for uploaded media (admissions documents) — Render's
+# container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
+# unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
+django-storages==1.14.4
+boto3==1.34.162
+
+# Web push notifications (VAPID) — inert until VAPID_* env keys are set.
+pywebpush==2.3.0
 
 # HTTP & APIs
 requests==2.31.0
@@ -30,8 +44,9 @@ httpx==0.27.0
 google-api-python-client==2.137.0
 google-auth==2.32.0
 
-# Payments
-globalpayments-api==1.0.0
+# Payments: Global Payments + Banorte are custom HPP redirect + HMAC-signed
+# webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
+# globalpayments-api==1.0.0 pin was unused and isn't even on PyPI.)
 
 # Email
 django-anymail==10.3
@@ -44,6 +59,8 @@ python-decouple==3.8
 
 # Security
 django-ratelimit==4.1.0
+# Login brute-force lockout (admin + JWT email/password) — IK-SEC C2/C6
+django-axes==8.3.1
 
 # Production
 gunicorn==21.2.0
@@ -52,7 +69,9 @@ whitenoise==6.6.0
 # Monitoring (no-op unless SENTRY_DSN is configured)
 sentry-sdk==2.19.2
 
+# Admin skin (IK-ADMIN) — pinned to the release resolved against Django 4.2
+django-unfold==0.89.0
+
 # Dev
 pytest-django==4.8.0
 factory-boy==3.3.0
-django-jazzmin==3.0.5

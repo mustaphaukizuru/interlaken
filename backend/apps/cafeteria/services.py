@@ -17,16 +17,16 @@ Notes for maintainers:
 """
 import logging
 from datetime import timedelta
+from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,25 @@ def get_customer_by_email(email: str) -> dict | None:
     return customers[0] if customers else None
 
 
+def get_all_customers(limit: int = 250, max_pages: int = 40) -> list:
+    """Fetch every customer store-wide, following Loyverse's cursor.
+
+    Powers ``link_loyverse`` (roster ↔ Loyverse linking): one pass builds a
+    ``customer_code → id`` map for the whole school. ``max_pages`` caps the poll
+    (250 × 40 = 10k customers) as a runaway guard.
+    """
+    customers: list = []
+    cursor = None
+    for _ in range(max_pages):
+        params = {'cursor': cursor, 'limit': limit} if cursor else {'limit': limit}
+        data = _get('/customers', params=params)
+        customers.extend(data.get('customers', []) or [])
+        cursor = data.get('cursor')
+        if not cursor:
+            break
+    return customers
+
+
 def get_balance_from_customer(customer: dict) -> Decimal:
     """
     Extract balance from Loyverse customer object.
@@ -138,6 +157,14 @@ def get_receipts(since: str | None = None, limit: int = 250, max_pages: int = 20
         if not cursor:
             break
     return receipts
+
+
+def _loyverse_ts(dt) -> str:
+    """Format a datetime for Loyverse's ``created_at_min`` — RFC3339 with a ``Z``
+    suffix and no microseconds. A raw ``.isoformat()`` (``+00:00`` offset) is
+    rejected by the API with a 400."""
+    return (dt.astimezone(dt_timezone.utc).replace(microsecond=0)
+            .isoformat().replace('+00:00', 'Z'))
 
 
 def _to_decimal(value) -> Decimal:
@@ -308,7 +335,15 @@ def sync_purchases():
     last = (CafeteriaTransaction.objects
             .filter(transaction_type=CafeteriaTransaction.TxType.PURCHASE)
             .order_by('-date').first())
-    since = (last.date - timedelta(minutes=5)).isoformat() if last and last.date else None
+    if last and last.date:
+        since = _loyverse_ts(last.date - timedelta(minutes=5))
+    else:
+        # FIRST RUN — must NOT backfill history. The opening balance was seeded
+        # from Loyverse points, which ALREADY reflect every past purchase, so
+        # replaying historical receipts would double-debit (spec R1). Start from
+        # the configured go-live moment (CAFETERIA_SYNC_PURCHASES_SINCE), or now.
+        since = (getattr(settings, 'CAFETERIA_SYNC_PURCHASES_SINCE', '') or '').strip() \
+            or _loyverse_ts(timezone.now())
 
     receipts = get_receipts(since=since)
 
@@ -344,47 +379,72 @@ def sync_purchases():
 
 
 def sync_student_balance(student_profile) -> Decimal:
-    """
-    Sync a student's Loyverse balance into the DB.
-    Returns the current balance in MXN pesos.
+    """SEED a student's opening cafeteria balance from Loyverse — exactly once.
+
+    Per spec **R1** the local ``CafeteriaBalance`` is the source of truth: top-ups,
+    purchase syncs, adjustments and refunds all own the balance. Loyverse
+    ``total_points`` is used ONLY to establish the *opening* balance the first time
+    we ever touch a student — after that we must never overwrite it, or an online
+    top-up (which R1 can't push to Loyverse) would be clobbered and POS purchases
+    double-counted (once here, once by ``sync_purchases``).
+
+    ``last_synced is None`` is the "never seeded" signal — every ledger mutation
+    sets it — so an already-seeded student is a no-op (no overwrite, no Loyverse
+    call). Returns the current balance in MXN. The points fetch runs outside the
+    row lock; a re-check under ``select_for_update`` guards the onboarding race
+    with a concurrent first top-up/purchase.
     """
     from apps.cafeteria.models import CafeteriaBalance
 
+    # Fast path: already seeded / locally owned — no overwrite, no Loyverse call.
+    existing = CafeteriaBalance.objects.filter(student=student_profile).first()
+    if existing is not None and existing.last_synced is not None:
+        return existing.balance
+
+    # Fetch the opening points BEFORE creating any row, so a failed seed leaves no
+    # empty balance behind.
     try:
         customer = get_customer_by_id(student_profile.loyverse_id)
         balance = get_balance_from_customer(customer)
+    except LoyverseError as e:
+        logger.error(f'Opening-balance seed failed for {student_profile}: {e}')
+        raise
 
-        cb, _ = CafeteriaBalance.objects.get_or_create(student=student_profile)
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student_profile)
+        if cb.last_synced is not None:
+            return cb.balance      # seeded/credited while we were fetching
         cb.balance = balance
         cb.last_synced = timezone.now()
         cb.save(update_fields=['balance', 'last_synced'])
 
-        logger.info(f'Synced balance for {student_profile}: {balance}')
-        return balance
-
-    except LoyverseError as e:
-        logger.error(f'Balance sync failed for {student_profile}: {e}')
-        raise
+    logger.info(f'Seeded opening balance for {student_profile}: {balance}')
+    return balance
 
 
 def sync_all_balances():
-    """Sync balances for all active students. Called by the ``sync_balances`` cron command."""
+    """Seed opening balances for every linked student — the ``sync_balances`` cron.
+
+    Idempotent by design (see ``sync_student_balance``): newly-linked students get
+    their opening balance from Loyverse; already-seeded students are a no-op, so
+    this is safe to run on a schedule without ever clobbering the local ledger.
+    """
     from apps.accounts.models import StudentProfile
 
     students = StudentProfile.objects.filter(
         is_active=True
     ).exclude(loyverse_id='')
 
-    synced, failed = 0, 0
+    seeded, failed = 0, 0
     for student in students:
         try:
             sync_student_balance(student)
-            synced += 1
+            seeded += 1
         except LoyverseError:
             failed += 1
 
-    logger.info(f'Balance sync complete: {synced} synced, {failed} failed')
-    return {'synced': synced, 'failed': failed}
+    logger.info(f'Opening-balance seed complete: {seeded} ok, {failed} failed')
+    return {'synced': seeded, 'failed': failed}
 
 
 def _topup_reference(payment) -> str:
@@ -412,11 +472,18 @@ def complete_online_topup(payment):
     """
     from django.utils import timezone as _tz
 
-    from apps.cafeteria.models import (CafeteriaBalance, CafeteriaTransaction,
-                                       TopUpRequest)
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 
     topup = getattr(payment, 'related_topup', None)
     if topup is None:
+        return None
+
+    # Defence in depth against a double-credit: if this top-up was already
+    # finalised (e.g. an admin mistakenly applied it manually before the webhook
+    # landed), don't credit again. The per-payment reference guard below only
+    # catches a replay of the *same* payment, not a separate manual credit.
+    if topup.status != TopUpRequest.Status.PENDING:
+        logger.info(f'Top-up #{topup.id} already {topup.status} — webhook credit no-op.')
         return None
 
     student = topup.student
@@ -615,8 +682,7 @@ def adjust_balance(student, amount, reason: str, admin=None):
     Returns the created ``BalanceAdjustment``. Raises ``ValueError`` on a zero
     amount or a debit that would overdraw the balance below zero.
     """
-    from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
-                                       CafeteriaTransaction)
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
 
     amount = Decimal(str(amount)).quantize(Decimal('0.01'))
     if amount == 0:
@@ -649,6 +715,12 @@ def adjust_balance(student, amount, reason: str, admin=None):
             description=(f'Ajuste manual: {reason}' if reason else 'Ajuste manual'),
             balance_after=cb.balance,
         )
+        # loyverse_receipt_id is unique=True; leaving it '' means only ONE such
+        # row can ever exist system-wide, so the second manual adjustment (any
+        # student) would hit an IntegrityError. Stamp a unique synthetic
+        # reference, mirroring the refund-tx-<id> / topup-* convention.
+        tx.loyverse_receipt_id = f'adjust-tx-{tx.id}'
+        tx.save(update_fields=['loyverse_receipt_id'])
         adj = BalanceAdjustment.objects.create(
             student=student,
             admin=admin,
@@ -716,8 +788,7 @@ def refund_transaction(tx, reason: str = '', admin=None):
     transaction can't be refunded (already refunded, is itself a reversal, or the
     debit would overdraw the balance).
     """
-    from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
-                                       CafeteriaTransaction)
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
     from apps.payments.models import Payment
 
     if tx.transaction_type in (CafeteriaTransaction.TxType.REFUND,
@@ -835,3 +906,237 @@ def reconcile_balances():
             row['error'] = str(e)
         rows.append(row)
     return rows
+
+
+# ── Roster ↔ Loyverse linking ────────────────────────────────────────────────
+#
+# A student's purchases/balance only sync once StudentProfile.loyverse_id holds
+# the Loyverse customer's internal **id (UUID)** — NOT the visible customer_code
+# or barcode. Collecting each UUID by hand for the whole school is impractical, so
+# this matches customers to students by matrícula (== customer_code) and backfills
+# every id in one pass. Matching is EXACT (stripped) to avoid mis-linking one
+# child's spending onto another; an email fallback covers rosters keyed that way.
+
+
+def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> dict:
+    """Match Loyverse ``customers`` to students and backfill ``loyverse_id``.
+
+    Pure over the given ``customers`` list (no API calls here — the command/endpoint
+    fetches them via ``get_all_customers``), so it is fully unit-testable offline.
+    Matches by exact matrícula (``StudentProfile.student_id`` == ``customer_code``),
+    falling back to exact email. Only fills EMPTY ids unless ``overwrite``; writes
+    only when ``commit`` (default is a dry-run preview).
+
+    Returns a report: ``{customers, students, linked, already_linked,
+    skipped_conflict, unmatched_students[], unmatched_customer_count,
+    duplicate_codes[], commit, changes[]}``.
+    """
+    from apps.accounts.models import StudentProfile
+
+    by_code, by_email, dup_codes = {}, {}, set()
+    for c in customers:
+        code = (c.get('customer_code') or '').strip()
+        if code:
+            if code in by_code:
+                dup_codes.add(code)
+            else:
+                by_code[code] = c
+        email = (c.get('email') or '').strip().lower()
+        if email and email not in by_email:
+            by_email[email] = c
+
+    report = {
+        'customers': len(customers), 'students': 0,
+        'linked': 0, 'already_linked': 0, 'skipped_conflict': 0,
+        'unmatched_students': [], 'unmatched_customer_count': 0,
+        'duplicate_codes': sorted(dup_codes), 'commit': commit, 'changes': [],
+    }
+
+    matched_ids = set()
+    students = StudentProfile.objects.filter(is_active=True).select_related('user')
+    report['students'] = students.count()
+
+    for s in students:
+        code = (s.student_id or '').strip()
+        email = (s.user.email or '').strip().lower()
+
+        cust, matched_by = by_code.get(code), 'código'
+        if cust is None and email:
+            cust, matched_by = by_email.get(email), 'correo'
+        if cust is None:
+            report['unmatched_students'].append(
+                {'matricula': s.student_id, 'name': s.user.full_name})
+            continue
+
+        uuid = cust.get('id')
+        matched_ids.add(uuid)
+
+        if s.loyverse_id == uuid:
+            report['already_linked'] += 1
+            continue
+        if s.loyverse_id and not overwrite:
+            # Already linked to a DIFFERENT id — never silently repoint (privacy).
+            report['skipped_conflict'] += 1
+            continue
+
+        report['linked'] += 1
+        report['changes'].append({
+            'matricula': s.student_id, 'name': s.user.full_name,
+            'loyverse_id': uuid, 'matched_by': matched_by,
+            'was': s.loyverse_id or None,
+        })
+        if commit:
+            s.loyverse_id = uuid
+            s.save(update_fields=['loyverse_id'])
+
+    report['unmatched_customer_count'] = sum(
+        1 for c in customers if c.get('id') not in matched_ids)
+    return report
+
+
+# ── Import students FROM Loyverse ─────────────────────────────────────────────
+#
+# The whole roster already lives in Loyverse (name, matrícula = customer_code,
+# grade encoded in the address like "6APRI", the customer id/UUID, and current
+# points). This creates the StudentProfiles directly from those customers so the
+# cafeteria works for everyone in one pass — no CSV needed. Parents aren't in
+# Loyverse, so guardian linkage is added separately (CSV/manual) afterward.
+
+_LEVEL_ABBR = {'PRE': 'Preescolar', 'KIN': 'Kinder', 'MAT': 'Maternal',
+               'PRI': 'Primaria', 'SEC': 'Secundaria', 'PREP': 'Preparatoria'}
+
+
+def _is_loyverse_student(c) -> bool:
+    """A Loyverse customer is a student iff it has a numeric matrícula and the
+    school's student email shape ``ci<digits>@interlaken.com.mx`` — this cleanly
+    excludes staff (name-based emails, ``ZP-`` prefixes) and test/junk records."""
+    code = (c.get('customer_code') or '').strip()
+    email = (c.get('email') or '').strip().lower()
+    return (code.isdigit()
+            and email.startswith('ci')
+            and email.endswith('@interlaken.com.mx'))
+
+
+def _parse_grade_code(addr):
+    """Decode Loyverse's grade code → (grade, group). ``6APRI`` → ("6° Primaria", "A")."""
+    import re
+    m = re.match(r'^\s*(\d)\s*([A-Za-z])\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', (addr or '').upper())
+    if not m:
+        return '', ''
+    num, group, lvl = m.groups()
+    return f'{num}° {_LEVEL_ABBR.get(lvl, lvl.title())}', group
+
+
+def _split_loyverse_name(name):
+    """Split a Loyverse name into (first_name, last_name). Mexican convention puts
+    the two apellidos first, then the nombres — so the first two words are the
+    last name and the rest are the first name (a heuristic; admin can correct
+    the rare single-apellido case)."""
+    parts = (name or '').split()
+    if not parts:
+        return 'Alumno', ''
+    if len(parts) == 1:
+        return parts[0], ''
+    if len(parts) == 2:
+        return parts[1], parts[0]          # [apellido, nombre]
+    return ' '.join(parts[2:]), ' '.join(parts[:2])
+
+
+def import_students_from_loyverse(customers, *, commit=False, seed_balances=True) -> dict:
+    """Create/refresh StudentProfiles from Loyverse customers (students only).
+
+    Pure over the given ``customers`` list (no API calls), so unit-testable
+    offline. Idempotent, keyed by matrícula (``student_id`` == ``customer_code``):
+    an existing student is updated (name/grade/loyverse_id), a new one is created
+    with a student ``User`` (unusable password). When ``seed_balances`` and the
+    customer has points, the opening balance is seeded **once** (respects the
+    seed-once rule: only when the balance was never touched). Writes only when
+    ``commit`` (default is a dry-run preview).
+
+    Returns a report: ``{total_customers, candidates, created, updated,
+    skipped_non_student, balance_seeded, errors[], commit, samples[]}``.
+    """
+    from django.db import transaction as _txn
+
+    from apps.accounts.models import StudentProfile, User
+    from apps.cafeteria.models import CafeteriaBalance
+
+    report = {
+        'total_customers': len(customers), 'candidates': 0,
+        'created': 0, 'updated': 0, 'skipped_non_student': 0,
+        'balance_seeded': Decimal('0'), 'errors': [], 'commit': commit, 'samples': [],
+    }
+
+    for c in customers:
+        if not _is_loyverse_student(c):
+            report['skipped_non_student'] += 1
+            continue
+        report['candidates'] += 1
+
+        code = (c.get('customer_code') or '').strip()
+        email = (c.get('email') or '').strip().lower()
+        uuid = c.get('id') or ''
+        first, last = _split_loyverse_name(c.get('name'))
+        grade, group = _parse_grade_code(c.get('address'))
+        points = _to_decimal(c.get('total_points'))
+
+        try:
+            existing = (StudentProfile.objects.filter(student_id=code)
+                        .select_related('user').first())
+            is_new = existing is None
+            if len(report['samples']) < 10:
+                report['samples'].append({
+                    'matricula': code, 'name': f'{first} {last}'.strip(),
+                    'grade': grade or '—', 'group': group or '—',
+                    'points': str(points), 'action': 'crear' if is_new else 'actualizar'})
+
+            if not commit:
+                report['created' if is_new else 'updated'] += 1
+                continue
+
+            with _txn.atomic():
+                if existing:
+                    profile = existing
+                    u = profile.user
+                    u.first_name, u.last_name = first, last
+                    u.save(update_fields=['first_name', 'last_name'])
+                    if grade:
+                        profile.grade = grade
+                    if group:
+                        profile.group = group
+                    profile.loyverse_id = uuid
+                    profile.save()
+                    report['updated'] += 1
+                else:
+                    u = User.objects.filter(email=email).first()
+                    if u is None:
+                        u = User.objects.create_user(
+                            email=email, password=None, first_name=first,
+                            last_name=last, role=User.Role.STUDENT)
+                        u.set_unusable_password()
+                        u.save(update_fields=['password'])
+                    else:
+                        u.first_name, u.last_name, u.role = first, last, User.Role.STUDENT
+                        u.save()
+                    profile = StudentProfile.objects.create(
+                        user=u, student_id=code, grade=grade or 'N/D',
+                        group=group, loyverse_id=uuid)
+                    report['created'] += 1
+
+                # At Interlaken the family logs in with the student's OWN email
+                # (student email == parent email), so the account is its own
+                # guardian — this routes purchase/low-balance notifications, which
+                # fan out over ``student.parents``, to the family. Idempotent.
+                profile.parents.add(u)
+
+                if seed_balances and points > 0:
+                    cb, _ = CafeteriaBalance.objects.get_or_create(student=profile)
+                    if cb.last_synced is None:      # seed-once (never clobber a topup)
+                        cb.balance = points
+                        cb.last_synced = timezone.now()
+                        cb.save(update_fields=['balance', 'last_synced'])
+                        report['balance_seeded'] += points
+        except Exception as exc:                     # per-row isolation
+            report['errors'].append({'matricula': code, 'error': str(exc)[:150]})
+
+    return report

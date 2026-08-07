@@ -1,34 +1,53 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight } from 'lucide-react';
+import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight, Bell } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
-import TopBar from '@/components/layout/TopBar';
+import { Reveal } from '@/components/ui/Reveal';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { portalApi } from '@/services/api';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
+import type { AnalyticsPayload } from '@/types/analytics';
+
+// Recharts loads only when this dashboard renders (keeps it off the main bundle).
+const ChartsSection = lazy(() => import('@/components/staff/ChartsSection'));
 
 export default function AdminDashboard() {
-  const { data, isLoading } = useQuery<DashboardData>({
+  const { data, isLoading, isError, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
   });
 
+  const { data: analytics } = useQuery<AnalyticsPayload>({
+    queryKey: ['staff-analytics', 30],
+    queryFn: async () => (await portalApi.getStaffAnalytics(30)).data,
+    staleTime: 60_000,
+  });
+
   return (
-    <div className="-mt-6 -mx-[clamp(16px,4vw,32px)]">
-      <TopBar title="Panel de Administración" subtitle="Ciclo Escolar 2025–2026" />
-      <div className="px-[clamp(16px,4vw,32px)] py-6">
+    <>
+      <PageHeader title="Panel de Administración" subtitle={`Ciclo Escolar ${CURRENT_CYCLE}`} />
         {/* Stats */}
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
-          {isLoading ? (
-            [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
-          ) : (
-            <>
-              <StatCard title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />
-              <StatCard title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />
-              <StatCard title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />
-              <StatCard title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />
-            </>
-          )}
-        </div>
+        {isError ? (
+          <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
+        ) : (
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
+            {isLoading ? (
+              [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
+            ) : (
+              [
+                <StatCard key="a" title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
+                <StatCard key="b" title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />,
+                <StatCard key="c" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
+                <StatCard key="d" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />,
+              ].map((card, i) => (
+                <Reveal key={i} delay={i * 70}>{card}</Reveal>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Quick actions */}
         <div className="mb-6 flex flex-wrap gap-3">
@@ -37,8 +56,24 @@ export default function AdminDashboard() {
           <Link to="/admin/alumnos" className="btn-outline"><Users size={16} /> Ver Alumnos</Link>
         </div>
 
+        {/* Analytics — reuses the staff chart suite (real data-viz on the landing) */}
+        {analytics && (
+          <div className="mb-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="font-head text-[15px] font-bold text-ink">Indicadores · últimos 30 días</h2>
+              <Link to="/staff" className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded">
+                Analítica completa <ArrowRight size={13} />
+              </Link>
+            </div>
+            <Suspense fallback={<div className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />}>
+              <ChartsSection data={analytics} />
+            </Suspense>
+          </div>
+        )}
+
         {/* Recent activity */}
-        <div className="card !p-0 overflow-hidden">
+        {!isError && (
+        <Reveal delay={60} className="card !p-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4 sm:px-[22px]">
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
             <Link
@@ -67,13 +102,20 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {!isLoading && !(data?.announcements ?? []).length && (
-                  <tr><td colSpan={4} className="p-8 text-center text-[13px] text-subtle">Sin actividad reciente</td></tr>
+                  <tr>
+                    <td colSpan={4} className="px-5 py-10">
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <Bell className="h-6 w-6 text-subtle" aria-hidden="true" />
+                        <p className="text-[13px] text-subtle">Sin actividad reciente</p>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
-    </div>
+        </Reveal>
+        )}
+    </>
   );
 }

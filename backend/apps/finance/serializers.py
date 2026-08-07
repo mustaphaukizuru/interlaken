@@ -3,8 +3,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import (Discount, FeeSchedule, Invoice, InvoiceAdjustment,
-                     InvoiceLineItem)
+from .models import Discount, FeeSchedule, Invoice, InvoiceAdjustment, InvoiceLineItem
 
 
 class InvoiceLineItemSerializer(serializers.ModelSerializer):

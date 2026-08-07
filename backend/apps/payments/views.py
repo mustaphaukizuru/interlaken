@@ -7,6 +7,8 @@ cafeteria top-up — credit the student's **local** ledger on success (spec R1: 
 Loyverse write) and notify the parent. Failures mark everything failed and credit
 nothing.
 """
+import logging
+
 from django.db import transaction as db_transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -17,8 +19,11 @@ from rest_framework.views import APIView
 from apps.core.ratelimit import ratelimit
 
 from .gateways import get_gateway, iter_gateways
+from .gateways.base import WebhookEvent
 from .models import Payment
 from .serializers import PaymentInitiateSerializer, PaymentSerializer
+
+logger = logging.getLogger(__name__)
 
 # Statuses that are terminal — a webhook that arrives for one of these is a
 # duplicate/replay and must be a no-op (idempotency).
@@ -47,8 +52,21 @@ class PaymentInitiateView(APIView):
 
         try:
             hpp_url = gateway.create_checkout(payment)
-        except Exception:  # pragma: no cover - defensive; keep the record either way
-            hpp_url = None
+        except Exception as exc:
+            logger.exception(
+                'create_checkout failed for payment=%s gateway=%s user=%s type=%s amount=%s',
+                payment.id, gateway.name, request.user.pk, payment.payment_type, payment.amount,
+            )
+            payment.mark_failed(exc, stage='create_checkout')
+            return self._checkout_failed(payment)
+
+        if not hpp_url:
+            logger.error(
+                'create_checkout returned no URL for payment=%s gateway=%s',
+                payment.id, gateway.name,
+            )
+            payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
+            return self._checkout_failed(payment)
 
         return Response({
             'payment_id': payment.id,
@@ -59,6 +77,15 @@ class PaymentInitiateView(APIView):
             'redirect_url': hpp_url,
             'detail': 'Pago registrado correctamente.',
         }, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _checkout_failed(payment):
+        """Explicit, frontend-consumable error for a failed checkout creation."""
+        return Response({
+            'payment_id': payment.id,
+            'status': payment.status,
+            'detail': 'No se pudo iniciar el pago con el proveedor. Intenta de nuevo más tarde.',
+        }, status=status.HTTP_502_BAD_GATEWAY)
 
 
 class _WebhookProcessMixin:
@@ -71,10 +98,8 @@ class _WebhookProcessMixin:
         ``(payment, success)`` when a top-up notification should be sent **after**
         commit, or ``None``.
         """
-        from apps.cafeteria.services import (complete_online_topup,
-                                             fail_online_topup)
-        from apps.finance.services import (complete_invoice_payment,
-                                           fail_invoice_payment)
+        from apps.cafeteria.services import complete_online_topup, fail_online_topup
+        from apps.finance.services import complete_invoice_payment, fail_invoice_payment
 
         notify_arg = None
         with db_transaction.atomic():
@@ -114,6 +139,8 @@ class _WebhookProcessMixin:
 
     def _process(self, request, gateways):
         """Verify the request against ``gateways`` and apply the first that matches."""
+        from apps.core.audit import audit_context
+
         event = None
         for gateway in gateways:
             event = gateway.verify_webhook(request)
@@ -123,7 +150,9 @@ class _WebhookProcessMixin:
             return Response({'error': 'invalid_signature'},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-        http_status, body, notify_arg = self._apply_event(event)
+        # Automated money movement: attribute audit records to the gateway job.
+        with audit_context(actor_label='system:webhook'):
+            http_status, body, notify_arg = self._apply_event(event)
 
         # Email/notify outside the DB transaction (best-effort; never blocks the ack).
         if notify_arg is not None:
@@ -171,6 +200,54 @@ class BanorteWebhookView(_WebhookProcessMixin, APIView):
 
     def post(self, request):
         return self._process(request, [get_gateway('banorte')])
+
+
+def _sandbox_payments_enabled() -> bool:
+    """Sandbox payment completion is DEV-ONLY (DEBUG or SQLITE_LOCAL). In
+    production the real gateway webhook settles payments and this is disabled."""
+    import os
+
+    from django.conf import settings
+    return bool(settings.DEBUG or os.getenv('SQLITE_LOCAL'))
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SandboxCompleteView(_WebhookProcessMixin, APIView):
+    """POST /api/v1/payments/sandbox/complete/ — DEV-ONLY.
+
+    Lets the mock hosted-payment page finish the flow end-to-end without a live
+    gateway. Reuses the EXACT webhook completion path (mark success/fail, credit
+    the cafeteria ledger / mark the invoice paid, notify the family) — only the
+    HMAC signature check is skipped — so sandbox behaviour matches production.
+    Returns 404 unless DEBUG/SQLITE_LOCAL.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if not _sandbox_payments_enabled():
+            return Response({'error': 'not_found'}, status=status.HTTP_404_NOT_FOUND)
+
+        order_id = request.data.get('order_id')
+        result = 'success' if request.data.get('result', 'success') == 'success' else 'failed'
+        event = WebhookEvent(
+            payment_id=order_id, status=result,
+            transaction_id=f'SANDBOX-{order_id}',
+            raw={'sandbox': True, 'result': result},
+        )
+
+        from apps.core.audit import audit_context
+        with audit_context(actor_label='system:sandbox'):
+            http_status, body, notify_arg = self._apply_event(event)
+
+        if notify_arg is not None:
+            payment, success = notify_arg
+            if payment.payment_type == Payment.Type.CAFETERIA:
+                from apps.cafeteria.services import notify_topup_result
+                notify_topup_result(payment, success=success)
+            elif payment.payment_type == Payment.Type.TUITION:
+                from apps.finance.services import notify_invoice_result
+                notify_invoice_result(payment, success=success)
+        return Response(body, status=http_status)
 
 
 class PaymentDetailView(generics.RetrieveAPIView):

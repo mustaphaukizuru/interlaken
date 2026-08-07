@@ -3,77 +3,69 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
   Facebook, Instagram, Youtube,
+  GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
+  FileText, CircleDollarSign, DoorOpen, UserPlus, MonitorSmartphone, Receipt,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { socialEntries } from '@/lib/siteContact';
+import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 
-const NAV_LINKS = [
-  { to: '/nosotros',          label: 'Nosotros' },
-  { to: '/admisiones',        label: 'Admisiones' },
-  { to: '/puertas-abiertas',  label: 'Puertas Abiertas' },
-  { to: '/agendar-visita',    label: 'Agendar Visita' },
-  { to: '/contacto',          label: 'Contacto' },
-];
-
-/** Grouped entries for the "Programas ▾" mega-menu. Routes are unchanged: the
- *  levels point at Admisiones and the extracurriculars at Nosotros. */
-const PROGRAM_GROUPS = [
+/** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
+ *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra. */
+const MENU: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }[] = [
   {
-    heading: 'Niveles',
+    label: 'El Colegio',
     items: [
-      { label: 'Preescolar', to: '/admisiones' },
-      { label: 'Primaria', to: '/admisiones' },
-      { label: 'Secundaria', to: '/admisiones' },
+      { label: 'Quiénes Somos', to: '/nosotros', icon: Users },
+      { label: 'Modelo Educativo', to: '/modelo-educativo', icon: BookOpen },
+      { label: 'Galería', to: '/galeria', icon: Camera },
     ],
   },
   {
-    heading: 'Programas',
+    label: 'Niveles Educativos',
     items: [
-      { label: 'Inglés', to: '/nosotros' },
-      { label: 'Deportes', to: '/nosotros' },
-      { label: 'Arte y Música', to: '/nosotros' },
-      { label: 'Ciencia y Robótica', to: '/nosotros' },
+      { label: 'Preescolar', to: '/niveles/preescolar', icon: Blocks },
+      { label: 'Primaria', to: '/niveles/primaria', icon: Pencil },
+      { label: 'Secundaria', to: '/niveles/secundaria', icon: GraduationCap },
+    ],
+  },
+  {
+    label: 'Admisiones',
+    items: [
+      { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
+      { label: 'Documentación', to: '/admisiones/documentacion', icon: FileText },
+      { label: 'Costos', to: '/admisiones/costos', icon: CircleDollarSign },
+      { label: 'Puertas Abiertas', to: '/puertas-abiertas', icon: DoorOpen },
+      { label: 'Pre-Registro', to: '/pre-registro', icon: UserPlus },
+    ],
+  },
+  {
+    label: 'Comunidad',
+    items: [
+      { label: 'Plataformas', to: '/comunidad/plataformas', icon: MonitorSmartphone },
+      { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
     ],
   },
 ];
 
-const FOOTER_GROUPS = [
-  {
-    heading: 'Niveles',
-    links: [
-      { label: 'Preescolar', to: '/admisiones' },
-      { label: 'Primaria', to: '/admisiones' },
-      { label: 'Secundaria', to: '/admisiones' },
-    ],
-  },
-  {
-    heading: 'Admisiones',
-    links: [
-      { label: 'Proceso de admisión', to: '/admisiones' },
-      { label: 'Pre-Registro', to: '/pre-registro' },
-      { label: 'Puertas Abiertas', to: '/puertas-abiertas' },
-      { label: 'Agendar Visita', to: '/agendar-visita' },
-    ],
-  },
-  {
-    heading: 'Comunidad',
-    links: [
-      { label: 'Nosotros', to: '/nosotros' },
-      { label: 'Contacto', to: '/contacto' },
-      { label: 'Portal Escolar', to: '/login' },
-    ],
-  },
-];
+/** El pie refleja los mismos 4 grupos del menú; Portal/Aviso van en la barra inferior. */
+const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
 
-const SOCIALS = [
-  { label: 'Facebook', href: 'https://facebook.com', Icon: Facebook },
-  { label: 'Instagram', href: 'https://instagram.com', Icon: Instagram },
-  { label: 'YouTube', href: 'https://youtube.com', Icon: Youtube },
-];
+// Icons per social key; URLs come from the admin-editable site settings
+// (CMS Phase 1) — entries without a configured URL are not rendered.
+const SOCIAL_ICONS = {
+  facebook: Facebook,
+  instagram: Instagram,
+  youtube: Youtube,
+} as const;
 
-/** Accessible desktop "Programas ▾" dropdown: hover + click, aria-expanded,
- *  Escape to close (restoring focus), and outside-click dismissal. */
-function ProgramsDropdown() {
+/** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
+ *  focus, outside-click dismissal). One per grupo del menú del cliente. */
+function NavDropdown({ label, items }: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -110,39 +102,35 @@ function ProgramsDropdown() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
+        className="flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 rounded"
       >
-        Programas
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        {label}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div
           role="menu"
-          aria-label="Programas"
-          className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-[420px]"
+          aria-label={label}
+          className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-64"
         >
-          <div className="rounded-2xl border border-slate-100 bg-white shadow-xl p-5 grid grid-cols-2 gap-5">
-            {PROGRAM_GROUPS.map((group) => (
-              <div key={group.heading}>
-                <p className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-2">{group.heading}</p>
-                <ul className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <li key={item.label}>
-                      <Link
-                        to={item.to}
-                        role="menuitem"
-                        onClick={() => setOpen(false)}
-                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-brand-50 hover:text-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <ul className="overflow-hidden rounded-2xl border border-line bg-white p-2 shadow-xl ring-1 ring-ink/5">
+            {items.map((item) => (
+              <li key={item.label}>
+                <Link
+                  to={item.to}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                >
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green group-hover:text-white">
+                    <item.icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
     </div>
@@ -151,7 +139,14 @@ function ProgramsDropdown() {
 
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
-  const [mobileProgramsOpen, setMobileProgramsOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const settings = useSiteSettings();
+  // Facebook viene confirmado por el cliente; Instagram se muestra siempre
+  // (petición del cliente) con enlace vacío hasta que entreguen la URL.
+  const socials = socialEntries(settings);
+  const displaySocials = socials.some((s) => s.key === 'instagram')
+    ? socials
+    : [...socials, { key: 'instagram' as const, label: 'Instagram', href: settings.instagram_url || '#' }];
 
   // Lock body scroll while the mobile menu is open (prevents background scroll).
   useEffect(() => {
@@ -170,47 +165,73 @@ export function PublicLayout() {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      {/* Top bar */}
-      <div className="hidden md:flex bg-brand-800 text-white text-xs px-6 py-1.5 justify-end gap-6">
-        <a href="tel:+525512345678" className="flex items-center gap-1 hover:text-brand-200 transition-colors">
-          <Phone className="w-3 h-3" /> (55) 1234-5678
-        </a>
-        <a href="mailto:colegio@interlaken.edu.mx" className="flex items-center gap-1 hover:text-brand-200 transition-colors">
-          <Mail className="w-3 h-3" /> colegio@interlaken.edu.mx
-        </a>
+      {/* Preheader — solo escritorio/tablet. Mismo contenedor que la barra de
+          navegación: las redes quedan alineadas al borde del logo y el correo
+          termina al ras del botón «Portal». */}
+      <div className="hidden md:block bg-brand-800 text-white text-xs">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-1.5 sm:px-6">
+          <div className="flex items-center gap-2">
+            {displaySocials.map(({ key, label, href }) => {
+              const Icon = SOCIAL_ICONS[key];
+              return (
+                <a
+                  key={key}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors hover:bg-white/25 hover:text-white"
+                >
+                  <Icon className="h-3 w-3" aria-hidden="true" />
+                </a>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-6">
+            {settings.phone_display && (
+              <a href={`tel:${settings.phone_e164}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
+                <Phone className="w-3 h-3" aria-hidden="true" /> {settings.phone_display}
+              </a>
+            )}
+            {settings.contact_email && (
+              <a href={`mailto:${settings.contact_email}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
+                <Mail className="w-3 h-3" aria-hidden="true" /> {settings.contact_email}
+              </a>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main nav */}
       <div className="accent-bar" />
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-line sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
             <Logo variant="horizontal" size={40} theme="light" eager />
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-6">
-            <ProgramsDropdown />
-            {NAV_LINKS.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  `text-sm font-medium transition-colors ${
-                    isActive ? 'text-brand-600' : 'text-slate-600 hover:text-brand-600'
-                  }`
-                }
-              >
-                {link.label}
-              </NavLink>
+          {/* Desktop nav — menú confirmado por el cliente */}
+          <nav className="hidden lg:flex items-center gap-5">
+            {MENU.map((group) => (
+              <NavDropdown key={group.label} label={group.label} items={group.items} />
             ))}
+            <NavLink
+              to="/contacto"
+              className={({ isActive }) =>
+                `text-sm font-medium transition-colors ${
+                  isActive ? 'text-brand-600' : 'text-muted hover:text-brand-600'
+                }`
+              }
+            >
+              Contacto
+            </NavLink>
           </nav>
 
           {/* CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link to="/pre-registro" className="btn-primary text-xs px-4 py-2">
-              Pre-Registro
+          <div className="hidden lg:flex items-center gap-3">
+            <Link to="/agendar-visita" className="btn-primary text-xs px-4 py-2">
+              Agendar Visita
             </Link>
             <Link to="/login" className="btn-secondary text-xs px-4 py-2">
               Portal
@@ -222,60 +243,63 @@ export function PublicLayout() {
             onClick={() => setOpen(!open)}
             aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={open}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            className="lg:hidden p-2 rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
           >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile menu — acordeón por grupo del menú */}
         {open && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
-            {/* Programas accordion */}
-            <button
-              type="button"
-              aria-expanded={mobileProgramsOpen}
-              onClick={() => setMobileProgramsOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-            >
-              Programas
-              <ChevronDown className={`w-4 h-4 transition-transform ${mobileProgramsOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {mobileProgramsOpen && (
-              <div className="pl-3 space-y-0.5">
-                {PROGRAM_GROUPS.flatMap((g) => g.items).map((item, i) => (
-                  <Link
-                    key={`${item.label}-${i}`}
-                    to={item.to}
-                    onClick={() => setOpen(false)}
-                    className="block px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
+          <div className="lg:hidden bg-white border-t border-line px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+            {MENU.map((group) => (
+              <div key={group.label}>
+                <button
+                  type="button"
+                  aria-expanded={openGroup === group.label}
+                  onClick={() => setOpenGroup((g) => (g === group.label ? null : group.label))}
+                  className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium text-ink hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                >
+                  {group.label}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${openGroup === group.label ? 'rotate-180' : ''}`} />
+                </button>
+                {openGroup === group.label && (
+                  <div className="space-y-0.5 pl-2">
+                    {group.items.map((item) => (
+                      <Link
+                        key={item.label}
+                        to={item.to}
+                        onClick={() => setOpen(false)}
+                        className="flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-cream hover:text-ink"
+                      >
+                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark">
+                          <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-
-            {NAV_LINKS.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-50'
-                  }`
-                }
-              >
-                {link.label}
-              </NavLink>
             ))}
+
+            <NavLink
+              to="/contacto"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                `block px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-cream'
+                }`
+              }
+            >
+              Contacto
+            </NavLink>
             <div className="pt-2 flex flex-col gap-2">
-              <Link to="/pre-registro" onClick={() => setOpen(false)} className="btn-primary justify-center">
-                Pre-Registro
+              <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-primary justify-center">
+                Agendar Visita
               </Link>
               <Link to="/login" onClick={() => setOpen(false)} className="btn-secondary justify-center">
-                Portal Escolar
+                Portal
               </Link>
             </div>
           </div>
@@ -284,20 +308,23 @@ export function PublicLayout() {
 
       {/* Page content */}
       <main id="contenido" className="flex-1">
-        <Outlet />
+        <RouteTransition><Outlet /></RouteTransition>
       </main>
 
-      {/* Sticky mobile CTA — quick path to pre-inscripción, phones only. */}
+      {/* Sticky mobile CTA — el CTA principal del cliente, solo en teléfonos. */}
       <Link
-        to="/pre-registro"
+        to="/agendar-visita"
         className="btn-pink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 justify-center shadow-lg md:hidden"
       >
-        Pre-inscripción
+        Agendar visita
       </Link>
 
+      {/* Floating WhatsApp bubble — right side, every public page. */}
+      <WhatsAppFloat />
+
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 text-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 md:grid-cols-5 gap-8">
+      <footer className="bg-dark text-white/60 text-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-8">
           {/* Brand column */}
           <div className="col-span-2">
             <div className="mb-3">
@@ -307,20 +334,25 @@ export function PublicLayout() {
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
               Tlalnepantla, Estado de México.
             </p>
-            <div className="flex items-center gap-3 mt-5">
-              {SOCIALS.map(({ label, href, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-                >
-                  <Icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
+            {displaySocials.length > 0 && (
+              <div className="flex items-center gap-3 mt-5">
+                {displaySocials.map(({ key, label, href }) => {
+                  const Icon = SOCIAL_ICONS[key];
+                  return (
+                    <a
+                      key={key}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={label}
+                      className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                    >
+                      <Icon className="w-4 h-4" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Link groups */}
@@ -341,34 +373,40 @@ export function PublicLayout() {
           <div>
             <h4 className="text-white font-semibold mb-3">Contacto</h4>
             <ul className="space-y-2 text-xs">
-              <li className="flex items-start gap-2">
-                <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <a href="tel:+525512345678" className="hover:text-white transition-colors">(55) 1234-5678</a>
-              </li>
-              <li className="flex items-start gap-2">
-                <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <a href="mailto:colegio@interlaken.edu.mx" className="hover:text-white transition-colors break-all">colegio@interlaken.edu.mx</a>
-              </li>
+              {settings.phone_display && (
+                <li className="flex items-start gap-2">
+                  <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <a href={`tel:${settings.phone_e164}`} className="hover:text-white transition-colors">{settings.phone_display}</a>
+                </li>
+              )}
+              {settings.contact_email && (
+                <li className="flex items-start gap-2">
+                  <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
+                </li>
+              )}
               <li className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <span>Tlalnepantla de Baz, Estado de México</span>
+                <a
+                  href={settings.maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={settings.address}
+                  className="hover:text-white transition-colors"
+                >
+                  Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                </a>
               </li>
             </ul>
-            <a
-              href="https://wa.me/5215512345678?text=Hola%2C%20me%20gustar%C3%ADa%20obtener%20m%C3%A1s%20informaci%C3%B3n"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-4 text-xs bg-green-600 text-white px-3 py-1.5 rounded-full hover:bg-green-700 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              WhatsApp
-            </a>
           </div>
         </div>
-        <div className="border-t border-slate-800">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-center">
+        <div className="border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
             <span>© {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados</span>
-            <span className="text-slate-500">Institución con reconocimiento de validez oficial · SEP</span>
+            <div className="flex items-center gap-4">
+              <Link to="/aviso-de-privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
+              <span className="text-white/45">Reconocimiento de validez oficial · SEP</span>
+            </div>
           </div>
         </div>
       </footer>

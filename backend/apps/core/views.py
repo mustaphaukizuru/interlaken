@@ -1,8 +1,11 @@
 """
-Core API views: public contact form.
+Core API views: public contact form + health check.
 """
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import send_mail
+from django.db import connection
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -37,3 +40,40 @@ class ContactCreateView(APIView):
         )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class HealthView(APIView):
+    """GET /api/v1/health/ — liveness + dependency probe for uptime monitors.
+
+    Public, unauthenticated, read-only (exempt from audit logging like all
+    reads). Returns 200 when DB and cache respond, 503 otherwise, so any
+    HTTP monitor (UptimeRobot/BetterStack/cron curl) can alert on it.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        checks = {'db': False, 'cache': False}
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+                checks['db'] = cursor.fetchone() is not None
+        except Exception:  # pragma: no cover — depends on a broken DB
+            pass
+
+        try:
+            cache.set('health-probe', 'ok', 10)
+            checks['cache'] = cache.get('health-probe') == 'ok'
+        except Exception:  # pragma: no cover — depends on a broken cache
+            pass
+
+        healthy = all(checks.values())
+        return Response(
+            {
+                'status': 'ok' if healthy else 'degraded',
+                'checks': checks,
+                'time': timezone.now().isoformat(),
+            },
+            status=status.HTTP_200_OK if healthy
+            else status.HTTP_503_SERVICE_UNAVAILABLE,
+        )

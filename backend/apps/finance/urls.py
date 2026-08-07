@@ -19,4 +19,8 @@ urlpatterns = [
     path('admin/student/<int:pk>/',      views.AdminStudentLedgerView.as_view(),  name='finance-admin-student'),
     path('admin/generate/',              views.AdminGenerateInvoicesView.as_view(), name='finance-admin-generate'),
     path('admin/bulk/',                  views.AdminBulkActionView.as_view(),     name='finance-admin-bulk'),
+    path('admin/fee-schedules/',         views.AdminFeeScheduleListCreateView.as_view(), name='finance-admin-fees'),
+    path('admin/fee-schedules/<int:pk>/', views.AdminFeeScheduleDetailView.as_view(),    name='finance-admin-fee-detail'),
+    path('admin/discounts/',             views.AdminDiscountListCreateView.as_view(),    name='finance-admin-discounts'),
+    path('admin/discounts/<int:pk>/',    views.AdminDiscountDetailView.as_view(),        name='finance-admin-discount-detail'),
 ]

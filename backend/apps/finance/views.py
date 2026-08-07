@@ -17,16 +17,61 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 
 from . import services
-from .models import Invoice
-from .serializers import (AdjustInvoiceInputSerializer, CancelInvoiceInputSerializer,
-                          GenerateInvoicesInputSerializer, InvoiceAdjustmentSerializer,
-                          InvoiceListSerializer, InvoicePayInputSerializer,
-                          InvoiceSerializer, MarkPaidInputSerializer)
+from .models import Discount, FeeSchedule, Invoice
+from .serializers import (
+    AdjustInvoiceInputSerializer,
+    CancelInvoiceInputSerializer,
+    DiscountSerializer,
+    FeeScheduleSerializer,
+    GenerateInvoicesInputSerializer,
+    InvoiceAdjustmentSerializer,
+    InvoiceListSerializer,
+    InvoicePayInputSerializer,
+    InvoiceSerializer,
+    MarkPaidInputSerializer,
+)
 
 
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.role == User.Role.ADMIN)
+        user = request.user
+        # AnonymousUser is truthy but has no `.role`; `is_authenticated` is the
+        # correct guard (a bare truthiness check would raise AttributeError -> 500).
+        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
+
+
+class AdminFeeScheduleListCreateView(generics.ListCreateAPIView):
+    """GET/POST /api/v1/finance/admin/fee-schedules/ — tuition plans (Planes)."""
+    queryset = FeeSchedule.objects.all().order_by('-active', 'level', 'grade', 'name')
+    serializer_class = FeeScheduleSerializer
+    permission_classes = [IsAdmin]
+
+
+class AdminFeeScheduleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH (edit / toggle active) or DELETE a tuition plan."""
+    queryset = FeeSchedule.objects.all()
+    serializer_class = FeeScheduleSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
+
+
+class AdminDiscountListCreateView(generics.ListCreateAPIView):
+    """GET (?student=<id>) / POST /api/v1/finance/admin/discounts/ — becas & descuentos."""
+    serializer_class = DiscountSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        qs = Discount.objects.select_related('student__user').order_by('-active', '-created_at')
+        student = self.request.query_params.get('student')
+        return qs.filter(student_id=student) if student else qs
+
+
+class AdminDiscountDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH (edit / toggle) or DELETE a beca / descuento."""
+    queryset = Discount.objects.all()
+    serializer_class = DiscountSerializer
+    permission_classes = [IsAdmin]
+    http_method_names = ['get', 'patch', 'delete']
 
 
 def _parent_invoices(user):
@@ -272,14 +317,18 @@ class AdminBulkActionView(APIView):
             return Response({'error': 'Acción no válida.'}, status=400)
 
         invoices = Invoice.objects.select_related('student__user').filter(pk__in=ids)
-        done = failed = 0
+        done = failed = skipped = 0
         for invoice in invoices:
             try:
                 if action == 'mark_paid':
                     services.mark_invoice_paid(invoice, reason=reason, admin=request.user)
                 elif action == 'cancel':
                     services.cancel_invoice(invoice, reason=reason, admin=request.user)
-                else:  # remind
+                else:  # remind — only invoices that actually owe money
+                    if (invoice.status == Invoice.Status.CANCELLED
+                            or invoice.balance_due <= 0):
+                        skipped += 1
+                        continue  # don't send a "$0.00 saldo" reminder
                     services._notify_invoice(
                         invoice, 'Recordatorio de colegiatura',
                         (f'Le recordamos que la colegiatura de '
@@ -289,4 +338,5 @@ class AdminBulkActionView(APIView):
                 done += 1
             except ValueError:
                 failed += 1
-        return Response({'action': action, 'done': done, 'failed': failed})
+        return Response({'action': action, 'done': done, 'failed': failed,
+                         'skipped': skipped})

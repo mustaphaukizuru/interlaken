@@ -11,10 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.12.0",
     "@hookform/resolvers": "^3.6.0",
     "@sentry/react": "^8.55.2",
     "@tanstack/react-query": "^5.45.0",
@@ -24,16 +24,17 @@
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-dropzone": "^14.2.3",
     "react-helmet-async": "^2.0.5",
     "react-hook-form": "^7.52.1",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.23.1",
+    "recharts": "^2.15.4",
     "tailwind-merge": "^2.3.0",
     "zod": "^3.23.8",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -46,6 +47,7 @@
     "autoprefixer": "^10.4.19",
     "axios-mock-adapter": "^2.1.0",
     "eslint": "^8.57.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.26",
     "jsdom": "^25.0.1",
@@ -54,6 +56,7 @@
     "typescript": "^5.4.5",
     "vite": "^5.3.1",
     "vite-plugin-pwa": "^0.20.5",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "vitest-axe": "^1.0.0-pre.3"
   }
 }

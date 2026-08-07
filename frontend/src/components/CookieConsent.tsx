@@ -39,15 +39,15 @@ export function CookieConsent() {
       aria-label="Aviso de cookies"
       className="fixed bottom-0 inset-x-0 z-[100] p-4 sm:p-6"
     >
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl border border-slate-100 p-5 sm:flex sm:items-center sm:gap-5">
+      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl border border-line p-5 sm:flex sm:items-center sm:gap-5">
         <div className="flex items-start gap-3 flex-1">
           <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
             <Cookie className="w-5 h-5 text-brand-600" />
           </div>
-          <p className="text-sm text-slate-600 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             Usamos cookies para medir el uso del sitio y mejorar tu experiencia.
             No se activa ninguna analítica hasta que aceptes.{' '}
-            <Link to="/contacto" className="text-brand-600 underline hover:text-brand-700">
+            <Link to="/aviso-de-privacidad" className="text-brand-600 underline hover:text-brand-700">
               Más información
             </Link>
             .

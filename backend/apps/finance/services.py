@@ -23,8 +23,14 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from .models import (Discount, FeeSchedule, Invoice, InvoiceAdjustment,
-                     InvoiceLineItem, InvoicePayment, q2)
+from .models import (
+    FeeSchedule,
+    Invoice,
+    InvoiceAdjustment,
+    InvoiceLineItem,
+    InvoicePayment,
+    q2,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -327,26 +333,47 @@ def start_invoice_payment(invoice, user, gateway_name=None):
 def complete_invoice_payment(payment):
     """Mark the linked invoice paid for a confirmed tuition ``Payment`` (webhook).
 
-    Atomic + idempotent: a replayed/duplicate webhook is a no-op (guarded by the
-    invoice already being settled and the ``InvoicePayment`` amount). Returns the
-    ``Invoice`` (or ``None`` when the payment isn't linked to one).
+    Atomic + idempotent **per payment** (guarded by the locked
+    ``InvoicePayment.applied_at``): a replay of the same payment is a no-op,
+    while a distinct second payment on an already-settled invoice is credited as
+    an overpayment (``balance_due`` goes negative, logged for refund) rather than
+    silently dropped. Returns the ``Invoice`` (or ``None`` when the payment isn't
+    linked to one).
     """
     link = getattr(payment, 'invoice_payment', None)
     if link is None:
         return None
 
     with transaction.atomic():
-        invoice = Invoice.objects.select_for_update().get(pk=link.invoice_id)
-        if invoice.status == Invoice.Status.PAID and invoice.is_settled:
-            logger.info(f'Invoice #{invoice.id} already paid — webhook no-op.')
-            return invoice
+        # Idempotency keys on THIS payment (via the locked link's applied_at),
+        # not on invoice status. Keying on status silently dropped a genuinely
+        # distinct second payment that landed on an already-settled invoice
+        # (e.g. a parent completing checkout in two tabs): the money was charged
+        # by the gateway but never recorded or refunded. Now such a payment is
+        # credited too, pushing amount_paid past amount so the overpayment is
+        # visible (balance_due < 0) and refundable — while a REPLAY of the same
+        # payment is a true no-op.
+        link = InvoicePayment.objects.select_for_update().get(pk=link.pk)
+        if link.applied_at is not None:
+            logger.info(f'Payment #{payment.id} already applied to invoice '
+                        f'#{link.invoice_id} — no-op.')
+            return Invoice.objects.get(pk=link.invoice_id)
 
+        invoice = Invoice.objects.select_for_update().get(pk=link.invoice_id)
         invoice.amount_paid = q2(invoice.amount_paid) + q2(payment.amount)
-        if invoice.balance_due <= 0:
+        if invoice.balance_due <= 0 and invoice.status != Invoice.Status.PAID:
             invoice.status = Invoice.Status.PAID
             invoice.paid_at = timezone.now()
         invoice.save(update_fields=['amount_paid', 'status', 'paid_at', 'updated_at'])
 
+        link.applied_at = timezone.now()
+        link.save(update_fields=['applied_at'])
+
+    if invoice.balance_due < 0:
+        logger.warning(
+            f'Invoice #{invoice.id} OVERPAID by ${-invoice.balance_due} '
+            f'(payment #{payment.id} landed on an already-settled invoice) — '
+            f'manual refund review needed.')
     logger.info(f'Invoice #{invoice.id} credited ${payment.amount} via payment #{payment.id}.')
     return invoice
 

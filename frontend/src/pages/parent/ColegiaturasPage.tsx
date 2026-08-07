@@ -9,9 +9,11 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
+import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { financeApi, downloadBlob } from '@/services/api';
 import type { Invoice } from '@/types';
 
@@ -22,17 +24,12 @@ const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
   cancelled: { label: 'Cancelada', variant: 'neutral', icon: XCircle },
 };
 
-const GATEWAYS = [
-  { value: 'global_payments', label: 'Tarjeta (Global Payments)' },
-  { value: 'banorte', label: 'Banorte Pago en Línea' },
-];
-
 export default function ColegiaturasPage() {
   const queryClient = useQueryClient();
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   const [gateway, setGateway] = useState('global_payments');
 
-  const { data: invoices, isLoading } = useQuery<Invoice[]>({
+  const { data: invoices, isLoading, isError, refetch } = useQuery<Invoice[]>({
     queryKey: ['invoices'],
     queryFn: async () => {
       const { data } = await financeApi.getInvoices();
@@ -63,8 +60,6 @@ export default function ColegiaturasPage() {
     onError: () => toast.error('No fue posible descargar el comprobante.'),
   });
 
-  if (isLoading) return <LoadingSpinner size="lg" className="mt-20" />;
-
   const outstanding = (invoices ?? [])
     .filter((i) => i.status !== 'paid' && i.status !== 'cancelled')
     .reduce((sum, i) => sum + parseFloat(i.balance_due), 0);
@@ -73,7 +68,7 @@ export default function ColegiaturasPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-fluid-xl font-bold text-ink">Colegiaturas</h1>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Colegiaturas</h1>
           <p className="mt-0.5 text-fluid-sm text-muted">
             Consulte y pague las colegiaturas mensuales de sus hijos.
           </p>
@@ -95,23 +90,11 @@ export default function ColegiaturasPage() {
               <div className="mt-1 flex justify-between gap-3"><span className="text-muted">Periodo</span><span className="font-medium text-ink">{payInvoice.period_label}</span></div>
               <div className="mt-1 flex justify-between gap-3"><span className="text-muted">Monto a pagar</span><span className="font-bold text-ink">${parseFloat(payInvoice.balance_due).toFixed(2)} {payInvoice.currency}</span></div>
             </div>
-            <div>
-              <label className="label" htmlFor="pay-gateway">Método de pago</label>
-              <select
-                id="pay-gateway"
-                className="input-field min-h-[44px] text-base"
-                value={gateway}
-                onChange={(e) => setGateway(e.target.value)}
-              >
-                {GATEWAYS.map((g) => (
-                  <option key={g.value} value={g.value}>{g.label}</option>
-                ))}
-              </select>
-            </div>
+            <PaymentMethodPicker value={gateway} onChange={setGateway} disabled={payMutation.isPending} />
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="secondary" onClick={() => setPayInvoice(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
               <Button loading={payMutation.isPending} onClick={() => payMutation.mutate()} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">
-                <CreditCard className="w-4 h-4" /> Pagar en línea
+                <CreditCard className="w-4 h-4" /> Pagar ${parseFloat(payInvoice.balance_due).toFixed(2)}
               </Button>
             </div>
           </div>
@@ -120,7 +103,11 @@ export default function ColegiaturasPage() {
 
       {/* Invoice list */}
       <Card>
-        {!invoices?.length ? (
+        {isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : isLoading ? (
+          <ListSkeleton />
+        ) : !invoices?.length ? (
           <EmptyState icon={Receipt} title="Sin colegiaturas" description="Las colegiaturas emitidas aparecerán aquí." />
         ) : (
           <div className="divide-y divide-cream">

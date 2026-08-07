@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -88,6 +89,26 @@ class TestTopUpInitiation:
         assert "redirect_url" not in resp.data
         assert not Payment.objects.filter(related_topup_id=resp.data["id"]).exists()
 
+    def test_online_topup_gateway_failure_marks_payment_failed(self, api_client):
+        """A gateway checkout failure must not leave an orphan PENDING payment."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        api_client.force_authenticate(user=parent)
+        with patch(
+            "apps.payments.gateways.global_payments.GlobalPaymentsGateway.create_checkout",
+            side_effect=RuntimeError("boom"),
+        ):
+            resp = api_client.post(
+                reverse("cafeteria-topup"),
+                {"student": student.id, "amount": "100.00", "method": "online",
+                 "gateway": "global_payments"},
+                format="json",
+            )
+        assert resp.status_code == 502, resp.data
+        payment = Payment.objects.get(related_topup__student=student)
+        assert payment.status == Payment.Status.FAILED
+        assert not Payment.objects.filter(status=Payment.Status.PENDING).exists()
+
 
 def _make_online_topup(parent, student, amount="200.00"):
     topup = TopUpRequest.objects.create(
@@ -164,5 +185,71 @@ class TestTopUpWebhookCredit:
         assert payment.status == Payment.Status.FAILED
         assert topup.status == TopUpRequest.Status.FAILED
         assert not CafeteriaTransaction.objects.filter(student=student).exists()
+
+    def test_credit_is_skipped_if_topup_already_finalised(self):
+        # Defence in depth: if an admin already applied this top-up manually
+        # (status flipped away from PENDING) before the webhook arrives, the
+        # webhook credit must be a no-op — the reference guard alone only catches
+        # a replay of the same payment, not a separate manual credit.
+        from apps.cafeteria.services import complete_online_topup
+
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup, payment = _make_online_topup(parent, student)
+        topup.status = TopUpRequest.Status.COMPLETED
+        topup.save(update_fields=["status"])
+        payment.status = Payment.Status.SUCCESS
+        payment.save(update_fields=["status"])
+
+        assert complete_online_topup(payment) is None
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+        assert not CafeteriaBalance.objects.filter(student=student).exists()
         assert CafeteriaBalance.objects.filter(
             student=student, balance__gt=0).count() == 0
+
+
+class TestSandboxComplete:
+    """The DEV-only mock-checkout completion reuses the webhook path (no signature),
+    so a sandbox 'success' credits the ledger exactly like production does."""
+
+    def test_sandbox_success_completes_and_credits(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup, payment = _make_online_topup(parent, student)
+
+        resp = api_client.post(
+            reverse("payment-sandbox-complete"),
+            {"order_id": payment.id, "result": "success"}, format="json")
+        assert resp.status_code == 200, resp.data
+
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.SUCCESS
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("200.00")
+        assert Notification.objects.filter(
+            user=parent, notif_type=Notification.NotifType.PAYMENT).count() == 1
+
+    def test_sandbox_failed_credits_nothing(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup, payment = _make_online_topup(parent, student)
+
+        resp = api_client.post(
+            reverse("payment-sandbox-complete"),
+            {"order_id": payment.id, "result": "failed"}, format="json")
+        assert resp.status_code == 200
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.FAILED
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+
+    def test_sandbox_disabled_returns_404(self, api_client, monkeypatch):
+        """In production (no DEBUG/SQLITE_LOCAL) the endpoint must not exist."""
+        monkeypatch.setattr("apps.payments.views._sandbox_payments_enabled", lambda: False)
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        _, payment = _make_online_topup(parent, student)
+        resp = api_client.post(
+            reverse("payment-sandbox-complete"),
+            {"order_id": payment.id, "result": "success"}, format="json")
+        assert resp.status_code == 404
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.PENDING

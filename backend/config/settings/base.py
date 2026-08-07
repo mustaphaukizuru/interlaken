@@ -1,6 +1,7 @@
 """
 Colegio Interlaken — Base Django Settings
 """
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -15,7 +16,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost'])
 
 # ── APPLICATIONS ──────────────────────────────────────────
 DJANGO_APPS = [
-    'jazzmin',
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -31,10 +32,13 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'django_filters',
     'social_django',
+    'drf_spectacular',
+    'axes',
 ]
 
 LOCAL_APPS = [
     'apps.core',
+    'apps.content',
     'apps.accounts',
     'apps.admissions',
     'apps.cafeteria',
@@ -43,6 +47,7 @@ LOCAL_APPS = [
     'apps.bookings',
     'apps.whatsapp',
     'apps.finance',
+    'apps.legal',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -50,6 +55,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ── MIDDLEWARE ────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # CSP + Permissions-Policy on every response (apps/core/security_headers.py).
+    'apps.core.security_headers.SecurityHeadersMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -59,6 +66,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
+    # Turns axes lockout signals into a 429 response (brute-force protection).
+    'axes.middleware.AxesMiddleware',
+    # Exposes the request so audit records can attribute the acting user (IK-SEC A3).
+    'apps.core.audit.AuditActorMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -100,12 +111,34 @@ DATABASES = {
 AUTH_USER_MODEL = 'accounts.User'
 
 AUTHENTICATION_BACKENDS = [
+    # Axes must come first: it raises on locked-out credentials before any
+    # real backend sees them (brute-force protection, IK-SEC C2/C6).
+    'axes.backends.AxesStandaloneBackend',
     'social_core.backends.google.GoogleOAuth2',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET')
+# ── LOGIN LOCKOUT (django-axes) ───────────────────────────
+# Counts failures on both the Django admin login and the JWT email/password
+# endpoint (simplejwt calls authenticate() with the DRF request). Lockout is
+# per username+IP pair, so an attacker can't lock a user out globally and a
+# shared school NAT doesn't lock out everyone at once.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+AXES_RESET_ON_SUCCESS = True
+
+# ── SECURITY HEADERS (IK-SEC C4) ──────────────────────────
+# CSP + Permissions-Policy via apps.core.security_headers; policies are
+# path-scoped (public/API strict; /admin relaxed for unfold's Alpine.js).
+CSP_ENABLED = env.bool('CSP_ENABLED', default=True)
+CSP_REPORT_ONLY = env.bool('CSP_REPORT_ONLY', default=False)
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Default '' so the app boots without Google OAuth configured (email/password
+# login still works); social-auth's Google backend simply stays inactive until set.
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID', default='')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
@@ -141,21 +174,53 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-from datetime import timedelta
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Colegio Interlaken API',
+    'DESCRIPTION': 'REST API del portal escolar: admisiones, cafetería, '
+                   'colegiaturas, reservas de visitas, portal y legal.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api/v1',
+}
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    # Access token is short-lived and kept in memory on the client (never in
+    # localStorage); the httpOnly refresh cookie mints a fresh one silently.
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+# ── AUTH COOKIES (httpOnly refresh + double-submit CSRF) ───
+# The refresh token lives ONLY in an httpOnly cookie (never readable by JS, never
+# in a URL). A second, JS-readable CSRF cookie is echoed back in the X-CSRF-Token
+# header on refresh/logout (double-submit) so a cross-site page can't drive them.
+# See AUTH.md.
+AUTH_REFRESH_COOKIE = env('AUTH_REFRESH_COOKIE', default='interlaken_refresh')
+AUTH_CSRF_COOKIE = env('AUTH_CSRF_COOKIE', default='interlaken_csrf')
+AUTH_COOKIE_SECURE = env.bool('AUTH_COOKIE_SECURE', default=not env.bool('DEBUG', default=False))
+AUTH_COOKIE_SAMESITE = env('AUTH_COOKIE_SAMESITE', default='Lax')
+AUTH_COOKIE_DOMAIN = env('AUTH_COOKIE_DOMAIN', default=None)
+AUTH_COOKIE_PATH = env('AUTH_COOKIE_PATH', default='/')
+
+# ── FIELD ENCRYPTION (at-rest, e.g. medical data — IK-LEGAL B4) ───
+# Dedicated Fernet key (urlsafe base64, 32 bytes). If blank, derived from
+# SECRET_KEY (dev/test). Set a real key in prod; see apps/core/fields.py.
+FIELD_ENCRYPTION_KEY = env('FIELD_ENCRYPTION_KEY', default='')
+
 # ── CORS ──────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True
+
+# HTTPS origins Django trusts for unsafe (POST) requests — needed by the Django
+# admin form on the deployed domain (the same-origin SPA + JWT API don't need
+# it). Comma-separated, full scheme, e.g. https://interlaken.onrender.com
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 # ── STATIC & MEDIA ────────────────────────────────────────
 STATIC_URL = '/static/'
@@ -166,20 +231,59 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = env('MEDIA_URL', default='/media/')
 MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 
+# ── OBJECT STORAGE FOR MEDIA (uploaded documents) ─────────
+# Render's container filesystem is EPHEMERAL — anything written to MEDIA_ROOT
+# (admissions documents: birth certificates, CURP, proof of address — legally
+# retained, ARCO-scoped) is wiped on every deploy/restart/spin-down. Set the
+# S3-compatible env vars below to store uploads in durable object storage.
+# Supabase Storage is S3-compatible: create a PRIVATE bucket + S3 access keys in
+# the Supabase dashboard (Storage → S3 Connection) and point AWS_S3_ENDPOINT_URL
+# at https://<project-ref>.supabase.co/storage/v1/s3. Empty bucket name → local
+# disk (dev/test/CI). Files stay private; DocumentDownloadView proxies them
+# behind the existing role + MEDICAL_DATA consent checks.
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default='')
+if AWS_STORAGE_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
+    AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
+    AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL', default='')
+    AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME', default='')
+    # Custom S3-compatible endpoints (Supabase / MinIO) need path-style addressing.
+    AWS_S3_ADDRESSING_STYLE = env('AWS_S3_ADDRESSING_STYLE', default='path')
+    AWS_DEFAULT_ACL = None            # rely on the bucket's private policy
+    AWS_S3_FILE_OVERWRITE = False     # never clobber a same-named upload
+    AWS_QUERYSTRING_AUTH = True       # signed, expiring URLs for private objects
+    AWS_QUERYSTRING_EXPIRE = env.int('AWS_QUERYSTRING_EXPIRE', default=3600)
+
 # ── EMAIL ─────────────────────────────────────────────────
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Env-driven so the documented EMAIL_BACKEND key works (development.py still
+# forces the console backend locally).
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = env('EMAIL_HOST', default='localhost')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@interlaken.edu.mx')
+
+# ── WEB PUSH (VAPID) ──────────────────────────────────────
+# Inert until keys are set. Generate once (see apps/portal/push.py docstring);
+# the public key is also exposed to the SPA as VITE_VAPID_PUBLIC_KEY.
+VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY', default='')
+VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='colegio@interlaken.edu.mx')
 # Where public contact-form messages are delivered (falls back to DEFAULT_FROM_EMAIL).
 CONTACT_EMAIL = env('CONTACT_EMAIL', default='')
 
 # ── LOYVERSE ──────────────────────────────────────────────
 LOYVERSE_API_TOKEN = env('LOYVERSE_API_TOKEN', default='')
 LOYVERSE_BASE_URL = 'https://api.loyverse.com/v1.0'
+# Go-live watermark for cafeteria purchase polling. On the FIRST sync_purchases run
+# (no purchases recorded yet) the poll starts here instead of backfilling all
+# history — opening balances are seeded from Loyverse points, which already include
+# past spend, so a backfill would double-debit. Set to the go-live moment as an
+# ISO-8601 datetime (e.g. 2026-08-01T00:00:00Z); blank → start from "now".
+CAFETERIA_SYNC_PURCHASES_SINCE = env('CAFETERIA_SYNC_PURCHASES_SINCE', default='')
 
 # ── PAYMENTS ──────────────────────────────────────────────
 # Which gateway a top-up defaults to when the client doesn't specify one.
@@ -295,85 +399,231 @@ if SENTRY_DSN:
         before_send=_scrub_sensitive,
     )
 
-# ── FILE UPLOAD ───────────────────────────────────────────
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
-ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
-
-# ── JAZZMIN ADMIN SKIN ────────────────────────────────────
-JAZZMIN_SETTINGS = {
-    'site_title': 'Admin · Interlaken',
-    'site_header': 'Colegio Interlaken',
-    'site_brand': 'INTERLAKEN',
-    # Brand marks — served from backend/static/admin/ (copied from official logo assets)
-    'site_logo': 'admin/logo-isotipo.png',            # clock isotipo in the dark brand area
-    'site_logo_classes': 'interlaken-brand-logo',      # no forced circle (see interlaken_admin.css)
-    'site_icon': 'admin/logo-isotipo.png',             # favicon
-    'login_logo': 'admin/logo-vertical.png',           # colored, on the light login card
-    'login_logo_dark': 'admin/logo-vertical-white.png',
-    'welcome_sign': 'Panel de Administración — Colegio Interlaken',
-    'copyright': 'Colegio Interlaken',
-    'search_model': ['accounts.User'],
-    'topmenu_links': [
-        {'name': 'Portal Web', 'url': 'http://localhost:3000', 'new_window': True},
-        {'name': 'API', 'url': '/api/v1/', 'new_window': True},
-    ],
-    'icons': {
-        'auth': 'fas fa-shield-alt',
-        'auth.user': 'fas fa-user',
-        'accounts.user': 'fas fa-user-circle',
-        'accounts.studentprofile': 'fas fa-graduation-cap',
-        'admissions.preregistration': 'fas fa-file-alt',
-        'admissions.registration': 'fas fa-clipboard-list',
-        'admissions.openschoolday': 'fas fa-door-open',
-        'cafeteria.cafeteriabalance': 'fas fa-coffee',
-        'cafeteria.cafeteriatransaction': 'fas fa-receipt',
-        'payments.payment': 'fas fa-credit-card',
-        'portal.announcement': 'fas fa-bullhorn',
-        'portal.event': 'fas fa-calendar-star',
-        'bookings.availabilityslot': 'fas fa-calendar-check',
-        'bookings.booking': 'fas fa-user-clock',
-    },
-    'default_icon_parents': 'fas fa-chevron-circle-right',
-    'default_icon_children': 'fas fa-dot-circle',
-    'related_modal_active': True,
-    'custom_css': 'admin/interlaken_admin.css',
-    'custom_js': 'admin/interlaken_admin.js',
-    'use_google_fonts_cdn': True,
-    'show_ui_builder': False,
-    'changeform_format': 'horizontal_tabs',
-    'language_chooser': False,
-    'show_sidebar': True,
-    'navigation_expanded': True,
+# ── CACHE ─────────────────────────────────────────────────
+# Per-process in-memory cache. Today it backs the 60s micro-cache on the
+# staff analytics endpoint (apps/portal/analytics.py); on cPanel/Passenger
+# each process keeps its own copy, which is acceptable for short-TTL
+# read-only aggregates.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'interlaken-default',
+    }
 }
 
-JAZZMIN_UI_TWEAKS = {
-    'navbar_small_text': False,
-    'footer_small_text': True,
-    'body_small_text': False,
-    'brand_small_text': False,
-    'brand_colour': False,
-    'accent': 'accent-purple',
-    'navbar': 'navbar-dark',
-    'no_navbar_border': True,
-    'navbar_fixed': True,
-    'layout_boxed': False,
-    'footer_fixed': False,
-    'sidebar_fixed': True,
-    'sidebar': 'sidebar-dark-purple',
-    'sidebar_nav_small_text': False,
-    'sidebar_disable_expand': False,
-    'sidebar_nav_child_indent': True,
-    'sidebar_nav_compact_style': False,
-    'sidebar_nav_legacy_style': False,
-    'sidebar_nav_flat_style': False,
-    'theme': 'default',
-    'button_classes': {
-        'primary': 'btn-primary',
-        'secondary': 'btn-secondary',
-        'info': 'btn-outline-info',
-        'warning': 'btn-warning',
-        'danger': 'btn-danger',
-        'success': 'btn-success',
+# ── FILE UPLOAD ───────────────────────────────────────────
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB (memory-vs-temp threshold)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
+# Hard cap on an admissions document upload. The *_MAX_MEMORY_SIZE settings
+# above are NOT size limits (Django excludes file fields from DATA_UPLOAD and
+# FILE_UPLOAD only picks memory vs temp file), so the upload view must enforce
+# this itself — otherwise an invited applicant could fill the disk.
+MAX_DOCUMENT_UPLOAD_SIZE = 10 * 1024 * 1024      # 10 MB per file
+
+# ── UNFOLD ADMIN SKIN ─────────────────────────────────────
+# django-unfold configuration. Every color below is a project design token
+# (docs/DESIGN.md §1 / frontend/tailwind.config.js): the purple `brand` ramp
+# drives `primary`, and the cream/line/ink/dark neutrals drive `base` surfaces
+# in both light and dark mode. Each stop is annotated with its source token —
+# no values exist here that are not already in the token layer.
+from django.templatetags.static import static as _static  # noqa: E402
+from django.urls import reverse_lazy  # noqa: E402
+
+UNFOLD = {
+    'SITE_TITLE': 'Admin · Interlaken',
+    'SITE_HEADER': 'Colegio Interlaken',
+    'SITE_SUBHEADER': 'Panel de Administración',
+    'SITE_URL': '/',
+    # Official clock isotipo works on light and dark surfaces alike.
+    'SITE_ICON': {
+        'light': lambda request: _static('admin/logo-isotipo.png'),
+        'dark': lambda request: _static('admin/logo-isotipo.png'),
+    },
+    'SITE_FAVICONS': [
+        {'rel': 'icon', 'sizes': '32x32', 'type': 'image/png',
+         'href': lambda request: _static('admin/logo-isotipo.png')},
+    ],
+    'SHOW_HISTORY': True,
+    'SHOW_VIEW_ON_SITE': False,
+    'STYLES': [
+        # Brand typography (Poppins display / Inter body) — static asset, not a
+        # template override; see backend/static/admin/unfold-interlaken.css.
+        lambda request: _static('admin/unfold-interlaken.css'),
+    ],
+    'COLORS': {
+        # Purple brand ramp = frontend `brand-*` scale (tailwind.config.js).
+        'primary': {
+            '50':  '#ede8f7',   # brand-50 / --purple-light
+            '100': '#e7e2f7',   # brand-100 / --purple-xlight
+            '200': '#d9cff0',   # brand-200
+            '300': '#b9a5e0',   # brand-300
+            '400': '#8f6fd0',   # brand-400
+            '500': '#5e3aad',   # brand-500 / --purple-mid
+            '600': '#401a8e',   # brand-600 / --purple (anchor)
+            '700': '#37167a',   # brand-700
+            '800': '#2c1163',   # brand-800
+            '900': '#1f0c47',   # brand-900
+            '950': '#1a1035',   # dark-3 (deep brand surface)
+        },
+        # Neutral/base ramp = cream, line, text and dark-surface tokens.
+        'base': {
+            '50':  '#FAF9FD',   # cream-2
+            '100': '#F5F4FA',   # cream
+            '200': '#EEEBF5',   # line-2 / --border-2
+            '300': '#ECEAF3',   # line / --border
+            '400': '#9A93AE',   # subtle / --text-light
+            '500': '#6E6885',   # muted / --text-muted
+            '600': '#2a2342',   # dark-card
+            '700': '#1A1130',   # ink / --text-main
+            '800': '#1a1035',   # dark-3
+            '900': '#0f0a24',   # dark-2
+            '950': '#080516',   # dark
+        },
+        # Text hierarchy mapped 1:1 to the text tokens.
+        'font': {
+            'subtle-light': '#9A93AE',      # --text-light
+            'subtle-dark': 'var(--color-base-400)',
+            'default-light': '#6E6885',     # --text-muted
+            'default-dark': 'var(--color-base-300)',
+            'important-light': '#1A1130',   # --text-main (ink)
+            'important-dark': 'var(--color-base-100)',
+        },
+    },
+    # KPI landing on the admin index (numbers + links only; charts live in the
+    # staff dashboard app view). See apps/core/dashboard.py.
+    'DASHBOARD_CALLBACK': 'apps.core.dashboard.dashboard_callback',
+    # Dev/prod marker: colored label by the user links + tab-title prefix, so a
+    # development admin can never be mistaken for production.
+    'ENVIRONMENT': 'apps.core.environment.environment_callback',
+    'ENVIRONMENT_TITLE_PREFIX': 'apps.core.environment.environment_title_prefix',
+    'SIDEBAR': {
+        'show_search': True,
+        # Plumbing models (JWT token blacklist, sessions, social-auth rows) are
+        # deliberately NOT listed below, which hides them from the default view.
+        'show_all_applications': False,
+        'navigation': [
+            {
+                'items': [
+                    {'title': 'Inicio', 'icon': 'home',
+                     'link': reverse_lazy('admin:index')},
+                ],
+            },
+            {
+                'title': 'Admisiones',
+                'separator': True,
+                'items': [
+                    {'title': 'Pre-registros', 'icon': 'how_to_reg',
+                     'badge': 'apps.core.badges.pending_preregistrations',
+                     'badge_variant': 'primary',
+                     'link': reverse_lazy('admin:admissions_preregistration_changelist')},
+                    {'title': 'Inscripciones', 'icon': 'assignment_turned_in',
+                     'link': reverse_lazy('admin:admissions_registration_changelist')},
+                    {'title': 'Documentos', 'icon': 'folder_open',
+                     'badge': 'apps.core.badges.documents_in_review',
+                     'badge_variant': 'warning',
+                     'link': reverse_lazy('admin:admissions_registrationdocument_changelist')},
+                    {'title': 'Puertas Abiertas', 'icon': 'meeting_room',
+                     'link': reverse_lazy('admin:admissions_openschoolday_changelist')},
+                    {'title': 'Disponibilidad de visitas', 'icon': 'event_available',
+                     'link': reverse_lazy('admin:bookings_availabilityslot_changelist')},
+                    {'title': 'Reservas de visita', 'icon': 'calendar_month',
+                     'link': reverse_lazy('admin:bookings_booking_changelist')},
+                ],
+            },
+            {
+                'title': 'Familias',
+                'separator': True,
+                'items': [
+                    {'title': 'Usuarios', 'icon': 'person',
+                     'link': reverse_lazy('admin:accounts_user_changelist')},
+                    {'title': 'Alumnos', 'icon': 'school',
+                     'link': reverse_lazy('admin:accounts_studentprofile_changelist')},
+                    {'title': 'Padres y tutores', 'icon': 'family_restroom',
+                     'link': reverse_lazy('admin:accounts_parentprofile_changelist')},
+                ],
+            },
+            {
+                'title': 'Cafetería',
+                'separator': True,
+                'items': [
+                    {'title': 'Saldos', 'icon': 'account_balance_wallet',
+                     'link': reverse_lazy('admin:cafeteria_cafeteriabalance_changelist')},
+                    {'title': 'Transacciones', 'icon': 'receipt_long',
+                     'link': reverse_lazy('admin:cafeteria_cafeteriatransaction_changelist')},
+                    {'title': 'Solicitudes de recarga', 'icon': 'add_card',
+                     'link': reverse_lazy('admin:cafeteria_topuprequest_changelist')},
+                    {'title': 'Ajustes de saldo', 'icon': 'published_with_changes',
+                     'link': reverse_lazy('admin:cafeteria_balanceadjustment_changelist')},
+                    {'title': 'Perfiles de Loyverse', 'icon': 'badge',
+                     'link': reverse_lazy('admin:cafeteria_loyverseprofile_changelist')},
+                ],
+            },
+            {
+                'title': 'Pagos',
+                'separator': True,
+                'items': [
+                    {'title': 'Pagos en línea', 'icon': 'payments',
+                     'link': reverse_lazy('admin:payments_payment_changelist')},
+                    {'title': 'Colegiaturas (facturas)', 'icon': 'request_quote',
+                     'link': reverse_lazy('admin:finance_invoice_changelist')},
+                    {'title': 'Planes de colegiatura', 'icon': 'price_change',
+                     'link': reverse_lazy('admin:finance_feeschedule_changelist')},
+                    {'title': 'Descuentos y becas', 'icon': 'percent',
+                     'link': reverse_lazy('admin:finance_discount_changelist')},
+                    {'title': 'Pagos aplicados', 'icon': 'receipt',
+                     'link': reverse_lazy('admin:finance_invoicepayment_changelist')},
+                    {'title': 'Ajustes de factura', 'icon': 'edit_note',
+                     'link': reverse_lazy('admin:finance_invoiceadjustment_changelist')},
+                ],
+            },
+            {
+                'title': 'Contenido del sitio',
+                'separator': True,
+                'items': [
+                    {'title': 'Ajustes del sitio', 'icon': 'tune',
+                     'link': reverse_lazy('admin:content_sitesettings_changelist')},
+                ],
+            },
+            {
+                'title': 'Comunicaciones',
+                'separator': True,
+                'items': [
+                    {'title': 'Comunicados', 'icon': 'campaign',
+                     'link': reverse_lazy('admin:portal_announcement_changelist')},
+                    {'title': 'Notificaciones', 'icon': 'notifications',
+                     'link': reverse_lazy('admin:portal_notification_changelist')},
+                    {'title': 'Comentarios', 'icon': 'forum',
+                     'link': reverse_lazy('admin:portal_announcementcomment_changelist')},
+                    {'title': 'Mensajes de contacto', 'icon': 'mail',
+                     'badge': 'apps.core.badges.unhandled_contact_messages',
+                     'badge_variant': 'primary',
+                     'link': reverse_lazy('admin:core_contactmessage_changelist')},
+                ],
+            },
+            {
+                'title': 'Legal y consentimientos',
+                'separator': True,
+                'items': [
+                    {'title': 'Aviso de privacidad', 'icon': 'policy',
+                     'link': reverse_lazy('admin:legal_privacynoticeversion_changelist')},
+                    {'title': 'Consentimientos', 'icon': 'fact_check',
+                     'link': reverse_lazy('admin:legal_consentrecord_changelist')},
+                    {'title': 'Solicitudes ARCO', 'icon': 'gavel',
+                     'badge': 'apps.core.badges.open_arco_requests',
+                     'link': reverse_lazy('admin:legal_arcorequest_changelist')},
+                ],
+            },
+            {
+                'title': 'Sistema',
+                'separator': True,
+                'items': [
+                    {'title': 'Auditoría', 'icon': 'history',
+                     'link': reverse_lazy('admin:core_auditlog_changelist')},
+                    {'title': 'Grupos de permisos', 'icon': 'group',
+                     'link': reverse_lazy('admin:auth_group_changelist')},
+                ],
+            },
+        ],
     },
 }

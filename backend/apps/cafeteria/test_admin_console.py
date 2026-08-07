@@ -12,11 +12,14 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import (AdminFactory, ParentFactory,
-                                     StudentProfileFactory)
+from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.cafeteria import services
-from apps.cafeteria.models import (BalanceAdjustment, CafeteriaBalance,
-                                   CafeteriaTransaction, TopUpRequest)
+from apps.cafeteria.models import (
+    BalanceAdjustment,
+    CafeteriaBalance,
+    CafeteriaTransaction,
+    TopUpRequest,
+)
 from apps.payments.models import Payment
 from apps.portal.models import Notification
 
@@ -67,6 +70,29 @@ class TestAdjustBalance:
             {"amount": "-30", "reason": "Corrección"}, format="json")
         assert resp.status_code == 201
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("70.00")
+
+    def test_multiple_adjustments_do_not_collide(self):
+        # Regression: the adjustment tx left loyverse_receipt_id='' which is
+        # unique=True, so a SECOND adjustment (any student) used to raise
+        # IntegrityError. Two adjustments across two students must both succeed
+        # and get distinct references.
+        s1 = StudentProfileFactory(loyverse_id="")
+        s2 = StudentProfileFactory(loyverse_id="")
+        _balance(s1, 100)
+        _balance(s2, 100)
+        admin = AdminFactory()
+
+        services.adjust_balance(s1, Decimal("10"), "uno", admin=admin)
+        services.adjust_balance(s2, Decimal("20"), "dos", admin=admin)
+        # And a second adjustment on the SAME student.
+        services.adjust_balance(s1, Decimal("5"), "tres", admin=admin)
+
+        refs = list(CafeteriaTransaction.objects
+                    .filter(transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT)
+                    .values_list("loyverse_receipt_id", flat=True))
+        assert len(refs) == 3
+        assert len(set(refs)) == 3            # all distinct
+        assert all(r.startswith("adjust-tx-") for r in refs)
 
     def test_debit_below_zero_is_rejected(self, api_client):
         student = StudentProfileFactory(loyverse_id="")

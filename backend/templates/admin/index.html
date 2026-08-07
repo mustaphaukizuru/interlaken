@@ -1,0 +1,40 @@
+{% extends 'unfold/layouts/base_simple.html' %}
+{# Unfold's documented dashboard pattern: DASHBOARD_CALLBACK provides context #}
+{# (apps/core/dashboard.py) and this template renders it with unfold's own    #}
+{# component templates only — no custom markup beyond composition.           #}
+{% load i18n unfold %}
+
+{% block title %}Inicio | {{ site_title }}{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+    {% component "unfold/components/container.html" %}
+        {% component "unfold/components/flex.html" with class="interlaken-kpi-row gap-4 mb-8 flex-col md:flex-row md:flex-wrap" %}
+            {% for kpi in kpis %}
+                {% component "unfold/components/card.html" with href=kpi.link icon=kpi.icon class="interlaken-kpi md:basis-[calc(33%-1rem)] lg:basis-[calc(20%-1rem)]" %}
+                    {% component "unfold/components/text.html" %}
+                        {{ kpi.title }}
+                    {% endcomponent %}
+
+                    {% component "unfold/components/title.html" %}
+                        {{ kpi.value }}
+                    {% endcomponent %}
+                {% endcomponent %}
+            {% endfor %}
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with title="Actividad reciente (auditoría)" %}
+            {% component "unfold/components/table.html" with table=audit_table card_included=1 striped=1 %}
+            {% endcomponent %}
+
+            <div class="mt-4 text-sm">
+                <a href="{{ audit_link }}" class="text-primary-600 dark:text-primary-500">
+                    Ver todo el registro de auditoría →
+                </a>
+            </div>
+        {% endcomponent %}
+    {% endcomponent %}
+{% endblock %}

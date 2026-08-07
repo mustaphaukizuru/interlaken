@@ -158,7 +158,9 @@ class Invoice(models.Model):
         OVERDUE   = 'overdue',   'Vencida'
         CANCELLED = 'cancelled', 'Cancelada'
 
-    student       = models.ForeignKey(StudentProfile, on_delete=models.CASCADE,
+    # PROTECT: tuition history must survive a student delete — deleting a student
+    # with invoices raises ProtectedError instead of silently erasing the record.
+    student       = models.ForeignKey(StudentProfile, on_delete=models.PROTECT,
                                       related_name='invoices')
     fee_schedule  = models.ForeignKey(FeeSchedule, on_delete=models.SET_NULL,
                                       null=True, blank=True, related_name='invoices')
@@ -273,6 +275,11 @@ class InvoicePayment(models.Model):
                                       related_name='invoice_payment')
     amount     = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(default=timezone.now)
+    # Set once the credit has been posted to the invoice. Gives per-payment
+    # idempotency: a distinct second payment on an already-paid invoice is
+    # recorded (as an overpayment) rather than silently dropped, while a replay
+    # of the same payment stays a no-op.
+    applied_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Pago de Colegiatura'

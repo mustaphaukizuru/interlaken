@@ -24,12 +24,16 @@ class BanorteGateway(BaseGateway):
     FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'REJECTED', 'CANCELLED', 'ERROR'})
 
     def create_checkout(self, payment, return_url: str | None = None) -> str:
-        base = getattr(settings, 'BANORTE_CHECKOUT_URL', '') or _DEFAULT_CHECKOUT_URL
+        # No live checkout URL configured → sandbox: use the local mock page.
+        base = (getattr(settings, 'BANORTE_CHECKOUT_URL', '')
+                or f'{settings.FRONTEND_URL}/pago/simulado')
         params = {
             'merchant_id': getattr(settings, 'BANORTE_MERCHANT_ID', ''),
+            'order_id': payment.id,
             'reference': payment.id,
             'amount': f'{payment.amount:.2f}',
             'currency': payment.currency,
+            'gateway': self.name,
             'env': getattr(settings, 'BANORTE_ENV', 'sandbox'),
         }
         resolved = self._return_url(payment, return_url)

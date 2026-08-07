@@ -24,11 +24,15 @@ class GlobalPaymentsGateway(BaseGateway):
     FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'ERROR', 'CANCELLED'})
 
     def create_checkout(self, payment, return_url: str | None = None) -> str:
-        base = getattr(settings, 'GLOBAL_PAYMENTS_HPP_URL', '') or _DEFAULT_HPP_URL
+        # With no live HPP URL configured we're in sandbox: send the browser to
+        # the local mock hosted-page so the flow can be tested end-to-end.
+        base = (getattr(settings, 'GLOBAL_PAYMENTS_HPP_URL', '')
+                or f'{settings.FRONTEND_URL}/pago/simulado')
         params = {
             'order_id': payment.id,
             'amount': f'{payment.amount:.2f}',
             'currency': payment.currency,
+            'gateway': self.name,
             'app_id': getattr(settings, 'GLOBAL_PAYMENTS_APP_ID', ''),
             'env': getattr(settings, 'GLOBAL_PAYMENTS_ENV', 'sandbox'),
         }

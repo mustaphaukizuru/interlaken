@@ -15,6 +15,11 @@ backend/db.sqlite3
 frontend/node_modules/
 frontend/dist/
 frontend/.env*.local
+# Playwright E2E artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
 .vscode/
 .idea/
 *.log
@@ -29,3 +34,7 @@ frontend/assets/*
 !frontend/assets/logo-horizontal.png
 !frontend/assets/logo-vertical.png
 !frontend/assets/logo-40 anos.png
+backups/
+
+# Rate-limit file cache (created at runtime in production)
+.ratelimit-cache/

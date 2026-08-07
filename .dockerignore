@@ -1,0 +1,20 @@
+# Keep the Docker build context small — everything below is rebuilt in-image or
+# is local-only / secret.
+.git
+**/node_modules
+**/venv
+**/.venv
+**/__pycache__
+**/*.pyc
+**/dist
+backend/staticfiles
+backend/media
+backend/.ratelimit-cache
+**/*.sqlite3
+**/db_local.sqlite3
+.env
+**/.env
+**/.env.*
+frontend/coverage
+frontend/playwright-report
+frontend/test-results
