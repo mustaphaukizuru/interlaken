@@ -28,6 +28,9 @@ concurrency:
 
 jobs:
   sync:
+    # Skip quietly until repo secrets are provisioned — otherwise every cron
+    # fails with ImproperlyConfigured(SECRET_KEY empty) and burns Action minutes.
+    if: ${{ secrets.SECRET_KEY != '' && secrets.LOYVERSE_API_TOKEN != '' && secrets.DB_HOST != '' }}
     runs-on: ubuntu-latest
     env:
       DJANGO_SETTINGS_MODULE: config.settings.production
