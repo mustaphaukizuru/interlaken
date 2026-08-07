@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from apps.payments.gateways.banorte import BanorteGateway, _DEFAULT_CHECKOUT_URL
-from apps.payments.gateways.global_payments import GlobalPaymentsGateway, _DEFAULT_HPP_URL
+from apps.payments.gateways.banorte import _DEFAULT_CHECKOUT_URL, BanorteGateway
+from apps.payments.gateways.global_payments import _DEFAULT_HPP_URL, GlobalPaymentsGateway
 
 pytestmark = pytest.mark.django_db
 
