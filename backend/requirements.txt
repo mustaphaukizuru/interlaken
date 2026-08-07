@@ -49,7 +49,7 @@ google-auth==2.32.0
 # globalpayments-api==1.0.0 pin was unused and isn't even on PyPI.)
 
 # Email
-django-anymail==10.3
+django-anymail==15.1
 
 # Utilities
 python-decouple==3.8
