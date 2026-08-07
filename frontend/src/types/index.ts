@@ -30,6 +30,8 @@ export interface CafeteriaBalance {
   balance: string;
   low_balance_threshold: string;
   last_synced: string;
+  /** Backend uses balance <= threshold; prefer this over recomputing. */
+  is_low_balance?: boolean;
 }
 
 export interface CafeteriaTransactionItem {

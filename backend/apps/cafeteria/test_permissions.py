@@ -10,6 +10,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.mark.parametrize("url_name, method, kwargs", [
     ("cafeteria-topup", "post", {}),          # IsParentOrAdmin
+    ("cafeteria-export", "get", {}),          # IsParentOrAdmin
     ("admin-balances", "get", {}),            # IsAdmin
     ("admin-topups", "get", {}),              # IsAdmin
     ("admin-sync-balance", "post", {"pk": 1}),  # IsAdmin

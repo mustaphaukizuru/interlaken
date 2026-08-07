@@ -586,6 +586,24 @@ class AdminLowBalanceView(APIView):
         return Response(CafeteriaBalanceSerializer(balances, many=True).data)
 
 
+class ParentExportView(APIView):
+    """GET /api/v1/cafeteria/export/
+
+    CSV of the authenticated parent's children's cafeteria transactions.
+    Admins may also call it (exports their linked children if any; typically
+    parents use this). Students are rejected — use the per-student admin export.
+    """
+    permission_classes = [IsParentOrAdmin]
+
+    def get(self, request):
+        from . import exports
+
+        user = request.user
+        if user.role not in (User.Role.PARENT, User.Role.ADMIN):
+            return Response({'error': 'No autorizado.'}, status=403)
+        return exports.parent_family_statement_csv(user)
+
+
 class AdminExportStudentView(APIView):
     """GET /api/v1/cafeteria/admin/export/student/<pk>/?fmt=csv|pdf"""
     permission_classes = [IsAdmin]

@@ -62,7 +62,14 @@ export default function ColegiaturasPage() {
 
   const outstanding = (invoices ?? [])
     .filter((i) => i.status !== 'paid' && i.status !== 'cancelled')
-    .reduce((sum, i) => sum + parseFloat(i.balance_due), 0);
+    .reduce((sum, i) => sum + Math.max(0, parseFloat(i.balance_due)), 0);
+
+  // Overpayments show as negative balance_due — surface as credit (saldo a favor).
+  const creditTotal = (invoices ?? [])
+    .reduce((sum, i) => {
+      const due = parseFloat(i.balance_due);
+      return due < 0 ? sum + (-due) : sum;
+    }, 0);
 
   return (
     <div className="space-y-6">
@@ -73,12 +80,19 @@ export default function ColegiaturasPage() {
             Consulte y pague las colegiaturas mensuales de sus hijos.
           </p>
         </div>
-        {outstanding > 0 && (
-          <div className="sm:text-right">
-            <p className="text-xs text-subtle">Saldo pendiente</p>
-            <p className="text-fluid-lg font-bold text-coral">${outstanding.toFixed(2)} MXN</p>
-          </div>
-        )}
+        <div className="flex flex-col gap-1 sm:items-end">
+          {outstanding > 0 && (
+            <div className="sm:text-right">
+              <p className="text-xs text-subtle">Saldo pendiente</p>
+              <p className="text-fluid-lg font-bold text-coral">${outstanding.toFixed(2)} MXN</p>
+            </div>
+          )}
+          {creditTotal > 0 && (
+            <p className="text-xs font-medium text-green-700">
+              Saldo a favor: ${creditTotal.toFixed(2)} MXN
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Pay modal */}
@@ -114,7 +128,9 @@ export default function ColegiaturasPage() {
             {invoices.map((inv) => {
               const meta = statusMeta[inv.status] ?? statusMeta.pending;
               const Icon = meta.icon;
-              const payable = inv.status === 'pending' || inv.status === 'overdue';
+              const balanceDue = parseFloat(inv.balance_due);
+              const hasCredit = balanceDue < 0;
+              const payable = (inv.status === 'pending' || inv.status === 'overdue') && balanceDue > 0;
               return (
                 <div key={inv.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="flex min-w-0 items-center gap-3">
@@ -128,12 +144,19 @@ export default function ColegiaturasPage() {
                       <p className="text-xs text-subtle">
                         Vence {format(new Date(inv.due_date), "d 'de' MMMM yyyy", { locale: es })}
                       </p>
+                      {hasCredit && (
+                        <p className="mt-0.5 text-xs font-medium text-green-700">
+                          Saldo a favor ${(-balanceDue).toFixed(2)}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-shrink-0 items-center justify-between gap-4 pl-12 sm:justify-end sm:pl-0">
                     <div className="text-right">
                       <p className="text-sm font-bold text-ink">${parseFloat(inv.amount).toFixed(2)} {inv.currency}</p>
-                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                      <Badge variant={hasCredit ? 'success' : meta.variant}>
+                        {hasCredit ? 'Saldo a favor' : meta.label}
+                      </Badge>
                     </div>
                     {payable && (
                       <Button size="sm" onClick={() => { setPayInvoice(inv); setGateway('global_payments'); }} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">

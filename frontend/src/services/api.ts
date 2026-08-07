@@ -257,6 +257,10 @@ export const cafeteriaApi = {
       students: number;
     }>('/cafeteria/refresh/'),
 
+  /** Parent family CSV of children's cafeteria transactions. */
+  exportMyTransactions: () =>
+    api.get('/cafeteria/export/', { responseType: 'blob' }),
+
   // Admin
   getAllBalances: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/balances/', { params }),
