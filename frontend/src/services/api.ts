@@ -108,6 +108,18 @@ export const authApi = {
   me: () => api.get('/accounts/me/'),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
+  requestPasswordReset: (email: string) =>
+    api.post('/accounts/password-reset/', { email }),
+  confirmPasswordReset: (data: { uid: string; token: string; password: string }) =>
+    api.post('/accounts/password-reset/confirm/', data),
+  setPassword: (password: string) =>
+    api.post('/accounts/set-password/', { password }),
+  getNotifPrefs: () =>
+    api.get<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>(
+      '/accounts/notification-preferences/',
+    ),
+  updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>) =>
+    api.patch('/accounts/notification-preferences/', data),
   logout: async () => {
     const csrf = getCookie(CSRF_COOKIE);
     const token = useAuthStore.getState().accessToken;

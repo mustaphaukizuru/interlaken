@@ -50,39 +50,40 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
 def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bool = False):
     """Create an in-app ``Notification`` for ``user`` and optionally email them.
 
-    Args:
-        user: the recipient ``accounts.User`` (in-app notifications need one).
-        notif_type: a ``Notification.NotifType`` value (e.g. ``'cafeteria'``).
-        title / message: notification contents (Spanish UI copy).
-        email: also send an email to ``user.email`` (best-effort).
-        whatsapp: placeholder — logs intent only until Prompt 14 wires WhatsApp.
-
-    Returns the created ``Notification`` (or ``None`` if ``user`` is falsy).
+    Respects ``NotificationPreference`` toggles when present (defaults = all on).
     """
+    from apps.accounts.models import NotificationPreference
     from apps.portal.models import Notification
 
     if user is None:
         return None
 
-    # Per-user notify() delivers email + push inline below, so stamp it dispatched
-    # immediately — the dispatch_notifications cron only picks up bulk fan-out rows.
-    notification = Notification.objects.create(
-        user=user,
-        notif_type=notif_type,
-        title=title,
-        message=message,
-        delivered_at=timezone.now(),
-    )
+    prefs = NotificationPreference.for_user(user)
+    want_in_app = prefs.in_app_enabled
+    want_email = email and prefs.email_enabled
+    want_push = prefs.push_enabled
 
-    if email and getattr(user, 'email', ''):
+    notification = None
+    if want_in_app:
+        # Per-user notify() delivers email + push inline below, so stamp it dispatched
+        # immediately — the dispatch_notifications cron only picks up bulk fan-out rows.
+        notification = Notification.objects.create(
+            user=user,
+            notif_type=notif_type,
+            title=title,
+            message=message,
+            delivered_at=timezone.now(),
+        )
+
+    if want_email and getattr(user, 'email', ''):
         send_email(subject=title, message=message, recipients=[user.email])
 
-    # Web push: fail-soft, inert without VAPID keys or subscriptions.
-    from apps.portal.push import send_web_push
-    send_web_push(user, title, message)
+    if want_push:
+        from apps.portal.push import send_web_push
+        send_web_push(user, title, message)
 
     if whatsapp:
-        # Prompt 14 wires the WhatsApp Business API. For now, record the intent.
+        # Prompt 14 / Phase D wires WhatsApp Cloud API.
         logger.info(f'WhatsApp notification requested for {user} (not yet enabled): {title}')
 
     return notification

@@ -35,6 +35,8 @@ const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage  = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
 
 // Parent portal
@@ -127,6 +129,8 @@ export default function App() {
             {/* Google OAuth returns to /login?login=ok — /auth/* is reserved for
                 the backend (Vite proxy + SPA catch-all both send it to Django). */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/olvide-contrasena" element={<ForgotPasswordPage />} />
+            <Route path="/restablecer-contrasena" element={<ResetPasswordPage />} />
             {/* Mock hosted-payment page — DEV only. It's a neutral bank-styled
                 page with an attacker-controllable amount/return_url, so mounting
                 it in production would be an open-redirect + phishing surface; in
