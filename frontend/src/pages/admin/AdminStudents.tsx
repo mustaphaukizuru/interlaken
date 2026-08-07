@@ -1,8 +1,9 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, FileUp, Link2 } from 'lucide-react';
+import { Users, Search, FileUp, Link2, Download } from 'lucide-react';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
+import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
 import { Card } from '@/components/ui/Card';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
@@ -18,6 +19,7 @@ export default function AdminStudents() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
+  const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
   // Debounced so typing fires one server search, not one per keystroke.
@@ -46,6 +48,9 @@ export default function AdminStudents() {
           <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-outline" onClick={() => setImportLoyverseOpen(true)}>
+            <Download size={16} aria-hidden="true" /> Importar desde Loyverse
+          </button>
           <button type="button" className="btn-outline" onClick={() => setLinkOpen(true)}>
             <Link2 size={16} aria-hidden="true" /> Vincular Loyverse
           </button>
@@ -55,6 +60,11 @@ export default function AdminStudents() {
         </div>
       </div>
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
+      <ImportLoyverseModal
+        open={importLoyverseOpen}
+        onClose={() => setImportLoyverseOpen(false)}
+        onImported={() => refetch()}
+      />
       <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
 
       <Card title={`${count} alumnos registrados`}>

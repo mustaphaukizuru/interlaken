@@ -5,8 +5,9 @@ Both cafeteria (purchase / low-balance alerts) and bookings (visit confirmations
 route through here. In dev, ``EMAIL_BACKEND`` is the console backend, so emails
 print to stdout; in prod it's cPanel SMTP (see DEPLOYMENT.md §2/§4).
 
-WhatsApp is a placeholder wired for Prompt 14 — passing ``whatsapp=True`` today
-just logs an intent; no message is sent.
+WhatsApp: when ``whatsapp=True`` and the user has a ``whatsapp`` number, we call
+``apps.whatsapp.services.send_text`` (fail-soft). If Cloud API creds are unset,
+``send_text`` logs a no-op — same degradation as booking confirmations.
 """
 import logging
 from datetime import timedelta
@@ -83,8 +84,15 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
         send_web_push(user, title, message)
 
     if whatsapp:
-        # Prompt 14 / Phase D wires WhatsApp Cloud API.
-        logger.info(f'WhatsApp notification requested for {user} (not yet enabled): {title}')
+        wa = (getattr(user, 'whatsapp', '') or '').strip()
+        if not wa:
+            logger.info('WhatsApp notification skipped (no number) for %s: %s', user, title)
+        else:
+            try:
+                from apps.whatsapp.services import send_text
+                send_text(wa, f'{title}\n\n{message}')
+            except Exception as e:  # pragma: no cover — send_text is already fail-soft
+                logger.warning('WhatsApp notify failed for %s: %s', user, e)
 
     return notification
 

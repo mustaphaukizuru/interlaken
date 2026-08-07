@@ -42,9 +42,7 @@ export function NotificationsMenu() {
     onSuccess: invalidate,
   });
   const markAll = useMutation({
-    mutationFn: async () => {
-      await Promise.all(data.filter((n) => !n.is_read).map((n) => portalApi.markNotificationRead(n.id)));
-    },
+    mutationFn: () => portalApi.markAllNotificationsRead(),
     onSuccess: invalidate,
   });
 

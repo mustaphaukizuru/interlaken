@@ -106,14 +106,22 @@ function RosterTab() {
   const balances = data?.results;
   const count = data?.count ?? 0;
 
+  const [lastSync, setLastSync] = useState<{
+    receipts: number; purchases_created: number; balances_ok: number; balances_failed: number;
+  } | null>(null);
+
   const syncAll = useMutation({
     mutationFn: () => cafeteriaApi.syncAll(),
     onSuccess: ({ data }) => {
       const created = data?.purchases_created ?? 0;
+      const receipts = data?.receipts ?? 0;
+      const ok = data?.balances_ok ?? 0;
+      const failed = data?.balances_failed ?? 0;
+      setLastSync({ receipts, purchases_created: created, balances_ok: ok, balances_failed: failed });
       toast.success(
-        created > 0
-          ? `Sincronización completada — ${created} compra(s) nueva(s) desde Loyverse.`
-          : 'Sincronización completada (saldos + compras Loyverse).',
+        `Sincronización: ${ok} saldo(s) ok`
+        + (failed ? `, ${failed} fallido(s)` : '')
+        + `, ${receipts} recibo(s), ${created} compra(s) nueva(s).`,
       );
       queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-balances'] });
     },
@@ -152,6 +160,13 @@ function RosterTab() {
           <RefreshCw className="w-3.5 h-3.5" /> Sincronizar todos
         </Button>
       </div>
+      {lastSync && (
+        <p className="-mt-1 mb-3 text-xs text-subtle">
+          Última sincronización — saldos ok: {lastSync.balances_ok}
+          {lastSync.balances_failed > 0 ? `, fallidos: ${lastSync.balances_failed}` : ''}
+          , recibos: {lastSync.receipts}, compras nuevas: {lastSync.purchases_created}.
+        </p>
+      )}
       <p className="-mt-2 mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
       {isLoading ? (
@@ -359,49 +374,68 @@ function DepositsTab() {
 // ── Reconciliation ───────────────────────────────────────────────────────────
 function ReconcileTab() {
   const [onlyDrift, setOnlyDrift] = useState(true);
+  const RECONCILE_LIMIT = 50;
 
-  const { data, isLoading, isFetching, isError, refetch } = useQuery<{
-    count: number; drift_count: number; results: ReconcileRow[];
-  }>({
-    queryKey: ['admin-cafeteria-reconcile', onlyDrift],
-    queryFn: async () => (await cafeteriaApi.reconcile(onlyDrift)).data,
-    enabled: false,
+  type ReconcileResult = {
+    count: number; drift_count: number; checked: number; total: number;
+    offset: number; limit: number; has_more: boolean; results: ReconcileRow[];
+  };
+
+  const reconcile = useMutation({
+    mutationFn: async (offset: number) =>
+      (await cafeteriaApi.reconcile(onlyDrift, { limit: RECONCILE_LIMIT, offset })).data as ReconcileResult,
   });
+  const data = reconcile.data;
 
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="text-sm text-muted">
-          Compara el saldo local contra los puntos de Loyverse y detecta diferencias.
+          Compara el saldo local contra los puntos de Loyverse y detecta diferencias
+          (lotes de {RECONCILE_LIMIT} alumnos).
         </p>
         <div className="flex items-center gap-3">
           <label className="inline-flex items-center gap-1.5 text-sm text-muted">
             <input type="checkbox" checked={onlyDrift} onChange={(e) => setOnlyDrift(e.target.checked)} />
             Solo diferencias
           </label>
-          <Button size="sm" loading={isFetching} onClick={() => refetch()}>
+          <Button size="sm" loading={reconcile.isPending} onClick={() => reconcile.mutate(0)}>
             <Scale className="w-3.5 h-3.5" /> Reconciliar
           </Button>
         </div>
       </div>
 
-      {isLoading || isFetching ? (
+      {reconcile.isPending ? (
         <TableSkeleton />
-      ) : isError ? (
-        <ErrorState onRetry={() => refetch()} />
+      ) : reconcile.isError ? (
+        <ErrorState onRetry={() => reconcile.mutate(0)} />
       ) : !data ? (
         <EmptyState icon={Scale} title="Ejecuta la reconciliación" description="Presiona «Reconciliar» para comparar con Loyverse." />
       ) : (
         <>
-          <div className="mb-3 text-sm text-muted">
+          <div className="mb-3 space-y-1 text-sm text-muted">
             {data.drift_count > 0 ? (
               <span className="inline-flex items-center gap-1.5 text-amber">
-                <AlertTriangle className="w-4 h-4" /> {data.drift_count} diferencia(s) de {data.count} revisadas.
+                <AlertTriangle className="w-4 h-4" /> {data.drift_count} diferencia(s) en este lote
+                ({data.checked} revisadas de {data.total}).
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 text-green-700">
-                <CheckCircle2 className="w-4 h-4" /> Todo en orden ({data.count} revisadas).
+                <CheckCircle2 className="w-4 h-4" /> Todo en orden en este lote
+                ({data.checked} revisadas de {data.total}).
               </span>
+            )}
+            {data.has_more && (
+              <p className="text-xs text-subtle">
+                Resultados parciales — quedan {data.total - (data.offset + data.checked)} alumno(s).{' '}
+                <button
+                  type="button"
+                  className="font-semibold text-brand-700 hover:underline"
+                  onClick={() => reconcile.mutate(data.offset + data.checked)}
+                >
+                  Revisar siguientes
+                </button>
+              </p>
             )}
           </div>
           {!data.results.length ? (
