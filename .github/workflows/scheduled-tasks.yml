@@ -24,12 +24,13 @@ env:
   DJANGO_SETTINGS_MODULE: config.settings.production
   SECRET_KEY: ${{ secrets.SECRET_KEY }}
   FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
-  DB_ENGINE: django.db.backends.postgresql
+  DB_ENGINE: ${{ secrets.DB_ENGINE }}
   DB_NAME: ${{ secrets.DB_NAME }}
   DB_USER: ${{ secrets.DB_USER }}
   DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
   DB_HOST: ${{ secrets.DB_HOST }}
   DB_PORT: ${{ secrets.DB_PORT }}
+  DB_SSLMODE: ${{ secrets.DB_SSLMODE }}
   ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
   FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
   EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
@@ -40,7 +41,7 @@ env:
 jobs:
   # Daily jobs (also run on manual dispatch). Skipped on the monthly cron tick.
   daily:
-    if: github.event.schedule != '0 8 1 * *'
+    if: ${{ secrets.SECRET_KEY != '' && secrets.DB_HOST != '' && github.event.schedule != '0 8 1 * *' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +71,7 @@ jobs:
 
   # Monthly invoice generation — 1st of the month (and on manual dispatch).
   monthly-invoices:
-    if: github.event.schedule == '0 8 1 * *' || github.event_name == 'workflow_dispatch'
+    if: ${{ secrets.SECRET_KEY != '' && secrets.DB_HOST != '' && (github.event.schedule == '0 8 1 * *' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

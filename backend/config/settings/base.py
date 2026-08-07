@@ -95,15 +95,24 @@ TEMPLATES = [
 ]
 
 # ── DATABASE ──────────────────────────────────────────────
+# MySQL (cPanel) needs utf8mb4. Postgres (Supabase / Render) needs SSL —
+# default sslmode=require; override with DB_SSLMODE=disable for local Postgres.
+_DB_ENGINE = env('DB_ENGINE', default='django.db.backends.mysql')
+if 'mysql' in _DB_ENGINE:
+    _DB_OPTIONS = {'charset': 'utf8mb4'}
+elif 'postgresql' in _DB_ENGINE or 'postgres' in _DB_ENGINE:
+    _DB_OPTIONS = {'sslmode': env('DB_SSLMODE', default='require')}
+else:
+    _DB_OPTIONS = {}
 DATABASES = {
     'default': {
-        'ENGINE': env('DB_ENGINE', default='django.db.backends.mysql'),
+        'ENGINE': _DB_ENGINE,
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER', default=''),
         'PASSWORD': env('DB_PASSWORD', default=''),
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='3306'),
-        'OPTIONS': {'charset': 'utf8mb4'} if 'mysql' in env('DB_ENGINE', default='mysql') else {},
+        'OPTIONS': _DB_OPTIONS,
     }
 }
 

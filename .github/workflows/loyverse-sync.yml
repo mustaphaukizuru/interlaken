@@ -8,10 +8,11 @@ name: Loyverse cafeteria sync
 # faster updates on cPanel use the 1-minute cron in docs/DEPLOYMENT.md, or the
 # parent/admin "Actualizar / Sincronizar" buttons which poll Loyverse on demand.
 #
-# ⚠️ Before enabling: set the CAFETERIA_SYNC_PURCHASES_SINCE secret to your
-# go-live datetime (ISO-8601, e.g. 2026-08-01T00:00:00Z). Without a watermark the
-# first purchase sync starts from "now" (safe) — never backfill history or you
-# double-debit balances already seeded from Loyverse points.
+# Required repo secrets: SECRET_KEY, LOYVERSE_API_TOKEN, DB_HOST, DB_NAME,
+# DB_USER, DB_PASSWORD, DB_PORT, ALLOWED_HOSTS. Optional: CAFETERIA_SYNC_PURCHASES_SINCE
+# (ISO-8601 go-live watermark). Without a watermark the first purchase sync starts
+# from "now" (safe) — never backfill history or you double-debit balances already
+# seeded from Loyverse points. DB_ENGINE is pinned to Postgres (Supabase).
 #
 # Free-minutes note: private repos get 2000 Action-min/month. At ~1 min/run the
 # 5-min cadence is ~8640 min/mo — make the repo public (unlimited), keep Render
@@ -35,12 +36,13 @@ jobs:
     env:
       DJANGO_SETTINGS_MODULE: config.settings.production
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      DB_ENGINE: django.db.backends.postgresql
+      DB_ENGINE: ${{ secrets.DB_ENGINE }}
       DB_NAME: ${{ secrets.DB_NAME }}
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_HOST: ${{ secrets.DB_HOST }}
       DB_PORT: ${{ secrets.DB_PORT }}
+      DB_SSLMODE: ${{ secrets.DB_SSLMODE }}
       ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
       LOYVERSE_API_TOKEN: ${{ secrets.LOYVERSE_API_TOKEN }}
       CAFETERIA_SYNC_PURCHASES_SINCE: ${{ secrets.CAFETERIA_SYNC_PURCHASES_SINCE }}
