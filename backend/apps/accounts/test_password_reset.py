@@ -1,10 +1,9 @@
 """Phase A: password reset / activation + notification preferences."""
+import pytest
 from django.core import mail
 from django.urls import reverse
 
-import pytest
-
-from apps.accounts.factories import DEFAULT_PASSWORD, ParentFactory
+from apps.accounts.factories import ParentFactory
 from apps.accounts.models import NotificationPreference, PasswordResetToken
 from apps.accounts.password_reset import issue_reset_token
 from apps.portal.models import Notification
