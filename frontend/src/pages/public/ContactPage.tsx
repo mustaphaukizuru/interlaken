@@ -150,6 +150,7 @@ export default function ContactPage() {
                 href={waHref(settings.whatsapp_number, 'Hola, me gustaría obtener más información')}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Escribir por WhatsApp al Colegio Interlaken"
                 className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 focus-visible:ring-offset-2"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" xmlns="http://www.w3.org/2000/svg">

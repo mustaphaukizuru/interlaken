@@ -178,6 +178,10 @@ export const admissionsApi = {
     });
   },
 
+  /** Parent portal — registrations linked to the logged-in user's email. */
+  getMyRegistrations: () =>
+    api.get('/admissions/my-registrations/'),
+
   getOpenSchoolEvents: () =>
     api.get('/admissions/open-school/'),
 

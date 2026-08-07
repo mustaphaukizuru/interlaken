@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
 import { Clock, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function OpenSchoolPage() {
   const [registered, setRegistered] = useState(false);
   const { whatsapp_number } = useSiteSettings();
 
-  const { data: events, isLoading } = useQuery<OpenSchoolEvent[]>({
+  const { data: events, isLoading, isError, refetch } = useQuery<OpenSchoolEvent[]>({
     queryKey: ['open-school-events'],
     queryFn: async () => {
       const { data } = await admissionsApi.getOpenSchoolEvents();
@@ -147,14 +148,20 @@ export default function OpenSchoolPage() {
 
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-12">
         {registered ? (
-          <div className="text-center py-16">
+          <div className="text-center py-16" role="status">
             <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-brand-600" />
+              <CheckCircle className="w-8 h-8 text-brand-600" aria-hidden="true" />
             </div>
             <h2 className="text-2xl font-bold text-ink mb-2">¡Registro confirmado!</h2>
-            <p className="text-muted">
+            <p className="text-muted mb-6">
               Recibirá un correo con los detalles del evento. ¡Esperamos verle pronto!
             </p>
+            <Link
+              to="/admisiones"
+              className="btn-primary inline-flex min-h-[44px] items-center"
+            >
+              Conocer el proceso de admisión
+            </Link>
           </div>
         ) : (
           <>
@@ -163,7 +170,20 @@ export default function OpenSchoolPage() {
             <div>
               <h2 className="font-semibold text-ink mb-4">Elija una fecha</h2>
               {isLoading ? (
-                <div className="flex justify-center py-10"><LoadingSpinner /></div>
+                <div className="flex justify-center py-10" aria-busy="true" aria-label="Cargando eventos">
+                  <LoadingSpinner />
+                </div>
+              ) : isError ? (
+                <div className="rounded-xl2 border border-coral/30 bg-coral-50 p-6 text-center text-sm text-coral-dark" role="alert">
+                  <p>No fue posible cargar las fechas. Intente de nuevo.</p>
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="mt-3 font-semibold underline"
+                  >
+                    Reintentar
+                  </button>
+                </div>
               ) : !calendarDays.length ? (
                 <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
                   No hay eventos programados actualmente. Escríbanos por WhatsApp y le

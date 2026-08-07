@@ -289,14 +289,22 @@ CAFETERIA_SYNC_PURCHASES_SINCE = env('CAFETERIA_SYNC_PURCHASES_SINCE', default='
 # Which gateway a top-up defaults to when the client doesn't specify one.
 DEFAULT_PAYMENT_GATEWAY = env('DEFAULT_PAYMENT_GATEWAY', default='global_payments')
 
-# Global Payments (Hosted Payment Page). ``GLOBAL_PAYMENTS_HPP_URL`` overrides the
-# built-in sandbox default; the APP_ID/KEY are used when the live HPP SDK is wired.
+# Master sandbox/live switch for hosted checkout URLs. When false (default),
+# create_checkout forces sandbox URLs and ignores live merchant HPP/checkout
+# hosts that may be sitting in env — see payments/gateways/*.py.
+PAYMENTS_LIVE = env.bool('PAYMENTS_LIVE', default=False)
+
+# Global Payments (Hosted Payment Page).
+# Sandbox: leave PAYMENTS_LIVE=false; empty HPP_URL → local /pago/simulado mock.
+# Live: set PAYMENTS_LIVE=true + real GLOBAL_PAYMENTS_HPP_URL + APP_ID/KEY.
 GLOBAL_PAYMENTS_APP_ID = env('GLOBAL_PAYMENTS_APP_ID', default='')
 GLOBAL_PAYMENTS_APP_KEY = env('GLOBAL_PAYMENTS_APP_KEY', default='')
 GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
 GLOBAL_PAYMENTS_HPP_URL = env('GLOBAL_PAYMENTS_HPP_URL', default='')
 
 # Banorte "Pago en Línea" hosted checkout.
+# Sandbox: leave PAYMENTS_LIVE=false; empty CHECKOUT_URL → local /pago/simulado.
+# Live: set PAYMENTS_LIVE=true + real BANORTE_CHECKOUT_URL + MERCHANT_ID.
 BANORTE_MERCHANT_ID = env('BANORTE_MERCHANT_ID', default='')
 BANORTE_ENV = env('BANORTE_ENV', default='sandbox')
 BANORTE_CHECKOUT_URL = env('BANORTE_CHECKOUT_URL', default='')

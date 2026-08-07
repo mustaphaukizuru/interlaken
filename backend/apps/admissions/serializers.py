@@ -172,6 +172,25 @@ class RegistrationStatusSerializer(serializers.ModelSerializer):
         fields = ['id', 'status', 'admin_notes']
 
 
+class RegistrationParentStatusSerializer(serializers.ModelSerializer):
+    """Read-only status card for a parent viewing their own applications.
+
+    Deliberately excludes medical/PII beyond what they already submitted as tutor.
+    """
+    child_name = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Registration
+        fields = [
+            'id', 'child_name', 'grade_applying', 'cycle',
+            'status', 'status_label', 'submitted_at', 'created_at', 'updated_at',
+        ]
+
+    def get_child_name(self, obj):
+        return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+
+
 MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes', 'estatura', 'peso')
 
 

@@ -40,7 +40,7 @@ export default function BookVisitPage() {
   const [confirmed, setConfirmed] = useState<AvailabilitySlot | null>(null);
   const { whatsapp_number } = useSiteSettings();
 
-  const { data: slots, isLoading } = useQuery<AvailabilitySlot[]>({
+  const { data: slots, isLoading, isError, refetch } = useQuery<AvailabilitySlot[]>({
     queryKey: ['availability', 'individual'],
     queryFn: async () => {
       const { data } = await bookingsApi.getAvailability({ type: 'individual' });
@@ -173,7 +173,20 @@ export default function BookVisitPage() {
               <div>
                 <h2 className="font-semibold text-fluid-lg text-ink mb-4">Elija una fecha y horario</h2>
                 {isLoading ? (
-                  <div className="flex justify-center py-10"><LoadingSpinner /></div>
+                  <div className="flex justify-center py-10" aria-busy="true" aria-label="Cargando horarios">
+                    <LoadingSpinner />
+                  </div>
+                ) : isError ? (
+                  <div className="rounded-xl2 border border-coral/30 bg-coral-50 p-6 text-center text-sm text-coral-dark" role="alert">
+                    <p>No fue posible cargar los horarios. Intente de nuevo.</p>
+                    <button
+                      type="button"
+                      onClick={() => refetch()}
+                      className="mt-3 font-semibold underline"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
                 ) : !calendarDays.length ? (
                   <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
                     No hay horarios disponibles por el momento. Escríbanos por WhatsApp y

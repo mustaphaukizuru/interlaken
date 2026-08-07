@@ -205,18 +205,29 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md" role="status">
           <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-brand-600" />
+            <CheckCircle className="w-8 h-8 text-brand-600" aria-hidden="true" />
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-3">¡Inscripción enviada!</h2>
           <p className="text-muted mb-6">
             Hemos recibido la documentación de inscripción de <strong>{form.child_first_name}</strong>.
             El equipo de admisiones la revisará y le informará en un plazo de 3 a 5 días hábiles.
           </p>
-          <Link to="/" className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2">
-            Volver al inicio
-          </Link>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to="/portal/inscripciones"
+              className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+            >
+              Ver estado en el portal
+            </Link>
+            <Link
+              to="/"
+              className="btn-outline focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+            >
+              Volver al inicio
+            </Link>
+          </div>
         </div>
       </div>
     );
