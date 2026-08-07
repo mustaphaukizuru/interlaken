@@ -7,6 +7,12 @@ export interface User {
   role: 'admin' | 'parent' | 'student' | 'staff';
   avatar: string;
   whatsapp: string;
+  has_usable_password?: boolean;
+  notif_prefs?: {
+    email_enabled: boolean;
+    in_app_enabled: boolean;
+    push_enabled: boolean;
+  };
 }
 
 export interface StudentProfile {
