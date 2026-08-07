@@ -22,9 +22,13 @@ logger = logging.getLogger(__name__)
 def send_email(subject: str, message: str, recipients, *, fail_silently: bool = True) -> bool:
     """Send a plain-text email from ``DEFAULT_FROM_EMAIL``.
 
-    Best-effort by default: mail failures are logged, never raised, so a broken
-    SMTP config can't block the action that triggered the notification. Returns
-    ``True`` when at least one recipient was accepted.
+    Best-effort by default: mail failures are **logged**, never raised, so a
+    broken SMTP config can't block the action that triggered the notification.
+    Returns ``True`` when at least one recipient was accepted.
+
+    Internally always calls Django with ``fail_silently=False`` so exceptions
+    surface into this helper (Django's own fail_silently=True would swallow
+    without a log line).
     """
     if isinstance(recipients, str):
         recipients = [recipients]
@@ -38,11 +42,13 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=recipients,
-            fail_silently=fail_silently,
+            fail_silently=False,
         )
+        if not sent:
+            logger.error('Email send returned 0 (%r → %s)', subject, recipients)
         return bool(sent)
-    except Exception as e:  # pragma: no cover - only hit when fail_silently=False
-        logger.error(f'Email send failed ({subject!r} → {recipients}): {e}')
+    except Exception as e:
+        logger.error('Email send failed (%r → %s): %s', subject, recipients, e)
         if not fail_silently:
             raise
         return False

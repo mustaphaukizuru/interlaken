@@ -1,10 +1,11 @@
 """
 admissions/views.py — Public forms API (no auth required)
 """
+import logging
 from datetime import datetime
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -20,6 +21,7 @@ from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
 from apps.core.ratelimit import ratelimit
+from apps.portal.services import send_email
 
 from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
@@ -29,11 +31,14 @@ from .serializers import (
     PublicPreRegistrationSerializer,
     RegistrationAdminListSerializer,
     RegistrationDocumentSerializer,
+    RegistrationParentStatusSerializer,
     RegistrationSerializer,
     RegistrationStatusSerializer,
     current_school_cycle,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
+
+logger = logging.getLogger(__name__)
 
 
 class IsAdmin(permissions.BasePermission):
@@ -98,33 +103,29 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
         self._notify_admin(instance)
 
     def _send_confirmation(self, obj):
-        send_mail(
-            subject='Pre-registro recibido — Colegio Interlaken',
-            message=(
+        send_email(
+            'Pre-registro recibido — Colegio Interlaken',
+            (
                 f'Estimado/a {obj.parent_name},\n\n'
                 f'Hemos recibido su solicitud de pre-registro para {obj.child_first_name} '
                 f'{obj.child_last_name}. En breve nos pondremos en contacto con usted.\n\n'
                 f'Colegio Interlaken\ncolegio@interlaken.edu.mx'
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[obj.parent_email],
-            fail_silently=True,
+            [obj.parent_email],
         )
 
     def _notify_admin(self, obj):
         # Deliver to the school's contact inbox (NOT EMAIL_HOST_USER, which is the
         # SMTP auth user and is empty by default), mirroring the contact form.
         recipient = getattr(settings, 'CONTACT_EMAIL', '') or settings.DEFAULT_FROM_EMAIL
-        send_mail(
-            subject=f'[Interlaken] Nuevo pre-registro: {obj.child_first_name} {obj.child_last_name}',
-            message=(
+        send_email(
+            f'[Interlaken] Nuevo pre-registro: {obj.child_first_name} {obj.child_last_name}',
+            (
                 f'Nivel: {obj.level}\nGrado: {obj.grade_applying}\n'
                 f'Padre/Tutor: {obj.parent_name}\nEmail: {obj.parent_email}\n'
                 f'Teléfono: {obj.parent_phone}'
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[recipient],
-            fail_silently=True,
+            [recipient],
         )
 
 
@@ -189,9 +190,9 @@ class PreRegistrationInviteView(APIView):
         }, status=status.HTTP_201_CREATED)
 
     def _email_invite(self, reg, invite_url):
-        send_mail(
-            subject='Invitación de inscripción — Colegio Interlaken',
-            message=(
+        send_email(
+            'Invitación de inscripción — Colegio Interlaken',
+            (
                 f'Estimado/a {reg.parent1_name},\n\n'
                 f'Le invitamos a completar la inscripción de {reg.child_first_name} '
                 f'{reg.child_last_name} para el ciclo {reg.cycle}.\n\n'
@@ -199,9 +200,7 @@ class PreRegistrationInviteView(APIView):
                 f'El enlace es personal y expira en 14 días.\n\n'
                 f'Colegio Interlaken'
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[reg.parent1_email],
-            fail_silently=True,
+            [reg.parent1_email],
         )
 
 
@@ -231,6 +230,27 @@ class RegistrationListCreateView(generics.ListCreateAPIView):
         data = dict(serializer.data)
         data['invite_token'] = issue_invite(serializer.instance)
         return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class MyRegistrationsView(APIView):
+    """GET /api/v1/admissions/my-registrations/ — parent application status.
+
+    Lists registrations linked to the authenticated user's email
+    (``parent1_email`` or ``parent2_email``). Minimal status tracking for the
+    parent portal — no medical fields, no session-token dance.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        email = (request.user.email or '').strip()
+        if not email:
+            return Response([])
+        regs = (
+            Registration.objects
+            .filter(Q(parent1_email__iexact=email) | Q(parent2_email__iexact=email))
+            .order_by('-updated_at')
+        )
+        return Response(RegistrationParentStatusSerializer(regs, many=True).data)
 
 
 class RegistrationStatusView(generics.UpdateAPIView):
@@ -267,8 +287,7 @@ class RegistrationStatusView(generics.UpdateAPIView):
                f'usted para darle más información.\n\n')
             + 'Colegio Interlaken'
         )
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL,
-                  [reg.parent1_email], fail_silently=True)
+        send_email(subject, body, [reg.parent1_email])
 
 
 class DocumentVerifyView(generics.UpdateAPIView):
@@ -316,7 +335,11 @@ class DocumentDownloadView(APIView):
 
         try:
             fh = doc.file.open('rb')
-        except (FileNotFoundError, ValueError):
+        except (FileNotFoundError, ValueError) as exc:
+            logger.error(
+                'Document download missing file doc=%s registration=%s: %s',
+                doc.pk, doc.registration_id, exc,
+            )
             raise Http404('Archivo no disponible.') from None
         return FileResponse(fh, as_attachment=True,
                             filename=doc.filename or 'documento')
@@ -369,8 +392,9 @@ class RegistrationSubmitView(APIView):
         reg = authorize_registration(request, pk)
 
         if reg.status != Registration.Status.DRAFT:
-            return Response({'error': 'Registration already submitted'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Esta inscripción ya fue enviada.'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         # LFPDPPP (IK-LEGAL B2): Stage B requires acceptance of the current notice.
         if reg.privacy_accepted_at is None:
@@ -391,18 +415,15 @@ class RegistrationSubmitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST)
 
         reg.submit()
-        # Send confirmation email
-        send_mail(
-            subject='Inscripción recibida — Colegio Interlaken',
-            message=(
+        send_email(
+            'Inscripción recibida — Colegio Interlaken',
+            (
                 f'Estimado/a {reg.parent1_name},\n\n'
                 f'Hemos recibido la documentación de inscripción de {reg.child_first_name} '
                 f'{reg.child_last_name}. La revisaremos y le informaremos en un plazo de 3-5 días hábiles.\n\n'
                 f'Colegio Interlaken'
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[reg.parent1_email],
-            fail_silently=True,
+            [reg.parent1_email],
         )
         return Response({'status': 'submitted', 'message': 'Inscripción enviada exitosamente.'})
 
@@ -419,21 +440,24 @@ class DocumentUploadView(APIView):
         doc_type = request.data.get('doc_type')
 
         if not file or not doc_type:
-            return Response({'error': 'file and doc_type are required'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Debe adjuntar un archivo y indicar el tipo de documento.'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         # Validate doc_type against the model's choices — create() skips
         # full_clean(), so without this any string is stored.
         if doc_type not in RegistrationDocument.DocType.values:
-            return Response({'error': 'doc_type no válido.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Tipo de documento no válido.'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         # Validate extension
         import os
         ext = os.path.splitext(file.name)[1].lower()
         if ext not in settings.ALLOWED_DOCUMENT_EXTENSIONS:
-            return Response({'error': f'File type {ext} not allowed'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': f'Tipo de archivo {ext} no permitido.'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         # Cap the size — the *_MAX_MEMORY_SIZE settings don't bound uploads, so
         # without this an invited session-holder could fill the disk (DoS).

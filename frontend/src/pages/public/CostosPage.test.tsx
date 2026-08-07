@@ -58,4 +58,18 @@ describe('CostosPage', () => {
       await screen.findByText(/No fue posible cargar los costos/i),
     ).toBeInTheDocument();
   });
+
+  it('shows a Spanish empty state with CTAs when the API returns no rows', async () => {
+    getCosts.mockResolvedValue({ data: [] } as never);
+    renderPage();
+    expect(await screen.findByText(/Costos próximamente/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Contactar al colegio/i })).toHaveAttribute(
+      'href',
+      '/contacto',
+    );
+    expect(screen.getByRole('link', { name: /Ver admisiones/i })).toHaveAttribute(
+      'href',
+      '/admisiones',
+    );
+  });
 });

@@ -55,14 +55,34 @@ export default function CostosPage() {
       <section className="bg-cream-2 py-10 sm:py-14">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           {isError ? (
-            <div className="rounded-xl2 border border-coral/30 bg-coral-50 p-6 text-sm text-coral-dark">
+            <div className="rounded-xl2 border border-coral/30 bg-coral-50 p-6 text-sm text-coral-dark" role="alert">
               No fue posible cargar los costos. Intente de nuevo más tarde o{' '}
               <Link to="/contacto" className="font-semibold underline">contáctenos</Link>.
             </div>
           ) : isLoading ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Cargando costos">
               <div className="skeleton h-[320px] rounded-xl2" aria-hidden="true" />
               <div className="skeleton h-[320px] rounded-xl2" aria-hidden="true" />
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="rounded-xl2 border border-ink/10 bg-white px-6 py-10 text-center shadow-card">
+              <CircleDollarSign className="mx-auto h-10 w-10 text-green" aria-hidden="true" />
+              <h2 className="mt-4 font-head text-xl font-bold text-ink">
+                Costos próximamente
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                El colegio publicará pronto las cuotas de inscripción y colegiatura
+                para el ciclo {CURRENT_CYCLE}. Mientras tanto, nuestro equipo de
+                admisiones puede orientarle.
+              </p>
+              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link to="/contacto" className="btn-primary">
+                  Contactar al colegio
+                </Link>
+                <Link to="/admisiones" className="btn-outline">
+                  Ver admisiones
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
