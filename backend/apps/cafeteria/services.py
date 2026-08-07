@@ -271,7 +271,9 @@ def _notify_purchase(tx):
 
     notified = 0
     for parent in student.parents.all():
-        notify(parent, Notification.NotifType.CAFETERIA, title, message)
+        use_wa = bool(getattr(parent, 'whatsapp', '') or '')
+        notify(parent, Notification.NotifType.CAFETERIA, title, message,
+               whatsapp=use_wa)
         notified += 1
     return notified
 
@@ -304,7 +306,9 @@ def _maybe_low_balance_alert(cb, now):
     )
     notified = 0
     for parent in student.parents.all():
-        notify(parent, Notification.NotifType.CAFETERIA, title, message)
+        use_wa = bool(getattr(parent, 'whatsapp', '') or '')
+        notify(parent, Notification.NotifType.CAFETERIA, title, message,
+               whatsapp=use_wa)
         notified += 1
 
     cb.last_low_balance_alert_at = now
@@ -869,20 +873,33 @@ def _payment_for_transaction(tx):
     return None
 
 
-def reconcile_balances():
-    """Compare each linked student's local ledger against Loyverse ``total_points``.
+def reconcile_balances(*, limit: int = 50, offset: int = 0):
+    """Compare linked students' local ledger against Loyverse ``total_points``.
 
-    Returns a list of rows (one per student with a ``loyverse_id``) flagging any
-    drift between the DB balance and the remote points. Read-only — it never writes
-    to either side (surfacing drift is the point; see spec §7 R1). Students whose
-    Loyverse fetch errors are reported with ``error`` set rather than dropped.
+    Paginated (default ``limit=50``) so the admin reconcile endpoint does not
+    timeout on a full roster. Returns a dict::
+
+        {rows, checked, total, offset, limit, has_more}
+
+    Read-only — never writes to either side (surfacing drift is the point; see
+    spec §7 R1). Students whose Loyverse fetch errors are reported with
+    ``error`` set rather than dropped.
     """
     from apps.accounts.models import StudentProfile
     from apps.cafeteria.models import CafeteriaBalance
 
+    limit = max(1, min(int(limit or 50), 200))
+    offset = max(0, int(offset or 0))
+
+    qs = (StudentProfile.objects.filter(is_active=True)
+          .exclude(loyverse_id='')
+          .select_related('user')
+          .order_by('id'))
+    total = qs.count()
+    page = list(qs[offset:offset + limit])
+
     rows = []
-    students = StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
-    for student in students.select_related('user'):
+    for student in page:
         cb, _ = CafeteriaBalance.objects.get_or_create(student=student)
         local = Decimal(str(cb.balance or 0))
         row = {
@@ -905,7 +922,16 @@ def reconcile_balances():
         except LoyverseError as e:
             row['error'] = str(e)
         rows.append(row)
-    return rows
+
+    checked = len(rows)
+    return {
+        'rows': rows,
+        'checked': checked,
+        'total': total,
+        'offset': offset,
+        'limit': limit,
+        'has_more': (offset + checked) < total,
+    }
 
 
 # ── Roster ↔ Loyverse linking ────────────────────────────────────────────────

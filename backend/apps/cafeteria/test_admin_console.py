@@ -280,6 +280,24 @@ class TestReconcile:
         api_client.force_authenticate(user=ParentFactory())
         assert api_client.get(reverse("admin-reconcile")).status_code == 403
 
+    @patch("apps.cafeteria.services.get_customer_by_id")
+    def test_reconcile_respects_limit_offset(self, mock_get, api_client):
+        for i in range(3):
+            s = StudentProfileFactory(loyverse_id=f"loy-{i}")
+            _balance(s, 50)
+        mock_get.return_value = {"total_points": 50}
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.get(reverse("admin-reconcile"), {"limit": 2, "offset": 0})
+        assert resp.status_code == 200
+        assert resp.data["checked"] == 2
+        assert resp.data["total"] == 3
+        assert resp.data["has_more"] is True
+        assert len(resp.data["results"]) == 2
+
+        page2 = api_client.get(reverse("admin-reconcile"), {"limit": 2, "offset": 2})
+        assert page2.data["checked"] == 1
+        assert page2.data["has_more"] is False
+
 
 class TestLowBalanceReport:
     def test_lists_only_students_at_or_below_threshold(self, api_client):

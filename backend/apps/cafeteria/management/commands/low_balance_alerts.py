@@ -65,7 +65,9 @@ class Command(BaseCommand):
 
             sent_to_someone = False
             for parent in student.parents.all():
-                notify(parent, Notification.NotifType.CAFETERIA, title, message)
+                use_wa = bool(getattr(parent, 'whatsapp', '') or '')
+                notify(parent, Notification.NotifType.CAFETERIA, title, message,
+                       whatsapp=use_wa)
                 notified_parents += 1
                 sent_to_someone = True
 

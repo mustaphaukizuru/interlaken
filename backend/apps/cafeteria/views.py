@@ -543,13 +543,25 @@ class AdminRefundView(APIView):
 class AdminReconcileView(APIView):
     """GET /api/v1/cafeteria/admin/reconcile/
 
-    Compare each linked student's local ledger vs Loyverse points and flag drift.
-    ``?only=drift`` returns only the out-of-sync/errored rows.
+    Compare linked students' local ledger vs Loyverse points and flag drift.
+    Paginated via ``?limit=`` / ``?offset=`` (default limit 50) so large rosters
+    don't time out. ``?only=drift`` returns only the out-of-sync/errored rows
+    within the page.
     """
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        rows = reconcile_balances()
+        try:
+            limit = int(request.query_params.get('limit', 50))
+        except (TypeError, ValueError):
+            limit = 50
+        try:
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            offset = 0
+
+        batch = reconcile_balances(limit=limit, offset=offset)
+        rows = batch['rows']
 
         def _ser(r):
             return {
@@ -566,6 +578,11 @@ class AdminReconcileView(APIView):
         return Response({
             'count': len(data),
             'drift_count': sum(1 for r in data if not r['in_sync']),
+            'checked': batch['checked'],
+            'total': batch['total'],
+            'offset': batch['offset'],
+            'limit': batch['limit'],
+            'has_more': batch['has_more'],
             'results': data,
         })
 

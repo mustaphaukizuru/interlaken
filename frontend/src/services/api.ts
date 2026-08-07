@@ -294,8 +294,14 @@ export const cafeteriaApi = {
   refundTransaction: (txId: number, reason?: string) =>
     api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
 
-  reconcile: (onlyDrift?: boolean) =>
-    api.get('/cafeteria/admin/reconcile/', { params: onlyDrift ? { only: 'drift' } : {} }),
+  reconcile: (onlyDrift?: boolean, params?: { limit?: number; offset?: number }) =>
+    api.get('/cafeteria/admin/reconcile/', {
+      params: {
+        ...(onlyDrift ? { only: 'drift' } : {}),
+        ...(params?.limit != null ? { limit: params.limit } : {}),
+        ...(params?.offset != null ? { offset: params.offset } : {}),
+      },
+    }),
 
   getLowBalance: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/low-balance/', { params }),
@@ -501,6 +507,7 @@ export const portalApi = {
   // Personal notifications (header bell menu).
   getNotifications: () => api.get('/portal/notifications/'),
   markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),
+  markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
@@ -530,6 +537,13 @@ export const portalApi = {
   // Roster ↔ Loyverse linking (admin): commit=false previews the plan, true persists.
   linkLoyverse: (commit: boolean) =>
     api.post('/accounts/admin/link-loyverse/', { commit: commit ? '1' : '0' }),
+
+  // Import roster from Loyverse customers (admin): preview then commit (+ link).
+  importLoyverse: (commit: boolean, seedBalances = true) =>
+    api.post('/accounts/admin/import-loyverse/', {
+      commit: commit ? '1' : '0',
+      seed_balances: seedBalances ? '1' : '0',
+    }),
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────
