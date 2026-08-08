@@ -284,28 +284,42 @@ HTTPS endpoints under Passenger — no cron/worker needed; see §3.)
 **Production `.env` (server only — never commit):**
 ```
 DEFAULT_PAYMENT_GATEWAY=global_payments
+BACKEND_URL=https://interlaken.edu.mx
 PAYMENT_RETURN_URL=https://interlaken.edu.mx/portal/cafeteria/recarga/retorno
+TUITION_RETURN_URL=https://interlaken.edu.mx/portal/colegiaturas/retorno
 
-# Global Payments
+# Keep PAYMENTS_LIVE=false until a real sandbox/live charge is verified.
+PAYMENTS_LIVE=false
+
+# Global Payments — APP_ID/APP_KEY required when PAYMENTS_LIVE=true.
+# SESSION_URL: provider HPP session create endpoint (POST JSON). When empty,
+# create_checkout falls back to query-string redirect / local /pago/simulado.
 GLOBAL_PAYMENTS_APP_ID=<merchant app id>
 GLOBAL_PAYMENTS_APP_KEY=<merchant app key>
-GLOBAL_PAYMENTS_ENV=live            # sandbox until credentials are verified
+GLOBAL_PAYMENTS_ENV=sandbox         # production only after verified
 GLOBAL_PAYMENTS_HPP_URL=<live HPP url from provider>
+GLOBAL_PAYMENTS_SESSION_URL=<session API url when merchant provides it>
+GLOBAL_PAYMENTS_API_VERSION=2021-03-22
 GLOBAL_PAYMENTS_WEBHOOK_SECRET=<shared HMAC secret>
 
 # Banorte "Pago en Línea"
 BANORTE_MERCHANT_ID=<merchant id>
-BANORTE_ENV=live                    # sandbox until credentials are verified
+BANORTE_API_KEY=<optional API key for session create>
+BANORTE_ENV=sandbox
 BANORTE_CHECKOUT_URL=<live checkout url from Banorte>
+BANORTE_SESSION_URL=<session API url when Banorte provides it>
 BANORTE_WEBHOOK_SECRET=<shared HMAC secret>
 ```
 
-**Sandbox vs live:** with `*_ENV=sandbox` (default) and no `*_HPP_URL`/`*_CHECKOUT_URL`
-set, the app builds a deterministic **sandbox** redirect URL carrying the order
-reference — enough to exercise the initiate → webhook flow end-to-end without live keys.
-Switch each gateway to `live` and set the provider's real hosted-page URL once merchant
-credentials are provisioned. The webhook verification is **always real** — set the
-`*_WEBHOOK_SECRET`s in every environment or the endpoint rejects everything (401).
+**Sandbox vs live:** with `PAYMENTS_LIVE=false` (default) and no `*_HPP_URL`/`*_CHECKOUT_URL`
+set, the app redirects to the local **`/pago/simulado`** mock — enough to exercise
+initiate → settle → return → webhook credit without merchant keys (DEV/`SQLITE_LOCAL`
+only for the settle endpoint). When `GLOBAL_PAYMENTS_SESSION_URL` (or Banorte's) is set
+with credentials, `create_checkout` POSTs a structured order payload and uses the
+provider's `redirect_url`. Flip `PAYMENTS_LIVE=true` only after a verified sandbox
+charge; live mode fails closed if APP_ID/APP_KEY (or Banorte merchant id) / HPP URL
+are missing. Webhook HMAC verification is **always real** — set `*_WEBHOOK_SECRET`s
+or the endpoint rejects everything (401).
 
 > **Never** credit a balance from the browser return URL or an unsigned webhook. Do
 > **not** store card/PAN data — the hosted page keeps it off our servers.
