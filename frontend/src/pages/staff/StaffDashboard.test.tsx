@@ -63,6 +63,9 @@ describe('StaffDashboard states (IK-ADMIN item 8)', () => {
   it('shows per-card skeletons while loading (no global spinner)', () => {
     mockedAnalytics.mockReturnValueOnce(new Promise(() => {}) as never);
     const { container } = renderDashboard();
+    // Page title via PageHeader (AppHeader owns hamburger/brand in PortalLayout).
+    expect(screen.getByRole('heading', { name: 'Panel de Dirección' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /abrir menú/i })).toBeNull();
     // 4 KPI skeletons + 3 chart skeletons, each its own shimmer card.
     expect(container.querySelectorAll('.skeleton').length).toBeGreaterThanOrEqual(7);
     expect(screen.queryByRole('status')).toBeNull();
