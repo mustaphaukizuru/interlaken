@@ -1,8 +1,14 @@
 """Admin guardian link/unlink on a student."""
+
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory, StudentUserFactory
+from apps.accounts.factories import (
+    AdminFactory,
+    ParentFactory,
+    StudentProfileFactory,
+    StudentUserFactory,
+)
 from apps.accounts.models import ParentProfile, User
 
 
@@ -77,7 +83,10 @@ class TestStudentGuardians:
         student = StudentProfileFactory(parents=[parent])
         api_client.force_authenticate(admin_user)
         resp = api_client.delete(
-            reverse('student-guardian-detail', kwargs={'pk': student.pk, 'user_id': parent.pk}),
+            reverse(
+                'student-guardian-detail',
+                kwargs={'pk': student.pk, 'user_id': parent.pk},
+            ),
         )
         assert resp.status_code == 204
         assert parent not in student.parents.all()
