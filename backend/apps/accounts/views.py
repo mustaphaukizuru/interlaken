@@ -80,6 +80,34 @@ def _email_is_verified(info: dict) -> bool:
     return v is True or v == 'true'
 
 
+def _google_domain_allowed(email: str) -> bool:
+    """True when auto-create is permitted for this email's domain.
+
+    Empty ``GOOGLE_AUTO_CREATE_DOMAINS`` → invite-only (no stranger accounts).
+    Non-empty → only listed domains may self-provision as PARENT on first Google
+    login. Pre-existing users always match regardless of domain.
+    """
+    domains = getattr(settings, 'GOOGLE_AUTO_CREATE_DOMAINS', None) or []
+    if not domains:
+        return False
+    host = (email or '').rsplit('@', 1)[-1].lower()
+    return host in {d.strip().lower() for d in domains if d and d.strip()}
+
+
+def _resolve_google_user(email: str, *, defaults: dict) -> User | None:
+    """Find an existing user or optionally create one for an allowlisted domain.
+
+    Returns ``None`` when the email is unknown and auto-create is not allowed —
+    callers must refuse the login with a clear error (no silent portal account).
+    """
+    user = User.objects.filter(email=email).first()
+    if user is not None:
+        return user
+    if not _google_domain_allowed(email):
+        return None
+    return User.objects.create_user(email=email, password=None, **defaults)
+
+
 @method_decorator(ratelimit('oauth-callback', '20/m', key='ip', method='GET'), name='dispatch')
 class GoogleCallbackView(APIView):
     """
@@ -139,26 +167,28 @@ class GoogleCallbackView(APIView):
         if not _email_is_verified(userinfo):
             return redirect(f'{settings.FRONTEND_URL}/login?error=email_unverified')
 
-        # Create or update user
-        user, created = User.objects.get_or_create(email=email, defaults={
+        user = _resolve_google_user(email, defaults={
             'first_name': first_name,
             'last_name': last_name,
             'google_id': google_id,
             'avatar': avatar,
             'role': User.Role.PARENT,  # default role; admin assigns final role
         })
+        if user is None:
+            # Invite-only: admin must pre-create / link the parent (or allowlist
+            # the domain via GOOGLE_AUTO_CREATE_DOMAINS).
+            return redirect(f'{settings.FRONTEND_URL}/login?error=not_invited')
 
-        if not created:
-            # Update profile picture and google_id if changed
-            updated = False
-            if user.google_id != google_id:
-                user.google_id = google_id
-                updated = True
-            if avatar and user.avatar != avatar:
-                user.avatar = avatar
-                updated = True
-            if updated:
-                user.save(update_fields=['google_id', 'avatar'])
+        # Refresh google_id / avatar for returning users.
+        updated = False
+        if google_id and user.google_id != google_id:
+            user.google_id = google_id
+            updated = True
+        if avatar and user.avatar != avatar:
+            user.avatar = avatar
+            updated = True
+        if updated:
+            user.save(update_fields=['google_id', 'avatar'])
 
         # Set the session as httpOnly cookies and redirect WITHOUT any token in
         # the URL. Land on /login (NOT /auth/*, which is reserved for the backend
@@ -199,13 +229,33 @@ class GoogleTokenView(APIView):
         if not _email_is_verified(payload):
             return Response({'error': 'email_unverified'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        user, _ = User.objects.get_or_create(email=email, defaults={
+        user = _resolve_google_user(email, defaults={
             'first_name': payload.get('given_name', ''),
             'last_name': payload.get('family_name', ''),
             'google_id': payload.get('sub', ''),
             'avatar': payload.get('picture', ''),
             'role': User.Role.PARENT,
         })
+        if user is None:
+            return Response(
+                {'error': 'not_invited',
+                 'detail': 'No hay una cuenta registrada con este correo. '
+                           'Pida al colegio que lo invite o vincule como tutor.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Refresh google_id / avatar for returning users.
+        google_id = payload.get('sub', '')
+        avatar = payload.get('picture', '')
+        dirty = []
+        if google_id and user.google_id != google_id:
+            user.google_id = google_id
+            dirty.append('google_id')
+        if avatar and user.avatar != avatar:
+            user.avatar = avatar
+            dirty.append('avatar')
+        if dirty:
+            user.save(update_fields=dirty)
 
         response = Response()
         access = issue_session(user, response)

@@ -147,9 +147,11 @@ class TestGoogleCallback:
 
     @patch("apps.accounts.views.requests.get")
     @patch("apps.accounts.views.requests.post")
-    def test_happy_path_creates_user_and_redirects_with_tokens(
+    def test_happy_path_existing_user_redirects_with_tokens(
         self, mock_post, mock_get, api_client
     ):
+        # Invite-only default: user must already exist.
+        ParentFactory(email="nuevo@test.mx")
         mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
         mock_get.return_value = _FakeResponse(200, _VERIFIED_USERINFO)
 
@@ -167,7 +169,40 @@ class TestGoogleCallback:
 
         user = User.objects.get(email="nuevo@test.mx")
         assert user.google_id == "google-uid-1"
-        assert user.role == User.Role.PARENT  # default role on first login
+        assert user.role == User.Role.PARENT
+
+    @override_settings(GOOGLE_AUTO_CREATE_DOMAINS=[])
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_unknown_email_rejected_when_invite_only(
+        self, mock_post, mock_get, api_client
+    ):
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(200, _VERIFIED_USERINFO)
+
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": state})
+        assert resp.status_code == 302
+        assert "error=not_invited" in resp["Location"]
+        assert not User.objects.filter(email="nuevo@test.mx").exists()
+
+    @override_settings(GOOGLE_AUTO_CREATE_DOMAINS=["interlaken.edu.mx"])
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_allowlisted_domain_may_auto_create(
+        self, mock_post, mock_get, api_client
+    ):
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(
+            200, {**_VERIFIED_USERINFO, "email": "familia@interlaken.edu.mx"},
+        )
+
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse(self.url_name), {"code": "abc", "state": state})
+        assert resp.status_code == 302
+        assert "/login?login=ok" in resp["Location"]
+        user = User.objects.get(email="familia@interlaken.edu.mx")
+        assert user.role == User.Role.PARENT
 
     @patch("apps.accounts.views.requests.get")
     @patch("apps.accounts.views.requests.post")
@@ -197,6 +232,7 @@ class TestGoogleCallback:
 class TestGoogleTokenExchange:
     @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
     def test_valid_credential_sets_cookie_and_returns_access(self, mock_verify, api_client):
+        ParentFactory(email="gtoken@test.mx")
         mock_verify.return_value = {
             "sub": "g-1", "email": "gtoken@test.mx", "email_verified": True,
             "given_name": "G", "family_name": "T",
@@ -208,6 +244,18 @@ class TestGoogleTokenExchange:
         # Verification is local — the credential is passed to the audience check,
         # never placed in an outbound URL.
         mock_verify.assert_called_once()
+
+    @override_settings(GOOGLE_AUTO_CREATE_DOMAINS=[])
+    @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
+    def test_unknown_email_credential_is_403(self, mock_verify, api_client):
+        mock_verify.return_value = {
+            "sub": "g-new", "email": "stranger@gmail.com", "email_verified": True,
+            "given_name": "X", "family_name": "Y",
+        }
+        resp = api_client.post(reverse("google-token"), {"credential": "fake"}, format="json")
+        assert resp.status_code == 403
+        assert resp.data["error"] == "not_invited"
+        assert not User.objects.filter(email="stranger@gmail.com").exists()
 
     @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
     def test_unverified_email_credential_is_401(self, mock_verify, api_client):
