@@ -11,8 +11,9 @@ interface Props {
 }
 
 /**
- * Shared mobile-nav state. TopBar is rendered by each page (inside <Outlet/>),
- * so it consumes this context to reach the hamburger toggle owned by PortalLayout.
+ * Shared mobile-nav state. AppHeader (hamburger, search, notifications, account)
+ * is rendered by PortalLayout on every authenticated route; page titles live in
+ * content via <PageHeader>. MobileTabBar / Sidebar consume this context too.
  */
 interface MobileNavCtx {
   open: boolean;

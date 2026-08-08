@@ -5,6 +5,7 @@ import logging
 
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
 from rest_framework.response import Response
@@ -207,9 +208,13 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
         announcement = serializer.save(created_by=self.request.user)
         # Alert the audience (in-app). Fail-soft: a fan-out hiccup must never
         # turn a saved comunicado into a 500. Drafts (is_active=False) notify
-        # nobody until published; publishing a draft later is a known follow-up.
+        # nobody until published (see perform_update on activate).
+        if not announcement.is_active:
+            return
         try:
             fanout_announcement(announcement)
+            Announcement.objects.filter(pk=announcement.pk).update(
+                fanout_at=timezone.now())
         except Exception:  # noqa: BLE001 — best-effort notification
             logging.getLogger(__name__).exception(
                 'Announcement %s fan-out failed', announcement.pk)
@@ -221,6 +226,22 @@ class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [_IsAdmin]
     http_method_names = ['get', 'patch', 'delete']
+
+    def perform_update(self, serializer):
+        previous = self.get_object()
+        was_active = previous.is_active
+        already_fanned = previous.fanout_at is not None
+        announcement = serializer.save()
+        # First-time publish of a draft: fan out once. Re-activate after a
+        # prior fan-out must not spam the audience again.
+        if announcement.is_active and not was_active and not already_fanned:
+            try:
+                fanout_announcement(announcement)
+                Announcement.objects.filter(pk=announcement.pk).update(
+                    fanout_at=timezone.now())
+            except Exception:  # noqa: BLE001 — best-effort notification
+                logging.getLogger(__name__).exception(
+                    'Announcement %s activate fan-out failed', announcement.pk)
 
 
 class NotificationListView(generics.ListAPIView):

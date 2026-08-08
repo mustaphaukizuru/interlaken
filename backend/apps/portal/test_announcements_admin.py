@@ -72,6 +72,29 @@ class TestAnnouncementAdminCRUD:
         a.refresh_from_db()
         assert a.is_active is False and a.title == 'A2'
 
+    def test_activating_draft_fans_out_once(self, api_client):
+        parent = ParentFactory()
+        api_client.force_authenticate(AdminFactory())
+        create = api_client.post(LIST_URL, {
+            'title': 'Borrador urgente', 'body': 'Detalle',
+            'audience': 'parents', 'is_active': False,
+        }, format='json')
+        assert create.status_code == 201
+        assert Notification.objects.count() == 0
+        a = Announcement.objects.get()
+        assert a.fanout_at is None
+
+        url = reverse('admin-announcement-detail', args=[a.id])
+        assert api_client.patch(url, {'is_active': True}, format='json').status_code == 200
+        assert Notification.objects.filter(user=parent).count() == 1
+        a.refresh_from_db()
+        assert a.fanout_at is not None
+
+        # Deactivate + reactivate must not spam again.
+        api_client.patch(url, {'is_active': False}, format='json')
+        api_client.patch(url, {'is_active': True}, format='json')
+        assert Notification.objects.filter(user=parent).count() == 1
+
     def test_admin_deletes(self, api_client):
         a = Announcement.objects.create(title='A', body='x')
         api_client.force_authenticate(AdminFactory())
