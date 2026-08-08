@@ -78,4 +78,12 @@ describe('LoginPage email/password submit', () => {
     expect(await screen.findByText(/credenciales incorrectas/i)).toBeInTheDocument();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
+
+  it('links to the forgot-password / first-access page', () => {
+    renderLogin();
+    expect(screen.getByRole('link', { name: /activar \/ restablecer/i })).toHaveAttribute(
+      'href',
+      '/olvide-contrasena',
+    );
+  });
 });
