@@ -206,6 +206,8 @@ def emergency_broadcast(
     )
     notified = fanout_announcement(
         announcement, notif_type=Notification.NotifType.WARNING)
+    Announcement.objects.filter(pk=announcement.pk).update(
+        fanout_at=timezone.now())
 
     dispatched = 0
     try:

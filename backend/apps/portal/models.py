@@ -20,6 +20,9 @@ class Announcement(models.Model):
                      on_delete=models.SET_NULL, null=True,
                      related_name='announcements')
     is_active  = models.BooleanField(default=True)
+    # Set when the audience has been fan-out notified (create or first activate).
+    # Prevents re-notify on deactivate→reactivate (GO-LIVE-AUDIT #16 follow-up).
+    fanout_at  = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
