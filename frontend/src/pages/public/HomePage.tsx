@@ -288,15 +288,23 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* ── LEVELS ── */}
+      {/* ── LEVELS — 3 scroll beats: eyebrow → staggered cards → CTA ── */}
       <Section bg="cream">
-        <Reveal className="mb-10 text-center">
+        <Reveal direction="up" className="mb-10 text-center">
           <span className="section-label-green inline-flex">Niveles Educativos</span>
           <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Un camino de excelencia</h2>
+          <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
+            De preescolar a secundaria, un mismo campus y un mismo compromiso con cada etapa.
+          </p>
         </Reveal>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {LEVELS.map((l, i) => (
-            <Reveal key={l.name} delay={i * 90}>
+            <Reveal
+              key={l.name}
+              delay={120 + i * 110}
+              direction={i === 1 ? 'up' : i === 0 ? 'right' : 'left'}
+              distance={28}
+            >
               <div className="card hover-lift overflow-hidden !p-0">
                 <div className="relative h-[180px]">
                   <img src={l.img} alt={l.name} loading="lazy" decoding="async" width={400} height={180} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
@@ -311,17 +319,22 @@ export default function HomePage() {
             </Reveal>
           ))}
         </div>
+        <Reveal delay={200} direction="up" className="mt-8 text-center">
+          <Link to="/modelo-educativo" className="btn-outline inline-flex focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2">
+            Conozca el modelo educativo <ArrowRight size={16} />
+          </Link>
+        </Reveal>
       </Section>
 
-      {/* ── PROGRAMAS ── */}
+      {/* ── PROGRAMAS — eyebrow → stagger → closing line ── */}
       <Section bg="white">
-        <Reveal className="mb-11 text-center">
+        <Reveal direction="up" className="mb-11 text-center">
           <span className="section-label-pink inline-flex">Nuestros Programas</span>
           <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Más allá del aula</h2>
         </Reveal>
         <div className="grid grid-cols-2 gap-7 sm:grid-cols-2 lg:grid-cols-4">
           {PROGRAMS.map((p, i) => (
-            <Reveal key={p.name} delay={i * 80} className="text-center">
+            <Reveal key={p.name} delay={100 + i * 90} direction="up" distance={20} className="text-center">
               <div className="relative mx-auto h-[150px] w-[150px] max-w-full">
                 <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${p.accent} 8%, transparent)` }} />
                 <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${p.accent} 53%, transparent)` }}>
@@ -335,6 +348,11 @@ export default function HomePage() {
             </Reveal>
           ))}
         </div>
+        <Reveal delay={180} direction="up" className="mt-10 text-center">
+          <p className="text-[15px] text-muted">
+            Programas que complementan la formación académica todos los días.
+          </p>
+        </Reveal>
       </Section>
 
       {/* ── PROMO PAIR ── */}

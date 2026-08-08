@@ -151,6 +151,8 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  /** Footer link groups collapse into an accordion below md. */
+  const [footerOpen, setFooterOpen] = useState<string | null>(null);
   const { pathname } = useLocation();
   const settings = useSiteSettings();
   // Facebook viene confirmado por el cliente; Instagram se muestra siempre
@@ -264,9 +266,32 @@ export function PublicLayout() {
           </button>
         </div>
 
-        {/* Mobile menu — acordeón por grupo del menú */}
+        {/* Mobile menu — CTAs near top, then Contacto, then acordeón por grupo */}
         {open && (
-          <div className="lg:hidden bg-white border-t border-line px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+          <div className="lg:hidden bg-white border-t border-line px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+            <div className="flex flex-col gap-2 pb-2">
+              <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-pink justify-center min-h-[44px]">
+                Agendar Visita
+              </Link>
+              <Link to="/login" onClick={() => setOpen(false)} className="btn-secondary justify-center min-h-[44px]">
+                Portal
+              </Link>
+            </div>
+
+            <NavLink
+              to="/contacto"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                `block px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-cream'
+                }`
+              }
+            >
+              Contacto
+            </NavLink>
+
+            <div className="border-t border-line pt-1" />
+
             {MENU.map((group) => (
               <div key={group.label}>
                 <button
@@ -297,26 +322,6 @@ export function PublicLayout() {
                 )}
               </div>
             ))}
-
-            <NavLink
-              to="/contacto"
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                `block px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-cream'
-                }`
-              }
-            >
-              Contacto
-            </NavLink>
-            <div className="pt-2 flex flex-col gap-2">
-              <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-primary justify-center">
-                Agendar Visita
-              </Link>
-              <Link to="/login" onClick={() => setOpen(false)} className="btn-secondary justify-center">
-                Portal
-              </Link>
-            </div>
           </div>
         )}
       </header>
@@ -352,13 +357,13 @@ export function PublicLayout() {
           showStickyCta ? 'pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0' : ''
         }`}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-8">
-          {/* Brand column */}
-          <div className="col-span-2">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+          {/* Brand always visible */}
+          <div className="mb-8 max-w-sm">
             <div className="mb-3">
               <Logo variant="horizontal" size={40} theme="dark" />
             </div>
-            <p className="text-xs leading-relaxed max-w-xs">
+            <p className="text-xs leading-relaxed">
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
               Tlalnepantla, Estado de México.
             </p>
@@ -383,49 +388,108 @@ export function PublicLayout() {
             )}
           </div>
 
-          {/* Link groups */}
-          {FOOTER_GROUPS.map((group) => (
-            <div key={group.heading}>
-              <h4 className="text-white font-semibold mb-3">{group.heading}</h4>
+          {/* Mobile (&lt;md): accordion link groups — desktop: open grid */}
+          <div className="md:hidden divide-y divide-white/10 border-y border-white/10">
+            {[...FOOTER_GROUPS, { heading: 'Contacto', links: [] as typeof FOOTER_GROUPS[number]['links'] }].map((group) => {
+              const isContact = group.heading === 'Contacto';
+              const expanded = footerOpen === group.heading;
+              return (
+                <div key={group.heading}>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() => setFooterOpen((h) => (h === group.heading ? null : group.heading))}
+                    className="flex w-full min-h-[48px] items-center justify-between py-3 text-left text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    {group.heading}
+                    <ChevronDown className={`h-4 w-4 text-white/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  {expanded && (
+                    isContact ? (
+                      <ul className="space-y-2.5 pb-4 text-xs">
+                        {settings.phone_display && (
+                          <li className="flex items-start gap-2">
+                            <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            <a href={`tel:${settings.phone_e164}`} className="hover:text-white transition-colors">{settings.phone_display}</a>
+                          </li>
+                        )}
+                        {settings.contact_email && (
+                          <li className="flex items-start gap-2">
+                            <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
+                          </li>
+                        )}
+                        <li className="flex items-start gap-2">
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          <a
+                            href={settings.maps_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={settings.address}
+                            className="hover:text-white transition-colors"
+                          >
+                            Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                          </a>
+                        </li>
+                      </ul>
+                    ) : (
+                      <ul className="space-y-2.5 pb-4 text-xs">
+                        {group.links.map((l) => (
+                          <li key={l.label}>
+                            <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop / tablet grid */}
+          <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-8">
+            {FOOTER_GROUPS.map((group) => (
+              <div key={group.heading}>
+                <h4 className="text-white font-semibold mb-3">{group.heading}</h4>
+                <ul className="space-y-2 text-xs">
+                  {group.links.map((l) => (
+                    <li key={l.label}>
+                      <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <div>
+              <h4 className="text-white font-semibold mb-3">Contacto</h4>
               <ul className="space-y-2 text-xs">
-                {group.links.map((l) => (
-                  <li key={l.label}>
-                    <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
+                {settings.phone_display && (
+                  <li className="flex items-start gap-2">
+                    <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <a href={`tel:${settings.phone_e164}`} className="hover:text-white transition-colors">{settings.phone_display}</a>
                   </li>
-                ))}
+                )}
+                {settings.contact_email && (
+                  <li className="flex items-start gap-2">
+                    <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
+                  </li>
+                )}
+                <li className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <a
+                    href={settings.maps_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={settings.address}
+                    className="hover:text-white transition-colors"
+                  >
+                    Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                  </a>
+                </li>
               </ul>
             </div>
-          ))}
-
-          {/* Contact */}
-          <div>
-            <h4 className="text-white font-semibold mb-3">Contacto</h4>
-            <ul className="space-y-2 text-xs">
-              {settings.phone_display && (
-                <li className="flex items-start gap-2">
-                  <Phone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <a href={`tel:${settings.phone_e164}`} className="hover:text-white transition-colors">{settings.phone_display}</a>
-                </li>
-              )}
-              {settings.contact_email && (
-                <li className="flex items-start gap-2">
-                  <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <a href={`mailto:${settings.contact_email}`} className="hover:text-white transition-colors break-all">{settings.contact_email}</a>
-                </li>
-              )}
-              <li className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <a
-                  href={settings.maps_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={settings.address}
-                  className="hover:text-white transition-colors"
-                >
-                  Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
-                </a>
-              </li>
-            </ul>
           </div>
         </div>
         <div className="border-t border-white/10">
