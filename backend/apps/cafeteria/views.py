@@ -42,10 +42,33 @@ logger = logging.getLogger(__name__)
 
 
 class IsParentOrAdmin(permissions.BasePermission):
+    """Family portal actors: parent, student (school-email / Loyverse self-guardian), or admin."""
+
     def has_permission(self, request, view):
         user = request.user
         return bool(user and user.is_authenticated
-                    and user.role in (User.Role.PARENT, User.Role.ADMIN))
+                    and user.role in (User.Role.PARENT, User.Role.STUDENT, User.Role.ADMIN))
+
+
+def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
+    """True if ``user`` may top up / manage cafeteria for ``student``.
+
+    Parents need an explicit guardian link. Students may act on their own profile
+    (family login with ``ci…@interlaken.com.mx``) or when linked as a guardian
+    (Loyverse import adds the student to ``student.parents``).
+    """
+    if user.role == User.Role.ADMIN:
+        return True
+    if user.role == User.Role.PARENT:
+        return student.parents.filter(pk=user.pk).exists()
+    if user.role == User.Role.STUDENT:
+        try:
+            if user.student_profile.pk == student.pk:
+                return True
+        except StudentProfile.DoesNotExist:
+            pass
+        return student.parents.filter(pk=user.pk).exists()
+    return False
 
 
 class IsAdmin(permissions.BasePermission):
@@ -204,7 +227,7 @@ class UpdateLowBalanceThresholdView(APIView):
         student = get_object_or_404(StudentProfile, pk=student_pk)
 
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
-            if not student.parents.filter(pk=user.pk).exists():
+            if not _can_manage_student_cafeteria(user, student):
                 return Response({'error': 'No autorizado para este alumno.'}, status=403)
         elif user.role != User.Role.ADMIN:
             return Response({'error': 'No autorizado.'}, status=403)
@@ -238,9 +261,10 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         student = serializer.validated_data['student']
 
-        # A parent may only top up their own children (admins may top up anyone).
+        # Family may only top up linked children; admins may top up anyone.
+        # Student-role school-email logins are self-guardians (see Loyverse import).
         user = request.user
-        if user.role == User.Role.PARENT and not student.parents.filter(pk=user.pk).exists():
+        if not _can_manage_student_cafeteria(user, student):
             return Response({'error': 'No autorizado para este alumno.'}, status=403)
 
         topup = serializer.save()
@@ -252,7 +276,11 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                 return Response({'error': 'Pasarela de pago no válida.'}, status=400)
             gateway = get_gateway(gateway_name)
 
-            payer = user if user.role == User.Role.PARENT else (student.parents.first() or user)
+            # Charge the authenticated family member; admin-initiated uses a linked guardian.
+            if user.role == User.Role.ADMIN:
+                payer = student.parents.first() or user
+            else:
+                payer = user
             payment = Payment.objects.create(
                 user=payer,
                 payment_type=Payment.Type.CAFETERIA,
@@ -606,9 +634,9 @@ class AdminLowBalanceView(APIView):
 class ParentExportView(APIView):
     """GET /api/v1/cafeteria/export/
 
-    CSV of the authenticated parent's children's cafeteria transactions.
-    Admins may also call it (exports their linked children if any; typically
-    parents use this). Students are rejected — use the per-student admin export.
+    CSV of cafeteria transactions for children linked to the authenticated user
+    (``user.children``). Parents, student-role family logins (self-guardian),
+    and admins may call it.
     """
     permission_classes = [IsParentOrAdmin]
 
@@ -616,7 +644,7 @@ class ParentExportView(APIView):
         from . import exports
 
         user = request.user
-        if user.role not in (User.Role.PARENT, User.Role.ADMIN):
+        if user.role not in (User.Role.PARENT, User.Role.STUDENT, User.Role.ADMIN):
             return Response({'error': 'No autorizado.'}, status=403)
         return exports.parent_family_statement_csv(user)
 

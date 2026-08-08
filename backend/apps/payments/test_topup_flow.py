@@ -89,6 +89,49 @@ class TestTopUpInitiation:
         assert "redirect_url" not in resp.data
         assert not Payment.objects.filter(related_topup_id=resp.data["id"]).exists()
 
+    def test_student_self_guardian_can_topup_own_balance(self, api_client):
+        """Loyverse family login: role=student, linked on student.parents."""
+        student = StudentProfileFactory()
+        student.parents.add(student.user)
+
+        api_client.force_authenticate(user=student.user)
+        resp = api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": student.id, "amount": "150.00", "method": "online",
+             "gateway": "global_payments"},
+            format="json",
+        )
+        assert resp.status_code == 201, resp.data
+        assert resp.data["redirect_url"]
+        payment = Payment.objects.get(pk=resp.data["payment_id"])
+        assert payment.user_id == student.user_id
+        assert payment.related_topup_id == resp.data["id"]
+
+    def test_student_can_topup_own_profile_without_parents_m2m(self, api_client):
+        """Own OneToOne profile is enough even if self-guardian link is missing."""
+        student = StudentProfileFactory()  # no parents.add(self)
+
+        api_client.force_authenticate(user=student.user)
+        resp = api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": student.id, "amount": "100.00", "method": "office"},
+            format="json",
+        )
+        assert resp.status_code == 201, resp.data
+
+    def test_student_cannot_topup_another_student(self, api_client):
+        student = StudentProfileFactory()
+        other = StudentProfileFactory()
+        student.parents.add(student.user)
+
+        api_client.force_authenticate(user=student.user)
+        resp = api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": other.id, "amount": "100.00", "method": "office"},
+            format="json",
+        )
+        assert resp.status_code == 403
+
     def test_online_topup_gateway_failure_marks_payment_failed(self, api_client):
         """A gateway checkout failure must not leave an orphan PENDING payment."""
         parent = ParentFactory()
