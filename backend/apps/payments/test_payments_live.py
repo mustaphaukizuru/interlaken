@@ -53,6 +53,9 @@ class TestPaymentsLiveSandboxForce:
         settings.PAYMENTS_LIVE = True
         settings.GLOBAL_PAYMENTS_HPP_URL = 'https://hpp.globalpay.com/live-checkout'
         settings.GLOBAL_PAYMENTS_ENV = 'production'
+        settings.GLOBAL_PAYMENTS_APP_ID = 'app-live'
+        settings.GLOBAL_PAYMENTS_APP_KEY = 'key-live'
+        settings.GLOBAL_PAYMENTS_SESSION_URL = ''
         settings.FRONTEND_URL = 'http://localhost:3000'
         settings.PAYMENT_RETURN_URL = ''
 
@@ -65,6 +68,9 @@ class TestPaymentsLiveSandboxForce:
 
         settings.PAYMENTS_LIVE = True
         settings.GLOBAL_PAYMENTS_HPP_URL = ''
+        settings.GLOBAL_PAYMENTS_APP_ID = 'app-live'
+        settings.GLOBAL_PAYMENTS_APP_KEY = 'key-live'
+        settings.GLOBAL_PAYMENTS_SESSION_URL = ''
         settings.FRONTEND_URL = 'http://localhost:3000'
         settings.PAYMENT_RETURN_URL = ''
 
@@ -76,6 +82,8 @@ class TestPaymentsLiveSandboxForce:
 
         settings.PAYMENTS_LIVE = True
         settings.BANORTE_CHECKOUT_URL = ''
+        settings.BANORTE_MERCHANT_ID = 'merch-1'
+        settings.BANORTE_SESSION_URL = ''
         settings.FRONTEND_URL = 'http://localhost:3000'
         settings.PAYMENT_RETURN_URL = ''
 
@@ -87,6 +95,9 @@ class TestPaymentsLiveSandboxForce:
 
         settings.PAYMENTS_LIVE = True
         settings.GLOBAL_PAYMENTS_HPP_URL = 'http://localhost:3000/pago/simulado'
+        settings.GLOBAL_PAYMENTS_APP_ID = 'app-live'
+        settings.GLOBAL_PAYMENTS_APP_KEY = 'key-live'
+        settings.GLOBAL_PAYMENTS_SESSION_URL = ''
         settings.FRONTEND_URL = 'http://localhost:3000'
         settings.PAYMENT_RETURN_URL = ''
 

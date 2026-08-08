@@ -303,20 +303,31 @@ DEFAULT_PAYMENT_GATEWAY = env('DEFAULT_PAYMENT_GATEWAY', default='global_payment
 # hosts that may be sitting in env — see payments/gateways/*.py.
 PAYMENTS_LIVE = env.bool('PAYMENTS_LIVE', default=False)
 
+# Public origin of this Django API (webhook status_url in HPP session payloads).
+# On cPanel the SPA and API share interlaken.edu.mx — set explicitly in prod.
+BACKEND_URL = env('BACKEND_URL', default='')
+
 # Global Payments (Hosted Payment Page).
 # Sandbox: leave PAYMENTS_LIVE=false; empty HPP_URL → local /pago/simulado mock.
 # Live: set PAYMENTS_LIVE=true + real GLOBAL_PAYMENTS_HPP_URL + APP_ID/KEY.
+# Optional GLOBAL_PAYMENTS_SESSION_URL: POST GP-API-shaped session; otherwise
+# create_checkout assembles a query-string redirect (mock/sandbox).
 GLOBAL_PAYMENTS_APP_ID = env('GLOBAL_PAYMENTS_APP_ID', default='')
 GLOBAL_PAYMENTS_APP_KEY = env('GLOBAL_PAYMENTS_APP_KEY', default='')
 GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
 GLOBAL_PAYMENTS_HPP_URL = env('GLOBAL_PAYMENTS_HPP_URL', default='')
+GLOBAL_PAYMENTS_SESSION_URL = env('GLOBAL_PAYMENTS_SESSION_URL', default='')
+GLOBAL_PAYMENTS_API_VERSION = env('GLOBAL_PAYMENTS_API_VERSION', default='2021-03-22')
 
 # Banorte "Pago en Línea" hosted checkout.
 # Sandbox: leave PAYMENTS_LIVE=false; empty CHECKOUT_URL → local /pago/simulado.
 # Live: set PAYMENTS_LIVE=true + real BANORTE_CHECKOUT_URL + MERCHANT_ID.
+# Optional BANORTE_SESSION_URL + BANORTE_API_KEY for provider session create.
 BANORTE_MERCHANT_ID = env('BANORTE_MERCHANT_ID', default='')
 BANORTE_ENV = env('BANORTE_ENV', default='sandbox')
 BANORTE_CHECKOUT_URL = env('BANORTE_CHECKOUT_URL', default='')
+BANORTE_SESSION_URL = env('BANORTE_SESSION_URL', default='')
+BANORTE_API_KEY = env('BANORTE_API_KEY', default='')
 
 # Where the hosted page returns the parent after payment (the frontend reads the
 # status). Defaults to the parent cafeteria return route on FRONTEND_URL.

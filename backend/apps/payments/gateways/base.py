@@ -13,6 +13,11 @@ this small surface so the rest of the app never touches provider specifics:
 Signature scheme (shared, per Prompt 03): ``HMAC-SHA256(secret, raw_body)`` as a
 hex digest sent in the ``X-Webhook-Signature`` header. Each gateway reads its own
 secret from settings, so the same verification code serves both providers.
+
+When a provider exposes a session API, subclasses POST a structured order payload
+(see ``build_session_payload`` / ``session_headers``) and return the provider's
+hosted redirect URL. Without credentials or a session URL, sandboxes fall back to
+the local ``/pago/simulado`` mock so the UX path stays exercisable.
 """
 import hashlib
 import hmac
@@ -27,6 +32,15 @@ logger = logging.getLogger(__name__)
 
 class LiveCheckoutNotConfigured(RuntimeError):
     """Raised when PAYMENTS_LIVE is on but no real HPP/checkout URL is set."""
+
+
+@dataclass
+class CheckoutSession:
+    """Result of creating (or assembling) a hosted-checkout session."""
+
+    redirect_url: str
+    session_id: str = ''
+    raw: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -64,10 +78,38 @@ class BaseGateway:
         """
         raise NotImplementedError
 
+    def build_session_payload(self, payment, return_url: str | None = None) -> dict:
+        """Canonical order/session body for the provider HPP session API.
+
+        Subclasses override. Used by real session POSTs and by tests/docs so that
+        wiring live credentials is mostly config + HTTP, not redesign.
+        """
+        raise NotImplementedError
+
+    def session_headers(self) -> dict:
+        """HTTP headers for the provider session API (auth, version, content-type)."""
+        raise NotImplementedError
+
     def _return_url(self, payment, return_url: str | None) -> str:
         """Resolve the browser return URL, defaulting to ``PAYMENT_RETURN_URL``."""
         base = return_url or getattr(settings, 'PAYMENT_RETURN_URL', '')
         return f'{base}?payment_id={payment.id}' if base else ''
+
+    def _persist_session(self, payment, session: CheckoutSession) -> None:
+        """Store session id / raw provider response on the Payment when possible."""
+        if not getattr(payment, 'pk', None):
+            return
+        dirty = []
+        if session.session_id and getattr(payment, 'gateway_ref', '') != session.session_id:
+            payment.gateway_ref = session.session_id
+            dirty.append('gateway_ref')
+        if session.raw:
+            raw = dict(getattr(payment, 'gateway_raw', None) or {})
+            raw['checkout_session'] = session.raw
+            payment.gateway_raw = raw
+            dirty.append('gateway_raw')
+        if dirty and hasattr(payment, 'save'):
+            payment.save(update_fields=[*dirty, 'updated_at'] if hasattr(payment, 'updated_at') else dirty)
 
     # ── webhook ───────────────────────────────────────────────
     def verify_webhook(self, request):
