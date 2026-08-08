@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useState } from 'react';
 import {
   Receipt, Search, PlusCircle, CheckCircle2, Ban, SlidersHorizontal,
-  TrendingUp, Wallet, AlertTriangle, History, Bell, X,
+  TrendingUp, Wallet, AlertTriangle, History, Bell, X, RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -61,6 +61,8 @@ export default function AdminFinance() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [adjustFor, setAdjustFor] = useState<Invoice | null>(null);
   const [cancelFor, setCancelFor] = useState<Invoice | null>(null);
+  const [refundFor, setRefundFor] = useState<Invoice | null>(null);
+  const [refundReason, setRefundReason] = useState('');
   const [bulkFor, setBulkFor] = useState<BulkAction | null>(null);
   const [historyFor, setHistoryFor] = useState<Invoice | null>(null);
 
@@ -110,6 +112,17 @@ export default function AdminFinance() {
     mutationFn: (id: number) => financeApi.cancelInvoice(id, 'Cancelada por administración'),
     onSuccess: () => { toast.success('Factura cancelada.'); setCancelFor(null); invalidate(); },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'No se pudo cancelar.'),
+  });
+
+  const refund = useMutation({
+    mutationFn: () => financeApi.refundOverpayment(refundFor!.id, refundReason.trim()),
+    onSuccess: () => {
+      toast.success('Devolución registrada. El pago quedó como reembolsado.');
+      setRefundFor(null);
+      setRefundReason('');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'No se pudo registrar la devolución.'),
   });
 
   const bulk = useMutation({
@@ -177,6 +190,26 @@ export default function AdminFinance() {
         <KpiCard icon={Receipt} label="Tasa de cobro" value={`${dashboard?.collection_rate ?? 0}%`} tone="brand" />
       </div>
 
+      {(dashboard?.overpaid ?? 0) > 0 && (
+        <button
+          type="button"
+          onClick={() => onFilter(() => setStatusFilter('overpaid'))}
+          className="flex w-full flex-wrap items-center gap-3 rounded-xl2 border border-brand-200 bg-brand-50 px-4 py-3 text-left transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <RotateCcw className="h-5 w-5 flex-shrink-0 text-brand-700" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-brand-800">
+              {dashboard!.overpaid} colegiatura(s) con saldo a favor
+            </p>
+            <p className="text-xs text-brand-700">
+              Crédito total ${dashboard?.overpaid_credit ?? '0.00'}. Revise y registre la devolución
+              (caja / transferencia / portal del banco).
+            </p>
+          </div>
+          <span className="text-sm font-medium text-brand-700">Ver sobrepagadas →</span>
+        </button>
+      )}
+
       {/* Filters */}
       <Card>
         <div className="flex flex-wrap items-center gap-3 mb-1">
@@ -200,6 +233,7 @@ export default function AdminFinance() {
             <option value="pending">Pendiente</option>
             <option value="overdue">Vencida</option>
             <option value="paid">Pagada</option>
+            <option value="overpaid">A favor (sobrepagada)</option>
             <option value="cancelled">Cancelada</option>
           </select>
         </div>
@@ -306,10 +340,12 @@ export default function AdminFinance() {
                           <InvoiceActions
                             inv={inv}
                             open={open}
+                            credit={credit}
                             markPaid={markPaid}
                             cancel={cancel}
                             onAdjust={setAdjustFor}
                             onCancel={setCancelFor}
+                            onRefund={setRefundFor}
                             onHistory={setHistoryFor}
                           />
                         </div>
@@ -382,10 +418,12 @@ export default function AdminFinance() {
                             <InvoiceActions
                               inv={inv}
                               open={open}
+                              credit={credit}
                               markPaid={markPaid}
                               cancel={cancel}
                               onAdjust={setAdjustFor}
                               onCancel={setCancelFor}
+                              onRefund={setRefundFor}
                               onHistory={setHistoryFor}
                             />
                           </div>
@@ -428,6 +466,46 @@ export default function AdminFinance() {
         }
       />
 
+      {/* Offline overpayment refund — staff confirm money was returned outside the app */}
+      <ConfirmDialog
+        open={!!refundFor}
+        title="Registrar devolución"
+        confirmLabel="Registrar devolución"
+        requireText="DEVOLVER"
+        loading={refund.isPending}
+        onClose={() => { setRefundFor(null); setRefundReason(''); }}
+        onConfirm={() => {
+          if (!refundReason.trim()) {
+            toast.error('Indique el motivo de la devolución.');
+            return;
+          }
+          refund.mutate();
+        }}
+        message={
+          refundFor && (
+            <>
+              Se revertirá el pago en línea más reciente de la colegiatura de{' '}
+              <span className="font-semibold text-ink">{refundFor.student_name}</span> (
+              {refundFor.period_label}). Saldo a favor actual:{' '}
+              <span className="font-semibold text-green-dark">
+                ${Math.abs(parseFloat(refundFor.balance_due)).toFixed(2)}
+              </span>
+              . El pago quedará como reembolsado en el sistema; confirme primero que el
+              dinero ya se devolvió (caja, transferencia o portal del banco).
+            </>
+          )
+        }
+      >
+        <input
+          id="refund-reason"
+          className="input-field"
+          aria-label="Motivo de la devolución"
+          placeholder="Motivo: ej. Doble cobro — devolución en transferencia"
+          value={refundReason}
+          onChange={(e) => setRefundReason(e.target.value)}
+        />
+      </ConfirmDialog>
+
       {/* Bulk action confirm — cancel is irreversible (type-to-confirm) */}
       <ConfirmDialog
         open={!!bulkFor}
@@ -452,18 +530,22 @@ type InvoiceMutation = {
 function InvoiceActions({
   inv,
   open,
+  credit,
   markPaid,
   cancel,
   onAdjust,
   onCancel,
+  onRefund,
   onHistory,
 }: {
   inv: Invoice;
   open: boolean;
+  credit: boolean;
   markPaid: InvoiceMutation;
   cancel: InvoiceMutation;
   onAdjust: (inv: Invoice) => void;
   onCancel: (inv: Invoice) => void;
+  onRefund: (inv: Invoice) => void;
   onHistory: (inv: Invoice) => void;
 }) {
   return (
@@ -474,6 +556,13 @@ function InvoiceActions({
           loading={markPaid.isPending && markPaid.variables === inv.id}
           onClick={() => markPaid.mutate(inv.id)}>
           <CheckCircle2 className="w-4 h-4 text-green-700" />
+        </Button>
+      )}
+      {credit && (
+        <Button size="sm" variant="ghost" title="Registrar devolución"
+          aria-label={`Registrar devolución de la colegiatura de ${inv.student_name}`}
+          onClick={() => onRefund(inv)}>
+          <RotateCcw className="w-4 h-4 text-brand-600" />
         </Button>
       )}
       {inv.status !== 'cancelled' && inv.status !== 'paid' && (

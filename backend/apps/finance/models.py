@@ -303,6 +303,7 @@ class InvoiceAdjustment(models.Model):
         ADJUST    = 'adjust',    'Ajuste de monto'
         CANCEL    = 'cancel',    'Cancelación'
         DISCOUNT  = 'discount',  'Descuento manual'
+        REFUND    = 'refund',    'Devolución'
 
     invoice    = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='adjustments')
     admin      = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True,

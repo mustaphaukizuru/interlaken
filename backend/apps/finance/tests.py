@@ -275,3 +275,241 @@ class TestAdmin:
         api_client.force_authenticate(user=mine)
         resp = api_client.get(reverse("finance-invoice-detail", args=[inv.id]))
         assert resp.status_code == 404
+
+    def test_cancel_requires_reason_and_is_audited(self, admin_client):
+        _schedule()
+        student = StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+
+        missing = admin_client.post(
+            reverse("finance-admin-cancel", args=[invoice.id]), {}, format="json")
+        assert missing.status_code == 400
+
+        resp = admin_client.post(
+            reverse("finance-admin-cancel", args=[invoice.id]),
+            {"reason": "Baja del alumno"}, format="json")
+        assert resp.status_code == 200, resp.data
+        invoice.refresh_from_db()
+        assert invoice.status == Invoice.Status.CANCELLED
+        assert invoice.adjustments.filter(kind="cancel").count() == 1
+
+    def test_cancel_rejects_paid_invoice(self, admin_client):
+        _schedule()
+        student = StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+        services.mark_invoice_paid(invoice)
+        resp = admin_client.post(
+            reverse("finance-admin-cancel", args=[invoice.id]),
+            {"reason": "Ya pagada"}, format="json")
+        assert resp.status_code == 400
+
+    def test_adjust_credit_and_charge_and_negative_guard(self, admin_client):
+        _schedule()
+        student = StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+
+        credit = admin_client.post(
+            reverse("finance-admin-adjust", args=[invoice.id]),
+            {"amount": "-200.00", "reason": "Descuento especial"}, format="json")
+        assert credit.status_code == 200, credit.data
+        invoice.refresh_from_db()
+        assert invoice.amount == Decimal("2800.00")
+        assert invoice.adjustments.filter(kind="adjust").count() == 1
+
+        charge = admin_client.post(
+            reverse("finance-admin-adjust", args=[invoice.id]),
+            {"amount": "50.00", "reason": "Material extra"}, format="json")
+        assert charge.status_code == 200, charge.data
+        invoice.refresh_from_db()
+        assert invoice.amount == Decimal("2850.00")
+
+        overdraw = admin_client.post(
+            reverse("finance-admin-adjust", args=[invoice.id]),
+            {"amount": "-10000.00", "reason": "Demasiado"}, format="json")
+        assert overdraw.status_code == 400
+
+    def test_adjust_reopens_paid_invoice(self, admin_client):
+        _schedule()
+        student = StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+        services.mark_invoice_paid(invoice)
+
+        resp = admin_client.post(
+            reverse("finance-admin-adjust", args=[invoice.id]),
+            {"amount": "100.00", "reason": "Cargo posterior"}, format="json")
+        assert resp.status_code == 200, resp.data
+        invoice.refresh_from_db()
+        assert invoice.status in (Invoice.Status.PENDING, Invoice.Status.OVERDUE)
+        assert invoice.balance_due == Decimal("100.00")
+
+    def test_bulk_mark_paid_and_cancel(self, admin_client):
+        _schedule()
+        s1, s2, s3 = StudentProfileFactory(), StudentProfileFactory(), StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+
+        paid_ids = list(
+            Invoice.objects.filter(student__in=[s1, s2], period=PERIOD)
+            .values_list("id", flat=True)
+        )
+        resp = admin_client.post(reverse("finance-admin-bulk"), {
+            "action": "mark_paid", "invoice_ids": paid_ids, "reason": "Caja",
+        }, format="json")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["done"] == 2
+        assert Invoice.objects.filter(id__in=paid_ids, status=Invoice.Status.PAID).count() == 2
+
+        cancel_id = Invoice.objects.get(student=s3, period=PERIOD).id
+        resp = admin_client.post(reverse("finance-admin-bulk"), {
+            "action": "cancel", "invoice_ids": [cancel_id], "reason": "Error de carga",
+        }, format="json")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["done"] == 1
+        assert Invoice.objects.get(pk=cancel_id).status == Invoice.Status.CANCELLED
+
+    def test_bulk_rejects_bad_action_and_empty_ids(self, admin_client):
+        empty = admin_client.post(reverse("finance-admin-bulk"), {
+            "action": "mark_paid", "invoice_ids": [],
+        }, format="json")
+        assert empty.status_code == 400
+
+        bad = admin_client.post(reverse("finance-admin-bulk"), {
+            "action": "explode", "invoice_ids": [1],
+        }, format="json")
+        assert bad.status_code == 400
+
+    def test_receipt_pdf_paid_vs_unpaid(self, api_client):
+        _schedule()
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+        api_client.force_authenticate(user=parent)
+
+        unpaid = api_client.get(reverse("finance-invoice-receipt", args=[invoice.id]))
+        assert unpaid.status_code == 400
+
+        services.mark_invoice_paid(invoice)
+        paid = api_client.get(reverse("finance-invoice-receipt", args=[invoice.id]))
+        assert paid.status_code == 200
+        assert paid["Content-Type"] == "application/pdf"
+        assert paid.content[:4] == b"%PDF"
+
+
+# ── overpayment refund (admin offline) ────────────────────────────────────────
+
+def _capture_tuition(api_client, payment, tx_id: str):
+    body = json.dumps({"order_id": payment.id, "status": "CAPTURED", "id": tx_id}).encode()
+    resp = api_client.post(
+        reverse("payment-webhook"),
+        data=body,
+        content_type="application/json",
+        HTTP_X_WEBHOOK_SIGNATURE=_sign(body),
+    )
+    assert resp.status_code == 200
+    return resp
+
+
+class TestOverpaymentRefund:
+    def _overpaid_invoice(self, api_client, settings):
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+        _schedule()
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+        pay_a, _ = services.start_invoice_payment(invoice, parent)
+        pay_b, _ = services.start_invoice_payment(invoice, parent)
+        _capture_tuition(api_client, pay_a, "tx-a")
+        _capture_tuition(api_client, pay_b, "tx-b")
+        invoice.refresh_from_db()
+        assert invoice.balance_due < 0
+        return invoice, parent, pay_a, pay_b
+
+    def test_admin_refund_reverses_newest_payment(self, api_client, admin_client, settings):
+        invoice, _parent, pay_a, pay_b = self._overpaid_invoice(api_client, settings)
+        newest = max(pay_a, pay_b, key=lambda p: p.id)
+
+        resp = admin_client.post(
+            reverse("finance-admin-refund", args=[invoice.id]),
+            {"reason": "Doble cobro — devolución en transferencia"},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+
+        invoice.refresh_from_db()
+        newest.refresh_from_db()
+        assert newest.status == Payment.Status.REFUNDED
+        assert invoice.amount_paid == invoice.amount
+        assert invoice.balance_due == Decimal("0.00")
+        assert invoice.status == Invoice.Status.PAID
+        assert invoice.adjustments.filter(kind="refund").count() == 1
+
+        again = admin_client.post(
+            reverse("finance-admin-refund", args=[invoice.id]),
+            {"reason": "Otra vez"}, format="json",
+        )
+        assert again.status_code == 400
+
+    def test_refund_specific_payment_id(self, api_client, admin_client, settings):
+        invoice, _parent, pay_a, pay_b = self._overpaid_invoice(api_client, settings)
+        resp = admin_client.post(
+            reverse("finance-admin-refund", args=[invoice.id]),
+            {"reason": "Devolver pago A", "payment_id": pay_a.id},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+        pay_a.refresh_from_db()
+        pay_b.refresh_from_db()
+        assert pay_a.status == Payment.Status.REFUNDED
+        assert pay_b.status == Payment.Status.SUCCESS
+        invoice.refresh_from_db()
+        assert invoice.amount_paid == invoice.amount
+
+    def test_refund_rejects_non_overpaid(self, admin_client):
+        _schedule()
+        student = StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+        services.mark_invoice_paid(invoice)
+
+        resp = admin_client.post(
+            reverse("finance-admin-refund", args=[invoice.id]),
+            {"reason": "No aplica"}, format="json",
+        )
+        assert resp.status_code == 400
+        assert "saldo a favor" in resp.data["error"].lower()
+
+    def test_refund_requires_reason(self, api_client, admin_client, settings):
+        invoice, *_ = self._overpaid_invoice(api_client, settings)
+        resp = admin_client.post(
+            reverse("finance-admin-refund", args=[invoice.id]),
+            {}, format="json",
+        )
+        assert resp.status_code == 400
+
+    def test_refund_is_admin_only(self, api_client, settings):
+        invoice, parent, *_ = self._overpaid_invoice(api_client, settings)
+        api_client.force_authenticate(user=parent)
+        resp = api_client.post(
+            reverse("finance-admin-refund", args=[invoice.id]),
+            {"reason": "No debería"}, format="json",
+        )
+        assert resp.status_code == 403
+
+    def test_dashboard_and_list_surface_overpaid(self, api_client, admin_client, settings):
+        invoice, *_ = self._overpaid_invoice(api_client, settings)
+
+        dash = admin_client.get(reverse("finance-admin-dashboard"), {"period": PERIOD})
+        assert dash.status_code == 200
+        assert dash.data["overpaid"] == 1
+        assert Decimal(dash.data["overpaid_credit"]) == invoice.amount
+
+        listing = admin_client.get(
+            reverse("finance-admin-invoices"), {"period": PERIOD, "status": "overpaid"})
+        assert listing.status_code == 200
+        results = listing.data["results"] if "results" in listing.data else listing.data
+        assert any(row["id"] == invoice.id for row in results)

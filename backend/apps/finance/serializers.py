@@ -91,6 +91,11 @@ class CancelInvoiceInputSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=255)
 
 
+class RefundOverpaymentInputSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=255)
+    payment_id = serializers.IntegerField(required=False, min_value=1)
+
+
 class GenerateInvoicesInputSerializer(serializers.Serializer):
     period = serializers.RegexField(r'^\d{4}-\d{2}$', required=False, allow_blank=True)
 
