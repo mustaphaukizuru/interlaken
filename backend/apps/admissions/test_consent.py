@@ -60,3 +60,19 @@ def test_medical_fields_require_medical_consent(api_client):
                      HTTP_X_SESSION_TOKEN=token)
     ok = _submit(api_client, reg_id, token, {"accept_privacy": True})
     assert ok.status_code == 200, ok.data
+
+
+def test_estatura_peso_alone_require_medical_consent(api_client):
+    """Encrypted height/weight are medical fields — must not bypass the gate."""
+    reg_id, token = _session(api_client, {"estatura": "1.20 m", "peso": "25 kg"})
+    blocked = _submit(api_client, reg_id, token, {"accept_privacy": True})
+    assert blocked.status_code == 400
+    assert "datos de salud" in blocked.data["error"]
+
+    api_client.patch(
+        reverse("register-detail", args=[reg_id]),
+        {"consent_medical_data": True}, format="json",
+        HTTP_X_SESSION_TOKEN=token,
+    )
+    ok = _submit(api_client, reg_id, token, {"accept_privacy": True})
+    assert ok.status_code == 200, ok.data
