@@ -46,9 +46,13 @@ export default function AdminAnnouncements() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-announcements'] });
 
   const save = useMutation({
-    mutationFn: () => editing
-      ? portalApi.adminUpdateAnnouncement(editing.id, form)
-      : portalApi.adminCreateAnnouncement(form),
+    mutationFn: async () => {
+      if (editing) {
+        await portalApi.adminUpdateAnnouncement(editing.id, form);
+      } else {
+        await portalApi.adminCreateAnnouncement(form);
+      }
+    },
     onSuccess: () => {
       invalidate();
       toast.success(editing ? 'Comunicado actualizado.' : 'Comunicado publicado.');
