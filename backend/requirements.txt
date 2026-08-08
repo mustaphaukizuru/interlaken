@@ -20,7 +20,7 @@ psycopg2-binary==2.9.12
 
 # Auth
 social-auth-app-django==5.4.1
-social-auth-core==4.5.4
+social-auth-core==5.0.2
 PyJWT==2.13.0
 
 # Storage & Files
