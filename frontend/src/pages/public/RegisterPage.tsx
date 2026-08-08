@@ -6,6 +6,7 @@ import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { admissionsApi } from '@/services/api';
 
 const GRADES = [
@@ -205,18 +206,29 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md" role="status">
           <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-brand-600" />
+            <CheckCircle className="w-8 h-8 text-brand-600" aria-hidden="true" />
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-3">¡Inscripción enviada!</h2>
           <p className="text-muted mb-6">
             Hemos recibido la documentación de inscripción de <strong>{form.child_first_name}</strong>.
             El equipo de admisiones la revisará y le informará en un plazo de 3 a 5 días hábiles.
           </p>
-          <Link to="/" className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2">
-            Volver al inicio
-          </Link>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to="/portal/inscripciones"
+              className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+            >
+              Ver estado en el portal
+            </Link>
+            <Link
+              to="/"
+              className="btn-outline focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+            >
+              Volver al inicio
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -259,15 +271,12 @@ export default function RegisterPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white py-10 sm:py-16">
-        <img src="/assets/court-primaria.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Admisiones</span>
-          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Inscripción en línea</h1>
-          <p className="text-brand-100 text-fluid-base">Ciclo Escolar {CURRENT_CYCLE}</p>
-        </div>
-      </section>
+      <FunnelHero
+        step="inscripcion"
+        title="Inscripción en línea"
+        subtitle={`Ciclo Escolar ${CURRENT_CYCLE}. Complete los datos del alumno, adjunte documentos y envíe su solicitud.`}
+        imageSrc="/assets/court-primaria.webp"
+      />
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {invited && (

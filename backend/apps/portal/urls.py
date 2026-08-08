@@ -14,6 +14,7 @@ urlpatterns = [
     path('admin/announcements/',         views.AnnouncementAdminListCreateView.as_view(), name='admin-announcements'),
     path('admin/announcements/<int:pk>/', views.AnnouncementAdminDetailView.as_view(),   name='admin-announcement-detail'),
     path('notifications/',               views.NotificationListView.as_view(),       name='notifications'),
+    path('notifications/mark-all-read/', views.NotificationMarkAllReadView.as_view(), name='notifications-mark-all-read'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(),   name='notification-read'),
     path('push/subscribe/',              PushSubscribeView.as_view(),                name='push-subscribe'),
     path('push/unsubscribe/',            PushUnsubscribeView.as_view(),              name='push-unsubscribe'),

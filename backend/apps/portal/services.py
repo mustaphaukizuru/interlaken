@@ -5,8 +5,9 @@ Both cafeteria (purchase / low-balance alerts) and bookings (visit confirmations
 route through here. In dev, ``EMAIL_BACKEND`` is the console backend, so emails
 print to stdout; in prod it's cPanel SMTP (see DEPLOYMENT.md §2/§4).
 
-WhatsApp is a placeholder wired for Prompt 14 — passing ``whatsapp=True`` today
-just logs an intent; no message is sent.
+WhatsApp: when ``whatsapp=True`` and the user has a ``whatsapp`` number, we call
+``apps.whatsapp.services.send_text`` (fail-soft). If Cloud API creds are unset,
+``send_text`` logs a no-op — same degradation as booking confirmations.
 """
 import logging
 from datetime import timedelta
@@ -21,9 +22,13 @@ logger = logging.getLogger(__name__)
 def send_email(subject: str, message: str, recipients, *, fail_silently: bool = True) -> bool:
     """Send a plain-text email from ``DEFAULT_FROM_EMAIL``.
 
-    Best-effort by default: mail failures are logged, never raised, so a broken
-    SMTP config can't block the action that triggered the notification. Returns
-    ``True`` when at least one recipient was accepted.
+    Best-effort by default: mail failures are **logged**, never raised, so a
+    broken SMTP config can't block the action that triggered the notification.
+    Returns ``True`` when at least one recipient was accepted.
+
+    Internally always calls Django with ``fail_silently=False`` so exceptions
+    surface into this helper (Django's own fail_silently=True would swallow
+    without a log line).
     """
     if isinstance(recipients, str):
         recipients = [recipients]
@@ -37,11 +42,13 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=recipients,
-            fail_silently=fail_silently,
+            fail_silently=False,
         )
+        if not sent:
+            logger.error('Email send returned 0 (%r → %s)', subject, recipients)
         return bool(sent)
-    except Exception as e:  # pragma: no cover - only hit when fail_silently=False
-        logger.error(f'Email send failed ({subject!r} → {recipients}): {e}')
+    except Exception as e:
+        logger.error('Email send failed (%r → %s): %s', subject, recipients, e)
         if not fail_silently:
             raise
         return False
@@ -50,40 +57,48 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
 def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bool = False):
     """Create an in-app ``Notification`` for ``user`` and optionally email them.
 
-    Args:
-        user: the recipient ``accounts.User`` (in-app notifications need one).
-        notif_type: a ``Notification.NotifType`` value (e.g. ``'cafeteria'``).
-        title / message: notification contents (Spanish UI copy).
-        email: also send an email to ``user.email`` (best-effort).
-        whatsapp: placeholder — logs intent only until Prompt 14 wires WhatsApp.
-
-    Returns the created ``Notification`` (or ``None`` if ``user`` is falsy).
+    Respects ``NotificationPreference`` toggles when present (defaults = all on).
     """
+    from apps.accounts.models import NotificationPreference
     from apps.portal.models import Notification
 
     if user is None:
         return None
 
-    # Per-user notify() delivers email + push inline below, so stamp it dispatched
-    # immediately — the dispatch_notifications cron only picks up bulk fan-out rows.
-    notification = Notification.objects.create(
-        user=user,
-        notif_type=notif_type,
-        title=title,
-        message=message,
-        delivered_at=timezone.now(),
-    )
+    prefs = NotificationPreference.for_user(user)
+    want_in_app = prefs.in_app_enabled
+    want_email = email and prefs.email_enabled
+    want_push = prefs.push_enabled
 
-    if email and getattr(user, 'email', ''):
+    notification = None
+    if want_in_app:
+        # Per-user notify() delivers email + push inline below, so stamp it dispatched
+        # immediately — the dispatch_notifications cron only picks up bulk fan-out rows.
+        notification = Notification.objects.create(
+            user=user,
+            notif_type=notif_type,
+            title=title,
+            message=message,
+            delivered_at=timezone.now(),
+        )
+
+    if want_email and getattr(user, 'email', ''):
         send_email(subject=title, message=message, recipients=[user.email])
 
-    # Web push: fail-soft, inert without VAPID keys or subscriptions.
-    from apps.portal.push import send_web_push
-    send_web_push(user, title, message)
+    if want_push:
+        from apps.portal.push import send_web_push
+        send_web_push(user, title, message)
 
     if whatsapp:
-        # Prompt 14 wires the WhatsApp Business API. For now, record the intent.
-        logger.info(f'WhatsApp notification requested for {user} (not yet enabled): {title}')
+        wa = (getattr(user, 'whatsapp', '') or '').strip()
+        if not wa:
+            logger.info('WhatsApp notification skipped (no number) for %s: %s', user, title)
+        else:
+            try:
+                from apps.whatsapp.services import send_text
+                send_text(wa, f'{title}\n\n{message}')
+            except Exception as e:  # pragma: no cover — send_text is already fail-soft
+                logger.warning('WhatsApp notify failed for %s: %s', user, e)
 
     return notification
 

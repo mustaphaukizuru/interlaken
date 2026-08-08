@@ -2,14 +2,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle } from 'lucide-react';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { AlertTriangle, CheckCircle, Clock, CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { PreRegistrationData } from '@/types';
 
 const schema = z.object({
@@ -37,6 +39,7 @@ const selectClass =
 
 export default function PreRegisterPage() {
   const [success, setSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -46,33 +49,51 @@ export default function PreRegisterPage() {
   });
 
   const onSubmit = async (data: FormData) => {
+    setSubmitError(null);
     try {
       await admissionsApi.preRegister(data as PreRegistrationData);
       trackEvent(FunnelEvent.SubmitPreRegister, { grade: data.grade_applying });
       setSuccess(true);
     } catch {
-      toast.error('Ocurrió un error. Verifique los datos e intente nuevamente.');
+      const msg = 'No pudimos enviar el pre-registro. Verifique los datos e intente nuevamente.';
+      setSubmitError(msg);
+      toast.error(msg);
     }
   };
 
   if (success) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md" role="status">
           <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-brand-600" />
+            <CheckCircle className="w-8 h-8 text-brand-600" aria-hidden="true" />
           </div>
           <h2 className="text-fluid-2xl font-bold text-ink mb-3">¡Pre-registro enviado!</h2>
           <p className="text-muted mb-6">
             Hemos recibido su solicitud. En los próximos 2 días hábiles, un asesor se pondrá en
             contacto con usted para coordinar los siguientes pasos.
           </p>
-          <a
-            href="/"
-            className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
-          >
-            Volver al inicio
-          </a>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to="/admisiones"
+              className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+            >
+              Ver proceso de admisión
+            </Link>
+            <Link
+              to="/contacto"
+              className="btn-outline focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
+            >
+              Contactar al colegio
+            </Link>
+          </div>
+          <p className="mt-6 text-sm text-subtle">
+            Si ya tiene cuenta de padres, puede consultar el estado de su inscripción en el{' '}
+            <Link to="/login" className="font-semibold text-green-dark underline">
+              portal
+            </Link>
+            .
+          </p>
         </div>
       </div>
     );
@@ -80,18 +101,37 @@ export default function PreRegisterPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white py-10 sm:py-16">
-        <img src="/assets/hopscotch.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" loading="eager" />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Admisiones</span>
-          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Pre-Registro</h1>
-          <p className="text-brand-100 text-fluid-base">Ciclo Escolar {CURRENT_CYCLE}</p>
+      <FunnelHero
+        step="pre-registro"
+        title="Pre-Registro"
+        subtitle="Menos de 5 minutos. Recibirá confirmación inmediata y un asesor le contactará en 2 días hábiles."
+      />
+
+      {/* Trust strip — reinforces cycle + time commitment under FunnelHero */}
+      <section className="border-b border-line bg-cream-2">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2.5 px-4 py-4 text-sm text-ink sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span className="inline-flex items-center gap-2 font-medium">
+            <Clock className="h-4 w-4 text-green-dark" aria-hidden="true" />
+            Menos de 5 minutos
+          </span>
+          <span className="inline-flex items-center gap-2 text-muted">
+            <CalendarDays className="h-4 w-4 text-pink" aria-hidden="true" />
+            Ciclo Escolar {CURRENT_CYCLE}
+          </span>
         </div>
       </section>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6" noValidate>
+          {submitError && (
+            <div
+              className="flex items-start gap-3 rounded-xl2 border border-coral/30 bg-coral-50 px-4 py-3 text-sm text-coral-dark"
+              role="alert"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>{submitError}</p>
+            </div>
+          )}
           <div>
             <h2 className="font-semibold text-fluid-lg text-ink mb-1">Datos del alumno</h2>
             <p className="text-xs text-subtle">Información del candidato a inscripción</p>
@@ -186,7 +226,7 @@ export default function PreRegisterPage() {
 
           <PrivacyNote />
 
-          <Button type="submit" loading={isSubmitting} size="lg" className="w-full justify-center min-h-[44px]">
+          <Button type="submit" variant="cta" loading={isSubmitting} size="lg" className="w-full justify-center">
             Enviar pre-registro
           </Button>
         </form>

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, XCircle, Clock, Coffee } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import Logo from '@/components/ui/Logo';
 import { paymentsApi } from '@/services/api';
 
 type Outcome = 'loading' | 'success' | 'failed' | 'pending';
@@ -64,40 +64,68 @@ export default function CafeteriaTopupReturn() {
   const content = {
     loading: {
       icon: <LoadingSpinner size="lg" />,
+      accent: 'bg-cream',
+      ring: 'ring-line',
       title: 'Confirmando su pago…',
       text: 'Estamos verificando el estado de su recarga. Esto tomará unos segundos.',
     },
     success: {
-      icon: <CheckCircle2 className="w-12 h-12 text-green-600" />,
+      icon: <CheckCircle2 className="h-10 w-10 text-green-dark" />,
+      accent: 'bg-green/10',
+      ring: 'ring-green/25',
       title: 'Recarga exitosa',
       text: 'El saldo de cafetería se acreditó correctamente. Ya puede verlo en su portal.',
     },
     failed: {
-      icon: <XCircle className="w-12 h-12 text-coral" />,
+      icon: <XCircle className="h-10 w-10 text-coral" />,
+      accent: 'bg-coral-50',
+      ring: 'ring-coral/30',
       title: 'La recarga no se completó',
       text: 'No se realizó ningún cargo. Puede intentarlo nuevamente desde la página de cafetería.',
     },
     pending: {
-      icon: <Clock className="w-12 h-12 text-amber" />,
+      icon: <Clock className="h-10 w-10 text-amber" />,
+      accent: 'bg-amber/10',
+      ring: 'ring-amber/30',
       title: 'Recarga en proceso',
       text: 'Su pago se está procesando. El saldo se actualizará en cuanto se confirme; puede revisar el historial en unos minutos.',
     },
   }[outcome];
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md px-4 sm:px-0">
-      <Card className="text-center">
-        <div className="mb-4 flex justify-center">{content.icon}</div>
-        <h1 className="text-fluid-lg font-bold text-ink">{content.title}</h1>
-        <p className="mt-2 text-fluid-sm text-muted">{content.text}</p>
-        <div className="mt-6">
-          <Link to="/portal/cafeteria">
-            <Button variant="primary" className="min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40">
-              <Coffee className="w-4 h-4" /> Volver a cafetería
-            </Button>
-          </Link>
+    <div className="min-h-[70vh] bg-cream-2 px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-md">
+        <div className="mb-6 flex justify-center">
+          <Logo variant="horizontal" size={36} theme="light" />
         </div>
-      </Card>
+        {outcome === 'success' && (
+          <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-green/20" aria-hidden="true">
+            <div className="h-full w-full rounded-full bg-green" />
+          </div>
+        )}
+        <div className={`rounded-xl2 border border-line bg-white p-8 text-center shadow-card ring-1 ${content.ring}`}>
+          <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${content.accent}`}>
+            {content.icon}
+          </div>
+          {outcome === 'success' && (
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[1.5px] text-green-dark">
+              Colegio Interlaken
+            </p>
+          )}
+          <h1 className="font-head text-fluid-xl font-bold text-ink">{content.title}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted">{content.text}</p>
+          <div className="mt-7">
+            <Link to="/portal/cafeteria">
+              <Button
+                variant={outcome === 'success' ? 'primary' : 'secondary'}
+                className="min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
+              >
+                <Coffee className="h-4 w-4" /> Volver a cafetería
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

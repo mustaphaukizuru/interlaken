@@ -45,9 +45,9 @@ describe('CostosPage', () => {
 
   it('renders CMS rows with SIN COSTO for null inscripción and MXN amounts', async () => {
     renderPage();
-    expect(await screen.findByText('SIN COSTO')).toBeInTheDocument();
-    // Ambas tablas (inscripción y colegiatura) listan cada sección.
-    expect(screen.getAllByText('Sección Maternal')).toHaveLength(2);
+    // Mobile + desktop markup both render SIN COSTO for null inscripción.
+    expect((await screen.findAllByText('SIN COSTO')).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Sección Maternal').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/8,800\.00/)).not.toHaveLength(0);
   });
 
@@ -57,5 +57,20 @@ describe('CostosPage', () => {
     expect(
       await screen.findByText(/No fue posible cargar los costos/i),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reintentar/i })).toBeInTheDocument();
+  });
+
+  it('shows a Spanish empty state with CTAs when the API returns no rows', async () => {
+    getCosts.mockResolvedValue({ data: [] } as never);
+    renderPage();
+    expect(await screen.findByText(/Costos próximamente/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Contactar al colegio/i })).toHaveAttribute(
+      'href',
+      '/contacto',
+    );
+    expect(screen.getByRole('link', { name: /Ver admisiones/i })).toHaveAttribute(
+      'href',
+      '/admisiones',
+    );
   });
 });

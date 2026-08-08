@@ -14,9 +14,11 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { AvailabilitySlot } from '@/types';
 
 const WHATSAPP_TEXT = 'Hola, me gustaría agendar una visita individual al Colegio Interlaken.';
@@ -40,7 +42,7 @@ export default function BookVisitPage() {
   const [confirmed, setConfirmed] = useState<AvailabilitySlot | null>(null);
   const { whatsapp_number } = useSiteSettings();
 
-  const { data: slots, isLoading } = useQuery<AvailabilitySlot[]>({
+  const { data: slots, isLoading, isError, refetch } = useQuery<AvailabilitySlot[]>({
     queryKey: ['availability', 'individual'],
     queryFn: async () => {
       const { data } = await bookingsApi.getAvailability({ type: 'individual' });
@@ -105,23 +107,12 @@ export default function BookVisitPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white py-12 sm:py-20">
-        <img
-          src="/assets/facade.webp"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
-          loading="eager"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Visita Individual</span>
-          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Agendar Visita</h1>
-          <p className="max-w-2xl text-brand-100 text-fluid-base">
-            Un recorrido personalizado para su familia: complete su pre-registro,
-            elija la fecha que le convenga y confirme su cita.
-          </p>
-        </div>
-      </section>
+      <FunnelHero
+        step="puertas-abiertas"
+        title="Agendar Visita"
+        subtitle="Un recorrido personalizado para su familia: complete su pre-registro, elija la fecha que le convenga y confirme su cita."
+        imageSrc="/assets/facade.webp"
+      />
 
       {/* Cómo funciona: pre-registro → fecha → confirmación */}
       <section className="border-b border-line bg-cream-2">
@@ -173,12 +164,43 @@ export default function BookVisitPage() {
               <div>
                 <h2 className="font-semibold text-fluid-lg text-ink mb-4">Elija una fecha y horario</h2>
                 {isLoading ? (
-                  <div className="flex justify-center py-10"><LoadingSpinner /></div>
-                ) : !calendarDays.length ? (
-                  <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
-                    No hay horarios disponibles por el momento. Escríbanos por WhatsApp y
-                    con gusto le agendamos.
+                  <div className="space-y-3" aria-busy="true" aria-label="Cargando horarios">
+                    <div className="skeleton h-10 w-48 rounded-lg" />
+                    <div className="skeleton h-[280px] rounded-xl2" />
+                    <div className="flex gap-2">
+                      <div className="skeleton h-11 w-20 rounded-xl" />
+                      <div className="skeleton h-11 w-20 rounded-xl" />
+                      <div className="skeleton h-11 w-20 rounded-xl" />
+                    </div>
                   </div>
+                ) : isError ? (
+                  <ErrorState
+                    title="No fue posible cargar los horarios"
+                    description="Verifique su conexión e intente de nuevo. También puede agendar por WhatsApp."
+                    onRetry={() => refetch()}
+                  />
+                ) : !calendarDays.length ? (
+                  <EmptyState
+                    icon={CalendarDays}
+                    title="Sin horarios disponibles"
+                    description="No hay citas abiertas por el momento. Escríbanos por WhatsApp y con gusto le agendamos."
+                    action={
+                      whatsapp_number ? (
+                        <a
+                          href={waHref(whatsapp_number, WHATSAPP_TEXT)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-green inline-flex min-h-[44px] items-center"
+                        >
+                          <MessageCircle className="h-4 w-4" /> Reservar por WhatsApp
+                        </a>
+                      ) : (
+                        <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
+                          Contactar al colegio
+                        </Link>
+                      )
+                    }
+                  />
                 ) : (
                   <div className="space-y-4">
                     <MonthCalendar

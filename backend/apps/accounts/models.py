@@ -109,3 +109,39 @@ class ParentProfile(models.Model):
 
     def __str__(self):
         return f'{self.user.full_name}'
+
+
+class PasswordResetToken(models.Model):
+    """One-time password reset / account-activation token (hashed at rest)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
+    token_hash = models.CharField(max_length=64, db_index=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'ResetToken(user={self.user_id}, used={bool(self.used_at)})'
+
+
+class NotificationPreference(models.Model):
+    """Per-user channel toggles for portal.services.notify()."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notif_prefs')
+    email_enabled = models.BooleanField(default=True)
+    in_app_enabled = models.BooleanField(default=True)
+    push_enabled = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Preferencias de notificación'
+
+    def __str__(self):
+        return f'NotifPrefs({self.user_id})'
+
+    @classmethod
+    def for_user(cls, user):
+        """Return prefs, creating defaults if missing."""
+        prefs, _ = cls.objects.get_or_create(user=user)
+        return prefs

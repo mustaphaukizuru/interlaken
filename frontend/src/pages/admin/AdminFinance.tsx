@@ -258,6 +258,7 @@ export default function AdminFinance() {
               {invoices.map((inv) => {
                 const meta = statusMeta[inv.status] ?? statusMeta.pending;
                 const open = inv.status === 'pending' || inv.status === 'overdue';
+                const credit = parseFloat(inv.balance_due) < 0;
                 return (
                   <li key={inv.id} className="rounded-xl2 border border-line p-4">
                     <div className="flex items-start gap-1">
@@ -276,7 +277,10 @@ export default function AdminFinance() {
                             <p className="font-medium text-ink truncate">{inv.student_name}</p>
                             <p className="text-xs text-subtle">{inv.student_code} · {inv.grade}</p>
                           </div>
-                          <Badge variant={meta.variant}>{meta.label}</Badge>
+                          <div className="flex flex-wrap items-center justify-end gap-1">
+                            {credit && <Badge variant="info">A favor</Badge>}
+                            <Badge variant={meta.variant}>{meta.label}</Badge>
+                          </div>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                           <div>
@@ -293,7 +297,9 @@ export default function AdminFinance() {
                           </div>
                           <div>
                             <dt className="text-xs font-semibold text-muted">Saldo</dt>
-                            <dd className="text-muted">${parseFloat(inv.balance_due).toFixed(2)}</dd>
+                            <dd className={credit ? 'font-semibold text-green-dark' : 'text-muted'}>
+                              ${parseFloat(inv.balance_due).toFixed(2)}
+                            </dd>
                           </div>
                         </dl>
                         <div className="mt-3 flex flex-wrap items-center gap-1">
@@ -341,6 +347,7 @@ export default function AdminFinance() {
                   {invoices.map((inv) => {
                     const meta = statusMeta[inv.status] ?? statusMeta.pending;
                     const open = inv.status === 'pending' || inv.status === 'overdue';
+                    const credit = parseFloat(inv.balance_due) < 0;
                     return (
                       <tr key={inv.id} className={selected.has(inv.id) ? 'bg-brand-50/60' : undefined}>
                         <td>
@@ -361,8 +368,15 @@ export default function AdminFinance() {
                           {format(new Date(inv.due_date), 'd MMM yyyy', { locale: es })}
                         </td>
                         <td className="num font-semibold text-ink">${parseFloat(inv.amount).toFixed(2)}</td>
-                        <td className="num text-muted">${parseFloat(inv.balance_due).toFixed(2)}</td>
-                        <td><Badge variant={meta.variant}>{meta.label}</Badge></td>
+                        <td className={`num ${credit ? 'font-semibold text-green-dark' : 'text-muted'}`}>
+                          ${parseFloat(inv.balance_due).toFixed(2)}
+                        </td>
+                        <td>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {credit && <Badge variant="info">A favor</Badge>}
+                            <Badge variant={meta.variant}>{meta.label}</Badge>
+                          </div>
+                        </td>
                         <td>
                           <div className="flex items-center justify-end gap-1">
                             <InvoiceActions

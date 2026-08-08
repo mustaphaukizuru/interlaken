@@ -256,10 +256,10 @@ class AnnouncementMarkReadView(APIView):
 
 
 class NotificationMarkReadView(APIView):
-    """PATCH /api/v1/portal/notifications/<pk>/read/"""
+    """POST|PATCH /api/v1/portal/notifications/<pk>/read/"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def patch(self, request, pk):
+    def _mark(self, request, pk):
         try:
             notif = Notification.objects.get(pk=pk, user=request.user)
             notif.is_read = True
@@ -267,3 +267,24 @@ class NotificationMarkReadView(APIView):
             return Response({'detail': 'Marcada como leída.'})
         except Notification.DoesNotExist:
             return Response({'error': 'No encontrada.'}, status=404)
+
+    def post(self, request, pk):
+        return self._mark(request, pk)
+
+    def patch(self, request, pk):
+        return self._mark(request, pk)
+
+
+class NotificationMarkAllReadView(APIView):
+    """POST /api/v1/portal/notifications/mark-all-read/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        updated = (Notification.objects
+                   .filter(user=request.user, is_read=False)
+                   .update(is_read=True))
+        return Response({'marked': updated})
+
+
+# TODO(Phase D4): Emergency broadcast admin endpoint — skipped this pass
+# (school-wide WhatsApp/email blast needs rate-limited batching + audit).
