@@ -71,49 +71,53 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Recent activity */}
+        {/* Recent announcements — admin-table stacks to cards on small screens */}
         {!isError && (
         <Reveal delay={60} className="card !p-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4 sm:px-[22px]">
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
             <Link
-              to="/admin/admisiones"
+              to="/admin/comunicados"
               className="flex items-center gap-1 whitespace-nowrap text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 rounded"
             >
-              Ver admisiones <ArrowRight size={13} />
+              Ver comunicados <ArrowRight size={13} />
             </Link>
           </div>
-          <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse">
-              <thead>
-                <tr className="bg-cream-2">
-                  {['Concepto', 'Audiencia', 'Estatus', 'Fecha'].map(h => (
-                    <th key={h} className="px-5 py-[11px] text-left font-head text-[11px] font-bold uppercase tracking-wider text-muted sm:px-[22px]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.announcements ?? []).slice(0, 10).map((a, i) => (
-                  <tr key={a.id} className={i === 0 ? '' : 'border-t border-cream'}>
-                    <td className="px-5 py-[13px] text-[13.5px] font-semibold text-ink sm:px-[22px]">{a.title}</td>
-                    <td className="px-5 py-[13px] text-[13px] capitalize text-muted sm:px-[22px]">{a.audience}</td>
-                    <td className="px-5 py-[13px] sm:px-[22px]"><span className="badge-green">Publicado</span></td>
-                    <td className="px-5 py-[13px] text-[13px] text-subtle sm:px-[22px]">{new Date(a.created_at).toLocaleDateString('es-MX')}</td>
-                  </tr>
-                ))}
-                {!isLoading && !(data?.announcements ?? []).length && (
+          {isLoading ? (
+            <div className="space-y-3 p-5">
+              {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
+            </div>
+          ) : !(data?.announcements ?? []).length ? (
+            <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
+              <Bell className="h-6 w-6 text-subtle" aria-hidden="true" />
+              <p className="text-[13px] text-subtle">Sin actividad reciente</p>
+            </div>
+          ) : (
+            <div className="admin-table-wrap border-0 !rounded-none">
+              <table className="admin-table">
+                <thead>
                   <tr>
-                    <td colSpan={4} className="px-5 py-10">
-                      <div className="flex flex-col items-center gap-2 text-center">
-                        <Bell className="h-6 w-6 text-subtle" aria-hidden="true" />
-                        <p className="text-[13px] text-subtle">Sin actividad reciente</p>
-                      </div>
-                    </td>
+                    <th>Concepto</th>
+                    <th>Audiencia</th>
+                    <th>Estatus</th>
+                    <th>Fecha</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {(data?.announcements ?? []).slice(0, 10).map((a) => (
+                    <tr key={a.id}>
+                      <td data-label="Concepto" className="font-semibold text-ink">{a.title}</td>
+                      <td data-label="Audiencia" className="capitalize text-muted">{a.audience}</td>
+                      <td data-label="Estatus"><span className="badge-green">Publicado</span></td>
+                      <td data-label="Fecha" className="text-subtle">
+                        {new Date(a.created_at).toLocaleDateString('es-MX')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Reveal>
         )}
     </>

@@ -1,13 +1,15 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt } from 'lucide-react';
+import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import { useAuthStore } from '@/store/authStore';
+import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { portalApi } from '@/services/api';
 import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
 import { PushOptIn } from '@/components/portal/PushOptIn';
@@ -33,6 +35,7 @@ const paymentTypeLabel: Record<string, string> = {
 
 export default function ParentDashboard() {
   const { user } = useAuthStore();
+  const childId = useSelectedChildStore((s) => s.childId);
   const { data, isLoading, isError, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
@@ -41,7 +44,8 @@ export default function ParentDashboard() {
 
   useAnnouncementsRead(data?.announcements);
 
-  const firstChild = data?.children?.[0];
+  const children = data?.children ?? [];
+  const selectedChild = children.find((c) => c.id === childId) ?? children[0];
   const totalBalance = (data?.cafeteria_balances ?? []).reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const hasLowBalance = data?.cafeteria_balances?.some(b => b.low);
   const pendingPayments = data?.recent_payments?.filter(p => p.status === 'pending').length ?? 0;
@@ -50,8 +54,16 @@ export default function ParentDashboard() {
     <>
       <PageHeader
         title={`Bienvenido/a, ${user?.first_name ?? ''}`}
-        subtitle={`Portal Familiar${firstChild ? ` · ${firstChild.name}` : ''}`}
+        subtitle={`Portal Familiar${selectedChild ? ` · ${selectedChild.name}` : ''}`}
       />
+
+      {children.length > 1 && (
+        <div className="mb-5">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-subtle">Alumno</p>
+          <ChildSwitcher students={children} />
+        </div>
+      )}
+
         {/* Web-push opt-in (renders only when supported and not yet enabled) */}
         <div className="mb-5">
           <PushOptIn />
@@ -98,6 +110,15 @@ export default function ParentDashboard() {
           <QuickAction to="/portal/colegiaturas" icon={Receipt} title="Pagar colegiaturas" desc="Consulta y paga las mensualidades." gradient="from-pink to-purple" />
           <QuickAction to="/portal/cafeteria" icon={Coffee} title="Recargar cafetería" desc="Agrega saldo con tarjeta." gradient="from-green to-green-dark" />
         </div>
+
+        <Link
+          to="/portal/perfil"
+          className="mb-6 flex items-center gap-2 text-[13px] font-medium text-muted transition-colors hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30 rounded"
+        >
+          <UserCircle size={16} className="text-subtle" aria-hidden="true" />
+          Mi información y preferencias
+          <ArrowRight size={14} className="text-subtle" aria-hidden="true" />
+        </Link>
 
         {/* Cafeteria spending trend — only for families that use the cafeteria */}
         {!!data?.cafeteria_balances?.length && (
