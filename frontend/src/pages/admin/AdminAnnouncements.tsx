@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Megaphone, Plus, Pencil, Trash2, Eye } from 'lucide-react';
+import { Megaphone, Plus, Pencil, Trash2, Eye, Siren } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -30,6 +30,7 @@ const AUDIENCE: { value: string; label: string; variant: 'info' | 'success' | 'w
 const audienceMeta = (a: string) => AUDIENCE.find((x) => x.value === a) ?? AUDIENCE[0];
 
 const EMPTY = { title: '', body: '', audience: 'all', is_active: true };
+const EMPTY_ALERT = { title: '', message: '', audience: 'parents', whatsapp: false };
 
 export default function AdminAnnouncements() {
   const qc = useQueryClient();
@@ -37,6 +38,9 @@ export default function AdminAnnouncements() {
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
   const [open, setOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertForm, setAlertForm] = useState(EMPTY_ALERT);
+  const [alertConfirm, setAlertConfirm] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-announcements'],
@@ -73,11 +77,43 @@ export default function AdminAnnouncements() {
     onError: () => toast.error('No se pudo eliminar.'),
   });
 
+  const broadcast = useMutation({
+    mutationFn: () =>
+      portalApi.adminEmergencyBroadcast({
+        title: alertForm.title.trim(),
+        message: alertForm.message.trim(),
+        audience: alertForm.audience,
+        whatsapp: alertForm.whatsapp,
+      }),
+    onSuccess: (resp) => {
+      const d = resp.data as { notified: number; dispatched: number; whatsapp_sent: number };
+      invalidate();
+      setAlertOpen(false);
+      setAlertConfirm(false);
+      setAlertForm(EMPTY_ALERT);
+      toast.success(
+        `Aviso urgente enviado: ${d.notified} notificados` +
+          (d.dispatched ? `, ${d.dispatched} por correo/push` : '') +
+          (d.whatsapp_sent ? `, ${d.whatsapp_sent} por WhatsApp` : '') +
+          '.',
+      );
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || 'No se pudo enviar el aviso urgente.');
+    },
+  });
+
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (a: Announcement) => {
     setEditing(a);
     setForm({ title: a.title, body: a.body, audience: a.audience, is_active: a.is_active });
     setOpen(true);
+  };
+  const openAlert = () => {
+    setAlertForm(EMPTY_ALERT);
+    setAlertConfirm(false);
+    setAlertOpen(true);
   };
 
   return (
@@ -85,7 +121,14 @@ export default function AdminAnnouncements() {
       <PageHeader
         title="Comunicados"
         subtitle="Publica avisos para las familias, alumnos y personal."
-        actions={<Button onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>}
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <Button variant="danger" onClick={openAlert}>
+              <Siren className="h-4 w-4" aria-hidden="true" /> Aviso urgente
+            </Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>
+          </div>
+        )}
       />
 
       <Card>
@@ -157,6 +200,83 @@ export default function AdminAnnouncements() {
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!form.title.trim() || !form.body.trim()}>
               {editing ? 'Guardar' : 'Publicar'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={alertOpen}
+        onClose={() => { setAlertOpen(false); setAlertConfirm(false); }}
+        title="Aviso urgente"
+        maxWidth={520}
+      >
+        <div className="space-y-4">
+          <p className="rounded-xl border border-coral/30 bg-coral/5 px-3 py-2 text-sm text-ink">
+            Se creará un comunicado y se notificará de inmediato (app + primer lote de correo/push).
+            El resto lo completa el cron. Use solo para contingencias reales.
+          </p>
+          <Input
+            label="Título"
+            value={alertForm.title}
+            onChange={(e) => setAlertForm((f) => ({ ...f, title: e.target.value }))}
+            placeholder="Ej. Suspensión de clases mañana"
+          />
+          <div>
+            <label htmlFor="alert-body" className="label">Mensaje</label>
+            <textarea
+              id="alert-body"
+              className="input-field min-h-[110px] resize-none"
+              value={alertForm.message}
+              onChange={(e) => setAlertForm((f) => ({ ...f, message: e.target.value }))}
+              placeholder="Detalle claro de la contingencia y qué deben hacer las familias…"
+            />
+          </div>
+          <div>
+            <label htmlFor="alert-audience" className="label">Dirigido a</label>
+            <select
+              id="alert-audience"
+              className="input-field"
+              value={alertForm.audience}
+              onChange={(e) => setAlertForm((f) => ({ ...f, audience: e.target.value }))}
+            >
+              {AUDIENCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={alertForm.whatsapp}
+              onChange={(e) => setAlertForm((f) => ({ ...f, whatsapp: e.target.checked }))}
+              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40"
+            />
+            También WhatsApp (solo números registrados; requiere Cloud API)
+          </label>
+          <label className="flex items-start gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={alertConfirm}
+              onChange={(e) => setAlertConfirm(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-line text-pink focus-visible:ring-2 focus-visible:ring-pink/40"
+            />
+            Confirmo que este aviso es urgente y debe enviarse ahora a la audiencia seleccionada.
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => { setAlertOpen(false); setAlertConfirm(false); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => broadcast.mutate()}
+              loading={broadcast.isPending}
+              disabled={
+                !alertConfirm
+                || !alertForm.title.trim()
+                || !alertForm.message.trim()
+                || broadcast.isPending
+              }
+            >
+              Enviar aviso urgente
             </Button>
           </div>
         </div>
