@@ -24,7 +24,10 @@ interface Reg {
   parent2_name: string; parent2_email: string; parent2_phone: string;
   emergency_name: string; emergency_phone: string; emergency_rel: string;
   blood_type: string | null; allergies: string | null; medical_notes: string | null;
+  estatura: string | null; peso: string | null;
   consent_medical_data: boolean; consent_photos_media: boolean;
+  privacy_accepted_at: string | null;
+  privacy_notice_version_label: string;
   status: string; submitted_at: string | null; admin_notes?: string; documents: Doc[];
 }
 
@@ -90,7 +93,19 @@ export function RegistrationReviewModal({ id, open, onClose }: {
   });
 
   const fullName = data ? `${data.child_first_name} ${data.child_last_name}`.trim() : 'Inscripción';
-  const hasMedical = !!(data && (data.blood_type || data.allergies || data.medical_notes));
+  const hasMedical = !!(data && (
+    data.blood_type || data.allergies || data.medical_notes || data.estatura || data.peso
+  ));
+  const fmtPrivacyAt = (iso: string | null) => {
+    if (!iso) return 'No registrado';
+    try {
+      return new Date(iso).toLocaleString('es-MX', {
+        dateStyle: 'medium', timeStyle: 'short',
+      });
+    } catch {
+      return iso;
+    }
+  };
 
   return (
     <Modal open={open} onClose={onClose} title={`Revisar inscripción — ${fullName}`} maxWidth={640}>
@@ -128,10 +143,47 @@ export function RegistrationReviewModal({ id, open, onClose }: {
           )}
           {hasMedical && (
             <Field label="Salud">
-              {[data.blood_type && `Sangre: ${data.blood_type}`, data.allergies && `Alergias: ${data.allergies}`, data.medical_notes]
-                .filter(Boolean).join(' · ')}
+              {[
+                data.blood_type && `Sangre: ${data.blood_type}`,
+                data.allergies && `Alergias: ${data.allergies}`,
+                data.estatura && `Estatura: ${data.estatura}`,
+                data.peso && `Peso: ${data.peso}`,
+                data.medical_notes,
+              ].filter(Boolean).join(' · ')}
             </Field>
           )}
+
+          {/* LFPDPPP consents — staff must see what the family accepted */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
+              Consentimientos
+            </p>
+            <div className="space-y-2 rounded-xl border border-line px-3 py-3 text-sm">
+              <ConsentRow
+                ok={!!data.privacy_accepted_at}
+                label="Aviso de Privacidad"
+                detail={
+                  data.privacy_accepted_at
+                    ? `${fmtPrivacyAt(data.privacy_accepted_at)}${
+                      data.privacy_notice_version_label
+                        ? ` · v${data.privacy_notice_version_label}`
+                        : ''
+                    }`
+                    : 'Sin aceptación registrada'
+                }
+              />
+              <ConsentRow
+                ok={data.consent_photos_media}
+                label="Fotos y medios"
+                detail={data.consent_photos_media ? 'Autorizado' : 'No autorizado'}
+              />
+              <ConsentRow
+                ok={data.consent_medical_data}
+                label="Datos de salud"
+                detail={data.consent_medical_data ? 'Autorizado' : 'No autorizado'}
+              />
+            </div>
+          </div>
 
           {/* Documents + verification */}
           <div>
@@ -213,6 +265,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="grid grid-cols-[7rem_1fr] gap-3 text-sm">
       <dt className="text-subtle">{label}</dt>
       <dd className="text-ink">{children}</dd>
+    </div>
+  );
+}
+
+function ConsentRow({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      {ok ? (
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" aria-hidden />
+      ) : (
+        <Circle className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden />
+      )}
+      <div className="min-w-0">
+        <p className="font-medium text-ink">{label}</p>
+        <p className="text-xs text-muted">{detail}</p>
+      </div>
     </div>
   );
 }

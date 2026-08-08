@@ -408,7 +408,12 @@ class RegistrationSubmitView(APIView):
             reg.save(update_fields=['privacy_notice_version', 'privacy_accepted_at'])
 
         # Medical data may only be submitted with explicit MEDICAL_DATA consent.
-        has_medical = any([reg.blood_type, reg.allergies, reg.medical_notes])
+        # Include estatura/peso — they are EncryptedTextField medical fields in
+        # MEDICAL_FIELDS and must not bypass the consent gate.
+        has_medical = any([
+            reg.blood_type, reg.allergies, reg.medical_notes,
+            reg.estatura, reg.peso,
+        ])
         if has_medical and not reg.consent_medical_data:
             return Response(
                 {'error': 'Se requiere consentimiento de datos de salud para enviar información médica.'},
