@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentDiscounts } from '@/components/admin/StudentDiscounts';
+import { StudentGuardians } from '@/components/admin/StudentGuardians';
 import { financeApi } from '@/services/api';
 
 const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
@@ -111,7 +112,12 @@ export default function AdminStudentDetail() {
         )}
       </Card>
 
-      {s && <div className="mt-6"><StudentDiscounts studentId={s.id} /></div>}
+      {s && (
+        <div className="mt-6 space-y-6">
+          <StudentGuardians studentId={s.id} />
+          <StudentDiscounts studentId={s.id} />
+        </div>
+      )}
     </>
   );
 }

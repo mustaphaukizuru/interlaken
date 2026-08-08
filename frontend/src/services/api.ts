@@ -548,6 +548,23 @@ export const portalApi = {
       commit: commit ? '1' : '0',
       seed_balances: seedBalances ? '1' : '0',
     }),
+
+  // Per-student parent/guardian linking (admin).
+  listGuardians: (studentId: number) =>
+    api.get(`/accounts/admin/students/${studentId}/guardians/`),
+  linkGuardian: (
+    studentId: number,
+    data: {
+      email: string;
+      full_name?: string;
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+      relationship?: string;
+    },
+  ) => api.post(`/accounts/admin/students/${studentId}/guardians/`, data),
+  unlinkGuardian: (studentId: number, userId: number) =>
+    api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────

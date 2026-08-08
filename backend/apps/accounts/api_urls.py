@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import password_views, views
+from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
@@ -9,6 +10,10 @@ urlpatterns = [
     path('admin/import-students/', ImportStudentsView.as_view(), name='import-students'),
     path('admin/import-loyverse/', ImportLoyverseView.as_view(), name='import-loyverse'),
     path('admin/link-loyverse/',   LinkLoyverseView.as_view(),   name='link-loyverse'),
+    path('admin/students/<int:pk>/guardians/', StudentGuardiansView.as_view(),
+         name='student-guardians'),
+    path('admin/students/<int:pk>/guardians/<int:user_id>/',
+         StudentGuardianDetailView.as_view(), name='student-guardian-detail'),
     path('token/',           views.RateLimitedTokenObtainView.as_view(), name='token-obtain'),
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),
