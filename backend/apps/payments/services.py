@@ -143,3 +143,30 @@ def expire_stale_checkouts(*, older_than_minutes: int | None = None) -> int:
     if count:
         logger.info('expire_stale_checkouts: marked %s payments FAILED', count)
     return count
+
+
+def payments_visible_to(user):
+    """Payments the family portal actor may list/poll.
+
+    Includes the caller's own rows plus tuition/cafeteria payments for linked
+    children (and a school-email student's own profile when the self-guardian
+    M2M row is missing). Admins see everything.
+    """
+    from django.db.models import Q
+
+    from apps.accounts.models import StudentProfile, User
+
+    if getattr(user, 'role', None) == User.Role.ADMIN:
+        return Payment.objects.all()
+
+    q = Q(user=user)
+    q |= Q(invoice_payment__invoice__student__parents=user)
+    q |= Q(related_topup__student__parents=user)
+
+    if getattr(user, 'role', None) == User.Role.STUDENT:
+        profile = StudentProfile.objects.filter(user_id=user.pk).only('pk').first()
+        if profile is not None:
+            q |= Q(invoice_payment__invoice__student_id=profile.pk)
+            q |= Q(related_topup__student_id=profile.pk)
+
+    return Payment.objects.filter(q).distinct()
