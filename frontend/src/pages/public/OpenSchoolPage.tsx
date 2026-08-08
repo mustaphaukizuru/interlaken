@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { OpenSchoolEvent } from '@/types';
 
 const schema = z.object({
@@ -111,24 +112,12 @@ export default function OpenSchoolPage() {
           <script type="application/ld+json">{JSON.stringify(eventsJsonLd)}</script>
         </Helmet>
       )}
-      <section className="relative overflow-hidden bg-dark py-14 text-white sm:py-20">
-        <img
-          src="/assets/classroom.webp"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
-          loading="eager"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Clase Abierta</span>
-          <h1 className="mt-3 mb-2 font-head text-fluid-4xl font-bold">Puertas Abiertas</h1>
-          <p className="max-w-2xl text-fluid-base text-white/75">
-            Viva una <strong className="text-white">clase abierta</strong>: usted y su
-            hijo/a participan en una clase real, conocen a nuestros docentes en acción
-            y recorren las instalaciones del colegio.
-          </p>
-        </div>
-      </section>
+      <FunnelHero
+        step="puertas-abiertas"
+        title="Puertas Abiertas"
+        subtitle="Viva una clase abierta: usted y su hijo/a participan en una clase real, conocen a nuestros docentes en acción y recorren las instalaciones del colegio."
+        imageSrc="/assets/classroom.webp"
+      />
 
       {/* Qué incluye la clase abierta */}
       <section className="border-b border-line bg-cream-2">

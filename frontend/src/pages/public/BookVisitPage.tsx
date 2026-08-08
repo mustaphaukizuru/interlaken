@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { AvailabilitySlot } from '@/types';
 
 const WHATSAPP_TEXT = 'Hola, me gustaría agendar una visita individual al Colegio Interlaken.';
@@ -105,23 +106,12 @@ export default function BookVisitPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white py-12 sm:py-20">
-        <img
-          src="/assets/facade.webp"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
-          loading="eager"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Visita Individual</span>
-          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Agendar Visita</h1>
-          <p className="max-w-2xl text-brand-100 text-fluid-base">
-            Un recorrido personalizado para su familia: complete su pre-registro,
-            elija la fecha que le convenga y confirme su cita.
-          </p>
-        </div>
-      </section>
+      <FunnelHero
+        step="puertas-abiertas"
+        title="Agendar Visita"
+        subtitle="Un recorrido personalizado para su familia: complete su pre-registro, elija la fecha que le convenga y confirme su cita."
+        imageSrc="/assets/facade.webp"
+      />
 
       {/* Cómo funciona: pre-registro → fecha → confirmación */}
       <section className="border-b border-line bg-cream-2">
