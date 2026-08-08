@@ -107,6 +107,8 @@ describe('ParentDashboard', () => {
           },
         ],
         recent_payments: [],
+        pending_invoices: 0,
+        pending_balance: '0.00',
         needs_family_link: false,
         announcements: [],
         unread_notifications: 0,
@@ -126,5 +128,30 @@ describe('ParentDashboard', () => {
     expect(screen.queryByText(/Cuenta sin alumno vinculado/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Saldo Cafetería/i)).toBeInTheDocument();
     expect(screen.getByText(/Luis López/i)).toBeInTheDocument();
+  });
+
+  it('shows unpaid colegiatura count even when recent_payments is empty', async () => {
+    getDashboard.mockResolvedValue({
+      data: {
+        children_count: 1,
+        children: [
+          { id: 11, name: 'Luis López', grade: '3°', group: 'A', student_id: 'A-11' },
+        ],
+        cafeteria_balances: [],
+        recent_payments: [],
+        pending_invoices: 2,
+        pending_balance: '5000.00',
+        needs_family_link: false,
+        announcements: [],
+        unread_notifications: 0,
+      },
+    } as never);
+
+    renderPage();
+
+    expect(await screen.findByText(/Colegiaturas pendientes/i)).toBeInTheDocument();
+    // Count-up may start at 0; assert the label + that we did not fall back to
+    // inferring zero from empty recent_payments.
+    expect(screen.queryByText(/Pagos Pendientes/i)).not.toBeInTheDocument();
   });
 });

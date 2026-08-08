@@ -50,7 +50,8 @@ export default function ParentDashboard() {
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
   const totalBalance = (data?.cafeteria_balances ?? []).reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const hasLowBalance = data?.cafeteria_balances?.some(b => b.low);
-  const pendingPayments = data?.recent_payments?.filter(p => p.status === 'pending').length ?? 0;
+  // Prefer invoice summary from the API; never infer from recent Payment stubs.
+  const pendingInvoices = data?.pending_invoices ?? 0;
 
   return (
     <>
@@ -141,7 +142,7 @@ export default function ParentDashboard() {
           {[
             <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
             <StatCard key="b" title="Saldo Cafetería" value={`$${totalBalance.toFixed(2)}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
-            <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="coral" />,
+            <StatCard key="c" title="Colegiaturas pendientes" value={pendingInvoices} icon={CreditCard} color="coral" />,
             <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />,
           ].map((card, i) => (
             <Reveal key={i} delay={i * 70}>{card}</Reveal>

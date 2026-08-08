@@ -72,11 +72,25 @@ class DashboardView(APIView):
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students
             balances = CafeteriaBalance.objects.filter(student__in=students)
+            from apps.finance.models import Invoice
             from apps.payments.services import payments_visible_to
             recent_payments = (
                 payments_visible_to(user).order_by('-created_at')[:5]
                 if students
                 else []
+            )
+            # Real family money signal: unpaid/overdue colegiaturas (not recent
+            # Payment rows, which stay 0 until a checkout is initiated).
+            from decimal import Decimal
+            pending_list = list(
+                Invoice.objects.filter(
+                    student__in=students,
+                    status__in=(Invoice.Status.PENDING, Invoice.Status.OVERDUE),
+                ).only('amount', 'amount_paid')
+            ) if students else []
+            pending_invoices = len(pending_list)
+            pending_balance = sum(
+                (inv.balance_due for inv in pending_list), start=Decimal('0'),
             )
 
             data = {
@@ -110,6 +124,8 @@ class DashboardView(APIView):
                     }
                     for p in recent_payments
                 ],
+                'pending_invoices': pending_invoices,
+                'pending_balance': f'{pending_balance:.2f}',
                 # Stable signal for the SPA: valid login, no linked StudentProfile yet.
                 'needs_family_link': not bool(students),
             }
