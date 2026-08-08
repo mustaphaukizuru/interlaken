@@ -309,10 +309,14 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                     payment.id, gateway.name, student.id,
                 )
                 payment.mark_failed(e, stage='create_checkout')
+                from apps.cafeteria.services import fail_online_topup
+                fail_online_topup(payment)
                 return Response({'error': f'No se pudo iniciar el pago: {e}'}, status=502)
 
             if not redirect_url:
                 payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
+                from apps.cafeteria.services import fail_online_topup
+                fail_online_topup(payment)
                 return Response({'error': 'No se pudo iniciar el pago.'}, status=502)
 
             data.update({

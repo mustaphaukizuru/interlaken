@@ -151,6 +151,9 @@ class TestTopUpInitiation:
         payment = Payment.objects.get(related_topup__student=student)
         assert payment.status == Payment.Status.FAILED
         assert not Payment.objects.filter(status=Payment.Status.PENDING).exists()
+        topup = payment.related_topup
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.FAILED
 
 
 def _make_online_topup(parent, student, amount="200.00"):

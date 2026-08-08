@@ -60,6 +60,8 @@ class TestCafeteriaCheckoutReuse:
         assert first.data["payment_id"] != second.data["payment_id"]
         old = Payment.objects.get(pk=first.data["payment_id"])
         assert old.status == Payment.Status.FAILED
+        old.related_topup.refresh_from_db()
+        assert old.related_topup.status == TopUpRequest.Status.FAILED
 
 
 class TestExpireStalePayments:
@@ -93,3 +95,103 @@ class TestExpireStalePayments:
         payment.refresh_from_db()
         assert payment.status == Payment.Status.PENDING
         assert "DRY RUN" in out.getvalue()
+
+
+class TestLateSuccessAfterSoftFail:
+    """Parents who finish an HPP after expire/supersede must still be credited."""
+
+    def test_expire_cascades_topup_then_late_success_credits(self, api_client, settings):
+        import hashlib
+        import hmac
+        import json
+
+        from apps.cafeteria.models import CafeteriaBalance
+
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = "test-webhook-secret"
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("150.00"),
+            method=TopUpRequest.Method.ONLINE,
+        )
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA,
+            amount=Decimal("150.00"), related_topup=topup,
+            status=Payment.Status.PENDING,
+        )
+        Payment.objects.filter(pk=payment.pk).update(
+            created_at=timezone.now() - timedelta(minutes=90))
+        assert expire_stale_checkouts(older_than_minutes=45) == 1
+        payment.refresh_from_db()
+        topup.refresh_from_db()
+        assert payment.status == Payment.Status.FAILED
+        assert payment.is_soft_failed()
+        assert topup.status == TopUpRequest.Status.FAILED
+
+        body = json.dumps({
+            "order_id": payment.id, "status": "CAPTURED", "id": "late-tx",
+        }).encode()
+        sig = hmac.new(b"test-webhook-secret", body, hashlib.sha256).hexdigest()
+        resp = api_client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_WEBHOOK_SIGNATURE=sig,
+        )
+        assert resp.status_code == 200, resp.data
+        payment.refresh_from_db()
+        topup.refresh_from_db()
+        assert payment.status == Payment.Status.SUCCESS
+        assert topup.status == TopUpRequest.Status.COMPLETED
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("150.00")
+
+    def test_gateway_declined_failed_rejects_late_success(self, api_client, settings):
+        """A real DECLINED webhook must not be revived by a later CAPTURED."""
+        import hashlib
+        import hmac
+        import json
+
+        from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = "test-webhook-secret"
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("100.00"),
+            method=TopUpRequest.Method.ONLINE,
+        )
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA,
+            amount=Decimal("100.00"), related_topup=topup,
+            status=Payment.Status.PENDING,
+        )
+        body_fail = json.dumps({
+            "order_id": payment.id, "status": "DECLINED", "id": "dec-1",
+        }).encode()
+        sig_fail = hmac.new(
+            b"test-webhook-secret", body_fail, hashlib.sha256).hexdigest()
+        assert api_client.post(
+            reverse("payment-webhook"), data=body_fail,
+            content_type="application/json",
+            HTTP_X_WEBHOOK_SIGNATURE=sig_fail,
+        ).status_code == 200
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.FAILED
+        assert not payment.is_soft_failed()
+
+        body_ok = json.dumps({
+            "order_id": payment.id, "status": "CAPTURED", "id": "cap-late",
+        }).encode()
+        sig_ok = hmac.new(
+            b"test-webhook-secret", body_ok, hashlib.sha256).hexdigest()
+        resp = api_client.post(
+            reverse("payment-webhook"), data=body_ok,
+            content_type="application/json",
+            HTTP_X_WEBHOOK_SIGNATURE=sig_ok,
+        )
+        assert resp.status_code == 200
+        assert resp.data["detail"] == "already_processed"
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.FAILED
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+        assert not CafeteriaBalance.objects.filter(student=student).exists()

@@ -25,9 +25,9 @@ from .serializers import PaymentInitiateSerializer, PaymentSerializer
 
 logger = logging.getLogger(__name__)
 
-# Fully terminal — any further webhook is a no-op (idempotency).
-# SUCCESS is *almost* terminal but still accepts a later ``refunded`` event so
-# provider refunds/chargebacks can reverse cafeteria/tuition credits.
+# Historically treated as closed for webhooks. Soft-FAILED (expire/supersede/
+# create_checkout) is special-cased in ``_apply_event`` so a late SUCCESS still
+# credits; REFUNDED remains fully closed. SUCCESS accepts a later ``refunded``.
 CLOSED_STATUSES = (Payment.Status.FAILED, Payment.Status.REFUNDED)
 
 
@@ -123,9 +123,14 @@ class _WebhookProcessMixin:
             except (Payment.DoesNotExist, TypeError, ValueError):
                 return status.HTTP_404_NOT_FOUND, {'error': 'payment_not_found'}, None
 
-            # Fully closed (failed/refunded): always a no-op.
-            if payment.status in CLOSED_STATUSES:
+            # Refunded is fully closed. Gateway-DECLINED FAILED is closed too.
+            # Soft-FAILED (expire/supersede/create_checkout) still accepts a late
+            # SUCCESS so a parent who pays after local TTL/supersede is credited.
+            if payment.status == Payment.Status.REFUNDED:
                 return status.HTTP_200_OK, {'detail': 'already_processed'}, None
+            if payment.status == Payment.Status.FAILED:
+                if not (event.status == 'success' and payment.is_soft_failed()):
+                    return status.HTTP_200_OK, {'detail': 'already_processed'}, None
 
             # Successful capture: only a later refund/chargeback may move money again.
             if payment.status == Payment.Status.SUCCESS:

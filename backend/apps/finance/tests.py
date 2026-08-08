@@ -655,3 +655,28 @@ class TestCheckoutReuse:
         assert pay_a.status == Payment.Status.FAILED
         assert pay_b.status == Payment.Status.PENDING
 
+    def test_late_success_after_stale_supersede_still_credits(self, api_client, settings):
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+        invoice, parent = self._invoice_with_parent()
+        pay_a, _ = services.start_invoice_payment(invoice, parent)
+        Payment.objects.filter(pk=pay_a.pk).update(
+            created_at=timezone.now() - timedelta(minutes=60))
+        pay_b, _ = services.start_invoice_payment(invoice, parent)
+        pay_a.refresh_from_db()
+        assert pay_a.is_soft_failed()
+
+        body = json.dumps({
+            "order_id": pay_a.id, "status": "CAPTURED", "id": "late-tuition",
+        }).encode()
+        resp = api_client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_WEBHOOK_SIGNATURE=_sign(body),
+        )
+        assert resp.status_code == 200, resp.data
+        pay_a.refresh_from_db()
+        invoice.refresh_from_db()
+        assert pay_a.status == Payment.Status.SUCCESS
+        assert invoice.amount_paid == pay_a.amount
+

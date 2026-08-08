@@ -482,12 +482,15 @@ def complete_online_topup(payment):
     if topup is None:
         return None
 
-    # Defence in depth against a double-credit: if this top-up was already
-    # finalised (e.g. an admin mistakenly applied it manually before the webhook
-    # landed), don't credit again. The per-payment reference guard below only
-    # catches a replay of the *same* payment, not a separate manual credit.
-    if topup.status != TopUpRequest.Status.PENDING:
-        logger.info(f'Top-up #{topup.id} already {topup.status} — webhook credit no-op.')
+    # Defence in depth against a double-credit: COMPLETED means already applied
+    # (admin or prior webhook). FAILED is allowed so a late SUCCESS after soft
+    # expire/supersede can still credit. The per-payment reference guard below
+    # catches a replay of the *same* payment.
+    if topup.status == TopUpRequest.Status.COMPLETED:
+        logger.info(f'Top-up #{topup.id} already completed — webhook credit no-op.')
+        return None
+    if topup.status not in (TopUpRequest.Status.PENDING, TopUpRequest.Status.FAILED):
+        logger.info(f'Top-up #{topup.id} status={topup.status} — webhook credit no-op.')
         return None
 
     student = topup.student
