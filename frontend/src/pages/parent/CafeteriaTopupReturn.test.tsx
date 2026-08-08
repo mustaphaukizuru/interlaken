@@ -47,8 +47,11 @@ describe('CafeteriaTopupReturn polling', () => {
     getStatus.mockResolvedValue({ data: { status: 'success' } } as never);
     renderAt('?payment_id=9');
 
-    expect(await screen.findByText('Recarga exitosa')).toBeInTheDocument();
-    expect(toastSuccess).toHaveBeenCalledWith('Recarga acreditada correctamente.');
+    expect(await screen.findByText('Pago confirmado')).toBeInTheDocument();
+    expect(screen.getByText(/cargará el monto en el POS/i)).toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenCalledWith(
+      'Pago confirmado. El colegio cargará el saldo en el POS.',
+    );
   });
 
   it('shows failed when status is failed or refunded', async () => {

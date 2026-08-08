@@ -36,7 +36,7 @@ export default function CafeteriaTopupReturn() {
         if (!active) return;
         if (data.status === 'success') {
           setOutcome('success');
-          toast.success('Recarga acreditada correctamente.');
+          toast.success('Pago confirmado. El colegio cargará el saldo en el POS.');
           return;
         }
         if (data.status === 'failed' || data.status === 'refunded') {
@@ -73,8 +73,8 @@ export default function CafeteriaTopupReturn() {
       icon: <CheckCircle2 className="h-10 w-10 text-green-dark" />,
       accent: 'bg-green/10',
       ring: 'ring-green/25',
-      title: 'Recarga exitosa',
-      text: 'El saldo de cafetería se acreditó correctamente. Ya puede verlo en su portal.',
+      title: 'Pago confirmado',
+      text: 'Su pago quedó registrado y el saldo ya aparece en el portal. El colegio cargará el monto en el POS de cafetería para que su hijo(a) pueda usarlo al comprar; esto puede tomar un momento.',
     },
     failed: {
       icon: <XCircle className="h-10 w-10 text-coral" />,
@@ -88,7 +88,7 @@ export default function CafeteriaTopupReturn() {
       accent: 'bg-amber/10',
       ring: 'ring-amber/30',
       title: 'Recarga en proceso',
-      text: 'Su pago se está procesando. El saldo se actualizará en cuanto se confirme; puede revisar el historial en unos minutos.',
+      text: 'Su pago se está procesando. Cuando se confirme verá el saldo en el portal; el colegio lo cargará después en el POS de cafetería.',
     },
   }[outcome];
 
