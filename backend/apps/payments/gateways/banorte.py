@@ -65,6 +65,7 @@ class BanorteGateway(BaseGateway):
     # Banorte/Pago en Línea vocabulary (incl. the ISO-8583 "00" approval code).
     SUCCESS_STATUSES = frozenset({'APPROVED', 'SUCCESS', 'PAID', 'CAPTURED', '00'})
     FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'REJECTED', 'CANCELLED', 'ERROR'})
+    REFUND_STATUSES = frozenset({'REFUNDED', 'REFUND', 'RETURNED', 'CHARGEBACK', '12'})
 
     def build_session_payload(self, payment, return_url: str | None = None) -> dict:
         """Banorte-shaped checkout session / order request body."""

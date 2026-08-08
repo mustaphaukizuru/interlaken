@@ -546,6 +546,42 @@ def fail_online_topup(payment):
     return topup
 
 
+def reverse_online_topup(payment):
+    """Reverse a credited online top-up after a provider refund/chargeback webhook.
+
+    Locates the ``topup-payment-<id>`` ledger row and runs ``refund_transaction``.
+    Idempotent (second call is a no-op via the refund-tx reference). Returns the
+    ``BalanceAdjustment`` or ``None`` when there is nothing to reverse.
+    """
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    topup = getattr(payment, 'related_topup', None)
+    if topup is None and payment.payment_type != 'cafeteria':
+        return None
+
+    reference = _topup_reference(payment)
+    tx = CafeteriaTransaction.objects.filter(loyverse_receipt_id=reference).first()
+    if tx is None:
+        logger.info(
+            'No cafeteria credit to reverse for payment #%s (never credited).',
+            payment.id,
+        )
+        return None
+
+    try:
+        return refund_transaction(
+            tx, reason='Reembolso del proveedor de pagos', admin=None,
+        )
+    except ValueError as exc:
+        # Already refunded, or balance already spent — leave Payment.REFUNDED and
+        # surface for ops; never re-raise into the webhook ack.
+        logger.warning(
+            'Could not reverse cafeteria top-up for payment #%s: %s',
+            payment.id, exc,
+        )
+        return None
+
+
 def notify_topup_result(payment, *, success: bool) -> int:
     """Notify the student's guardians of a top-up outcome (type ``payment`` + email).
 

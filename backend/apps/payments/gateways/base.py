@@ -67,6 +67,8 @@ class BaseGateway:
     SUCCESS_STATUSES: frozenset = frozenset()
     #: provider status strings that mean the payment failed/was declined
     FAILURE_STATUSES: frozenset = frozenset()
+    #: provider status strings that mean a captured payment was refunded/charged back
+    REFUND_STATUSES: frozenset = frozenset()
 
     # ── checkout ──────────────────────────────────────────────
     def create_checkout(self, payment, return_url: str | None = None) -> str:  # pragma: no cover - abstract
@@ -147,7 +149,9 @@ class BaseGateway:
 
         Uses the shared field conventions (``order_id``/``reference`` → our
         ``Payment`` pk, ``id``/``transaction_id`` → gateway tx id); subclasses set
-        ``SUCCESS_STATUSES`` / ``FAILURE_STATUSES`` to map their own vocabulary.
+        ``SUCCESS_STATUSES`` / ``FAILURE_STATUSES`` / ``REFUND_STATUSES`` to map
+        their own vocabulary. Normalised status is one of
+        ``success | failed | refunded | pending``.
         """
         payload = json.loads(request.body)
         transaction_id = payload.get('id') or payload.get('transaction_id')
@@ -158,6 +162,8 @@ class BaseGateway:
             status = 'success'
         elif raw_status in self.FAILURE_STATUSES:
             status = 'failed'
+        elif raw_status in self.REFUND_STATUSES:
+            status = 'refunded'
         else:
             status = 'pending'
 
