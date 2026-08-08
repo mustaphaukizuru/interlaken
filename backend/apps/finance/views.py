@@ -76,10 +76,20 @@ class AdminDiscountDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 def _parent_invoices(user):
-    """Invoices for the children of ``user`` (a parent). Admins see everything."""
+    """Invoices visible to ``user`` in the family portal.
+
+    Parents see linked children. Students also see their own ``StudentProfile``
+    invoices (school-email family login), even when the self-guardian M2M row is
+    missing — mirrors cafeteria ``_can_manage_student_cafeteria``. Admins see all.
+    """
     if user.role == User.Role.ADMIN:
         return Invoice.objects.all()
-    return Invoice.objects.filter(student__parents=user)
+    q = Q(student__parents=user)
+    if user.role == User.Role.STUDENT:
+        profile = StudentProfile.objects.filter(user_id=user.pk).only('pk').first()
+        if profile is not None:
+            q |= Q(student_id=profile.pk)
+    return Invoice.objects.filter(q).distinct()
 
 
 # ── Parent portal ─────────────────────────────────────────────────────────────

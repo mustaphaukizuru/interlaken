@@ -218,13 +218,24 @@ class TestPaymentWebhook:
         assert invoice.amount_paid == invoice.amount  # credited once, not twice
 
     def test_second_distinct_payment_is_recorded_as_overpayment(self, api_client, settings):
-        # Two checkouts opened for one invoice (e.g. two browser tabs), both
-        # paid at the gateway. The second real charge must be recorded — as an
-        # overpayment that can be refunded — not silently absorbed.
+        # Two distinct gateway charges on one invoice (legacy concurrent HPP
+        # sessions, or a charge that slipped past the reuse guard). The second
+        # real capture must be recorded as an overpayment — not silently absorbed.
         settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
         invoice, parent = self._invoice_with_parent()
         pay_a, _ = services.start_invoice_payment(invoice, parent)
-        pay_b, _ = services.start_invoice_payment(invoice, parent)
+        # Bypass reuse guard: model a second Payment that already exists at the
+        # provider (pre-guard double-tab) so webhook ledger behaviour stays covered.
+        pay_b = Payment.objects.create(
+            user=parent,
+            payment_type=Payment.Type.TUITION,
+            amount=invoice.balance_due,
+            currency=invoice.currency,
+            description=pay_a.description,
+            gateway=pay_a.gateway,
+            status=Payment.Status.PENDING,
+        )
+        InvoicePayment.objects.create(invoice=invoice, payment=pay_b, amount=pay_b.amount)
 
         url = reverse("payment-webhook")
         for p, tx in ((pay_a, "tx-a"), (pay_b, "tx-b")):
@@ -452,7 +463,17 @@ class TestOverpaymentRefund:
         services.generate_invoices(PERIOD)
         invoice = Invoice.objects.get(student=student, period=PERIOD)
         pay_a, _ = services.start_invoice_payment(invoice, parent)
-        pay_b, _ = services.start_invoice_payment(invoice, parent)
+        # Bypass reuse guard: model a second captured charge (pre-guard double-tab).
+        pay_b = Payment.objects.create(
+            user=parent,
+            payment_type=Payment.Type.TUITION,
+            amount=invoice.balance_due,
+            currency=invoice.currency,
+            description=pay_a.description,
+            gateway=pay_a.gateway,
+            status=Payment.Status.PENDING,
+        )
+        InvoicePayment.objects.create(invoice=invoice, payment=pay_b, amount=pay_b.amount)
         _capture_tuition(api_client, pay_a, "tx-a")
         _capture_tuition(api_client, pay_b, "tx-b")
         invoice.refresh_from_db()
@@ -543,3 +564,94 @@ class TestOverpaymentRefund:
         assert listing.status_code == 200
         results = listing.data["results"] if "results" in listing.data else listing.data
         assert any(row["id"] == invoice.id for row in results)
+
+
+# ── school-email / family-login students ──────────────────────────────────────
+
+class TestStudentOwnInvoices:
+    """School-email students must see/pay their own colegiaturas (cafeteria parity)."""
+
+    def test_self_guardian_can_list_and_pay(self, api_client):
+        _schedule()
+        student = StudentProfileFactory()
+        student.parents.add(student.user)
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+
+        api_client.force_authenticate(user=student.user)
+        listing = api_client.get(reverse("finance-invoices"))
+        assert listing.status_code == 200
+        rows = listing.data["results"] if "results" in listing.data else listing.data
+        assert any(row["id"] == invoice.id for row in rows)
+
+        pay = api_client.post(reverse("finance-invoice-pay", args=[invoice.id]), {})
+        assert pay.status_code == 201, pay.data
+        assert pay.data["payment_id"]
+        assert pay.data["redirect_url"]
+
+    def test_own_profile_without_parents_m2m_can_list_and_pay(self, api_client):
+        """Own OneToOne profile is enough even if self-guardian link is missing."""
+        _schedule()
+        student = StudentProfileFactory()  # no parents.add(self)
+        services.generate_invoices(PERIOD)
+        invoice = Invoice.objects.get(student=student, period=PERIOD)
+
+        api_client.force_authenticate(user=student.user)
+        listing = api_client.get(reverse("finance-invoices"))
+        assert listing.status_code == 200
+        rows = listing.data["results"] if "results" in listing.data else listing.data
+        assert any(row["id"] == invoice.id for row in rows)
+
+        pay = api_client.post(reverse("finance-invoice-pay", args=[invoice.id]), {})
+        assert pay.status_code == 201, pay.data
+
+    def test_student_cannot_see_or_pay_another_invoice(self, api_client):
+        _schedule()
+        mine = StudentProfileFactory()
+        other = StudentProfileFactory()
+        services.generate_invoices(PERIOD)
+        foreign = Invoice.objects.get(student=other, period=PERIOD)
+
+        api_client.force_authenticate(user=mine.user)
+        assert api_client.get(
+            reverse("finance-invoice-detail", args=[foreign.id])
+        ).status_code == 404
+        assert api_client.post(
+            reverse("finance-invoice-pay", args=[foreign.id]), {}
+        ).status_code == 404
+
+# ── concurrent checkout reuse ─────────────────────────────────────────────────
+
+class TestCheckoutReuse:
+    def _invoice_with_parent(self):
+        _schedule()
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        services.generate_invoices(PERIOD)
+        return Invoice.objects.get(student=student, period=PERIOD), parent
+
+    def test_second_initiate_reuses_same_payment(self):
+        invoice, parent = self._invoice_with_parent()
+        pay_a, url_a = services.start_invoice_payment(invoice, parent)
+        pay_b, url_b = services.start_invoice_payment(invoice, parent)
+        assert pay_a.id == pay_b.id
+        assert url_a and url_b
+        assert Payment.objects.filter(
+            invoice_payment__invoice=invoice, status=Payment.Status.PENDING,
+        ).count() == 1
+
+    def test_stale_open_checkout_is_superseded(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        invoice, parent = self._invoice_with_parent()
+        pay_a, _ = services.start_invoice_payment(invoice, parent)
+        Payment.objects.filter(pk=pay_a.pk).update(
+            created_at=timezone.now() - timedelta(minutes=60))
+        pay_b, _ = services.start_invoice_payment(invoice, parent)
+        pay_a.refresh_from_db()
+        assert pay_a.id != pay_b.id
+        assert pay_a.status == Payment.Status.FAILED
+        assert pay_b.status == Payment.Status.PENDING
+

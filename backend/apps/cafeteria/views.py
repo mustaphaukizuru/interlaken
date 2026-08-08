@@ -254,8 +254,11 @@ class TopUpRequestCreateView(generics.CreateAPIView):
     permission_classes = [IsParentOrAdmin]
 
     def create(self, request, *args, **kwargs):
+        from django.db import transaction
+
         from apps.payments.gateways import GATEWAY_CHOICES, get_gateway
         from apps.payments.models import Payment
+        from apps.payments.services import reuse_or_clear_cafeteria_checkout
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -267,29 +270,37 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         if not _can_manage_student_cafeteria(user, student):
             return Response({'error': 'No autorizado para este alumno.'}, status=403)
 
-        topup = serializer.save()
-        data = dict(self.get_serializer(topup).data)
-
-        if topup.method == TopUpRequest.Method.ONLINE:
+        method = serializer.validated_data.get('method') or TopUpRequest.Method.OFFICE
+        if method == TopUpRequest.Method.ONLINE:
             gateway_name = (request.data.get('gateway') or '').lower() or None
             if gateway_name and gateway_name not in GATEWAY_CHOICES:
                 return Response({'error': 'Pasarela de pago no válida.'}, status=400)
             gateway = get_gateway(gateway_name)
+            amount = serializer.validated_data['amount']
 
-            # Charge the authenticated family member; admin-initiated uses a linked guardian.
-            if user.role == User.Role.ADMIN:
-                payer = student.parents.first() or user
-            else:
-                payer = user
-            payment = Payment.objects.create(
-                user=payer,
-                payment_type=Payment.Type.CAFETERIA,
-                amount=topup.amount,
-                description=f'Recarga cafetería — {student.user.full_name}',
-                gateway=gateway.name,
-                related_topup=topup,
-                status=Payment.Status.PENDING,
-            )
+            with transaction.atomic():
+                existing = reuse_or_clear_cafeteria_checkout(
+                    student, amount=amount, gateway_name=gateway.name)
+                if existing is not None:
+                    payment = existing
+                    topup = payment.related_topup
+                else:
+                    topup = serializer.save()
+                    if user.role == User.Role.ADMIN:
+                        payer = student.parents.first() or user
+                    else:
+                        payer = user
+                    payment = Payment.objects.create(
+                        user=payer,
+                        payment_type=Payment.Type.CAFETERIA,
+                        amount=topup.amount,
+                        description=f'Recarga cafetería — {student.user.full_name}',
+                        gateway=gateway.name,
+                        related_topup=topup,
+                        status=Payment.Status.PENDING,
+                    )
+
+            data = dict(self.get_serializer(topup).data)
             try:
                 redirect_url = gateway.create_checkout(payment)
             except Exception as e:
@@ -309,7 +320,11 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                 'gateway': gateway.name,
                 'redirect_url': redirect_url,
             })
+            headers = self.get_success_headers(data)
+            return Response(data, status=201, headers=headers)
 
+        topup = serializer.save()
+        data = dict(self.get_serializer(topup).data)
         headers = self.get_success_headers(data)
         return Response(data, status=201, headers=headers)
 

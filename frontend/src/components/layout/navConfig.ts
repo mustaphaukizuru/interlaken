@@ -39,9 +39,16 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
     { icon: UserCircle,      label: 'Mi perfil',    to: '/portal/perfil' },
   ],
+  // School-email students use the family portal shell (`/portal/*`); `/alumno/*`
+  // only redirects there. Keep the same destinations as parents.
   student: [
-    { icon: LayoutDashboard, label: 'Inicio',    to: '/alumno', end: true },
-    { icon: Coffee,          label: 'Cafetería', to: '/alumno/cafeteria' },
+    { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
+    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
+    { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
+    { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: ClipboardList,   label: 'Inscripciones', to: '/portal/inscripciones' },
+    { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
+    { icon: UserCircle,      label: 'Mi perfil',    to: '/portal/perfil' },
   ],
 };
 
@@ -65,5 +72,11 @@ export const mobileNavByRole: Record<Role, NavEntry[]> = {
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
   ],
   staff: navByRole.staff,
-  student: navByRole.student,
+  student: [
+    { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
+    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
+    { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
+    { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
+  ],
 };
