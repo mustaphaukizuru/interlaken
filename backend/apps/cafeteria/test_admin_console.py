@@ -56,10 +56,11 @@ class TestAdjustBalance:
         assert tx.transaction_type == CafeteriaTransaction.TxType.ADJUSTMENT
         assert tx.balance_after == Decimal("150.00")
 
-        # Parent notified (in-app + email).
+        # Guardians + school-email student (when not self-linked) get notified.
         note = Notification.objects.get(user=parent)
         assert note.notif_type == Notification.NotifType.CAFETERIA
-        assert len(mailoutbox) == 1
+        assert Notification.objects.filter(user=student.user).count() == 1
+        assert len(mailoutbox) == 2
 
     def test_debit_reduces_balance(self, api_client):
         student = StudentProfileFactory(loyverse_id="")
