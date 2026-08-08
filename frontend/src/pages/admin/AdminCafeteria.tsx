@@ -341,6 +341,7 @@ function DepositsTab() {
                 <th>Método</th>
                 <th>Pasarela</th>
                 <th>Estado</th>
+                <th>POS</th>
                 <th>Referencia</th>
               </tr>
             </thead>
@@ -360,6 +361,17 @@ function DepositsTab() {
                   <td data-label="Método" className="text-muted">{d.method_display}</td>
                   <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
                   <td data-label="Estado"><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
+                  <td data-label="POS">
+                    {d.needs_pos_unload ? (
+                      <Badge variant="error">Quitar del POS</Badge>
+                    ) : d.needs_pos_load ? (
+                      <Badge variant="warning">Pendiente POS</Badge>
+                    ) : d.pos_loaded_at ? (
+                      <Badge variant="success">En POS</Badge>
+                    ) : (
+                      <span className="text-subtle">—</span>
+                    )}
+                  </td>
                   <td data-label="Referencia" className="text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
                 </tr>
               ))}

@@ -638,8 +638,9 @@ def notify_topup_result(payment, *, success: bool) -> int:
     if success:
         title = 'Recarga de cafetería exitosa'
         message = (
-            f'Se acreditaron ${payment.amount:.2f} al saldo de cafetería de '
-            f'{student.user.full_name}. Gracias por su pago. '
+            f'Se registró el pago de ${payment.amount:.2f} para el saldo de '
+            f'cafetería de {student.user.full_name}. Ya puede verlo en el portal; '
+            f'el colegio cargará el monto en el POS para que pueda usarlo al comprar. '
             f'Referencia: {payment.gateway_tx_id or payment.id}.'
         )
     else:

@@ -45,9 +45,10 @@ class TestFamilyNotifyRecipients:
         )
         n = notify_topup_result(payment, success=True)
         assert n == 1
-        assert Notification.objects.filter(
+        notif = Notification.objects.get(
             user=student.user, notif_type=Notification.NotifType.PAYMENT,
-        ).count() == 1
+        )
+        assert 'POS' in notif.message
 
     def test_invoice_notify_reaches_student_without_m2m(self):
         student = StudentProfileFactory()
