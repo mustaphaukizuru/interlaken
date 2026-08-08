@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { financeApi } from '@/services/api';
 
 interface Discount {
@@ -34,7 +35,7 @@ export function StudentDiscounts({ studentId }: { studentId: number }) {
   const [form, setForm] = useState(emptyForm(studentId));
   const [toDelete, setToDelete] = useState<Discount | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-discounts', studentId],
     queryFn: async () => (await financeApi.adminListDiscounts(studentId)).data.results as Discount[],
   });
@@ -65,7 +66,13 @@ export function StudentDiscounts({ studentId }: { studentId: number }) {
       title="Becas y descuentos"
       action={<button type="button" onClick={openNew} className="inline-flex items-center gap-1 text-sm font-semibold text-purple hover:underline"><Plus className="h-4 w-4" /> Agregar</button>}
     >
-      {isLoading ? (
+      {isError ? (
+        <ErrorState
+          title="No se pudieron cargar las becas"
+          description="Verifique su conexión e intente de nuevo."
+          onRetry={() => refetch()}
+        />
+      ) : isLoading ? (
         <ListSkeleton />
       ) : !data?.length ? (
         <EmptyState icon={GraduationCap} title="Sin becas ni descuentos" description="Agrega una beca o descuento para aplicarlo a las colegiaturas de este alumno." />
