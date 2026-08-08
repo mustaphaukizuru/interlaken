@@ -67,6 +67,9 @@ export interface TopUpLogEntry {
   gateway_tx_id: string;
   created_at: string;
   processed_at: string | null;
+  pos_loaded_at: string | null;
+  pos_loaded_by_name: string;
+  needs_pos_load: boolean;
 }
 
 export interface BalanceAdjustment {

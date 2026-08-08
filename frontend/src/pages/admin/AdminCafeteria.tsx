@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Coffee, RefreshCw, Search, Download, ChevronRight, ScrollText,
-  Scale, AlertTriangle, CheckCircle2,
+  Scale, AlertTriangle, CheckCircle2, Store,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -19,11 +19,12 @@ import { cafeteriaApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
 
-type Tab = 'roster' | 'deposits' | 'reconcile' | 'low';
+type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
 
 const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
   { key: 'roster',    label: 'Saldos',         icon: Coffee },
   { key: 'deposits',  label: 'Depósitos',      icon: ScrollText },
+  { key: 'pos',       label: 'Cargar en POS',  icon: Store },
   { key: 'reconcile', label: 'Reconciliación', icon: Scale },
   { key: 'low',       label: 'Saldo bajo',     icon: AlertTriangle },
 ];
@@ -40,7 +41,7 @@ export default function AdminCafeteria() {
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería — Admin</h1>
           <p className="mt-1 text-sm text-muted">
-            Saldos, depósitos, ajustes, devoluciones y reconciliación.
+            Saldos, depósitos, carga en POS, ajustes, devoluciones y reconciliación.
           </p>
         </div>
         <SchoolExportButtons />
@@ -64,6 +65,7 @@ export default function AdminCafeteria() {
 
       {tab === 'roster' && <RosterTab />}
       {tab === 'deposits' && <DepositsTab />}
+      {tab === 'pos' && <PosLoadTab />}
       {tab === 'reconcile' && <ReconcileTab />}
       {tab === 'low' && <LowBalanceTab />}
     </div>
@@ -367,6 +369,109 @@ function DepositsTab() {
       )}
 
       <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="depósitos" />
+    </Card>
+  );
+}
+
+// ── Loyverse POS load queue ──────────────────────────────────────────────────
+function PosLoadTab() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+
+  const { data: paged, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-cafeteria-pos-queue', page],
+    queryFn: async () =>
+      toPaged<TopUpLogEntry>(
+        (await cafeteriaApi.getTopUpLog({ needs_pos: 1, page })).data,
+      ),
+    placeholderData: keepPreviousData,
+  });
+
+  const mark = useMutation({
+    mutationFn: (id: number) => cafeteriaApi.markTopUpPosLoaded(id),
+    onSuccess: () => {
+      toast.success('Marcado como cargado en Loyverse POS.');
+      queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-pos-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-topups'] });
+    },
+    onError: () => toast.error('No se pudo marcar la recarga.'),
+  });
+
+  const data = paged?.results;
+  const count = paged?.count ?? 0;
+
+  return (
+    <Card>
+      <div className="mb-4 max-w-2xl">
+        <h2 className="font-head text-base font-semibold text-ink">Cargar en POS</h2>
+        <p className="mt-1 text-sm text-muted">
+          Recargas en línea ya acreditadas en el saldo local. Cargue el monto en el
+          POS de Loyverse y márquelo aquí para que el alumno pueda gastar.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <TableSkeleton />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : !data?.length ? (
+        <EmptyState
+          icon={CheckCircle2}
+          title="Sin pendientes de carga en POS"
+          description="Todas las recargas en línea ya fueron marcadas como cargadas."
+        />
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Acreditada</th>
+                <th>Alumno</th>
+                <th className="num">Monto</th>
+                <th>Pasarela</th>
+                <th>Referencia</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((d) => (
+                <tr key={d.id}>
+                  <td data-label="Acreditada" className="whitespace-nowrap text-muted">
+                    {fmtDate(d.processed_at || d.created_at)}
+                  </td>
+                  <td data-label="Alumno" className="font-medium text-ink">
+                    <span className="block">
+                      <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
+                        {d.student_name}
+                      </Link>
+                      <span className="block text-xs text-subtle">{d.student_code}</span>
+                    </span>
+                  </td>
+                  <td data-label="Monto" className="num font-semibold text-ink">
+                    ${parseFloat(d.amount).toFixed(2)}
+                  </td>
+                  <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
+                  <td data-label="Referencia" className="text-subtle text-xs font-mono">
+                    {d.gateway_tx_id || '—'}
+                  </td>
+                  <td data-label="Acción" className="text-right">
+                    <Button
+                      size="sm"
+                      loading={mark.isPending && mark.variables === d.id}
+                      onClick={() => mark.mutate(d.id)}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Cargado en Loyverse
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="recargas" />
     </Card>
   );
 }
