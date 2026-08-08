@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { CreditCard, CheckCircle, Clock, XCircle, Receipt, Coffee, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
@@ -9,6 +10,8 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { Pagination } from '@/components/ui/Pagination';
+import { ADMIN_PAGE_SIZE, toPaged } from '@/lib/pagination';
 import { paymentsApi } from '@/services/api';
 import type { Payment } from '@/types';
 
@@ -43,13 +46,19 @@ const paymentTypeLabel: Record<string, string> = {
  * old free-amount "Realizar pago" modal never redirected, so it created orphan
  * PENDING rows that settled nothing — it's replaced by these action cards. */
 export default function PaymentsPage() {
-  const { data: payments, isLoading, isError, refetch } = useQuery<Payment[]>({
-    queryKey: ['payments'],
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['payments', page],
     queryFn: async () => {
-      const { data } = await paymentsApi.getMyPayments();
-      return data.results ?? data;
+      const { data: body } = await paymentsApi.getMyPayments({ page });
+      return toPaged<Payment>(body);
     },
+    placeholderData: keepPreviousData,
   });
+
+  const payments = data?.results;
+  const count = data?.count ?? 0;
 
   return (
     <>
@@ -80,32 +89,41 @@ export default function PaymentsPage() {
         ) : !payments?.length ? (
           <EmptyState icon={CreditCard} title="Sin pagos" description="Los pagos realizados aparecerán aquí." />
         ) : (
-          <div className="divide-y divide-cream">
-            {payments.map((p) => {
-              const meta = statusMeta[p.status] ?? statusMeta.pending;
-              const Icon = meta.icon;
-              return (
-                <div key={p.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cream">
-                      <Icon className="h-4 w-4 text-muted" />
+          <>
+            <div className="divide-y divide-cream">
+              {payments.map((p) => {
+                const meta = statusMeta[p.status] ?? statusMeta.pending;
+                const Icon = meta.icon;
+                return (
+                  <div key={p.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cream">
+                        <Icon className="h-4 w-4 text-muted" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink">{paymentTypeLabel[p.payment_type] ?? p.payment_type}</p>
+                        <p className="text-xs text-subtle">
+                          {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
+                          {p.description ? ` · ${p.description}` : ''}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink">{paymentTypeLabel[p.payment_type] ?? p.payment_type}</p>
-                      <p className="text-xs text-subtle">
-                        {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
-                        {p.description ? ` · ${p.description}` : ''}
-                      </p>
+                    <div className="flex flex-shrink-0 items-center justify-between gap-3 pl-12 sm:block sm:pl-0 sm:text-right">
+                      <p className="text-sm font-bold text-ink">${parseFloat(p.amount).toFixed(2)} {p.currency}</p>
+                      <Badge variant={meta.variant}>{meta.label}</Badge>
                     </div>
                   </div>
-                  <div className="flex flex-shrink-0 items-center justify-between gap-3 pl-12 sm:block sm:pl-0 sm:text-right">
-                    <p className="text-sm font-bold text-ink">${parseFloat(p.amount).toFixed(2)} {p.currency}</p>
-                    <Badge variant={meta.variant}>{meta.label}</Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            <Pagination
+              page={page}
+              pageSize={ADMIN_PAGE_SIZE}
+              count={count}
+              onChange={setPage}
+              itemLabel="pagos"
+            />
+          </>
         )}
       </Card>
     </>

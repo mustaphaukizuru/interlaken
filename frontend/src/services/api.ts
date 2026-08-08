@@ -341,8 +341,8 @@ export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
-  getMyPayments: () =>
-    api.get('/payments/history/'),
+  getMyPayments: (params?: { page?: number }) =>
+    api.get('/payments/history/', { params }),
 };
 
 // ── FINANCE / TUITION (Prompt 17) ─────────────────────────
