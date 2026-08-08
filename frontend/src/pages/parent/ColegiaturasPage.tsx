@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import {
   Receipt, CheckCircle, Clock, AlertTriangle, XCircle, Download, CreditCard,
 } from 'lucide-react';
@@ -13,11 +13,13 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
+import { Pagination } from '@/components/ui/Pagination';
 import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
-import { financeApi, downloadBlob } from '@/services/api';
-import type { Invoice } from '@/types';
+import { financeApi, portalApi, downloadBlob } from '@/services/api';
+import { ADMIN_PAGE_SIZE, toPaged } from '@/lib/pagination';
+import type { DashboardData, Invoice } from '@/types';
 
 const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
   paid:      { label: 'Pagada',    variant: 'success', icon: CheckCircle },
@@ -29,23 +31,40 @@ const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
 export default function ColegiaturasPage() {
   const queryClient = useQueryClient();
   const childId = useSelectedChildStore((s) => s.childId);
+  const [page, setPage] = useState(1);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   const [gateway, setGateway] = useState('global_payments');
 
-  const { data: invoices, isLoading, isError, refetch } = useQuery<Invoice[]>({
-    queryKey: ['invoices'],
-    queryFn: async () => {
-      const { data } = await financeApi.getInvoices();
-      return data.results ?? data;
-    },
+  // Child filter is server-side; reset page so we never land on an empty slice.
+  useEffect(() => { setPage(1); }, [childId]);
+
+  const { data: dashboard } = useQuery<DashboardData>({
+    queryKey: ['dashboard'],
+    queryFn: async () => (await portalApi.getDashboard()).data,
+    staleTime: 1000 * 60 * 2,
   });
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['invoices', childId, page],
+    queryFn: async () => {
+      const { data: body } = await financeApi.getInvoices({
+        page,
+        student: childId ?? undefined,
+      });
+      return toPaged<Invoice>(body);
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const invoices = data?.results ?? [];
+  const count = data?.count ?? 0;
 
   const payMutation = useMutation({
     mutationFn: () => financeApi.payInvoice(payInvoice!.id, gateway),
-    onSuccess: ({ data }) => {
-      if (data?.redirect_url) {
+    onSuccess: ({ data: body }) => {
+      if (body?.redirect_url) {
         toast.success('Redirigiendo a la pasarela de pago…');
-        window.location.href = data.redirect_url;
+        window.location.href = body.redirect_url;
         return;
       }
       setPayInvoice(null);
@@ -57,33 +76,27 @@ export default function ColegiaturasPage() {
 
   const receiptMutation = useMutation({
     mutationFn: (invoice: Invoice) => financeApi.downloadReceipt(invoice.id),
-    onSuccess: ({ data }, invoice) => {
-      downloadBlob(data, `colegiatura_${invoice.student_code}_${invoice.period}.pdf`);
+    onSuccess: ({ data: blob }, invoice) => {
+      downloadBlob(blob, `colegiatura_${invoice.student_code}_${invoice.period}.pdf`);
     },
     onError: () => toast.error('No fue posible descargar el comprobante.'),
   });
 
-  const studentsMap = new Map<number, { id: number; name: string; grade?: string }>();
-  for (const inv of invoices ?? []) {
-    if (!studentsMap.has(inv.student_id)) {
-      studentsMap.set(inv.student_id, { id: inv.student_id, name: inv.student_name, grade: inv.grade });
-    }
-  }
-  const students = Array.from(studentsMap.values());
-  const visible = childId == null
-    ? (invoices ?? [])
-    : (invoices ?? []).filter((i) => i.student_id === childId);
+  const students = (dashboard?.children ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    grade: c.grade,
+  }));
 
-  const outstanding = visible
+  // Totals are page-scoped — DRF only returns one PAGE_SIZE slice.
+  const outstanding = invoices
     .filter((i) => i.status !== 'paid' && i.status !== 'cancelled')
     .reduce((sum, i) => sum + Math.max(0, parseFloat(i.balance_due)), 0);
 
-  // Overpayments show as negative balance_due — surface as credit (saldo a favor).
-  const creditTotal = visible
-    .reduce((sum, i) => {
-      const due = parseFloat(i.balance_due);
-      return due < 0 ? sum + (-due) : sum;
-    }, 0);
+  const creditTotal = invoices.reduce((sum, i) => {
+    const due = parseFloat(i.balance_due);
+    return due < 0 ? sum + (-due) : sum;
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -97,13 +110,13 @@ export default function ColegiaturasPage() {
         <div className="flex flex-col gap-1 sm:items-end">
           {outstanding > 0 && (
             <div className="sm:text-right">
-              <p className="text-xs text-subtle">Saldo pendiente</p>
+              <p className="text-xs text-subtle">Saldo pendiente (página actual)</p>
               <p className="text-fluid-lg font-bold text-coral">${outstanding.toFixed(2)} MXN</p>
             </div>
           )}
           {creditTotal > 0 && (
             <p className="text-xs font-medium text-green-700">
-              Saldo a favor: ${creditTotal.toFixed(2)} MXN
+              Saldo a favor (página actual): ${creditTotal.toFixed(2)} MXN
             </p>
           )}
         </div>
@@ -139,72 +152,81 @@ export default function ColegiaturasPage() {
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
           <ListSkeleton />
-        ) : !visible.length ? (
+        ) : !invoices.length ? (
           <EmptyState
             icon={Receipt}
             title="Sin colegiaturas"
             description={
-              childId != null && (invoices?.length ?? 0) > 0
+              childId != null
                 ? 'No hay colegiaturas para el alumno seleccionado.'
                 : 'Las colegiaturas emitidas aparecerán aquí.'
             }
           />
         ) : (
-          <div className="divide-y divide-cream">
-            {visible.map((inv) => {
-              const meta = statusMeta[inv.status] ?? statusMeta.pending;
-              const Icon = meta.icon;
-              const balanceDue = parseFloat(inv.balance_due);
-              const hasCredit = balanceDue < 0;
-              const payable = (inv.status === 'pending' || inv.status === 'overdue') && balanceDue > 0;
-              return (
-                <div key={inv.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cream">
-                      <Icon className="h-4 w-4 text-muted" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-ink">
-                        {inv.period_label} · {inv.student_name}
-                      </p>
-                      <p className="text-xs text-subtle">
-                        Vence {format(new Date(inv.due_date), "d 'de' MMMM yyyy", { locale: es })}
-                      </p>
-                      {hasCredit && (
-                        <p className="mt-0.5 text-xs font-medium text-green-700">
-                          Saldo a favor ${(-balanceDue).toFixed(2)}
+          <>
+            <div className="divide-y divide-cream">
+              {invoices.map((inv) => {
+                const meta = statusMeta[inv.status] ?? statusMeta.pending;
+                const Icon = meta.icon;
+                const balanceDue = parseFloat(inv.balance_due);
+                const hasCredit = balanceDue < 0;
+                const payable = (inv.status === 'pending' || inv.status === 'overdue') && balanceDue > 0;
+                return (
+                  <div key={inv.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cream">
+                        <Icon className="h-4 w-4 text-muted" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink">
+                          {inv.period_label} · {inv.student_name}
                         </p>
+                        <p className="text-xs text-subtle">
+                          Vence {format(new Date(inv.due_date), "d 'de' MMMM yyyy", { locale: es })}
+                        </p>
+                        {hasCredit && (
+                          <p className="mt-0.5 text-xs font-medium text-green-700">
+                            Saldo a favor ${(-balanceDue).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center justify-between gap-4 pl-12 sm:justify-end sm:pl-0">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-ink">${parseFloat(inv.amount).toFixed(2)} {inv.currency}</p>
+                        <Badge variant={hasCredit ? 'success' : meta.variant}>
+                          {hasCredit ? 'Saldo a favor' : meta.label}
+                        </Badge>
+                      </div>
+                      {payable && (
+                        <Button size="sm" onClick={() => { setPayInvoice(inv); setGateway('global_payments'); }} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
+                          Pagar
+                        </Button>
+                      )}
+                      {inv.status === 'paid' && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={receiptMutation.isPending && receiptMutation.variables?.id === inv.id}
+                          onClick={() => receiptMutation.mutate(inv)}
+                          className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40"
+                        >
+                          <Download className="w-4 h-4" /> Recibo
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-shrink-0 items-center justify-between gap-4 pl-12 sm:justify-end sm:pl-0">
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-ink">${parseFloat(inv.amount).toFixed(2)} {inv.currency}</p>
-                      <Badge variant={hasCredit ? 'success' : meta.variant}>
-                        {hasCredit ? 'Saldo a favor' : meta.label}
-                      </Badge>
-                    </div>
-                    {payable && (
-                      <Button size="sm" onClick={() => { setPayInvoice(inv); setGateway('global_payments'); }} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
-                        Pagar
-                      </Button>
-                    )}
-                    {inv.status === 'paid' && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        loading={receiptMutation.isPending && receiptMutation.variables?.id === inv.id}
-                        onClick={() => receiptMutation.mutate(inv)}
-                        className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40"
-                      >
-                        <Download className="w-4 h-4" /> Recibo
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            <Pagination
+              page={page}
+              pageSize={ADMIN_PAGE_SIZE}
+              count={count}
+              onChange={setPage}
+              itemLabel="colegiaturas"
+            />
+          </>
         )}
       </Card>
     </div>
