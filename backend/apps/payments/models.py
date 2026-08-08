@@ -65,11 +65,16 @@ class Payment(models.Model):
         self.completed_at = timezone.now()
         self.save()
 
+    # Local soft-fails: HPP may still complete after expire/supersede, or never
+    # started (create_checkout). Distinct from a gateway DECLINED webhook.
+    SOFT_FAIL_STAGES = frozenset({'expire', 'supersede', 'create_checkout'})
+
     def mark_failed(self, error='', stage=''):
         """Mark the payment failed, preserving the error for reconciliation.
 
         Used when a gateway call fails during checkout creation so we never leave
-        an unreachable PENDING row (no hosted-page URL was ever issued).
+        an unreachable PENDING row (no hosted-page URL was ever issued), and when
+        local expiry/supersede clears an open session.
         """
         self.status = self.Status.FAILED
         raw = dict(self.gateway_raw or {})
@@ -78,3 +83,14 @@ class Payment(models.Model):
             raw['stage'] = stage
         self.gateway_raw = raw
         self.save(update_fields=['status', 'gateway_raw', 'updated_at'])
+
+    def is_soft_failed(self) -> bool:
+        """True when FAILED only by local expiry/supersede/checkout abort.
+
+        A soft-failed payment may still receive a late SUCCESS webhook if the
+        parent completes an abandoned or superseded hosted-payment page.
+        """
+        if self.status != self.Status.FAILED:
+            return False
+        raw = self.gateway_raw if isinstance(self.gateway_raw, dict) else {}
+        return raw.get('stage') in self.SOFT_FAIL_STAGES

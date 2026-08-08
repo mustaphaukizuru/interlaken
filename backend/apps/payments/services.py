@@ -63,6 +63,7 @@ def reuse_or_clear_invoice_checkout(invoice) -> Payment | None:
         return payment
 
     payment.mark_failed('checkout superseded — stale open session', stage='supersede')
+    _cascade_fail_linked_topup(payment)
     logger.info(
         'Superseded stale tuition checkout payment=%s invoice=%s',
         payment.id, invoice.id,
@@ -109,11 +110,21 @@ def reuse_or_clear_cafeteria_checkout(
                 else 'checkout superseded — stale open session'
             )
             payment.mark_failed(reason, stage='supersede')
+            _cascade_fail_linked_topup(payment)
             logger.info(
                 'Superseded cafeteria checkout payment=%s student=%s (%s)',
                 payment.id, student.id, reason,
             )
     return reusable
+
+
+def _cascade_fail_linked_topup(payment: Payment) -> None:
+    """Mark a linked cafeteria TopUpRequest failed when its Payment soft-fails."""
+    if payment.related_topup_id is None:
+        return
+    from apps.cafeteria.services import fail_online_topup
+
+    fail_online_topup(payment)
 
 
 def expire_stale_checkouts(*, older_than_minutes: int | None = None) -> int:
@@ -127,6 +138,7 @@ def expire_stale_checkouts(*, older_than_minutes: int | None = None) -> int:
             f'checkout expired after {minutes}m without capture',
             stage='expire',
         )
+        _cascade_fail_linked_topup(payment)
         count += 1
     if count:
         logger.info('expire_stale_checkouts: marked %s payments FAILED', count)
