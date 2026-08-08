@@ -124,7 +124,7 @@ def _audience_roles():
     return _AUDIENCE_ROLES
 
 
-def fanout_announcement(announcement) -> int:
+def fanout_announcement(announcement, *, notif_type=None) -> int:
     """Create an in-app ``Notification`` for every active user in the
     announcement's audience, so a newly published comunicado actually alerts the
     people it targets (they could already *find* it in the announcements list,
@@ -154,13 +154,96 @@ def fanout_announcement(announcement) -> int:
         return 0
 
     message = Truncator(announcement.body or '').chars(280)
+    kind = notif_type or Notification.NotifType.INFO
     Notification.objects.bulk_create(
-        [Notification(user_id=uid, notif_type=Notification.NotifType.INFO,
+        [Notification(user_id=uid, notif_type=kind,
                       title=announcement.title, message=message)
          for uid in user_ids],
         batch_size=500,
     )
     return len(user_ids)
+
+
+def emergency_broadcast(
+    *,
+    title: str,
+    message: str,
+    audience: str,
+    created_by=None,
+    dispatch_limit: int = 200,
+    whatsapp: bool = False,
+    whatsapp_limit: int = 100,
+) -> dict:
+    """School-wide urgent alert (Phase D4).
+
+    1. Persists an active ``Announcement`` so the aviso stays in Comunicados.
+    2. Bulk-creates WARNING in-app notifications (``delivered_at=NULL``).
+    3. Immediately dispatches up to ``dispatch_limit`` email+push sends; the
+       ``dispatch_notifications`` cron finishes the rest.
+    4. Optionally WhatsApp-blasts users who have a number (capped, fail-soft).
+
+    Returns counts for the admin UI. Never raises into the view for channel
+    failures — only validation errors should surface as 400s.
+    """
+    from django.utils.text import Truncator
+
+    from apps.accounts.models import User
+    from apps.portal.models import Announcement, Notification
+
+    title = (title or '').strip()
+    message = (message or '').strip()
+    if not title or not message:
+        raise ValueError('Título y mensaje son obligatorios.')
+    if audience not in {c.value for c in Announcement.Audience}:
+        raise ValueError('Audiencia no válida.')
+
+    announcement = Announcement.objects.create(
+        title=title,
+        body=message,
+        audience=audience,
+        is_active=True,
+        created_by=created_by,
+    )
+    notified = fanout_announcement(
+        announcement, notif_type=Notification.NotifType.WARNING)
+
+    dispatched = 0
+    try:
+        dispatched = dispatch_pending_notifications(limit=dispatch_limit)
+    except Exception:  # pragma: no cover — channel failures must not 500
+        logger.exception('Emergency broadcast dispatch failed')
+
+    whatsapp_sent = 0
+    if whatsapp:
+        roles = _audience_roles().get(audience, [])
+        qs = (
+            User.objects.filter(is_active=True, role__in=roles)
+            .exclude(whatsapp='')
+            .order_by('id')[:whatsapp_limit]
+        )
+        body = f'{title}\n\n{Truncator(message).chars(400)}'
+        try:
+            from apps.whatsapp.services import send_text
+        except Exception:  # pragma: no cover
+            send_text = None
+            logger.exception('WhatsApp import failed during emergency broadcast')
+        if send_text:
+            for user in qs:
+                wa = (user.whatsapp or '').strip()
+                if not wa:
+                    continue
+                try:
+                    if send_text(wa, body):
+                        whatsapp_sent += 1
+                except Exception:
+                    logger.warning('Emergency WhatsApp failed for %s', user, exc_info=True)
+
+    return {
+        'announcement_id': announcement.id,
+        'notified': notified,
+        'dispatched': dispatched,
+        'whatsapp_sent': whatsapp_sent,
+    }
 
 
 def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> int:

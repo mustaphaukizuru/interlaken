@@ -522,6 +522,14 @@ export const portalApi = {
   adminDeleteAnnouncement: (id: number) =>
     api.delete(`/portal/admin/announcements/${id}/`),
 
+  /** Urgent school-wide broadcast (creates comunicado + fans out WARNING notifs). */
+  adminEmergencyBroadcast: (data: {
+    title: string;
+    message: string;
+    audience: string;
+    whatsapp?: boolean;
+  }) => api.post('/portal/admin/broadcast/', data),
+
   // Web push opt-in/out (subscription persisted per user+device).
   subscribePush: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
     api.post('/portal/push/subscribe/', sub),

@@ -5,6 +5,7 @@ import logging
 
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +13,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
+from apps.core.ratelimit import ratelimit
 from apps.payments.models import Payment
 
 from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification
@@ -21,7 +23,7 @@ from .serializers import (
     AnnouncementSerializer,
     NotificationSerializer,
 )
-from .services import fanout_announcement
+from .services import emergency_broadcast, fanout_announcement
 
 
 def audiences_for_user(user):
@@ -286,5 +288,31 @@ class NotificationMarkAllReadView(APIView):
         return Response({'marked': updated})
 
 
-# TODO(Phase D4): Emergency broadcast admin endpoint — skipped this pass
-# (school-wide WhatsApp/email blast needs rate-limited batching + audit).
+@method_decorator(ratelimit('emergency-broadcast', '3/m', key='user', method='POST'), name='dispatch')
+class EmergencyBroadcastView(APIView):
+    """POST /api/v1/portal/admin/broadcast/
+
+    Urgent school-wide aviso: creates a Comunicado, fans out WARNING
+    notifications, immediately dispatches a first email/push batch, and
+    optionally WhatsApp-blasts numbers on file (capped). Remaining email/push
+    is finished by the ``dispatch_notifications`` cron.
+    """
+    permission_classes = [_IsAdmin]
+
+    def post(self, request):
+        title = request.data.get('title')
+        message = request.data.get('message') or request.data.get('body')
+        audience = (request.data.get('audience') or Announcement.Audience.PARENTS).strip()
+        whatsapp = str(request.data.get('whatsapp', '0')).lower() in (
+            '1', 'true', 'si', 'sí', 'yes')
+        try:
+            result = emergency_broadcast(
+                title=title,
+                message=message,
+                audience=audience,
+                created_by=request.user,
+                whatsapp=whatsapp,
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=400)
+        return Response(result, status=201)
