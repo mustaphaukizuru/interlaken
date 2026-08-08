@@ -314,14 +314,16 @@ export default function CafeteriaPage() {
                 </p>
               )}
 
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
-                className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
-              >
-                <Plus className="w-3.5 h-3.5" /> Recargar
-              </Button>
+              {!notLinked && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
+                  className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Recargar
+                </Button>
+              )}
 
               <button
                 type="button"

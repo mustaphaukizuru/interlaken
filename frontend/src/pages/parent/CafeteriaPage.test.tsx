@@ -13,9 +13,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 const mockedBalance = vi.mocked(cafeteriaApi.getMyBalance);
 const mockedTx = vi.mocked(cafeteriaApi.getTransactions);
 
-// A linked cafeteria account — the history card only renders when the family
-// actually has one (balances.length > 0), so recovery must resolve to a real
-// account, not an empty roster (which shows the "Sin cuentas" empty state).
+// History card renders when the family has any cafeteria balance row.
 const account = {
   id: 1,
   student: {
@@ -24,11 +22,17 @@ const account = {
     student_id: '09824',
     grade: '4°',
     group: 'A',
-    loyverse_id: '',
+    loyverse_id: 'loy-emma',
   },
   balance: '150.00',
   low_balance_threshold: '50',
   last_synced: '2026-07-17T12:00:00Z',
+};
+
+const unlinkedAccount = {
+  ...account,
+  id: 2,
+  student: { ...account.student, id: 11, loyverse_id: '' },
 };
 
 describe('CafeteriaPage states', () => {
@@ -70,5 +74,27 @@ describe('CafeteriaPage states', () => {
     await userEvent.click(screen.getByRole('button', { name: /página siguiente/i }));
     // Page 2 was requested from the API.
     expect(mockedTx).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
+  });
+
+  it('hides Recargar when the student is not linked to Loyverse', async () => {
+    mockedBalance.mockResolvedValue({ data: [unlinkedAccount] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    expect(
+      await screen.findByText(/aún no está vinculado a cafetería\/Loyverse/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Recargar/i })).not.toBeInTheDocument();
+  });
+
+  it('shows Recargar for a linked cafeteria account', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    expect(await screen.findByRole('button', { name: /Recargar/i })).toBeInTheDocument();
+    expect(screen.queryByText(/aún no está vinculado a cafetería\/Loyverse/i)).toBeNull();
   });
 });
