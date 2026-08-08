@@ -344,10 +344,9 @@ export function downloadBlob(data: Blob, filename: string) {
 }
 
 // ── PAYMENTS ─────────────────────────────────────────────
+// Bare POST /payments/initiate/ is fail-closed (no unlinked charge path).
+// Real money starts from finance invoice-pay or cafeteria top-up.
 export const paymentsApi = {
-  initiatePayment: (data: { amount: number; payment_type: string; description: string }) =>
-    api.post('/payments/initiate/', data),
-
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
