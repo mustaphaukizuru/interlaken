@@ -6,6 +6,7 @@ import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { admissionsApi } from '@/services/api';
 
 const GRADES = [
@@ -270,15 +271,12 @@ export default function RegisterPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white py-10 sm:py-16">
-        <img src="/assets/court-primaria.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Admisiones</span>
-          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Inscripción en línea</h1>
-          <p className="text-brand-100 text-fluid-base">Ciclo Escolar {CURRENT_CYCLE}</p>
-        </div>
-      </section>
+      <FunnelHero
+        step="inscripcion"
+        title="Inscripción en línea"
+        subtitle={`Ciclo Escolar ${CURRENT_CYCLE}. Complete los datos del alumno, adjunte documentos y envíe su solicitud.`}
+        imageSrc="/assets/court-primaria.webp"
+      />
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {invited && (

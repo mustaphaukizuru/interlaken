@@ -5,10 +5,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
 import type { PreRegistrationData } from '@/types';
@@ -100,15 +100,11 @@ export default function PreRegisterPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white py-10 sm:py-16">
-        <img src="/assets/hopscotch.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" loading="eager" />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Admisiones</span>
-          <h1 className="mt-3 text-fluid-4xl font-bold mb-2">Pre-Registro</h1>
-          <p className="text-brand-100 text-fluid-base">Ciclo Escolar {CURRENT_CYCLE}</p>
-        </div>
-      </section>
+      <FunnelHero
+        step="pre-registro"
+        title="Pre-Registro"
+        subtitle="Menos de 5 minutos. Recibirá confirmación inmediata y un asesor le contactará en 2 días hábiles."
+      />
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6" noValidate>
@@ -215,7 +211,7 @@ export default function PreRegisterPage() {
 
           <PrivacyNote />
 
-          <Button type="submit" loading={isSubmitting} size="lg" className="w-full justify-center min-h-[44px]">
+          <Button type="submit" variant="cta" loading={isSubmitting} size="lg" className="w-full justify-center">
             Enviar pre-registro
           </Button>
         </form>

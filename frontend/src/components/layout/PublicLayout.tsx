@@ -1,4 +1,4 @@
-import { Outlet, Link, NavLink } from 'react-router-dom';
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
@@ -13,6 +13,17 @@ import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { socialEntries } from '@/lib/siteContact';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
+
+/** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
+const HIDE_STICKY_CTA = [
+  '/agendar-visita',
+  '/pre-registro',
+  '/registro',
+  '/puertas-abiertas',
+  '/login',
+  '/olvide-contrasena',
+  '/restablecer-contrasena',
+];
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
  *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra. */
@@ -140,6 +151,7 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
 export function PublicLayout() {
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const { pathname } = useLocation();
   const settings = useSiteSettings();
   // Facebook viene confirmado por el cliente; Instagram se muestra siempre
   // (petición del cliente) con enlace vacío hasta que entreguen la URL.
@@ -147,6 +159,9 @@ export function PublicLayout() {
   const displaySocials = socials.some((s) => s.key === 'instagram')
     ? socials
     : [...socials, { key: 'instagram' as const, label: 'Instagram', href: settings.instagram_url || '#' }];
+  const showStickyCta = !HIDE_STICKY_CTA.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
 
   // Lock body scroll while the mobile menu is open (prevents background scroll).
   useEffect(() => {
@@ -306,24 +321,37 @@ export function PublicLayout() {
         )}
       </header>
 
-      {/* Page content */}
-      <main id="contenido" className="flex-1">
+      {/* Page content — bottom pad clears sticky CTA + WA on phones */}
+      <main
+        id="contenido"
+        className={`flex-1 ${
+          showStickyCta
+            ? 'pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0'
+            : ''
+        }`}
+      >
         <RouteTransition><Outlet /></RouteTransition>
       </main>
 
-      {/* Sticky mobile CTA — el CTA principal del cliente, solo en teléfonos. */}
-      <Link
-        to="/agendar-visita"
-        className="btn-pink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 justify-center shadow-lg md:hidden"
-      >
-        Agendar visita
-      </Link>
+      {/* Sticky mobile CTA — hidden on funnel/auth pages that already have a primary action. */}
+      {showStickyCta && (
+        <Link
+          to="/agendar-visita"
+          className="btn-pink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 justify-center shadow-lg md:hidden"
+        >
+          Agendar visita
+        </Link>
+      )}
 
       {/* Floating WhatsApp bubble — right side, every public page. */}
-      <WhatsAppFloat />
+      <WhatsAppFloat stickyCtaVisible={showStickyCta} />
 
       {/* Footer */}
-      <footer className="bg-dark text-white/60 text-sm">
+      <footer
+        className={`bg-dark text-white/60 text-sm ${
+          showStickyCta ? 'pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0' : ''
+        }`}
+      >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-8">
           {/* Brand column */}
           <div className="col-span-2">

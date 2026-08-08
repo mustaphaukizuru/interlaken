@@ -57,7 +57,8 @@ export default {
         pink:    { DEFAULT: '#ef2558', dark: '#d81a49', hot: '#ec1f7f', light: '#fde8ed', soft: '#ff6a8e', pale: '#ff8fa8' },
         amber:   { DEFAULT: '#d97706', bright: '#f5b300' },
         dark:    { DEFAULT: '#080516', 2: '#0f0a24', 3: '#1a1035', card: '#2a2342' },
-        cream:   { DEFAULT: '#F1EFF8', 2: '#FAF9FD' },
+        // Match CSS tokens / BRAND.md — was #F1EFF8 and drifted from --cream.
+        cream:   { DEFAULT: '#F5F4FA', 2: '#FAF9FD' },
         ink:     { DEFAULT: '#1A1130' },
         muted:   '#6E6885',
         subtle:  '#9A93AE',

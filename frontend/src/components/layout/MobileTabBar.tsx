@@ -1,13 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { navByRole, type Role } from './navConfig';
+import { mobileNavByRole, type Role } from './navConfig';
 
 /**
  * Always-visible primary navigation on phones — the drawer is for the full menu,
- * this keeps the 3–5 core destinations one tap away. Hidden at lg+ where the
+ * this keeps the curated daily destinations one tap away. Hidden at lg+ where the
  * static sidebar is present.
  */
 export default function MobileTabBar({ role }: { role: Role }) {
-  const items = (navByRole[role] ?? navByRole.parent).slice(0, 5);
+  const items = mobileNavByRole[role] ?? mobileNavByRole.parent;
 
   return (
     <nav
