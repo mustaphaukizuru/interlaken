@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Save, Bell } from 'lucide-react';
+import { Save, Bell, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -193,6 +194,23 @@ export default function ProfilePage() {
               Guardar avisos
             </Button>
           </div>
+        </Card>
+
+        <Card>
+          <div className="mb-3 flex items-center gap-2">
+            <Shield className="h-4 w-4 text-purple" />
+            <h2 className="font-head text-base font-semibold text-ink">Privacidad y derechos ARCO</h2>
+          </div>
+          <p className="mb-4 text-sm text-muted">
+            Consulte y actualice consentimientos LFPDPPP, descargue sus datos o presente una
+            solicitud de Acceso, Rectificación, Cancelación u Oposición.
+          </p>
+          <Link
+            to="/portal/privacidad"
+            className="inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline"
+          >
+            Ir a Privacidad y ARCO
+          </Link>
         </Card>
       </div>
     </>
