@@ -31,6 +31,10 @@ const DOC_TYPES: { key: string; label: string }[] = [
   { key: 'proof_addr',  label: 'Comprobante de Domicilio' },
 ];
 
+/** Matches backend ``MAX_DOCUMENT_UPLOAD_SIZE`` (10 MB). */
+const MAX_DOC_BYTES = 10 * 1024 * 1024;
+const ALLOWED_DOC_EXT = /\.(pdf|jpe?g|png)$/i;
+
 type Form = {
   child_first_name: string; child_last_name: string; child_dob: string;
   child_curp: string; child_nationality: string; grade_applying: string;
@@ -143,8 +147,10 @@ export default function RegisterPage() {
         const { data } = await admissionsApi.createRegistration({
           ...step1, cycle: CURRENT_CYCLE.replace('–', '-'),
         });
-        const { data: sess } = await admissionsApi.exchangeAccess(data.id, data.invite_token);
+        // Persist id immediately so a failed token exchange does not orphan
+        // the draft without a recoverable handle in local state.
         setRegId(data.id);
+        const { data: sess } = await admissionsApi.exchangeAccess(data.id, data.invite_token);
         setSession(sess.session_token);
       }
       setStep(2);
@@ -190,8 +196,18 @@ export default function RegisterPage() {
         consent_photos_media: form.consent_photos_media,
       }, session);
 
+      const failedDocs: string[] = [];
       for (const [docType, file] of Object.entries(files)) {
-        await admissionsApi.uploadDocument(regId, file, docType, session);
+        try {
+          await admissionsApi.uploadDocument(regId, file, docType, session);
+        } catch {
+          const label = DOC_TYPES.find((d) => d.key === docType)?.label ?? docType;
+          failedDocs.push(label);
+        }
+      }
+      if (failedDocs.length) {
+        toast.error(`No se pudieron subir: ${failedDocs.join(', ')}. Revise tamaño/formato e intente de nuevo.`);
+        return;
       }
 
       await admissionsApi.submitRegistration(regId, session, true);
@@ -445,6 +461,17 @@ function FileRow({ label, file, onPick, onClear }: {
   label: string; file?: File; onPick: (f: File) => void; onClear: () => void;
 }) {
   const id = `doc-${label.replace(/\s+/g, '-')}`;
+  const pick = (f: File) => {
+    if (!ALLOWED_DOC_EXT.test(f.name)) {
+      toast.error(`${label}: use PDF, JPG o PNG.`);
+      return;
+    }
+    if (f.size > MAX_DOC_BYTES) {
+      toast.error(`${label}: el archivo supera 10 MB.`);
+      return;
+    }
+    onPick(f);
+  };
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
       <span className="flex min-w-0 items-center gap-2 text-sm text-ink">
@@ -457,7 +484,11 @@ function FileRow({ label, file, onPick, onClear }: {
         <label htmlFor={id} className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cream px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line">
           <UploadCloud className="h-3.5 w-3.5" /> Adjuntar
           <input id={id} type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); }} />
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) pick(f);
+            }} />
         </label>
       )}
     </div>
