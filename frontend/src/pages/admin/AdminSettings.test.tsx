@@ -49,7 +49,10 @@ describe('AdminSettings (CMS preview + density)', () => {
     mockedGet.mockResolvedValueOnce({ data: SAMPLE } as never);
     renderPage();
 
-    expect(await screen.findByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number);
+    // Wait until the query hydrates form state (input mounts empty first).
+    await waitFor(() => {
+      expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number);
+    });
     expect(screen.getByText('Vista previa del sitio')).toBeInTheDocument();
     expect(screen.getByText('Barra superior')).toBeInTheDocument();
     expect(screen.getByText('Pie de contacto')).toBeInTheDocument();
@@ -63,6 +66,7 @@ describe('AdminSettings (CMS preview + density)', () => {
     renderPage();
 
     const wa = await screen.findByLabelText('WhatsApp');
+    await waitFor(() => expect(wa).toHaveValue(SAMPLE.whatsapp_number));
     await userEvent.clear(wa);
     await waitFor(() => {
       expect(screen.queryByLabelText('Vista previa del botón de WhatsApp')).toBeNull();
@@ -77,7 +81,9 @@ describe('AdminSettings (CMS preview + density)', () => {
     mockedPatch.mockResolvedValueOnce({ data: SAMPLE } as never);
     renderPage();
 
-    await screen.findByLabelText('WhatsApp');
+    await waitFor(() => {
+      expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number);
+    });
     await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => expect(mockedPatch).toHaveBeenCalledTimes(1));
     expect(mockedPatch.mock.calls[0][0]).toMatchObject({
