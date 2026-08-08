@@ -63,7 +63,7 @@ django-ratelimit==4.1.0
 django-axes==8.3.1
 
 # Production
-gunicorn==21.2.0
+gunicorn==26.0.0
 whitenoise==6.6.0
 
 # Monitoring (no-op unless SENTRY_DSN is configured)
