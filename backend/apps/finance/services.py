@@ -388,6 +388,48 @@ def fail_invoice_payment(payment):
     return link.invoice if link is not None else None
 
 
+def reverse_invoice_payment(payment):
+    """Undo a posted tuition credit after a provider refund/chargeback webhook.
+
+    Subtracts the payment amount from ``invoice.amount_paid``, reopens the
+    invoice when a balance is owed again, and is idempotent via
+    ``InvoicePayment.applied_at`` (cleared after a successful reverse so a
+    duplicate refund webhook is a no-op). Returns the ``Invoice`` or ``None``.
+    """
+    link = getattr(payment, 'invoice_payment', None)
+    if link is None:
+        return None
+
+    with transaction.atomic():
+        link = InvoicePayment.objects.select_for_update().get(pk=link.pk)
+        if link.applied_at is None:
+            logger.info(
+                'Payment #%s was never applied to invoice #%s — refund no-op.',
+                payment.id, link.invoice_id,
+            )
+            return Invoice.objects.get(pk=link.invoice_id)
+
+        invoice = Invoice.objects.select_for_update().get(pk=link.invoice_id)
+        invoice.amount_paid = q2(max(Decimal('0.00'), q2(invoice.amount_paid) - q2(payment.amount)))
+        if invoice.balance_due > 0:
+            # Re-open for collection; overdue if past due date.
+            if invoice.due_date < timezone.localdate():
+                invoice.status = Invoice.Status.OVERDUE
+            else:
+                invoice.status = Invoice.Status.PENDING
+            invoice.paid_at = None
+        invoice.save(update_fields=['amount_paid', 'status', 'paid_at', 'updated_at'])
+
+        link.applied_at = None
+        link.save(update_fields=['applied_at'])
+
+    logger.info(
+        'Invoice #%s reversed $%s via refunded payment #%s.',
+        invoice.id, payment.amount, payment.id,
+    )
+    return invoice
+
+
 def notify_invoice_result(payment, *, success: bool) -> int:
     """Notify the student's guardians of a tuition-payment outcome. Best-effort.
 

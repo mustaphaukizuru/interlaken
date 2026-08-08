@@ -75,6 +75,7 @@ class GlobalPaymentsGateway(BaseGateway):
     webhook_secret_setting = 'GLOBAL_PAYMENTS_WEBHOOK_SECRET'
     SUCCESS_STATUSES = frozenset({'CAPTURED', 'SUCCESS', 'PAID', 'APPROVED'})
     FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'ERROR', 'CANCELLED'})
+    REFUND_STATUSES = frozenset({'REFUNDED', 'REFUND', 'RETURNED', 'CHARGEBACK'})
 
     def build_session_payload(self, payment, return_url: str | None = None) -> dict:
         """GP-API-shaped HPP session / transaction request body.

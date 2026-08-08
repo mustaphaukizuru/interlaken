@@ -25,9 +25,10 @@ from .serializers import PaymentInitiateSerializer, PaymentSerializer
 
 logger = logging.getLogger(__name__)
 
-# Statuses that are terminal — a webhook that arrives for one of these is a
-# duplicate/replay and must be a no-op (idempotency).
-FINAL_STATUSES = (Payment.Status.SUCCESS, Payment.Status.FAILED, Payment.Status.REFUNDED)
+# Fully terminal — any further webhook is a no-op (idempotency).
+# SUCCESS is *almost* terminal but still accepts a later ``refunded`` event so
+# provider refunds/chargebacks can reverse cafeteria/tuition credits.
+CLOSED_STATUSES = (Payment.Status.FAILED, Payment.Status.REFUNDED)
 
 
 class PaymentInitiateView(APIView):
@@ -98,8 +99,16 @@ class _WebhookProcessMixin:
         ``(payment, success)`` when a top-up notification should be sent **after**
         commit, or ``None``.
         """
-        from apps.cafeteria.services import complete_online_topup, fail_online_topup
-        from apps.finance.services import complete_invoice_payment, fail_invoice_payment
+        from apps.cafeteria.services import (
+            complete_online_topup,
+            fail_online_topup,
+            reverse_online_topup,
+        )
+        from apps.finance.services import (
+            complete_invoice_payment,
+            fail_invoice_payment,
+            reverse_invoice_payment,
+        )
 
         notify_arg = None
         with db_transaction.atomic():
@@ -110,9 +119,24 @@ class _WebhookProcessMixin:
             except (Payment.DoesNotExist, TypeError, ValueError):
                 return status.HTTP_404_NOT_FOUND, {'error': 'payment_not_found'}, None
 
-            # Idempotency: never re-process a payment already in a final state.
-            if payment.status in FINAL_STATUSES:
+            # Fully closed (failed/refunded): always a no-op.
+            if payment.status in CLOSED_STATUSES:
                 return status.HTTP_200_OK, {'detail': 'already_processed'}, None
+
+            # Successful capture: only a later refund/chargeback may move money again.
+            if payment.status == Payment.Status.SUCCESS:
+                if event.status != 'refunded':
+                    return status.HTTP_200_OK, {'detail': 'already_processed'}, None
+                payment.gateway_raw = event.raw or payment.gateway_raw
+                if event.transaction_id:
+                    payment.gateway_tx_id = event.transaction_id
+                payment.status = Payment.Status.REFUNDED
+                payment.save(update_fields=[
+                    'status', 'gateway_tx_id', 'gateway_raw', 'updated_at',
+                ])
+                reverse_online_topup(payment)
+                reverse_invoice_payment(payment)
+                return status.HTTP_200_OK, {'detail': 'refunded'}, None
 
             if event.status == 'success':
                 payment.mark_success(event.transaction_id or payment.gateway_tx_id, event.raw)
@@ -128,6 +152,15 @@ class _WebhookProcessMixin:
                 fail_online_topup(payment)
                 fail_invoice_payment(payment)
                 notify_arg = (payment, False)
+            elif event.status == 'refunded':
+                # Refund before capture is unusual — mark refunded, reverse no-ops.
+                payment.status = Payment.Status.REFUNDED
+                if event.transaction_id:
+                    payment.gateway_tx_id = event.transaction_id
+                payment.gateway_raw = event.raw
+                payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
+                reverse_online_topup(payment)
+                reverse_invoice_payment(payment)
             else:
                 # Non-terminal notification (PENDING/PROCESSING): record raw only.
                 payment.gateway_raw = event.raw

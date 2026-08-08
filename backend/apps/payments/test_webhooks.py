@@ -3,16 +3,22 @@ Payment webhook security + idempotency, and the initiate endpoint.
 
 The webhook verifies an HMAC-SHA256 signature over the raw body and must be a
 no-op for a payment that already reached a final state (replay protection).
+A later ``REFUNDED`` event on a successful payment reverses cafeteria/tuition
+credits.
 """
 
 import hashlib
 import hmac
 import json
+from decimal import Decimal
 
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import ParentFactory
+from apps.accounts.factories import ParentFactory, StudentProfileFactory
+from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+from apps.finance import services as finance_services
+from apps.finance.models import FeeSchedule, InvoicePayment
 from apps.payments.factories import PaymentFactory
 from apps.payments.models import Payment
 
@@ -35,6 +41,16 @@ def _post_webhook(api_client, payload, signature=None):
         data=body,
         content_type="application/json",
         **headers,
+    )
+
+
+def _signed(api_client, payload):
+    body = json.dumps(payload).encode()
+    return api_client.post(
+        reverse("payment-webhook"),
+        data=body,
+        content_type="application/json",
+        HTTP_X_WEBHOOK_SIGNATURE=_sign(body),
     )
 
 
@@ -114,6 +130,77 @@ class TestWebhookIdempotency:
             HTTP_X_WEBHOOK_SIGNATURE=_sign(body),
         )
         assert resp.status_code == 404
+
+
+class TestWebhookRefund:
+    def test_refund_reverses_cafeteria_topup(self, api_client, settings):
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal('200.00'),
+            method=TopUpRequest.Method.ONLINE,
+        )
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA,
+            amount=Decimal('200.00'), gateway=Payment.Gateway.GLOBAL_PAYMENTS,
+            related_topup=topup, status=Payment.Status.PENDING,
+        )
+
+        assert _signed(api_client, {
+            'order_id': payment.id, 'status': 'CAPTURED', 'id': 'gp-1',
+        }).status_code == 200
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('200.00')
+
+        resp = _signed(api_client, {
+            'order_id': payment.id, 'status': 'REFUNDED', 'id': 'gp-refund-1',
+        })
+        assert resp.status_code == 200
+        assert resp.data['detail'] == 'refunded'
+        payment.refresh_from_db()
+        assert payment.status == Payment.Status.REFUNDED
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('0.00')
+        assert CafeteriaTransaction.objects.filter(
+            student=student,
+            transaction_type=CafeteriaTransaction.TxType.REFUND,
+        ).exists()
+
+        # Replay is a no-op.
+        again = _signed(api_client, {
+            'order_id': payment.id, 'status': 'REFUNDED', 'id': 'gp-refund-1',
+        })
+        assert again.data['detail'] == 'already_processed'
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('0.00')
+
+    def test_refund_reopens_tuition_invoice(self, api_client, settings):
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+        FeeSchedule.objects.create(
+            name='Mensual', grade='', monthly_amount=Decimal('1500.00'),
+            due_day=5, active=True,
+        )
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        finance_services.generate_invoices('2026-08')
+        from apps.finance.models import Invoice
+        invoice = Invoice.objects.get(student=student, period='2026-08')
+        payment, _ = finance_services.start_invoice_payment(invoice, parent)
+
+        assert _signed(api_client, {
+            'order_id': payment.id, 'status': 'CAPTURED', 'id': 'tu-1',
+        }).status_code == 200
+        invoice.refresh_from_db()
+        assert invoice.status == invoice.Status.PAID
+
+        resp = _signed(api_client, {
+            'order_id': payment.id, 'status': 'REFUNDED', 'id': 'tu-refund',
+        })
+        assert resp.status_code == 200
+        payment.refresh_from_db()
+        invoice.refresh_from_db()
+        assert payment.status == Payment.Status.REFUNDED
+        assert invoice.amount_paid == Decimal('0.00')
+        assert invoice.status in (invoice.Status.PENDING, invoice.Status.OVERDUE)
+        assert InvoicePayment.objects.get(payment=payment).applied_at is None
 
 
 class TestPaymentInitiate:
