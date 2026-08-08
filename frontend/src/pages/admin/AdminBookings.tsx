@@ -297,15 +297,22 @@ function SlotManager() {
 
 export default function AdminBookings() {
   const qc = useQueryClient();
+  // Default to individual visits — matches page copy / slot generator; open_class
+  // bookings are still reachable via the type filter.
+  const [typeFilter, setTypeFilter] = useState<'individual' | 'open_class' | ''>('individual');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-bookings', statusFilter, page],
+    queryKey: ['admin-bookings', typeFilter, statusFilter, page],
     queryFn: async () =>
       toPaged<Booking>(
-        (await bookingsApi.getAdminBookings({ ...(statusFilter ? { status: statusFilter } : {}), page })).data,
+        (await bookingsApi.getAdminBookings({
+          ...(typeFilter ? { type: typeFilter } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+          page,
+        })).data,
       ),
     placeholderData: keepPreviousData,
   });
@@ -347,19 +354,34 @@ export default function AdminBookings() {
       <Card
         title="Reservas"
         action={
-          <select
-            className="input-field text-sm py-1.5"
-            aria-label="Filtrar por estado"
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          >
-            <option value="">Todas</option>
-            <option value="confirmed">Confirmadas</option>
-            <option value="pending">Pendientes</option>
-            <option value="attended">Asistió</option>
-            <option value="cancelled">Canceladas</option>
-            <option value="no_show">No asistió</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="input-field text-sm py-1.5"
+              aria-label="Filtrar por tipo de visita"
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value as 'individual' | 'open_class' | '');
+                setPage(1);
+              }}
+            >
+              <option value="individual">Individuales</option>
+              <option value="open_class">Puertas Abiertas</option>
+              <option value="">Todos los tipos</option>
+            </select>
+            <select
+              className="input-field text-sm py-1.5"
+              aria-label="Filtrar por estado"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            >
+              <option value="">Todas</option>
+              <option value="confirmed">Confirmadas</option>
+              <option value="pending">Pendientes</option>
+              <option value="attended">Asistió</option>
+              <option value="cancelled">Canceladas</option>
+              <option value="no_show">No asistió</option>
+            </select>
+          </div>
         }
       >
         {isError ? (
@@ -369,12 +391,20 @@ export default function AdminBookings() {
         ) : !bookings?.length ? (
           <EmptyState
             icon={CalendarClock}
-            title={statusFilter ? 'Sin resultados' : 'Sin reservas'}
-            description={statusFilter
-              ? 'Ninguna reserva coincide con el estado seleccionado.'
+            title={(statusFilter || typeFilter) ? 'Sin resultados' : 'Sin reservas'}
+            description={(statusFilter || typeFilter)
+              ? 'Ninguna reserva coincide con los filtros seleccionados.'
               : 'Las visitas agendadas aparecerán aquí.'}
-            action={statusFilter
-              ? <Button variant="secondary" size="sm" onClick={() => { setStatusFilter(''); setPage(1); }}>Ver todas</Button>
+            action={(statusFilter || typeFilter)
+              ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setStatusFilter(''); setTypeFilter(''); setPage(1); }}
+                >
+                  Ver todas
+                </Button>
+              )
               : undefined}
           />
         ) : (
@@ -394,7 +424,12 @@ export default function AdminBookings() {
                           {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
                         </p>
                       </div>
-                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="neutral">
+                          {VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}
+                        </Badge>
+                        <Badge variant={meta.variant}>{meta.label}</Badge>
+                      </div>
                     </div>
                     <div className="mt-3 text-sm">
                       <p className="text-muted">{b.parent_name}</p>
@@ -418,6 +453,7 @@ export default function AdminBookings() {
                 <thead>
                   <tr>
                     <th>Fecha</th>
+                    <th>Tipo</th>
                     <th>Tutor</th>
                     <th>Contacto</th>
                     <th>Estado</th>
@@ -436,6 +472,11 @@ export default function AdminBookings() {
                           <div className="text-subtle text-xs">
                             {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
                           </div>
+                        </td>
+                        <td data-label="Tipo">
+                          <Badge variant="neutral">
+                            {VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}
+                          </Badge>
                         </td>
                         <td className="text-muted">
                           {b.parent_name}
