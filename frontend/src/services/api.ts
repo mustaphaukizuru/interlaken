@@ -361,7 +361,7 @@ export const paymentsApi = {
 // ── FINANCE / TUITION (Prompt 17) ─────────────────────────
 export const financeApi = {
   // Parent
-  getInvoices: (params?: { student?: number; status?: string; period?: string }) =>
+  getInvoices: (params?: { student?: number; status?: string; period?: string; page?: number }) =>
     api.get('/finance/invoices/', { params }),
 
   getInvoice: (id: number) =>
