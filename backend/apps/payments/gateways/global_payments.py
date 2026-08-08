@@ -25,10 +25,6 @@ from .base import BaseGateway, LiveCheckoutNotConfigured
 _DEFAULT_HPP_URL = 'https://hpp.sandbox.globalpay.com/checkout'
 
 
-class LiveCheckoutNotConfigured(RuntimeError):
-    """Raised when PAYMENTS_LIVE is on but no real HPP/checkout URL is set."""
-
-
 def _checkout_base() -> str:
     """Resolve the HPP base URL, honouring PAYMENTS_LIVE sandbox forcing."""
     configured = (getattr(settings, 'GLOBAL_PAYMENTS_HPP_URL', '') or '').strip()

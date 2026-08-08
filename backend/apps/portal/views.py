@@ -5,7 +5,6 @@ import logging
 
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
 from rest_framework.response import Response
