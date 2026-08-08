@@ -1,13 +1,9 @@
 /**
- * push.ts — opt-in Web Push scaffolding for future portal notifications.
+ * push.ts — Web Push opt-in for portal notifications.
  *
- * This is intentionally inert until:
- *   1. VITE_VAPID_PUBLIC_KEY is configured, and
- *   2. the user explicitly opts in (call subscribeToPush from a UI control).
- *
- * It relies on the service worker registered by vite-plugin-pwa. The resulting
- * PushSubscription should be POSTed to the backend to persist per user — wire
- * that up when the portal notification endpoint exists.
+ * Inert until VITE_VAPID_PUBLIC_KEY is set. Relies on the vite-plugin-pwa
+ * service worker (which imports public/push-sw.js for push + notificationclick).
+ * enablePush() persists the subscription via portalApi.subscribePush.
  */
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
@@ -37,9 +33,8 @@ function urlBase64ToUint8Array(base64: string): BufferSource {
 }
 
 /**
- * Request permission and subscribe to Web Push. Returns the subscription (to be
- * sent to the backend) or null if unsupported/denied. Safe to call from a click
- * handler — never runs on its own.
+ * Request permission and subscribe to Web Push. Returns the subscription or
+ * null if unsupported/denied. Call from a click handler only.
  */
 export async function subscribeToPush(): Promise<PushSubscription | null> {
   if (!isPushSupported()) return null;
@@ -66,9 +61,8 @@ export async function unsubscribeFromPush(): Promise<boolean> {
 }
 
 /**
- * Full opt-in: browser subscription + persist it on the backend so
+ * Full opt-in: browser subscription + persist on the backend so
  * portal notifications (cafetería, pagos, avisos) reach this device.
- * Call from a click handler. Returns true when the server stored it.
  */
 export async function enablePush(): Promise<boolean> {
   const sub = await subscribeToPush();

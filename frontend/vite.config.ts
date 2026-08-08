@@ -26,6 +26,9 @@ export default defineConfig(({ command }) => ({
         // Precache the app shell only; campus photos (.webp) are runtime-cached
         // on demand (see runtimeCaching below) to keep the install lightweight.
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}', 'icon-*.png', 'favicon.ico', 'apple-touch-icon.png', 'og-image.png'],
+        // Push/notificationclick handlers live in public/push-sw.js so generateSW
+        // stays simple (GO-LIVE-AUDIT #15).
+        importScripts: ['push-sw.js'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/admin/],
         cleanupOutdatedCaches: true,
