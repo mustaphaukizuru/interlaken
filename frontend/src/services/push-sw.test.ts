@@ -1,19 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+// Vite raw import — avoids node:fs so tsc --noEmit stays happy.
+import pushSw from '../../public/push-sw.js?raw';
+import viteConfig from '../../vite.config.ts?raw';
 
 describe('web push service worker companion', () => {
-  const src = readFileSync(resolve(__dirname, '../../public/push-sw.js'), 'utf8');
-
   it('registers push and notificationclick handlers', () => {
-    expect(src).toMatch(/addEventListener\(\s*['"]push['"]/);
-    expect(src).toMatch(/addEventListener\(\s*['"]notificationclick['"]/);
-    expect(src).toContain('showNotification');
-    expect(src).toContain('openWindow');
+    expect(pushSw).toMatch(/addEventListener\(\s*['"]push['"]/);
+    expect(pushSw).toMatch(/addEventListener\(\s*['"]notificationclick['"]/);
+    expect(pushSw).toContain('showNotification');
+    expect(pushSw).toContain('openWindow');
   });
 
   it('is imported by the VitePWA workbox config', () => {
-    const vite = readFileSync(resolve(__dirname, '../../vite.config.ts'), 'utf8');
-    expect(vite).toContain("importScripts: ['push-sw.js']");
+    expect(viteConfig).toContain("importScripts: ['push-sw.js']");
   });
 });
