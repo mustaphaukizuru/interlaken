@@ -14,6 +14,7 @@ import hmac
 import json
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -23,6 +24,8 @@ from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.finance import services
 from apps.finance.models import Discount, FeeSchedule, Invoice, InvoiceLineItem, InvoicePayment
 from apps.payments.models import Payment
+
+GW_CHECKOUT = "apps.payments.gateways.global_payments.GlobalPaymentsGateway.create_checkout"
 
 pytestmark = pytest.mark.django_db
 
@@ -155,6 +158,33 @@ class TestPaymentWebhook:
         assert InvoicePayment.objects.filter(payment=payment, invoice=invoice).exists()
         invoice.refresh_from_db()
         assert invoice.status == Invoice.Status.PENDING  # not paid until webhook
+
+    def test_checkout_exception_marks_failed_no_orphan(self, api_client):
+        """Gateway raise during tuition checkout → FAILED, no PENDING orphan."""
+        invoice, parent = self._invoice_with_parent()
+        api_client.force_authenticate(user=parent)
+        with patch(GW_CHECKOUT, side_effect=RuntimeError("gateway down")):
+            resp = api_client.post(reverse("finance-invoice-pay", args=[invoice.id]), {})
+        assert resp.status_code == 502, resp.data
+        assert not Payment.objects.filter(status=Payment.Status.PENDING).exists()
+        payment = Payment.objects.get()
+        assert payment.status == Payment.Status.FAILED
+        assert "gateway down" in payment.gateway_raw.get("error", "")
+        assert payment.gateway_raw.get("stage") == "create_checkout"
+        # InvoicePayment link remains for audit; invoice stays unpaid.
+        assert InvoicePayment.objects.filter(payment=payment, invoice=invoice).exists()
+        invoice.refresh_from_db()
+        assert invoice.status == Invoice.Status.PENDING
+        assert invoice.amount_paid == Decimal("0.00")
+
+    def test_checkout_empty_url_marks_failed(self, api_client):
+        invoice, parent = self._invoice_with_parent()
+        api_client.force_authenticate(user=parent)
+        with patch(GW_CHECKOUT, return_value=""):
+            resp = api_client.post(reverse("finance-invoice-pay", args=[invoice.id]), {})
+        assert resp.status_code == 502, resp.data
+        assert not Payment.objects.filter(status=Payment.Status.PENDING).exists()
+        assert Payment.objects.get().status == Payment.Status.FAILED
 
     def test_signed_webhook_flips_invoice_paid(self, api_client, settings):
         settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET

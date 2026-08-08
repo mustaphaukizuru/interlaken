@@ -132,9 +132,16 @@ class InvoicePayView(APIView):
             payment, redirect_url = services.start_invoice_payment(invoice, request.user, gateway)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:  # pragma: no cover - gateway construction failure
-            return Response({'error': f'No se pudo iniciar el pago: {e}'},
-                            status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as e:
+            # Gateway / checkout failures: payment already mark_failed inside
+            # start_invoice_payment when a row was created.
+            return Response(
+                {
+                    'error': f'No se pudo iniciar el pago: {e}',
+                    'detail': 'No se pudo iniciar el pago con el proveedor. Intenta de nuevo más tarde.',
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         return Response({
             'payment_id': payment.id,
