@@ -57,6 +57,8 @@ export default function LoginPage() {
       case 'userinfo_failed': return 'No fue posible obtener su perfil de Google. Intente de nuevo.';
       case 'google_unreachable': return 'No fue posible comunicarse con Google. Intente de nuevo.';
       case 'google_unavailable': return 'El acceso con Google no está disponible ahora. Use su correo y contraseña.';
+      case 'not_invited': return 'No hay una cuenta registrada con este correo. Pida al colegio que lo invite o vincule como tutor.';
+      case 'email_unverified': return 'Su correo de Google no está verificado. Verifíquelo e intente de nuevo.';
       case 'backend_unreachable': return 'El servicio no está disponible en este momento. Intente más tarde.';
       default: return oauthError ? 'Ocurrió un error. Intente de nuevo.' : null;
     }

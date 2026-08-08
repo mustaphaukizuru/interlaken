@@ -159,6 +159,10 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_EXTRA_DATA = ['first_name', 'last_name', 'picture']
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
 GOOGLE_REDIRECT_URI = env('GOOGLE_REDIRECT_URI', default='http://localhost:8000/auth/google/callback/')
+# Domains allowed to self-provision a PARENT on first Google login. Empty
+# (default) = invite-only: the email must already exist (admin import / guardian
+# link / CSV). Example: GOOGLE_AUTO_CREATE_DOMAINS=interlaken.edu.mx
+GOOGLE_AUTO_CREATE_DOMAINS = env.list('GOOGLE_AUTO_CREATE_DOMAINS', default=[])
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 
 LOGIN_URL = '/auth/login/'
