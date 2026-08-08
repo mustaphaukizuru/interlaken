@@ -14,6 +14,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
+import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
+import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { financeApi, downloadBlob } from '@/services/api';
 import type { Invoice } from '@/types';
 
@@ -26,6 +28,7 @@ const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
 
 export default function ColegiaturasPage() {
   const queryClient = useQueryClient();
+  const childId = useSelectedChildStore((s) => s.childId);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   const [gateway, setGateway] = useState('global_payments');
 
@@ -60,12 +63,23 @@ export default function ColegiaturasPage() {
     onError: () => toast.error('No fue posible descargar el comprobante.'),
   });
 
-  const outstanding = (invoices ?? [])
+  const studentsMap = new Map<number, { id: number; name: string; grade?: string }>();
+  for (const inv of invoices ?? []) {
+    if (!studentsMap.has(inv.student_id)) {
+      studentsMap.set(inv.student_id, { id: inv.student_id, name: inv.student_name, grade: inv.grade });
+    }
+  }
+  const students = Array.from(studentsMap.values());
+  const visible = childId == null
+    ? (invoices ?? [])
+    : (invoices ?? []).filter((i) => i.student_id === childId);
+
+  const outstanding = visible
     .filter((i) => i.status !== 'paid' && i.status !== 'cancelled')
     .reduce((sum, i) => sum + Math.max(0, parseFloat(i.balance_due)), 0);
 
   // Overpayments show as negative balance_due — surface as credit (saldo a favor).
-  const creditTotal = (invoices ?? [])
+  const creditTotal = visible
     .reduce((sum, i) => {
       const due = parseFloat(i.balance_due);
       return due < 0 ? sum + (-due) : sum;
@@ -95,6 +109,10 @@ export default function ColegiaturasPage() {
         </div>
       </div>
 
+      {students.length > 1 && (
+        <ChildSwitcher students={students} allowAll />
+      )}
+
       {/* Pay modal */}
       <Modal open={!!payInvoice} onClose={() => setPayInvoice(null)} title="Pagar colegiatura">
         {payInvoice && (
@@ -121,11 +139,19 @@ export default function ColegiaturasPage() {
           <ErrorState onRetry={() => refetch()} />
         ) : isLoading ? (
           <ListSkeleton />
-        ) : !invoices?.length ? (
-          <EmptyState icon={Receipt} title="Sin colegiaturas" description="Las colegiaturas emitidas aparecerán aquí." />
+        ) : !visible.length ? (
+          <EmptyState
+            icon={Receipt}
+            title="Sin colegiaturas"
+            description={
+              childId != null && (invoices?.length ?? 0) > 0
+                ? 'No hay colegiaturas para el alumno seleccionado.'
+                : 'Las colegiaturas emitidas aparecerán aquí.'
+            }
+          />
         ) : (
           <div className="divide-y divide-cream">
-            {invoices.map((inv) => {
+            {visible.map((inv) => {
               const meta = statusMeta[inv.status] ?? statusMeta.pending;
               const Icon = meta.icon;
               const balanceDue = parseFloat(inv.balance_due);

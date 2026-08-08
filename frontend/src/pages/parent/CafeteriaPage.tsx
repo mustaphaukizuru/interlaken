@@ -10,13 +10,14 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { Pagination } from '@/components/ui/Pagination';
+import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
+import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 
@@ -50,6 +51,8 @@ function topupErrorMessage(err: unknown): string {
 
 export default function CafeteriaPage() {
   const queryClient = useQueryClient();
+  const childId = useSelectedChildStore((s) => s.childId);
+  const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
   const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
@@ -58,12 +61,17 @@ export default function CafeteriaPage() {
   const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
   const [thresholdValue, setThresholdValue] = useState('');
 
-  // History filters + pagination
-  const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
+  // History filters + pagination — default student filter follows portal child switcher.
+  const [filterStudent, setFilterStudent] = useState<number | 'all'>(() => childId ?? 'all');
   const [filterType, setFilterType] = useState<TypeFilter>('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [page, setPage] = useState(1);
+
+  // Keep history filter aligned when the parent switches alumno elsewhere in the portal.
+  useEffect(() => {
+    setFilterStudent(childId ?? 'all');
+  }, [childId]);
 
   // Any filter change resets to the first page (stale page would show empty).
   useEffect(() => { setPage(1); }, [filterStudent, filterType, filterFrom, filterTo]);
@@ -189,9 +197,8 @@ export default function CafeteriaPage() {
     setFilterFrom('');
     setFilterTo('');
     setFilterStudent('all');
+    setChildId(null);
   };
-
-  if (balancesLoading) return <LoadingSpinner size="lg" className="mt-20" />;
 
   if (balancesError) {
     return (
@@ -205,6 +212,17 @@ export default function CafeteriaPage() {
     );
   }
 
+  const switcherStudents = (balances ?? []).map((b) => ({
+    id: b.student.id,
+    name: b.student.user.full_name,
+    grade: b.student.grade,
+    group: b.student.group,
+  }));
+
+  const visibleBalances = childId == null
+    ? (balances ?? [])
+    : (balances ?? []).filter((b) => b.student.id === childId);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -213,7 +231,7 @@ export default function CafeteriaPage() {
           <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
-          {balances && balances.length > 0 && (
+          {!balancesLoading && balances && balances.length > 0 && (
             <Button
               variant="secondary"
               size="sm"
@@ -224,23 +242,45 @@ export default function CafeteriaPage() {
               <Download className="w-3 h-3" /> Descargar movimientos
             </Button>
           )}
-          <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
+          <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} disabled={balancesLoading} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
             <RefreshCw className="w-3 h-3" /> Actualizar
           </Button>
         </div>
       </div>
 
+      {balancesLoading ? (
+        <div className="space-y-4" aria-busy="true" aria-label="Cargando cafetería">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[200px] rounded-xl2" />)}
+          </div>
+          <Card><ListSkeleton rows={4} /></Card>
+        </div>
+      ) : null}
+
+      {!balancesLoading && switcherStudents.length > 1 && (
+        <ChildSwitcher
+          students={switcherStudents}
+          allowAll
+          className="mb-1"
+        />
+      )}
+
       {/* Balance cards */}
+      {!balancesLoading && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {balances?.map((b) => {
+        {visibleBalances.map((b) => {
           // Prefer API flag (balance <= threshold); fall back to same inequality.
           const isLow = typeof b.is_low_balance === 'boolean'
             ? b.is_low_balance
             : parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
           const notLinked = !b.student.loyverse_id;
           const bal = parseFloat(b.balance);
+          const isSelected = childId === b.student.id;
           return (
-            <Card key={b.id} className="flex flex-col">
+            <Card
+              key={b.id}
+              className={`flex flex-col ${isSelected ? 'ring-2 ring-purple/35' : ''}`}
+            >
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
                   <Coffee className="h-5 w-5" />
@@ -293,9 +333,10 @@ export default function CafeteriaPage() {
           );
         })}
       </div>
+      )}
 
       {/* No cafeteria accounts — school must link children to Loyverse. */}
-      {balances && balances.length === 0 && (
+      {!balancesLoading && balances && balances.length === 0 && (
         <Card>
           <EmptyState
             icon={Coffee}
@@ -418,7 +459,7 @@ export default function CafeteriaPage() {
       </Modal>
 
       {/* Transactions — only when the family actually has cafeteria accounts */}
-      {balances && balances.length > 0 && (
+      {!balancesLoading && balances && balances.length > 0 && (
       <Card title="Historial de movimientos">
         {/* Filters */}
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
@@ -426,7 +467,11 @@ export default function CafeteriaPage() {
             <select
               className="input-field min-h-[44px] text-sm lg:w-auto"
               value={filterStudent}
-              onChange={(e) => setFilterStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              onChange={(e) => {
+                const next = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                setFilterStudent(next);
+                setChildId(next === 'all' ? null : next);
+              }}
               aria-label="Filtrar por alumno"
             >
               <option value="all">Todos los alumnos</option>

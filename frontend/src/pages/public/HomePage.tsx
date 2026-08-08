@@ -15,6 +15,7 @@ import type { OpenSchoolEvent } from '@/types';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
 import { Reveal } from '@/components/ui/Reveal';
+import Logo from '@/components/ui/Logo';
 
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
@@ -22,8 +23,6 @@ const STATS = [
   { value: String(SCHOOL_YEARS), label: 'Años', color: 'var(--purple-mid)', icon: CalendarDays },
   { value: '95%', label: 'Aprovechamiento', color: 'var(--green-mid)', icon: TrendingUp },
 ];
-
-const TRUST_BADGES = ['Bilingüe', `${SCHOOL_YEARS} años`, 'Certificación SEP', 'Grupos reducidos'];
 
 const LEVELS = [
   { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: 'var(--green)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
@@ -178,58 +177,60 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* ── HERO ── */}
-      <section className="relative overflow-hidden bg-dark text-white">
-        <div className="pointer-events-none absolute -top-40 -left-28 hidden h-[520px] w-[520px] rounded-full sm:block" style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.55), rgba(8,5,22,0) 68%)' }} />
-        <div className="pointer-events-none absolute -bottom-36 -right-24 hidden h-[420px] w-[420px] rounded-full sm:block" style={{ background: 'radial-gradient(circle, rgba(71,160,40,0.2), rgba(8,5,22,0) 66%)' }} />
-        <Container className="relative grid gap-10 !py-14 sm:!py-16 lg:!py-[72px]">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
-            {/* Text */}
-            <div>
-              <span className="section-label-pink inline-flex">Ciclo Escolar {CURRENT_CYCLE} · Inscripciones Abiertas</span>
-              <h1 className="mt-3.5 font-head font-black leading-[1.05] tracking-[-0.03em] text-fluid-5xl">
-                Formando Líderes<br />
-                <span style={{ background: 'linear-gradient(100deg, var(--pink) 0%, var(--purple-mid) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>con Excelencia</span>
-              </h1>
-              <p className="mt-[18px] max-w-[520px] text-[17px] leading-relaxed text-white/60">
-                Educación bilingüe de excelencia en Tlalnepantla. Desde preescolar hasta secundaria, formamos personas íntegras y preparadas para el mundo.
-              </p>
-              {/* Trust badges */}
-              <div className="mt-6 flex flex-wrap gap-2.5">
-                {TRUST_BADGES.map((b) => (
-                  <span key={b} className="inline-flex items-center gap-[7px] rounded-full border border-white/[0.14] bg-white/[0.06] px-3.5 py-[7px] text-[13px] font-semibold text-white/[0.86]">
-                    <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-green-400/[0.18]">
-                      <Check size={12} color="var(--green-mid)" strokeWidth={3} />
-                    </span>
-                    {b}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-7 flex flex-wrap gap-3.5">
-                <Link to="/pre-registro" className="btn-pink btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark">Inicie su pre-registro <ArrowRight size={17} /></Link>
-                <Link to="/login" className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark">Portal Familias</Link>
-              </div>
-            </div>
-            {/* Image + floating cards */}
-            <div className="relative">
-              <img
-                src="/assets/court-wide.webp"
-                alt="Colegio Interlaken"
-                {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
-                decoding="async"
-                width={800}
-                height={600}
-                className="aspect-[4/3] h-auto w-full max-w-full rounded-[20px] border border-white/[0.14] object-cover shadow-[0_30px_60px_-20px_rgba(0,0,0,0.6)]"
-                onError={hideOnError}
-              />
-              <div className="absolute top-4 left-2 flex items-center gap-2.5 rounded-[14px] bg-white px-4 py-3 text-ink shadow-[0_16px_30px_-12px_rgba(0,0,0,0.4)] sm:-left-3.5">
-                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-amber/10"><Award size={18} color="var(--amber)" /></div>
-                <div><div className="font-head text-sm font-extrabold">Incorporado a la SEP</div><div className="text-[11px] text-muted">Validez oficial</div></div>
-              </div>
-              <div className="absolute bottom-4 right-2 flex items-center gap-2.5 rounded-[14px] bg-white px-4 py-3 text-ink shadow-[0_16px_30px_-12px_rgba(0,0,0,0.4)] sm:-right-3.5">
-                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-green-500/10"><TrendingUp size={18} color="var(--green)" /></div>
-                <div><div className="font-head text-sm font-extrabold">Promedio 9.2</div><div className="text-[11px] text-muted">Ciclo anterior</div></div>
-              </div>
+      {/* ── HERO: brand + one headline + one line + CTAs over full-bleed campus ── */}
+      <section className="relative flex min-h-[min(92svh,820px)] items-end overflow-hidden bg-dark text-white sm:min-h-[min(88svh,760px)]">
+        <img
+          src="/assets/court-wide.webp"
+          alt="Campus Colegio Interlaken"
+          {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
+          decoding="async"
+          width={1600}
+          height={900}
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          onError={hideOnError}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(8,5,22,0.35) 0%, rgba(8,5,22,0.55) 42%, rgba(8,5,22,0.92) 100%)',
+          }}
+        />
+        <div
+          className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
+          style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.4), transparent 68%)' }}
+        />
+        <Container className="relative w-full !pb-12 !pt-28 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
+          <div className="max-w-[640px]">
+            <Logo variant="horizontal" theme="dark" size={56} eager className="mb-6 sm:mb-7" />
+            <h1 className="font-head font-black leading-[1.05] tracking-[-0.03em] text-fluid-5xl">
+              Formando líderes<br />
+              <span
+                style={{
+                  background: 'linear-gradient(100deg, var(--pink) 0%, var(--purple-mid) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                con excelencia
+              </span>
+            </h1>
+            <p className="mt-4 max-w-[480px] text-[16px] leading-relaxed text-white/75 sm:text-[17px]">
+              Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {CURRENT_CYCLE}.
+            </p>
+            <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap sm:gap-3.5">
+              <Link
+                to="/pre-registro"
+                className="btn-pink btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark"
+              >
+                Inicie su pre-registro <ArrowRight size={17} />
+              </Link>
+              <Link
+                to="/login"
+                className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark"
+              >
+                Portal Familias
+              </Link>
             </div>
           </div>
         </Container>
