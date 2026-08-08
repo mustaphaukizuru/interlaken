@@ -76,6 +76,9 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     gateway        = serializers.SerializerMethodField()
     payment_status = serializers.SerializerMethodField()
     gateway_tx_id  = serializers.SerializerMethodField()
+    needs_pos_load = serializers.SerializerMethodField()
+    pos_loaded_by_name = serializers.CharField(
+        source='pos_loaded_by.full_name', read_only=True, default='')
 
     class Meta:
         model = TopUpRequest
@@ -84,7 +87,15 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'method', 'method_display', 'status', 'status_display',
             'gateway', 'payment_status', 'gateway_tx_id',
             'created_at', 'processed_at',
+            'pos_loaded_at', 'pos_loaded_by_name', 'needs_pos_load',
         ]
+
+    def get_needs_pos_load(self, obj):
+        return (
+            obj.method == TopUpRequest.Method.ONLINE
+            and obj.status == TopUpRequest.Status.COMPLETED
+            and obj.pos_loaded_at is None
+        )
 
     def _payment(self, obj):
         # ``payments`` is the reverse accessor of Payment.related_topup.

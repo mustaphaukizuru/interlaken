@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.cafeteria import services
@@ -241,6 +242,98 @@ class TestTopUpLog:
     def test_log_is_admin_only(self, api_client):
         api_client.force_authenticate(user=ParentFactory())
         assert api_client.get(reverse("admin-topups")).status_code == 403
+
+    def test_needs_pos_filter_lists_unloaded_online_completed(self, api_client):
+        student = StudentProfileFactory()
+        waiting = TopUpRequest.objects.create(
+            student=student, amount=Decimal("100"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+        )
+        TopUpRequest.objects.create(
+            student=student, amount=Decimal("50"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+            pos_loaded_at=timezone.now(),
+        )
+        TopUpRequest.objects.create(
+            student=student, amount=Decimal("80"),
+            method=TopUpRequest.Method.OFFICE,
+            status=TopUpRequest.Status.COMPLETED,
+        )
+        TopUpRequest.objects.create(
+            student=student, amount=Decimal("60"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.PENDING,
+        )
+
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.get(reverse("admin-topups"), {"needs_pos": "1"})
+        assert resp.status_code == 200
+        rows = resp.data["results"]
+        assert len(rows) == 1
+        assert rows[0]["id"] == waiting.id
+        assert rows[0]["needs_pos_load"] is True
+
+
+class TestMarkPosLoaded:
+    def test_marks_online_completed_idempotent(self, api_client):
+        admin = AdminFactory()
+        student = StudentProfileFactory()
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("120"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+        )
+        api_client.force_authenticate(user=admin)
+        url = reverse("admin-topup-pos-loaded", args=[topup.id])
+        first = api_client.post(url, {}, format="json")
+        assert first.status_code == 200, first.data
+        assert first.data["needs_pos_load"] is False
+        topup.refresh_from_db()
+        assert topup.pos_loaded_at is not None
+        assert topup.pos_loaded_by_id == admin.id
+        stamped = topup.pos_loaded_at
+
+        second = api_client.post(url, {}, format="json")
+        assert second.status_code == 200
+        topup.refresh_from_db()
+        assert topup.pos_loaded_at == stamped
+
+        empty = api_client.get(reverse("admin-topups"), {"needs_pos": "1"})
+        assert empty.data["results"] == []
+
+    def test_rejects_office_and_pending(self, api_client):
+        student = StudentProfileFactory()
+        office = TopUpRequest.objects.create(
+            student=student, amount=Decimal("40"),
+            method=TopUpRequest.Method.OFFICE,
+            status=TopUpRequest.Status.COMPLETED,
+        )
+        pending = TopUpRequest.objects.create(
+            student=student, amount=Decimal("40"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.PENDING,
+        )
+        api_client.force_authenticate(user=AdminFactory())
+        assert api_client.post(
+            reverse("admin-topup-pos-loaded", args=[office.id]), {}, format="json",
+        ).status_code == 400
+        assert api_client.post(
+            reverse("admin-topup-pos-loaded", args=[pending.id]), {}, format="json",
+        ).status_code == 400
+
+    def test_mark_is_admin_only(self, api_client):
+        student = StudentProfileFactory()
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("40"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+        )
+        api_client.force_authenticate(user=ParentFactory())
+        assert api_client.post(
+            reverse("admin-topup-pos-loaded", args=[topup.id]), {}, format="json",
+        ).status_code == 403
 
 
 class TestReconcile:

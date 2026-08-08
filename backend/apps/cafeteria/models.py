@@ -5,7 +5,7 @@ cafeteria/models.py — Loyverse cafeteria integration & balance tracking.
 from django.db import models
 from django.utils import timezone
 
-from apps.accounts.models import StudentProfile
+from apps.accounts.models import StudentProfile, User
 
 
 class CafeteriaBalance(models.Model):
@@ -94,10 +94,27 @@ class TopUpRequest(models.Model):
     processed_at = models.DateTimeField(null=True, blank=True)
     notes        = models.TextField(blank=True)
 
+    # Online top-ups credit the local ledger only (R1); staff must manually load
+    # the amount into Loyverse POS so the child can spend. Cleared when marked.
+    pos_loaded_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When staff loaded this online top-up into Loyverse POS.',
+    )
+    pos_loaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='pos_loaded_topups',
+    )
+
     class Meta:
         verbose_name = 'Solicitud de Recarga'
         verbose_name_plural = 'Solicitudes de Recarga'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['method', 'status', 'pos_loaded_at'],
+                name='cafeteria_topup_pos_queue',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.student} — ${self.amount} ({self.status})'

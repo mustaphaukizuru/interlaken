@@ -286,8 +286,18 @@ export const cafeteriaApi = {
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
-  getTopUpLog: (params?: { status?: string; method?: string; from?: string; to?: string; page?: number }) =>
+  getTopUpLog: (params?: {
+    status?: string;
+    method?: string;
+    from?: string;
+    to?: string;
+    needs_pos?: boolean | number | string;
+    page?: number;
+  }) =>
     api.get('/cafeteria/admin/topups/', { params }),
+
+  markTopUpPosLoaded: (topupId: number) =>
+    api.post(`/cafeteria/admin/topup/${topupId}/pos-loaded/`),
 
   getStudentDetail: (studentId: number) =>
     api.get(`/cafeteria/admin/student/${studentId}/`),
