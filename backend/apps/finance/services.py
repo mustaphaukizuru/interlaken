@@ -327,7 +327,22 @@ def start_invoice_payment(invoice, user, gateway_name=None):
     InvoicePayment.objects.create(invoice=invoice, payment=payment, amount=payment.amount)
 
     return_url = getattr(settings, 'TUITION_RETURN_URL', '')
-    redirect_url = gateway.create_checkout(payment, return_url=return_url or None)
+    # Mirror cafeteria top-up: never leave an unreachable PENDING payment when
+    # the gateway checkout call fails (no HPP URL was issued).
+    try:
+        redirect_url = gateway.create_checkout(payment, return_url=return_url or None)
+    except Exception as exc:
+        logger.exception(
+            'create_checkout failed for tuition payment=%s gateway=%s invoice=%s',
+            payment.id, gateway.name, invoice.id,
+        )
+        payment.mark_failed(exc, stage='create_checkout')
+        raise
+
+    if not redirect_url:
+        payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
+        raise RuntimeError('No se pudo iniciar el pago con el proveedor.')
+
     return payment, redirect_url
 
 

@@ -209,7 +209,7 @@ class TestPaymentInitiate:
             reverse("payment-initiate"),
             {
                 "amount": "500.00",
-                "payment_type": "tuition",
+                "payment_type": "other",
             },
             format="json",
         )
@@ -222,8 +222,8 @@ class TestPaymentInitiate:
             reverse("payment-initiate"),
             {
                 "amount": "500.00",
-                "payment_type": "tuition",
-                "description": "Colegiatura",
+                "payment_type": "other",
+                "description": "Pago escolar",
             },
             format="json",
         )
@@ -231,6 +231,19 @@ class TestPaymentInitiate:
         assert resp.data["status"] == Payment.Status.PENDING
         payment = Payment.objects.get(pk=resp.data["payment_id"])
         assert payment.user == user
+
+    @pytest.mark.parametrize("payment_type", ["tuition", "cafeteria"])
+    def test_rejects_unlinked_money_types(self, api_client, payment_type):
+        """tuition/cafeteria must use their linked endpoints — never bare initiate."""
+        api_client.force_authenticate(user=ParentFactory())
+        resp = api_client.post(
+            reverse("payment-initiate"),
+            {"amount": "500.00", "payment_type": payment_type},
+            format="json",
+        )
+        assert resp.status_code == 400, resp.data
+        assert "payment_type" in resp.data
+        assert not Payment.objects.exists()
 
     def test_history_is_scoped_to_the_user(self, api_client):
         mine = ParentFactory()

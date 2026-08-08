@@ -32,7 +32,11 @@ CLOSED_STATUSES = (Payment.Status.FAILED, Payment.Status.REFUNDED)
 
 
 class PaymentInitiateView(APIView):
-    """POST /api/v1/payments/initiate/ — create a pending payment + hosted-page URL."""
+    """POST /api/v1/payments/initiate/ — create a pending payment + hosted-page URL.
+
+    Rejects ``tuition`` / ``cafeteria`` (must use invoice-pay / cafeteria top-up so a
+    SUCCESS webhook has something to credit). ``enrollment`` / ``other`` remain open.
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
