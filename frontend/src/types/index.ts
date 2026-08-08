@@ -269,6 +269,8 @@ export interface DashboardData {
   children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;
   cafeteria_balances?: Array<{ student_name: string; balance: string; low: boolean; last_synced: string }>;
   recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
+  /** True when the family account has no linked StudentProfile yet. */
+  needs_family_link?: boolean;
   student_id?: string;
   grade?: string;
   group?: string;
