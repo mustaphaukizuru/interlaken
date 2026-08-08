@@ -521,7 +521,8 @@ export const portalApi = {
     api.post('/portal/announcements/mark-read/', { ids }),
 
   // Comunicados (announcements) for families — list, detail, and replies.
-  getAnnouncements: () => api.get('/portal/announcements/'),
+  getAnnouncements: (params?: { page?: number }) =>
+    api.get('/portal/announcements/', { params }),
   getAnnouncement: (id: number) => api.get(`/portal/announcements/${id}/`),
   getAnnouncementComments: (id: number) =>
     api.get(`/portal/announcements/${id}/comments/`),
