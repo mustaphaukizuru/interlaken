@@ -297,14 +297,19 @@ def send_payment_reminders(as_of=None):
 # ── online payment (reuses Prompt 10 gateway/webhook) ─────────────────────────
 
 def start_invoice_payment(invoice, user, gateway_name=None):
-    """Create a pending ``Payment`` + ``InvoicePayment`` link and return its HPP URL.
+    """Create (or reuse) a pending ``Payment`` + ``InvoicePayment`` and return its HPP URL.
 
     Reuses the Prompt 10 gateway abstraction. The invoice is credited later by the
     **signed** webhook (``complete_invoice_payment``), never here. Returns
     ``(payment, redirect_url)``. Raises ``ValueError`` if the invoice isn't payable.
+
+    Concurrent initiates for the same invoice reuse a fresh open checkout (same
+    ``payment_id``) instead of opening a second HPP session that could double-charge.
+    Stale open checkouts are failed before a new one is created.
     """
     from apps.payments.gateways import GATEWAY_CHOICES, get_gateway
     from apps.payments.models import Payment
+    from apps.payments.services import reuse_or_clear_invoice_checkout
 
     if invoice.status == Invoice.Status.CANCELLED:
         raise ValueError('La factura está cancelada.')
@@ -315,26 +320,52 @@ def start_invoice_payment(invoice, user, gateway_name=None):
         raise ValueError('Pasarela de pago no válida.')
     gateway = get_gateway((gateway_name or '').lower() or None)
 
-    payment = Payment.objects.create(
-        user=user,
-        payment_type=Payment.Type.TUITION,
-        amount=invoice.balance_due,
-        currency=invoice.currency,
-        description=f'Colegiatura {_period_label(invoice.period)} — {invoice.student.user.full_name}',
-        gateway=gateway.name,
-        status=Payment.Status.PENDING,
-    )
-    InvoicePayment.objects.create(invoice=invoice, payment=payment, amount=payment.amount)
-
     return_url = getattr(settings, 'TUITION_RETURN_URL', '')
-    # Mirror cafeteria top-up: never leave an unreachable PENDING payment when
-    # the gateway checkout call fails (no HPP URL was issued).
+
+    with transaction.atomic():
+        inv = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if inv.status == Invoice.Status.CANCELLED:
+            raise ValueError('La factura está cancelada.')
+        if inv.is_settled:
+            raise ValueError('La factura ya está pagada.')
+
+        existing = reuse_or_clear_invoice_checkout(inv)
+        if existing is not None and existing.gateway == gateway.name:
+            payment = existing
+            due = inv.balance_due
+            if payment.amount != due:
+                payment.amount = due
+                payment.save(update_fields=['amount', 'updated_at'])
+                link = getattr(payment, 'invoice_payment', None)
+                if link is not None and link.amount != due:
+                    link.amount = due
+                    link.save(update_fields=['amount'])
+        else:
+            if existing is not None:
+                existing.mark_failed(
+                    'checkout superseded — gateway change', stage='supersede')
+            payment = Payment.objects.create(
+                user=user,
+                payment_type=Payment.Type.TUITION,
+                amount=inv.balance_due,
+                currency=inv.currency,
+                description=(
+                    f'Colegiatura {_period_label(inv.period)} — '
+                    f'{inv.student.user.full_name}'
+                ),
+                gateway=gateway.name,
+                status=Payment.Status.PENDING,
+            )
+            InvoicePayment.objects.create(
+                invoice=inv, payment=payment, amount=payment.amount)
+
+    # Never leave an unreachable PENDING payment when checkout creation fails.
     try:
         redirect_url = gateway.create_checkout(payment, return_url=return_url or None)
     except Exception as exc:
         logger.exception(
             'create_checkout failed for tuition payment=%s gateway=%s invoice=%s',
-            payment.id, gateway.name, invoice.id,
+            payment.id, gateway.name, inv.id,
         )
         payment.mark_failed(exc, stage='create_checkout')
         raise

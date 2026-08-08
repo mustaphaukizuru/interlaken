@@ -55,17 +55,27 @@ class DashboardView(APIView):
         user = request.user
         data = {}
 
-        # student == family login (shared account): a self-guardian student is in
-        # its own `parents` set, so anyone who guards students — a parent OR a
-        # self-guardian student — gets the full family dashboard.
-        family_students = StudentProfile.objects.filter(parents=user).select_related('user')
-        if user.role in (User.Role.PARENT, User.Role.STUDENT) and family_students.exists():
+        # Family portal: parents via guardian M2M; school-email students via M2M
+        # self-guardian OR their own StudentProfile (defense when M2M is missing).
+        family_students = list(
+            StudentProfile.objects.filter(parents=user).select_related('user')
+        )
+        if user.role == User.Role.STUDENT and not family_students:
+            own = (
+                StudentProfile.objects.filter(user_id=user.pk)
+                .select_related('user')
+                .first()
+            )
+            if own is not None:
+                family_students = [own]
+
+        if user.role in (User.Role.PARENT, User.Role.STUDENT) and family_students:
             students = family_students
             balances = CafeteriaBalance.objects.filter(student__in=students)
             recent_payments = Payment.objects.filter(user=user).order_by('-created_at')[:5]
 
             data = {
-                'children_count': students.count(),
+                'children_count': len(students),
                 'children': [
                     {
                         'id': s.id,
@@ -96,20 +106,6 @@ class DashboardView(APIView):
                     for p in recent_payments
                 ],
             }
-
-        elif user.role == User.Role.STUDENT:
-            try:
-                profile = user.student_profile
-                balance, _ = CafeteriaBalance.objects.get_or_create(student=profile)
-                data = {
-                    'student_id': profile.student_id,
-                    'grade': profile.grade,
-                    'group': profile.group,
-                    'cafeteria_balance': str(balance.balance),
-                    'is_low_balance': balance.is_low_balance,
-                }
-            except StudentProfile.DoesNotExist:
-                data = {}
 
         elif user.role == User.Role.ADMIN:
             total_revenue = Payment.objects.filter(
