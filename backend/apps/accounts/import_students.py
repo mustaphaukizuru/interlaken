@@ -173,6 +173,10 @@ class ImportStudentsView(APIView):
                         group=grupo, loyverse_id=loyverse_id)
                     stats['created_students'] += 1
 
+                # School-email family login: alumno is its own guardian
+                # (same idempotent pattern as Loyverse import).
+                profile.parents.add(profile.user)
+
                 detail = f'Alumno {action}'
                 if email_padre:
                     parent = User.objects.filter(email=email_padre).first()

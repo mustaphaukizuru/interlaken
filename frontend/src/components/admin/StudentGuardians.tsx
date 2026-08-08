@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Users, UserPlus, Unlink } from 'lucide-react';
+import { Users, UserPlus, Unlink, Link2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +17,19 @@ interface Guardian {
   phone?: string;
   whatsapp?: string;
   relationship?: string;
+  is_self?: boolean;
+}
+
+interface GuardiansResponse {
+  student: {
+    id: number;
+    user_id: number;
+    name: string;
+    email: string;
+    student_id: string;
+    grade: string;
+  };
+  guardians: Guardian[];
 }
 
 interface Props {
@@ -33,9 +46,7 @@ export function StudentGuardians({ studentId }: Props) {
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-student-guardians', studentId],
-    queryFn: async () => (await portalApi.listGuardians(studentId)).data as {
-      guardians: Guardian[];
-    },
+    queryFn: async () => (await portalApi.listGuardians(studentId)).data as GuardiansResponse,
   });
 
   const invalidate = () => {
@@ -43,17 +54,26 @@ export function StudentGuardians({ studentId }: Props) {
   };
 
   const link = useMutation({
-    mutationFn: () =>
-      portalApi.linkGuardian(studentId, {
-        email: email.trim(),
-        full_name: fullName.trim() || undefined,
-        phone: phone.trim() || undefined,
-        relationship: relationship.trim() || undefined,
-      }),
+    mutationFn: (payload: {
+      email: string;
+      full_name?: string;
+      phone?: string;
+      relationship?: string;
+    }) => portalApi.linkGuardian(studentId, payload),
     onSuccess: (resp) => {
-      const body = resp.data as { created_user: boolean; already_linked: boolean };
+      const body = resp.data as {
+        created_user: boolean;
+        already_linked: boolean;
+        guardian?: Guardian;
+      };
       if (body.already_linked) {
-        toast.success('Ese tutor ya estaba vinculado.');
+        toast.success(
+          body.guardian?.is_self
+            ? 'La cuenta familiar ya estaba vinculada.'
+            : 'Ese tutor ya estaba vinculado.',
+        );
+      } else if (body.guardian?.is_self) {
+        toast.success('Cuenta familiar del alumno vinculada.');
       } else if (body.created_user) {
         toast.success('Tutor creado y vinculado. Puede activar su cuenta con «Olvidé mi contraseña».');
       } else {
@@ -82,6 +102,8 @@ export function StudentGuardians({ studentId }: Props) {
   });
 
   const guardians = data?.guardians ?? [];
+  const studentEmail = data?.student?.email ?? '';
+  const selfLinked = guardians.some((g) => g.is_self);
 
   return (
     <Card
@@ -93,6 +115,26 @@ export function StudentGuardians({ studentId }: Props) {
         </Button>
       }
     >
+      {!selfLinked && studentEmail && !isLoading && !isError && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-cream/60 px-4 py-3">
+          <p className="min-w-0 text-sm text-ink">
+            En Interlaken la familia entra con el correo escolar del alumno.
+            <span className="mt-0.5 block truncate text-xs text-subtle">{studentEmail}</span>
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            loading={link.isPending}
+            disabled={link.isPending}
+            onClick={() => link.mutate({ email: studentEmail })}
+          >
+            <Link2 className="h-4 w-4" aria-hidden="true" />
+            Vincular cuenta del alumno
+          </Button>
+        </div>
+      )}
+
       {open && (
         <form
           className="mb-5 grid gap-3 rounded-2xl bg-cream/60 p-4 sm:grid-cols-2"
@@ -102,7 +144,12 @@ export function StudentGuardians({ studentId }: Props) {
               toast.error('Indique el correo del tutor.');
               return;
             }
-            link.mutate();
+            link.mutate({
+              email: email.trim(),
+              full_name: fullName.trim() || undefined,
+              phone: phone.trim() || undefined,
+              relationship: relationship.trim() || undefined,
+            });
           }}
         >
           <Input
@@ -148,18 +195,20 @@ export function StudentGuardians({ studentId }: Props) {
         <EmptyState
           icon={Users}
           title="Sin tutores vinculados"
-          description="Vincule el correo del padre o tutor para que vea cafetería, colegiaturas y comunicados."
+          description="Vincule la cuenta escolar del alumno o el correo de un padre/tutor."
         />
       ) : (
         <ul className="divide-y divide-cream">
           {guardians.map((g) => (
             <li key={g.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{g.full_name || g.email}</p>
+                <p className="truncate text-sm font-medium text-ink">
+                  {g.is_self ? 'Cuenta familiar' : g.full_name || g.email}
+                </p>
                 <p className="truncate text-xs text-subtle">
                   {g.email}
                   {g.relationship ? ` · ${g.relationship}` : ''}
-                  {(g.phone || g.whatsapp) ? ` · ${g.phone || g.whatsapp}` : ''}
+                  {!g.is_self && (g.phone || g.whatsapp) ? ` · ${g.phone || g.whatsapp}` : ''}
                 </p>
               </div>
               <Button
@@ -168,7 +217,10 @@ export function StudentGuardians({ studentId }: Props) {
                 size="sm"
                 disabled={unlink.isPending}
                 onClick={() => {
-                  if (window.confirm(`¿Desvincular a ${g.full_name || g.email} de este alumno?`)) {
+                  const label = g.is_self
+                    ? 'la cuenta familiar'
+                    : (g.full_name || g.email);
+                  if (window.confirm(`¿Desvincular a ${label} de este alumno?`)) {
                     unlink.mutate(g.id);
                   }
                 }}
