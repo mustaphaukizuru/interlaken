@@ -4,13 +4,14 @@ import { z } from 'zod';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
+import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { PreRegistrationData } from '@/types';
 
 const schema = z.object({
@@ -105,6 +106,20 @@ export default function PreRegisterPage() {
         title="Pre-Registro"
         subtitle="Menos de 5 minutos. Recibirá confirmación inmediata y un asesor le contactará en 2 días hábiles."
       />
+
+      {/* Trust strip — reinforces cycle + time commitment under FunnelHero */}
+      <section className="border-b border-line bg-cream-2">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2.5 px-4 py-4 text-sm text-ink sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span className="inline-flex items-center gap-2 font-medium">
+            <Clock className="h-4 w-4 text-green-dark" aria-hidden="true" />
+            Menos de 5 minutos
+          </span>
+          <span className="inline-flex items-center gap-2 text-muted">
+            <CalendarDays className="h-4 w-4 text-pink" aria-hidden="true" />
+            Ciclo Escolar {CURRENT_CYCLE}
+          </span>
+        </div>
+      </section>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <form onSubmit={handleSubmit(onSubmit)} className="card space-y-6" noValidate>

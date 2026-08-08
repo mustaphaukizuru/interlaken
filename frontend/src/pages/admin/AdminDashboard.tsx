@@ -49,11 +49,12 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Quick actions */}
+        {/* Quick actions — green = ops, pink = admissions; no improvised solid fills */}
         <div className="mb-6 flex flex-wrap gap-3">
           <Link to="/admin/cafeteria" className="btn-green"><RefreshCw size={16} /> Sincronizar Loyverse</Link>
-          <Link to="/admin/admisiones" className="btn bg-purple text-white"><UserPlus size={16} /> Nueva Admisión</Link>
+          <Link to="/admin/admisiones" className="btn-pink"><UserPlus size={16} /> Nueva Admisión</Link>
           <Link to="/admin/alumnos" className="btn-outline"><Users size={16} /> Ver Alumnos</Link>
+          <Link to="/admin/comunicados" className="btn-outline"><Bell size={16} /> Comunicados</Link>
         </div>
 
         {/* Analytics — reuses the staff chart suite (real data-viz on the landing) */}

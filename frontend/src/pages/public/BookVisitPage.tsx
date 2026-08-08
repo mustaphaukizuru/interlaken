@@ -14,7 +14,8 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
@@ -163,25 +164,43 @@ export default function BookVisitPage() {
               <div>
                 <h2 className="font-semibold text-fluid-lg text-ink mb-4">Elija una fecha y horario</h2>
                 {isLoading ? (
-                  <div className="flex justify-center py-10" aria-busy="true" aria-label="Cargando horarios">
-                    <LoadingSpinner />
+                  <div className="space-y-3" aria-busy="true" aria-label="Cargando horarios">
+                    <div className="skeleton h-10 w-48 rounded-lg" />
+                    <div className="skeleton h-[280px] rounded-xl2" />
+                    <div className="flex gap-2">
+                      <div className="skeleton h-11 w-20 rounded-xl" />
+                      <div className="skeleton h-11 w-20 rounded-xl" />
+                      <div className="skeleton h-11 w-20 rounded-xl" />
+                    </div>
                   </div>
                 ) : isError ? (
-                  <div className="rounded-xl2 border border-coral/30 bg-coral-50 p-6 text-center text-sm text-coral-dark" role="alert">
-                    <p>No fue posible cargar los horarios. Intente de nuevo.</p>
-                    <button
-                      type="button"
-                      onClick={() => refetch()}
-                      className="mt-3 font-semibold underline"
-                    >
-                      Reintentar
-                    </button>
-                  </div>
+                  <ErrorState
+                    title="No fue posible cargar los horarios"
+                    description="Verifique su conexión e intente de nuevo. También puede agendar por WhatsApp."
+                    onRetry={() => refetch()}
+                  />
                 ) : !calendarDays.length ? (
-                  <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
-                    No hay horarios disponibles por el momento. Escríbanos por WhatsApp y
-                    con gusto le agendamos.
-                  </div>
+                  <EmptyState
+                    icon={CalendarDays}
+                    title="Sin horarios disponibles"
+                    description="No hay citas abiertas por el momento. Escríbanos por WhatsApp y con gusto le agendamos."
+                    action={
+                      whatsapp_number ? (
+                        <a
+                          href={waHref(whatsapp_number, WHATSAPP_TEXT)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-green inline-flex min-h-[44px] items-center"
+                        >
+                          <MessageCircle className="h-4 w-4" /> Reservar por WhatsApp
+                        </a>
+                      ) : (
+                        <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
+                          Contactar al colegio
+                        </Link>
+                      )
+                    }
+                  />
                 ) : (
                   <div className="space-y-4">
                     <MonthCalendar

@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
-import { Clock, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
+import { Clock, MapPin, Users, CheckCircle, MessageCircle, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { admissionsApi } from '@/services/api';
@@ -15,7 +15,8 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
@@ -159,25 +160,39 @@ export default function OpenSchoolPage() {
             <div>
               <h2 className="font-semibold text-ink mb-4">Elija una fecha</h2>
               {isLoading ? (
-                <div className="flex justify-center py-10" aria-busy="true" aria-label="Cargando eventos">
-                  <LoadingSpinner />
+                <div className="space-y-3" aria-busy="true" aria-label="Cargando eventos">
+                  <div className="skeleton h-10 w-40 rounded-lg" />
+                  <div className="skeleton h-[280px] rounded-xl2" />
+                  <div className="skeleton h-20 rounded-xl2" />
                 </div>
               ) : isError ? (
-                <div className="rounded-xl2 border border-coral/30 bg-coral-50 p-6 text-center text-sm text-coral-dark" role="alert">
-                  <p>No fue posible cargar las fechas. Intente de nuevo.</p>
-                  <button
-                    type="button"
-                    onClick={() => refetch()}
-                    className="mt-3 font-semibold underline"
-                  >
-                    Reintentar
-                  </button>
-                </div>
+                <ErrorState
+                  title="No fue posible cargar las fechas"
+                  description="Verifique su conexión e intente de nuevo. También puede registrarse por WhatsApp."
+                  onRetry={() => refetch()}
+                />
               ) : !calendarDays.length ? (
-                <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
-                  No hay eventos programados actualmente. Escríbanos por WhatsApp y le
-                  avisamos de la próxima fecha.
-                </div>
+                <EmptyState
+                  icon={CalendarDays}
+                  title="Sin eventos programados"
+                  description="No hay Puertas Abiertas abiertas por ahora. Escríbanos por WhatsApp y le avisamos de la próxima fecha."
+                  action={
+                    whatsapp_number ? (
+                      <a
+                        href={waHref(whatsapp_number, WHATSAPP_TEXT)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-green inline-flex min-h-[44px] items-center"
+                      >
+                        <MessageCircle className="h-4 w-4" /> Reservar por WhatsApp
+                      </a>
+                    ) : (
+                      <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
+                        Contactar al colegio
+                      </Link>
+                    )
+                  }
+                />
               ) : (
                 <div className="space-y-4">
                   <MonthCalendar
