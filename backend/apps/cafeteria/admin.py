@@ -65,7 +65,11 @@ class CafeteriaTransactionAdmin(ModelAdmin):
 
 @admin.register(TopUpRequest)
 class TopUpRequestAdmin(ModelAdmin):
-    list_display = ('student', 'amount', 'method', 'status', 'created_at', 'processed_at')
+    list_display = (
+        'student', 'amount', 'method', 'status',
+        'pos_loaded_at', 'pos_unload_needed_at', 'pos_unloaded_at',
+        'created_at', 'processed_at',
+    )
     list_filter = ('status', 'method')
     search_fields = ('student__user__email', 'student__user__first_name',
                      'student__user__last_name', 'student__student_id', 'payment_ref')
@@ -74,7 +78,11 @@ class TopUpRequestAdmin(ModelAdmin):
     list_select_related = ('student__user',)
     # Top-ups are created by the online flow / the staff console; the amount and
     # gateway reference are immutable once the request exists.
-    readonly_fields = ('amount', 'payment_ref', 'created_at', 'processed_at')
+    readonly_fields = (
+        'amount', 'payment_ref', 'created_at', 'processed_at',
+        'pos_loaded_at', 'pos_loaded_by',
+        'pos_unload_needed_at', 'pos_unloaded_at', 'pos_unloaded_by',
+    )
 
 
 @admin.register(BalanceAdjustment)

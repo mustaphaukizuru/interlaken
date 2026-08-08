@@ -16,6 +16,8 @@ urlpatterns = [
     path('admin/topup/<int:pk>/apply/',  views.AdminApplyTopUpView.as_view(),     name='admin-apply-topup'),
     path('admin/topup/<int:pk>/pos-loaded/', views.AdminMarkTopUpPosLoadedView.as_view(),
          name='admin-topup-pos-loaded'),
+    path('admin/topup/<int:pk>/pos-unloaded/', views.AdminMarkTopUpPosUnloadedView.as_view(),
+         name='admin-topup-pos-unloaded'),
     path('admin/sync/<int:pk>/',         views.AdminSyncBalanceView.as_view(),    name='admin-sync-balance'),
     path('admin/sync-all/',              views.AdminSyncAllView.as_view(),        name='admin-sync-all'),
 

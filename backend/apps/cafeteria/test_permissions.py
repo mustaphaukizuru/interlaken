@@ -14,6 +14,7 @@ pytestmark = pytest.mark.django_db
     ("admin-balances", "get", {}),            # IsAdmin
     ("admin-topups", "get", {}),              # IsAdmin
     ("admin-topup-pos-loaded", "post", {"pk": 1}),  # IsAdmin
+    ("admin-topup-pos-unloaded", "post", {"pk": 1}),  # IsAdmin
     ("admin-sync-balance", "post", {"pk": 1}),  # IsAdmin
 ])
 def test_anonymous_gets_401_not_500(api_client, url_name, method, kwargs):

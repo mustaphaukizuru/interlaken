@@ -469,19 +469,21 @@ class AdminSyncAllView(APIView):
 
 
 class AdminTopUpLogView(generics.ListAPIView):
-    """GET /api/v1/cafeteria/admin/topups/?status=&method=&from=&to=&needs_pos=
+    """GET /api/v1/cafeteria/admin/topups/?status=&method=&from=&to=&needs_pos=&needs_unload=
 
     Deposits/top-up log: every ``TopUpRequest`` (office + online) enriched with its
     linked gateway ``Payment`` state. Paginated; filters by ``status``, ``method``,
-    a ``from``/``to`` created-date range (spec §5), and ``needs_pos=1`` for the
-    operational Loyverse POS load queue.
+    a ``from``/``to`` created-date range (spec §5), ``needs_pos=1`` for the
+    Loyverse POS load queue, and ``needs_unload=1`` for the post-refund unload queue.
     """
     serializer_class = TopUpLogSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
+        from apps.payments.models import Payment
+
         qs = (TopUpRequest.objects
-              .select_related('student__user', 'pos_loaded_by')
+              .select_related('student__user', 'pos_loaded_by', 'pos_unloaded_by')
               .prefetch_related('payments')
               .all())
         params = self.request.query_params
@@ -502,13 +504,24 @@ class AdminTopUpLogView(generics.ListAPIView):
             qs = qs.filter(created_at__date__lte=date_to)
 
         # Operational queue: paid online, local ledger credited, not yet loaded
-        # into Loyverse POS so the child can spend at the cafeteria.
+        # into Loyverse POS so the child can spend at the cafeteria. Exclude
+        # provider-refunded rows so staff never load a reversed credit.
         needs_pos = (params.get('needs_pos') or '').lower()
         if needs_pos in ('1', 'true', 'yes'):
-            qs = qs.filter(
+            qs = (qs.filter(
                 method=TopUpRequest.Method.ONLINE,
                 status=TopUpRequest.Status.COMPLETED,
                 pos_loaded_at__isnull=True,
+            ).exclude(
+                payments__status=Payment.Status.REFUNDED,
+            ).distinct())
+
+        # Post-refund unload: POS was loaded, then payment/ledger was reversed.
+        needs_unload = (params.get('needs_unload') or '').lower()
+        if needs_unload in ('1', 'true', 'yes'):
+            qs = qs.filter(
+                pos_unload_needed_at__isnull=False,
+                pos_unloaded_at__isnull=True,
             )
 
         return qs
@@ -518,13 +531,17 @@ class AdminMarkTopUpPosLoadedView(APIView):
     """POST /api/v1/cafeteria/admin/topup/<pk>/pos-loaded/
 
     Staff marks an online completed top-up as loaded into Loyverse POS.
-    Idempotent when already marked. Rejects office/pending/failed rows.
+    Idempotent when already marked. Rejects office/pending/failed/refunded rows.
     """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
+        from apps.payments.models import Payment
+
         topup = get_object_or_404(
-            TopUpRequest.objects.select_related('student__user', 'pos_loaded_by'),
+            TopUpRequest.objects.select_related(
+                'student__user', 'pos_loaded_by',
+            ).prefetch_related('payments'),
             pk=pk,
         )
         if topup.method != TopUpRequest.Method.ONLINE:
@@ -535,6 +552,12 @@ class AdminMarkTopUpPosLoadedView(APIView):
         if topup.status != TopUpRequest.Status.COMPLETED:
             return Response(
                 {'error': 'La recarga aún no está acreditada en el saldo local.'},
+                status=400,
+            )
+        linked = topup.payments.order_by('-created_at').first()
+        if linked is not None and linked.status == Payment.Status.REFUNDED:
+            return Response(
+                {'error': 'Esta recarga fue reembolsada; no la cargue en el POS.'},
                 status=400,
             )
 
@@ -551,6 +574,44 @@ class AdminMarkTopUpPosLoadedView(APIView):
             ),
             'needs_pos_load': False,
             'detail': 'Marcado como cargado en Loyverse POS.',
+        })
+
+
+class AdminMarkTopUpPosUnloadedView(APIView):
+    """POST /api/v1/cafeteria/admin/topup/<pk>/pos-unloaded/
+
+    Staff confirms a refunded online top-up was removed from Loyverse POS.
+    Idempotent when already marked. Rejects rows not queued for unload.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        topup = get_object_or_404(
+            TopUpRequest.objects.select_related(
+                'student__user', 'pos_unloaded_by',
+            ),
+            pk=pk,
+        )
+        if topup.pos_unload_needed_at is None:
+            return Response(
+                {'error': 'Esta recarga no está en la cola de quitar del POS.'},
+                status=400,
+            )
+
+        if topup.pos_unloaded_at is None:
+            topup.pos_unloaded_at = timezone.now()
+            topup.pos_unloaded_by = request.user
+            topup.save(update_fields=['pos_unloaded_at', 'pos_unloaded_by'])
+
+        return Response({
+            'id': topup.id,
+            'pos_unload_needed_at': topup.pos_unload_needed_at,
+            'pos_unloaded_at': topup.pos_unloaded_at,
+            'pos_unloaded_by_name': (
+                topup.pos_unloaded_by.full_name if topup.pos_unloaded_by_id else ''
+            ),
+            'needs_pos_unload': False,
+            'detail': 'Marcado como quitado del POS de Loyverse.',
         })
 
 
