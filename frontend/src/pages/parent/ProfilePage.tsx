@@ -38,11 +38,20 @@ export default function ProfilePage() {
   });
 
   const prefsMutation = useMutation({
-    mutationFn: () => authApi.updateNotifPrefs({
-      email_enabled: emailOn,
-      in_app_enabled: inAppOn,
-      push_enabled: pushOn,
-    }),
+    mutationFn: async () => {
+      const { data } = await authApi.updateNotifPrefs({
+        email_enabled: emailOn,
+        in_app_enabled: inAppOn,
+        push_enabled: pushOn,
+      });
+      // Best-effort device subscribe/unsubscribe when the push preference flips.
+      const { isPushSupported, enablePush, disablePush } = await import('@/services/push');
+      if (isPushSupported()) {
+        if (pushOn) await enablePush().catch(() => false);
+        else await disablePush().catch(() => false);
+      }
+      return data;
+    },
     onSuccess: async () => {
       const { data } = await authApi.me();
       setUser(data as User);

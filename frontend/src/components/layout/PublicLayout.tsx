@@ -155,12 +155,8 @@ export function PublicLayout() {
   const [footerOpen, setFooterOpen] = useState<string | null>(null);
   const { pathname } = useLocation();
   const settings = useSiteSettings();
-  // Facebook viene confirmado por el cliente; Instagram se muestra siempre
-  // (petición del cliente) con enlace vacío hasta que entreguen la URL.
-  const socials = socialEntries(settings);
-  const displaySocials = socials.some((s) => s.key === 'instagram')
-    ? socials
-    : [...socials, { key: 'instagram' as const, label: 'Instagram', href: settings.instagram_url || '#' }];
+  // Only socials with a real URL — never render href="#" (GO-LIVE-AUDIT #41).
+  const displaySocials = socialEntries(settings);
   const showStickyCta = !HIDE_STICKY_CTA.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
