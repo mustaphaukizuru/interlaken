@@ -50,6 +50,7 @@ const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
 const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
 const InscripcionesPage = lazy(() => import('./pages/parent/InscripcionesPage'));
 const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
+const PrivacyPage = lazy(() => import('./pages/parent/PrivacyPage'));
 
 // Staff dashboard
 const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
@@ -156,6 +157,7 @@ export default function App() {
               <Route path="comunicados" element={<ComunicadosPage />} />
               <Route path="comunicados/:id" element={<ComunicadoDetailPage />} />
               <Route path="perfil"    element={<ProfilePage />} />
+              <Route path="privacidad" element={<PrivacyPage />} />
             </Route>
 
             {/* Student portal merged into the family portal — /alumno* redirects. */}
