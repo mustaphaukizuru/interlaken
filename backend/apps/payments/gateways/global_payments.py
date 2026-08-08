@@ -10,15 +10,15 @@ Sandbox vs live
   URL — either the built-in sandbox HPP host, an explicit ``*sandbox*`` URL from
   ``GLOBAL_PAYMENTS_HPP_URL``, or the local ``/pago/simulado`` mock when unset.
   Live merchant HPP URLs are ignored so a mis-set env cannot charge real cards.
-- ``PAYMENTS_LIVE=true``: uses ``GLOBAL_PAYMENTS_HPP_URL`` (or the local mock if
-  still unset). Wire a real HPP-session call with ``GLOBAL_PAYMENTS_APP_ID`` /
-  ``GLOBAL_PAYMENTS_APP_KEY`` before flipping the flag (see DEPLOYMENT.md).
+- ``PAYMENTS_LIVE=true``: requires a real ``GLOBAL_PAYMENTS_HPP_URL`` (not empty,
+  not the local mock). Missing config raises so the initiate view returns 502
+  and marks the payment failed — never redirects parents to a dead mock.
 """
 from urllib.parse import urlencode
 
 from django.conf import settings
 
-from .base import BaseGateway
+from .base import BaseGateway, LiveCheckoutNotConfigured
 
 # Default sandbox hosted page; used when PAYMENTS_LIVE is false and a live URL
 # was accidentally configured (or as the sandbox fallback).
@@ -29,9 +29,13 @@ def _checkout_base() -> str:
     """Resolve the HPP base URL, honouring PAYMENTS_LIVE sandbox forcing."""
     configured = (getattr(settings, 'GLOBAL_PAYMENTS_HPP_URL', '') or '').strip()
     live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
-    local_mock = f'{settings.FRONTEND_URL}/pago/simulado'
+    local_mock = f'{settings.FRONTEND_URL.rstrip("/")}/pago/simulado'
     if live:
-        return configured or local_mock
+        if not configured or 'simulado' in configured.lower():
+            raise LiveCheckoutNotConfigured(
+                'PAYMENTS_LIVE=true requiere GLOBAL_PAYMENTS_HPP_URL '
+                '(HPP real del comercio). No se usará /pago/simulado.')
+        return configured
     # Sandbox mode: never hit a live merchant URL.
     if not configured:
         return local_mock

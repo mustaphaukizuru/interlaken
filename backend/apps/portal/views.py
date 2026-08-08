@@ -5,7 +5,6 @@ import logging
 
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
 from rest_framework.response import Response
@@ -24,7 +23,7 @@ from .serializers import (
     AnnouncementSerializer,
     NotificationSerializer,
 )
-from .services import emergency_broadcast, fanout_announcement
+from .services import emergency_broadcast, fanout_and_stamp
 
 
 def audiences_for_user(user):
@@ -212,9 +211,7 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
         if not announcement.is_active:
             return
         try:
-            fanout_announcement(announcement)
-            Announcement.objects.filter(pk=announcement.pk).update(
-                fanout_at=timezone.now())
+            fanout_and_stamp(announcement)
         except Exception:  # noqa: BLE001 — best-effort notification
             logging.getLogger(__name__).exception(
                 'Announcement %s fan-out failed', announcement.pk)
@@ -236,9 +233,7 @@ class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
         # prior fan-out must not spam the audience again.
         if announcement.is_active and not was_active and not already_fanned:
             try:
-                fanout_announcement(announcement)
-                Announcement.objects.filter(pk=announcement.pk).update(
-                    fanout_at=timezone.now())
+                fanout_and_stamp(announcement)
             except Exception:  # noqa: BLE001 — best-effort notification
                 logging.getLogger(__name__).exception(
                     'Announcement %s activate fan-out failed', announcement.pk)

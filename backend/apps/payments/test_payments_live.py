@@ -59,3 +59,36 @@ class TestPaymentsLiveSandboxForce:
         url = GlobalPaymentsGateway().create_checkout(_payment())
         assert url.startswith('https://hpp.globalpay.com/live-checkout')
         assert 'env=production' in url
+
+    def test_live_without_hpp_url_fails_closed(self, settings):
+        from apps.payments.gateways.base import LiveCheckoutNotConfigured
+
+        settings.PAYMENTS_LIVE = True
+        settings.GLOBAL_PAYMENTS_HPP_URL = ''
+        settings.FRONTEND_URL = 'http://localhost:3000'
+        settings.PAYMENT_RETURN_URL = ''
+
+        with pytest.raises(LiveCheckoutNotConfigured):
+            GlobalPaymentsGateway().create_checkout(_payment())
+
+    def test_live_banorte_without_checkout_url_fails_closed(self, settings):
+        from apps.payments.gateways.base import LiveCheckoutNotConfigured
+
+        settings.PAYMENTS_LIVE = True
+        settings.BANORTE_CHECKOUT_URL = ''
+        settings.FRONTEND_URL = 'http://localhost:3000'
+        settings.PAYMENT_RETURN_URL = ''
+
+        with pytest.raises(LiveCheckoutNotConfigured):
+            BanorteGateway().create_checkout(_payment())
+
+    def test_live_rejects_simulado_url(self, settings):
+        from apps.payments.gateways.base import LiveCheckoutNotConfigured
+
+        settings.PAYMENTS_LIVE = True
+        settings.GLOBAL_PAYMENTS_HPP_URL = 'http://localhost:3000/pago/simulado'
+        settings.FRONTEND_URL = 'http://localhost:3000'
+        settings.PAYMENT_RETURN_URL = ''
+
+        with pytest.raises(LiveCheckoutNotConfigured):
+            GlobalPaymentsGateway().create_checkout(_payment())

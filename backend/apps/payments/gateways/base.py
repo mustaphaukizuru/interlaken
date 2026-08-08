@@ -25,6 +25,10 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+class LiveCheckoutNotConfigured(RuntimeError):
+    """Raised when PAYMENTS_LIVE is on but no real HPP/checkout URL is set."""
+
+
 @dataclass
 class WebhookEvent:
     """A provider-agnostic view of a payment webhook.
