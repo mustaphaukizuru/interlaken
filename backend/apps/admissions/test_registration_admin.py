@@ -177,6 +177,18 @@ class TestDocumentUploadValidation:
         assert resp.status_code == 400
         assert not RegistrationDocument.objects.filter(registration=reg).exists()
 
+    def test_reupload_same_doc_type_replaces_previous(self, api_client):
+        reg = _reg()
+        first = self._upload(api_client, reg, name='acta-v1.pdf', content=b'%PDF-1.4 v1')
+        assert first.status_code == 201, first.content
+        second = self._upload(api_client, reg, name='acta-v2.pdf', content=b'%PDF-1.4 v2')
+        assert second.status_code == 201, second.content
+        docs = list(RegistrationDocument.objects.filter(
+            registration=reg, doc_type=RegistrationDocument.DocType.BIRTH_CERT,
+        ))
+        assert len(docs) == 1
+        assert docs[0].filename == 'acta-v2.pdf'
+
 
 @pytest.mark.django_db
 class TestDocumentDownload:

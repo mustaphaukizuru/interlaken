@@ -473,6 +473,16 @@ class DocumentUploadView(APIView):
                           f'{max_size // (1024 * 1024)} MB.'},
                 status=status.HTTP_400_BAD_REQUEST)
 
+        # Replacing the same doc_type avoids duplicate rows when a family
+        # retries finish() (OTHER may still have multiple attachments).
+        if doc_type != RegistrationDocument.DocType.OTHER:
+            for old in RegistrationDocument.objects.filter(
+                registration=reg, doc_type=doc_type,
+            ):
+                if old.file:
+                    old.file.delete(save=False)
+                old.delete()
+
         doc = RegistrationDocument.objects.create(
             registration=reg,
             doc_type=doc_type,
