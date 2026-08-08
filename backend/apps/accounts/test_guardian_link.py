@@ -27,9 +27,12 @@ class TestStudentGuardians:
         resp = api_client.get(reverse('student-guardians', kwargs={'pk': student.pk}))
         assert resp.status_code == 200
         assert resp.data['student']['id'] == student.pk
+        assert resp.data['student']['email'] == student.user.email
+        assert resp.data['student']['user_id'] == student.user_id
         assert len(resp.data['guardians']) == 1
         assert resp.data['guardians'][0]['email'] == 'tutor1@test.mx'
         assert resp.data['guardians'][0]['relationship'] == 'Madre'
+        assert resp.data['guardians'][0]['is_self'] is False
 
     def test_link_creates_parent_and_profile(self, api_client, admin_user):
         student = StudentProfileFactory()
@@ -66,17 +69,65 @@ class TestStudentGuardians:
         assert second.data['already_linked'] is True
         assert student.parents.filter(pk=parent.pk).count() == 1
 
-    def test_rejects_non_parent_email(self, api_client, admin_user):
-        staff = StudentUserFactory(email='alumno@test.mx')
+    def test_rejects_unrelated_student_email(self, api_client, admin_user):
+        other = StudentUserFactory(email='otro-alumno@test.mx')
         student = StudentProfileFactory()
         api_client.force_authenticate(admin_user)
         resp = api_client.post(
             reverse('student-guardians', kwargs={'pk': student.pk}),
-            {'email': staff.email},
+            {'email': other.email},
             format='json',
         )
         assert resp.status_code == 400
-        assert 'rol' in resp.data['error'].lower() or 'alumno' in resp.data['error'].lower()
+        assert 'rol' in resp.data['error'].lower()
+
+    def test_rejects_admin_email(self, api_client, admin_user):
+        student = StudentProfileFactory()
+        api_client.force_authenticate(admin_user)
+        resp = api_client.post(
+            reverse('student-guardians', kwargs={'pk': student.pk}),
+            {'email': admin_user.email},
+            format='json',
+        )
+        assert resp.status_code == 400
+        assert 'rol' in resp.data['error'].lower()
+
+    def test_link_student_self_guardian(self, api_client, admin_user):
+        """School-email family login: alumno may be linked as self-guardian."""
+        student = StudentProfileFactory()
+        api_client.force_authenticate(admin_user)
+        resp = api_client.post(
+            reverse('student-guardians', kwargs={'pk': student.pk}),
+            {'email': student.user.email},
+            format='json',
+        )
+        assert resp.status_code == 201
+        assert resp.data['created_user'] is False
+        assert resp.data['already_linked'] is False
+        assert resp.data['guardian']['is_self'] is True
+        assert resp.data['guardian']['relationship'] == 'Cuenta familiar'
+        assert student.user in student.parents.all()
+        assert not ParentProfile.objects.filter(user=student.user).exists()
+
+        # Idempotent re-link
+        again = api_client.post(
+            reverse('student-guardians', kwargs={'pk': student.pk}),
+            {'email': student.user.email},
+            format='json',
+        )
+        assert again.status_code == 200
+        assert again.data['already_linked'] is True
+        assert again.data['guardian']['is_self'] is True
+
+    def test_list_includes_self_guardian(self, api_client, admin_user):
+        student = StudentProfileFactory()
+        student.parents.add(student.user)
+        api_client.force_authenticate(admin_user)
+        resp = api_client.get(reverse('student-guardians', kwargs={'pk': student.pk}))
+        assert resp.status_code == 200
+        self_g = next(g for g in resp.data['guardians'] if g['is_self'])
+        assert self_g['email'] == student.user.email
+        assert self_g['relationship'] == 'Cuenta familiar'
 
     def test_unlink(self, api_client, admin_user):
         parent = ParentFactory()

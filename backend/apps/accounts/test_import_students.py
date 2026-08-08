@@ -64,7 +64,8 @@ class TestImport:
         parent = User.objects.get(email='luis@x.mx')
         assert parent.role == User.Role.PARENT
         assert not parent.has_usable_password()
-        assert list(profile.parents.all()) == [parent]
+        # Self-guardian (school-email family login) + explicit padre/tutor.
+        assert set(profile.parents.all()) == {profile.user, parent}
 
     def test_reimport_is_idempotent_update(self, api_client, admin_user):
         api_client.force_authenticate(admin_user)
@@ -77,7 +78,9 @@ class TestImport:
         assert body['created_parents'] == 0
         assert User.objects.filter(email='luis@x.mx').count() == 1
         profile = StudentProfile.objects.get(student_id='INT-001')
-        assert profile.grade == '4° Primaria' and profile.parents.count() == 1
+        assert profile.grade == '4° Primaria'
+        assert profile.parents.count() == 2
+        assert profile.user in profile.parents.all()
 
     def test_bad_row_isolated_good_rows_land(self, api_client, admin_user):
         api_client.force_authenticate(admin_user)
@@ -88,7 +91,8 @@ class TestImport:
         body = resp.json()
         assert body['errors'] == 2
         assert body['created_students'] == 1
-        assert StudentProfile.objects.filter(student_id='INT-001').exists()
+        profile = StudentProfile.objects.get(student_id='INT-001')
+        assert profile.user in profile.parents.all()
         assert not StudentProfile.objects.filter(student_id='INT-003').exists()
 
     def test_missing_required_headers_400(self, api_client, admin_user):

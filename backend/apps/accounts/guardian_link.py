@@ -8,6 +8,10 @@ DELETE /api/v1/accounts/admin/students/<pk>/guardians/<user_id>/
 Linking by email is idempotent (M2M add). If the email is new, a parent User
 is created with an unusable password (Google OAuth or password-reset once
 SMTP is live). ParentProfile is get_or_create'd so relationship/phone stick.
+
+Interlaken family login uses the student's school email as a self-guardian
+on ``student.parents`` (same pattern as Loyverse import). Admin can repair
+that link without creating a ParentProfile.
 """
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -18,11 +22,18 @@ from .import_students import IsAdmin, _split_name
 from .models import ParentProfile, StudentProfile, User
 
 
-def _serialize_guardian(user: User) -> dict:
+def _serialize_guardian(user: User, *, student: StudentProfile | None = None) -> dict:
     try:
         profile = user.parent_profile
     except ParentProfile.DoesNotExist:
         profile = None
+    # Loyverse / school-email family login: the alumno is linked on parents.
+    if student is not None and user.pk == student.user_id:
+        relationship = 'Cuenta familiar'
+    elif profile and profile.relationship:
+        relationship = profile.relationship
+    else:
+        relationship = 'Padre/Madre'
     return {
         'id': user.id,
         'email': user.email,
@@ -31,7 +42,8 @@ def _serialize_guardian(user: User) -> dict:
         'last_name': user.last_name,
         'whatsapp': user.whatsapp,
         'phone': profile.phone if profile else '',
-        'relationship': profile.relationship if profile else 'Padre/Madre',
+        'relationship': relationship,
+        'is_self': bool(student is not None and user.pk == student.user_id),
     }
 
 
@@ -45,11 +57,13 @@ class StudentGuardiansView(APIView):
                 'parents__parent_profile'),
             pk=pk,
         )
-        guardians = [_serialize_guardian(p) for p in student.parents.all()]
+        guardians = [_serialize_guardian(p, student=student) for p in student.parents.all()]
         return Response({
             'student': {
                 'id': student.id,
+                'user_id': student.user_id,
                 'name': student.user.full_name,
+                'email': student.user.email,
                 'student_id': student.student_id,
                 'grade': student.grade,
             },
@@ -90,36 +104,44 @@ class StudentGuardiansView(APIView):
             parent.save()
             created = True
         else:
-            if parent.role != User.Role.PARENT:
+            is_self = (
+                parent.role == User.Role.STUDENT
+                and parent.pk == student.user_id
+            )
+            if parent.role == User.Role.PARENT:
+                # Refresh name/phone when the admin supplies them.
+                dirty = []
+                if first_name and parent.first_name != first_name:
+                    parent.first_name = first_name
+                    dirty.append('first_name')
+                if last_name and parent.last_name != last_name:
+                    parent.last_name = last_name
+                    dirty.append('last_name')
+                if phone and parent.whatsapp != phone:
+                    parent.whatsapp = phone
+                    dirty.append('whatsapp')
+                if dirty:
+                    parent.save(update_fields=dirty)
+            elif not is_self:
                 return Response(
                     {'error': f'El correo {email} pertenece a un usuario con rol '
                               f'«{parent.get_role_display()}», no a un padre/tutor.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            # Refresh name/phone when the admin supplies them.
-            dirty = []
-            if first_name and parent.first_name != first_name:
-                parent.first_name = first_name
-                dirty.append('first_name')
-            if last_name and parent.last_name != last_name:
-                parent.last_name = last_name
-                dirty.append('last_name')
-            if phone and parent.whatsapp != phone:
-                parent.whatsapp = phone
-                dirty.append('whatsapp')
-            if dirty:
-                parent.save(update_fields=dirty)
 
-        profile, _ = ParentProfile.objects.get_or_create(user=parent)
-        profile_dirty = []
-        if phone and profile.phone != phone:
-            profile.phone = phone
-            profile_dirty.append('phone')
-        if relationship and profile.relationship != relationship:
-            profile.relationship = relationship
-            profile_dirty.append('relationship')
-        if profile_dirty:
-            profile.save(update_fields=profile_dirty)
+        # Real tutors get a ParentProfile; school-email self-guardian does not
+        # (the User already has StudentProfile — same pattern as Loyverse import).
+        if parent.role == User.Role.PARENT:
+            profile, _ = ParentProfile.objects.get_or_create(user=parent)
+            profile_dirty = []
+            if phone and profile.phone != phone:
+                profile.phone = phone
+                profile_dirty.append('phone')
+            if relationship and profile.relationship != relationship:
+                profile.relationship = relationship
+                profile_dirty.append('relationship')
+            if profile_dirty:
+                profile.save(update_fields=profile_dirty)
 
         already = student.parents.filter(pk=parent.pk).exists()
         if not already:
@@ -129,7 +151,7 @@ class StudentGuardiansView(APIView):
             {
                 'created_user': created,
                 'already_linked': already,
-                'guardian': _serialize_guardian(parent),
+                'guardian': _serialize_guardian(parent, student=student),
             },
             status=status.HTTP_201_CREATED if created or not already else status.HTTP_200_OK,
         )
