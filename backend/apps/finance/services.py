@@ -722,11 +722,12 @@ def dashboard_summary(period=None):
 
 def _notify_invoice(invoice, title, message, *, whatsapp=False) -> int:
     """Fan out an in-app + email (and optional WhatsApp) notice to every guardian."""
+    from apps.accounts.family import family_notify_recipients
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
     notified = 0
-    for parent in invoice.student.parents.all():
+    for parent in family_notify_recipients(invoice.student):
         notify(parent, Notification.NotifType.PAYMENT, title, message, whatsapp=whatsapp)
         notified += 1
     return notified

@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.accounts.family import family_notify_recipients
 from apps.cafeteria.models import CafeteriaBalance
 from apps.portal.models import Notification
 from apps.portal.services import notify
@@ -64,7 +65,7 @@ class Command(BaseCommand):
             )
 
             sent_to_someone = False
-            for parent in student.parents.all():
+            for parent in family_notify_recipients(student):
                 use_wa = bool(getattr(parent, 'whatsapp', '') or '')
                 notify(parent, Notification.NotifType.CAFETERIA, title, message,
                        whatsapp=use_wa)
