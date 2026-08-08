@@ -164,6 +164,33 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     return len(user_ids)
 
 
+def fanout_and_stamp(
+    announcement,
+    *,
+    notif_type=None,
+    dispatch_limit: int = 200,
+) -> dict:
+    """In-app fan-out + stamp ``fanout_at`` + first email/push batch.
+
+    Shared by comunicado publish/activate and emergency broadcast so cron lag
+    does not leave families waiting for the next ``dispatch_notifications`` run.
+    Fail-soft for dispatch: channel errors are logged, never raised.
+    Returns ``{notified, dispatched}``.
+    """
+    notified = fanout_announcement(announcement, notif_type=notif_type)
+    from apps.portal.models import Announcement
+    Announcement.objects.filter(pk=announcement.pk).update(
+        fanout_at=timezone.now())
+    dispatched = 0
+    if notified and dispatch_limit > 0:
+        try:
+            dispatched = dispatch_pending_notifications(limit=dispatch_limit)
+        except Exception:  # pragma: no cover — channel failures must not 500
+            logger.exception(
+                'Announcement %s first-batch dispatch failed', announcement.pk)
+    return {'notified': notified, 'dispatched': dispatched}
+
+
 def emergency_broadcast(
     *,
     title: str,
@@ -204,16 +231,13 @@ def emergency_broadcast(
         is_active=True,
         created_by=created_by,
     )
-    notified = fanout_announcement(
-        announcement, notif_type=Notification.NotifType.WARNING)
-    Announcement.objects.filter(pk=announcement.pk).update(
-        fanout_at=timezone.now())
-
-    dispatched = 0
-    try:
-        dispatched = dispatch_pending_notifications(limit=dispatch_limit)
-    except Exception:  # pragma: no cover — channel failures must not 500
-        logger.exception('Emergency broadcast dispatch failed')
+    stats = fanout_and_stamp(
+        announcement,
+        notif_type=Notification.NotifType.WARNING,
+        dispatch_limit=dispatch_limit,
+    )
+    notified = stats['notified']
+    dispatched = stats['dispatched']
 
     whatsapp_sent = 0
     if whatsapp:

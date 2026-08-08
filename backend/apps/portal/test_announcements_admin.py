@@ -46,6 +46,10 @@ class TestAnnouncementAdminCRUD:
         assert notified == {p1.id, p2.id, student.id}   # all families
         assert staff.id not in notified                 # staff excluded
         assert Notification.objects.get(user=p1).title == 'Junta de padres'
+        # First-batch email/push dispatch stamps delivered_at (cron finishes rest).
+        assert Notification.objects.filter(delivered_at__isnull=False).exists()
+        a = Announcement.objects.get()
+        assert a.fanout_at is not None
 
     def test_draft_announcement_notifies_nobody(self, api_client):
         ParentFactory()

@@ -10,16 +10,15 @@ Sandbox vs live
   URL — either the built-in Banorte sandbox host, an explicit ``*sandbox*`` URL
   from ``BANORTE_CHECKOUT_URL``, or the local ``/pago/simulado`` mock when unset.
   Live merchant URLs are ignored so a mis-set env cannot charge real cards.
-- ``PAYMENTS_LIVE=true``: uses ``BANORTE_CHECKOUT_URL`` (or the local mock if
-  still unset). Provision real Banorte merchant credentials before flipping the
-  flag (see DEPLOYMENT.md). Webhook verification (HMAC on the raw body) is real
-  in both modes.
+- ``PAYMENTS_LIVE=true``: requires a real ``BANORTE_CHECKOUT_URL`` (not empty,
+  not the local mock). Missing config raises so initiate returns 502 — never
+  redirects parents to a dead mock.
 """
 from urllib.parse import urlencode
 
 from django.conf import settings
 
-from .base import BaseGateway
+from .base import BaseGateway, LiveCheckoutNotConfigured
 
 # Default sandbox checkout endpoint; used when PAYMENTS_LIVE is false and a live
 # URL was accidentally configured (or as the sandbox fallback).
@@ -30,9 +29,13 @@ def _checkout_base() -> str:
     """Resolve the Banorte checkout base URL, honouring PAYMENTS_LIVE."""
     configured = (getattr(settings, 'BANORTE_CHECKOUT_URL', '') or '').strip()
     live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
-    local_mock = f'{settings.FRONTEND_URL}/pago/simulado'
+    local_mock = f'{settings.FRONTEND_URL.rstrip("/")}/pago/simulado'
     if live:
-        return configured or local_mock
+        if not configured or 'simulado' in configured.lower():
+            raise LiveCheckoutNotConfigured(
+                'PAYMENTS_LIVE=true requiere BANORTE_CHECKOUT_URL '
+                '(checkout real del comercio). No se usará /pago/simulado.')
+        return configured
     # Sandbox mode: never hit a live merchant URL.
     if not configured:
         return local_mock
