@@ -98,7 +98,7 @@ export function PortalLayout({ role }: Props) {
           </div>
         </main>
 
-        {/* Always-visible primary nav on phones (staff has its own shell) */}
+        {/* Staff analytics is a single-route surface — no bottom tab bar. */}
         {role !== 'staff' && <MobileTabBar role={role} />}
       </div>
     </MobileNavContext.Provider>
