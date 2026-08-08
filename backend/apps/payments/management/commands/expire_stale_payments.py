@@ -7,7 +7,11 @@ initiate can open a fresh checkout. Use --dry-run to report without mutating.
 """
 from django.core.management.base import BaseCommand
 
-from apps.payments.services import DEFAULT_OPEN_CHECKOUT_MINUTES, expire_stale_checkouts, open_checkout_ttl_minutes
+from apps.payments.services import (
+    DEFAULT_OPEN_CHECKOUT_MINUTES,
+    expire_stale_checkouts,
+    open_checkout_ttl_minutes,
+)
 
 
 class Command(BaseCommand):

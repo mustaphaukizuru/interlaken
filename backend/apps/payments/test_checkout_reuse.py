@@ -1,12 +1,12 @@
 """Concurrent checkout reuse + stale expiry."""
 from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 
 import pytest
 from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
-from io import StringIO
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.cafeteria.models import TopUpRequest
