@@ -70,6 +70,10 @@ export interface TopUpLogEntry {
   pos_loaded_at: string | null;
   pos_loaded_by_name: string;
   needs_pos_load: boolean;
+  pos_unload_needed_at: string | null;
+  pos_unloaded_at: string | null;
+  pos_unloaded_by_name: string;
+  needs_pos_unload: boolean;
 }
 
 export interface BalanceAdjustment {

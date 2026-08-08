@@ -292,12 +292,16 @@ export const cafeteriaApi = {
     from?: string;
     to?: string;
     needs_pos?: boolean | number | string;
+    needs_unload?: boolean | number | string;
     page?: number;
   }) =>
     api.get('/cafeteria/admin/topups/', { params }),
 
   markTopUpPosLoaded: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/pos-loaded/`),
+
+  markTopUpPosUnloaded: (topupId: number) =>
+    api.post(`/cafeteria/admin/topup/${topupId}/pos-unloaded/`),
 
   getStudentDetail: (studentId: number) =>
     api.get(`/cafeteria/admin/student/${studentId}/`),

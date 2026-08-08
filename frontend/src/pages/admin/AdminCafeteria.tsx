@@ -24,7 +24,7 @@ type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
 const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
   { key: 'roster',    label: 'Saldos',         icon: Coffee },
   { key: 'deposits',  label: 'Depósitos',      icon: ScrollText },
-  { key: 'pos',       label: 'Cargar en POS',  icon: Store },
+  { key: 'pos',       label: 'POS Loyverse',   icon: Store },
   { key: 'reconcile', label: 'Reconciliación', icon: Scale },
   { key: 'low',       label: 'Saldo bajo',     icon: AlertTriangle },
 ];
@@ -41,7 +41,7 @@ export default function AdminCafeteria() {
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería — Admin</h1>
           <p className="mt-1 text-sm text-muted">
-            Saldos, depósitos, carga en POS, ajustes, devoluciones y reconciliación.
+            Saldos, depósitos, carga/quita en POS, ajustes, devoluciones y reconciliación.
           </p>
         </div>
         <SchoolExportButtons />
@@ -373,8 +373,17 @@ function DepositsTab() {
   );
 }
 
-// ── Loyverse POS load queue ──────────────────────────────────────────────────
+// ── Loyverse POS load + unload queues ────────────────────────────────────────
 function PosLoadTab() {
+  return (
+    <div className="space-y-6">
+      <PosLoadQueue />
+      <PosUnloadQueue />
+    </div>
+  );
+}
+
+function PosLoadQueue() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
@@ -462,6 +471,110 @@ function PosLoadTab() {
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Cargado en Loyverse
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="recargas" />
+    </Card>
+  );
+}
+
+function PosUnloadQueue() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+
+  const { data: paged, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-cafeteria-pos-unload', page],
+    queryFn: async () =>
+      toPaged<TopUpLogEntry>(
+        (await cafeteriaApi.getTopUpLog({ needs_unload: 1, page })).data,
+      ),
+    placeholderData: keepPreviousData,
+  });
+
+  const mark = useMutation({
+    mutationFn: (id: number) => cafeteriaApi.markTopUpPosUnloaded(id),
+    onSuccess: () => {
+      toast.success('Marcado como quitado del POS de Loyverse.');
+      queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-pos-unload'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-topups'] });
+    },
+    onError: () => toast.error('No se pudo marcar la recarga.'),
+  });
+
+  const data = paged?.results;
+  const count = paged?.count ?? 0;
+
+  return (
+    <Card>
+      <div className="mb-4 max-w-2xl">
+        <h2 className="font-head text-base font-semibold text-ink">Quitar del POS</h2>
+        <p className="mt-1 text-sm text-muted">
+          Recargas ya cargadas en Loyverse que fueron reembolsadas. Quite el monto
+          del POS y márquelo aquí para evitar que el alumno siga gastando crédito
+          devuelto.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <TableSkeleton />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : !data?.length ? (
+        <EmptyState
+          icon={CheckCircle2}
+          title="Sin pendientes de quitar del POS"
+          description="No hay recargas reembolsadas esperando descarga en Loyverse."
+        />
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Reembolso</th>
+                <th>Alumno</th>
+                <th className="num">Monto</th>
+                <th>Pasarela</th>
+                <th>Referencia</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((d) => (
+                <tr key={d.id}>
+                  <td data-label="Reembolso" className="whitespace-nowrap text-muted">
+                    {fmtDate(d.pos_unload_needed_at)}
+                  </td>
+                  <td data-label="Alumno" className="font-medium text-ink">
+                    <span className="block">
+                      <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
+                        {d.student_name}
+                      </Link>
+                      <span className="block text-xs text-subtle">{d.student_code}</span>
+                    </span>
+                  </td>
+                  <td data-label="Monto" className="num font-semibold text-ink">
+                    ${parseFloat(d.amount).toFixed(2)}
+                  </td>
+                  <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
+                  <td data-label="Referencia" className="text-subtle text-xs font-mono">
+                    {d.gateway_tx_id || '—'}
+                  </td>
+                  <td data-label="Acción" className="text-right">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={mark.isPending && mark.variables === d.id}
+                      onClick={() => mark.mutate(d.id)}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Quitado de Loyverse
                     </Button>
                   </td>
                 </tr>

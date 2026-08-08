@@ -335,6 +335,93 @@ class TestMarkPosLoaded:
             reverse("admin-topup-pos-loaded", args=[topup.id]), {}, format="json",
         ).status_code == 403
 
+    def test_rejects_refunded_before_pos_load(self, api_client):
+        student = StudentProfileFactory()
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("90"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+        )
+        Payment.objects.create(
+            user=student.user, payment_type=Payment.Type.CAFETERIA,
+            amount=Decimal("90"), gateway=Payment.Gateway.GLOBAL_PAYMENTS,
+            related_topup=topup, status=Payment.Status.REFUNDED,
+        )
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.post(
+            reverse("admin-topup-pos-loaded", args=[topup.id]), {}, format="json",
+        )
+        assert resp.status_code == 400
+        assert "reembolsada" in resp.data["error"].lower()
+
+        queue = api_client.get(reverse("admin-topups"), {"needs_pos": "1"})
+        assert queue.data["results"] == []
+
+
+class TestPosUnloadQueue:
+    def test_needs_unload_filter_and_mark_idempotent(self, api_client):
+        admin = AdminFactory()
+        student = StudentProfileFactory()
+        waiting = TopUpRequest.objects.create(
+            student=student, amount=Decimal("100"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+            pos_loaded_at=timezone.now(),
+            pos_unload_needed_at=timezone.now(),
+        )
+        TopUpRequest.objects.create(
+            student=student, amount=Decimal("50"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+            pos_loaded_at=timezone.now(),
+            pos_unload_needed_at=timezone.now(),
+            pos_unloaded_at=timezone.now(),
+        )
+        TopUpRequest.objects.create(
+            student=student, amount=Decimal("80"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+            pos_loaded_at=timezone.now(),
+        )
+
+        api_client.force_authenticate(user=admin)
+        resp = api_client.get(reverse("admin-topups"), {"needs_unload": "1"})
+        assert resp.status_code == 200
+        rows = resp.data["results"]
+        assert len(rows) == 1
+        assert rows[0]["id"] == waiting.id
+        assert rows[0]["needs_pos_unload"] is True
+
+        url = reverse("admin-topup-pos-unloaded", args=[waiting.id])
+        first = api_client.post(url, {}, format="json")
+        assert first.status_code == 200, first.data
+        assert first.data["needs_pos_unload"] is False
+        waiting.refresh_from_db()
+        assert waiting.pos_unloaded_at is not None
+        assert waiting.pos_unloaded_by_id == admin.id
+        stamped = waiting.pos_unloaded_at
+
+        second = api_client.post(url, {}, format="json")
+        assert second.status_code == 200
+        waiting.refresh_from_db()
+        assert waiting.pos_unloaded_at == stamped
+
+        empty = api_client.get(reverse("admin-topups"), {"needs_unload": "1"})
+        assert empty.data["results"] == []
+
+    def test_mark_unload_rejects_not_queued(self, api_client):
+        student = StudentProfileFactory()
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("40"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+            pos_loaded_at=timezone.now(),
+        )
+        api_client.force_authenticate(user=AdminFactory())
+        assert api_client.post(
+            reverse("admin-topup-pos-unloaded", args=[topup.id]), {}, format="json",
+        ).status_code == 400
+
 
 class TestReconcile:
     @patch("apps.cafeteria.services.get_customer_by_id")
