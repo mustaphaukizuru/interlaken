@@ -215,26 +215,9 @@ class TestPaymentInitiate:
         )
         assert resp.status_code == 401
 
-    def test_authenticated_user_creates_pending_payment(self, api_client):
-        user = ParentFactory()
-        api_client.force_authenticate(user=user)
-        resp = api_client.post(
-            reverse("payment-initiate"),
-            {
-                "amount": "500.00",
-                "payment_type": "other",
-                "description": "Pago escolar",
-            },
-            format="json",
-        )
-        assert resp.status_code == 201, resp.data
-        assert resp.data["status"] == Payment.Status.PENDING
-        payment = Payment.objects.get(pk=resp.data["payment_id"])
-        assert payment.user == user
-
-    @pytest.mark.parametrize("payment_type", ["tuition", "cafeteria"])
+    @pytest.mark.parametrize("payment_type", ["tuition", "cafeteria", "enrollment", "other"])
     def test_rejects_unlinked_money_types(self, api_client, payment_type):
-        """tuition/cafeteria must use their linked endpoints — never bare initiate."""
+        """Bare initiate must not open an HPP session that credits nothing."""
         api_client.force_authenticate(user=ParentFactory())
         resp = api_client.post(
             reverse("payment-initiate"),

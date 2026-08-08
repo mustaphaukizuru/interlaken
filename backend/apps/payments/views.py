@@ -32,10 +32,12 @@ CLOSED_STATUSES = (Payment.Status.FAILED, Payment.Status.REFUNDED)
 
 
 class PaymentInitiateView(APIView):
-    """POST /api/v1/payments/initiate/ — create a pending payment + hosted-page URL.
+    """POST /api/v1/payments/initiate/ — fail-closed for unlinked money types.
 
-    Rejects ``tuition`` / ``cafeteria`` (must use invoice-pay / cafeteria top-up so a
-    SUCCESS webhook has something to credit). ``enrollment`` / ``other`` remain open.
+    All current ``payment_type`` values are rejected: tuition/cafeteria must use
+    invoice-pay / cafeteria top-up; enrollment has no Registration fee link yet;
+    ``other`` would leave a SUCCESS webhook with nothing to credit. Keep the
+    endpoint for a future linked fee type.
     """
     permission_classes = [permissions.IsAuthenticated]
 
