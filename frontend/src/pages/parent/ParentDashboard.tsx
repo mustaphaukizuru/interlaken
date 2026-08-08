@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle } from 'lucide-react';
+import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle, MessageCircle } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import { useAuthStore } from '@/store/authStore';
@@ -45,6 +46,7 @@ export default function ParentDashboard() {
   useAnnouncementsRead(data?.announcements);
 
   const children = data?.children ?? [];
+  const needsFamilyLink = Boolean(data?.needs_family_link) || (!isLoading && !isError && children.length === 0);
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
   const totalBalance = (data?.cafeteria_balances ?? []).reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const hasLowBalance = data?.cafeteria_balances?.some(b => b.low);
@@ -69,6 +71,55 @@ export default function ParentDashboard() {
           <PushOptIn />
         </div>
 
+        {isError ? (
+          <div className="card"><ErrorState onRetry={() => refetch()} /></div>
+        ) : isLoading ? (
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
+            {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)}
+          </div>
+        ) : needsFamilyLink ? (
+          <>
+            <div className="card mb-6">
+              <EmptyState
+                icon={GraduationCap}
+                title="Cuenta sin alumno vinculado"
+                description="Su acceso está activo, pero el colegio aún no ha vinculado un alumno a este correo. Contacte a administración para completar el vínculo; mientras tanto puede actualizar sus datos."
+                action={
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                    <Link to="/contacto" className="btn-pink inline-flex min-h-[44px] items-center justify-center gap-2 text-sm">
+                      <MessageCircle size={15} aria-hidden="true" /> Contactar al colegio
+                    </Link>
+                    <Link to="/portal/perfil" className="btn-outline inline-flex min-h-[44px] items-center justify-center gap-2 text-sm">
+                      <UserCircle size={15} aria-hidden="true" /> Mi información
+                    </Link>
+                  </div>
+                }
+              />
+            </div>
+            <Reveal delay={40}>
+              <SectionCard title="Avisos Escolares" action={{ to: '/portal/comunicados', label: 'Ver todos' }}>
+                {!data?.announcements?.length ? (
+                  <SectionEmpty icon={Bell}>Sin avisos</SectionEmpty>
+                ) : (
+                  <div>
+                    {data.announcements.slice(0, 4).map((a, i) => (
+                      <Link
+                        key={a.id}
+                        to={`/portal/comunicados/${a.id}`}
+                        className={`block px-5 py-[13px] transition hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/30 ${i === 0 ? '' : 'border-t border-cream'}`}
+                      >
+                        <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
+                        <div className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{a.body}</div>
+                        <div className="mt-1 text-[11.5px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            </Reveal>
+          </>
+        ) : (
+        <>
         {/* Low balance alert */}
         {hasLowBalance && (
           <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber/30 bg-amber/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:px-[18px]">
@@ -85,24 +136,16 @@ export default function ParentDashboard() {
           </div>
         )}
 
-        {isError ? (
-          <div className="card"><ErrorState onRetry={() => refetch()} /></div>
-        ) : (
-        <>
         {/* Stats */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
-          {isLoading ? (
-            [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
-          ) : (
-            [
-              <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
-              <StatCard key="b" title="Saldo Cafetería" value={`$${totalBalance.toFixed(2)}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
-              <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="coral" />,
-              <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />,
-            ].map((card, i) => (
-              <Reveal key={i} delay={i * 70}>{card}</Reveal>
-            ))
-          )}
+          {[
+            <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
+            <StatCard key="b" title="Saldo Cafetería" value={`$${totalBalance.toFixed(2)}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
+            <StatCard key="c" title="Pagos Pendientes" value={pendingPayments} icon={CreditCard} color="coral" />,
+            <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />,
+          ].map((card, i) => (
+            <Reveal key={i} delay={i * 70}>{card}</Reveal>
+          ))}
         </div>
 
         {/* Quick actions — the two things parents do most */}
