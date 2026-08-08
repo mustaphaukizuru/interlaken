@@ -543,13 +543,25 @@ class AdminRefundView(APIView):
 class AdminReconcileView(APIView):
     """GET /api/v1/cafeteria/admin/reconcile/
 
-    Compare each linked student's local ledger vs Loyverse points and flag drift.
-    ``?only=drift`` returns only the out-of-sync/errored rows.
+    Compare linked students' local ledger vs Loyverse points and flag drift.
+    Paginated via ``?limit=`` / ``?offset=`` (default limit 50) so large rosters
+    don't time out. ``?only=drift`` returns only the out-of-sync/errored rows
+    within the page.
     """
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        rows = reconcile_balances()
+        try:
+            limit = int(request.query_params.get('limit', 50))
+        except (TypeError, ValueError):
+            limit = 50
+        try:
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            offset = 0
+
+        batch = reconcile_balances(limit=limit, offset=offset)
+        rows = batch['rows']
 
         def _ser(r):
             return {
@@ -566,6 +578,11 @@ class AdminReconcileView(APIView):
         return Response({
             'count': len(data),
             'drift_count': sum(1 for r in data if not r['in_sync']),
+            'checked': batch['checked'],
+            'total': batch['total'],
+            'offset': batch['offset'],
+            'limit': batch['limit'],
+            'has_more': batch['has_more'],
             'results': data,
         })
 
@@ -584,6 +601,24 @@ class AdminLowBalanceView(APIView):
                     .filter(balance__lte=models.F('low_balance_threshold'))
                     .order_by('balance'))
         return Response(CafeteriaBalanceSerializer(balances, many=True).data)
+
+
+class ParentExportView(APIView):
+    """GET /api/v1/cafeteria/export/
+
+    CSV of the authenticated parent's children's cafeteria transactions.
+    Admins may also call it (exports their linked children if any; typically
+    parents use this). Students are rejected — use the per-student admin export.
+    """
+    permission_classes = [IsParentOrAdmin]
+
+    def get(self, request):
+        from . import exports
+
+        user = request.user
+        if user.role not in (User.Role.PARENT, User.Role.ADMIN):
+            return Response({'error': 'No autorizado.'}, status=403)
+        return exports.parent_family_statement_csv(user)
 
 
 class AdminExportStudentView(APIView):

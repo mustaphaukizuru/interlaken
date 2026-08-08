@@ -54,7 +54,7 @@ export default function AboutPage() {
           </h1>
           <p className="mt-4 max-w-xl text-fluid-base leading-relaxed text-white/60 sm:mt-[18px]">
             Colegio Interlaken es una institución educativa privada con más de cuatro décadas
-            de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta preparatoria.
+            de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta secundaria.
           </p>
         </div>
       </section>

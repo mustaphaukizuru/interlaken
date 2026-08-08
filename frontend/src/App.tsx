@@ -35,6 +35,8 @@ const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage  = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
 
 // Parent portal
@@ -46,6 +48,7 @@ const ColegiaturasPage = lazy(() => import('./pages/parent/ColegiaturasPage'));
 const ColegiaturaPaymentReturn = lazy(() => import('./pages/parent/ColegiaturaPaymentReturn'));
 const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
 const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
+const InscripcionesPage = lazy(() => import('./pages/parent/InscripcionesPage'));
 const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
 
 // Staff dashboard
@@ -127,6 +130,8 @@ export default function App() {
             {/* Google OAuth returns to /login?login=ok — /auth/* is reserved for
                 the backend (Vite proxy + SPA catch-all both send it to Django). */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/olvide-contrasena" element={<ForgotPasswordPage />} />
+            <Route path="/restablecer-contrasena" element={<ResetPasswordPage />} />
             {/* Mock hosted-payment page — DEV only. It's a neutral bank-styled
                 page with an attacker-controllable amount/return_url, so mounting
                 it in production would be an open-redirect + phishing surface; in
@@ -147,6 +152,7 @@ export default function App() {
               <Route path="colegiaturas" element={<ColegiaturasPage />} />
               <Route path="colegiaturas/retorno" element={<ColegiaturaPaymentReturn />} />
               <Route path="pagos"     element={<PaymentsPage />} />
+              <Route path="inscripciones" element={<InscripcionesPage />} />
               <Route path="comunicados" element={<ComunicadosPage />} />
               <Route path="comunicados/:id" element={<ComunicadoDetailPage />} />
               <Route path="perfil"    element={<ProfilePage />} />

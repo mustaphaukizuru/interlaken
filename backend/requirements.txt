@@ -63,14 +63,15 @@ django-ratelimit==4.1.0
 django-axes==8.3.1
 
 # Production
-gunicorn==21.2.0
+gunicorn==26.0.0
 whitenoise==6.12.0
 
 # Monitoring (no-op unless SENTRY_DSN is configured)
 sentry-sdk==2.66.1
 
-# Admin skin (IK-ADMIN) — pinned to the release resolved against Django 4.2
-django-unfold==0.102.0
+# Admin skin (IK-ADMIN) — last release that still supports Django 4.2
+# (0.90+ requires Django>=5.0; stay on 0.89 until we upgrade Django).
+django-unfold==0.89.0
 
 # Dev
 pytest-django==4.12.0

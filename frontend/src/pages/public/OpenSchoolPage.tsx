@@ -3,9 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
-import { Clock, MapPin, Users, CheckCircle, MessageCircle } from 'lucide-react';
+import { Clock, MapPin, Users, CheckCircle, MessageCircle, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { admissionsApi } from '@/services/api';
@@ -14,9 +15,11 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { MonthCalendar } from '@/components/ui/MonthCalendar';
+import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { OpenSchoolEvent } from '@/types';
 
 const schema = z.object({
@@ -37,7 +40,7 @@ export default function OpenSchoolPage() {
   const [registered, setRegistered] = useState(false);
   const { whatsapp_number } = useSiteSettings();
 
-  const { data: events, isLoading } = useQuery<OpenSchoolEvent[]>({
+  const { data: events, isLoading, isError, refetch } = useQuery<OpenSchoolEvent[]>({
     queryKey: ['open-school-events'],
     queryFn: async () => {
       const { data } = await admissionsApi.getOpenSchoolEvents();
@@ -110,24 +113,12 @@ export default function OpenSchoolPage() {
           <script type="application/ld+json">{JSON.stringify(eventsJsonLd)}</script>
         </Helmet>
       )}
-      <section className="relative overflow-hidden bg-dark py-14 text-white sm:py-20">
-        <img
-          src="/assets/classroom.webp"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
-          loading="eager"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-          <span className="section-label-pink inline-flex">Clase Abierta</span>
-          <h1 className="mt-3 mb-2 font-head text-fluid-4xl font-bold">Puertas Abiertas</h1>
-          <p className="max-w-2xl text-fluid-base text-white/75">
-            Viva una <strong className="text-white">clase abierta</strong>: usted y su
-            hijo/a participan en una clase real, conocen a nuestros docentes en acción
-            y recorren las instalaciones del colegio.
-          </p>
-        </div>
-      </section>
+      <FunnelHero
+        step="puertas-abiertas"
+        title="Puertas Abiertas"
+        subtitle="Viva una clase abierta: usted y su hijo/a participan en una clase real, conocen a nuestros docentes en acción y recorren las instalaciones del colegio."
+        imageSrc="/assets/classroom.webp"
+      />
 
       {/* Qué incluye la clase abierta */}
       <section className="border-b border-line bg-cream-2">
@@ -147,14 +138,20 @@ export default function OpenSchoolPage() {
 
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-12">
         {registered ? (
-          <div className="text-center py-16">
+          <div className="text-center py-16" role="status">
             <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-brand-600" />
+              <CheckCircle className="w-8 h-8 text-brand-600" aria-hidden="true" />
             </div>
             <h2 className="text-2xl font-bold text-ink mb-2">¡Registro confirmado!</h2>
-            <p className="text-muted">
+            <p className="text-muted mb-6">
               Recibirá un correo con los detalles del evento. ¡Esperamos verle pronto!
             </p>
+            <Link
+              to="/admisiones"
+              className="btn-primary inline-flex min-h-[44px] items-center"
+            >
+              Conocer el proceso de admisión
+            </Link>
           </div>
         ) : (
           <>
@@ -163,12 +160,39 @@ export default function OpenSchoolPage() {
             <div>
               <h2 className="font-semibold text-ink mb-4">Elija una fecha</h2>
               {isLoading ? (
-                <div className="flex justify-center py-10"><LoadingSpinner /></div>
-              ) : !calendarDays.length ? (
-                <div className="rounded-xl2 border border-dashed border-line bg-cream p-6 text-center text-sm text-muted">
-                  No hay eventos programados actualmente. Escríbanos por WhatsApp y le
-                  avisamos de la próxima fecha.
+                <div className="space-y-3" aria-busy="true" aria-label="Cargando eventos">
+                  <div className="skeleton h-10 w-40 rounded-lg" />
+                  <div className="skeleton h-[280px] rounded-xl2" />
+                  <div className="skeleton h-20 rounded-xl2" />
                 </div>
+              ) : isError ? (
+                <ErrorState
+                  title="No fue posible cargar las fechas"
+                  description="Verifique su conexión e intente de nuevo. También puede registrarse por WhatsApp."
+                  onRetry={() => refetch()}
+                />
+              ) : !calendarDays.length ? (
+                <EmptyState
+                  icon={CalendarDays}
+                  title="Sin eventos programados"
+                  description="No hay Puertas Abiertas abiertas por ahora. Escríbanos por WhatsApp y le avisamos de la próxima fecha."
+                  action={
+                    whatsapp_number ? (
+                      <a
+                        href={waHref(whatsapp_number, WHATSAPP_TEXT)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-green inline-flex min-h-[44px] items-center"
+                      >
+                        <MessageCircle className="h-4 w-4" /> Reservar por WhatsApp
+                      </a>
+                    ) : (
+                      <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center">
+                        Contactar al colegio
+                      </Link>
+                    )
+                  }
+                />
               ) : (
                 <div className="space-y-4">
                   <MonthCalendar

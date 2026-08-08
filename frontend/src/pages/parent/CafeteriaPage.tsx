@@ -1,23 +1,29 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw, Search, X } from 'lucide-react';
+import {
+  Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw,
+  Search, X, Download,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { Pagination } from '@/components/ui/Pagination';
-import { cafeteriaApi } from '@/services/api';
+import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
+import { useSelectedChildStore } from '@/store/selectedChildStore';
+import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
+const TOPUP_MIN = 50;
+const TOPUP_MAX = 2000;
 
 const txIcon = (type: string) => {
   if (type === 'topup')   return <ArrowUpCircle className="w-4 h-4 text-green-600" />;
@@ -33,8 +39,20 @@ const txLabel = (type: string) => {
 
 type TypeFilter = '' | 'purchase' | 'topup' | 'refund';
 
+function topupErrorMessage(err: unknown): string {
+  const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data;
+  if (!data) return 'No fue posible procesar la recarga. Intente nuevamente.';
+  if (typeof data.error === 'string') return data.error;
+  const amount = data.amount;
+  if (Array.isArray(amount) && typeof amount[0] === 'string') return amount[0];
+  if (typeof amount === 'string') return amount;
+  return 'No fue posible procesar la recarga. Revise el monto e intente nuevamente.';
+}
+
 export default function CafeteriaPage() {
   const queryClient = useQueryClient();
+  const childId = useSelectedChildStore((s) => s.childId);
+  const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
   const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
@@ -43,12 +61,17 @@ export default function CafeteriaPage() {
   const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
   const [thresholdValue, setThresholdValue] = useState('');
 
-  // History filters + pagination
-  const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
+  // History filters + pagination — default student filter follows portal child switcher.
+  const [filterStudent, setFilterStudent] = useState<number | 'all'>(() => childId ?? 'all');
   const [filterType, setFilterType] = useState<TypeFilter>('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [page, setPage] = useState(1);
+
+  // Keep history filter aligned when the parent switches alumno elsewhere in the portal.
+  useEffect(() => {
+    setFilterStudent(childId ?? 'all');
+  }, [childId]);
 
   // Any filter change resets to the first page (stale page would show empty).
   useEffect(() => { setPage(1); }, [filterStudent, filterType, filterFrom, filterTo]);
@@ -81,11 +104,17 @@ export default function CafeteriaPage() {
   const transactions = txData?.results;
   const txCount = txData?.count ?? 0;
 
+  const topupAmountNum = parseFloat(topupAmount);
+  const topupAmountValid =
+    Number.isFinite(topupAmountNum)
+    && topupAmountNum >= TOPUP_MIN
+    && topupAmountNum <= TOPUP_MAX;
+
   const topupMutation = useMutation({
     mutationFn: () =>
       cafeteriaApi.requestTopUp(
         selectedStudent!,
-        parseFloat(topupAmount),
+        topupAmountNum,
         topupMethod,
         topupMethod === 'online' ? topupGateway : undefined,
       ),
@@ -93,16 +122,18 @@ export default function CafeteriaPage() {
       // Online payments hand off to the gateway's hosted page; the balance is
       // credited later by the confirmed webhook (see the return page).
       if (topupMethod === 'online' && data?.redirect_url) {
-        toast.success('Redirigiendo a la pasarela de pago…');
+        toast.success('Listo. Te redirigimos a Global Payments / Banorte para completar el pago…');
         window.location.href = data.redirect_url;
         return;
       }
-      toast.success('Solicitud de recarga enviada correctamente.');
+      toast.success(
+        'Solicitud de recarga enviada. Paga en caja escolar y el colegio aplicará el saldo.',
+      );
       setShowTopup(false);
       setTopupAmount('');
       queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
     },
-    onError: () => toast.error('No fue posible procesar la recarga. Intente nuevamente.'),
+    onError: (err) => toast.error(topupErrorMessage(err)),
   });
 
   // Family-set low-balance alert threshold (#12).
@@ -119,6 +150,7 @@ export default function CafeteriaPage() {
   });
 
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -141,6 +173,20 @@ export default function CafeteriaPage() {
     }
   };
 
+  const exportMovements = async () => {
+    setExporting(true);
+    try {
+      const { data } = await cafeteriaApi.exportMyTransactions();
+      const stamp = format(new Date(), 'yyyyMMdd');
+      downloadBlob(data, `movimientos_cafeteria_${stamp}.csv`);
+      toast.success('Descarga de movimientos lista.');
+    } catch {
+      toast.error('No se pudo descargar los movimientos. Intente nuevamente.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // History filters: track whether any is active so we can give feedback and a
   // one-tap reset (the list auto-applies filters, so without this a filter that
   // matches nothing looks like a dead end).
@@ -151,9 +197,8 @@ export default function CafeteriaPage() {
     setFilterFrom('');
     setFilterTo('');
     setFilterStudent('all');
+    setChildId(null);
   };
-
-  if (balancesLoading) return <LoadingSpinner size="lg" className="mt-20" />;
 
   if (balancesError) {
     return (
@@ -167,6 +212,17 @@ export default function CafeteriaPage() {
     );
   }
 
+  const switcherStudents = (balances ?? []).map((b) => ({
+    id: b.student.id,
+    name: b.student.user.full_name,
+    grade: b.student.grade,
+    group: b.student.group,
+  }));
+
+  const visibleBalances = childId == null
+    ? (balances ?? [])
+    : (balances ?? []).filter((b) => b.student.id === childId);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -174,17 +230,57 @@ export default function CafeteriaPage() {
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
           <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
         </div>
-        <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} className="self-start min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
-          <RefreshCw className="w-3 h-3" /> Actualizar
-        </Button>
+        <div className="flex flex-wrap gap-2 self-start">
+          {!balancesLoading && balances && balances.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={exporting}
+              onClick={exportMovements}
+              className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40"
+            >
+              <Download className="w-3 h-3" /> Descargar movimientos
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} disabled={balancesLoading} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
+            <RefreshCw className="w-3 h-3" /> Actualizar
+          </Button>
+        </div>
       </div>
 
+      {balancesLoading ? (
+        <div className="space-y-4" aria-busy="true" aria-label="Cargando cafetería">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[200px] rounded-xl2" />)}
+          </div>
+          <Card><ListSkeleton rows={4} /></Card>
+        </div>
+      ) : null}
+
+      {!balancesLoading && switcherStudents.length > 1 && (
+        <ChildSwitcher
+          students={switcherStudents}
+          allowAll
+          className="mb-1"
+        />
+      )}
+
       {/* Balance cards */}
+      {!balancesLoading && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {balances?.map((b) => {
-          const isLow = parseFloat(b.balance) < parseFloat(b.low_balance_threshold ?? '50');
+        {visibleBalances.map((b) => {
+          // Prefer API flag (balance <= threshold); fall back to same inequality.
+          const isLow = typeof b.is_low_balance === 'boolean'
+            ? b.is_low_balance
+            : parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
+          const notLinked = !b.student.loyverse_id;
+          const bal = parseFloat(b.balance);
+          const isSelected = childId === b.student.id;
           return (
-            <Card key={b.id} className="flex flex-col">
+            <Card
+              key={b.id}
+              className={`flex flex-col ${isSelected ? 'ring-2 ring-purple/35' : ''}`}
+            >
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
                   <Coffee className="h-5 w-5" />
@@ -200,13 +296,19 @@ export default function CafeteriaPage() {
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-subtle">Saldo</p>
                   <p className={`font-head text-2xl font-bold ${isLow ? 'text-amber' : 'text-ink'}`}>
-                    ${parseFloat(b.balance).toFixed(2)}
+                    ${bal.toFixed(2)}
                   </p>
                 </div>
                 <p className="pb-1 text-right text-[11px] leading-tight text-subtle">
                   Actualizado<br />{b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
                 </p>
               </div>
+
+              {notLinked && (
+                <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
+                  Este alumno aún no está vinculado a cafetería/Loyverse. Contacta al colegio para activar el servicio.
+                </p>
+              )}
 
               <Button
                 variant="secondary"
@@ -231,34 +333,41 @@ export default function CafeteriaPage() {
           );
         })}
       </div>
+      )}
 
-      {/* No cafeteria accounts linked — explain instead of showing a blank page. */}
-      {balances && balances.length === 0 && (
+      {/* No cafeteria accounts — school must link children to Loyverse. */}
+      {!balancesLoading && balances && balances.length === 0 && (
         <Card>
           <EmptyState
             icon={Coffee}
-            title="Sin cuentas de cafetería"
-            description="Aún no hay alumnos con servicio de cafetería vinculados a tu cuenta. Si crees que es un error, contacta al colegio."
+            title="Sin servicio de cafetería"
+            description="El colegio debe vincular a tu hijo(a) con el servicio de cafetería (Loyverse) para ver saldo y movimientos aquí. Contacta a la administración escolar si crees que ya debería estar activo."
           />
         </Card>
       )}
 
       {/* Top-up modal */}
-      <Modal open={showTopup} onClose={() => setShowTopup(false)} title="Solicitar recarga">
+      <Modal open={showTopup} onClose={() => { setShowTopup(false); setTopupAmount(''); }} title="Solicitar recarga">
         <div>
           <label className="label" htmlFor="topup-amount">Monto (MXN)</label>
           <input
             id="topup-amount"
             type="number"
             inputMode="decimal"
-            min="50"
-            max="2000"
+            min={TOPUP_MIN}
+            max={TOPUP_MAX}
             className="input-field min-h-[44px] text-base"
             placeholder="Ej. 200"
             value={topupAmount}
             onChange={(e) => setTopupAmount(e.target.value)}
           />
-          <p className="mt-1 text-xs text-subtle">Mínimo $50 · Máximo $2,000</p>
+          <p className="mt-1 text-xs text-subtle">Mínimo ${TOPUP_MIN} · Máximo ${TOPUP_MAX.toLocaleString('es-MX')}</p>
+          {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > TOPUP_MAX && (
+            <p className="mt-1 text-xs text-coral">El monto máximo por recarga es ${TOPUP_MAX.toLocaleString('es-MX')}.</p>
+          )}
+          {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > 0 && topupAmountNum < TOPUP_MIN && (
+            <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${TOPUP_MIN}.</p>
+          )}
           <div className="mt-2.5 flex flex-wrap gap-2">
             {[100, 200, 300, 500].map((amt) => (
               <button
@@ -282,26 +391,26 @@ export default function CafeteriaPage() {
             id="topup-method"
             className="input-field min-h-[44px] text-base"
             value={topupMethod}
-            onChange={(e) => setTopupMethod(e.target.value as any)}
+            onChange={(e) => setTopupMethod(e.target.value as 'online' | 'office')}
           >
-            <option value="online">Pago en línea (tarjeta)</option>
+            <option value="online">Pago en línea (Global Payments / Banorte)</option>
             <option value="office">Pago en caja escolar</option>
           </select>
         </div>
         {topupMethod === 'online' && (
           <PaymentMethodPicker
             value={topupGateway}
-            onChange={(v) => setTopupGateway(v as any)}
+            onChange={(v) => setTopupGateway(v as 'global_payments' | 'banorte')}
             disabled={topupMutation.isPending}
           />
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="secondary" onClick={() => setShowTopup(false)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
+          <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); }} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
           <Button
             variant="primary"
             loading={topupMutation.isPending}
             onClick={() => topupMutation.mutate()}
-            disabled={!topupAmount || parseFloat(topupAmount) < 50}
+            disabled={!topupAmountValid}
             className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             {topupMethod === 'online' ? 'Continuar al pago' : 'Solicitar recarga'}
@@ -350,7 +459,7 @@ export default function CafeteriaPage() {
       </Modal>
 
       {/* Transactions — only when the family actually has cafeteria accounts */}
-      {balances && balances.length > 0 && (
+      {!balancesLoading && balances && balances.length > 0 && (
       <Card title="Historial de movimientos">
         {/* Filters */}
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
@@ -358,7 +467,11 @@ export default function CafeteriaPage() {
             <select
               className="input-field min-h-[44px] text-sm lg:w-auto"
               value={filterStudent}
-              onChange={(e) => setFilterStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              onChange={(e) => {
+                const next = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                setFilterStudent(next);
+                setChildId(next === 'all' ? null : next);
+              }}
               aria-label="Filtrar por alumno"
             >
               <option value="all">Todos los alumnos</option>

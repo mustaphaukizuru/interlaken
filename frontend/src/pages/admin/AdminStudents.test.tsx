@@ -3,7 +3,12 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
-  portalApi: { getStudents: vi.fn(), importStudents: vi.fn() },
+  portalApi: {
+    getStudents: vi.fn(),
+    importStudents: vi.fn(),
+    importLoyverse: vi.fn(),
+    linkLoyverse: vi.fn(),
+  },
 }));
 
 import AdminStudents from './AdminStudents';

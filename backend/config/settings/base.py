@@ -95,15 +95,24 @@ TEMPLATES = [
 ]
 
 # ── DATABASE ──────────────────────────────────────────────
+# MySQL (cPanel) needs utf8mb4. Postgres (Supabase / Render) needs SSL —
+# default sslmode=require; override with DB_SSLMODE=disable for local Postgres.
+_DB_ENGINE = env('DB_ENGINE', default='django.db.backends.mysql')
+if 'mysql' in _DB_ENGINE:
+    _DB_OPTIONS = {'charset': 'utf8mb4'}
+elif 'postgresql' in _DB_ENGINE or 'postgres' in _DB_ENGINE:
+    _DB_OPTIONS = {'sslmode': env('DB_SSLMODE', default='require')}
+else:
+    _DB_OPTIONS = {}
 DATABASES = {
     'default': {
-        'ENGINE': env('DB_ENGINE', default='django.db.backends.mysql'),
+        'ENGINE': _DB_ENGINE,
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER', default=''),
         'PASSWORD': env('DB_PASSWORD', default=''),
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='3306'),
-        'OPTIONS': {'charset': 'utf8mb4'} if 'mysql' in env('DB_ENGINE', default='mysql') else {},
+        'OPTIONS': _DB_OPTIONS,
     }
 }
 
@@ -289,14 +298,22 @@ CAFETERIA_SYNC_PURCHASES_SINCE = env('CAFETERIA_SYNC_PURCHASES_SINCE', default='
 # Which gateway a top-up defaults to when the client doesn't specify one.
 DEFAULT_PAYMENT_GATEWAY = env('DEFAULT_PAYMENT_GATEWAY', default='global_payments')
 
-# Global Payments (Hosted Payment Page). ``GLOBAL_PAYMENTS_HPP_URL`` overrides the
-# built-in sandbox default; the APP_ID/KEY are used when the live HPP SDK is wired.
+# Master sandbox/live switch for hosted checkout URLs. When false (default),
+# create_checkout forces sandbox URLs and ignores live merchant HPP/checkout
+# hosts that may be sitting in env — see payments/gateways/*.py.
+PAYMENTS_LIVE = env.bool('PAYMENTS_LIVE', default=False)
+
+# Global Payments (Hosted Payment Page).
+# Sandbox: leave PAYMENTS_LIVE=false; empty HPP_URL → local /pago/simulado mock.
+# Live: set PAYMENTS_LIVE=true + real GLOBAL_PAYMENTS_HPP_URL + APP_ID/KEY.
 GLOBAL_PAYMENTS_APP_ID = env('GLOBAL_PAYMENTS_APP_ID', default='')
 GLOBAL_PAYMENTS_APP_KEY = env('GLOBAL_PAYMENTS_APP_KEY', default='')
 GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
 GLOBAL_PAYMENTS_HPP_URL = env('GLOBAL_PAYMENTS_HPP_URL', default='')
 
 # Banorte "Pago en Línea" hosted checkout.
+# Sandbox: leave PAYMENTS_LIVE=false; empty CHECKOUT_URL → local /pago/simulado.
+# Live: set PAYMENTS_LIVE=true + real BANORTE_CHECKOUT_URL + MERCHANT_ID.
 BANORTE_MERCHANT_ID = env('BANORTE_MERCHANT_ID', default='')
 BANORTE_ENV = env('BANORTE_ENV', default='sandbox')
 BANORTE_CHECKOUT_URL = env('BANORTE_CHECKOUT_URL', default='')

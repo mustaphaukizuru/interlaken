@@ -280,6 +280,24 @@ class TestReconcile:
         api_client.force_authenticate(user=ParentFactory())
         assert api_client.get(reverse("admin-reconcile")).status_code == 403
 
+    @patch("apps.cafeteria.services.get_customer_by_id")
+    def test_reconcile_respects_limit_offset(self, mock_get, api_client):
+        for i in range(3):
+            s = StudentProfileFactory(loyverse_id=f"loy-{i}")
+            _balance(s, 50)
+        mock_get.return_value = {"total_points": 50}
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.get(reverse("admin-reconcile"), {"limit": 2, "offset": 0})
+        assert resp.status_code == 200
+        assert resp.data["checked"] == 2
+        assert resp.data["total"] == 3
+        assert resp.data["has_more"] is True
+        assert len(resp.data["results"]) == 2
+
+        page2 = api_client.get(reverse("admin-reconcile"), {"limit": 2, "offset": 2})
+        assert page2.data["checked"] == 1
+        assert page2.data["has_more"] is False
+
 
 class TestLowBalanceReport:
     def test_lists_only_students_at_or_below_threshold(self, api_client):
@@ -359,3 +377,44 @@ class TestExports:
         assert api_client.get(
             reverse("admin-export-student", args=[student.id])).status_code == 403
         assert api_client.get(reverse("admin-export-school")).status_code == 403
+
+
+class TestParentExport:
+    """GET /api/v1/cafeteria/export/ — family CSV for authenticated parents."""
+
+    def test_parent_export_csv_includes_children_transactions(self, api_client):
+        parent = ParentFactory()
+        child = StudentProfileFactory(parents=[parent])
+        other = StudentProfileFactory()  # not linked — must not appear
+        _balance(child, 100)
+        _balance(other, 50)
+        CafeteriaTransaction.objects.create(
+            student=child,
+            transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+            amount=Decimal("25.00"),
+            description="Jugo",
+            loyverse_receipt_id="R-parent-export-1",
+            balance_after=Decimal("75.00"),
+        )
+        CafeteriaTransaction.objects.create(
+            student=other,
+            transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+            amount=Decimal("10.00"),
+            description="secreto",
+            loyverse_receipt_id="R-parent-export-other",
+            balance_after=Decimal("40.00"),
+        )
+
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-export"))
+        assert resp.status_code == 200
+        assert resp["Content-Type"].startswith("text/csv")
+        assert "attachment" in resp["Content-Disposition"]
+        body = resp.content.decode("utf-8")
+        assert child.student_id in body
+        assert "Jugo" in body
+        assert other.student_id not in body
+        assert "secreto" not in body
+
+    def test_parent_export_rejects_anonymous(self, api_client):
+        assert api_client.get(reverse("cafeteria-export")).status_code == 401

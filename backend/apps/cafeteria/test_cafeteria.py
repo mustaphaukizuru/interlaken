@@ -111,8 +111,24 @@ class TestBalanceSync:
             low_balance_threshold=Decimal("50"),
         )
         assert cb.is_low_balance is True
+        # Equality with threshold is low (<=), matching serializer / parent UI.
+        cb.balance = Decimal("50")
+        assert cb.is_low_balance is True
         cb.balance = Decimal("80")
         assert cb.is_low_balance is False
+
+    def test_balance_serializer_exposes_is_low_balance(self):
+        from apps.cafeteria.serializers import CafeteriaBalanceSerializer
+
+        student = StudentProfileFactory()
+        cb = CafeteriaBalance.objects.create(
+            student=student,
+            balance=Decimal("50"),
+            low_balance_threshold=Decimal("50"),
+        )
+        data = CafeteriaBalanceSerializer(cb).data
+        assert data["is_low_balance"] is True
+        assert data["balance"] == "50.00"
 
 
 class TestSyncPurchases:
@@ -374,8 +390,17 @@ class TestApplyTopUp:
         # A zero/negative top-up must be rejected at the boundary — otherwise an
         # applied negative "top-up" would DEBIT the child's balance.
         student = StudentProfileFactory()
-        for bad in (Decimal("0"), Decimal("-500")):
+        for bad in (Decimal("0"), Decimal("-500"), Decimal("49.99"), Decimal("2000.01")):
             s = TopUpRequestSerializer(
                 data={"student": student.id, "amount": bad, "method": "office"})
             assert not s.is_valid()
             assert "amount" in s.errors
+
+    def test_serializer_accepts_amount_within_ui_bounds(self):
+        student = StudentProfileFactory()
+        s = TopUpRequestSerializer(
+            data={"student": student.id, "amount": Decimal("50.00"), "method": "office"})
+        assert s.is_valid(), s.errors
+        s = TopUpRequestSerializer(
+            data={"student": student.id, "amount": Decimal("2000.00"), "method": "office"})
+        assert s.is_valid(), s.errors

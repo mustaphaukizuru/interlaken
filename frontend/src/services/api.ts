@@ -108,6 +108,18 @@ export const authApi = {
   me: () => api.get('/accounts/me/'),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
+  requestPasswordReset: (email: string) =>
+    api.post('/accounts/password-reset/', { email }),
+  confirmPasswordReset: (data: { uid: string; token: string; password: string }) =>
+    api.post('/accounts/password-reset/confirm/', data),
+  setPassword: (password: string) =>
+    api.post('/accounts/set-password/', { password }),
+  getNotifPrefs: () =>
+    api.get<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>(
+      '/accounts/notification-preferences/',
+    ),
+  updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>) =>
+    api.patch('/accounts/notification-preferences/', data),
   logout: async () => {
     const csrf = getCookie(CSRF_COOKIE);
     const token = useAuthStore.getState().accessToken;
@@ -165,6 +177,10 @@ export const admissionsApi = {
       },
     });
   },
+
+  /** Parent portal — registrations linked to the logged-in user's email. */
+  getMyRegistrations: () =>
+    api.get('/admissions/my-registrations/'),
 
   getOpenSchoolEvents: () =>
     api.get('/admissions/open-school/'),
@@ -245,6 +261,10 @@ export const cafeteriaApi = {
       students: number;
     }>('/cafeteria/refresh/'),
 
+  /** Parent family CSV of children's cafeteria transactions. */
+  exportMyTransactions: () =>
+    api.get('/cafeteria/export/', { responseType: 'blob' }),
+
   // Admin
   getAllBalances: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/balances/', { params }),
@@ -278,8 +298,14 @@ export const cafeteriaApi = {
   refundTransaction: (txId: number, reason?: string) =>
     api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
 
-  reconcile: (onlyDrift?: boolean) =>
-    api.get('/cafeteria/admin/reconcile/', { params: onlyDrift ? { only: 'drift' } : {} }),
+  reconcile: (onlyDrift?: boolean, params?: { limit?: number; offset?: number }) =>
+    api.get('/cafeteria/admin/reconcile/', {
+      params: {
+        ...(onlyDrift ? { only: 'drift' } : {}),
+        ...(params?.limit != null ? { limit: params.limit } : {}),
+        ...(params?.offset != null ? { offset: params.offset } : {}),
+      },
+    }),
 
   getLowBalance: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/low-balance/', { params }),
@@ -485,6 +511,7 @@ export const portalApi = {
   // Personal notifications (header bell menu).
   getNotifications: () => api.get('/portal/notifications/'),
   markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),
+  markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
@@ -514,6 +541,13 @@ export const portalApi = {
   // Roster ↔ Loyverse linking (admin): commit=false previews the plan, true persists.
   linkLoyverse: (commit: boolean) =>
     api.post('/accounts/admin/link-loyverse/', { commit: commit ? '1' : '0' }),
+
+  // Import roster from Loyverse customers (admin): preview then commit (+ link).
+  importLoyverse: (commit: boolean, seedBalances = true) =>
+    api.post('/accounts/admin/import-loyverse/', {
+      commit: commit ? '1' : '0',
+      seed_balances: seedBalances ? '1' : '0',
+    }),
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────

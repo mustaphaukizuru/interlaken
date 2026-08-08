@@ -210,7 +210,13 @@ export default function LoginPage() {
                   {submitting ? 'Ingresando…' : (<><LogIn className="h-4 w-4" aria-hidden="true" /> Ingresar</>)}
                 </button>
                 <p className="mt-3.5 text-center text-[12px] text-subtle">
-                  ¿Problemas para ingresar?{' '}
+                  ¿Olvidó su contraseña o es su primer acceso?{' '}
+                  <Link to="/olvide-contrasena" className="font-semibold text-purple hover:underline">
+                    Activar / restablecer
+                  </Link>
+                </p>
+                <p className="mt-2 text-center text-[12px] text-subtle">
+                  ¿Problemas?{' '}
                   <Link to="/contacto" className="font-semibold text-purple hover:underline">Contacte al colegio</Link>
                 </p>
               </form>

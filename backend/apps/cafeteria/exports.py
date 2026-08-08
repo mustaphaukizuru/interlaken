@@ -153,3 +153,50 @@ def school_statement_pdf() -> HttpResponse:
     pdf = simple_document_pdf('Saldos de cafetería — toda la escuela', lines)
     response = HttpResponse(pdf, content_type='application/pdf')
     return _download(response, _filename('saldos_cafeteria_escuela', 'pdf'))
+
+
+# ── parent family statement ──────────────────────────────────────────────────
+
+def parent_family_statement_csv(parent) -> HttpResponse:
+    """CSV ledger for every child linked to ``parent`` (authenticated guardian)."""
+    students = list(
+        parent.children.select_related('user').order_by(
+            'user__last_name', 'user__first_name'))
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response.write('\ufeff')  # BOM so Excel opens UTF-8 accents correctly
+    writer = csv.writer(response)
+    writer.writerow(['Movimientos de cafetería — familia'])
+    writer.writerow(['Padre/Tutor', parent.full_name or parent.email])
+    writer.writerow(['Generado', _fmt_dt(timezone.now())])
+    writer.writerow([])
+
+    if not students:
+        writer.writerow(['(Sin alumnos vinculados)'])
+        return _download(response, _filename('movimientos_cafeteria', 'csv'))
+
+    header = ['Alumno', 'Matrícula', 'Fecha', 'Tipo', 'Descripción', 'Monto', 'Saldo']
+    writer.writerow(header)
+
+    for student in students:
+        txns = (CafeteriaTransaction.objects
+                .filter(student=student)
+                .order_by('date'))
+        if not txns.exists():
+            writer.writerow([
+                student.user.full_name, student.student_id,
+                '', '', '(Sin movimientos)', '', '',
+            ])
+            continue
+        for tx in txns:
+            writer.writerow([
+                student.user.full_name,
+                student.student_id,
+                _fmt_dt(tx.date),
+                tx.get_transaction_type_display(),
+                tx.description or '',
+                f'{Decimal(str(tx.amount)):.2f}',
+                f'{Decimal(str(tx.balance_after)):.2f}' if tx.balance_after is not None else '',
+            ])
+
+    return _download(response, _filename('movimientos_cafeteria', 'csv'))
