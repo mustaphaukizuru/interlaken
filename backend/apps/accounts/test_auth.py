@@ -358,3 +358,51 @@ class TestStudentListPermissions:
     def test_anonymous_is_denied(self, api_client):
         resp = api_client.get(reverse("students"))
         assert resp.status_code == 401
+
+
+# ── current user (GET/PATCH /accounts/me/) ────────────────────────────────
+class TestCurrentUser:
+    def test_get_requires_auth(self, api_client):
+        resp = api_client.get(reverse("current-user"))
+        assert resp.status_code == 401
+
+    def test_get_returns_authenticated_user(self, api_client):
+        parent = ParentFactory(first_name="Ana", last_name="López", whatsapp="5511111111")
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("current-user"))
+        assert resp.status_code == 200
+        assert resp.data["email"] == parent.email
+        assert resp.data["first_name"] == "Ana"
+        assert resp.data["whatsapp"] == "5511111111"
+        assert resp.data["role"] == User.Role.PARENT
+        assert "notif_prefs" in resp.data
+
+    def test_patch_updates_name_and_whatsapp(self, api_client):
+        parent = ParentFactory(first_name="Ana", last_name="López", whatsapp="")
+        api_client.force_authenticate(user=parent)
+        resp = api_client.patch(
+            reverse("current-user"),
+            {"first_name": "Ana María", "last_name": "García", "whatsapp": "5522222222"},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+        parent.refresh_from_db()
+        assert parent.first_name == "Ana María"
+        assert parent.last_name == "García"
+        assert parent.whatsapp == "5522222222"
+        assert resp.data["first_name"] == "Ana María"
+        assert resp.data["whatsapp"] == "5522222222"
+
+    def test_patch_ignores_email_and_role(self, api_client):
+        parent = ParentFactory()
+        api_client.force_authenticate(user=parent)
+        resp = api_client.patch(
+            reverse("current-user"),
+            {"email": "attacker@evil.test", "role": User.Role.ADMIN, "first_name": "Ok"},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+        parent.refresh_from_db()
+        assert parent.email != "attacker@evil.test"
+        assert parent.role == User.Role.PARENT
+        assert parent.first_name == "Ok"
