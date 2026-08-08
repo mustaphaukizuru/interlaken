@@ -270,7 +270,8 @@ def _notify_purchase(tx):
     message = f'{student.user.full_name}: {head}{detail}.{balance}'
 
     notified = 0
-    for parent in student.parents.all():
+    from apps.accounts.family import family_notify_recipients
+    for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
                whatsapp=use_wa)
@@ -305,7 +306,8 @@ def _maybe_low_balance_alert(cb, now):
         f'contratiempos a la hora del almuerzo.'
     )
     notified = 0
-    for parent in student.parents.all():
+    from apps.accounts.family import family_notify_recipients
+    for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
                whatsapp=use_wa)
@@ -615,7 +617,8 @@ def notify_topup_result(payment, *, success: bool) -> int:
         )
 
     notified = 0
-    for parent in student.parents.all():
+    from apps.accounts.family import family_notify_recipients
+    for parent in family_notify_recipients(student):
         notify(parent, Notification.NotifType.PAYMENT, title, message)
         notified += 1
     return notified
@@ -704,11 +707,12 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
 
 def _notify_balance_change(student, title, message):
     """Fan out an in-app + email notification to every guardian. Returns count."""
+    from apps.accounts.family import family_notify_recipients
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
     notified = 0
-    for parent in student.parents.all():
+    for parent in family_notify_recipients(student):
         notify(parent, Notification.NotifType.CAFETERIA, title, message)
         notified += 1
     return notified

@@ -160,15 +160,17 @@ class TestSyncPurchases:
         assert cb.balance == Decimal("70")
         assert cb.last_synced is not None
 
-        # In-app notification + email fan out to the guardian.
+        # In-app + email to linked guardians and the school-email student User
+        # when that account is not already on parents M2M.
         note = Notification.objects.get(user=parent)
         assert note.notif_type == Notification.NotifType.CAFETERIA
         assert "$30.00" in note.message
-        assert len(mailoutbox) == 1
-        assert parent.email in mailoutbox[0].to
+        assert Notification.objects.filter(user=student.user).count() == 1
+        assert len(mailoutbox) == 2
+        assert {m.to[0] for m in mailoutbox} == {parent.email, student.user.email}
 
         assert result["created"] == 1
-        assert result["notified"] == 1
+        assert result["notified"] == 2
 
     @patch("apps.cafeteria.services.get_receipts")
     def test_sync_is_idempotent(self, mock_receipts, mailoutbox):
@@ -181,11 +183,12 @@ class TestSyncPurchases:
         second = services.sync_purchases()
 
         # Re-processing the same receipt neither duplicates the row, re-debits the
-        # balance, nor re-notifies the parent (unique loyverse_receipt_id).
+        # balance, nor re-notifies (unique loyverse_receipt_id).
         assert CafeteriaTransaction.objects.filter(loyverse_receipt_id="R-1").count() == 1
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("70")
         assert Notification.objects.filter(user=parent).count() == 1
-        assert len(mailoutbox) == 1
+        assert Notification.objects.filter(user=student.user).count() == 1
+        assert len(mailoutbox) == 2
         assert second["created"] == 0
 
     @patch("apps.cafeteria.services.get_receipts")
