@@ -11,7 +11,8 @@ The critical money paths mirror the cafeteria pattern:
   the invoice to *paid* — atomically and idempotently (a replayed webhook is a
   no-op). We never mark an invoice paid from the browser return.
 - **manual admin changes** (``mark_invoice_paid``, ``adjust_invoice``,
-  ``cancel_invoice``) are audited via ``InvoiceAdjustment``.
+  ``cancel_invoice``, ``refund_invoice_overpayment``) are audited via
+  ``InvoiceAdjustment``.
 """
 import calendar
 import logging
@@ -20,7 +21,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.utils import timezone
 
 from .models import (
@@ -536,6 +537,74 @@ def adjust_invoice(invoice, amount, reason, admin=None):
     return adj
 
 
+def refund_invoice_overpayment(invoice, *, payment_id=None, reason='', admin=None):
+    """Record an offline/admin refund of an applied tuition overpayment.
+
+    Requires ``balance_due < 0``. Marks the chosen (or newest) applied SUCCESS
+    ``Payment`` as ``REFUNDED``, reverses its invoice credit, and writes a
+    ``REFUND`` ``InvoiceAdjustment``. Does **not** call the payment provider —
+    staff confirm the money was returned offline (caja / transferencia / portal
+    del banco). Raises ``ValueError`` when the invoice is not overpaid or no
+    refundable online payment exists.
+    """
+    from apps.payments.models import Payment
+
+    if not (reason or '').strip():
+        raise ValueError('La devolución requiere un motivo.')
+
+    with transaction.atomic():
+        inv = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if inv.balance_due >= 0:
+            raise ValueError('La factura no tiene un saldo a favor.')
+
+        links = (
+            InvoicePayment.objects
+            .select_for_update()
+            .filter(
+                invoice=inv,
+                applied_at__isnull=False,
+                payment__status=Payment.Status.SUCCESS,
+            )
+            .select_related('payment')
+            .order_by('-created_at')
+        )
+        if payment_id is not None:
+            link = links.filter(payment_id=payment_id).first()
+            if link is None:
+                raise ValueError('Pago no encontrado o no reembolsable en esta factura.')
+        else:
+            link = links.first()
+            if link is None:
+                raise ValueError('No hay un pago en línea aplicado para devolver.')
+
+        payment = link.payment
+        amount = q2(payment.amount)
+        payment.status = Payment.Status.REFUNDED
+        payment.save(update_fields=['status', 'updated_at'])
+
+        reverse_invoice_payment(payment)
+        inv.refresh_from_db()
+
+        adj = InvoiceAdjustment.objects.create(
+            invoice=inv, admin=admin, kind=InvoiceAdjustment.Kind.REFUND,
+            amount=-amount, reason=reason,
+            status_after=inv.status, amount_after=inv.amount,
+            amount_paid_after=inv.amount_paid,
+        )
+
+    _notify_invoice(
+        inv, 'Devolución de colegiatura',
+        (f'Se registró una devolución de ${amount:.2f} sobre la colegiatura de '
+         f'{_period_label(inv.period)} de {inv.student.user.full_name}. '
+         f'Motivo: {reason}. Saldo actual: ${inv.balance_due:.2f}.'),
+    )
+    logger.info(
+        'Invoice #%s overpayment refund of $%s (payment #%s) by %s — %r.',
+        inv.id, amount, payment.id, admin, reason,
+    )
+    return adj
+
+
 def cancel_invoice(invoice, reason, admin=None):
     """Cancel an invoice (no longer owed). Audited. Raises if already paid."""
     if not (reason or '').strip():
@@ -575,11 +644,18 @@ def dashboard_summary(period=None):
         paid=Count('id', filter=Q(status=Invoice.Status.PAID)),
         overdue=Count('id', filter=Q(status=Invoice.Status.OVERDUE)),
         pending=Count('id', filter=Q(status=Invoice.Status.PENDING)),
+        overpaid=Count('id', filter=Q(amount_paid__gt=F('amount'))),
     )
     billed = q2(agg['billed'])
     collected = q2(agg['collected'])
     outstanding = q2(billed - collected)
     rate = float((collected / billed * 100).quantize(Decimal('0.1'))) if billed > 0 else 0.0
+    # Credit sitting on overpaid invoices (amount_paid past amount) — staff signal
+    # for manual refund review (see refund_invoice_overpayment).
+    overpaid_credit = q2(
+        qs.filter(amount_paid__gt=F('amount'))
+        .aggregate(credit=Sum(F('amount_paid') - F('amount')))['credit']
+    )
 
     return {
         'period': period or 'all',
@@ -591,6 +667,8 @@ def dashboard_summary(period=None):
         'paid': agg['paid'] or 0,
         'overdue': agg['overdue'] or 0,
         'pending': agg['pending'] or 0,
+        'overpaid': agg['overpaid'] or 0,
+        'overpaid_credit': str(overpaid_credit),
     }
 
 

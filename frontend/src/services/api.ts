@@ -395,6 +395,13 @@ export const financeApi = {
   cancelInvoice: (id: number, reason: string) =>
     api.post(`/finance/admin/invoices/${id}/cancel/`, { reason }),
 
+  /** Record offline refund of an applied online overpayment (Payment→REFUNDED). */
+  refundOverpayment: (id: number, reason: string, paymentId?: number) =>
+    api.post(`/finance/admin/invoices/${id}/refund/`, {
+      reason,
+      ...(paymentId != null ? { payment_id: paymentId } : {}),
+    }),
+
   generate: (period?: string) =>
     api.post('/finance/admin/generate/', period ? { period } : {}),
 

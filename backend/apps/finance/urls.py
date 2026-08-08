@@ -16,6 +16,7 @@ urlpatterns = [
     path('admin/invoices/<int:pk>/mark-paid/', views.AdminMarkPaidView.as_view(), name='finance-admin-mark-paid'),
     path('admin/invoices/<int:pk>/adjust/',    views.AdminAdjustInvoiceView.as_view(), name='finance-admin-adjust'),
     path('admin/invoices/<int:pk>/cancel/',    views.AdminCancelInvoiceView.as_view(), name='finance-admin-cancel'),
+    path('admin/invoices/<int:pk>/refund/',    views.AdminRefundOverpaymentView.as_view(), name='finance-admin-refund'),
     path('admin/student/<int:pk>/',      views.AdminStudentLedgerView.as_view(),  name='finance-admin-student'),
     path('admin/generate/',              views.AdminGenerateInvoicesView.as_view(), name='finance-admin-generate'),
     path('admin/bulk/',                  views.AdminBulkActionView.as_view(),     name='finance-admin-bulk'),

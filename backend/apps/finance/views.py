@@ -8,7 +8,7 @@ manual actions (mark-paid / adjust / cancel / bulk).
 """
 from decimal import Decimal
 
-from django.db.models import Q
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -29,6 +29,7 @@ from .serializers import (
     InvoicePayInputSerializer,
     InvoiceSerializer,
     MarkPaidInputSerializer,
+    RefundOverpaymentInputSerializer,
 )
 
 
@@ -172,15 +173,22 @@ class AdminDashboardView(APIView):
 
 
 class AdminInvoiceListView(generics.ListAPIView):
-    """GET /api/v1/finance/admin/invoices/?status=&period=&student=&grade=&q="""
+    """GET /api/v1/finance/admin/invoices/?status=&period=&student=&grade=&q=
+
+    ``status=overpaid`` is a pseudo-filter for invoices with ``amount_paid > amount``
+    (saldo a favor / credit waiting on a manual refund).
+    """
     serializer_class = InvoiceListSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
         qs = Invoice.objects.select_related('student__user')
         p = self.request.query_params
-        if p.get('status'):
-            qs = qs.filter(status=p['status'])
+        status_filter = p.get('status')
+        if status_filter == 'overpaid':
+            qs = qs.filter(amount_paid__gt=F('amount'))
+        elif status_filter:
+            qs = qs.filter(status=status_filter)
         if p.get('period'):
             qs = qs.filter(period=p['period'])
         if p.get('student'):
@@ -284,6 +292,31 @@ class AdminCancelInvoiceView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         if adj is None:
             return Response({'detail': 'La factura ya estaba cancelada.'})
+        invoice.refresh_from_db()
+        return Response(InvoiceSerializer(invoice).data)
+
+
+class AdminRefundOverpaymentView(APIView):
+    """POST /api/v1/finance/admin/invoices/<pk>/refund/  ``{reason, payment_id?}``.
+
+    Records an offline refund of an applied online overpayment: Payment→REFUNDED,
+    invoice credit reversed, audited. Provider capture is not contacted.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        invoice = get_object_or_404(Invoice.objects.select_related('student__user'), pk=pk)
+        serializer = RefundOverpaymentInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            services.refund_invoice_overpayment(
+                invoice,
+                payment_id=serializer.validated_data.get('payment_id'),
+                reason=serializer.validated_data['reason'],
+                admin=request.user,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         invoice.refresh_from_db()
         return Response(InvoiceSerializer(invoice).data)
 

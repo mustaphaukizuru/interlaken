@@ -189,6 +189,10 @@ export interface FinanceDashboard {
   paid: number;
   overdue: number;
   pending: number;
+  /** Invoices with amount_paid > amount (saldo a favor). */
+  overpaid?: number;
+  /** Total credit on overpaid invoices (MXN string). */
+  overpaid_credit?: string;
 }
 
 export interface Announcement {
