@@ -270,6 +270,19 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         if not _can_manage_student_cafeteria(user, student):
             return Response({'error': 'No autorizado para este alumno.'}, status=403)
 
+        # Online/office top-ups only make sense once the student is on Loyverse —
+        # office apply and POS load both require loyverse_id downstream.
+        if not (student.loyverse_id or '').strip():
+            return Response(
+                {
+                    'error': (
+                        'Este alumno aún no está vinculado a cafetería/Loyverse. '
+                        'Contacte al colegio para activar el servicio.'
+                    ),
+                },
+                status=400,
+            )
+
         method = serializer.validated_data.get('method') or TopUpRequest.Method.OFFICE
         if method == TopUpRequest.Method.ONLINE:
             gateway_name = (request.data.get('gateway') or '').lower() or None
