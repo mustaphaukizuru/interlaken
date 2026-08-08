@@ -293,22 +293,20 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
 
 
 class PaymentDetailView(generics.RetrieveAPIView):
-    """GET /api/v1/payments/<pk>/"""
+    """GET /api/v1/payments/<pk>/ — family-scoped (return-page polling)."""
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        if self.request.user.role == 'admin':
-            return Payment.objects.all()
-        return Payment.objects.filter(user=self.request.user)
+        from .services import payments_visible_to
+        return payments_visible_to(self.request.user)
 
 
 class PaymentHistoryView(generics.ListAPIView):
-    """GET /api/v1/payments/history/"""
+    """GET /api/v1/payments/history/ — family-scoped payment history."""
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        if self.request.user.role == 'admin':
-            return Payment.objects.all().order_by('-created_at')
-        return Payment.objects.filter(user=self.request.user).order_by('-created_at')
+        from .services import payments_visible_to
+        return payments_visible_to(self.request.user).order_by('-created_at')

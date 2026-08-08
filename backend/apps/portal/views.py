@@ -72,7 +72,8 @@ class DashboardView(APIView):
         if user.role in (User.Role.PARENT, User.Role.STUDENT) and family_students:
             students = family_students
             balances = CafeteriaBalance.objects.filter(student__in=students)
-            recent_payments = Payment.objects.filter(user=user).order_by('-created_at')[:5]
+            from apps.payments.services import payments_visible_to
+            recent_payments = payments_visible_to(user).order_by('-created_at')[:5]
 
             data = {
                 'children_count': len(students),
