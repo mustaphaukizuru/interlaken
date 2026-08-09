@@ -5,16 +5,23 @@ import { Blob } from '@/components/ui/Blob';
 
 const FUNNEL_STEPS = [
   { n: '01', label: 'Pre-Registro', to: '/pre-registro' },
-  { n: '02', label: 'Puertas Abiertas', to: '/puertas-abiertas' },
+  // Covers both Puertas Abiertas (group) and Agendar Visita (individual).
+  { n: '02', label: 'Visita', to: '/agendar-visita' },
   { n: '03', label: 'Inscripción', to: '/admisiones/documentacion' },
   { n: '04', label: 'Bienvenida', to: '/admisiones' },
 ] as const;
 
-export type FunnelStepKey = 'pre-registro' | 'puertas-abiertas' | 'inscripcion' | 'bienvenida';
+export type FunnelStepKey =
+  | 'pre-registro'
+  | 'puertas-abiertas'
+  | 'agendar-visita'
+  | 'inscripcion'
+  | 'bienvenida';
 
 const STEP_INDEX: Record<FunnelStepKey, number> = {
   'pre-registro': 0,
   'puertas-abiertas': 1,
+  'agendar-visita': 1,
   inscripcion: 2,
   bienvenida: 3,
 };
