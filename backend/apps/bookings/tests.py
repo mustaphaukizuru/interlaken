@@ -266,7 +266,7 @@ class SlotGeneratorWeekdayTests(APITestCase):
         self.assertEqual(py_weekdays, {0})
 
     def test_open_class_generator_sets_title_and_capacity(self):
-        from datetime import date, timedelta
+        from datetime import date
 
         from apps.accounts.models import User
         admin = User.objects.create_user(
