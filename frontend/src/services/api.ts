@@ -479,6 +479,7 @@ export const bookingsApi = {
   // Admin
   generateSlots: (data: {
     visit_type?: string;
+    title?: string;
     start_date: string;
     end_date: string;
     weekdays: number[];
