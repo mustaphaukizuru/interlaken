@@ -23,7 +23,7 @@ import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { OpenSchoolEvent } from '@/types';
 
 const schema = z.object({
-  event:          z.number(),
+  // `event` is chosen via the calendar UI (selectedEvent), not a form field.
   name:           z.string().min(2, 'Nombre requerido'),
   email:          z.string().email('Correo inválido'),
   phone:          z.string().min(10, 'Teléfono inválido'),
@@ -82,8 +82,9 @@ export default function OpenSchoolPage() {
   });
 
   const onSubmit = async (data: FormData) => {
+    if (!selectedEvent) return;
     try {
-      await admissionsApi.signUpOpenSchool({ ...data, event: selectedEvent?.id });
+      await admissionsApi.signUpOpenSchool({ ...data, event: selectedEvent.id });
       setRegistered(true);
     } catch {
       toast.error('No fue posible completar el registro. Intente de nuevo.');
