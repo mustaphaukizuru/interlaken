@@ -1,1 +1,0 @@
-import{r as o}from"./vendor-CqouS74J.js";import{y as r}from"./index-Q6NMDTsu.js";function s(t){const e=(t??[]).map(n=>n.id).join(",");o.useEffect(()=>{e&&r.markAnnouncementsRead(e.split(",").map(Number)).catch(()=>{})},[e])}export{s as u};

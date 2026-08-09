@@ -23,24 +23,34 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const oauthReturning = params.get('login') === 'ok';
+  const [oauthBootstrapping, setOauthBootstrapping] = useState(oauthReturning);
 
   // Handle the Google OAuth return. The backend set the session as httpOnly
   // cookies and redirected here with ?login=ok (NO tokens in the URL); we mint
   // an in-memory access token from the cookie via a silent refresh.
   useEffect(() => {
-    if (params.get('login') !== 'ok') return;
+    if (!oauthReturning) return;
+    let cancelled = false;
+    setOauthBootstrapping(true);
     bootstrapSession()
       .then(async (ok) => {
         if (!ok) throw new Error('no-session');
         const { data } = await authApi.me();
+        if (cancelled) return;
         setUser(data);
         navigate(ROLE_PATHS[data.role] ?? '/portal', { replace: true });
       })
       .catch(() => {
+        if (cancelled) return;
         toast.error('Error al iniciar sesión. Intente nuevamente.');
+        setOauthBootstrapping(false);
         navigate('/login', { replace: true });
       });
-  }, [params, setUser, navigate]);
+    return () => {
+      cancelled = true;
+    };
+  }, [oauthReturning, setUser, navigate]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -141,7 +151,17 @@ export default function LoginPage() {
               <h2 className="text-center font-head text-fluid-xl font-extrabold text-ink">Iniciar Sesión</h2>
               <p className="mb-6 mt-1 text-center text-[13px] text-muted">Acceso para familias y personal del colegio</p>
 
-              {alertMsg && (
+              {oauthBootstrapping && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="mb-[18px] rounded-xl border border-purple/25 bg-purple/[0.06] px-3.5 py-3 text-center text-[13px] text-ink"
+                >
+                  Completando acceso con Google…
+                </div>
+              )}
+
+              {alertMsg && !oauthBootstrapping && (
                 <div className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark">
                   {alertMsg}
                 </div>
@@ -149,8 +169,9 @@ export default function LoginPage() {
 
               <button
                 type="button"
+                disabled={oauthBootstrapping}
                 onClick={() => authApi.googleLogin()}
-                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
               >
                 <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -179,7 +200,8 @@ export default function LoginPage() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="correo@interlaken.edu.mx"
-                    className="input-field min-h-[44px] pl-10 text-base"
+                    disabled={oauthBootstrapping}
+                    className="input-field min-h-[44px] pl-10 text-base disabled:opacity-60"
                   />
                 </div>
                 <label htmlFor="login-password" className="label">Contraseña</label>
@@ -193,23 +215,29 @@ export default function LoginPage() {
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="input-field min-h-[44px] pl-10 pr-11 text-base"
+                    disabled={oauthBootstrapping}
+                    className="input-field min-h-[44px] pl-10 pr-11 text-base disabled:opacity-60"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
+                    disabled={oauthBootstrapping}
                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || oauthBootstrapping}
                   className="btn-pink min-h-[44px] w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-70"
                 >
-                  {submitting ? 'Ingresando…' : (<><LogIn className="h-4 w-4" aria-hidden="true" /> Ingresar</>)}
+                  {oauthBootstrapping
+                    ? 'Completando…'
+                    : submitting
+                      ? 'Ingresando…'
+                      : (<><LogIn className="h-4 w-4" aria-hidden="true" /> Ingresar</>)}
                 </button>
                 <p className="mt-3.5 text-center text-[12px] text-subtle">
                   ¿Olvidó su contraseña o es su primer acceso?{' '}
