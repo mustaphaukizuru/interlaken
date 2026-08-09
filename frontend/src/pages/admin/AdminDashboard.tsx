@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Users, ClipboardList, CreditCard, Coffee, RefreshCw, UserPlus, ArrowRight, Bell } from 'lucide-react';
+import { Users, ClipboardList, FileCheck2, CreditCard, Receipt, RefreshCw, UserPlus, ArrowRight, Bell } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -33,15 +33,16 @@ export default function AdminDashboard() {
         {isError ? (
           <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
         ) : (
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 sm:gap-[18px]">
             {isLoading ? (
-              [0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)
+              [0, 1, 2, 3, 4].map(i => <div key={i} className="skeleton h-[148px]" />)
             ) : (
               [
                 <StatCard key="a" title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
                 <StatCard key="b" title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />,
-                <StatCard key="c" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
-                <StatCard key="d" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Coffee} color="green" />,
+                <StatCard key="c" title="Inscripciones Pendientes" value={data?.pending_registrations ?? 0} icon={FileCheck2} color="coral" />,
+                <StatCard key="d" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
+                <StatCard key="e" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Receipt} color="amber" />,
               ].map((card, i) => (
                 <Reveal key={i} delay={i * 70}>{card}</Reveal>
               ))
