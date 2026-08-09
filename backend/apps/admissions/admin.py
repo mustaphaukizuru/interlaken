@@ -1,7 +1,10 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from .models import OpenSchoolDay, PreRegistration, Registration, RegistrationDocument
+# OpenSchoolDay is retired for publishing — live /puertas-abiertas reads
+# bookings.AvailabilitySlot(visit_type=open_class). Manage dates in
+# /admin/visitas (React) or bookings.AvailabilitySlot.
+from .models import PreRegistration, Registration, RegistrationDocument
 
 
 @admin.register(PreRegistration)
@@ -45,13 +48,3 @@ class RegistrationDocumentAdmin(ModelAdmin):
     list_select_related = ('registration',)
     readonly_fields = ('filename', 'file_size', 'uploaded_at')
 
-
-@admin.register(OpenSchoolDay)
-class OpenSchoolDayAdmin(ModelAdmin):
-    list_display = ('event_name', 'event_date', 'event_time', 'parent_name',
-                    'child_name', 'status', 'max_capacity')
-    list_filter = ('status', 'event_date')
-    search_fields = ('parent_name', 'parent_email', 'child_name')
-    ordering = ('event_date',)
-    date_hierarchy = 'event_date'
-    readonly_fields = ('created_at',)

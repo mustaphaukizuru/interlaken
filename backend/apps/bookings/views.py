@@ -112,6 +112,7 @@ class AvailabilityView(APIView):
                         start_time=cursor.time(),
                         end_time=slot_end.time(),
                         defaults={
+                            'title': d.get('title') or '',
                             'capacity': d['capacity'],
                             'location': d['location'],
                             'is_active': True,

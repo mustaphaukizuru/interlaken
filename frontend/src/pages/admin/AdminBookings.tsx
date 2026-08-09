@@ -36,7 +36,9 @@ const WEEKDAYS = [
 ];
 
 function SlotGenerator({ onDone }: { onDone: () => void }) {
+  const [visitType, setVisitType] = useState<'individual' | 'open_class'>('individual');
   const [form, setForm] = useState({
+    title: '',
     start_date: '',
     end_date: '',
     window_start: '09:00',
@@ -47,12 +49,29 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
   });
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
 
+  const setVisitTypeAndDefaults = (next: 'individual' | 'open_class') => {
+    setVisitType(next);
+    setForm((f) => ({
+      ...f,
+      title: next === 'open_class' ? (f.title || 'Puertas Abiertas') : '',
+      // Open-class = one event block per day; individual = short tour slots.
+      interval_minutes: next === 'open_class' ? 120 : 30,
+      capacity: next === 'open_class' ? 30 : 1,
+      window_end: next === 'open_class' ? '11:00' : f.window_end,
+    }));
+  };
+
   const mutation = useMutation({
     mutationFn: () =>
       bookingsApi.generateSlots({
-        visit_type: 'individual',
+        visit_type: visitType,
+        title: visitType === 'open_class' ? (form.title.trim() || 'Puertas Abiertas') : undefined,
         weekdays,
-        ...form,
+        start_date: form.start_date,
+        end_date: form.end_date,
+        window_start: form.window_start,
+        window_end: form.window_end,
+        location: form.location,
         interval_minutes: Number(form.interval_minutes),
         capacity: Number(form.capacity),
       }),
@@ -81,8 +100,38 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
     mutation.mutate();
   };
 
+  const isOpenClass = visitType === 'open_class';
+
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div>
+        <label className="label" htmlFor="slot-visit-type">Tipo de visita</label>
+        <select
+          id="slot-visit-type"
+          className="input-field"
+          aria-label="Tipo de visita a publicar"
+          value={visitType}
+          onChange={(e) => setVisitTypeAndDefaults(e.target.value as 'individual' | 'open_class')}
+        >
+          <option value="individual">Visita individual (Agendar visita)</option>
+          <option value="open_class">Puertas Abiertas (clase abierta)</option>
+        </select>
+        <p className="mt-1.5 text-xs text-subtle">
+          {isOpenClass
+            ? 'Se publica en /puertas-abiertas. Use una duración igual a la ventana (ej. 09:00–11:00 y 120 min) para un solo evento por día.'
+            : 'Se publica en /agendar-visita como horarios cortos de recorrido personalizado.'}
+        </p>
+      </div>
+
+      {isOpenClass && (
+        <Input
+          label="Nombre del evento"
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          placeholder="Puertas Abiertas"
+        />
+      )}
+
       <div className="grid sm:grid-cols-2 gap-4">
         <Input
           label="Desde"
@@ -142,13 +191,13 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
             value={form.interval_minutes}
             onChange={(e) => setForm({ ...form, interval_minutes: Number(e.target.value) })}
           >
-            {[15, 20, 30, 45, 60].map((n) => (
+            {[15, 20, 30, 45, 60, 90, 120, 180].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
         </div>
         <Input
-          label="Cupo por horario"
+          label={isOpenClass ? 'Cupo del evento' : 'Cupo por horario'}
           type="number"
           min={1}
           value={form.capacity}
@@ -162,7 +211,8 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
       </div>
 
       <Button type="submit" loading={mutation.isPending}>
-        <CalendarPlus className="w-4 h-4" /> Generar horarios
+        <CalendarPlus className="w-4 h-4" />
+        {isOpenClass ? 'Publicar eventos' : 'Generar horarios'}
       </Button>
     </form>
   );
@@ -226,11 +276,18 @@ const VISIT_TYPE_LABEL: Record<string, string> = {
 function SlotManager() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
+  const [typeFilter, setTypeFilter] = useState<'individual' | 'open_class' | ''>('');
   const [deleteFor, setDeleteFor] = useState<AdminSlot | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-slots', page],
-    queryFn: async () => toPaged<AdminSlot>((await bookingsApi.getAdminSlots({ page })).data),
+    queryKey: ['admin-slots', page, typeFilter],
+    queryFn: async () =>
+      toPaged<AdminSlot>(
+        (await bookingsApi.getAdminSlots({
+          page,
+          ...(typeFilter ? { type: typeFilter } : {}),
+        })).data,
+      ),
     placeholderData: keepPreviousData,
   });
   const slots = data?.results;
@@ -247,18 +304,46 @@ function SlotManager() {
     onError: (e: any) => { toast.error(e?.response?.data?.detail ?? 'No se pudo eliminar el horario.'); setDeleteFor(null); },
   });
 
-  if (isError) return <ErrorState onRetry={() => refetch()} />;
-  if (isLoading) return <TableSkeleton />;
-  if (!slots?.length) return <EmptyState icon={CalendarClock} title="Sin horarios" description="Genere disponibilidad con el formulario de arriba." />;
-
   return (
     <>
+      <div className="mb-4">
+        <select
+          className="input-field text-sm py-1.5 max-w-xs"
+          aria-label="Filtrar horarios por tipo"
+          value={typeFilter}
+          onChange={(e) => {
+            setTypeFilter(e.target.value as 'individual' | 'open_class' | '');
+            setPage(1);
+          }}
+        >
+          <option value="">Todos los tipos</option>
+          <option value="individual">Visitas individuales</option>
+          <option value="open_class">Puertas Abiertas</option>
+        </select>
+      </div>
+
+      {isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : isLoading ? (
+        <TableSkeleton />
+      ) : !slots?.length ? (
+        <EmptyState
+          icon={CalendarClock}
+          title="Sin horarios"
+          description={
+            typeFilter
+              ? 'Ningún horario coincide con el filtro. Genere disponibilidad arriba o cambie el filtro.'
+              : 'Genere disponibilidad con el formulario de arriba.'
+          }
+        />
+      ) : (
       <div className="divide-y divide-line">
         {slots.map((s) => (
           <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
             <div className="min-w-0">
               <p className="text-sm font-medium text-ink">
                 {format(parseISO(s.date), 'EEE d MMM yyyy', { locale: es })} · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
+                {s.title ? ` · ${s.title}` : ''}
               </p>
               <p className="text-xs text-subtle">
                 {VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type} · {s.booked_count}/{s.capacity} reservas · {s.location || 'Campus'}
@@ -276,7 +361,10 @@ function SlotManager() {
           </div>
         ))}
       </div>
-      <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="horarios" />
+      )}
+      {!!slots?.length && (
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="horarios" />
+      )}
       <ConfirmDialog
         open={!!deleteFor}
         title="¿Eliminar horario?"
@@ -336,18 +424,21 @@ export default function AdminBookings() {
       <div>
         <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Visitas</h1>
         <p className="text-muted text-sm mt-0.5">
-          Publique disponibilidad y gestione las visitas individuales.
+          Publique fechas para visitas individuales (/agendar-visita) y Puertas Abiertas (/puertas-abiertas).
         </p>
       </div>
 
-      <Card title="Publicar disponibilidad" subtitle="Genere horarios recurrentes para visitas individuales.">
+      <Card
+        title="Publicar disponibilidad"
+        subtitle="Elija el tipo: recorrido individual o evento de clase abierta."
+      >
         <SlotGenerator onDone={() => {
           qc.invalidateQueries({ queryKey: ['admin-bookings'] });
           qc.invalidateQueries({ queryKey: ['admin-slots'] });
         }} />
       </Card>
 
-      <Card title="Horarios publicados" subtitle="Active, desactive o elimine los horarios de disponibilidad.">
+      <Card title="Horarios publicados" subtitle="Active, desactive o elimine los horarios de ambos tipos.">
         <SlotManager />
       </Card>
 

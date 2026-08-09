@@ -12,7 +12,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 
-from .models import AvailabilitySlot, Booking
+from .models import AvailabilitySlot, Booking, VisitType
 from .services import calendar
 
 
@@ -264,6 +264,31 @@ class SlotGeneratorWeekdayTests(APITestCase):
         py_weekdays = {s.date.weekday() for s in AvailabilitySlot.objects.all()}
         # Every generated slot must fall on Monday (python weekday()==0).
         self.assertEqual(py_weekdays, {0})
+
+    def test_open_class_generator_sets_title_and_capacity(self):
+        from datetime import date, timedelta
+
+        from apps.accounts.models import User
+        admin = User.objects.create_user(
+            email='ocadmin@x.mx', password='x', first_name='A', last_name='D',
+            role=User.Role.ADMIN, is_staff=True)
+        self.client.force_authenticate(admin)
+        start = date(2026, 9, 7)  # a Monday
+        resp = self.client.post(reverse('bookings-availability'), {
+            'visit_type': 'open_class',
+            'title': '',  # blank → serializer default "Puertas Abiertas"
+            'start_date': start.isoformat(),
+            'end_date': start.isoformat(),
+            'weekdays': [1],
+            'window_start': '09:00', 'window_end': '11:00',
+            'interval_minutes': 120, 'capacity': 30, 'location': 'Campus',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data['created'], 1)
+        slot = AvailabilitySlot.objects.get()
+        self.assertEqual(slot.visit_type, VisitType.OPEN_CLASS)
+        self.assertEqual(slot.title, 'Puertas Abiertas')
+        self.assertEqual(slot.capacity, 30)
 
 
 class AdminBookingsConsoleTests(APITestCase):
