@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import OpenSchoolDay, PreRegistration, Registration, RegistrationDocument
+from .models import PreRegistration, Registration, RegistrationDocument
 
 
 def _validate_child_dob(value):
@@ -247,21 +247,3 @@ class RegistrationSerializer(serializers.ModelSerializer):
                 if field in data:
                     data[field] = None
         return data
-
-
-class OpenSchoolDaySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OpenSchoolDay
-        fields = [
-            'id', 'event_date', 'event_time', 'event_name',
-            'parent_name', 'parent_email', 'parent_phone',
-            'child_name', 'child_age', 'level_interest', 'message',
-            'status', 'created_at',
-        ]
-        read_only_fields = ['id', 'status', 'created_at']
-
-
-class OpenSchoolDayEventSerializer(serializers.Serializer):
-    event_date  = serializers.DateField()
-    event_time  = serializers.CharField()
-    event_name  = serializers.CharField()
