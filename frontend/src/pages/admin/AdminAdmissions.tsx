@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ClipboardList, GraduationCap, Search, Send, Copy, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { RegistrationReviewModal } from '@/components/admin/RegistrationReviewModal';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { api, admissionsAdminApi } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { STATUS_BADGE } from '@/lib/admissionsStatus';
@@ -42,10 +43,15 @@ export default function AdminAdmissions() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [invitedLink, setInvitedLink] = useState<{ name: string; url: string } | null>(null);
+  const debouncedSearch = useDebouncedValue(search.trim(), 350);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-preregistrations', page],
-    queryFn: async () => toPaged<PreReg>((await api.get('/admissions/pre-register/', { params: { page } })).data),
+    queryKey: ['admin-preregistrations', page, debouncedSearch],
+    queryFn: async () => toPaged<PreReg>((await api.get('/admissions/pre-register/', {
+      params: { page, ...(debouncedSearch ? { search: debouncedSearch } : {}) },
+    })).data),
     placeholderData: keepPreviousData,
   });
 
@@ -74,14 +80,6 @@ export default function AdminAdmissions() {
 
   const preRegs = data?.results;
   const count = data?.count ?? 0;
-
-  const filtered = preRegs?.filter((p) =>
-    !search ||
-    p.child_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.parent_email.toLowerCase().includes(search.toLowerCase())
-  );
-
   const invitingId = invite.isPending ? invite.variables?.id : undefined;
 
   return (
@@ -114,33 +112,33 @@ export default function AdminAdmissions() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="relative mb-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
+        {/* Search — server-side across the full roster (debounced). */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" aria-hidden="true" />
           <input
             className="input-field pl-9"
             placeholder="Buscar por nombre, correo…"
+            aria-label="Buscar pre-registros"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <p className="mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
         {isLoading ? (
           <TableSkeleton />
         ) : isError ? (
           <ErrorState onRetry={() => refetch()} />
-        ) : !filtered?.length ? (
+        ) : !preRegs?.length ? (
           <EmptyState
             icon={ClipboardList}
-            title={search ? 'Sin resultados' : 'Sin pre-registros'}
-            description={search ? 'Ningún pre-registro coincide con la búsqueda.' : 'Los pre-registros aparecerán aquí cuando se reciban.'}
+            title={debouncedSearch ? 'Sin resultados' : 'Sin pre-registros'}
+            description={debouncedSearch ? 'Ningún pre-registro coincide con la búsqueda.' : 'Los pre-registros aparecerán aquí cuando se reciban.'}
           />
         ) : (
           <>
             {/* Mobile: stacked cards */}
             <ul className="space-y-3 md:hidden">
-              {filtered.map((p) => {
+              {preRegs.map((p) => {
                 const meta = statusMeta[p.status] ?? statusMeta.pending;
                 return (
                   <li key={p.id} className="rounded-xl2 border border-line p-4">
@@ -194,7 +192,7 @@ export default function AdminAdmissions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((p) => {
+                  {preRegs.map((p) => {
                     const meta = statusMeta[p.status] ?? statusMeta.pending;
                     return (
                       <tr key={p.id}>
