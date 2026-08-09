@@ -10,11 +10,17 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+vi.mock('react-hot-toast', () => ({
+  default: { error: vi.fn(), success: vi.fn() },
+}));
+
+import toast from 'react-hot-toast';
 import AdminSettings from './AdminSettings';
 import { contentApi } from '@/services/api';
 
 const mockedGet = vi.mocked(contentApi.adminGetSettings);
 const mockedPatch = vi.mocked(contentApi.adminUpdateSettings);
+const toastError = vi.mocked(toast.error);
 
 const SAMPLE = {
   phone_display: '(55) 5379-1188',
@@ -89,6 +95,60 @@ describe('AdminSettings (CMS preview + density)', () => {
     expect(mockedPatch.mock.calls[0][0]).toMatchObject({
       whatsapp_number: SAMPLE.whatsapp_number,
       phone_display: SAMPLE.phone_display,
+    });
+  });
+
+  it('surfaces DRF field errors under the matching inputs', async () => {
+    mockedGet.mockResolvedValueOnce({ data: SAMPLE } as never);
+    mockedPatch.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          contact_email: ['Introduzca una dirección de correo electrónico válida.'],
+          maps_url: ['Introduzca una URL válida.'],
+        },
+      },
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number);
+    });
+    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    expect(
+      await screen.findByText('Introduzca una dirección de correo electrónico válida.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Introduzca una URL válida.')).toBeInTheDocument();
+    expect(toastError).toHaveBeenCalledWith('Revise los campos marcados e intente de nuevo.');
+    expect(mockedPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a field error when the admin edits that input', async () => {
+    mockedGet.mockResolvedValueOnce({ data: SAMPLE } as never);
+    mockedPatch.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          contact_email: ['Introduzca una dirección de correo electrónico válida.'],
+        },
+      },
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Correo de contacto')).toHaveValue(SAMPLE.contact_email);
+    });
+    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    expect(
+      await screen.findByText('Introduzca una dirección de correo electrónico válida.'),
+    ).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Correo de contacto'), 'x');
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Introduzca una dirección de correo electrónico válida.'),
+      ).not.toBeInTheDocument();
     });
   });
 });
