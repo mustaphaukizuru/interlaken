@@ -85,6 +85,14 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
     """POST /api/v1/admissions/pre-register/ — Public, no auth.
     GET — Admin-only paginated list for the Admisiones console."""
     queryset = PreRegistration.objects.all()
+    # Admin GET ?search= — SearchFilter is in DEFAULT_FILTER_BACKENDS.
+    search_fields = [
+        'child_first_name',
+        'child_last_name',
+        'parent_name',
+        'parent_email',
+        'parent_phone',
+    ]
 
     def get_permissions(self):
         if self.request.method == 'GET':
