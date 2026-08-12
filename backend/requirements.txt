@@ -8,7 +8,7 @@ django-filter==23.5
 drf-spectacular==0.30.0
 # At-rest encryption for sensitive fields (medical data — IK-LEGAL B4).
 # social-auth-core 5.x requires cryptography>=46.0.7.
-cryptography==46.0.7
+cryptography==50.0.0
 
 # Database
 mysqlclient==2.2.8
