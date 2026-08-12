@@ -1,0 +1,55 @@
+# Normalize line endings so builds are byte-reproducible across OS.
+#
+# Why: the repo commits the built SPA (backend/static + backend/templates/index.html)
+# and CI verifies it matches a fresh build. Without this file, a Windows checkout
+# (core.autocrlf=true) has CRLF source, so a local `npm run build` produces
+# different Vite chunk hashes than CI's Linux/LF build and the freshness check
+# fails. `eol=lf` forces LF in every working tree, so a plain local build now
+# matches CI — no Docker/container dance needed.
+#
+# Safe to adopt: all existing blobs are already stored as LF, so this changes
+# working-tree checkout only, with no content churn.
+
+# Default: auto-detect text vs binary; store and check out text as LF.
+* text=auto eol=lf
+
+# Text formats that must stay LF (explicit for clarity).
+*.py    text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.css   text eol=lf
+*.scss  text eol=lf
+*.html  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.svg   text eol=lf
+*.sh    text eol=lf
+
+# Windows scripts must keep CRLF or they won't run.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary assets — never apply line-ending or diff filters.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.avif  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.pptx  binary
+*.zip   binary
+*.gz    binary
