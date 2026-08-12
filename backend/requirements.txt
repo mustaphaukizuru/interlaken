@@ -1,6 +1,6 @@
 # Core
 Django==4.2.13
-djangorestframework==3.17.1
+djangorestframework==3.18.0
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 django-environ==0.14.0
@@ -21,7 +21,7 @@ psycopg2-binary==2.9.12
 
 # Auth
 social-auth-app-django==5.4.1
-social-auth-core==5.0.2
+social-auth-core==5.1.0
 PyJWT==2.13.0
 
 # Storage & Files
@@ -31,10 +31,10 @@ python-magic==0.4.27
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
 django-storages==1.14.6
-boto3==1.43.63
+boto3==1.43.67
 
 # Web push notifications (VAPID) — inert until VAPID_* env keys are set.
-pywebpush==2.3.0
+pywebpush==2.4.0
 
 # HTTP & APIs
 requests==2.34.2
@@ -43,7 +43,7 @@ httpx==0.28.1
 # Google Calendar (service-account writes for confirmed bookings — Prompt 13).
 # Fail-soft: bookings never depend on these being importable/configured.
 google-api-python-client==2.198.0
-google-auth==2.56.2
+google-auth==2.56.3
 
 # Payments: Global Payments + Banorte are custom HPP redirect + HMAC-signed
 # webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
@@ -72,8 +72,8 @@ sentry-sdk==2.66.1
 
 # Admin skin (IK-ADMIN) — last release that still supports Django 4.2
 # (0.90+ requires Django>=5.0; stay on 0.89 until we upgrade Django).
-django-unfold==0.89.0
+django-unfold==0.103.0
 
 # Dev
-pytest-django==4.12.0
+pytest-django==4.13.0
 factory-boy==3.3.3
