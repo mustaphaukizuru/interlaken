@@ -73,6 +73,16 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: pip install -r requirements.txt
+      # These crons hit Supabase directly, independent of the Render deploy that
+      # normally runs entrypoint migrate. If a migration-bearing PR merges before
+      # Render redeploys, the DB schema lags the code and every command fails
+      # (e.g. "column cafeteria_cafeteriabalance.daily_spend_limit does not exist").
+      # Apply pending migrations first so the cron self-heals. Idempotent no-op
+      # when already migrated.
+      - name: Apply pending migrations
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: backend
+        run: python manage.py migrate --noinput
       - name: Seed balances + poll purchases (fast path)
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend

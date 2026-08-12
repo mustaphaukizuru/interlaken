@@ -76,6 +76,12 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: pip install -r requirements.txt
+      # Self-heal DB schema drift: these jobs hit Supabase directly, so if a
+      # migration merged before Render redeployed, apply it here first (idempotent).
+      - name: Apply pending migrations
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: backend
+        run: python manage.py migrate --noinput
       - name: Apply late fees (no email)
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
@@ -135,6 +141,10 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: pip install -r requirements.txt
+      - name: Apply pending migrations
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: backend
+        run: python manage.py migrate --noinput
       - name: Generate monthly tuition invoices
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
