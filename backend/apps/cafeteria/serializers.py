@@ -1,5 +1,8 @@
+from datetime import timedelta
 from decimal import Decimal
 
+from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.serializers import StudentProfileSerializer
@@ -28,10 +31,40 @@ class LoyverseProfileSerializer(serializers.ModelSerializer):
 class CafeteriaBalanceSerializer(serializers.ModelSerializer):
     student = StudentProfileSerializer(read_only=True)
     is_low_balance = serializers.BooleanField(read_only=True)
+    # Running spend for budget progress bars (F13). Two extra queries each, so
+    # only computed for family views that pass ``include_spend`` in context —
+    # admin balance lists (large N) keep them null and stay cheap.
+    today_spend = serializers.SerializerMethodField()
+    week_spend  = serializers.SerializerMethodField()
 
     class Meta:
         model = CafeteriaBalance
-        fields = ['id', 'student', 'balance', 'low_balance_threshold', 'last_synced', 'is_low_balance']
+        fields = ['id', 'student', 'balance', 'low_balance_threshold', 'last_synced',
+                  'is_low_balance', 'daily_spend_limit', 'weekly_spend_limit',
+                  'today_spend', 'week_spend']
+
+    def _spend_since(self, obj, start):
+        total = (CafeteriaTransaction.objects
+                 .filter(student=obj.student,
+                         transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                         date__gte=start)
+                 .aggregate(t=Sum('amount'))['t'])
+        return str(total or Decimal('0'))
+
+    def get_today_spend(self, obj):
+        if not self.context.get('include_spend'):
+            return None
+        now = timezone.localtime()
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return self._spend_since(obj, start)
+
+    def get_week_spend(self, obj):
+        if not self.context.get('include_spend'):
+            return None
+        now = timezone.localtime()
+        start = (now.replace(hour=0, minute=0, second=0, microsecond=0)
+                 - timedelta(days=now.weekday()))
+        return self._spend_since(obj, start)
 
 
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):
@@ -151,6 +184,26 @@ class LowBalanceThresholdSerializer(serializers.Serializer):
     threshold = serializers.DecimalField(
         max_digits=8, decimal_places=2,
         min_value=Decimal('0.00'), max_value=Decimal('100000.00'))
+
+
+class SpendLimitsSerializer(serializers.Serializer):
+    """Validates a family-set daily/weekly cafeteria spend budget (F13).
+
+    Both fields are optional; 0 disables that cap. Either may be sent alone so a
+    parent can set just a daily or just a weekly limit.
+    """
+    daily_spend_limit = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False,
+        min_value=Decimal('0.00'), max_value=Decimal('100000.00'))
+    weekly_spend_limit = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False,
+        min_value=Decimal('0.00'), max_value=Decimal('100000.00'))
+
+    def validate(self, attrs):
+        if 'daily_spend_limit' not in attrs and 'weekly_spend_limit' not in attrs:
+            raise serializers.ValidationError(
+                'Envíe daily_spend_limit y/o weekly_spend_limit.')
+        return attrs
 
 
 class AdjustmentInputSerializer(serializers.Serializer):

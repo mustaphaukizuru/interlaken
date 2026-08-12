@@ -37,6 +37,9 @@ env:
   EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
   EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
   DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+  # Set to True (on both the web service and this secret) to switch cafetería to
+  # digest mode: per-purchase pings are suppressed and one daily roll-up is sent.
+  CAFETERIA_PURCHASE_DIGEST: ${{ secrets.CAFETERIA_PURCHASE_DIGEST }}
 
 jobs:
   # Daily jobs (also run on manual dispatch). Skipped on the monthly cron tick.
@@ -89,6 +92,11 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: python manage.py send_booking_reminders
+      - name: Daily cafetería spending digest (digest mode only)
+        # Only in digest mode, so per-purchase families are never double-notified.
+        if: steps.gate.outputs.skip != 'true' && (env.CAFETERIA_PURCHASE_DIGEST == 'True' || env.CAFETERIA_PURCHASE_DIGEST == 'true' || env.CAFETERIA_PURCHASE_DIGEST == '1')
+        working-directory: backend
+        run: python manage.py send_spending_digest --period daily
       - name: Deliver pending notifications (email + push)
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend

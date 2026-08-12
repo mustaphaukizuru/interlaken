@@ -6,8 +6,12 @@ urlpatterns = [
     path('balance/',                     views.MyBalanceView.as_view(),           name='cafeteria-balance'),
     path('transactions/',                views.MyTransactionsView.as_view(),      name='cafeteria-transactions'),
     path('spending-trend/',              views.MySpendingTrendView.as_view(),     name='cafeteria-spending-trend'),
+    path('spending-categories/',         views.MySpendingCategoriesView.as_view(), name='cafeteria-spending-categories'),
     path('balance/<int:student_pk>/threshold/', views.UpdateLowBalanceThresholdView.as_view(), name='cafeteria-threshold'),
+    path('balance/<int:student_pk>/budget/',    views.UpdateSpendLimitsView.as_view(),         name='cafeteria-budget'),
     path('topup/',                       views.TopUpRequestCreateView.as_view(),  name='cafeteria-topup'),
+    # Near-real-time Loyverse receipt push (shared-secret header, fail-closed).
+    path('loyverse/webhook/',            views.LoyverseWebhookView.as_view(),     name='cafeteria-loyverse-webhook'),
     # Parent family statement (CSV of children's cafeteria transactions).
     path('export/',                      views.ParentExportView.as_view(),        name='cafeteria-export'),
     # On-demand Loyverse poll (parents/staff) — does not wait for cron.
