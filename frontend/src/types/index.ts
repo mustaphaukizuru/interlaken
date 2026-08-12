@@ -32,6 +32,12 @@ export interface CafeteriaBalance {
   last_synced: string;
   /** Backend uses balance <= threshold; prefer this over recomputing. */
   is_low_balance?: boolean;
+  /** Parent-set spend caps (F13). "0.00" disables the cap. */
+  daily_spend_limit?: string;
+  weekly_spend_limit?: string;
+  /** Running spend for budget progress (family views only; null otherwise). */
+  today_spend?: string | null;
+  week_spend?: string | null;
 }
 
 export interface CafeteriaTransactionItem {

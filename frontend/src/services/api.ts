@@ -239,9 +239,26 @@ export const cafeteriaApi = {
       params: { days, ...(student ? { student } : {}) },
     }),
 
+  // Spend grouped by coarse category (Bebidas / Comida / Snacks / Otros).
+  getSpendingCategories: (days = 30, student?: number) =>
+    api.get<{
+      days: number;
+      total: number;
+      categories: { category: string; total: number; count: number; pct: number }[];
+    }>('/cafeteria/spending-categories/', {
+      params: { days, ...(student ? { student } : {}) },
+    }),
+
   // Family sets the saldo-bajo warning level for one of their children.
   updateLowBalanceThreshold: (studentId: number, threshold: number) =>
     api.patch(`/cafeteria/balance/${studentId}/threshold/`, { threshold }),
+
+  // Family sets daily/weekly spend caps (0 disables). Either field may be sent alone.
+  updateSpendLimits: (
+    studentId: number,
+    limits: { daily_spend_limit?: number; weekly_spend_limit?: number },
+  ) =>
+    api.patch(`/cafeteria/balance/${studentId}/budget/`, limits),
 
   requestTopUp: (
     studentId: number,
