@@ -24,6 +24,14 @@ class CafeteriaBalance(models.Model):
     # Cleared once the balance recovers above the threshold (see low_balance_alerts).
     last_low_balance_alert_at = models.DateTimeField(null=True, blank=True)
 
+    # ── Spending budgets (parent-set) ─────────────────────────
+    # Optional caps on how much a child may spend per day / per (Mon-Sun) week.
+    # 0 = disabled. When a purchase pushes the running total over a cap, guardians
+    # get one overspend alert (deduped once/day via ``last_budget_alert_at``).
+    daily_spend_limit    = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    weekly_spend_limit   = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    last_budget_alert_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         verbose_name = 'Saldo de Cafetería'
 

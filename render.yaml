@@ -73,3 +73,13 @@ services:
         sync: false
       - key: DJANGO_SUPERUSER_LAST_NAME
         sync: false
+      # ── Cafetería / Loyverse ────────────────────────────────────────────
+      # Shared secret for the near-real-time receipts webhook. Set the SAME value
+      # in Loyverse's webhook config (sent as the X-Webhook-Token header). Blank
+      # leaves the endpoint fail-closed; the ~10-min poll stays the fallback.
+      - key: LOYVERSE_WEBHOOK_SECRET
+        sync: false
+      # True → digest mode: per-purchase cafetería pings off, one daily roll-up
+      # via the send_spending_digest cron. Default False (immediate per-purchase).
+      - key: CAFETERIA_PURCHASE_DIGEST
+        sync: false

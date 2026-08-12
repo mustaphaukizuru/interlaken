@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useState, useEffect } from 'react';
 import {
   Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw,
-  Search, X, Download,
+  Search, X, Download, Wallet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -17,6 +17,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
 import { Pagination } from '@/components/ui/Pagination';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
+import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
@@ -60,6 +61,9 @@ export default function CafeteriaPage() {
   const [showTopup, setShowTopup] = useState(false);
   const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
   const [thresholdValue, setThresholdValue] = useState('');
+  const [budgetStudent, setBudgetStudent] = useState<CafeteriaBalance | null>(null);
+  const [budgetDaily, setBudgetDaily] = useState('');
+  const [budgetWeekly, setBudgetWeekly] = useState('');
 
   // History filters + pagination — default student filter follows portal child switcher.
   const [filterStudent, setFilterStudent] = useState<number | 'all'>(() => childId ?? 'all');
@@ -148,6 +152,29 @@ export default function CafeteriaPage() {
     },
     onError: () => toast.error('No se pudo actualizar la alerta. Intente nuevamente.'),
   });
+
+  // Family-set daily/weekly spending budget (#13). Empty field → 0 (disabled).
+  const budgetMutation = useMutation({
+    mutationFn: () =>
+      cafeteriaApi.updateSpendLimits(budgetStudent!.student.id, {
+        daily_spend_limit: budgetDaily === '' ? 0 : parseFloat(budgetDaily),
+        weekly_spend_limit: budgetWeekly === '' ? 0 : parseFloat(budgetWeekly),
+      }),
+    onSuccess: () => {
+      toast.success('Presupuesto de cafetería actualizado.');
+      setBudgetStudent(null);
+      queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
+    },
+    onError: () => toast.error('No se pudo actualizar el presupuesto. Intente nuevamente.'),
+  });
+
+  const openBudget = (b: CafeteriaBalance) => {
+    setBudgetStudent(b);
+    const d = parseFloat(b.daily_spend_limit ?? '0');
+    const w = parseFloat(b.weekly_spend_limit ?? '0');
+    setBudgetDaily(d > 0 ? d.toFixed(0) : '');
+    setBudgetWeekly(w > 0 ? w.toFixed(0) : '');
+  };
 
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -329,10 +356,68 @@ export default function CafeteriaPage() {
               >
                 Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '50').toFixed(0)}</span> · Cambiar
               </button>
+
+              {/* Spending budget (#13): progress vs the parent-set daily/weekly cap. */}
+              {(() => {
+                const dailyLimit = parseFloat(b.daily_spend_limit ?? '0');
+                const weeklyLimit = parseFloat(b.weekly_spend_limit ?? '0');
+                if (dailyLimit <= 0 && weeklyLimit <= 0) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => openBudget(b)}
+                      className="mt-2 flex items-center gap-1 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                    >
+                      <Wallet className="h-3 w-3" /> Establecer presupuesto
+                    </button>
+                  );
+                }
+                const useDaily = dailyLimit > 0;
+                const limit = useDaily ? dailyLimit : weeklyLimit;
+                const spent = parseFloat((useDaily ? b.today_spend : b.week_spend) ?? '0');
+                const label = useDaily ? 'hoy' : 'esta semana';
+                const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+                const over = limit > 0 && spent > limit;
+                return (
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-baseline justify-between text-[11.5px]">
+                      <span className="font-medium text-subtle">Presupuesto {label}</span>
+                      <span className={over ? 'font-semibold text-coral' : 'text-muted'}>
+                        ${spent.toFixed(0)} / ${limit.toFixed(0)}
+                      </span>
+                    </div>
+                    <div
+                      className="h-2 w-full overflow-hidden rounded-full bg-cream"
+                      role="progressbar"
+                      aria-label={`Presupuesto ${label}`}
+                      aria-valuenow={Math.round(pct)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className={`h-full rounded-full ${over ? 'bg-coral' : 'bg-green-500'}`}
+                        style={{ width: `${Math.max(pct, 3)}%` }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openBudget(b)}
+                      className="mt-1.5 self-start rounded text-left text-[11px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                    >
+                      Cambiar presupuesto
+                    </button>
+                  </div>
+                );
+              })()}
             </Card>
           );
         })}
       </div>
+      )}
+
+      {/* Spend-by-category breakdown (#14) — follows the child switcher selection. */}
+      {!balancesLoading && balances && balances.length > 0 && (
+        <CafeteriaCategoriesCard student={childId ?? 'all'} />
       )}
 
       {/* No cafeteria accounts — school must link children to Loyverse. */}
@@ -449,6 +534,63 @@ export default function CafeteriaPage() {
                 loading={thresholdMutation.isPending}
                 onClick={() => thresholdMutation.mutate()}
                 disabled={thresholdValue === '' || parseFloat(thresholdValue) < 0}
+                className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
+              >
+                Guardar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Spending budget modal (#13) */}
+      <Modal open={!!budgetStudent} onClose={() => setBudgetStudent(null)} title="Presupuesto de cafetería">
+        {budgetStudent && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Establece cuánto puede gastar{' '}
+              <span className="font-semibold text-ink">{budgetStudent.student.user.full_name}</span>{' '}
+              en cafetería. Te avisaremos cuando una compra supere el límite. Deja un
+              campo vacío o en 0 para desactivarlo.
+            </p>
+            <div>
+              <label className="label" htmlFor="budget-daily">Límite diario (MXN)</label>
+              <input
+                id="budget-daily"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="10"
+                className="input-field min-h-[44px] text-base"
+                placeholder="Sin límite"
+                value={budgetDaily}
+                onChange={(e) => setBudgetDaily(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="budget-weekly">Límite semanal (MXN)</label>
+              <input
+                id="budget-weekly"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="50"
+                className="input-field min-h-[44px] text-base"
+                placeholder="Sin límite"
+                value={budgetWeekly}
+                onChange={(e) => setBudgetWeekly(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="secondary" onClick={() => setBudgetStudent(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
+              <Button
+                variant="primary"
+                loading={budgetMutation.isPending}
+                onClick={() => budgetMutation.mutate()}
+                disabled={
+                  (budgetDaily !== '' && parseFloat(budgetDaily) < 0)
+                  || (budgetWeekly !== '' && parseFloat(budgetWeekly) < 0)
+                }
                 className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 Guardar

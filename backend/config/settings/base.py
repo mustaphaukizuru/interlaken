@@ -297,6 +297,14 @@ LOYVERSE_BASE_URL = 'https://api.loyverse.com/v1.0'
 # past spend, so a backfill would double-debit. Set to the go-live moment as an
 # ISO-8601 datetime (e.g. 2026-08-01T00:00:00Z); blank → start from "now".
 CAFETERIA_SYNC_PURCHASES_SINCE = env('CAFETERIA_SYNC_PURCHASES_SINCE', default='')
+# Shared secret guarding the near-real-time Loyverse receipts webhook. Sent by
+# Loyverse in the X-Webhook-Token header; blank disables the endpoint (fail-closed),
+# so the ~10-min poll stays the fallback until this is configured.
+LOYVERSE_WEBHOOK_SECRET = env('LOYVERSE_WEBHOOK_SECRET', default='')
+# When True, per-purchase cafeteria alerts are suppressed in favour of a single
+# daily/weekly spending digest (send_spending_digest cron). Default False keeps
+# the immediate per-purchase notification behaviour.
+CAFETERIA_PURCHASE_DIGEST = env.bool('CAFETERIA_PURCHASE_DIGEST', default=False)
 
 # ── PAYMENTS ──────────────────────────────────────────────
 # Which gateway a top-up defaults to when the client doesn't specify one.

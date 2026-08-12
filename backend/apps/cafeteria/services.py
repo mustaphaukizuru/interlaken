@@ -174,6 +174,53 @@ def _to_decimal(value) -> Decimal:
         return Decimal('0')
 
 
+# Coarse spend categories for the parent breakdown (F14). Loyverse receipt line
+# items don't carry a category name (only item_id), and resolving item→category
+# would need a separate catalog sync; a keyword classifier over the item name is
+# a deliberate, good-enough approximation for a school cafeteria and degrades
+# gracefully to "Otros". Keep keywords lower-case and accent-stripped.
+CATEGORY_OTHER = 'Otros'
+_CATEGORY_KEYWORDS = (
+    ('Bebidas', (
+        'agua', 'jugo', 'refresco', 'soda', 'leche', 'cafe', 'te ', 'licuado',
+        'malteada', 'smoothie', 'boing', 'gatorade', 'yakult', 'bebida', 'coca',
+        'sprite', 'fanta', 'jarrito', 'electrolit', 'powerade', 'frappe',
+    )),
+    ('Comida', (
+        'torta', 'sandwich', 'sndwich', 'quesadilla', 'taco', 'pizza', 'sopa',
+        'hamburguesa', 'hot dog', 'hotdog', 'ensalada', 'arroz', 'pollo', 'carne',
+        'burrito', 'mollete', 'chilaquil', 'huevo', 'desayuno', 'almuerzo',
+        'comida', 'guisado', 'baguette', 'panini', 'wrap', 'nugget', 'papas a la',
+        'espagueti', 'pasta', 'fruta', 'yogurt', 'yoghurt', 'gelatina',
+    )),
+    ('Snacks', (
+        'papas', 'sabritas', 'chips', 'galleta', 'dulce', 'chocolate', 'gomita',
+        'chicle', 'palomita', 'frituras', 'botana', 'barra', 'cacahuate',
+        'churro', 'donita', 'pan ', 'panque', 'muffin', 'nieve', 'helado',
+        'paleta', 'chetos', 'cheetos', 'takis', 'doritos', 'ruffles',
+    )),
+)
+
+
+def categorize_item(name: str) -> str:
+    """Map a Loyverse line-item name to a coarse cafeteria spend category.
+
+    Deliberate keyword heuristic (see ``_CATEGORY_KEYWORDS``): the receipt gives
+    us only the item name, so we bucket by substring. First match wins in the
+    Bebidas → Comida → Snacks order; anything unmatched is ``Otros``.
+    """
+    if not name:
+        return CATEGORY_OTHER
+    text = name.strip().lower()
+    # Cheap accent fold so "café"/"cafe" and "plátano"/"platano" both match.
+    for a, b in (('á', 'a'), ('é', 'e'), ('í', 'i'), ('ó', 'o'), ('ú', 'u')):
+        text = text.replace(a, b)
+    for category, keywords in _CATEGORY_KEYWORDS:
+        if any(k in text for k in keywords):
+            return category
+    return CATEGORY_OTHER
+
+
 def _parse_receipt(receipt: dict):
     """Normalise a Loyverse receipt into the pieces a transaction needs.
 
@@ -198,6 +245,7 @@ def _parse_receipt(receipt: dict):
             'name': name,
             'quantity': qty,
             'total': str(_to_decimal(total)) if total is not None else None,
+            'category': categorize_item(name),
         })
         parts.append(f'{qty}× {name}' if qty not in (1, '1') else name)
 
@@ -318,23 +366,141 @@ def _maybe_low_balance_alert(cb, now):
     return notified
 
 
+def _spend_since(student, start) -> Decimal:
+    """Sum of a student's PURCHASE amounts since ``start`` (local ledger, F13)."""
+    from django.db.models import Sum
+
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    total = (CafeteriaTransaction.objects
+             .filter(student=student,
+                     transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                     date__gte=start)
+             .aggregate(t=Sum('amount'))['t'])
+    return total or Decimal('0')
+
+
+def _maybe_budget_alert(cb, now):
+    """Alert guardians when spend crosses a parent-set daily/weekly budget (F13).
+
+    Fired from the purchase record path. Deduped to at most one budget alert per
+    student per calendar day, so once a child is over budget the parent isn't
+    re-pinged on every later purchase that day. No-op when both limits are 0.
+    """
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    daily = cb.daily_spend_limit or Decimal('0')
+    weekly = cb.weekly_spend_limit or Decimal('0')
+    if daily <= 0 and weekly <= 0:
+        return 0
+
+    local_now = timezone.localtime(now)
+    # Already alerted this family today → stay quiet.
+    if (cb.last_budget_alert_at is not None
+            and timezone.localtime(cb.last_budget_alert_at).date() == local_now.date()):
+        return 0
+
+    start_of_day = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_week = start_of_day - timedelta(days=local_now.weekday())
+
+    student = cb.student
+    over = []
+    if daily > 0:
+        day_spend = _spend_since(student, start_of_day)
+        if day_spend > daily:
+            over.append(f'hoy lleva ${day_spend:.2f} (límite diario ${daily:.2f})')
+    if weekly > 0:
+        week_spend = _spend_since(student, start_of_week)
+        if week_spend > weekly:
+            over.append(f'esta semana lleva ${week_spend:.2f} (límite semanal ${weekly:.2f})')
+
+    if not over:
+        return 0
+
+    title = 'Límite de gasto alcanzado'
+    message = (
+        f'{student.user.full_name} superó su presupuesto de cafetería: '
+        f'{" y ".join(over)}.'
+    )
+    notified = 0
+    from apps.accounts.family import family_notify_recipients
+    for parent in family_notify_recipients(student):
+        use_wa = bool(getattr(parent, 'whatsapp', '') or '')
+        notify(parent, Notification.NotifType.CAFETERIA, title, message,
+               whatsapp=use_wa)
+        notified += 1
+
+    cb.last_budget_alert_at = now
+    cb.save(update_fields=['last_budget_alert_at'])
+    return notified
+
+
+def _students_by_loyverse_id():
+    """Map ``loyverse_id`` → active StudentProfile for receipt matching."""
+    from apps.accounts.models import StudentProfile
+
+    return {
+        s.loyverse_id: s
+        for s in StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
+    }
+
+
+def record_receipts(receipts, students=None):
+    """Record a batch of Loyverse receipts against matched students.
+
+    Shared by the ``sync_purchases`` cron and the real-time Loyverse webhook
+    (``LoyverseWebhookView``). Idempotent — each receipt maps to a unique
+    ``loyverse_receipt_id`` — so a webhook delivery that overlaps the poll, or a
+    webhook retry, is a no-op. For every newly recorded purchase it fires the
+    per-purchase parent alert (unless digest mode is on), a low-balance alert and
+    a budget/overspend alert. Returns ``{'created', 'notified', 'unmatched'}``.
+    """
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+    if students is None:
+        students = _students_by_loyverse_id()
+    now = timezone.now()
+    per_purchase_notify = not getattr(settings, 'CAFETERIA_PURCHASE_DIGEST', False)
+
+    created = notified = unmatched = 0
+    for receipt in receipts or []:
+        customer_id = receipt.get('customer_id')
+        student = students.get(customer_id) if customer_id else None
+        if student is None:
+            unmatched += 1
+            continue
+
+        tx = _record_receipt(student, receipt)
+        if tx is None:
+            continue
+
+        created += 1
+        if per_purchase_notify:
+            notified += _notify_purchase(tx)
+
+        if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
+            cb = CafeteriaBalance.objects.get(student=student)
+            notified += _maybe_low_balance_alert(cb, now)
+            notified += _maybe_budget_alert(cb, now)
+
+    return {'created': created, 'notified': notified, 'unmatched': unmatched}
+
+
 def sync_purchases():
     """Poll Loyverse receipts → transactions + balance debit + parent alerts.
 
     Idempotent: each receipt maps to a unique ``CafeteriaTransaction`` so re-runs
     neither duplicate rows nor re-notify. Called by the ``sync_purchases`` cron
-    command (spec §2.1). Returns a summary dict.
+    command (spec §2.1); the near-real-time webhook shares the same record path
+    (``record_receipts``). Returns a summary dict.
     """
-    from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+    from apps.cafeteria.models import CafeteriaTransaction
 
-    students = {
-        s.loyverse_id: s
-        for s in StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
-    }
+    students = _students_by_loyverse_id()
     if not students:
         logger.info('sync_purchases: no students with a Loyverse id — nothing to do.')
-        return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0}
+        return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0, 'unmatched': 0}
 
     # Only poll receipts newer than the last one we processed (idempotency still
     # guards the overlap window); a small look-back avoids missing boundary rows.
@@ -352,36 +518,13 @@ def sync_purchases():
             or _loyverse_ts(timezone.now())
 
     receipts = get_receipts(since=since)
-
-    now = timezone.now()
-    created = notified = 0
-    for receipt in receipts:
-        customer_id = receipt.get('customer_id')
-        student = students.get(customer_id) if customer_id else None
-        if student is None:
-            continue
-
-        tx = _record_receipt(student, receipt)
-        if tx is None:
-            continue
-
-        created += 1
-        notified += _notify_purchase(tx)
-
-        if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
-            cb = CafeteriaBalance.objects.get(student=student)
-            notified += _maybe_low_balance_alert(cb, now)
+    result = record_receipts(receipts, students)
 
     logger.info(
-        f'sync_purchases: {len(receipts)} receipt(s) polled, {created} new, '
-        f'{notified} notification(s) sent.'
+        f'sync_purchases: {len(receipts)} receipt(s) polled, {result["created"]} new, '
+        f'{result["notified"]} notification(s) sent, {result["unmatched"]} unmatched.'
     )
-    return {
-        'students': len(students),
-        'receipts': len(receipts),
-        'created': created,
-        'notified': notified,
-    }
+    return {'students': len(students), 'receipts': len(receipts), **result}
 
 
 def sync_student_balance(student_profile) -> Decimal:

@@ -1,14 +1,17 @@
 """
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
+import hmac
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,6 +28,7 @@ from .serializers import (
     LowBalanceThresholdSerializer,
     LoyverseProfileSerializer,
     RefundInputSerializer,
+    SpendLimitsSerializer,
     TopUpLogSerializer,
     TopUpRequestSerializer,
 )
@@ -32,6 +36,7 @@ from .services import (
     add_points_to_customer,
     adjust_balance,
     reconcile_balances,
+    record_receipts,
     refund_transaction,
     sync_all_balances,
     sync_purchases,
@@ -94,7 +99,8 @@ class MyBalanceView(APIView):
             except StudentProfile.DoesNotExist:
                 return Response({'error': 'Perfil de alumno no encontrado.'}, status=404)
             balance, _ = CafeteriaBalance.objects.get_or_create(student=profile)
-            return Response(CafeteriaBalanceSerializer(balance).data)
+            return Response(CafeteriaBalanceSerializer(
+                balance, context={'include_spend': True}).data)
 
         if user.role == User.Role.PARENT:
             students = StudentProfile.objects.filter(parents=user)
@@ -102,7 +108,8 @@ class MyBalanceView(APIView):
             students = StudentProfile.objects.all()
 
         balances = [CafeteriaBalance.objects.get_or_create(student=s)[0] for s in students]
-        return Response(CafeteriaBalanceSerializer(balances, many=True).data)
+        return Response(CafeteriaBalanceSerializer(
+            balances, many=True, context={'include_spend': True}).data)
 
 
 class MyTransactionsView(generics.ListAPIView):
@@ -237,7 +244,158 @@ class UpdateLowBalanceThresholdView(APIView):
         balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
         balance.low_balance_threshold = serializer.validated_data['threshold']
         balance.save(update_fields=['low_balance_threshold'])
-        return Response(CafeteriaBalanceSerializer(balance).data)
+        return Response(CafeteriaBalanceSerializer(
+            balance, context={'include_spend': True}).data)
+
+
+class UpdateSpendLimitsView(APIView):
+    """PATCH /api/v1/cafeteria/balance/<student_pk>/budget/
+
+    Body: ``{daily_spend_limit?, weekly_spend_limit?}`` (0 disables a cap). Lets a
+    family cap how much a child spends per day / per week; guardians get one
+    overspend alert per day when a purchase crosses the cap. Same scoping as the
+    threshold endpoint: a parent/student may only manage their own children.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, student_pk):
+        user = request.user
+        student = get_object_or_404(StudentProfile, pk=student_pk)
+
+        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+            if not _can_manage_student_cafeteria(user, student):
+                return Response({'error': 'No autorizado para este alumno.'}, status=403)
+        elif user.role != User.Role.ADMIN:
+            return Response({'error': 'No autorizado.'}, status=403)
+
+        serializer = SpendLimitsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
+        updated = []
+        for field in ('daily_spend_limit', 'weekly_spend_limit'):
+            if field in serializer.validated_data:
+                setattr(balance, field, serializer.validated_data[field])
+                updated.append(field)
+        # Re-arm the alert so a freshly raised budget can alert again today.
+        balance.last_budget_alert_at = None
+        updated.append('last_budget_alert_at')
+        balance.save(update_fields=updated)
+        return Response(CafeteriaBalanceSerializer(
+            balance, context={'include_spend': True}).data)
+
+
+class MySpendingCategoriesView(APIView):
+    """GET /api/v1/cafeteria/spending-categories/?days=30&student=
+
+    Spend grouped by coarse category (Bebidas / Comida / Snacks / Otros) over the
+    last N days (clamped 7-90), for the caller's children. Powers the parent
+    "¿en qué gasta?" donut. Categories come from the per-line ``category`` stamped
+    at receipt time (see ``categorize_item``). Scoped by role like the other
+    'my' endpoints; an out-of-family ``student`` id yields an empty result.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        try:
+            days = int(request.query_params.get('days', 30))
+        except (TypeError, ValueError):
+            days = 30
+        days = max(7, min(days, 90))
+
+        if user.role == User.Role.STUDENT:
+            students = StudentProfile.objects.filter(user=user)
+        elif user.role == User.Role.PARENT:
+            students = StudentProfile.objects.filter(parents=user)
+        elif user.role == User.Role.ADMIN:
+            students = StudentProfile.objects.all()
+        else:
+            students = StudentProfile.objects.none()
+
+        student_id = request.query_params.get('student')
+        if student_id:
+            students = students.filter(id=student_id)
+
+        start = timezone.localdate() - timedelta(days=days - 1)
+        txns = (CafeteriaTransaction.objects
+                .filter(student__in=students,
+                        transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                        date__date__gte=start)
+                .values_list('items', 'amount'))
+
+        # Aggregate line totals by category. Fall back to the receipt total under
+        # "Otros" when a receipt has no itemised lines (older rows / manual entries).
+        from decimal import Decimal
+        totals: dict[str, Decimal] = {}
+        counts: dict[str, int] = {}
+        for items, amount in txns:
+            if not items:
+                totals['Otros'] = totals.get('Otros', Decimal('0')) + (amount or Decimal('0'))
+                counts['Otros'] = counts.get('Otros', 0) + 1
+                continue
+            for li in items:
+                cat = (li.get('category') or 'Otros') if isinstance(li, dict) else 'Otros'
+                raw = li.get('total') if isinstance(li, dict) else None
+                try:
+                    line_total = Decimal(str(raw)) if raw not in (None, '') else Decimal('0')
+                except (TypeError, ValueError):
+                    line_total = Decimal('0')
+                totals[cat] = totals.get(cat, Decimal('0')) + line_total
+                counts[cat] = counts.get(cat, 0) + 1
+
+        grand = sum(totals.values()) or Decimal('0')
+        categories = [
+            {
+                'category': cat,
+                'total': round(float(total), 2),
+                'count': counts.get(cat, 0),
+                'pct': round(float(total) / float(grand) * 100, 1) if grand else 0.0,
+            }
+            for cat, total in sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+            if total > 0
+        ]
+        return Response({
+            'days': days,
+            'total': round(float(grand), 2),
+            'categories': categories,
+        })
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class LoyverseWebhookView(APIView):
+    """POST /api/v1/cafeteria/loyverse/webhook/ — near-real-time receipt ingest.
+
+    Loyverse posts receipt events here so a purchase debits the wallet in seconds
+    instead of waiting for the ~10-min poll. Protected by a shared secret sent in
+    the ``X-Webhook-Token`` header, compared in constant time against
+    ``LOYVERSE_WEBHOOK_SECRET``; **fail-closed** when the secret is unset. Reuses
+    the idempotent ``record_receipts`` path, so a redelivery or an overlap with
+    the ``sync_purchases`` cron is a no-op.
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes: list = []
+
+    def post(self, request):
+        secret = (getattr(settings, 'LOYVERSE_WEBHOOK_SECRET', '') or '').strip()
+        provided = request.headers.get('X-Webhook-Token', '')
+        if not secret or not hmac.compare_digest(secret, provided):
+            return Response({'error': 'unauthorized'}, status=401)
+
+        payload = request.data if isinstance(request.data, dict) else {}
+        receipts = payload.get('receipts')
+        if receipts is None:
+            # Some integrations post a single receipt object at the top level.
+            receipts = [payload] if (payload.get('receipt_number')
+                                     or payload.get('customer_id')) else []
+        if not isinstance(receipts, list):
+            return Response({'error': 'receipts debe ser una lista.'}, status=400)
+
+        try:
+            result = record_receipts(receipts)
+        except Exception:  # noqa: BLE001 — never leak internals to the caller
+            logger.exception('Loyverse webhook processing failed')
+            return Response({'error': 'processing_error'}, status=500)
+        return Response({'ok': True, **result})
 
 
 @method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')

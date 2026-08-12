@@ -9,7 +9,9 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.core.management import call_command
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.cafeteria import services
@@ -267,8 +269,23 @@ class TestSyncPurchases:
     def test_no_linked_students_is_noop(self, mock_receipts):
         StudentProfileFactory(loyverse_id="")  # not linked to Loyverse
         result = services.sync_purchases()
-        assert result == {"students": 0, "receipts": 0, "created": 0, "notified": 0}
+        assert result == {
+            "students": 0, "receipts": 0, "created": 0, "notified": 0, "unmatched": 0}
         mock_receipts.assert_not_called()
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_sync_reports_unmatched_receipts(self, mock_receipts):
+        """A receipt whose customer isn't a linked student is counted, not silently
+        dropped (F21 visibility) — and never recorded."""
+        parent = ParentFactory()
+        StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        mock_receipts.return_value = [
+            _receipt("loy-buyer", "R-1", 30),
+            _receipt("stranger", "R-2", 15),
+        ]
+        result = services.sync_purchases()
+        assert result["created"] == 1
+        assert result["unmatched"] == 1
 
 
 class TestAdminPermissions:
@@ -407,3 +424,241 @@ class TestApplyTopUp:
         s = TopUpRequestSerializer(
             data={"student": student.id, "amount": Decimal("2000.00"), "method": "office"})
         assert s.is_valid(), s.errors
+
+
+def _recent_receipt(customer_id, number, total, *, line_items=None, receipt_type="SALE"):
+    """A receipt stamped ``now`` so it falls inside 'today'/rolling-window queries."""
+    return _receipt(customer_id, number, total, receipt_type=receipt_type,
+                    line_items=line_items, date=timezone.now().isoformat())
+
+
+class TestLoyverseWebhook:
+    """F17: near-real-time receipt push. Shared secret, fail-closed, idempotent."""
+
+    def test_missing_secret_is_fail_closed(self, api_client, settings):
+        settings.LOYVERSE_WEBHOOK_SECRET = ""  # not configured
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook"),
+            {"receipts": [_receipt("loy-x", "R-1", 30)]},
+            format="json", HTTP_X_WEBHOOK_TOKEN="anything")
+        assert resp.status_code == 401
+
+    def test_wrong_token_rejected(self, api_client, settings):
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook"),
+            {"receipts": [_receipt("loy-x", "R-1", 30)]},
+            format="json", HTTP_X_WEBHOOK_TOKEN="wrong")
+        assert resp.status_code == 401
+        assert CafeteriaTransaction.objects.count() == 0
+
+    def test_valid_webhook_records_and_debits(self, api_client, settings, mailoutbox):
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook"),
+            {"receipts": [_recent_receipt("loy-buyer", "R-1", 30)]},
+            format="json", HTTP_X_WEBHOOK_TOKEN="s3cr3t")
+
+        assert resp.status_code == 200, resp.data
+        assert resp.data["created"] == 1
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("70")
+        assert Notification.objects.filter(user=parent).exists()
+
+    def test_webhook_is_idempotent_with_poll(self, api_client, settings):
+        """A webhook delivery that races the cron poll must not double-debit."""
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        student = StudentProfileFactory(loyverse_id="loy-buyer")
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        payload = {"receipts": [_recent_receipt("loy-buyer", "R-1", 30)]}
+
+        api_client.post(reverse("cafeteria-loyverse-webhook"), payload,
+                        format="json", HTTP_X_WEBHOOK_TOKEN="s3cr3t")
+        # Same receipt again (retry / overlap) → no-op.
+        resp = api_client.post(reverse("cafeteria-loyverse-webhook"), payload,
+                               format="json", HTTP_X_WEBHOOK_TOKEN="s3cr3t")
+        assert resp.data["created"] == 0
+        assert CafeteriaTransaction.objects.filter(loyverse_receipt_id="R-1").count() == 1
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("70")
+
+    def test_single_receipt_payload_shape(self, api_client, settings):
+        """Accepts a bare receipt object (not wrapped in a 'receipts' list)."""
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        student = StudentProfileFactory(loyverse_id="loy-buyer")
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook"),
+            _recent_receipt("loy-buyer", "R-9", 25),
+            format="json", HTTP_X_WEBHOOK_TOKEN="s3cr3t")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["created"] == 1
+
+
+class TestSpendingBudgets:
+    """F13: parent-set daily/weekly caps + overspend alerts."""
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_daily_budget_overspend_alerts_once(self, mock_receipts):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("500"),
+            daily_spend_limit=Decimal("50"))
+
+        # A 60-peso purchase exceeds the 50/day cap.
+        mock_receipts.return_value = [_recent_receipt("loy-buyer", "R-1", 60)]
+        services.sync_purchases()
+
+        alerts = Notification.objects.filter(user=parent, title="Límite de gasto alcanzado")
+        assert alerts.count() == 1
+        assert "límite diario" in alerts.first().message
+
+        # A second purchase the same day must not re-alert (deduped).
+        mock_receipts.return_value = [_recent_receipt("loy-buyer", "R-2", 10)]
+        services.sync_purchases()
+        assert Notification.objects.filter(
+            user=parent, title="Límite de gasto alcanzado").count() == 1
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_no_alert_when_under_budget(self, mock_receipts):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("500"),
+            daily_spend_limit=Decimal("100"))
+        mock_receipts.return_value = [_recent_receipt("loy-buyer", "R-1", 30)]
+        services.sync_purchases()
+        assert not Notification.objects.filter(
+            user=parent, title="Límite de gasto alcanzado").exists()
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_no_alert_when_budget_disabled(self, mock_receipts):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("500"))  # limits 0
+        mock_receipts.return_value = [_recent_receipt("loy-buyer", "R-1", 400)]
+        services.sync_purchases()
+        assert not Notification.objects.filter(
+            user=parent, title="Límite de gasto alcanzado").exists()
+
+    def test_parent_can_set_budget(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        api_client.force_authenticate(user=parent)
+        resp = api_client.patch(
+            reverse("cafeteria-budget", args=[student.id]),
+            {"daily_spend_limit": "75.00", "weekly_spend_limit": "300.00"},
+            format="json")
+        assert resp.status_code == 200, resp.data
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert cb.daily_spend_limit == Decimal("75.00")
+        assert cb.weekly_spend_limit == Decimal("300.00")
+
+    def test_cannot_set_budget_for_other_family(self, api_client):
+        outsider = ParentFactory()
+        student = StudentProfileFactory(parents=[ParentFactory()])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        api_client.force_authenticate(user=outsider)
+        resp = api_client.patch(
+            reverse("cafeteria-budget", args=[student.id]),
+            {"daily_spend_limit": "10.00"}, format="json")
+        assert resp.status_code == 403
+
+    def test_budget_serializer_requires_a_field(self):
+        from apps.cafeteria.serializers import SpendLimitsSerializer
+        assert not SpendLimitsSerializer(data={}).is_valid()
+        assert SpendLimitsSerializer(data={"daily_spend_limit": "20"}).is_valid()
+
+
+class TestSpendingCategories:
+    """F14: coarse category breakdown from line-item names."""
+
+    def test_categorize_item(self):
+        from apps.cafeteria.services import categorize_item
+        assert categorize_item("Torta de jamón") == "Comida"
+        assert categorize_item("Jugo de naranja") == "Bebidas"
+        assert categorize_item("Café con leche") == "Bebidas"
+        assert categorize_item("Sabritas") == "Snacks"
+        assert categorize_item("Cuaderno") == "Otros"
+        assert categorize_item("") == "Otros"
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_receipt_items_carry_category(self, mock_receipts):
+        student = StudentProfileFactory(loyverse_id="loy-buyer")
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        mock_receipts.return_value = [
+            _recent_receipt("loy-buyer", "R-1", 30, line_items=[
+                {"item_name": "Torta", "quantity": 1, "total_money": 20},
+                {"item_name": "Agua", "quantity": 1, "total_money": 10},
+            ]),
+        ]
+        services.sync_purchases()
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="R-1")
+        cats = {i["name"]: i["category"] for i in tx.items}
+        assert cats == {"Torta": "Comida", "Agua": "Bebidas"}
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_categories_endpoint_aggregates(self, mock_receipts, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("500"))
+        mock_receipts.return_value = [
+            _recent_receipt("loy-buyer", "R-1", 30, line_items=[
+                {"item_name": "Torta", "quantity": 1, "total_money": 20},
+                {"item_name": "Jugo", "quantity": 1, "total_money": 10},
+            ]),
+            _recent_receipt("loy-buyer", "R-2", 15, line_items=[
+                {"item_name": "Sabritas", "quantity": 1, "total_money": 15},
+            ]),
+        ]
+        services.sync_purchases()
+
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-spending-categories"))
+        assert resp.status_code == 200, resp.data
+        by_cat = {c["category"]: c["total"] for c in resp.data["categories"]}
+        assert by_cat["Comida"] == 20.0
+        assert by_cat["Bebidas"] == 10.0
+        assert by_cat["Snacks"] == 15.0
+        assert resp.data["total"] == 45.0
+
+
+class TestSpendingDigest:
+    """F15: one roll-up per family instead of / alongside per-purchase pings."""
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_digest_mode_suppresses_per_purchase_and_digest_summarises(
+            self, mock_receipts, settings):
+        settings.CAFETERIA_PURCHASE_DIGEST = True
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("500"))
+        mock_receipts.return_value = [
+            _recent_receipt("loy-buyer", "R-1", 30),
+            _recent_receipt("loy-buyer", "R-2", 20),
+        ]
+        services.sync_purchases()
+
+        # Digest mode: no immediate per-purchase notification.
+        assert not Notification.objects.filter(
+            user=parent, title="Compra en cafetería").exists()
+
+        call_command("send_spending_digest", period="daily")
+        digest = Notification.objects.filter(
+            user=parent, title__startswith="Resumen de cafetería").first()
+        assert digest is not None
+        assert "$50.00" in digest.message  # 30 + 20 total
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_digest_skips_families_without_spend(self, mock_receipts):
+        ParentFactory()
+        StudentProfileFactory(loyverse_id="loy-buyer")
+        mock_receipts.return_value = []
+        services.sync_purchases()
+        call_command("send_spending_digest", period="weekly")
+        assert not Notification.objects.filter(
+            title__startswith="Resumen de cafetería").exists()

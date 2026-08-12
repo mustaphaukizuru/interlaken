@@ -3,7 +3,18 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
-  cafeteriaApi: { getMyBalance: vi.fn(), getTransactions: vi.fn(), requestTopUp: vi.fn() },
+  cafeteriaApi: {
+    getMyBalance: vi.fn(),
+    getTransactions: vi.fn(),
+    requestTopUp: vi.fn(),
+    // Rendered by the embedded category-breakdown card; resolve empty so it
+    // doesn't error the query in these state tests.
+    getSpendingCategories: vi.fn().mockResolvedValue({
+      data: { days: 30, total: 0, categories: [] },
+    }),
+    updateLowBalanceThreshold: vi.fn(),
+    updateSpendLimits: vi.fn(),
+  },
 }));
 
 import CafeteriaPage from './CafeteriaPage';
