@@ -1,6 +1,7 @@
 """
 Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 """
+import hashlib
 import hmac
 import logging
 from datetime import timedelta
@@ -480,26 +481,47 @@ class MyLoyverseHistoryView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LoyverseWebhookView(APIView):
-    """POST /api/v1/cafeteria/loyverse/webhook/ — near-real-time receipt ingest.
+    """POST /api/v1/cafeteria/loyverse/webhook/[<token>/] — near-real-time receipt
+    ingest so a purchase debits the wallet in seconds instead of waiting for the
+    poll. Reuses the idempotent ``record_receipts`` path, so a redelivery or an
+    overlap with the ``sync_purchases`` cron is a no-op.
 
-    Loyverse posts receipt events here so a purchase debits the wallet in seconds
-    instead of waiting for the ~10-min poll. Protected by a shared secret sent in
-    the ``X-Webhook-Token`` header, compared in constant time against
-    ``LOYVERSE_WEBHOOK_SECRET``; **fail-closed** when the secret is unset. Reuses
-    the idempotent ``record_receipts`` path, so a redelivery or an overlap with
-    the ``sync_purchases`` cron is a no-op.
+    Auth is **fail-closed** (401 unless ``LOYVERSE_WEBHOOK_SECRET`` is set and the
+    request proves it) and accepts every mode Loyverse can actually deliver:
+
+    * **Secret in the URL path** — ``.../webhook/<secret>/``. Loyverse webhooks
+      created from the dashboard or with an Access token send NO custom headers
+      and NO signature, so the secret rides in the URL. This is the simplest
+      setup: paste ``https://<host>/api/v1/cafeteria/loyverse/webhook/<secret>/``
+      as the Loyverse webhook URL.
+    * **``X-Loyverse-Signature``** — hex SHA-1 HMAC of the raw body, sent only by
+      OAuth-2.0-created webhooks; verified against the secret.
+    * **``X-Webhook-Token``** header — for any sender that supports custom headers.
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes: list = []
 
-    def post(self, request):
+    @staticmethod
+    def _authorized(request, secret, token):
+        sec = secret.encode('utf-8')
+        # 1. Secret in the URL path (dashboard / access-token webhooks).
+        if token and hmac.compare_digest(token.encode('utf-8'), sec):
+            return True
+        # 2. Custom header (compared as bytes so a non-ASCII value can't 500).
+        header = request.headers.get('X-Webhook-Token', '') or ''
+        if header and hmac.compare_digest(header.encode('utf-8'), sec):
+            return True
+        # 3. Loyverse OAuth signature: hex SHA-1 HMAC of the raw request body.
+        sig = request.headers.get('X-Loyverse-Signature', '') or ''
+        if sig:
+            expected = hmac.new(sec, request.body, hashlib.sha1).hexdigest()
+            if hmac.compare_digest(expected, sig):
+                return True
+        return False
+
+    def post(self, request, token=None):
         secret = (getattr(settings, 'LOYVERSE_WEBHOOK_SECRET', '') or '').strip()
-        provided = request.headers.get('X-Webhook-Token', '') or ''
-        # Compare as bytes: hmac.compare_digest raises TypeError on a non-ASCII
-        # str, and this runs before the try below, so an attacker's non-ASCII
-        # header would otherwise 500 instead of returning a clean 401.
-        if not secret or not hmac.compare_digest(
-                secret.encode('utf-8'), provided.encode('utf-8')):
+        if not secret or not self._authorized(request, secret, token):
             return Response({'error': 'unauthorized'}, status=401)
 
         payload = request.data if isinstance(request.data, dict) else {}

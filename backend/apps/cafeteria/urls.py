@@ -14,8 +14,11 @@ urlpatterns = [
     path('balance/<int:student_pk>/threshold/', views.UpdateLowBalanceThresholdView.as_view(), name='cafeteria-threshold'),
     path('balance/<int:student_pk>/budget/',    views.UpdateSpendLimitsView.as_view(),         name='cafeteria-budget'),
     path('topup/',                       views.TopUpRequestCreateView.as_view(),  name='cafeteria-topup'),
-    # Near-real-time Loyverse receipt push (shared-secret header, fail-closed).
+    # Near-real-time Loyverse receipt push (fail-closed). Two shapes: bare URL
+    # (auth via X-Webhook-Token or X-Loyverse-Signature) and a secret-in-URL
+    # variant for Loyverse dashboard/access-token webhooks that send no headers.
     path('loyverse/webhook/',            views.LoyverseWebhookView.as_view(),     name='cafeteria-loyverse-webhook'),
+    path('loyverse/webhook/<str:token>/', views.LoyverseWebhookView.as_view(),    name='cafeteria-loyverse-webhook-token'),
     # Parent family statement (CSV of children's cafeteria transactions).
     path('export/',                      views.ParentExportView.as_view(),        name='cafeteria-export'),
     # On-demand Loyverse poll (parents/staff) — does not wait for cron.
