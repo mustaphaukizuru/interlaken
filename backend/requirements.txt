@@ -1,10 +1,10 @@
 # Core
-Django==4.2.13
-djangorestframework==3.17.1
+Django==6.1
+djangorestframework==3.18.0
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 django-environ==0.14.0
-django-filter==23.5
+django-filter==26.1
 drf-spectacular==0.30.0
 # At-rest encryption for sensitive fields (medical data — IK-LEGAL B4).
 # social-auth-core 5.x requires cryptography>=46.0.7.
@@ -20,12 +20,12 @@ PyMySQL==1.2.0
 psycopg2-binary==2.9.12
 
 # Auth
-social-auth-app-django==5.4.1
-social-auth-core==5.0.2
+social-auth-app-django==6.0.1
+social-auth-core==5.1.0
 PyJWT==2.13.0
 
 # Storage & Files
-Pillow==10.3.0
+Pillow==12.3.0
 python-magic==0.4.27
 # Durable object storage for uploaded media (admissions documents) — Render's
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
@@ -50,7 +50,7 @@ google-auth==2.56.2
 # globalpayments-api==1.0.0 pin was unused and isn't even on PyPI.)
 
 # Email
-django-anymail==10.3
+django-anymail==15.1
 
 # Utilities
 python-decouple==3.8
@@ -70,10 +70,9 @@ whitenoise==6.12.0
 # Monitoring (no-op unless SENTRY_DSN is configured)
 sentry-sdk==2.66.1
 
-# Admin skin (IK-ADMIN) — last release that still supports Django 4.2
-# (0.90+ requires Django>=5.0; stay on 0.89 until we upgrade Django).
-django-unfold==0.89.0
+# Admin skin (IK-ADMIN). 0.103.0 supports Django 5.x/6.x.
+django-unfold==0.103.0
 
 # Dev
-pytest-django==4.12.0
+pytest-django==4.13.0
 factory-boy==3.3.3
