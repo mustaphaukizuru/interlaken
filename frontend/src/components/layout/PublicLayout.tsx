@@ -2,11 +2,11 @@ import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
-  Facebook, Instagram, Youtube,
   GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
   FileText, CircleDollarSign, DoorOpen, UserPlus, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Facebook, Instagram, Youtube } from '@/components/icons/brand-icons';
 import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
