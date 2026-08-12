@@ -524,6 +524,42 @@ class TestLoyverseWebhook:
         assert resp.status_code == 200, resp.data
         assert resp.data["created"] == 1
 
+    def test_secret_in_url_path_records(self, api_client, settings):
+        """Loyverse dashboard / access-token webhooks send no headers, so the
+        secret rides in the URL path: .../webhook/<secret>/."""
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        student = StudentProfileFactory(loyverse_id="loy-buyer")
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook-token", args=["s3cr3t"]),
+            {"receipts": [_recent_receipt("loy-buyer", "R-url", 25)]},
+            format="json")
+        assert resp.status_code == 200, resp.data
+        assert resp.data["created"] == 1
+
+    def test_wrong_url_path_secret_rejected(self, api_client, settings):
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook-token", args=["wrong"]),
+            {"receipts": []}, format="json")
+        assert resp.status_code == 401
+
+    def test_loyverse_signature_records(self, api_client, settings):
+        """OAuth-created webhooks sign the raw body with hex SHA-1 HMAC."""
+        import hashlib
+        import hmac as _hmac
+        import json
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        student = StudentProfileFactory(loyverse_id="loy-buyer")
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        raw = json.dumps({"receipts": [_recent_receipt("loy-buyer", "R-sig", 15)]})
+        sig = _hmac.new(b"s3cr3t", raw.encode(), hashlib.sha1).hexdigest()
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook"), raw,
+            content_type="application/json", HTTP_X_LOYVERSE_SIGNATURE=sig)
+        assert resp.status_code == 200, resp.data
+        assert resp.data["created"] == 1
+
 
 class TestSpendingBudgets:
     """F13: parent-set daily/weekly caps + overspend alerts."""
