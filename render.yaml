@@ -83,3 +83,17 @@ services:
       # via the send_spending_digest cron. Default False (immediate per-purchase).
       - key: CAFETERIA_PURCHASE_DIGEST
         sync: false
+      # ── Google sign-in (button reports "no disponible" until set) ───────
+      # OAuth 2.0 client from Google Cloud Console → APIs & Services →
+      # Credentials. Register the redirect URI EXACTLY as GOOGLE_REDIRECT_URI
+      # below, e.g. https://interlaken.onrender.com/auth/google/callback/.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false                  # https://<host>/auth/google/callback/
+      # Optional: comma-separated domains allowed to self-provision as PARENT on
+      # first Google login. Blank = strict invite-only (recommended).
+      - key: GOOGLE_AUTO_CREATE_DOMAINS
+        sync: false
