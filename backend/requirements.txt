@@ -31,10 +31,10 @@ python-magic==0.4.27
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
 django-storages==1.14.6
-boto3==1.43.63
+boto3==1.43.67
 
 # Web push notifications (VAPID) — inert until VAPID_* env keys are set.
-pywebpush==2.3.0
+pywebpush==2.4.0
 
 # HTTP & APIs
 requests==2.34.2
@@ -43,7 +43,7 @@ httpx==0.28.1
 # Google Calendar (service-account writes for confirmed bookings — Prompt 13).
 # Fail-soft: bookings never depend on these being importable/configured.
 google-api-python-client==2.198.0
-google-auth==2.56.2
+google-auth==2.56.3
 
 # Payments: Global Payments + Banorte are custom HPP redirect + HMAC-signed
 # webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
