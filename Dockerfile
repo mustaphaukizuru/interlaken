@@ -6,7 +6,11 @@
 FROM node:20-slim AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+# node:20-slim ships npm 10.8.2, which generates/validates a lock inconsistently
+# for this dependency graph (ajv/json-schema-traverse split) and fails `npm ci`
+# with EUSAGE. Pin a newer npm that resolves it (the committed lock is generated
+# with the same version), so the Render build stops failing.
+RUN npm install -g npm@11.19.0 && npm ci
 COPY frontend/ ./
 RUN npm run build   # → frontend/dist (assets reference /static/)
 
