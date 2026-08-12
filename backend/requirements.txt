@@ -25,7 +25,7 @@ social-auth-core==5.0.2
 PyJWT==2.13.0
 
 # Storage & Files
-Pillow==10.3.0
+Pillow==12.3.0
 python-magic==0.4.27
 # Durable object storage for uploaded media (admissions documents) — Render's
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
