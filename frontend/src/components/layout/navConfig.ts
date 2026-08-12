@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList,
-  BarChart3, CalendarClock, Receipt, Megaphone, Settings, Wallet, UserCircle, type LucideIcon,
+  BarChart3, CalendarClock, Receipt, Megaphone, Settings, Wallet, UserCircle, QrCode, type LucideIcon,
 } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
@@ -35,6 +35,7 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
     { icon: ClipboardList,   label: 'Inscripciones', to: '/portal/inscripciones' },
     { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
     { icon: UserCircle,      label: 'Mi perfil',    to: '/portal/perfil' },
@@ -46,6 +47,7 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
     { icon: ClipboardList,   label: 'Inscripciones', to: '/portal/inscripciones' },
     { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
     { icon: UserCircle,      label: 'Mi perfil',    to: '/portal/perfil' },
@@ -59,8 +61,8 @@ export const navByRole: Record<Role, NavEntry[]> = {
 export const mobileNavByRole: Record<Role, NavEntry[]> = {
   parent: [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
-    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
     { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
   ],
@@ -74,8 +76,8 @@ export const mobileNavByRole: Record<Role, NavEntry[]> = {
   staff: navByRole.staff,
   student: [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
-    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
+    { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
     { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
   ],

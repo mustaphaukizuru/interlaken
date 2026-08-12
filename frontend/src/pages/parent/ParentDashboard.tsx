@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle, MessageCircle } from 'lucide-react';
+import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle, MessageCircle, QrCode } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -21,6 +21,7 @@ import { es } from 'date-fns/locale';
 // Recharts (heavy) stays out of the dashboard's main chunk — loaded only when a
 // cafeteria-using family renders the trend.
 const CafeteriaTrendCard = lazy(() => import('@/components/portal/CafeteriaTrendCard'));
+const CafeteriaCategoriesCard = lazy(() => import('@/components/portal/CafeteriaCategoriesCard'));
 
 const payBadge = (s: string) => {
   if (s === 'success' || s === 'completed') return { cls: 'badge-green', label: 'Completado' };
@@ -149,10 +150,11 @@ export default function ParentDashboard() {
           ))}
         </div>
 
-        {/* Quick actions — the two things parents do most */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        {/* Quick actions — the things parents do most */}
+        <div className="mb-6 grid gap-4 sm:grid-cols-3">
           <QuickAction to="/portal/colegiaturas" icon={Receipt} title="Pagar colegiaturas" desc="Consulta y paga las mensualidades." gradient="from-pink to-purple" />
           <QuickAction to="/portal/cafeteria" icon={Coffee} title="Recargar cafetería" desc="Agrega saldo con tarjeta." gradient="from-green to-green-dark" />
+          <QuickAction to="/portal/credencial" icon={QrCode} title="Credencial digital" desc="Código para pagar en caja." gradient="from-purple to-pink" />
         </div>
 
         <Link
@@ -164,12 +166,17 @@ export default function ParentDashboard() {
           <ArrowRight size={14} className="text-subtle" aria-hidden="true" />
         </Link>
 
-        {/* Cafeteria spending trend — only for families that use the cafeteria */}
+        {/* Cafeteria spending trend + category breakdown — cafeteria families only */}
         {!!data?.cafeteria_balances?.length && (
           <Reveal delay={20} className="mb-6">
-            <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
-              <CafeteriaTrendCard />
-            </Suspense>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
+                <CafeteriaTrendCard />
+              </Suspense>
+              <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
+                <CafeteriaCategoriesCard student={childId ?? 'all'} />
+              </Suspense>
+            </div>
           </Reveal>
         )}
 
