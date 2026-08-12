@@ -14,12 +14,30 @@ import { socialEntries } from '@/lib/siteContact';
 import type { SiteSettings } from '@/types/content';
 
 type SettingsForm = Omit<SiteSettings, 'updated_at'>;
+type FieldErrors = Partial<Record<keyof SettingsForm, string>>;
 
 const EMPTY: SettingsForm = {
   phone_display: '', phone_e164: '', whatsapp_number: '', contact_email: '',
   address: '', maps_url: '', office_hours: '',
   facebook_url: '', instagram_url: '', youtube_url: '',
 };
+
+const FORM_KEYS = Object.keys(EMPTY) as (keyof SettingsForm)[];
+
+/** First DRF field message per known settings key; ignores unknown keys. */
+function fieldErrorsFromDrf(data: unknown): FieldErrors {
+  if (!data || typeof data !== 'object') return {};
+  const out: FieldErrors = {};
+  for (const key of FORM_KEYS) {
+    const raw = (data as Record<string, unknown>)[key];
+    if (Array.isArray(raw) && typeof raw[0] === 'string' && raw[0]) {
+      out[key] = raw[0];
+    } else if (typeof raw === 'string' && raw) {
+      out[key] = raw;
+    }
+  }
+  return out;
+}
 
 const SOCIAL_ICONS = {
   facebook: Facebook,
@@ -166,13 +184,30 @@ export default function AdminSettings() {
     queryFn: async () => (await contentApi.adminGetSettings()).data as SettingsForm,
   });
   const [form, setForm] = useState<SettingsForm>(EMPTY);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   useEffect(() => { if (data) setForm({ ...EMPTY, ...data }); }, [data]);
-  const set = (k: keyof SettingsForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof SettingsForm, v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setFieldErrors((prev) => (prev[k] ? { ...prev, [k]: undefined } : prev));
+  };
 
   const save = useMutation({
-    mutationFn: () => contentApi.adminUpdateSettings({ ...form }),
+    mutationFn: () => {
+      setFieldErrors({});
+      return contentApi.adminUpdateSettings({ ...form });
+    },
     onSuccess: () => toast.success('Ajustes guardados. El sitio público se actualizará.'),
-    onError: () => toast.error('No se pudieron guardar los ajustes.'),
+    onError: (err: unknown) => {
+      const data = (err as { response?: { data?: unknown } })?.response?.data;
+      const next = fieldErrorsFromDrf(data);
+      if (Object.keys(next).length > 0) {
+        setFieldErrors(next);
+        toast.error('Revise los campos marcados e intente de nuevo.');
+        return;
+      }
+      const detail = (data as { detail?: string } | undefined)?.detail;
+      toast.error(typeof detail === 'string' && detail ? detail : 'No se pudieron guardar los ajustes.');
+    },
   });
 
   return (
@@ -206,6 +241,7 @@ export default function AdminSettings() {
                   value={form.phone_display}
                   onChange={(e) => set('phone_display', e.target.value)}
                   placeholder="Ej. (55) 5379-1188"
+                  error={fieldErrors.phone_display}
                 />
                 <Input
                   label="Teléfono (E.164)"
@@ -214,6 +250,7 @@ export default function AdminSettings() {
                   onChange={(e) => set('phone_e164', e.target.value)}
                   placeholder="+5255…"
                   inputMode="tel"
+                  error={fieldErrors.phone_e164}
                 />
                 <Input
                   label="WhatsApp"
@@ -223,6 +260,7 @@ export default function AdminSettings() {
                   placeholder="52155…"
                   inputMode="tel"
                   hint="Solo dígitos; aparece como botón flotante en el sitio."
+                  error={fieldErrors.whatsapp_number}
                 />
                 <Input
                   label="Correo de contacto"
@@ -230,6 +268,7 @@ export default function AdminSettings() {
                   className={FIELD}
                   value={form.contact_email}
                   onChange={(e) => set('contact_email', e.target.value)}
+                  error={fieldErrors.contact_email}
                 />
                 <div className="sm:col-span-2">
                   <Input
@@ -237,14 +276,17 @@ export default function AdminSettings() {
                     className={FIELD}
                     value={form.address}
                     onChange={(e) => set('address', e.target.value)}
+                    error={fieldErrors.address}
                   />
                 </div>
                 <Input
                   label="URL de Google Maps"
+                  type="url"
                   className={FIELD}
                   value={form.maps_url}
                   onChange={(e) => set('maps_url', e.target.value)}
                   placeholder="https://maps.app.goo.gl/…"
+                  error={fieldErrors.maps_url}
                 />
                 <Input
                   label="Horario de oficina"
@@ -252,6 +294,7 @@ export default function AdminSettings() {
                   value={form.office_hours}
                   onChange={(e) => set('office_hours', e.target.value)}
                   placeholder="Lunes–Viernes 8:00–16:00 hrs"
+                  error={fieldErrors.office_hours}
                 />
               </div>
             </Card>
@@ -263,24 +306,30 @@ export default function AdminSettings() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <Input
                   label="Facebook"
+                  type="url"
                   className={FIELD}
                   value={form.facebook_url}
                   onChange={(e) => set('facebook_url', e.target.value)}
                   placeholder="https://facebook.com/…"
+                  error={fieldErrors.facebook_url}
                 />
                 <Input
                   label="Instagram"
+                  type="url"
                   className={FIELD}
                   value={form.instagram_url}
                   onChange={(e) => set('instagram_url', e.target.value)}
                   placeholder="https://instagram.com/…"
+                  error={fieldErrors.instagram_url}
                 />
                 <Input
                   label="YouTube"
+                  type="url"
                   className={FIELD}
                   value={form.youtube_url}
                   onChange={(e) => set('youtube_url', e.target.value)}
                   placeholder="https://youtube.com/…"
+                  error={fieldErrors.youtube_url}
                 />
               </div>
             </Card>

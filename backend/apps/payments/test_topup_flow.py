@@ -76,6 +76,21 @@ class TestTopUpInitiation:
         )
         assert resp.status_code == 403
 
+    def test_topup_without_loyverse_id_is_rejected(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent], loyverse_id="")
+        api_client.force_authenticate(user=parent)
+        resp = api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": student.id, "amount": "100.00", "method": "online",
+             "gateway": "global_payments"},
+            format="json",
+        )
+        assert resp.status_code == 400, resp.data
+        assert "Loyverse" in resp.data["error"]
+        assert not TopUpRequest.objects.filter(student=student).exists()
+        assert not Payment.objects.filter(user=parent, payment_type=Payment.Type.CAFETERIA).exists()
+
     def test_office_topup_creates_no_payment(self, api_client):
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])

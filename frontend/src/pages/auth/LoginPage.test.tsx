@@ -16,15 +16,16 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import LoginPage from './LoginPage';
-import { api, authApi } from '@/services/api';
+import { api, authApi, bootstrapSession } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 
 const mockedPost = vi.mocked(api.post);
 const mockedMe = vi.mocked(authApi.me);
+const mockedBootstrap = vi.mocked(bootstrapSession);
 
-function renderLogin() {
+function renderLogin(entry = '/login') {
   return render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[entry]}>
       <LoginPage />
     </MemoryRouter>,
   );
@@ -77,5 +78,47 @@ describe('LoginPage email/password submit', () => {
 
     expect(await screen.findByText(/credenciales incorrectas/i)).toBeInTheDocument();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it('links to the forgot-password / first-access page', () => {
+    renderLogin();
+    expect(screen.getByRole('link', { name: /activar \/ restablecer/i })).toHaveAttribute(
+      'href',
+      '/olvide-contrasena',
+    );
+  });
+});
+
+describe('LoginPage Google OAuth return (?login=ok)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+    });
+    vi.clearAllMocks();
+  });
+
+  it('shows a bootstrapping status and disables the form while the session settles', async () => {
+    let resolveBootstrap: (v: boolean) => void = () => {};
+    mockedBootstrap.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => {
+        resolveBootstrap = resolve;
+      }),
+    );
+    mockedMe.mockResolvedValueOnce({
+      data: { id: 2, email: 'parent@gmail.com', role: 'parent', full_name: 'G P' },
+    } as never);
+
+    renderLogin('/login?login=ok');
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/completando acceso con google/i);
+    expect(screen.getByRole('button', { name: /continuar con google/i })).toBeDisabled();
+    expect(screen.getByPlaceholderText('correo@interlaken.edu.mx')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /completando/i })).toBeDisabled();
+
+    resolveBootstrap(true);
+    await waitFor(() => expect(mockedMe).toHaveBeenCalled());
   });
 });

@@ -115,3 +115,50 @@ class TestPreRegistrationStatusUpdate:
         assert resp.status_code in (401, 403)
         pre.refresh_from_db()
         assert pre.status == PreRegistration.Status.PENDING
+
+
+@pytest.mark.django_db
+class TestPreRegistrationAdminListSearch:
+    """GET /admissions/pre-register/?search= must filter across the roster,
+    not just the current page — powers the Admisiones console search box."""
+
+    url = reverse('pre-register')
+
+    def _pre(self, **kwargs):
+        defaults = dict(
+            child_first_name='Ana',
+            child_last_name='Pérez',
+            child_dob='2011-01-01',
+            level=PreRegistration.Level.PRIMARY,
+            grade_applying='Primaria 1°',
+            parent_name='Roberto Pérez',
+            parent_email='roberto@test.mx',
+            parent_phone='5551111111',
+        )
+        defaults.update(kwargs)
+        return PreRegistration.objects.create(**defaults)
+
+    def test_admin_search_matches_parent_email(self, api_client):
+        self._pre(parent_email='match@test.mx', child_first_name='Match')
+        self._pre(parent_email='other@test.mx', child_first_name='Other',
+                  parent_name='Otro Tutor', parent_phone='5552222222')
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.get(self.url, {'search': 'match@test.mx'})
+        assert resp.status_code == 200, resp.content
+        rows = resp.json()['results']
+        assert len(rows) == 1
+        assert rows[0]['child_name'] == 'Match Pérez'
+
+    def test_admin_search_matches_child_name(self, api_client):
+        self._pre(child_first_name='Lucía', child_last_name='Gómez')
+        self._pre(child_first_name='Pedro', child_last_name='Ruiz',
+                  parent_email='pedro@test.mx', parent_phone='5553333333')
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.get(self.url, {'search': 'Lucía'})
+        assert resp.status_code == 200
+        names = [r['child_name'] for r in resp.json()['results']]
+        assert names == ['Lucía Gómez']
+
+    def test_anonymous_cannot_list(self, api_client):
+        resp = api_client.get(self.url)
+        assert resp.status_code in (401, 403)

@@ -109,6 +109,12 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     gateway        = serializers.SerializerMethodField()
     payment_status = serializers.SerializerMethodField()
     gateway_tx_id  = serializers.SerializerMethodField()
+    needs_pos_load = serializers.SerializerMethodField()
+    needs_pos_unload = serializers.SerializerMethodField()
+    pos_loaded_by_name = serializers.CharField(
+        source='pos_loaded_by.full_name', read_only=True, default='')
+    pos_unloaded_by_name = serializers.CharField(
+        source='pos_unloaded_by.full_name', read_only=True, default='')
 
     class Meta:
         model = TopUpRequest
@@ -117,7 +123,30 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'method', 'method_display', 'status', 'status_display',
             'gateway', 'payment_status', 'gateway_tx_id',
             'created_at', 'processed_at',
+            'pos_loaded_at', 'pos_loaded_by_name', 'needs_pos_load',
+            'pos_unload_needed_at', 'pos_unloaded_at', 'pos_unloaded_by_name',
+            'needs_pos_unload',
         ]
+
+    def get_needs_pos_load(self, obj):
+        if not (
+            obj.method == TopUpRequest.Method.ONLINE
+            and obj.status == TopUpRequest.Status.COMPLETED
+            and obj.pos_loaded_at is None
+        ):
+            return False
+        # Refunded before POS load — do not ask staff to credit Loyverse.
+        from apps.payments.models import Payment
+        p = self._payment(obj)
+        if p is not None and p.status == Payment.Status.REFUNDED:
+            return False
+        return True
+
+    def get_needs_pos_unload(self, obj):
+        return (
+            obj.pos_unload_needed_at is not None
+            and obj.pos_unloaded_at is None
+        )
 
     def _payment(self, obj):
         # ``payments`` is the reverse accessor of Payment.related_topup.

@@ -742,10 +742,38 @@ def fail_online_topup(payment):
     return topup
 
 
+def flag_pos_unload_if_needed(topup) -> bool:
+    """Queue Loyverse POS unload when a POS-loaded online top-up is reversed.
+
+    Local ledger reversal does not touch Loyverse (R1). If staff already loaded
+    the credit into POS, ops must manually remove it. Idempotent.
+    Returns True when the unload flag was newly set.
+    """
+    from apps.cafeteria.models import TopUpRequest
+
+    if topup is None:
+        return False
+    if topup.method != TopUpRequest.Method.ONLINE:
+        return False
+    if topup.pos_loaded_at is None:
+        return False
+    if topup.pos_unload_needed_at is not None:
+        return False
+
+    topup.pos_unload_needed_at = timezone.now()
+    topup.save(update_fields=['pos_unload_needed_at'])
+    logger.info(
+        'Queued Loyverse POS unload for top-up #%s (was loaded at %s).',
+        topup.id, topup.pos_loaded_at,
+    )
+    return True
+
+
 def reverse_online_topup(payment):
     """Reverse a credited online top-up after a provider refund/chargeback webhook.
 
     Locates the ``topup-payment-<id>`` ledger row and runs ``refund_transaction``.
+    If the top-up was already loaded into Loyverse POS, queues a staff unload.
     Idempotent (second call is a no-op via the refund-tx reference). Returns the
     ``BalanceAdjustment`` or ``None`` when there is nothing to reverse.
     """
@@ -754,6 +782,10 @@ def reverse_online_topup(payment):
     topup = getattr(payment, 'related_topup', None)
     if topup is None and payment.payment_type != 'cafeteria':
         return None
+
+    # Flag unload even when the local reverse fails (e.g. child already spent) —
+    # Loyverse may still hold residual credit that staff must clear.
+    flag_pos_unload_if_needed(topup)
 
     reference = _topup_reference(payment)
     tx = CafeteriaTransaction.objects.filter(loyverse_receipt_id=reference).first()
@@ -767,6 +799,8 @@ def reverse_online_topup(payment):
     try:
         return refund_transaction(
             tx, reason='Reembolso del proveedor de pagos', admin=None,
+            # Unload already flagged above; avoid a second save in the nested path.
+            flag_pos_unload=False,
         )
     except ValueError as exc:
         # Already refunded, or balance already spent — leave Payment.REFUNDED and
@@ -795,8 +829,9 @@ def notify_topup_result(payment, *, success: bool) -> int:
     if success:
         title = 'Recarga de cafetería exitosa'
         message = (
-            f'Se acreditaron ${payment.amount:.2f} al saldo de cafetería de '
-            f'{student.user.full_name}. Gracias por su pago. '
+            f'Se registró el pago de ${payment.amount:.2f} para el saldo de '
+            f'cafetería de {student.user.full_name}. Ya puede verlo en el portal; '
+            f'el colegio cargará el monto en el POS para que pueda usarlo al comprar. '
             f'Referencia: {payment.gateway_tx_id or payment.id}.'
         )
     else:
@@ -1013,7 +1048,7 @@ def _net_effect(tx) -> Decimal:
     return Decimal(str(adj.amount)) if adj else amount
 
 
-def refund_transaction(tx, reason: str = '', admin=None):
+def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: bool = True):
     """Reverse a cafeteria transaction: undo its balance effect + refund any payment.
 
     Creates a ``REFUND`` ledger transaction that negates the original's effect on
@@ -1021,6 +1056,10 @@ def refund_transaction(tx, reason: str = '', admin=None):
     linked ``Payment`` refunded when one exists, writes a ``BalanceAdjustment``
     audit row, and notifies the guardians. Idempotent: a second call is a no-op
     (guarded by a unique ``refund-tx-<id>`` reference).
+
+    When reversing a POS-loaded online top-up, queues staff Loyverse unload unless
+    ``flag_pos_unload`` is False (webhook path flags earlier so spent-balance
+    failures still queue unload).
 
     Returns the created ``BalanceAdjustment``. Raises ``ValueError`` if the
     transaction can't be refunded (already refunded, is itself a reversal, or the
@@ -1082,6 +1121,9 @@ def refund_transaction(tx, reason: str = '', admin=None):
         if payment is not None and payment.status != Payment.Status.REFUNDED:
             payment.status = Payment.Status.REFUNDED
             payment.save(update_fields=['status', 'updated_at'])
+
+        if flag_pos_unload and payment is not None:
+            flag_pos_unload_if_needed(getattr(payment, 'related_topup', None))
 
     _notify_balance_change(
         student,

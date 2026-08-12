@@ -85,6 +85,14 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
     """POST /api/v1/admissions/pre-register/ — Public, no auth.
     GET — Admin-only paginated list for the Admisiones console."""
     queryset = PreRegistration.objects.all()
+    # Admin GET ?search= — SearchFilter is in DEFAULT_FILTER_BACKENDS.
+    search_fields = [
+        'child_first_name',
+        'child_last_name',
+        'parent_name',
+        'parent_email',
+        'parent_phone',
+    ]
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -408,7 +416,12 @@ class RegistrationSubmitView(APIView):
             reg.save(update_fields=['privacy_notice_version', 'privacy_accepted_at'])
 
         # Medical data may only be submitted with explicit MEDICAL_DATA consent.
-        has_medical = any([reg.blood_type, reg.allergies, reg.medical_notes])
+        # Include estatura/peso — they are EncryptedTextField medical fields in
+        # MEDICAL_FIELDS and must not bypass the consent gate.
+        has_medical = any([
+            reg.blood_type, reg.allergies, reg.medical_notes,
+            reg.estatura, reg.peso,
+        ])
         if has_medical and not reg.consent_medical_data:
             return Response(
                 {'error': 'Se requiere consentimiento de datos de salud para enviar información médica.'},
@@ -467,6 +480,16 @@ class DocumentUploadView(APIView):
                 {'error': f'El archivo excede el tamaño máximo de '
                           f'{max_size // (1024 * 1024)} MB.'},
                 status=status.HTTP_400_BAD_REQUEST)
+
+        # Replacing the same doc_type avoids duplicate rows when a family
+        # retries finish() (OTHER may still have multiple attachments).
+        if doc_type != RegistrationDocument.DocType.OTHER:
+            for old in RegistrationDocument.objects.filter(
+                registration=reg, doc_type=doc_type,
+            ):
+                if old.file:
+                    old.file.delete(save=False)
+                old.delete()
 
         doc = RegistrationDocument.objects.create(
             registration=reg,

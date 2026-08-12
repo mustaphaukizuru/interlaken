@@ -8,19 +8,27 @@ import { login, DEV_PARENT } from './helpers';
  * chosen gateway and follows the returned redirect.
  */
 test('paying a tuition invoice initiates the gateway redirect with the chosen gateway', async ({ page }) => {
-  await page.route('**/api/v1/finance/invoices/', (route) => {
+  // Trailing /** so ?page= / ?student= still match (Playwright globs are path-exact
+  // without it). Register the list stub before /pay/ — later routes win (LIFO).
+  await page.route('**/api/v1/finance/invoices/**', (route) => {
+    if (route.request().url().includes('/pay/')) return route.fallback();
     route.fulfill({
       json: {
+        count: 1,
         results: [{
           id: 42,
+          student_id: 3,
           student_name: 'Test Alumno',
           student_code: 'A-001',
+          grade: '3°',
           period: '2026-08',
           period_label: 'Agosto 2026',
           amount: '2500.00',
+          amount_paid: '0.00',
           balance_due: '2500.00',
           currency: 'MXN',
           status: 'pending',
+          status_display: 'Pendiente',
           due_date: '2026-08-05',
         }],
       },

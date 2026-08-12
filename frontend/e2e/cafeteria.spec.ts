@@ -18,6 +18,8 @@ test('an online cafeteria top-up initiates the gateway redirect', async ({ page 
           id: 3,
           grade: '3° Primaria',
           group: 'A',
+          student_id: 'A-003',
+          loyverse_id: 'loy-test-alumno',
           user: { full_name: 'Test Alumno' },
         },
       }],

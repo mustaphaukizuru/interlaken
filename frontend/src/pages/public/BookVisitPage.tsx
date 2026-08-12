@@ -108,7 +108,7 @@ export default function BookVisitPage() {
   return (
     <div>
       <FunnelHero
-        step="puertas-abiertas"
+        step="agendar-visita"
         title="Agendar Visita"
         subtitle="Un recorrido personalizado para su familia: complete su pre-registro, elija la fecha que le convenga y confirme su cita."
         imageSrc="/assets/facade.webp"

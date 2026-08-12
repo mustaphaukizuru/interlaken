@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import OpenSchoolDay, PreRegistration, Registration, RegistrationDocument
+from .models import PreRegistration, Registration, RegistrationDocument
 
 
 def _validate_child_dob(value):
@@ -196,6 +196,7 @@ MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes', 'estatura', 'peso'
 
 class RegistrationSerializer(serializers.ModelSerializer):
     documents = RegistrationDocumentSerializer(many=True, read_only=True)
+    privacy_notice_version_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Registration
@@ -206,11 +207,20 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'parent2_name', 'parent2_email', 'parent2_phone',
             'emergency_name', 'emergency_phone', 'emergency_rel',
             'blood_type', 'allergies', 'medical_notes', 'estatura', 'peso',
-            'consent_photos_media', 'consent_medical_data', 'privacy_accepted_at',
+            'consent_photos_media', 'consent_medical_data',
+            'privacy_accepted_at', 'privacy_notice_version_label',
             'status', 'submitted_at', 'created_at', 'documents',
         ]
-        read_only_fields = ['id', 'status', 'submitted_at', 'created_at', 'documents',
-                            'privacy_accepted_at']
+        read_only_fields = [
+            'id', 'status', 'submitted_at', 'created_at', 'documents',
+            'privacy_accepted_at', 'privacy_notice_version_label',
+        ]
+
+    def get_privacy_notice_version_label(self, obj):
+        ver = obj.privacy_notice_version
+        if ver is None:
+            return ''
+        return getattr(ver, 'version', None) or str(ver)
 
     def validate_child_dob(self, value):
         return _validate_child_dob(value)
@@ -237,21 +247,3 @@ class RegistrationSerializer(serializers.ModelSerializer):
                 if field in data:
                     data[field] = None
         return data
-
-
-class OpenSchoolDaySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OpenSchoolDay
-        fields = [
-            'id', 'event_date', 'event_time', 'event_name',
-            'parent_name', 'parent_email', 'parent_phone',
-            'child_name', 'child_age', 'level_interest', 'message',
-            'status', 'created_at',
-        ]
-        read_only_fields = ['id', 'status', 'created_at']
-
-
-class OpenSchoolDayEventSerializer(serializers.Serializer):
-    event_date  = serializers.DateField()
-    event_time  = serializers.CharField()
-    event_name  = serializers.CharField()

@@ -5,7 +5,7 @@ cafeteria/models.py — Loyverse cafeteria integration & balance tracking.
 from django.db import models
 from django.utils import timezone
 
-from apps.accounts.models import StudentProfile
+from apps.accounts.models import StudentProfile, User
 
 
 class CafeteriaBalance(models.Model):
@@ -102,10 +102,47 @@ class TopUpRequest(models.Model):
     processed_at = models.DateTimeField(null=True, blank=True)
     notes        = models.TextField(blank=True)
 
+    # Online top-ups credit the local ledger only (R1); staff must manually load
+    # the amount into Loyverse POS so the child can spend. Cleared when marked.
+    pos_loaded_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When staff loaded this online top-up into Loyverse POS.',
+    )
+    pos_loaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='pos_loaded_topups',
+    )
+
+    # After a provider refund/chargeback (or admin reverse) of a POS-loaded
+    # top-up, local ledger is reversed but Loyverse still holds the credit until
+    # staff unload it. Queued when set; cleared via pos_unloaded_at.
+    pos_unload_needed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When a refund required staff to remove this credit from Loyverse POS.',
+    )
+    pos_unloaded_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When staff removed this refunded top-up from Loyverse POS.',
+    )
+    pos_unloaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='pos_unloaded_topups',
+    )
+
     class Meta:
         verbose_name = 'Solicitud de Recarga'
         verbose_name_plural = 'Solicitudes de Recarga'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['method', 'status', 'pos_loaded_at'],
+                name='cafeteria_topup_pos_queue',
+            ),
+            models.Index(
+                fields=['pos_unload_needed_at', 'pos_unloaded_at'],
+                name='cafeteria_topup_pos_unload',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.student} — ${self.amount} ({self.status})'

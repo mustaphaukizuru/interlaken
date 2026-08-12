@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({
-  paymentsApi: { getMyPayments: vi.fn(), initiatePayment: vi.fn() },
+  paymentsApi: { getMyPayments: vi.fn() },
 }));
 
 import PaymentsPage from './PaymentsPage';

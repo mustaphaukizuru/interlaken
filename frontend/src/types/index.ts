@@ -73,6 +73,13 @@ export interface TopUpLogEntry {
   gateway_tx_id: string;
   created_at: string;
   processed_at: string | null;
+  pos_loaded_at: string | null;
+  pos_loaded_by_name: string;
+  needs_pos_load: boolean;
+  pos_unload_needed_at: string | null;
+  pos_unloaded_at: string | null;
+  pos_unloaded_by_name: string;
+  needs_pos_unload: boolean;
 }
 
 export interface BalanceAdjustment {
@@ -268,6 +275,12 @@ export interface DashboardData {
   children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;
   cafeteria_balances?: Array<{ student_name: string; balance: string; low: boolean; last_synced: string }>;
   recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
+  /** Count of unpaid/overdue family colegiatura invoices. */
+  pending_invoices?: number;
+  /** Sum of balance_due on those invoices (MXN string). */
+  pending_balance?: string;
+  /** True when the family account has no linked StudentProfile yet. */
+  needs_family_link?: boolean;
   student_id?: string;
   grade?: string;
   group?: string;

@@ -256,7 +256,11 @@ export default function CafeteriaPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
-          <p className="mt-1 text-fluid-sm text-muted">Consulte el saldo y los movimientos del servicio de cafetería.</p>
+          <p className="mt-1 text-fluid-sm text-muted">
+            Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo
+            aparece aquí al confirmar el pago; el colegio lo carga en el POS para
+            compras en cafetería.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
           {!balancesLoading && balances && balances.length > 0 && (
@@ -338,14 +342,16 @@ export default function CafeteriaPage() {
                 </p>
               )}
 
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
-                className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
-              >
-                <Plus className="w-3.5 h-3.5" /> Recargar
-              </Button>
+              {!notLinked && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
+                  className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Recargar
+                </Button>
+              )}
 
               <button
                 type="button"
@@ -492,11 +498,17 @@ export default function CafeteriaPage() {
           </select>
         </div>
         {topupMethod === 'online' && (
-          <PaymentMethodPicker
-            value={topupGateway}
-            onChange={(v) => setTopupGateway(v as 'global_payments' | 'banorte')}
-            disabled={topupMutation.isPending}
-          />
+          <>
+            <PaymentMethodPicker
+              value={topupGateway}
+              onChange={(v) => setTopupGateway(v as 'global_payments' | 'banorte')}
+              disabled={topupMutation.isPending}
+            />
+            <p className="mb-3 text-xs leading-snug text-muted">
+              Al confirmar el pago verá el saldo en el portal. El colegio lo carga
+              en el POS de cafetería para que su hijo(a) pueda comprar.
+            </p>
+          </>
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); }} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>

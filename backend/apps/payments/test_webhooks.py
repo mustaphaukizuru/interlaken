@@ -171,6 +171,44 @@ class TestWebhookRefund:
         })
         assert again.data['detail'] == 'already_processed'
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal('0.00')
+        # Never loaded into POS — unload queue stays empty.
+        topup.refresh_from_db()
+        assert topup.pos_unload_needed_at is None
+
+    def test_refund_after_pos_load_queues_unload(self, api_client, settings):
+        from django.utils import timezone
+
+        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal('150.00'),
+            method=TopUpRequest.Method.ONLINE,
+        )
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA,
+            amount=Decimal('150.00'), gateway=Payment.Gateway.GLOBAL_PAYMENTS,
+            related_topup=topup, status=Payment.Status.PENDING,
+        )
+
+        assert _signed(api_client, {
+            'order_id': payment.id, 'status': 'CAPTURED', 'id': 'gp-pos-1',
+        }).status_code == 200
+        topup.refresh_from_db()
+        topup.pos_loaded_at = timezone.now()
+        topup.save(update_fields=['pos_loaded_at'])
+
+        resp = _signed(api_client, {
+            'order_id': payment.id, 'status': 'REFUNDED', 'id': 'gp-pos-refund',
+        })
+        assert resp.status_code == 200
+        assert resp.data['detail'] == 'refunded'
+        payment.refresh_from_db()
+        topup.refresh_from_db()
+        assert payment.status == Payment.Status.REFUNDED
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('0.00')
+        assert topup.pos_unload_needed_at is not None
+        assert topup.pos_unloaded_at is None
 
     def test_refund_reopens_tuition_invoice(self, api_client, settings):
         settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
@@ -215,26 +253,9 @@ class TestPaymentInitiate:
         )
         assert resp.status_code == 401
 
-    def test_authenticated_user_creates_pending_payment(self, api_client):
-        user = ParentFactory()
-        api_client.force_authenticate(user=user)
-        resp = api_client.post(
-            reverse("payment-initiate"),
-            {
-                "amount": "500.00",
-                "payment_type": "other",
-                "description": "Pago escolar",
-            },
-            format="json",
-        )
-        assert resp.status_code == 201, resp.data
-        assert resp.data["status"] == Payment.Status.PENDING
-        payment = Payment.objects.get(pk=resp.data["payment_id"])
-        assert payment.user == user
-
-    @pytest.mark.parametrize("payment_type", ["tuition", "cafeteria"])
+    @pytest.mark.parametrize("payment_type", ["tuition", "cafeteria", "enrollment", "other"])
     def test_rejects_unlinked_money_types(self, api_client, payment_type):
-        """tuition/cafeteria must use their linked endpoints — never bare initiate."""
+        """Bare initiate must not open an HPP session that credits nothing."""
         api_client.force_authenticate(user=ParentFactory())
         resp = api_client.post(
             reverse("payment-initiate"),

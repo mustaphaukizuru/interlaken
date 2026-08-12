@@ -129,6 +129,7 @@ class SlotGeneratorSerializer(serializers.Serializer):
     ``interval_minutes`` increments.
     """
     visit_type       = serializers.ChoiceField(choices=VisitType.choices, default=VisitType.INDIVIDUAL)
+    title            = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
     start_date       = serializers.DateField()
     end_date         = serializers.DateField()
     weekdays         = serializers.ListField(
@@ -149,4 +150,9 @@ class SlotGeneratorSerializer(serializers.Serializer):
             raise serializers.ValidationError('La fecha final no puede ser anterior a la inicial.')
         if data['window_end'] <= data['window_start']:
             raise serializers.ValidationError('La hora de fin debe ser posterior a la de inicio.')
+        # Open-class events need a public name on /puertas-abiertas.
+        if data['visit_type'] == VisitType.OPEN_CLASS and not (data.get('title') or '').strip():
+            data['title'] = 'Puertas Abiertas'
+        if data['visit_type'] == VisitType.INDIVIDUAL:
+            data['title'] = (data.get('title') or '').strip()
         return data

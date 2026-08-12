@@ -563,8 +563,6 @@ UNFOLD = {
                      'badge': 'apps.core.badges.documents_in_review',
                      'badge_variant': 'warning',
                      'link': reverse_lazy('admin:admissions_registrationdocument_changelist')},
-                    {'title': 'Puertas Abiertas', 'icon': 'meeting_room',
-                     'link': reverse_lazy('admin:admissions_openschoolday_changelist')},
                     {'title': 'Disponibilidad de visitas', 'icon': 'event_available',
                      'link': reverse_lazy('admin:bookings_availabilityslot_changelist')},
                     {'title': 'Reservas de visita', 'icon': 'calendar_month',

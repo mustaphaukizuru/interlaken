@@ -303,8 +303,22 @@ export const cafeteriaApi = {
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
-  getTopUpLog: (params?: { status?: string; method?: string; from?: string; to?: string; page?: number }) =>
+  getTopUpLog: (params?: {
+    status?: string;
+    method?: string;
+    from?: string;
+    to?: string;
+    needs_pos?: boolean | number | string;
+    needs_unload?: boolean | number | string;
+    page?: number;
+  }) =>
     api.get('/cafeteria/admin/topups/', { params }),
+
+  markTopUpPosLoaded: (topupId: number) =>
+    api.post(`/cafeteria/admin/topup/${topupId}/pos-loaded/`),
+
+  markTopUpPosUnloaded: (topupId: number) =>
+    api.post(`/cafeteria/admin/topup/${topupId}/pos-unloaded/`),
 
   getStudentDetail: (studentId: number) =>
     api.get(`/cafeteria/admin/student/${studentId}/`),
@@ -351,10 +365,9 @@ export function downloadBlob(data: Blob, filename: string) {
 }
 
 // ── PAYMENTS ─────────────────────────────────────────────
+// Bare POST /payments/initiate/ is fail-closed (no unlinked charge path).
+// Real money starts from finance invoice-pay or cafeteria top-up.
 export const paymentsApi = {
-  initiatePayment: (data: { amount: number; payment_type: string; description: string }) =>
-    api.post('/payments/initiate/', data),
-
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
@@ -365,7 +378,7 @@ export const paymentsApi = {
 // ── FINANCE / TUITION (Prompt 17) ─────────────────────────
 export const financeApi = {
   // Parent
-  getInvoices: (params?: { student?: number; status?: string; period?: string }) =>
+  getInvoices: (params?: { student?: number; status?: string; period?: string; page?: number }) =>
     api.get('/finance/invoices/', { params }),
 
   getInvoice: (id: number) =>
@@ -483,6 +496,7 @@ export const bookingsApi = {
   // Admin
   generateSlots: (data: {
     visit_type?: string;
+    title?: string;
     start_date: string;
     end_date: string;
     weekdays: number[];
@@ -525,7 +539,8 @@ export const portalApi = {
     api.post('/portal/announcements/mark-read/', { ids }),
 
   // Comunicados (announcements) for families — list, detail, and replies.
-  getAnnouncements: () => api.get('/portal/announcements/'),
+  getAnnouncements: (params?: { page?: number }) =>
+    api.get('/portal/announcements/', { params }),
   getAnnouncement: (id: number) => api.get(`/portal/announcements/${id}/`),
   getAnnouncementComments: (id: number) =>
     api.get(`/portal/announcements/${id}/comments/`),
