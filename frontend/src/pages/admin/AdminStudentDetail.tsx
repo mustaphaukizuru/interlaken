@@ -5,9 +5,9 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentDiscounts } from '@/components/admin/StudentDiscounts';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
@@ -37,26 +37,40 @@ export default function AdminStudentDetail() {
     enabled: !!studentId,
   });
 
-  const s = data?.student;
-  const outstanding = parseFloat(data?.outstanding ?? '0');
-
   return (
     <>
       <Link to="/admin/alumnos" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" /> Alumnos
       </Link>
 
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : isError || !data ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : (
+        <StudentLedgerBody data={data} />
+      )}
+    </>
+  );
+}
+
+function StudentLedgerBody({ data }: { data: Ledger }) {
+  const s = data.student;
+  const outstanding = parseFloat(data.outstanding);
+  const paidCount = data.invoices.filter((i) => i.status === 'paid').length;
+
+  return (
+    <>
       <PageHeader
-        title={s?.name ?? 'Alumno'}
-        subtitle={s ? `Matrícula ${s.student_code} · ${s.grade}` : undefined}
-        actions={s && (
+        title={s.name}
+        subtitle={`Matrícula ${s.student_code} · ${s.grade}`}
+        actions={(
           <Link to={`/admin/cafeteria/${s.id}`} className="btn-outline">
             <Coffee size={16} aria-hidden="true" /> Cafetería
           </Link>
         )}
       />
 
-      {/* Summary */}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Saldo de colegiaturas</p>
@@ -66,22 +80,16 @@ export default function AdminStudentDetail() {
         </Card>
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Facturas</p>
-          <p className="mt-1 font-head text-2xl font-bold text-ink">{data?.invoices?.length ?? 0}</p>
+          <p className="mt-1 font-head text-2xl font-bold text-ink">{data.invoices.length}</p>
         </Card>
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Pagadas</p>
-          <p className="mt-1 font-head text-2xl font-bold text-ink">
-            {data?.invoices?.filter((i) => i.status === 'paid').length ?? 0}
-          </p>
+          <p className="mt-1 font-head text-2xl font-bold text-ink">{paidCount}</p>
         </Card>
       </div>
 
       <Card title="Colegiaturas">
-        {isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : isLoading ? (
-          <ListSkeleton />
-        ) : !data?.invoices?.length ? (
+        {!data.invoices.length ? (
           <EmptyState icon={Receipt} title="Sin colegiaturas" description="Aún no se han emitido colegiaturas para este alumno." />
         ) : (
           <div className="divide-y divide-cream">
@@ -112,12 +120,10 @@ export default function AdminStudentDetail() {
         )}
       </Card>
 
-      {s && (
-        <div className="mt-6 space-y-6">
-          <StudentGuardians studentId={s.id} />
-          <StudentDiscounts studentId={s.id} />
-        </div>
-      )}
+      <div className="mt-6 space-y-6">
+        <StudentGuardians studentId={s.id} />
+        <StudentDiscounts studentId={s.id} />
+      </div>
     </>
   );
 }
