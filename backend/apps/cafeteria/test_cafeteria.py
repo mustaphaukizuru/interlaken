@@ -778,3 +778,97 @@ class TestReviewFixes:
         assert resp.data["total"] == 50.0
         by_cat = {c["category"]: c["total"] for c in resp.data["categories"]}
         assert by_cat.get("Otros") == 50.0
+
+
+class TestCafeteriaCards:
+    """Digital student card endpoint: identity + code (QR/barcode) + stats."""
+
+    def test_parent_sees_child_card_with_code_and_stats(self, api_client):
+        from apps.cafeteria.models import LoyverseProfile
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-card-1", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("120"))
+        LoyverseProfile.objects.create(
+            student=student, loyverse_id="loy-card-1", customer_code="10020",
+            total_visits=267, total_spent=Decimal("111"), total_points=Decimal("70"))
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-cards"))
+        assert resp.status_code == 200
+        card = resp.data[0]
+        assert card["code"] == "10020"           # POS scans this
+        assert card["balance"] == "120.00"
+        assert card["linked"] is True
+        assert card["loyverse"]["total_visits"] == 267
+        assert card["loyverse"]["total_spent"] == "111.00"
+
+    def test_code_falls_back_to_student_id_when_no_loyverse_profile(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("0"))
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-cards"))
+        assert resp.data[0]["code"] == student.student_id
+        assert resp.data[0]["linked"] is False
+        assert resp.data[0]["loyverse"] is None
+
+    def test_outsider_sees_no_cards(self, api_client):
+        outsider = ParentFactory()
+        StudentProfileFactory(parents=[ParentFactory()])
+        api_client.force_authenticate(user=outsider)
+        resp = api_client.get(reverse("cafeteria-cards"))
+        assert resp.data == []
+
+
+class TestLoyverseReadOnlyHistory:
+    """Read-only recent purchases pulled live from Loyverse (no ledger writes)."""
+
+    @patch("apps.cafeteria.services.get_recent_transactions")
+    def test_returns_parsed_readonly_receipts(self, mock_get, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-h1", parents=[parent])
+        mock_get.return_value = [
+            {"customer_id": "loy-h1", "receipt_number": "R-1", "total_money": 30,
+             "receipt_date": "2026-01-01T12:00:00.000Z",
+             "line_items": [{"item_name": "Torta", "quantity": 1, "total_money": 30}]},
+        ]
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-loyverse-history"), {"student": student.id})
+        assert resp.status_code == 200
+        assert resp.data["linked"] is True
+        assert len(resp.data["receipts"]) == 1
+        assert resp.data["receipts"][0]["amount"] == "30.00"
+        assert resp.data["receipts"][0]["items"][0]["name"] == "Torta"
+        # READ-ONLY: nothing written to the local ledger.
+        assert CafeteriaTransaction.objects.count() == 0
+
+    @patch("apps.cafeteria.services.get_recent_transactions")
+    def test_drops_foreign_customer_receipts(self, mock_get, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-h2", parents=[parent])
+        mock_get.return_value = [
+            {"customer_id": "loy-h2", "receipt_number": "R-1", "total_money": 30,
+             "receipt_date": "2026-01-01T12:00:00.000Z", "line_items": []},
+            {"customer_id": "stranger", "receipt_number": "R-2", "total_money": 99,
+             "receipt_date": "2026-01-01T12:00:00.000Z", "line_items": []},
+        ]
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-loyverse-history"), {"student": student.id})
+        assert len(resp.data["receipts"]) == 1
+
+    def test_unlinked_student_returns_empty(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="", parents=[parent])
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-loyverse-history"), {"student": student.id})
+        assert resp.data == {"linked": False, "receipts": []}
+
+    @patch("apps.cafeteria.services.get_recent_transactions")
+    def test_failsoft_when_loyverse_unreachable(self, mock_get, api_client):
+        mock_get.side_effect = RuntimeError("boom")
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-h3", parents=[parent])
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-loyverse-history"), {"student": student.id})
+        assert resp.status_code == 200
+        assert resp.data["receipts"] == []
+        assert resp.data.get("error") == "loyverse_unreachable"

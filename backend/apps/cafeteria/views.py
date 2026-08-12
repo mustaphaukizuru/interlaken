@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
@@ -372,6 +373,109 @@ class MySpendingCategoriesView(APIView):
             'total': round(float(grand), 2),
             'categories': categories,
         })
+
+
+def _family_students_qs(user):
+    """StudentProfiles the caller may see: own children (parent), self (student),
+    all (admin). Same scoping as the other 'my' cafetería endpoints."""
+    if user.role == User.Role.PARENT:
+        return StudentProfile.objects.filter(parents=user)
+    if user.role == User.Role.STUDENT:
+        return StudentProfile.objects.filter(user=user)
+    if user.role == User.Role.ADMIN:
+        return StudentProfile.objects.all()
+    return StudentProfile.objects.none()
+
+
+class MyCardsView(APIView):
+    """GET /api/v1/cafeteria/cards/ — digital cafetería card(s) for the caller's
+    children: identity + the Loyverse code the POS scans (for the on-screen
+    QR/barcode) + live balance + the Loyverse profile stats (visits, lifetime
+    spend, points, first/last visit)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        students = (_family_students_qs(request.user)
+                    .select_related('user', 'loyverse_profile'))
+        cards = []
+        for s in students:
+            balance, _ = CafeteriaBalance.objects.get_or_create(student=s)
+            loyverse = getattr(s, 'loyverse_profile', None)
+            code = ((loyverse.customer_code if loyverse else '')
+                    or s.student_id or '')
+            cards.append({
+                'student': {
+                    'id': s.id,
+                    'name': s.user.full_name,
+                    'grade': s.grade,
+                    'group': s.group,
+                    'student_id': s.student_id,
+                },
+                'code': code,                       # QR/barcode payload
+                'linked': bool(s.loyverse_id),
+                'balance': str(balance.balance),
+                'is_low_balance': balance.is_low_balance,
+                'points': str(loyverse.total_points) if loyverse else None,
+                'loyverse': LoyverseProfileSerializer(loyverse).data if loyverse else None,
+            })
+        return Response(cards)
+
+
+class MyLoyverseHistoryView(APIView):
+    """GET /api/v1/cafeteria/loyverse-history/?student=&limit= — READ-ONLY recent
+    purchases pulled live from Loyverse for display only. It does NOT touch the
+    local wallet ledger (the ledger records purchases from go-live forward; this
+    surfaces earlier history for the family). Cached ~10 min to spare the API and
+    fail-soft (returns an empty list if Loyverse is unreachable)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        students = _family_students_qs(request.user)
+        student_id = request.query_params.get('student')
+        if student_id:
+            students = students.filter(id=student_id)
+        student = students.select_related('user').first()
+        if student is None:
+            return Response({'linked': False, 'receipts': []})
+        if not student.loyverse_id:
+            return Response({'linked': False, 'receipts': []})
+
+        try:
+            limit = min(max(int(request.query_params.get('limit', 20)), 1), 50)
+        except (TypeError, ValueError):
+            limit = 20
+
+        cache_key = f'loyverse-history:{student.loyverse_id}:{limit}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        from .services import _parse_receipt, get_recent_transactions
+        try:
+            raw = get_recent_transactions(student.loyverse_id, limit=limit)
+        except Exception:  # noqa: BLE001 — fail-soft, never 500 the portal
+            logger.warning('Loyverse read-only history fetch failed', exc_info=True)
+            return Response({'linked': True, 'receipts': [], 'error': 'loyverse_unreachable'})
+
+        receipts = []
+        for r in raw or []:
+            # Defensive: the /receipts customer_id filter is unofficial, so drop
+            # any receipt that isn't this student's.
+            cid = r.get('customer_id')
+            if cid and cid != student.loyverse_id:
+                continue
+            amount, items, summary, is_refund, date = _parse_receipt(r)
+            receipts.append({
+                'receipt_number': r.get('receipt_number'),
+                'date': date.isoformat() if date else None,
+                'type': 'refund' if is_refund else 'purchase',
+                'amount': f'{amount:.2f}',
+                'description': summary,
+                'items': items,
+            })
+        result = {'linked': True, 'receipts': receipts}
+        cache.set(cache_key, result, 600)
+        return Response(result)
 
 
 @method_decorator(csrf_exempt, name='dispatch')

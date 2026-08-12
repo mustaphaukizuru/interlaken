@@ -44,6 +44,42 @@ export interface CafeteriaTransactionItem {
   name: string;
   quantity: number | string;
   total: string | null;
+  category?: string;
+}
+
+/** Loyverse customer snapshot (visits, lifetime spend, points). */
+export interface LoyverseProfile {
+  customer_code: string;
+  name: string;
+  email: string;
+  address_code: string;
+  first_visit: string | null;
+  last_visit: string | null;
+  total_visits: number;
+  total_spent: string;
+  total_points: string;
+  synced_at: string;
+}
+
+/** Digital cafetería card for one child (from /cafeteria/cards/). */
+export interface CafeteriaCard {
+  student: { id: number; name: string; grade: string; group: string; student_id: string };
+  code: string;            // matrícula the POS scans (QR/barcode payload)
+  linked: boolean;
+  balance: string;
+  is_low_balance: boolean;
+  points: string | null;
+  loyverse: LoyverseProfile | null;
+}
+
+/** Read-only recent purchase pulled live from Loyverse. */
+export interface LoyverseHistoryReceipt {
+  receipt_number: string | null;
+  date: string | null;
+  type: 'purchase' | 'refund';
+  amount: string;
+  description: string;
+  items: CafeteriaTransactionItem[];
 }
 
 export interface CafeteriaTransaction {

@@ -7,6 +7,10 @@ urlpatterns = [
     path('transactions/',                views.MyTransactionsView.as_view(),      name='cafeteria-transactions'),
     path('spending-trend/',              views.MySpendingTrendView.as_view(),     name='cafeteria-spending-trend'),
     path('spending-categories/',         views.MySpendingCategoriesView.as_view(), name='cafeteria-spending-categories'),
+    # Digital student card(s): code for QR/barcode + balance + Loyverse stats.
+    path('cards/',                       views.MyCardsView.as_view(),             name='cafeteria-cards'),
+    # Read-only recent purchases pulled live from Loyverse (does not touch ledger).
+    path('loyverse-history/',            views.MyLoyverseHistoryView.as_view(),   name='cafeteria-loyverse-history'),
     path('balance/<int:student_pk>/threshold/', views.UpdateLowBalanceThresholdView.as_view(), name='cafeteria-threshold'),
     path('balance/<int:student_pk>/budget/',    views.UpdateSpendLimitsView.as_view(),         name='cafeteria-budget'),
     path('topup/',                       views.TopUpRequestCreateView.as_view(),  name='cafeteria-topup'),

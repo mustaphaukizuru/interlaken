@@ -42,6 +42,7 @@ const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
 // Parent portal
 const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
 const CafeteriaPage   = lazy(() => import('./pages/parent/CafeteriaPage'));
+const CredencialPage  = lazy(() => import('./pages/parent/CredencialPage'));
 const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupReturn'));
 const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
 const ColegiaturasPage = lazy(() => import('./pages/parent/ColegiaturasPage'));
@@ -149,6 +150,7 @@ export default function App() {
             }>
               <Route index            element={<ParentDashboard />} />
               <Route path="cafeteria" element={<CafeteriaPage />} />
+              <Route path="credencial" element={<CredencialPage />} />
               <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
               <Route path="colegiaturas" element={<ColegiaturasPage />} />
               <Route path="colegiaturas/retorno" element={<ColegiaturaPaymentReturn />} />

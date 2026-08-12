@@ -249,6 +249,19 @@ export const cafeteriaApi = {
       params: { days, ...(student ? { student } : {}) },
     }),
 
+  // Digital student card(s): identity + code (QR/barcode) + balance + Loyverse stats.
+  getCards: () => api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/'),
+
+  // Read-only recent purchases pulled live from Loyverse (does not touch the ledger).
+  getLoyverseHistory: (student?: number, limit = 20) =>
+    api.get<{
+      linked: boolean;
+      error?: string;
+      receipts: import('@/types').LoyverseHistoryReceipt[];
+    }>('/cafeteria/loyverse-history/', {
+      params: { limit, ...(student ? { student } : {}) },
+    }),
+
   // Family sets the saldo-bajo warning level for one of their children.
   updateLowBalanceThreshold: (studentId: number, threshold: number) =>
     api.patch(`/cafeteria/balance/${studentId}/threshold/`, { threshold }),
