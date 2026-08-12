@@ -1,1 +1,0 @@
-import{j as e}from"./query-0FL5IC2E.js";function n({rows:r=6}){return e.jsx("div",{className:"space-y-2.5","aria-hidden":"true",children:Array.from({length:r}).map((s,a)=>e.jsx("div",{className:"skeleton h-11 w-full rounded-lg"},a))})}export{n as T};

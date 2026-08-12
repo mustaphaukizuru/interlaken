@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Save, Phone, Mail, MapPin, MessageCircle, Facebook, Instagram, Youtube,
+  Save, Phone, Mail, MapPin, MessageCircle,
 } from 'lucide-react';
+import { Facebook, Instagram, Youtube } from '@/components/icons/brand-icons';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
