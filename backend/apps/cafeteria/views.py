@@ -104,12 +104,16 @@ class MyBalanceView(APIView):
 
         if user.role == User.Role.PARENT:
             students = StudentProfile.objects.filter(parents=user)
+            include_spend = True
         else:
+            # Admin/staff wide view: skip the per-student spend aggregates so a
+            # full-roster list stays cheap (matches AdminBalancesView).
             students = StudentProfile.objects.all()
+            include_spend = False
 
         balances = [CafeteriaBalance.objects.get_or_create(student=s)[0] for s in students]
         return Response(CafeteriaBalanceSerializer(
-            balances, many=True, context={'include_spend': True}).data)
+            balances, many=True, context={'include_spend': include_spend}).data)
 
 
 class MyTransactionsView(generics.ListAPIView):
@@ -325,25 +329,34 @@ class MySpendingCategoriesView(APIView):
 
         # Aggregate line totals by category. Fall back to the receipt total under
         # "Otros" when a receipt has no itemised lines (older rows / manual entries).
-        from decimal import Decimal
+        from decimal import Decimal, InvalidOperation
         totals: dict[str, Decimal] = {}
         counts: dict[str, int] = {}
         for items, amount in txns:
+            amount = amount or Decimal('0')
             if not items:
-                totals['Otros'] = totals.get('Otros', Decimal('0')) + (amount or Decimal('0'))
+                totals['Otros'] = totals.get('Otros', Decimal('0')) + amount
                 counts['Otros'] = counts.get('Otros', 0) + 1
                 continue
+            line_sum = Decimal('0')
             for li in items:
                 cat = (li.get('category') or 'Otros') if isinstance(li, dict) else 'Otros'
                 raw = li.get('total') if isinstance(li, dict) else None
                 try:
                     line_total = Decimal(str(raw)) if raw not in (None, '') else Decimal('0')
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, InvalidOperation):
                     line_total = Decimal('0')
                 totals[cat] = totals.get(cat, Decimal('0')) + line_total
                 counts[cat] = counts.get(cat, 0) + 1
+                line_sum += line_total
+            # Reconcile with the amount-based spend shown elsewhere (today_spend,
+            # trend, CSV): attribute any shortfall from null/missing line totals
+            # (combos, modifiers) to "Otros" so the grand total isn't under-stated.
+            shortfall = amount - line_sum
+            if shortfall > 0:
+                totals['Otros'] = totals.get('Otros', Decimal('0')) + shortfall
 
-        grand = sum(totals.values()) or Decimal('0')
+        grand = sum(totals.values(), Decimal('0'))
         categories = [
             {
                 'category': cat,
@@ -377,8 +390,12 @@ class LoyverseWebhookView(APIView):
 
     def post(self, request):
         secret = (getattr(settings, 'LOYVERSE_WEBHOOK_SECRET', '') or '').strip()
-        provided = request.headers.get('X-Webhook-Token', '')
-        if not secret or not hmac.compare_digest(secret, provided):
+        provided = request.headers.get('X-Webhook-Token', '') or ''
+        # Compare as bytes: hmac.compare_digest raises TypeError on a non-ASCII
+        # str, and this runs before the try below, so an attacker's non-ASCII
+        # header would otherwise 500 instead of returning a clean 401.
+        if not secret or not hmac.compare_digest(
+                secret.encode('utf-8'), provided.encode('utf-8')):
             return Response({'error': 'unauthorized'}, status=401)
 
         payload = request.data if isinstance(request.data, dict) else {}

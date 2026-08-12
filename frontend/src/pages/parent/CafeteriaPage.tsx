@@ -186,6 +186,7 @@ export default function CafeteriaPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] }),
         queryClient.invalidateQueries({ queryKey: ['cafeteria-transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['cafeteria-spending-categories'] }),
       ]);
       const created = data?.created ?? 0;
       toast.success(
@@ -357,7 +358,9 @@ export default function CafeteriaPage() {
                 Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '50').toFixed(0)}</span> · Cambiar
               </button>
 
-              {/* Spending budget (#13): progress vs the parent-set daily/weekly cap. */}
+              {/* Spending budget (#13): progress vs the parent-set daily/weekly cap.
+                  Render a bar for EACH active limit so a weekly overspend isn't
+                  hidden behind an under-budget daily bar. */}
               {(() => {
                 const dailyLimit = parseFloat(b.daily_spend_limit ?? '0');
                 const weeklyLimit = parseFloat(b.weekly_spend_limit ?? '0');
@@ -372,37 +375,43 @@ export default function CafeteriaPage() {
                     </button>
                   );
                 }
-                const useDaily = dailyLimit > 0;
-                const limit = useDaily ? dailyLimit : weeklyLimit;
-                const spent = parseFloat((useDaily ? b.today_spend : b.week_spend) ?? '0');
-                const label = useDaily ? 'hoy' : 'esta semana';
-                const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-                const over = limit > 0 && spent > limit;
+                const bars = [
+                  { on: dailyLimit > 0, label: 'hoy', limit: dailyLimit, spent: parseFloat(b.today_spend ?? '0') },
+                  { on: weeklyLimit > 0, label: 'esta semana', limit: weeklyLimit, spent: parseFloat(b.week_spend ?? '0') },
+                ].filter((x) => x.on);
                 return (
-                  <div className="mt-3">
-                    <div className="mb-1 flex items-baseline justify-between text-[11.5px]">
-                      <span className="font-medium text-subtle">Presupuesto {label}</span>
-                      <span className={over ? 'font-semibold text-coral' : 'text-muted'}>
-                        ${spent.toFixed(0)} / ${limit.toFixed(0)}
-                      </span>
-                    </div>
-                    <div
-                      className="h-2 w-full overflow-hidden rounded-full bg-cream"
-                      role="progressbar"
-                      aria-label={`Presupuesto ${label}`}
-                      aria-valuenow={Math.round(pct)}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
-                      <div
-                        className={`h-full rounded-full ${over ? 'bg-coral' : 'bg-green-500'}`}
-                        style={{ width: `${Math.max(pct, 3)}%` }}
-                      />
-                    </div>
+                  <div className="mt-3 space-y-2.5">
+                    {bars.map(({ label, limit, spent }) => {
+                      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+                      const over = limit > 0 && spent > limit;
+                      return (
+                        <div key={label}>
+                          <div className="mb-1 flex items-baseline justify-between text-[11.5px]">
+                            <span className="font-medium text-subtle">Presupuesto {label}</span>
+                            <span className={over ? 'font-semibold text-coral' : 'text-muted'}>
+                              ${spent.toFixed(0)} / ${limit.toFixed(0)}
+                            </span>
+                          </div>
+                          <div
+                            className="h-2 w-full overflow-hidden rounded-full bg-cream"
+                            role="progressbar"
+                            aria-label={`Presupuesto ${label}`}
+                            aria-valuenow={Math.round(pct)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                          >
+                            <div
+                              className={`h-full rounded-full ${over ? 'bg-coral' : 'bg-green-500'}`}
+                              style={{ width: `${Math.max(pct, 3)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                     <button
                       type="button"
                       onClick={() => openBudget(b)}
-                      className="mt-1.5 self-start rounded text-left text-[11px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
+                      className="self-start rounded text-left text-[11px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
                     >
                       Cambiar presupuesto
                     </button>

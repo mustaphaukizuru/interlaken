@@ -334,6 +334,9 @@ def _maybe_low_balance_alert(cb, now):
     tracked on ``CafeteriaBalance.last_low_balance_alert_at`` and cleared by that
     command once the balance recovers.
     """
+    from django.db.models import Q
+
+    from apps.cafeteria.models import CafeteriaBalance
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
@@ -342,8 +345,19 @@ def _maybe_low_balance_alert(cb, now):
 
     cooldown = getattr(settings, 'CAFETERIA_LOW_BALANCE_ALERT_COOLDOWN_DAYS', 7)
     cutoff = now - timedelta(days=cooldown)
-    if cb.last_low_balance_alert_at is not None and cb.last_low_balance_alert_at > cutoff:
+    # Atomically CLAIM the alert slot: a single conditional UPDATE flips the
+    # timestamp only if it's unset or past the cooldown. The webhook and a
+    # concurrent on-demand refresh both call this for the same student, so a
+    # check-then-save read-modify-write would let both send; the DB WHERE clause
+    # makes exactly one caller win (rowcount 1) and the loser no-op (rowcount 0).
+    claimed = (CafeteriaBalance.objects
+               .filter(pk=cb.pk)
+               .filter(Q(last_low_balance_alert_at__isnull=True)
+                       | Q(last_low_balance_alert_at__lte=cutoff))
+               .update(last_low_balance_alert_at=now))
+    if not claimed:
         return 0
+    cb.last_low_balance_alert_at = now
 
     student = cb.student
     title = 'Saldo bajo en cafetería'
@@ -360,9 +374,6 @@ def _maybe_low_balance_alert(cb, now):
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
                whatsapp=use_wa)
         notified += 1
-
-    cb.last_low_balance_alert_at = now
-    cb.save(update_fields=['last_low_balance_alert_at'])
     return notified
 
 
@@ -387,6 +398,9 @@ def _maybe_budget_alert(cb, now):
     student per calendar day, so once a child is over budget the parent isn't
     re-pinged on every later purchase that day. No-op when both limits are 0.
     """
+    from django.db.models import Q
+
+    from apps.cafeteria.models import CafeteriaBalance
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
@@ -396,11 +410,6 @@ def _maybe_budget_alert(cb, now):
         return 0
 
     local_now = timezone.localtime(now)
-    # Already alerted this family today → stay quiet.
-    if (cb.last_budget_alert_at is not None
-            and timezone.localtime(cb.last_budget_alert_at).date() == local_now.date()):
-        return 0
-
     start_of_day = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     start_of_week = start_of_day - timedelta(days=local_now.weekday())
 
@@ -418,6 +427,19 @@ def _maybe_budget_alert(cb, now):
     if not over:
         return 0
 
+    # Atomically CLAIM the once-per-day slot (see _maybe_low_balance_alert): only
+    # one concurrent caller's conditional UPDATE matches when the last alert is
+    # unset or from a previous day, so a webhook + a concurrent refresh can't
+    # double-alert.
+    claimed = (CafeteriaBalance.objects
+               .filter(pk=cb.pk)
+               .filter(Q(last_budget_alert_at__isnull=True)
+                       | Q(last_budget_alert_at__lt=start_of_day))
+               .update(last_budget_alert_at=now))
+    if not claimed:
+        return 0
+    cb.last_budget_alert_at = now
+
     title = 'Límite de gasto alcanzado'
     message = (
         f'{student.user.full_name} superó su presupuesto de cafetería: '
@@ -430,9 +452,6 @@ def _maybe_budget_alert(cb, now):
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
                whatsapp=use_wa)
         notified += 1
-
-    cb.last_budget_alert_at = now
-    cb.save(update_fields=['last_budget_alert_at'])
     return notified
 
 
@@ -487,6 +506,21 @@ def record_receipts(receipts, students=None):
     return {'created': created, 'notified': notified, 'unmatched': unmatched}
 
 
+def _newest_receipt_dt(receipts):
+    """Newest receipt timestamp in a batch — the poll's own high-water mark.
+
+    Uses the same field ``_parse_receipt`` stores (``receipt_date``/``created_at``).
+    Returns an aware datetime or ``None`` for an empty/undated batch.
+    """
+    newest = None
+    for r in receipts or []:
+        raw = r.get('receipt_date') or r.get('created_at')
+        dt = parse_datetime(raw) if raw else None
+        if dt and (newest is None or dt > newest):
+            newest = dt
+    return newest
+
+
 def sync_purchases():
     """Poll Loyverse receipts → transactions + balance debit + parent alerts.
 
@@ -495,30 +529,44 @@ def sync_purchases():
     command (spec §2.1); the near-real-time webhook shares the same record path
     (``record_receipts``). Returns a summary dict.
     """
-    from apps.cafeteria.models import CafeteriaTransaction
+    from apps.cafeteria.models import LoyverseSyncState
 
     students = _students_by_loyverse_id()
     if not students:
         logger.info('sync_purchases: no students with a Loyverse id — nothing to do.')
         return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0, 'unmatched': 0}
 
-    # Only poll receipts newer than the last one we processed (idempotency still
-    # guards the overlap window); a small look-back avoids missing boundary rows.
-    last = (CafeteriaTransaction.objects
-            .filter(transaction_type=CafeteriaTransaction.TxType.PURCHASE)
-            .order_by('-date').first())
-    if last and last.date:
-        since = _loyverse_ts(last.date - timedelta(minutes=5))
+    # Drive the poll from ITS OWN persisted high-water mark, never from
+    # max(PURCHASE.date). The real-time webhook (LoyverseWebhookView) also inserts
+    # PURCHASE rows through the shared record path, so keying off the newest
+    # transaction would let a delivered webhook advance the cursor past receipts
+    # the poll never scanned — permanently skipping an older receipt whose webhook
+    # was lost (a never-debited wallet). ``last_purchases_cursor`` is advanced only
+    # by the poll below. A small look-back + idempotency guard the overlap window.
+    now = timezone.now()
+    state = LoyverseSyncState.load()
+    if state.last_purchases_cursor:
+        since = _loyverse_ts(state.last_purchases_cursor - timedelta(minutes=5))
     else:
         # FIRST RUN — must NOT backfill history. The opening balance was seeded
         # from Loyverse points, which ALREADY reflect every past purchase, so
         # replaying historical receipts would double-debit (spec R1). Start from
         # the configured go-live moment (CAFETERIA_SYNC_PURCHASES_SINCE), or now.
         since = (getattr(settings, 'CAFETERIA_SYNC_PURCHASES_SINCE', '') or '').strip() \
-            or _loyverse_ts(timezone.now())
+            or _loyverse_ts(now)
 
     receipts = get_receipts(since=since)
     result = record_receipts(receipts, students)
+
+    # Advance the poll's own cursor by the newest receipt IT fetched (clamped to
+    # now so a mis-stamped future date can't skip a window). The webhook never
+    # touches this, so a lost webhook is always re-scanned by a later poll.
+    newest = _newest_receipt_dt(receipts)
+    if newest is not None:
+        newest = min(newest, now)
+        if state.last_purchases_cursor is None or newest > state.last_purchases_cursor:
+            state.last_purchases_cursor = newest
+            state.save(update_fields=['last_purchases_cursor'])
 
     logger.info(
         f'sync_purchases: {len(receipts)} receipt(s) polled, {result["created"]} new, '

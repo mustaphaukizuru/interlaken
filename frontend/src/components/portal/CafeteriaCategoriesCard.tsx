@@ -3,6 +3,7 @@ import { Coffee } from 'lucide-react';
 import { cafeteriaApi } from '@/services/api';
 import { fmtMXN } from '@/lib/chartTheme';
 import { SectionEmpty } from '@/components/ui/SectionCard';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 interface CategoryRow { category: string; total: number; count: number; pct: number; }
 interface CategoriesResp { days: number; total: number; categories: CategoryRow[]; }
@@ -26,7 +27,7 @@ const styleFor = (c: string) => CATEGORY_STYLE[c] ?? CATEGORY_STYLE.Otros;
 export default function CafeteriaCategoriesCard({ student }: { student?: number | 'all' }) {
   const scoped = student && student !== 'all' ? student : undefined;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['cafeteria-spending-categories', 30, scoped ?? 'all'],
     queryFn: async () => (await cafeteriaApi.getSpendingCategories(30, scoped)).data as CategoriesResp,
     staleTime: 1000 * 60 * 5,
@@ -50,7 +51,11 @@ export default function CafeteriaCategoriesCard({ student }: { student?: number 
         )}
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="p-5">
+          <ErrorState onRetry={() => refetch()} />
+        </div>
+      ) : isLoading ? (
         <div className="space-y-3 p-5" aria-hidden="true">
           {[0, 1, 2].map((i) => <div key={i} className="skeleton h-9 rounded-lg" />)}
         </div>

@@ -5,6 +5,7 @@ signal, and the admin-only permission gate around balances / top-up application.
 No Loyverse HTTP call is ever made — the ``services.*`` helpers are patched.
 """
 
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -286,6 +287,33 @@ class TestSyncPurchases:
         result = services.sync_purchases()
         assert result["created"] == 1
         assert result["unmatched"] == 1
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_webhook_purchase_does_not_poison_poll_watermark(self, mock_receipts):
+        """A webhook-recorded newer purchase must NOT advance the poll's cursor,
+        or a lost webhook for an OLDER receipt would be permanently skipped by the
+        poll fallback. The poll drives from its own persisted cursor, not
+        max(PURCHASE.date)."""
+        student = StudentProfileFactory(loyverse_id="loy-buyer")
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("500"))
+
+        now = timezone.now()
+        t1 = now - timedelta(minutes=20)   # the poll's last scanned receipt
+        t2 = now - timedelta(minutes=2)    # a LATER purchase, via the webhook
+
+        # First poll scans a receipt at t1 → cursor advances to t1.
+        mock_receipts.return_value = [_receipt("loy-buyer", "R-poll", 10, date=t1.isoformat())]
+        services.sync_purchases()
+
+        # A webhook then records a NEWER purchase (t2) via the shared record path.
+        services.record_receipts([_receipt("loy-buyer", "R-web", 15, date=t2.isoformat())])
+
+        # Next poll must still key off the poll's own cursor (t1), NOT the webhook's
+        # newer purchase (t2) — otherwise an older lost-webhook receipt is skipped.
+        mock_receipts.return_value = []
+        services.sync_purchases()
+        _, kwargs = mock_receipts.call_args
+        assert kwargs["since"] == services._loyverse_ts(t1 - timedelta(minutes=5))
 
 
 class TestAdminPermissions:
@@ -662,3 +690,91 @@ class TestSpendingDigest:
         call_command("send_spending_digest", period="weekly")
         assert not Notification.objects.filter(
             title__startswith="Resumen de cafetería").exists()
+
+
+class TestReviewFixes:
+    """Regression tests for the adversarial-review findings on the cafetería diff."""
+
+    def test_low_balance_alert_claim_is_race_safe(self):
+        """Two concurrent record paths each hold a stale (None) balance row; the
+        atomic claim must let only ONE send the low-balance alert."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        cb = CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("20"), low_balance_threshold=Decimal("50"))
+        now = timezone.now()
+        # Two independent reads, both seeing last_low_balance_alert_at = None.
+        cb1 = CafeteriaBalance.objects.get(pk=cb.pk)
+        cb2 = CafeteriaBalance.objects.get(pk=cb.pk)
+        n1 = services._maybe_low_balance_alert(cb1, now)
+        n2 = services._maybe_low_balance_alert(cb2, now)
+        assert n1 > 0 and n2 == 0
+        assert Notification.objects.filter(
+            user=parent, title="Saldo bajo en cafetería").count() == 1
+
+    def test_budget_alert_claim_is_race_safe(self):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        cb = CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("500"), daily_spend_limit=Decimal("50"))
+        # A purchase today pushes spend over the daily cap.
+        CafeteriaTransaction.objects.create(
+            student=student, transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+            amount=Decimal("60"), date=timezone.now())
+        now = timezone.now()
+        cb1 = CafeteriaBalance.objects.get(pk=cb.pk)
+        cb2 = CafeteriaBalance.objects.get(pk=cb.pk)
+        n1 = services._maybe_budget_alert(cb1, now)
+        n2 = services._maybe_budget_alert(cb2, now)
+        assert n1 > 0 and n2 == 0
+        assert Notification.objects.filter(
+            user=parent, title="Límite de gasto alcanzado").count() == 1
+
+    def test_admin_balance_list_omits_spend(self, api_client):
+        """Admin wide balance list must keep today/week spend null (no per-row
+        aggregates) — the serializer's documented cheap-admin contract."""
+        student = StudentProfileFactory()
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.get(reverse("cafeteria-balance"))
+        assert resp.status_code == 200
+        assert all(row["today_spend"] is None and row["week_spend"] is None
+                   for row in resp.data)
+
+    def test_parent_balance_includes_spend(self, api_client):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("100"))
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-balance"))
+        assert resp.status_code == 200
+        assert resp.data[0]["today_spend"] is not None
+
+    def test_webhook_non_ascii_token_is_401_not_500(self, api_client, settings):
+        """A non-ASCII X-Webhook-Token must yield a clean 401, not a 500 from
+        hmac.compare_digest raising on non-ASCII str."""
+        settings.LOYVERSE_WEBHOOK_SECRET = "s3cr3t"
+        resp = api_client.post(
+            reverse("cafeteria-loyverse-webhook"), {"receipts": []},
+            format="json", HTTP_X_WEBHOOK_TOKEN="\xf1\xf1\xf1")
+        assert resp.status_code == 401
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_categories_reconcile_with_null_line_totals(self, mock_receipts, api_client):
+        """A receipt whose line items carry no total_money still counts its full
+        amount (shortfall → 'Otros'), so the category total matches spend."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("500"))
+        mock_receipts.return_value = [
+            _recent_receipt("loy-buyer", "R-1", 50, line_items=[
+                {"item_name": "Combo del día", "quantity": 1},  # no total_money
+            ]),
+        ]
+        services.sync_purchases()
+        api_client.force_authenticate(user=parent)
+        resp = api_client.get(reverse("cafeteria-spending-categories"))
+        assert resp.status_code == 200
+        assert resp.data["total"] == 50.0
+        by_cat = {c["category"]: c["total"] for c in resp.data["categories"]}
+        assert by_cat.get("Otros") == 50.0
