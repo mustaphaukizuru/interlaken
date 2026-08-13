@@ -104,6 +104,7 @@ class Command(BaseCommand):
         if result['created'] or not quiet:
             self.stdout.write(self.style.SUCCESS(
                 f"Purchases: {result['receipts']} receipt(s) polled, "
-                f"{result['created']} new, {result['notified']} notification(s) "
+                f"{result['created']} new, {result['notified']} notification(s), "
+                f"{result['unmatched']} unmatched, {result['skipped']} no-wallet "
                 f"across {result['students']} linked student(s)."
             ))

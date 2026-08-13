@@ -221,14 +221,39 @@ def categorize_item(name: str) -> str:
     return CATEGORY_OTHER
 
 
+def _points_spent(receipt: dict) -> Decimal:
+    """MXN charged to the prepaid wallet on one receipt.
+
+    The school POS charges the wallet through Loyverse's *points redemption*,
+    which lands on receipts as a receipt-level ``DISCOUNT_BY_POINTS`` entry in
+    ``total_discounts`` (in MXN — 1 point == $1, the same 1:1 mapping the
+    opening-balance seed uses). ``total_money`` on such receipts is 0: it is
+    the cash/card portion and must NEVER debit the wallet (a kid paying cash
+    would otherwise drain a wallet they didn't use). Some Loyverse flows
+    report the redemption in ``points_deducted`` instead, so take the MAX of
+    the two — never the sum — so a receipt carrying the same redemption in
+    both fields can't double-debit (spec R1: prefer under- to over-counting).
+    ``points_earned`` (cashback, 0 in this store) is subtracted, clamped at 0.
+    """
+    discounts = Decimal('0')
+    for d in receipt.get('total_discounts') or []:
+        if (d.get('type') or '').upper() == 'DISCOUNT_BY_POINTS':
+            discounts += _to_decimal(d.get('money_amount')).copy_abs()
+    deducted = _to_decimal(receipt.get('points_deducted')).copy_abs()
+    earned = _to_decimal(receipt.get('points_earned')).copy_abs()
+    return max(max(discounts, deducted) - earned, Decimal('0'))
+
+
 def _parse_receipt(receipt: dict):
     """Normalise a Loyverse receipt into the pieces a transaction needs.
 
-    Returns ``(amount, items, summary, is_refund, date)`` where ``amount`` is the
-    absolute total (MXN), ``items`` is a JSON-friendly list of line items and
-    ``summary`` is a short human string for the notification / description.
+    Returns ``(amount, items, summary, is_refund, date)`` where ``amount`` is
+    the wallet movement in MXN (the points portion — see ``_points_spent``;
+    NOT ``total_money``, which is the cash/card portion), ``items`` is a
+    JSON-friendly list of line items and ``summary`` is a short human string
+    for the notification / description.
     """
-    amount = _to_decimal(receipt.get('total_money')).copy_abs()
+    amount = _points_spent(receipt)
     is_refund = (receipt.get('receipt_type') or 'SALE').upper() == 'REFUND'
 
     items, parts = [], []
@@ -240,11 +265,24 @@ def _parse_receipt(receipt: dict):
             qty = int(qty) if qty.is_integer() else qty
         except (TypeError, ValueError):
             qty = raw_qty
+        # A line's economic value = money paid + points paid. On a points sale
+        # the line's total_money is 0 and the spend sits in a line-level
+        # DISCOUNT_BY_POINTS entry — without adding it back, every line would
+        # aggregate as $0 and the category donut would collapse into "Otros"
+        # (promo discounts are NOT added back: those reduce real value).
         total = li.get('total_money')
+        line_points = Decimal('0')
+        for d in li.get('line_discounts') or []:
+            if (d.get('type') or '').upper() == 'DISCOUNT_BY_POINTS':
+                line_points += _to_decimal(d.get('money_amount')).copy_abs()
+        if total is None and not line_points:
+            value = None   # unknown line total → shortfall handling downstream
+        else:
+            value = _to_decimal(total) + line_points
         items.append({
             'name': name,
             'quantity': qty,
-            'total': str(_to_decimal(total)) if total is not None else None,
+            'total': str(value) if value is not None else None,
             'category': categorize_item(name),
         })
         parts.append(f'{qty}× {name}' if qty not in (1, '1') else name)
@@ -471,9 +509,12 @@ def record_receipts(receipts, students=None):
     Shared by the ``sync_purchases`` cron and the real-time Loyverse webhook
     (``LoyverseWebhookView``). Idempotent — each receipt maps to a unique
     ``loyverse_receipt_id`` — so a webhook delivery that overlaps the poll, or a
-    webhook retry, is a no-op. For every newly recorded purchase it fires the
+    webhook retry, is a no-op. Receipts with no wallet movement (pure cash/card
+    sales — ``_points_spent`` == 0) are skipped entirely: no ledger row, no
+    "$0.00" notification. For every newly recorded purchase it fires the
     per-purchase parent alert (unless digest mode is on), a low-balance alert and
-    a budget/overspend alert. Returns ``{'created', 'notified', 'unmatched'}``.
+    a budget/overspend alert. Returns
+    ``{'created', 'notified', 'unmatched', 'skipped'}``.
     """
     from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
 
@@ -482,12 +523,20 @@ def record_receipts(receipts, students=None):
     now = timezone.now()
     per_purchase_notify = not getattr(settings, 'CAFETERIA_PURCHASE_DIGEST', False)
 
-    created = notified = unmatched = 0
+    created = notified = unmatched = skipped = 0
     for receipt in receipts or []:
         customer_id = receipt.get('customer_id')
         student = students.get(customer_id) if customer_id else None
         if student is None:
             unmatched += 1
+            continue
+
+        if _points_spent(receipt) == 0:
+            # Cash/card sale merely *attached* to the student (or a zero-point
+            # refund): the wallet didn't move, so recording it would fabricate
+            # a $0 purchase and spam parents. Visible in the summary so a POS
+            # flow change (wallet charged some other way) can't hide silently.
+            skipped += 1
             continue
 
         tx = _record_receipt(student, receipt)
@@ -503,7 +552,8 @@ def record_receipts(receipts, students=None):
             notified += _maybe_low_balance_alert(cb, now)
             notified += _maybe_budget_alert(cb, now)
 
-    return {'created': created, 'notified': notified, 'unmatched': unmatched}
+    return {'created': created, 'notified': notified, 'unmatched': unmatched,
+            'skipped': skipped}
 
 
 def _newest_receipt_dt(receipts):
@@ -534,7 +584,8 @@ def sync_purchases():
     students = _students_by_loyverse_id()
     if not students:
         logger.info('sync_purchases: no students with a Loyverse id — nothing to do.')
-        return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0, 'unmatched': 0}
+        return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0,
+                'unmatched': 0, 'skipped': 0}
 
     # Drive the poll from ITS OWN persisted high-water mark, never from
     # max(PURCHASE.date). The real-time webhook (LoyverseWebhookView) also inserts
@@ -570,7 +621,8 @@ def sync_purchases():
 
     logger.info(
         f'sync_purchases: {len(receipts)} receipt(s) polled, {result["created"]} new, '
-        f'{result["notified"]} notification(s) sent, {result["unmatched"]} unmatched.'
+        f'{result["notified"]} notification(s) sent, {result["unmatched"]} unmatched, '
+        f'{result["skipped"]} skipped (no wallet movement).'
     )
     return {'students': len(students), 'receipts': len(receipts), **result}
 
@@ -944,13 +996,20 @@ def _notify_balance_change(student, title, message):
     return notified
 
 
-def adjust_balance(student, amount, reason: str, admin=None):
+def adjust_balance(student, amount, reason: str, admin=None, *,
+                   notify=True, mirror=True):
     """Apply an audited manual credit/debit to a student's cafeteria balance.
 
     ``amount`` is a signed ``Decimal`` (positive = credit, negative = debit). This
     atomically updates the local ledger, records an ``ADJUSTMENT``
     ``CafeteriaTransaction`` (with running ``balance_after``) and a
     ``BalanceAdjustment`` audit row, then notifies the guardians (outside the lock).
+
+    ``notify=False`` skips the guardian notification and ``mirror=False`` skips
+    the best-effort Loyverse points push — both are used by the
+    ``repair_wallet_ledger`` reconcile, where the local ledger is being SET TO
+    Loyverse's value (mirroring back is pointless and a roster-wide adjustment
+    blast would spam every family).
 
     Returns the created ``BalanceAdjustment``. Raises ``ValueError`` on a zero
     amount or a debit that would overdraw the balance below zero.
@@ -1005,7 +1064,7 @@ def adjust_balance(student, amount, reason: str, admin=None):
         )
 
     # Best-effort remote mirror (R1: expected no-op on the current Loyverse plan).
-    if student.loyverse_id:
+    if mirror and student.loyverse_id:
         try:
             with _session() as session:
                 resp = session.post(
@@ -1017,14 +1076,15 @@ def adjust_balance(student, amount, reason: str, admin=None):
         except requests.RequestException as e:
             logger.warning(f'Loyverse mirror after adjustment skipped for {student}: {e}')
 
-    verb = 'acreditaron' if amount > 0 else 'descontaron'
-    _notify_balance_change(
-        student,
-        'Ajuste de saldo en cafetería',
-        (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
-         f'{student.user.full_name}. Motivo: {reason}. '
-         f'Saldo actual: ${cb.balance:.2f}.'),
-    )
+    if notify:
+        verb = 'acreditaron' if amount > 0 else 'descontaron'
+        _notify_balance_change(
+            student,
+            'Ajuste de saldo en cafetería',
+            (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
+             f'{student.user.full_name}. Motivo: {reason}. '
+             f'Saldo actual: ${cb.balance:.2f}.'),
+        )
     logger.info(f'Balance adjustment ${amount} for {student} by {admin} — reason: {reason!r}')
     return adj
 

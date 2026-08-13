@@ -466,6 +466,11 @@ class MyLoyverseHistoryView(APIView):
             if cid and cid != student.loyverse_id:
                 continue
             amount, items, summary, is_refund, date = _parse_receipt(r)
+            # ``amount`` is the wallet (points) portion — for a pure cash/card
+            # sale it is 0, so fall back to the money total for display.
+            if not amount:
+                from .services import _to_decimal
+                amount = _to_decimal(r.get('total_money')).copy_abs()
             receipts.append({
                 'receipt_number': r.get('receipt_number'),
                 'date': date.isoformat() if date else None,

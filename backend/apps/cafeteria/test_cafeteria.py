@@ -24,13 +24,24 @@ pytestmark = pytest.mark.django_db
 
 
 def _receipt(customer_id, number, total, *, receipt_type="SALE", line_items=None,
-             date="2026-07-01T12:00:00.000Z"):
-    """Build a minimal Loyverse receipt payload matching ``_parse_receipt``."""
+             date="2026-07-01T12:00:00.000Z", cash=0, points_deducted=0,
+             points_earned=0):
+    """Build a Loyverse receipt payload matching the store's REAL shape.
+
+    The school POS charges the wallet via points redemption, so ``total`` (the
+    wallet spend) lands in a receipt-level ``DISCOUNT_BY_POINTS`` entry and
+    ``total_money`` carries only the cash/card portion (``cash``, usually 0).
+    """
+    discounts = ([{"type": "DISCOUNT_BY_POINTS", "name": "Discount by points",
+                   "money_amount": total}] if total else [])
     return {
         "customer_id": customer_id,
         "receipt_number": number,
         "receipt_type": receipt_type,
-        "total_money": total,
+        "total_money": cash,
+        "total_discounts": discounts,
+        "points_deducted": points_deducted,
+        "points_earned": points_earned,
         "receipt_date": date,
         "line_items": line_items or [],
     }
@@ -271,7 +282,8 @@ class TestSyncPurchases:
         StudentProfileFactory(loyverse_id="")  # not linked to Loyverse
         result = services.sync_purchases()
         assert result == {
-            "students": 0, "receipts": 0, "created": 0, "notified": 0, "unmatched": 0}
+            "students": 0, "receipts": 0, "created": 0, "notified": 0,
+            "unmatched": 0, "skipped": 0}
         mock_receipts.assert_not_called()
 
     @patch("apps.cafeteria.services.get_receipts")
@@ -908,3 +920,192 @@ class TestLoyverseReadOnlyHistory:
         assert resp.status_code == 200
         assert resp.data["receipts"] == []
         assert resp.data.get("error") == "loyverse_unreachable"
+
+
+class TestPointsWalletExtraction:
+    """Bug fix 2026-08-13: the store charges the wallet via Loyverse points
+    redemption (receipt-level ``DISCOUNT_BY_POINTS``), so ``total_money`` is
+    only the cash/card portion. The old code debited ``total_money`` — points
+    sales recorded $0.00, wallets never decreased, parents got "$0.00" alerts.
+    """
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_real_store_receipt_debits_points_not_total_money(self, mock_receipts):
+        """Trimmed copy of live receipt 3-1023: $10 'Agua sabor' fully paid by
+        points → total_money 0, DISCOUNT_BY_POINTS 10. Must debit $10."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-real", parents=[parent])
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("100"), last_synced=timezone.now())
+        mock_receipts.return_value = [{
+            "receipt_number": "3-1023",
+            "receipt_type": "SALE",
+            "receipt_date": "2026-08-12T22:42:08.000Z",
+            "total_money": 0.0,
+            "points_earned": 0.0,
+            "points_deducted": 0.0,
+            "points_balance": 5575.0,
+            "customer_id": "loy-real",
+            "total_discount": 10.0,
+            "total_discounts": [
+                {"type": "DISCOUNT_BY_POINTS", "name": "Discount by points",
+                 "money_amount": 10.0},
+            ],
+            "line_items": [
+                {"item_name": "Agua sabor", "variant_name": "Chica",
+                 "quantity": 1, "price": 10.0, "gross_total_money": 10.0,
+                 "total_money": 0.0, "total_discount": 10.0,
+                 "line_discounts": [
+                     {"type": "DISCOUNT_BY_POINTS", "name": "Discount by points",
+                      "money_amount": 10.0},
+                 ]},
+            ],
+            "payments": [{"name": "Efectivo", "type": "CASH", "money_amount": 0.0}],
+        }]
+
+        result = services.sync_purchases()
+
+        assert result["created"] == 1
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="3-1023")
+        assert tx.amount == Decimal("10")
+        assert tx.balance_after == Decimal("90")
+        # Line value = money + points paid, so the category donut doesn't
+        # collapse into "Otros" on points sales (line total_money is 0).
+        assert Decimal(tx.items[0]["total"]) == Decimal("10")
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("90")
+        note = Notification.objects.get(user=parent)
+        assert "$10.00" in note.message
+        assert "$0.00" not in note.message
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_cash_only_receipt_is_skipped_entirely(self, mock_receipts):
+        """A cash sale merely attached to the student must not touch the wallet,
+        create a ledger row, or notify — and is counted as skipped."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-cash", parents=[parent])
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("100"), last_synced=timezone.now())
+        mock_receipts.return_value = [_receipt("loy-cash", "R-cash", 0, cash=30)]
+
+        result = services.sync_purchases()
+
+        assert result["created"] == 0
+        assert result["skipped"] == 1
+        assert CafeteriaTransaction.objects.count() == 0
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("100")
+        assert Notification.objects.filter(user=parent).count() == 0
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_partial_points_plus_cash_debits_only_points(self, mock_receipts):
+        student = StudentProfileFactory(loyverse_id="loy-mix")
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("50"), last_synced=timezone.now())
+        mock_receipts.return_value = [_receipt("loy-mix", "R-mix", 10, cash=15)]
+
+        services.sync_purchases()
+
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="R-mix")
+        assert tx.amount == Decimal("10")
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("40")
+
+    def test_points_deducted_and_discount_do_not_double_debit(self):
+        """Some Loyverse flows report the redemption in ``points_deducted`` —
+        if BOTH carry it, take the max, never the sum (R1: no double-count)."""
+        r = _receipt("c", "R-both", 10, points_deducted=10)
+        amount, *_ = services._parse_receipt(r)
+        assert amount == Decimal("10")
+
+    def test_points_deducted_alone_debits(self):
+        r = _receipt("c", "R-pd", 0, points_deducted=12)
+        amount, *_ = services._parse_receipt(r)
+        assert amount == Decimal("12")
+
+    def test_points_earned_reduces_debit_clamped_at_zero(self):
+        r = _receipt("c", "R-earn", 10, points_earned=25)
+        amount, *_ = services._parse_receipt(r)
+        assert amount == Decimal("0")
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_refund_with_points_credits_wallet(self, mock_receipts):
+        student = StudentProfileFactory(loyverse_id="loy-ref")
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("90"), last_synced=timezone.now())
+        mock_receipts.return_value = [
+            _receipt("loy-ref", "R-refund", 10, receipt_type="REFUND")]
+
+        services.sync_purchases()
+
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="R-refund")
+        assert tx.transaction_type == CafeteriaTransaction.TxType.REFUND
+        assert tx.amount == Decimal("10")
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("100")
+
+
+class TestRepairWalletLedger:
+    """One-time repair command for the points-debit bug: re-price $0 rows and
+    reconcile drifted balances to Loyverse total_points."""
+
+    _CMD = "apps.cafeteria.management.commands.repair_wallet_ledger"
+
+    @patch(f"{_CMD}.get_all_customers")
+    @patch(f"{_CMD}.get_receipts")
+    def test_apply_reprices_zero_rows_and_reconciles(self, mock_receipts, mock_customers):
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-fix", parents=[parent])
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("5768"), last_synced=timezone.now())
+        # A $0 row recorded by the old code for a points-paid receipt.
+        CafeteriaTransaction.objects.create(
+            student=student,
+            transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+            amount=Decimal("0"), loyverse_receipt_id="3-1023",
+            date=timezone.now() - timedelta(days=1), balance_after=Decimal("5768"),
+        )
+        mock_receipts.return_value = [_receipt("loy-fix", "3-1023", 10)]
+        mock_customers.return_value = [{"id": "loy-fix", "total_points": 5575}]
+
+        call_command("repair_wallet_ledger", "--apply")
+
+        tx = CafeteriaTransaction.objects.get(loyverse_receipt_id="3-1023")
+        assert tx.amount == Decimal("10")          # history re-priced…
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert cb.balance == Decimal("5575")       # …and balance = Loyverse points
+        adj = CafeteriaTransaction.objects.get(
+            transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT)
+        assert adj.balance_after == Decimal("5575")
+        # Silent repair: reconcile must NOT blast guardians with notifications.
+        assert Notification.objects.filter(user=parent).count() == 0
+
+    @patch(f"{_CMD}.get_all_customers")
+    @patch(f"{_CMD}.get_receipts")
+    def test_dry_run_changes_nothing(self, mock_receipts, mock_customers):
+        student = StudentProfileFactory(loyverse_id="loy-dry")
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("100"), last_synced=timezone.now())
+        mock_receipts.return_value = []
+        mock_customers.return_value = [{"id": "loy-dry", "total_points": 60}]
+
+        call_command("repair_wallet_ledger")   # no --apply
+
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("100")
+        assert CafeteriaTransaction.objects.count() == 0
+
+    @patch(f"{_CMD}.get_all_customers")
+    @patch(f"{_CMD}.get_receipts")
+    def test_pending_pos_topup_is_skipped(self, mock_receipts, mock_customers):
+        """A completed online top-up not yet loaded into the POS means the local
+        ledger legitimately leads Loyverse — reconciling would erase real money."""
+        student = StudentProfileFactory(loyverse_id="loy-pend")
+        CafeteriaBalance.objects.create(
+            student=student, balance=Decimal("300"), last_synced=timezone.now())
+        TopUpRequest.objects.create(
+            student=student, amount=Decimal("200"),
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED, pos_loaded_at=None,
+        )
+        mock_receipts.return_value = []
+        mock_customers.return_value = [{"id": "loy-pend", "total_points": 100}]
+
+        call_command("repair_wallet_ledger", "--apply")
+
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal("300")
