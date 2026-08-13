@@ -25,6 +25,10 @@ WORKDIR /app/backend
 COPY backend/requirements.txt ./
 # libpq5 is the only native runtime dep (psycopg2). The MySQL toolchain that
 # used to be installed here just to compile mysqlclient is gone with the driver.
+# There is now NO C compiler in this image: every dependency must ship a
+# manylinux wheel (cryptography, Pillow, psycopg2-binary do) or be pure Python
+# (http-ece, the one sdist, is). Adding a dependency that compiles C means
+# re-adding build-essential here, or the Render build fails.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpq5 \
  && pip install -r requirements.txt \
