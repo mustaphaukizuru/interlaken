@@ -23,14 +23,15 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app/backend
 
 COPY backend/requirements.txt ./
-# libpq5 stays (psycopg2 runtime). build-essential + libmysqlclient-dev are only
-# needed to COMPILE the mysqlclient wheel — the Render deploy runs on Postgres so
-# MySQLdb is never imported at runtime — so purge them after to keep the image lean.
+# libpq5 is the only native runtime dep (psycopg2). The MySQL toolchain that
+# used to be installed here just to compile mysqlclient is gone with the driver.
+# There is now NO C compiler in this image: every dependency must ship a
+# manylinux wheel (cryptography, Pillow, psycopg2-binary do) or be pure Python
+# (http-ece, the one sdist, is). Adding a dependency that compiles C means
+# re-adding build-essential here, or the Render build fails.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      libpq5 build-essential default-libmysqlclient-dev pkg-config \
+ && apt-get install -y --no-install-recommends libpq5 \
  && pip install -r requirements.txt \
- && apt-get purge -y --auto-remove build-essential default-libmysqlclient-dev pkg-config \
  && rm -rf /var/lib/apt/lists/*
 
 COPY backend/ ./

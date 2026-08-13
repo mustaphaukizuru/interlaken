@@ -10,13 +10,8 @@ drf-spectacular==0.30.0
 # social-auth-core 5.x requires cryptography>=46.0.7.
 cryptography==50.0.0
 
-# Database
-mysqlclient==2.2.8
-# Pure-Python MySQL driver installed as MySQLdb in config/__init__.py — the
-# actual runtime driver on cPanel and in CI (no libmysqlclient build needed).
-PyMySQL==1.2.0
-# PostgreSQL driver — the Render + Supabase free-tier deploy sets
-# DB_ENGINE=django.db.backends.postgresql.
+# Database — Postgres only (Render + Supabase in production, SQLite locally).
+# The MySQL drivers the cPanel host needed are gone; nothing imports MySQLdb.
 psycopg2-binary==2.9.12
 
 # Auth
