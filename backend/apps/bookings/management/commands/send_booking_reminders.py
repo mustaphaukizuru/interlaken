@@ -6,7 +6,7 @@ every family whose visit is TOMORROW and who hasn't been reminded yet.
     python manage.py send_booking_reminders --dry-run  # preview, send nothing
     python manage.py send_booking_reminders --date 2026-07-20   # specific day
 
-cPanel cron target (see DEPLOYMENT.md §3), suggested daily at 08:00. Idempotent:
+Scheduled by .github/workflows/scheduled-tasks.yml (daily). Idempotent:
 ``reminder_sent`` guards against a double-send, so re-running is safe. Only
 active bookings (pending/confirmed) are reminded — cancelled/attended/no-show
 are skipped.

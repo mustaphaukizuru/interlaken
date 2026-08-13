@@ -1,11 +1,12 @@
 """
 sync_purchases — poll Loyverse receipts → cafeteria transactions + parent alerts.
 
-cPanel cron target (see DEPLOYMENT.md §3), suggested every 5 minutes. Idempotent:
-each receipt maps to a unique ``CafeteriaTransaction`` so re-running never
-duplicates a purchase or re-notifies a parent. Loyverse/credential failures are
-logged and reported, not fatal, so cron never emails a traceback for a transient
-hiccup.
+Scheduled by .github/workflows/loyverse-sync.yml; the Loyverse webhook
+(LoyverseWebhookView) delivers the same receipts in real time, so this poll is
+the safety net rather than the primary path. Idempotent: each receipt maps to a
+unique ``CafeteriaTransaction`` so re-running never duplicates a purchase or
+re-notifies a parent. Loyverse/credential failures are logged and reported, not
+fatal, so a transient hiccup never fails the scheduled run.
 
 ``--watch`` loops in-process (dev/demo only — cron can't poll faster than 1 min):
 

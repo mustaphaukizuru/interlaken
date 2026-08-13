@@ -1,7 +1,7 @@
 """
 low_balance_alerts — notify parents whose child's cafeteria balance is low.
 
-cPanel cron target (see DEPLOYMENT.md §3), suggested daily at 07:00.
+Scheduled by .github/workflows/scheduled-tasks.yml (daily).
 
 Dedup: an alert is (re)sent only when the balance is low AND we haven't alerted
 within ``CAFETERIA_LOW_BALANCE_ALERT_COOLDOWN_DAYS`` (default 7). When a balance

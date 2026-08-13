@@ -9,7 +9,7 @@ by piggy-backing a self-throttled profile refresh — the heavy all-customers
 fetch runs at most ~once/day, so no separate cron entry is needed. Pass
 ``--no-profiles`` to skip it.
 
-cPanel cron target (see DEPLOYMENT.md §3), suggested every 10 minutes.
+Scheduled by .github/workflows/loyverse-sync.yml.
 Network/credential failures are counted, not fatal, so cron never emails a
 traceback for a transient Loyverse hiccup.
 """
