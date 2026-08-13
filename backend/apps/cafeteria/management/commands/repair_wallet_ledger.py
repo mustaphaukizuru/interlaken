@@ -26,8 +26,13 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 
 from apps.cafeteria.services import (
-    LoyverseError, _loyverse_ts, _points_spent, adjust_balance,
-    get_all_customers, get_balance_from_customer, get_receipts,
+    LoyverseError,
+    _loyverse_ts,
+    _points_spent,
+    adjust_balance,
+    get_all_customers,
+    get_balance_from_customer,
+    get_receipts,
 )
 
 
