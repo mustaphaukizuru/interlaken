@@ -29,12 +29,19 @@ def _test_settings(settings):
 
     * Rate limiting shares a process-wide cache across tests → disable it so
       repeated hits to login/webhook endpoints don't bleed into each other.
+      (RATELIMIT_ENABLE=False also disables the DRF SharedScopedRateThrottle.)
+    * The LocMem cache outlives each test's DB rollback → clear it so the
+      public micro-caches (availability, open-school, legal notice, settings)
+      never serve one test's data to the next.
     * Login lockout (django-axes) would trip on tests that intentionally send
       wrong credentials → disable globally; the dedicated lockout tests
       re-enable it with override_settings.
     * The manifest static-files storage raises on any missing asset; use the
       plain storage so views that render templates don't blow up in CI.
     """
+    from django.core.cache import cache
+
+    cache.clear()
     settings.RATELIMIT_ENABLE = False
     settings.AXES_ENABLED = False
     settings.STORAGES = {

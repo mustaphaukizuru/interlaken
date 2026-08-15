@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
 from apps.core.ratelimit import ratelimit
+from apps.core.throttling import SharedScopedRateThrottle
 
 from .models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from .serializers import (
@@ -435,7 +436,7 @@ class MyLoyverseHistoryView(APIView):
     """GET /api/v1/cafeteria/loyverse-history/?student=&limit= — READ-ONLY recent
     purchases pulled live from Loyverse for display only. It does NOT touch the
     local wallet ledger (the ledger records purchases from go-live forward; this
-    surfaces earlier history for the family). Cached ~10 min to spare the API and
+    surfaces earlier history for the family). Cached ~2 min to spare the API and
     fail-soft (returns an empty list if Loyverse is unreachable)."""
     permission_classes = [permissions.IsAuthenticated]
 
@@ -489,7 +490,7 @@ class MyLoyverseHistoryView(APIView):
                 'items': items,
             })
         result = {'linked': True, 'receipts': receipts}
-        cache.set(cache_key, result, 600)
+        cache.set(cache_key, result, 120)  # 600→120 (P7b audit): fresher for parents, still spares the Loyverse API
         return Response(result)
 
 
@@ -567,6 +568,10 @@ class TopUpRequestCreateView(generics.CreateAPIView):
     """
     serializer_class = TopUpRequestSerializer
     permission_classes = [IsParentOrAdmin]
+    # Per-user payment-initiation bound (shared scope with payments/finance);
+    # the ip decorator above stays as the cross-account per-IP backstop.
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'payment-initiate'
 
     def create(self, request, *args, **kwargs):
         from django.db import transaction

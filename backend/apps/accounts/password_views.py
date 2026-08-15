@@ -20,7 +20,9 @@ def _reset_link(user_id: int, raw: str) -> str:
     return f'{base}/restablecer-contrasena?uid={user_id}&token={raw}'
 
 
-@method_decorator(ratelimit('password-reset', '5/m', key='ip', method='POST'), name='dispatch')
+# 5/hour/IP: every request sends an email, so the window is deliberately long
+# (a genuine parent rarely needs more than a couple of reset mails an hour).
+@method_decorator(ratelimit('password-reset', '5/h', key='ip', method='POST'), name='dispatch')
 class PasswordResetRequestView(APIView):
     """POST /api/v1/accounts/password-reset/  {email}
 

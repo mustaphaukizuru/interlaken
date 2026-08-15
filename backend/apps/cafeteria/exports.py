@@ -179,10 +179,11 @@ def parent_family_statement_csv(parent) -> HttpResponse:
     writer.writerow(header)
 
     for student in students:
-        txns = (CafeteriaTransaction.objects
-                .filter(student=student)
-                .order_by('date'))
-        if not txns.exists():
+        # Materialise once: `.exists()` + iteration was two queries per student.
+        txns = list(CafeteriaTransaction.objects
+                    .filter(student=student)
+                    .order_by('date'))
+        if not txns:
             writer.writerow([
                 student.user.full_name, student.student_id,
                 '', '', '(Sin movimientos)', '', '',

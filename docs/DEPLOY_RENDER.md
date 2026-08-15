@@ -58,7 +58,9 @@ FRONTEND_URL=https://interlaken.onrender.com
 ```
 
 ## 5 · Verify
-- `https://<url>/api/v1/health/` → `{"status":"ok", ...}`
+- `https://<url>/healthz` → `{"status":"ok","db":true,"cache":true,...}` — this is
+  also the blueprint's `healthCheckPath`, so Render only routes traffic once DB +
+  cache answer. (`/api/v1/health/` still works for older monitors.)
 - `https://<url>/` → the app · `https://<url>/admin/` → log in as the superuser.
 - Then **delete the `DJANGO_SUPERUSER_*` env vars** (no longer needed).
 
@@ -85,6 +87,47 @@ then runs every 30 min (edit the cron in the workflow file).
 Google Cloud Console → your OAuth client → **add redirect URI**
 `https://<url>/auth/google/callback/`. Set in Render: `GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI=https://<url>/auth/google/callback/`.
+
+## 9 · Observability & hardening (all optional, no-op until set)
+
+**Sentry (backend)** — set in the Render service environment:
+
+| Var | Meaning |
+|---|---|
+| `SENTRY_DSN` | Enables the SDK. Unset (default) → Sentry is never even imported. |
+| `SENTRY_ENVIRONMENT` | Event environment tag. Falls back to `RENDER_ENV`, then `production`. |
+| `SENTRY_RELEASE` | Release tag. Falls back to `GIT_SHA`, then `RENDER_GIT_COMMIT` (Render sets this automatically — so on Render, releases work with zero config). |
+| `SENTRY_TRACES_SAMPLE_RATE` | Performance tracing sample rate, `0`–`1`. Default `0` (errors only). |
+
+PII is scrubbed in `before_send` (user email/name/IP, secret-looking headers and
+extras) and `send_default_pii=False`.
+
+**Sentry (frontend)** — *build-time* Vite vars (must be present when
+`npm run build` runs, i.e. passed as Docker build args if you want them):
+`VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_SENTRY_TRACES_SAMPLE_RATE`,
+`VITE_GIT_SHA` (release tag). Without `VITE_SENTRY_DSN` the bundle never
+initialises Sentry. Source-map upload (`SENTRY_AUTH_TOKEN` + the Sentry Vite
+plugin) is deliberately **not** wired into the Docker build; if you later want
+readable production stack traces, add `@sentry/vite-plugin` with
+`SENTRY_AUTH_TOKEN` as a build secret — until then, events arrive minified.
+
+**Logs** — production logs are JSON lines on stdout (Render's log stream), one
+object per record with `ts`, `level`, `logger`, `message` and `request_id`.
+Every response carries `X-Request-ID` (inbound ids from a proxy are propagated),
+so one request's log lines can be correlated. `LOG_LEVEL` (default `INFO`)
+adjusts verbosity.
+
+**Database** — `CONN_MAX_AGE` (default `60`): persistent connections, safe with
+the **session-mode** pooler on port 5432 used here. If you ever move to the
+transaction-mode pooler (port 6543), set `CONN_MAX_AGE=0` (and
+`DISABLE_SERVER_SIDE_CURSORS=True`) — transaction pooling breaks both.
+
+**Rate limiting** — abuse-prone endpoints are throttled (login 10/min/IP, reset
+5/h/IP, public forms 5/min/IP, booking 10/min/IP, payment initiation
+10/min/user). Counters live in a file cache shared across gunicorn workers;
+`RATELIMIT_CACHE_DIR` overrides its location (default `backend/.ratelimit-cache`).
+Payment/Loyverse webhooks are signature-verified and not throttled beyond the
+pre-existing generous per-IP ceiling, so a provider burst is never dropped.
 
 ## Limits to expect (free)
 - **Render free sleeps** after ~15 min idle → first hit is a ~30–60s cold start.

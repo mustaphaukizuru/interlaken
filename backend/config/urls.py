@@ -19,6 +19,11 @@ _docs_kwargs = {
 }
 
 urlpatterns = [
+    # Health probe at the ROOT (Render's healthCheckPath): no auth, one DB
+    # SELECT 1 + a cache round-trip. /api/v1/health/ below stays for existing
+    # monitors. Registered before the SPA catch-all so it never serves HTML.
+    path('healthz', HealthView.as_view(), name='healthz'),
+
     # Admin
     path('admin/', admin.site.urls),
 

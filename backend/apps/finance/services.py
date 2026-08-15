@@ -16,7 +16,7 @@ The critical money paths mirror the cafeteria pattern:
 """
 import calendar
 import logging
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -219,16 +219,18 @@ def apply_late_fees(as_of=None):
                                     'discount_total', 'late_fee_total', 'amount', 'updated_at'])
             overdue += 1
             if fee > 0:
-                fee_invoices.append(inv.pk)
+                # Keep the outer row (student__user already select_related) plus
+                # the post-fee balance from the locked copy — no per-invoice
+                # re-fetch in the notify pass below (P7b audit).
+                fee_invoices.append((invoice, inv.balance_due))
 
     # Best-effort notify parents that a late fee was applied (outside the locks).
     notified = 0
-    for pk in fee_invoices:
-        inv = Invoice.objects.select_related('student__user').get(pk=pk)
+    for inv, balance_due in fee_invoices:
         notified += _notify_invoice(
             inv, 'Recargo por colegiatura vencida',
             (f'Se aplicó un recargo por mora a la colegiatura de {_period_label(inv.period)} '
-             f'de {inv.student.user.full_name}. Saldo actual: ${inv.balance_due:.2f}. '
+             f'de {inv.student.user.full_name}. Saldo actual: ${balance_due:.2f}. '
              f'Le recomendamos pagar a la brevedad para evitar recargos adicionales.'))
 
     logger.info(f'apply_late_fees[{today}]: {overdue} marked overdue, {charged} fees, '
@@ -251,44 +253,55 @@ def send_payment_reminders(as_of=None):
     before_days = getattr(settings, 'TUITION_REMINDER_BEFORE_DAYS', 3)
     overdue_days = getattr(settings, 'TUITION_REMINDER_OVERDUE_DAYS', 1)
 
+    # Window + dedup filters pushed into SQL (P7b audit): the loops below only
+    # ever see rows that will actually be notified (barring the settled check),
+    # instead of iterating every unpaid invoice each cron tick. Per-row .save()
+    # is kept — it only runs for rows that were notified.
     unpaid = (Invoice.objects
               .filter(status__in=[Invoice.Status.PENDING, Invoice.Status.OVERDUE])
               .select_related('student__user'))
 
     before = overdue = 0
-    for invoice in unpaid:
+    before_pks = []
+
+    # Pre-due: 0 <= (due_date - today).days <= before_days, never reminded.
+    for invoice in unpaid.filter(reminder_before_sent_at__isnull=True,
+                                 due_date__gte=today,
+                                 due_date__lte=today + timedelta(days=before_days)):
         if invoice.is_settled:
             continue
-        days_to_due = (invoice.due_date - today).days
+        _notify_invoice(
+            invoice, 'Recordatorio de colegiatura',
+            (f'La colegiatura de {_period_label(invoice.period)} de '
+             f'{invoice.student.user.full_name} vence el '
+             f'{invoice.due_date.strftime("%d/%m/%Y")}. Monto: '
+             f'${invoice.balance_due:.2f}. Puede pagarla en línea desde el portal.'),
+            whatsapp=True)
+        invoice.reminder_before_sent_at = now
+        invoice.save(update_fields=['reminder_before_sent_at', 'updated_at'])
+        before += 1
+        before_pks.append(invoice.pk)
 
-        # Pre-due reminder: within the window and not yet reminded.
-        if (invoice.reminder_before_sent_at is None
-                and 0 <= days_to_due <= before_days):
-            _notify_invoice(
-                invoice, 'Recordatorio de colegiatura',
-                (f'La colegiatura de {_period_label(invoice.period)} de '
-                 f'{invoice.student.user.full_name} vence el '
-                 f'{invoice.due_date.strftime("%d/%m/%Y")}. Monto: '
-                 f'${invoice.balance_due:.2f}. Puede pagarla en línea desde el portal.'),
-                whatsapp=True)
-            invoice.reminder_before_sent_at = now
-            invoice.save(update_fields=['reminder_before_sent_at', 'updated_at'])
-            before += 1
+    # Overdue: (today - due_date).days >= overdue_days, never reminded. Excluding
+    # this run's pre-due rows preserves the old loop's `continue` semantics when
+    # both windows overlap (only possible with TUITION_REMINDER_OVERDUE_DAYS=0).
+    overdue_qs = unpaid.filter(reminder_overdue_sent_at__isnull=True,
+                               due_date__lte=today - timedelta(days=overdue_days))
+    if before_pks:
+        overdue_qs = overdue_qs.exclude(pk__in=before_pks)
+    for invoice in overdue_qs:
+        if invoice.is_settled:
             continue
-
-        # Overdue reminder: past due by the configured margin and not yet reminded.
-        if (invoice.reminder_overdue_sent_at is None
-                and -days_to_due >= overdue_days):
-            _notify_invoice(
-                invoice, 'Colegiatura vencida',
-                (f'La colegiatura de {_period_label(invoice.period)} de '
-                 f'{invoice.student.user.full_name} venció el '
-                 f'{invoice.due_date.strftime("%d/%m/%Y")} y presenta un saldo de '
-                 f'${invoice.balance_due:.2f}. Le pedimos regularizar su pago.'),
-                whatsapp=True)
-            invoice.reminder_overdue_sent_at = now
-            invoice.save(update_fields=['reminder_overdue_sent_at', 'updated_at'])
-            overdue += 1
+        _notify_invoice(
+            invoice, 'Colegiatura vencida',
+            (f'La colegiatura de {_period_label(invoice.period)} de '
+             f'{invoice.student.user.full_name} venció el '
+             f'{invoice.due_date.strftime("%d/%m/%Y")} y presenta un saldo de '
+             f'${invoice.balance_due:.2f}. Le pedimos regularizar su pago.'),
+            whatsapp=True)
+        invoice.reminder_overdue_sent_at = now
+        invoice.save(update_fields=['reminder_overdue_sent_at', 'updated_at'])
+        overdue += 1
 
     logger.info(f'send_payment_reminders[{today}]: {before} pre-due, {overdue} overdue.')
     return {'before': before, 'overdue': overdue}

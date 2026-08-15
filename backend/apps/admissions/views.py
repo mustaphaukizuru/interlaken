@@ -512,18 +512,29 @@ class OpenSchoolDayListView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
+    # TTL-only public micro-cache (P7b) — same rationale as bookings
+    # AvailabilityView: 1-query already, ≤60s staleness is capacity-safe.
+    CACHE_KEY = 'admissions:open-school-list'
+    CACHE_TTL = 60
+
     def get(self, request):
-        today = timezone.localdate()  # school-local day, not the UTC date
-        now = timezone.now()
-        slots = [
-            s for s in AvailabilitySlot.annotate_booked(
-                AvailabilitySlot.objects.filter(
-                    visit_type=VisitType.OPEN_CLASS, is_active=True, date__gte=today,
-                ).order_by('date', 'start_time'))
-            if not s.is_full
-            and timezone.make_aware(datetime.combine(s.date, s.start_time)) >= now
-        ]
-        return Response(OpenClassEventSerializer(slots, many=True).data)
+        from django.core.cache import cache
+
+        data = cache.get(self.CACHE_KEY)
+        if data is None:
+            today = timezone.localdate()  # school-local day, not the UTC date
+            now = timezone.now()
+            slots = [
+                s for s in AvailabilitySlot.annotate_booked(
+                    AvailabilitySlot.objects.filter(
+                        visit_type=VisitType.OPEN_CLASS, is_active=True, date__gte=today,
+                    ).order_by('date', 'start_time'))
+                if not s.is_full
+                and timezone.make_aware(datetime.combine(s.date, s.start_time)) >= now
+            ]
+            data = OpenClassEventSerializer(slots, many=True).data
+            cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
+        return Response(data)
 
 
 @method_decorator(ratelimit('booking-create', '10/m', method='POST'), name='dispatch')

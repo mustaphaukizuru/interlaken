@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.throttling import SharedScopedRateThrottle
 
 from . import services
 from .models import Discount, FeeSchedule, Invoice
@@ -129,6 +130,9 @@ class InvoicePayView(APIView):
     The balance is only settled later, by the verified webhook.
     """
     permission_classes = [permissions.IsAuthenticated]
+    # Per-user payment-initiation bound (shared scope with payments/cafeteria).
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'payment-initiate'
 
     def post(self, request, pk):
         invoice = get_object_or_404(
