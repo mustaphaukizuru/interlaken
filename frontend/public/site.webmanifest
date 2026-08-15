@@ -3,10 +3,10 @@
   "short_name": "Interlaken",
   "description": "Portal de Colegio Interlaken — educación bilingüe de excelencia en Tlalnepantla, Estado de México.",
   "lang": "es-MX",
-  "start_url": "/",
+  "start_url": "/portal",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#F5F4FA",
   "theme_color": "#401a8e",
   "icons": [
     {

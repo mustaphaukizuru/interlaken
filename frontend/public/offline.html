@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#401a8e" />
+  <title>Sin conexión — Colegio Interlaken</title>
+  <!--
+    Offline navigation fallback, served from the service worker's precache when
+    a navigation fails (no network and no cached copy of the page). Fully
+    self-contained: system fonts, inline styles, no scripts (CSP: script-src
+    'self' — a retry is just a link back to the same URL). Brand tokens mirror
+    tailwind.config.js (cream/ink/purple/green/coral).
+  -->
+  <style>
+    :root {
+      --cream: #F5F4FA;
+      --ink: #1A1130;
+      --muted: #6E6885;
+      --purple: #401a8e;
+      --purple-light: #ede8f7;
+      --green: #47a028;
+      --green-strong: #38801e;
+      --coral: #dd2622;
+      --line: #ECEAF3;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      padding: 24px;
+      text-align: center;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10);
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+    }
+    .logo { width: 72px; height: 72px; margin: 0 auto 20px; display: block; }
+    h1 {
+      font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    h1 span { color: var(--purple); }
+    p { font-size: 0.95rem; line-height: 1.55; color: var(--muted); margin-bottom: 24px; }
+    .actions { display: flex; flex-direction: column; gap: 10px; }
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 22px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+    }
+    a.retry { background: var(--green-strong); color: #ffffff; }
+    a.retry:hover, a.retry:focus-visible { background: var(--green); }
+    a.home { border: 1.5px solid var(--purple); color: var(--purple); background: transparent; }
+    a.home:hover, a.home:focus-visible { background: var(--purple-light); }
+    a:focus-visible { outline: 3px solid rgba(64,26,142,0.4); outline-offset: 2px; }
+    .rule { width: 48px; height: 3px; border-radius: 2px; background: var(--coral); margin: 0 auto 18px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/icon-192.png" alt="" width="72" height="72" />
+    <div class="rule" aria-hidden="true"></div>
+    <h1>Sin conexión a <span>internet</span></h1>
+    <p>
+      No pudimos cargar esta página. Verifique su conexión Wi-Fi o de datos
+      móviles e intente de nuevo. Cuando la conexión regrese, el portal se
+      mostrará normalmente.
+    </p>
+    <div class="actions">
+      <a class="btn retry" href="">Reintentar</a>
+      <a class="btn home" href="/portal">Ir al portal</a>
+    </div>
+  </main>
+</body>
+</html>

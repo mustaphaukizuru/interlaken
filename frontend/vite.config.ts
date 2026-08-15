@@ -13,6 +13,13 @@ export default defineConfig(({ command }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // The SPA is built with base '/static/' but pages live at the web ROOT
+      // (whitenoise serves dist/ at '/', Django's catch-all renders index.html).
+      // Register the SW at /sw.js with scope '/' — with the default (vite base)
+      // it would register at /static/sw.js and never control navigations, so
+      // offline fallback and notificationclick client.navigate() wouldn't work.
+      base: '/',
+      scope: '/',
       // Reuse the curated public/site.webmanifest (already linked in index.html)
       // instead of generating a second manifest.
       manifest: false,
@@ -23,16 +30,70 @@ export default defineConfig(({ command }) => ({
         'robots.txt',
       ],
       workbox: {
-        // Precache the app shell only; campus photos (.webp) are runtime-cached
-        // on demand (see runtimeCaching below) to keep the install lightweight.
+        // Precache the app shell (+ offline.html); campus photos (.webp) are
+        // runtime-cached on demand (see runtimeCaching) to keep the install light.
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}', 'icon-*.png', 'favicon.ico', 'apple-touch-icon.png', 'og-image.png'],
+        // index.html references hashed assets at /static/assets/* (vite base),
+        // so precache them under that URL — a bare 'assets/…' entry would never
+        // match the browser's actual requests and the shell would break offline.
+        modifyURLPrefix: { 'assets/': '/static/assets/' },
         // Push/notificationclick handlers live in public/push-sw.js so generateSW
         // stays simple (GO-LIVE-AUDIT #15).
         importScripts: ['push-sw.js'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/admin/],
         cleanupOutdatedCaches: true,
+        // First matching route wins — keep money/health NetworkOnly ABOVE the
+        // generic API route. Routes register for GET only (Workbox default), so
+        // POST/PUT/DELETE are never cached or served from cache.
         runtimeCaching: [
+          {
+            // Money + health endpoints must never be served stale: no fallback
+            // cache at all. (Payments, cafetería balance, health probe.)
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/api/v1/payments') ||
+              url.pathname.startsWith('/api/v1/cafeteria/balance') ||
+              url.pathname === '/healthz',
+            handler: 'NetworkOnly',
+          },
+          {
+            // App navigations (mirrors the Django SPA catch-all exclusions):
+            // fresh HTML when online, cached copy when the network is slow/down
+            // (3s timeout also masks Render free-tier cold starts), and the
+            // branded es-MX offline page when nothing is cached.
+            urlPattern: ({ request, url }) =>
+              request.mode === 'navigate' &&
+              !/^\/(api|admin|auth|static|media)\//.test(url.pathname) &&
+              url.pathname !== '/healthz',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 24, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [200] },
+              precacheFallback: { fallbackURL: '/offline.html' },
+            },
+          },
+          {
+            // Other API GETs — network-first with a short-lived fallback cache
+            // so the portal shows recent data during brief offline windows.
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 5 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Campus imagery — hashed/immutable-ish: cache-first, capped.
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images',
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             // Google Fonts stylesheet + files.
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
@@ -41,15 +102,6 @@ export default defineConfig(({ command }) => ({
               cacheName: 'google-fonts',
               expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // Campus imagery — serve fast, refresh in the background.
-            urlPattern: ({ request }) => request.destination === 'image',
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'images',
-              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
         ],

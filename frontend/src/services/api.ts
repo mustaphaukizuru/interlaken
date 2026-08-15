@@ -555,8 +555,10 @@ export const portalApi = {
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
-  adminCreateAnnouncement: (data: { title: string; body: string; audience: string; is_active?: boolean }) =>
-    api.post('/portal/admin/announcements/', data),
+  adminCreateAnnouncement: (data: {
+    title: string; body: string; audience: string;
+    is_active?: boolean; push_enabled?: boolean;
+  }) => api.post('/portal/admin/announcements/', data),
   adminUpdateAnnouncement: (id: number, data: Record<string, unknown>) =>
     api.patch(`/portal/admin/announcements/${id}/`, data),
   adminDeleteAnnouncement: (id: number) =>

@@ -12,6 +12,12 @@ COPY frontend/package.json frontend/package-lock.json ./
 # with the same version), so the Render build stops failing.
 RUN npm install -g npm@11.19.0 && npm ci
 COPY frontend/ ./
+# Build-time SPA config. VITE_VAPID_PUBLIC_KEY enables web-push opt-in in the
+# bundle (same public key as the backend's VAPID_PUBLIC_KEY); leave unset and
+# push stays inert. Render passes service env vars to Docker builds — this ARG
+# picks it up (see docs/DEPLOY_RENDER.md §10).
+ARG VITE_VAPID_PUBLIC_KEY=
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 RUN npm run build   # → frontend/dist (assets reference /static/)
 
 # ── Stage 2: Django + gunicorn ──────────────────────────────────────────────
