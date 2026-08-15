@@ -67,6 +67,11 @@
     <meta name="twitter:description" content="Educación bilingüe de excelencia en Tlalnepantla, Estado de México." />
     <meta name="twitter:image" content="https://interlaken.edu.mx/og-image.png" />
 
+    <!-- Home-only LCP preload: starts the hero image download during HTML
+         parse, in parallel with the JS bundles (external file + defer because
+         the public CSP has no 'unsafe-inline' and must not block parsing). -->
+    <script src="/preload-lcp.js" defer></script>
+
     <!-- Fonts: Poppins (display) + Inter (body), loaded once here -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

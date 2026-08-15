@@ -9,7 +9,15 @@ import { useAuthStore } from './store/authStore';
 // Layouts & guards are part of the shell — keep them in the main chunk.
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { PublicLayout } from './components/layout/PublicLayout';
-import { PortalLayout } from './components/layout/PortalLayout';
+// PortalLayout is lazy ON PURPOSE (perf budget): it statically pulls the whole
+// authenticated chrome — Sidebar, AppHeader, NotificationsMenu (which drags in
+// date-fns + the `es` locale), AccountMenu, MobileTabBar, CommandPalette — and
+// keeping it in the shell made every PUBLIC visitor download ~14 kB gz of
+// portal-only code. Visitors never render it; portal users load it with their
+// first portal route inside the existing route-level <Suspense>.
+const PortalLayout = lazy(() =>
+  import('./components/layout/PortalLayout').then((m) => ({ default: m.PortalLayout })),
+);
 import { CookieConsent } from './components/CookieConsent';
 import { AnalyticsListener } from './components/analytics/AnalyticsListener';
 import { ErrorBoundary } from './components/ErrorBoundary';
