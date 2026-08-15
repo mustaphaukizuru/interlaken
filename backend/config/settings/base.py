@@ -302,7 +302,7 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@interlaken.edu.m
 # the public key is also exposed to the SPA as VITE_VAPID_PUBLIC_KEY.
 VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY', default='')
 VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY', default='')
-VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='colegio@interlaken.edu.mx')
+VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='colegio@interlaken.com.mx')
 # Where public contact-form messages are delivered (falls back to DEFAULT_FROM_EMAIL).
 CONTACT_EMAIL = env('CONTACT_EMAIL', default='')
 

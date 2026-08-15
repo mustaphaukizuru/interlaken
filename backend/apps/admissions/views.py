@@ -117,7 +117,7 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
                 f'Estimado/a {obj.parent_name},\n\n'
                 f'Hemos recibido su solicitud de pre-registro para {obj.child_first_name} '
                 f'{obj.child_last_name}. En breve nos pondremos en contacto con usted.\n\n'
-                f'Colegio Interlaken\ncolegio@interlaken.edu.mx'
+                f'Colegio Interlaken\ncolegio@interlaken.com.mx'
             ),
             [obj.parent_email],
         )

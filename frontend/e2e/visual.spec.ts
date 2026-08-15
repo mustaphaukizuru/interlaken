@@ -64,6 +64,13 @@ test.describe('Visual baselines', () => {
   });
 
   test('home', async ({ page }) => {
+    // Pin the video section OFF: the real setting embeds an external YouTube
+    // thumbnail (nondeterministic bytes); the section itself is unit-tested.
+    await page.route('**/api/v1/content/settings/', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      await route.fulfill({ json: { ...json, video_url: '' } });
+    });
     await page.goto('/');
     await expect(page.getByRole('main')).toBeVisible();
     await snapBothViewports(page, 'home');
