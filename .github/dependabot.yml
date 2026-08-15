@@ -1,5 +1,11 @@
 # Automated dependency updates. Weekly, grouped to keep PR noise low;
 # security advisories always open PRs immediately regardless of schedule.
+#
+# POLICY (2026-08-15): semver-MAJOR updates for app dependencies are excluded.
+# Majors (React 19, TypeScript 7, Django next, ...) are deliberate migration
+# projects with their own branch, gates, and testing — not weekly bot PRs that
+# sit red until someone does that work anyway (see closed #127/#129/#130).
+# GitHub Actions majors stay enabled: low blast radius, CI-verified.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -13,6 +19,9 @@ updates:
       python-minor-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /frontend
@@ -25,6 +34,9 @@ updates:
       js-minor-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
