@@ -45,8 +45,6 @@ const CafeteriaPage   = lazy(() => import('./pages/parent/CafeteriaPage'));
 const CredencialPage  = lazy(() => import('./pages/parent/CredencialPage'));
 const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupReturn'));
 const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
-const ColegiaturasPage = lazy(() => import('./pages/parent/ColegiaturasPage'));
-const ColegiaturaPaymentReturn = lazy(() => import('./pages/parent/ColegiaturaPaymentReturn'));
 const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
 const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
 const InscripcionesPage = lazy(() => import('./pages/parent/InscripcionesPage'));
@@ -152,8 +150,6 @@ export default function App() {
               <Route path="cafeteria" element={<CafeteriaPage />} />
               <Route path="credencial" element={<CredencialPage />} />
               <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
-              <Route path="colegiaturas" element={<ColegiaturasPage />} />
-              <Route path="colegiaturas/retorno" element={<ColegiaturaPaymentReturn />} />
               <Route path="pagos"     element={<PaymentsPage />} />
               <Route path="inscripciones" element={<InscripcionesPage />} />
               <Route path="comunicados" element={<ComunicadosPage />} />

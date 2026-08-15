@@ -1,6 +1,6 @@
 /**
- * Parent multi-child selection — shared across Portal dashboard,
- * Colegiaturas, and Cafetería so the active alumno sticks while navigating.
+ * Parent multi-child selection — shared across Portal dashboard and
+ * Cafetería so the active alumno sticks while navigating.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
