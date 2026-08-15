@@ -1,32 +1,31 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, FileUp, Link2, Download } from 'lucide-react';
+import { Users, Search, FileUp, Link2, Download, FileDown } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
+import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
-import { portalApi } from '@/services/api';
+import { portalApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { StudentProfile } from '@/types';
 
 export default function AdminStudents() {
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  // URL-synced filters (shareable, survive refresh); search writes are
+  // debounced (300 ms) so the URL doesn't churn per keystroke.
+  const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
+  const [page, setPage] = useUrlPage();
   const [importOpen, setImportOpen] = useState(false);
   const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
-
-  // Debounced so typing fires one server search, not one per keystroke.
-  const debouncedSearch = useDebouncedValue(search.trim(), 350);
-
-  // A new search always starts from page 1.
-  useEffect(() => { setPage(1); }, [debouncedSearch]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-students', page, debouncedSearch],
@@ -34,6 +33,13 @@ export default function AdminStudents() {
       toPaged<StudentProfile>(
         (await portalApi.getStudents({ page, search: debouncedSearch || undefined })).data),
     placeholderData: keepPreviousData,
+  });
+
+  const exportCsv = useMutation({
+    mutationFn: async () =>
+      (await portalApi.exportStudents(debouncedSearch || undefined)).data as Blob,
+    onSuccess: (blob) => downloadBlob(blob, 'alumnos.csv'),
+    onError: () => toast.error('No se pudo generar el archivo.'),
   });
 
   // Server-side search across the whole roster (SearchFilter on the viewset).
@@ -57,6 +63,9 @@ export default function AdminStudents() {
           <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
             <FileUp size={16} aria-hidden="true" /> Importar CSV
           </button>
+          <Button variant="secondary" loading={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
+            <FileDown size={16} aria-hidden="true" /> Exportar CSV
+          </Button>
         </div>
       </div>
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
@@ -79,6 +88,13 @@ export default function AdminStudents() {
           />
         </div>
         <p className="mb-4 text-xs text-subtle">Busca en todo el directorio de alumnos.</p>
+
+        <ActiveFilterChips
+          chips={debouncedSearch
+            ? [{ key: 'q', label: `Búsqueda: “${debouncedSearch}”`, onClear: () => setSearch('') }]
+            : []}
+          onClearAll={() => setSearch('')}
+        />
 
         {isError ? (
           <ErrorState onRetry={() => refetch()} />

@@ -1008,6 +1008,19 @@ def _notify_balance_change(student, title, message):
     return notified
 
 
+def _audit_wallet(context, balance, *, admin=None, **metadata):
+    """Append an ``AuditLog`` row for a manual wallet mutation. Fail-open: the
+    signal-based wallet auditing already records the balance diff, but not the
+    admin's *reason* — this explicit row carries it. A logging failure must
+    never break the money mutation it describes."""
+    try:
+        from apps.core.audit import record
+        record('update', balance, metadata, actor=admin, context=context)
+    except Exception:  # noqa: BLE001 — audit is best-effort by design
+        logger.warning('AuditLog write failed for balance #%s (%s)',
+                       balance.pk, context, exc_info=True)
+
+
 def adjust_balance(student, amount, reason: str, admin=None, *,
                    notify=True, mirror=True):
     """Apply an audited manual credit/debit to a student's cafeteria balance.
@@ -1074,6 +1087,12 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
             balance_after=cb.balance,
             transaction=tx,
         )
+
+    _audit_wallet(
+        'cafeteria.adjust', cb, admin=admin,
+        reason=reason, amount=str(amount), balance_after=str(cb.balance),
+        student=student.student_id,
+    )
 
     # Best-effort remote mirror (R1: expected no-op on the current Loyverse plan).
     if mirror and student.loyverse_id:
@@ -1197,6 +1216,12 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
         if flag_pos_unload and payment is not None:
             flag_pos_unload_if_needed(getattr(payment, 'related_topup', None))
 
+    _audit_wallet(
+        'cafeteria.refund', cb, admin=admin,
+        reason=reason or f'Devolución de transacción #{tx.id}',
+        amount=str(reversal), balance_after=str(cb.balance),
+        source_transaction=tx.id, student=student.student_id,
+    )
     _notify_balance_change(
         student,
         'Devolución en cafetería',

@@ -193,35 +193,53 @@ class AdminDashboardView(APIView):
         return Response(services.dashboard_summary(period))
 
 
-class AdminInvoiceListView(generics.ListAPIView):
-    """GET /api/v1/finance/admin/invoices/?status=&period=&student=&grade=&q=
+def filter_admin_invoices(params):
+    """Admin invoice queryset for ``params`` — shared by the list and the CSV
+    export so the download always matches the on-screen filters.
 
     ``status=overpaid`` is a pseudo-filter for invoices with ``amount_paid > amount``
     (saldo a favor / credit waiting on a manual refund).
     """
+    qs = Invoice.objects.select_related('student__user')
+    status_filter = params.get('status')
+    if status_filter == 'overpaid':
+        qs = qs.filter(amount_paid__gt=F('amount'))
+    elif status_filter:
+        qs = qs.filter(status=status_filter)
+    if params.get('period'):
+        qs = qs.filter(period=params['period'])
+    if params.get('student'):
+        qs = qs.filter(student_id=params['student'])
+    if params.get('grade'):
+        qs = qs.filter(student__grade=params['grade'])
+    if params.get('q'):
+        term = params['q']
+        qs = qs.filter(Q(student__user__first_name__icontains=term)
+                       | Q(student__user__last_name__icontains=term)
+                       | Q(student__student_id__icontains=term))
+    return qs.order_by('-period', 'student__user__last_name')
+
+
+class AdminInvoiceListView(generics.ListAPIView):
+    """GET /api/v1/finance/admin/invoices/?status=&period=&student=&grade=&q="""
     serializer_class = InvoiceListSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        qs = Invoice.objects.select_related('student__user')
-        p = self.request.query_params
-        status_filter = p.get('status')
-        if status_filter == 'overpaid':
-            qs = qs.filter(amount_paid__gt=F('amount'))
-        elif status_filter:
-            qs = qs.filter(status=status_filter)
-        if p.get('period'):
-            qs = qs.filter(period=p['period'])
-        if p.get('student'):
-            qs = qs.filter(student_id=p['student'])
-        if p.get('grade'):
-            qs = qs.filter(student__grade=p['grade'])
-        if p.get('q'):
-            term = p['q']
-            qs = qs.filter(Q(student__user__first_name__icontains=term)
-                           | Q(student__user__last_name__icontains=term)
-                           | Q(student__student_id__icontains=term))
-        return qs.order_by('-period', 'student__user__last_name')
+        return filter_admin_invoices(self.request.query_params)
+
+
+class AdminInvoiceExportView(APIView):
+    """GET /api/v1/finance/admin/invoices/export/ — CSV of the filtered list.
+
+    Accepts the same query params as the list endpoint (status / period /
+    student / grade / q) so the download respects the active filters.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from . import exports
+        return exports.invoices_csv(filter_admin_invoices(request.query_params))
 
 
 class AdminInvoiceDetailView(APIView):

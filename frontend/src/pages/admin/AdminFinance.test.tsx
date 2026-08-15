@@ -13,7 +13,10 @@ vi.mock('@/services/api', () => ({
     adjustInvoice: vi.fn(),
     getAdminInvoice: vi.fn(),
     bulkAction: vi.fn(),
+    exportInvoices: vi.fn(),
   },
+  coreApi: { getAuditLog: vi.fn() },
+  downloadBlob: vi.fn(),
 }));
 
 vi.mock('react-hot-toast', () => ({

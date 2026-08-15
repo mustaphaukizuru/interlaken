@@ -331,3 +331,17 @@ export interface DashboardData {
   announcements?: Announcement[];
   unread_notifications?: number;
 }
+
+/** One append-only audit-trail row (core.AuditLog). */
+export interface AuditLogEntry {
+  id: number;
+  actor: number | null;
+  actor_label: string;
+  action: 'create' | 'update' | 'delete' | 'permission';
+  action_display: string;
+  object_type: string;
+  object_id: string;
+  changes: Record<string, unknown>;
+  context: string;
+  created_at: string;
+}

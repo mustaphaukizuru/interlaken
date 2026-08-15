@@ -1,18 +1,53 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarCheck, GraduationCap, Receipt, Search, X } from 'lucide-react';
+import {
+  CalendarCheck, Download, GraduationCap, Megaphone, Receipt, Search, Settings, X,
+} from 'lucide-react';
 import { bookingsApi, financeApi, portalApi } from '@/services/api';
 import type { Booking, Invoice, StudentProfile } from '@/types';
 
 interface Item {
   key: string;
-  group: 'Alumnos' | 'Reservas' | 'Facturas';
+  group: 'Acciones' | 'Alumnos' | 'Reservas' | 'Facturas';
   icon: typeof Search;
   title: string;
   detail: string;
   to: string;
 }
+
+/**
+ * Palette actions: quick navigation + entry points that open the target page's
+ * own flow via a URL param (the page keeps every confirmation it already has —
+ * actions never skip them). Filtered accent-insensitively while typing.
+ */
+const ACTIONS: Item[] = [
+  {
+    key: 'act-comunicado', group: 'Acciones', icon: Megaphone,
+    title: 'Crear comunicado', detail: 'Abre el redactor de comunicados',
+    to: '/admin/comunicados?nuevo=1',
+  },
+  {
+    key: 'act-export-cafeteria', group: 'Acciones', icon: Download,
+    title: 'Exportar saldos de cafetería', detail: 'CSV de toda la escuela',
+    to: '/admin/cafeteria?exportar=csv',
+  },
+  {
+    key: 'act-finanzas', group: 'Acciones', icon: Receipt,
+    title: 'Ir a Finanzas', detail: '/admin/finanzas', to: '/admin/finanzas',
+  },
+  {
+    key: 'act-visitas', group: 'Acciones', icon: CalendarCheck,
+    title: 'Ir a Visitas', detail: '/admin/visitas', to: '/admin/visitas',
+  },
+  {
+    key: 'act-ajustes', group: 'Acciones', icon: Settings,
+    title: 'Ir a Ajustes', detail: '/admin/ajustes', to: '/admin/ajustes',
+  },
+];
+
+const normalize = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 function useDebounced(value: string, ms = 300) {
   const [debounced, setDebounced] = useState(value);
@@ -27,9 +62,10 @@ const asList = <T,>(data: unknown): T[] =>
   Array.isArray(data) ? (data as T[]) : ((data as { results?: T[] })?.results ?? []);
 
 /**
- * Global admin search (Ctrl/Cmd+K): alumnos, reservas y facturas from one
- * box, grouped, keyboard-navigable. Search hits the existing list endpoints
- * (?search= / ?q=) — no new backend surface.
+ * Global admin search + actions (Ctrl/Cmd+K): an 'Acciones' group (quick navs
+ * and flows opened via URL params on the target page) plus alumnos, reservas y
+ * facturas from one box, grouped, keyboard-navigable. Search hits the existing
+ * list endpoints (?search= / ?q=) — no new backend surface.
  */
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -135,8 +171,15 @@ export function CommandPalette() {
   });
 
   const items = useMemo<Item[]>(() => {
-    if (!enabled) return [];
+    // Actions are always available: all of them on an empty box, narrowed
+    // (accent-insensitively) while typing.
+    const nq = normalize(q);
+    const actions = nq
+      ? ACTIONS.filter((a) => normalize(`${a.title} ${a.detail}`).includes(nq))
+      : ACTIONS;
+    if (!enabled) return actions;
     return [
+      ...actions,
       ...(students.data ?? []).slice(0, 5).map((s): Item => ({
         key: `s-${s.id}`,
         group: 'Alumnos',
@@ -162,7 +205,7 @@ export function CommandPalette() {
         to: '/admin/finanzas',
       })),
     ];
-  }, [enabled, students.data, bookings.data, invoices.data]);
+  }, [enabled, q, students.data, bookings.data, invoices.data]);
 
   const searching = enabled && (students.isFetching || bookings.isFetching || invoices.isFetching);
 
@@ -234,6 +277,14 @@ export function CommandPalette() {
           </button>
         </div>
 
+        {/* Hint lives OUTSIDE the listbox: a listbox may only contain options
+            (aria-required-children), and with palette actions the listbox is
+            non-empty even before typing. */}
+        {q.length < 2 && (
+          <p className="px-3 pb-0 pt-4 text-center text-sm text-muted">
+            Escriba al menos 2 caracteres. Consejo: <kbd className="rounded border border-ink/15 px-1">Ctrl</kbd>+<kbd className="rounded border border-ink/15 px-1">K</kbd> abre esta búsqueda.
+          </p>
+        )}
         {/* role="listbox" only when there are options — an empty listbox fails
             aria-required-children; status messages render in a plain div. */}
         <div
@@ -242,13 +293,9 @@ export function CommandPalette() {
           role={items.length ? 'listbox' : undefined}
           aria-label={items.length ? 'Resultados' : undefined}
         >
-          {q.length < 2 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted">
-              Escriba al menos 2 caracteres. Consejo: <kbd className="rounded border border-ink/15 px-1">Ctrl</kbd>+<kbd className="rounded border border-ink/15 px-1">K</kbd> abre esta búsqueda.
-            </p>
-          ) : searching && !items.length ? (
+          {q.length >= 2 && searching && !items.length ? (
             <p className="px-3 py-6 text-center text-sm text-muted">Buscando…</p>
-          ) : !items.length ? (
+          ) : q.length >= 2 && !items.length ? (
             <p className="px-3 py-6 text-center text-sm text-muted">Sin resultados para “{q}”.</p>
           ) : (
             items.map((item, i) => {

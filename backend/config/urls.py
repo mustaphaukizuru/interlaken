@@ -37,6 +37,7 @@ urlpatterns = [
 
     # API v1
     path('api/v1/accounts/',    include('apps.accounts.api_urls')),
+    path('api/v1/core/',        include('apps.core.api_urls')),
     path('api/v1/admissions/',  include('apps.admissions.urls')),
     path('api/v1/cafeteria/',   include('apps.cafeteria.urls')),
     path('api/v1/payments/',    include('apps.payments.urls')),

@@ -66,6 +66,7 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminFinance    = lazy(() => import('./pages/admin/AdminFinance'));
+const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -196,6 +197,7 @@ export default function App() {
               <Route path="alumnos/:studentId" element={<AdminStudentDetail />} />
               <Route path="comunicados" element={<AdminAnnouncements />} />
               <Route path="ajustes"     element={<AdminSettings />} />
+              <Route path="auditoria"   element={<AdminAudit />} />
             </Route>
 
           </Routes>

@@ -438,6 +438,25 @@ export const financeApi = {
 
   bulkAction: (invoiceIds: number[], action: 'mark_paid' | 'cancel' | 'remind', reason?: string) =>
     api.post('/finance/admin/bulk/', { invoice_ids: invoiceIds, action, reason }),
+
+  /** CSV of the invoice list, respecting the active filters. */
+  exportInvoices: (params?: { status?: string; period?: string; grade?: string; q?: string }) =>
+    api.get('/finance/admin/invoices/export/', { params, responseType: 'blob' }),
+};
+
+// ── CORE (audit trail) ────────────────────────────────────
+export const coreApi = {
+  /** Read-only admin audit log (append-only), paginated + filterable. */
+  getAuditLog: (params?: {
+    page?: number;
+    actor?: string;
+    action?: string;
+    context?: string;
+    object_type?: string;
+    object_id?: string | number;
+    from?: string;
+    to?: string;
+  }) => api.get('/core/admin/audit/', { params }),
 };
 
 // ── LEGAL / CONSENT (LFPDPPP) ─────────────────────────────
@@ -511,6 +530,10 @@ export const bookingsApi = {
   getAdminBookings: (params?: { type?: string; status?: string; date?: string; q?: string; page?: number }) =>
     api.get('/bookings/admin/bookings/', { params }),
 
+  /** CSV of the visits list, respecting the active filters. */
+  exportBookings: (params?: { type?: string; status?: string; date?: string; q?: string }) =>
+    api.get('/bookings/admin/bookings/export/', { params, responseType: 'blob' }),
+
   bookingAction: (id: number, action: 'confirm' | 'cancel' | 'attended' | 'no_show') =>
     api.post(`/bookings/admin/bookings/${id}/${action}/`),
 
@@ -530,6 +553,12 @@ export const portalApi = {
 
   getStudents: (params?: { page?: number; search?: string }) =>
     api.get('/accounts/students/', { params }),
+
+  /** CSV roster export (grade/group/guardians count), honors ?search=. */
+  exportStudents: (search?: string) =>
+    api.get('/accounts/admin/export/students/', {
+      params: search ? { search } : {}, responseType: 'blob',
+    }),
 
   // Aggregated staff analytics (staff/admin only; server-cached 60s per range).
   getStaffAnalytics: (days?: number) =>
@@ -563,6 +592,11 @@ export const portalApi = {
     api.patch(`/portal/admin/announcements/${id}/`, data),
   adminDeleteAnnouncement: (id: number) =>
     api.delete(`/portal/admin/announcements/${id}/`),
+
+  /** Composer preview: active accounts a comunicado with this audience notifies. */
+  getAnnouncementRecipientCount: (audience: string) =>
+    api.get<{ audience: string; count: number }>(
+      '/portal/admin/announcements/recipient-count/', { params: { audience } }),
 
   /** Urgent school-wide broadcast (creates comunicado + fans out WARNING notifs). */
   adminEmergencyBroadcast: (data: {

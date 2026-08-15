@@ -12,6 +12,7 @@ urlpatterns = [
     # Admin finance console
     path('admin/dashboard/',             views.AdminDashboardView.as_view(),      name='finance-admin-dashboard'),
     path('admin/invoices/',              views.AdminInvoiceListView.as_view(),    name='finance-admin-invoices'),
+    path('admin/invoices/export/',       views.AdminInvoiceExportView.as_view(),  name='finance-admin-invoices-export'),
     path('admin/invoices/<int:pk>/',     views.AdminInvoiceDetailView.as_view(),  name='finance-admin-invoice'),
     path('admin/invoices/<int:pk>/mark-paid/', views.AdminMarkPaidView.as_view(), name='finance-admin-mark-paid'),
     path('admin/invoices/<int:pk>/adjust/',    views.AdminAdjustInvoiceView.as_view(), name='finance-admin-adjust'),

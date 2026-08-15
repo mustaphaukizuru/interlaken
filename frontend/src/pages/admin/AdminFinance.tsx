@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Receipt, Search, PlusCircle, CheckCircle2, Ban, SlidersHorizontal,
-  TrendingUp, Wallet, AlertTriangle, History, Bell, X, RotateCcw,
+  TrendingUp, Wallet, AlertTriangle, History, Bell, X, RotateCcw, FileDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -16,9 +16,11 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pagination } from '@/components/ui/Pagination';
-import { financeApi } from '@/services/api';
+import { ActiveFilterChips, type FilterChip } from '@/components/admin/ActiveFilterChips';
+import { financeApi, coreApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
-import type { Invoice, InvoiceAdjustment, FinanceDashboard } from '@/types';
+import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
+import type { Invoice, InvoiceAdjustment, FinanceDashboard, AuditLogEntry } from '@/types';
 
 const statusMeta: Record<string, { label: string; variant: any }> = {
   paid:      { label: 'Pagada',    variant: 'success' },
@@ -54,10 +56,14 @@ function currentPeriod() {
 
 export default function AdminFinance() {
   const queryClient = useQueryClient();
-  const [period, setPeriod] = useState(currentPeriod());
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  // URL-synced filters (shareable, survive refresh). The month picker defaults
+  // to the current period, which stays out of the URL; search writes are
+  // debounced (300 ms) so the URL doesn't churn per keystroke.
+  const { get, set } = useUrlFilters();
+  const period = get('periodo') || currentPeriod();
+  const statusFilter = get('estado');
+  const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
+  const [page, setPage] = useUrlPage();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [adjustFor, setAdjustFor] = useState<Invoice | null>(null);
   const [cancelFor, setCancelFor] = useState<Invoice | null>(null);
@@ -71,8 +77,29 @@ export default function AdminFinance() {
     queryClient.invalidateQueries({ queryKey: ['finance-admin-invoices'] });
   };
 
-  /** Reset paging + selection whenever the filter set changes. */
-  const onFilter = (fn: () => void) => { fn(); setPage(1); setSelected(new Set()); };
+  const setPeriod = (value: string) =>
+    set({ periodo: value === currentPeriod() ? null : value, page: null });
+  const setStatusFilter = (value: string) => set({ estado: value || null, page: null });
+  const clearAllFilters = () => set({ estado: null, q: null, page: null });
+
+  // Selection is page/filter-scoped: drop it whenever the filter set changes.
+  useEffect(() => { setSelected(new Set()); }, [period, statusFilter, debouncedSearch]);
+
+  const activeChips: FilterChip[] = [
+    ...(get('periodo') && get('periodo') !== currentPeriod()
+      ? [{ key: 'periodo', label: `Periodo: ${period}`, onClear: () => set({ periodo: null, page: null }) }]
+      : []),
+    ...(statusFilter
+      ? [{
+          key: 'estado',
+          label: `Estado: ${statusFilter === 'overpaid' ? 'A favor' : (statusMeta[statusFilter]?.label ?? statusFilter)}`,
+          onClear: () => set({ estado: null, page: null }),
+        }]
+      : []),
+    ...(debouncedSearch
+      ? [{ key: 'q', label: `Búsqueda: “${debouncedSearch}”`, onClear: () => set({ q: null, page: null }) }]
+      : []),
+  ];
 
   const {
     data: dashboard,
@@ -85,11 +112,11 @@ export default function AdminFinance() {
   });
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['finance-admin-invoices', period, statusFilter, search, page],
+    queryKey: ['finance-admin-invoices', period, statusFilter, debouncedSearch, page],
     queryFn: async () =>
       toPaged<Invoice>(
         (await financeApi.getAdminInvoices({
-          period, status: statusFilter || undefined, q: search || undefined, page,
+          period, status: statusFilter || undefined, q: debouncedSearch || undefined, page,
         })).data,
       ),
     placeholderData: keepPreviousData,
@@ -97,6 +124,15 @@ export default function AdminFinance() {
 
   const invoices = data?.results;
   const count = data?.count ?? 0;
+
+  const exportCsv = useMutation({
+    mutationFn: async () =>
+      (await financeApi.exportInvoices({
+        period, status: statusFilter || undefined, q: debouncedSearch || undefined,
+      })).data as Blob,
+    onSuccess: (blob) => downloadBlob(blob, 'colegiaturas.csv'),
+    onError: () => toast.error('No se pudo generar el archivo.'),
+  });
 
   const generate = useMutation({
     mutationFn: () => financeApi.generate(period),
@@ -179,7 +215,7 @@ export default function AdminFinance() {
             className="input-field w-auto"
             aria-label="Periodo"
             value={period}
-            onChange={(e) => onFilter(() => setPeriod(e.target.value))}
+            onChange={(e) => setPeriod(e.target.value)}
           />
           <Button size="sm" loading={generate.isPending} onClick={() => generate.mutate()}>
             <PlusCircle className="w-4 h-4" /> Generar
@@ -220,7 +256,7 @@ export default function AdminFinance() {
       {(dashboard?.overpaid ?? 0) > 0 && (
         <button
           type="button"
-          onClick={() => onFilter(() => setStatusFilter('overpaid'))}
+          onClick={() => setStatusFilter('overpaid')}
           className="flex w-full flex-wrap items-center gap-3 rounded-xl2 border border-brand-200 bg-brand-50 px-4 py-3 text-left transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <RotateCcw className="h-5 w-5 flex-shrink-0 text-brand-700" aria-hidden />
@@ -247,14 +283,14 @@ export default function AdminFinance() {
               placeholder="Buscar alumno o matrícula…"
               aria-label="Buscar alumno o matrícula"
               value={search}
-              onChange={(e) => onFilter(() => setSearch(e.target.value))}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <select
             className="input-field w-auto"
             aria-label="Estado"
             value={statusFilter}
-            onChange={(e) => onFilter(() => setStatusFilter(e.target.value))}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">Todos los estados</option>
             <option value="pending">Pendiente</option>
@@ -263,8 +299,18 @@ export default function AdminFinance() {
             <option value="overpaid">A favor (sobrepagada)</option>
             <option value="cancelled">Cancelada</option>
           </select>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={exportCsv.isPending}
+            onClick={() => exportCsv.mutate()}
+          >
+            <FileDown className="w-3.5 h-3.5" /> Exportar CSV
+          </Button>
         </div>
         <p className="mb-4 text-xs text-subtle">La selección aplica a la página actual.</p>
+
+        <ActiveFilterChips chips={activeChips} onClearAll={clearAllFilters} />
 
         {/* Bulk action bar */}
         {selected.size > 0 && (
@@ -308,7 +354,7 @@ export default function AdminFinance() {
             }
             action={
               search || statusFilter
-                ? <Button variant="secondary" size="sm" onClick={() => onFilter(() => { setSearch(''); setStatusFilter(''); })}>Limpiar filtros</Button>
+                ? <Button variant="secondary" size="sm" onClick={clearAllFilters}>Limpiar filtros</Button>
                 : undefined
             }
           />
@@ -638,13 +684,27 @@ function KpiCard({ icon: Icon, label, value, tone }: {
   );
 }
 
-/** Audit trail (who/what/when/why) for one invoice — InvoiceAdjustment feed. */
+/** Audit trail (who/what/when/why) for one invoice — InvoiceAdjustment feed
+ *  plus the append-only AuditLog rows for this invoice (Historial). */
 function AuditTrailModal({ invoice, onClose }: { invoice: Invoice | null; onClose: () => void }) {
   const { data, isLoading, isError, refetch } = useQuery<{ adjustments: InvoiceAdjustment[] }>({
     queryKey: ['finance-admin-invoice-detail', invoice?.id],
     queryFn: async () => (await financeApi.getAdminInvoice(invoice!.id)).data,
     enabled: !!invoice,
   });
+
+  // Append-only audit rows targeting this invoice (core audit endpoint).
+  const audit = useQuery({
+    queryKey: ['finance-admin-invoice-audit', invoice?.id],
+    queryFn: async () =>
+      toPaged<AuditLogEntry>(
+        (await coreApi.getAuditLog({
+          object_type: 'finance.invoice', object_id: invoice!.id,
+        })).data,
+      ),
+    enabled: !!invoice,
+  });
+  const auditRows = audit.data?.results ?? [];
 
   const adjustments = data?.adjustments ?? [];
   const fmt = (d: string) => format(new Date(d), "d MMM yyyy, HH:mm", { locale: es });
@@ -690,6 +750,34 @@ function AuditTrailModal({ invoice, onClose }: { invoice: Invoice | null; onClos
               </table>
             </div>
           )}
+
+          {/* Historial — append-only audit rows for this invoice */}
+          <div>
+            <h3 className="font-head text-sm font-semibold text-ink">Historial de auditoría</h3>
+            {audit.isError ? (
+              <p className="mt-1 text-xs text-subtle">No se pudo cargar el historial de auditoría.</p>
+            ) : audit.isLoading ? (
+              <TableSkeleton rows={2} />
+            ) : !auditRows.length ? (
+              <p className="mt-1 text-xs text-subtle">Sin registros de auditoría para esta colegiatura.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {auditRows.map((entry) => (
+                  <li key={entry.id} className="rounded-xl2 border border-line px-3 py-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-ink">
+                        {String(entry.changes?.reason ?? entry.action_display)}
+                      </span>
+                      <Badge variant="neutral">{entry.context || entry.action_display}</Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-subtle">
+                      {fmt(entry.created_at)} · {entry.actor_label || 'system'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
     </Modal>

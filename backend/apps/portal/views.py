@@ -23,7 +23,7 @@ from .serializers import (
     AnnouncementSerializer,
     NotificationSerializer,
 )
-from .services import emergency_broadcast, fanout_and_stamp
+from .services import _audience_roles, emergency_broadcast, fanout_and_stamp
 
 
 def audiences_for_user(user):
@@ -330,6 +330,25 @@ class NotificationMarkAllReadView(APIView):
                    .filter(user=request.user, is_read=False)
                    .update(is_read=True))
         return Response({'marked': updated})
+
+
+class AnnouncementRecipientCountView(APIView):
+    """GET /api/v1/portal/admin/announcements/recipient-count/?audience=
+
+    Composer preview: how many active accounts a comunicado with this audience
+    would notify. Reuses the exact role mapping the fan-out uses
+    (``_audience_roles``) so the number matches what publish will do.
+    """
+    permission_classes = [_IsAdmin]
+
+    def get(self, request):
+        audience = (request.query_params.get('audience')
+                    or Announcement.Audience.ALL).strip()
+        if audience not in Announcement.Audience.values:
+            return Response({'error': 'Audiencia no válida.'}, status=400)
+        roles = _audience_roles().get(audience, [])
+        count = User.objects.filter(is_active=True, role__in=roles).count()
+        return Response({'audience': audience, 'count': count})
 
 
 @method_decorator(ratelimit('emergency-broadcast', '3/m', key='user', method='POST'), name='dispatch')

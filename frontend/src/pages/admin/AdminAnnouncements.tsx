@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Megaphone, Plus, Pencil, Trash2, Eye, Siren } from 'lucide-react';
 import { format } from 'date-fns';
@@ -106,6 +107,22 @@ export default function AdminAnnouncements() {
   });
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
+
+  // Command-palette deep link: /admin/comunicados?nuevo=1 opens the composer
+  // (same modal, same validations) and consumes the param.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wantsNew = searchParams.get('nuevo');
+  useEffect(() => {
+    if (!wantsNew) return;
+    openNew();
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('nuevo');
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsNew]);
+
   const openEdit = (a: Announcement) => {
     setEditing(a);
     setForm({
@@ -198,6 +215,7 @@ export default function AdminAnnouncements() {
               onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))}>
               {AUDIENCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
+            <RecipientCountHint audience={form.audience} />
           </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
@@ -255,6 +273,7 @@ export default function AdminAnnouncements() {
             >
               {AUDIENCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
+            <RecipientCountHint audience={alertForm.audience} />
           </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input
@@ -305,5 +324,21 @@ export default function AdminAnnouncements() {
         loading={remove.isPending}
       />
     </>
+  );
+}
+
+/** Audience-size preview: how many active accounts publish would notify. */
+function RecipientCountHint({ audience }: { audience: string }) {
+  const { data } = useQuery({
+    queryKey: ['announcement-recipient-count', audience],
+    queryFn: async () => (await portalApi.getAnnouncementRecipientCount(audience)).data,
+    staleTime: 60_000,
+  });
+  if (!data) return null;
+  const noun = audience === 'staff' ? 'cuenta(s) del personal' : 'familia(s)';
+  return (
+    <p className="mt-1.5 text-xs text-subtle">
+      Se notificará a ~{data.count} {noun}.
+    </p>
   );
 }

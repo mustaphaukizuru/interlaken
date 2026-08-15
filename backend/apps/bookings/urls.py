@@ -11,6 +11,7 @@ urlpatterns = [
 
     # Admin
     path('admin/bookings/',                    views.AdminBookingsView.as_view(),      name='bookings-admin-list'),
+    path('admin/bookings/export/',             views.AdminBookingsExportView.as_view(), name='bookings-admin-export'),
     path('admin/bookings/<int:pk>/<str:action>/', views.AdminBookingActionView.as_view(), name='bookings-admin-action'),
     path('admin/slots/',                       views.AdminSlotListView.as_view(),      name='bookings-admin-slots'),
     path('admin/slots/<int:pk>/',              views.AdminSlotDetailView.as_view(),    name='bookings-admin-slot-detail'),
