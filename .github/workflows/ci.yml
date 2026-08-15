@@ -4,6 +4,10 @@ on:
   push:
     branches: [master, main, automated-build]
   pull_request:
+  # Nightly full run on master (03:15 CT): catches drift between merges —
+  # external API changes, dependency rot, flaky-test creep — before a PR does.
+  schedule:
+    - cron: '15 9 * * *'
 
 # Cancel superseded runs on the same ref to save minutes.
 concurrency:
