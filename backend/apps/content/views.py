@@ -72,13 +72,21 @@ class PublicPricingView(APIView):
 
     def get(self, request):
         from .models import (
-            PRICING_CACHE_KEY, DaycareRate, EnrollmentFee,
-            ExtracurricularActivity, FixedConcept, PricingPolicy, TuitionCost,
+            PRICING_CACHE_KEY,
+            DaycareRate,
+            EnrollmentFee,
+            ExtracurricularActivity,
+            FixedConcept,
+            PricingPolicy,
+            TuitionCost,
         )
         from .serializers import (
-            DaycareRateSerializer, EnrollmentFeeSerializer,
-            ExtracurricularSerializer, FixedConceptSerializer,
-            PricingPolicySerializer, TuitionCostSerializer,
+            DaycareRateSerializer,
+            EnrollmentFeeSerializer,
+            ExtracurricularSerializer,
+            FixedConceptSerializer,
+            PricingPolicySerializer,
+            TuitionCostSerializer,
         )
         data = cache.get(PRICING_CACHE_KEY)
         if data is None:

@@ -3,7 +3,7 @@ Portal views: role-aware dashboard, announcements, notifications.
 """
 import logging
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
@@ -71,27 +71,32 @@ class DashboardView(APIView):
 
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students
-            balances = CafeteriaBalance.objects.filter(student__in=students)
+            balances = (CafeteriaBalance.objects.filter(student__in=students)
+                        .select_related('student__user'))
             from apps.finance.models import Invoice
-            from apps.payments.services import payments_visible_to
+            # Same visibility as payments_visible_to, but reusing the in-hand
+            # students list instead of re-joining the guardian M2M per row.
             recent_payments = (
-                payments_visible_to(user).order_by('-created_at')[:5]
+                Payment.objects.filter(
+                    Q(user=user)
+                    | Q(invoice_payment__invoice__student__in=students)
+                    | Q(related_topup__student__in=students)
+                ).distinct().order_by('-created_at')[:5]
                 if students
                 else []
             )
             # Real family money signal: unpaid/overdue colegiaturas (not recent
             # Payment rows, which stay 0 until a checkout is initiated).
             from decimal import Decimal
-            pending_list = list(
+            pending = (
                 Invoice.objects.filter(
                     student__in=students,
                     status__in=(Invoice.Status.PENDING, Invoice.Status.OVERDUE),
-                ).only('amount', 'amount_paid')
-            ) if students else []
-            pending_invoices = len(pending_list)
-            pending_balance = sum(
-                (inv.balance_due for inv in pending_list), start=Decimal('0'),
+                ).aggregate(n=Count('id'), due=Sum(F('amount') - F('amount_paid')))
+                if students else {}
             )
+            pending_invoices = pending.get('n') or 0
+            pending_balance = pending.get('due') or Decimal('0')
 
             data = {
                 'children_count': len(students),
@@ -147,6 +152,8 @@ class DashboardView(APIView):
         # Common: announcements + unread notifications
         announcements = Announcement.objects.filter(
             is_active=True, audience__in=audiences_for_user(user)
+        ).annotate(
+            visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
         )[:5]
         data['announcements'] = AnnouncementSerializer(announcements, many=True).data
         data['unread_notifications'] = Notification.objects.filter(user=user, is_read=False).count()
@@ -218,7 +225,8 @@ class _IsAdmin(permissions.BasePermission):
 class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
     """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive).
     POST — compose a new audience-targeted comunicado (author = current admin)."""
-    queryset = Announcement.objects.all()
+    queryset = (Announcement.objects.select_related('created_by')
+                .annotate(read_count_ann=Count('reads')))
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [_IsAdmin]
 
@@ -238,7 +246,8 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
 
 class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """PATCH (edit / toggle active) or DELETE a comunicado (admin)."""
-    queryset = Announcement.objects.all()
+    queryset = (Announcement.objects.select_related('created_by')
+                .annotate(read_count_ann=Count('reads')))
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [_IsAdmin]
     http_method_names = ['get', 'patch', 'delete']

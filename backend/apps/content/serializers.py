@@ -1,8 +1,13 @@
 from rest_framework import serializers
 
 from .models import (
-    DaycareRate, EnrollmentFee, ExtracurricularActivity, FixedConcept,
-    PricingPolicy, SiteSettings, TuitionCost,
+    DaycareRate,
+    EnrollmentFee,
+    ExtracurricularActivity,
+    FixedConcept,
+    PricingPolicy,
+    SiteSettings,
+    TuitionCost,
 )
 
 

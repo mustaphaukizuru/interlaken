@@ -47,6 +47,11 @@ class AnnouncementAdminSerializer(serializers.ModelSerializer):
         return obj.created_by.full_name if obj.created_by else '—'
 
     def get_read_count(self, obj):
+        # Prefer the admin list/detail queryset annotation; fall back to a count
+        # for unannotated instances (e.g. the row just created by POST).
+        annotated = getattr(obj, 'read_count_ann', None)
+        if annotated is not None:
+            return annotated
         return obj.reads.count()
 
 

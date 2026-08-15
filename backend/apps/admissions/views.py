@@ -516,9 +516,10 @@ class OpenSchoolDayListView(APIView):
         today = timezone.localdate()  # school-local day, not the UTC date
         now = timezone.now()
         slots = [
-            s for s in AvailabilitySlot.objects.filter(
-                visit_type=VisitType.OPEN_CLASS, is_active=True, date__gte=today,
-            ).order_by('date', 'start_time')
+            s for s in AvailabilitySlot.annotate_booked(
+                AvailabilitySlot.objects.filter(
+                    visit_type=VisitType.OPEN_CLASS, is_active=True, date__gte=today,
+                ).order_by('date', 'start_time'))
             if not s.is_full
             and timezone.make_aware(datetime.combine(s.date, s.start_time)) >= now
         ]

@@ -33,6 +33,7 @@ from .serializers import (
     SpendLimitsSerializer,
     TopUpLogSerializer,
     TopUpRequestSerializer,
+    build_spend_map,
 )
 from .services import (
     add_points_to_customer,
@@ -105,17 +106,25 @@ class MyBalanceView(APIView):
                 balance, context={'include_spend': True}).data)
 
         if user.role == User.Role.PARENT:
-            students = StudentProfile.objects.filter(parents=user)
+            students = list(StudentProfile.objects.filter(parents=user))
             include_spend = True
         else:
             # Admin/staff wide view: skip the per-student spend aggregates so a
             # full-roster list stays cheap (matches AdminBalancesView).
-            students = StudentProfile.objects.all()
+            students = list(StudentProfile.objects.all())
             include_spend = False
 
-        balances = [CafeteriaBalance.objects.get_or_create(student=s)[0] for s in students]
+        # Constant query count regardless of family size: create any missing
+        # wallet rows in one INSERT … ON CONFLICT, then fetch them in one query.
+        CafeteriaBalance.objects.bulk_create(
+            [CafeteriaBalance(student=s) for s in students], ignore_conflicts=True)
+        balances = (CafeteriaBalance.objects.filter(student__in=students)
+                    .select_related('student__user').order_by('student_id'))
+        context = {'include_spend': include_spend}
+        if include_spend:
+            context['spend_map'] = build_spend_map(students)
         return Response(CafeteriaBalanceSerializer(
-            balances, many=True, context={'include_spend': include_spend}).data)
+            balances, many=True, context=context).data)
 
 
 class MyTransactionsView(generics.ListAPIView):
@@ -803,7 +812,11 @@ class AdminTopUpLogView(generics.ListAPIView):
 
         qs = (TopUpRequest.objects
               .select_related('student__user', 'pos_loaded_by', 'pos_unloaded_by')
-              .prefetch_related('payments')
+              # Explicit ordered Prefetch: the serializer takes the FIRST
+              # prefetched row as "the" payment, and a plain .order_by() on the
+              # reverse manager would discard the prefetch cache (N+1).
+              .prefetch_related(models.Prefetch(
+                  'payments', queryset=Payment.objects.order_by('-created_at')))
               .all())
         params = self.request.query_params
 
@@ -947,11 +960,14 @@ class AdminStudentDetailView(APIView):
             StudentProfile.objects.select_related('user', 'loyverse_profile'), pk=pk)
         balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
         transactions = CafeteriaTransaction.objects.filter(student=student)[:200]
-        adjustments = BalanceAdjustment.objects.filter(student=student)
+        # select_related: BalanceAdjustmentSerializer reads admin.full_name per
+        # row. Capped like the ledger — the audit trail can grow unbounded.
+        adjustments = (BalanceAdjustment.objects.filter(student=student)
+                       .select_related('admin')[:100])
 
         parents = [
             {'id': p.id, 'full_name': p.full_name, 'email': p.email, 'whatsapp': p.whatsapp}
-            for p in student.parents.all()
+            for p in student.parents.all()[:20]
         ]
 
         # Full Loyverse customer snapshot (visit history + lifetime spend), if

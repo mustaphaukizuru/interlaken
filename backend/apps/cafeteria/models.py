@@ -71,6 +71,10 @@ class CafeteriaTransaction(models.Model):
         verbose_name = 'Transacción de Cafetería'
         verbose_name_plural = 'Transacciones de Cafetería'
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['student', '-date']),
+            models.Index(fields=['transaction_type', 'date']),
+        ]
 
     def __str__(self):
         return f'{self.student} — {self.transaction_type} ${self.amount}'

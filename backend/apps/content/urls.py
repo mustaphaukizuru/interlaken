@@ -1,7 +1,9 @@
 from django.urls import path
 
 from .views import (
-    AdminSiteSettingsView, PublicPricingView, PublicSiteSettingsView,
+    AdminSiteSettingsView,
+    PublicPricingView,
+    PublicSiteSettingsView,
     PublicTuitionCostsView,
 )
 
