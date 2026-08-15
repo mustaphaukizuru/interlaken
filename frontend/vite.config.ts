@@ -1,7 +1,8 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path';
 
 export default defineConfig(({ command }) => ({
@@ -33,10 +34,33 @@ export default defineConfig(({ command }) => ({
         // Precache the app shell (+ offline.html); campus photos (.webp) are
         // runtime-cached on demand (see runtimeCaching) to keep the install light.
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}', 'icon-*.png', 'favicon.ico', 'apple-touch-icon.png', 'og-image.png'],
+        // Keep the precache to the true app shell (~1 MB instead of ~1.8 MB):
+        // the biggest role-gated lazy chunks — recharts (AreaChart +
+        // useChartEntrance + charts UI), the whole admin console, staff
+        // analytics, the credencial (jsbarcode/qrcode) and the zod+RHF form
+        // bundle — are trimmed here and picked up on demand by the
+        // 'lazy-chunks' runtime route below (hash-named → CacheFirst is safe).
+        // NOTE 'Admin*' must not swallow public chunks: AdmissionsPage differs
+        // ('Admis'), but keep an eye on future 'Admin…'-named public pages.
+        globIgnores: [
+          '**/assets/AreaChart-*.js',
+          '**/assets/useChartEntrance-*.js',
+          '**/assets/ChartsSection-*.js',
+          '**/assets/KpiRow-*.js',
+          '**/assets/StaffDashboard-*.js',
+          '**/assets/CredencialPage-*.js',
+          '**/assets/schemas-*.js',
+          '**/assets/Admin*.js',
+        ],
         // index.html references hashed assets at /static/assets/* (vite base),
         // so precache them under that URL — a bare 'assets/…' entry would never
         // match the browser's actual requests and the shell would break offline.
-        modifyURLPrefix: { 'assets/': '/static/assets/' },
+        // Same story for the LCP preload script (vite rewrites its <script src>
+        // with the /static/ base too).
+        modifyURLPrefix: {
+          'assets/': '/static/assets/',
+          'preload-lcp.js': '/static/preload-lcp.js',
+        },
         // Push/notificationclick handlers live in public/push-sw.js so generateSW
         // stays simple (GO-LIVE-AUDIT #15).
         importScripts: ['push-sw.js'],
@@ -85,6 +109,20 @@ export default defineConfig(({ command }) => ({
             },
           },
           {
+            // Hashed build assets trimmed from the precache (see globIgnores:
+            // charts/admin/staff/credencial/forms). Content-hashed filenames
+            // are immutable, so CacheFirst is safe; cached on first use so a
+            // portal user who visited a section keeps it working offline.
+            // Precached assets never reach this route (precache wins).
+            urlPattern: ({ url }) => url.pathname.startsWith('/static/assets/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'lazy-chunks',
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
             // Campus imagery — hashed/immutable-ish: cache-first, capped.
             urlPattern: ({ request }) => request.destination === 'image',
             handler: 'CacheFirst',
@@ -111,6 +149,18 @@ export default defineConfig(({ command }) => ({
         enabled: false,
       },
     }),
+    // Bundle analysis, build-time only and opt-in: `ANALYZE=1 npm run build`
+    // (PowerShell: `$env:ANALYZE='1'; npm run build`) writes an interactive
+    // treemap to stats.html (gitignored). Never runs in normal/CI builds.
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: 'stats.html',
+            template: 'treemap',
+            gzipSize: true,
+          }) as PluginOption,
+        ]
+      : []),
   ],
   resolve: {
     alias: {
@@ -166,6 +216,10 @@ export default defineConfig(({ command }) => ({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // .vite/manifest.json maps source modules → emitted chunks (+ their static
+    // import graph). scripts/check-budgets.mjs walks it to compute the real JS
+    // payload of each public route (see docs/PERFORMANCE.md).
+    manifest: true,
     rollupOptions: {
       output: {
         manualChunks: {

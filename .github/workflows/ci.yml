@@ -84,6 +84,11 @@ jobs:
       - name: Build (vite)
         run: npm run build
 
+      # Performance budget gate — fails on public-route JS regressions
+      # (see docs/PERFORMANCE.md for budgets + the allowlist policy).
+      - name: Check performance budgets
+        run: npm run check:budgets
+
       # The Render Docker image builds the SPA fresh (Dockerfile stage 1), so no
       # committed-static freshness gate is needed anymore (it was a cPanel-era
       # requirement). We still assert the push companion SW ships in dist.

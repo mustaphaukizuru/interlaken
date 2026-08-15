@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import {
   ArrowRight, Award, TrendingUp, Star, Check, Users, GraduationCap,
@@ -128,6 +126,22 @@ const heroItem: Variants = {
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   (e.target as HTMLImageElement).style.display = 'none';
+}
+
+/**
+ * "2026-09-12" → "12 de septiembre, 2026" — same rendering date-fns produced
+ * here before, via the built-in Intl API instead. This page is the heaviest
+ * public route, and one event date was its only date-fns usage; dropping the
+ * import keeps format/parseISO + the `es` locale (~10 kB gz) off the home
+ * route (perf budget). Parsed manually because `new Date('yyyy-MM-dd')` is
+ * UTC-midnight and can shift a day in Mexico; parseISO treated it as local.
+ */
+function formatEventDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const month = new Intl.DateTimeFormat('es-MX', { month: 'long' }).format(date);
+  return `${date.getDate()} de ${month}, ${date.getFullYear()}`;
 }
 
 function NewsletterCTA() {
@@ -533,13 +547,7 @@ export default function HomePage() {
                 <div className="mt-[18px] flex flex-wrap gap-[18px]">
                   <span className="inline-flex items-center gap-2 text-[15px] font-semibold">
                     <CalendarDays size={17} />
-                    {(() => {
-                      try {
-                        return format(parseISO(nextEvent.date), "d 'de' MMMM, yyyy", { locale: es });
-                      } catch {
-                        return nextEvent.date;
-                      }
-                    })()}
+                    {formatEventDate(nextEvent.date)}
                   </span>
                   {nextEvent.location && (
                     <span className="inline-flex items-center gap-2 text-[15px] font-semibold">
