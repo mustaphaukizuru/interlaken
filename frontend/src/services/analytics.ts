@@ -112,3 +112,16 @@ export const FunnelEvent = {
   ViewInscripcion: 'funnel_view_inscripcion',
   BookingConversion: 'conversion_agendar_visita',
 } as const;
+
+/**
+ * Admissions conversion micro-events (P6 funnel work). Fired through the same
+ * consent-gated trackEvent transport:
+ *  - AdmissionsStepCta → props { step }        (timeline CTA clicked)
+ *  - EstimatorUsed     → props { section, modality }
+ *  - WhatsappCta       → props { context }     (which WhatsApp button)
+ */
+export const ConversionEvent = {
+  AdmissionsStepCta: 'admissions_step_cta',
+  EstimatorUsed: 'estimator_used',
+  WhatsappCta: 'whatsapp_cta',
+} as const;

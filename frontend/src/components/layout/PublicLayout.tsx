@@ -12,8 +12,11 @@ import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { socialEntries } from '@/lib/siteContact';
+import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
 import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
+import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 
 /** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
 const HIDE_STICKY_CTA = [
@@ -339,14 +342,28 @@ export function PublicLayout() {
         <RouteTransition><Outlet /></RouteTransition>
       </main>
 
-      {/* Sticky mobile CTA — hidden on funnel/auth pages that already have a primary action. */}
+      {/* Sticky mobile CTA — hidden on funnel/auth pages that already have a
+          primary action. ONE bar with two actions: Agendar (primary) +
+          WhatsApp (secondary, hidden when no number is configured). */}
       {showStickyCta && (
-        <Link
-          to="/agendar-visita"
-          className="btn-pink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 justify-center shadow-lg md:hidden"
-        >
-          Agendar visita
-        </Link>
+        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-stretch gap-2 md:hidden">
+          <Link to="/agendar-visita" className="btn-pink min-w-0 flex-1 justify-center shadow-lg">
+            Agendar visita
+          </Link>
+          {settings.whatsapp_number && (
+            <a
+              href={waLink(settings.whatsapp_number, WA_MESSAGES.visit)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Escribir por WhatsApp"
+              title="Escribir por WhatsApp"
+              onClick={() => trackEvent(ConversionEvent.WhatsappCta, { context: 'barra_fija' })}
+              className="flex w-[52px] flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white shadow-lg transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+            >
+              <WhatsAppIcon className="h-6 w-6" />
+            </a>
+          )}
+        </div>
       )}
 
       {/* Floating WhatsApp bubble — right side, every public page. */}
