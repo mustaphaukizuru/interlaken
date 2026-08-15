@@ -104,6 +104,9 @@ jobs:
       DB_NAME: test_interlaken
       GOOGLE_CLIENT_ID: ci-client-id.apps.googleusercontent.com
       GOOGLE_CLIENT_SECRET: ci-client-secret
+      # The suite logs in ~19×/run — opt out of the 10/min login rate limit
+      # (honored by config.settings.development only; production is unaffected).
+      RATELIMIT_DISABLE: '1'
     steps:
       - uses: actions/checkout@v7
 
@@ -135,13 +138,38 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Cache the browser download (~115 MB) keyed on the Playwright version;
+      # `playwright install` becomes a no-op on a hit.
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browser
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      # --update-snapshots=missing: visual baselines are per-platform; until the
+      # linux ones are committed (grab them from the artifact below, see
+      # frontend/e2e/README.md) missing baselines are written instead of failing.
+      # Committed baselines are still compared strictly.
       - name: Run E2E (Playwright boots both dev servers)
         working-directory: frontend
-        run: npm run test:e2e
+        run: npm run test:e2e -- --update-snapshots=missing
+
+      - name: Upload visual baselines (linux — commit these to enable CI visual diffs)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines-linux
+          path: frontend/e2e/visual.spec.ts-snapshots/
+          retention-days: 7
 
       - name: Upload Playwright report on failure
         if: failure()
