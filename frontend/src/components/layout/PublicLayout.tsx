@@ -134,7 +134,7 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
                   onClick={() => setOpen(false)}
                   className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green group-hover:text-white">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green-strong group-hover:text-white">
                     <item.icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <span className="font-medium">{item.label}</span>

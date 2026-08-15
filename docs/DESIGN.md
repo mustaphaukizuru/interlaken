@@ -28,9 +28,10 @@ N%, transparent)` — never a hex+alpha suffix.
 | coral scale | `coral-50…900`, `coral-dark/light` | ramp |
 | Structural (purple) | `purple` / `brand-*` / `--purple` | `#401a8e` |
 | purple family | `purple-mid/dark/light/xlight` | `#5e3aad`,`#4d22a8`,`#ede8f7`,`#e7e2f7` |
-| Energetic (pink) | `pink` / `--pink` | `#ef2558` |
+| Energetic (pink) | `pink` / `--pink` | `#e01a4e` (darkened from `#ef2558` for AA: white labels 4.74:1) |
 | pink family | `pink-dark/hot/light/soft/pale` | ramp |
-| Warn/attention (amber) | `amber` / `--amber` | `#d97706` |
+| Interactive green face | `green-strong` / `--green-strong` | `#38801e` (white labels 4.91:1; wordmark `green` is decorative-only) |
+| Warn/attention (amber) | `amber` / `--amber` | `#b45309` (darkened from `#d97706` for AA text: 5.02:1) |
 
 `brand-*` is remapped to the purple scale so legacy `brand-*` utilities rebrand
 automatically. **Teal (`#1da2ab`) is banned** — retired from the palette; it must
@@ -43,7 +44,7 @@ in the login glow was removed in this run).
 |---|---|---|
 | Ink / body text | `ink` / `--text-main` | `#1A1130` |
 | Muted text | `muted` / `--text-muted` | `#6E6885` |
-| Subtle text | `subtle` / `--text-light` | `#9A93AE` |
+| Subtle text | `subtle` / `--text-light` | `#726B89` (darkened from `#9A93AE`, which was 2.93:1; now 5.02:1 white / 4.59:1 cream) |
 | Hairline border | `line` / `--border` | `#ECEAF3` |
 | Border (alt) | `line-2` / `--border-2` | `#EEEBF5` |
 | Page bg (cream) | `cream` / `cream-2` | `#F5F4FA` / `#FAF9FD` |
@@ -51,8 +52,9 @@ in the login glow was removed in this run).
 
 ### 1.3 Semantic state colors
 
-- **Success** → green family (`green-dark` `#316f1c` for text on light = AA).
-- **Warning/attention** → amber.
+- **Success** → green family (`green-dark` `#316f1c` for text on light = AA;
+  `green-strong` `#38801e` for solid interactive faces under white labels).
+- **Warning/attention** → amber (`#b45309`, AA as text on white/cream).
 - **Error/danger** → coral family; form validation text uses `red-600` (Tailwind
   default) as the conventional error signal.
 - **Info** → purple/brand.
@@ -144,6 +146,29 @@ currency, DD/MM/YYYY dates. Register standard: **usted**, held site-wide
 colegiatura, inscripción, preescolar/primaria/secundaria, CURP, SEP, LFPDPPP.
 
 ---
+
+## 4.5 Contrast audit (P1, Aug 2026)
+
+WCAG 2.1 AA audit of every token text/background pair (script: WCAG relative
+luminance, 4.5:1 body / 3:1 large+icons). Failures found and fixed at token level:
+
+| Pair | Before | After | Fix |
+|---|---|---|---|
+| `subtle` on white / cream | 2.93 / 2.68 | 5.02 / 4.59 | `#9A93AE` → `#726B89` |
+| white on `pink` (buttons) | 4.14 | 4.74 | `--pink` `#ef2558` → `#e01a4e` (gradients + shadows updated) |
+| white on `green` (buttons/chips) | 3.32 | 4.91 | new `green-strong` `#38801e` for interactive faces; wordmark `green` decorative-only |
+| `amber` as text | 3.19 | 5.02 | `--amber` `#d97706` → `#b45309` (`amber-bright` stays decorative) |
+
+Passing (unchanged): ink 18.0, muted 5.27, purple links 11.96, white-on-purple 11.96,
+white-on-coral 4.80, green-dark text 6.14. Exemptions: Google logo SVG colors in the
+OAuth button (third-party brand), Barcode line `#111827` (scanner contrast), decorative
+gradients without text.
+
+Skill evidence (ui-ux-pro-max, offline engine): ADOPTED — 4.5:1 enforced on all text
+faces, 16-24px radius conventions (already aligned), education-sector "playful but
+trustworthy" direction. REJECTED — suggested indigo `#4F46E5` palette and Claymorphism
+style: the palette is fixed by the official logo; visual language stays the current
+rounded-card system.
 
 ## 5. Verification results (this run)
 

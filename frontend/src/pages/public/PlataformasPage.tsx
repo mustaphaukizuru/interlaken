@@ -71,7 +71,7 @@ function PlatformCard({ p }: { p: (typeof FAMILY_PLATFORMS)[number] }) {
         href={p.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full border-2 border-green px-5 text-sm font-semibold text-green-dark transition-colors hover:bg-green hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green/40"
+        className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full border-2 border-green px-5 text-sm font-semibold text-green-dark transition-colors hover:bg-green-strong hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green/40"
       >
         {p.cta} <ArrowUpRight size={15} aria-hidden="true" />
       </a>

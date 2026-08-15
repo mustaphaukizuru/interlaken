@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ghost:
         'text-muted hover:bg-cream focus-visible:ring-purple/30',
       green:
-        'bg-green text-white shadow-green hover:bg-green-dark focus-visible:ring-green/40',
+        'bg-green-strong text-white shadow-green hover:bg-green-dark focus-visible:ring-green/40',
     };
     const sizes = {
       sm: 'text-xs px-3 py-1.5 min-h-[36px]',

@@ -11,7 +11,7 @@ artwork; drive the UI from these tokens instead.
 | **Primary / anchor** | `green-500` / `green` (DEFAULT) | `#47a028` | wordmark "INTERLAKEN / COLEGIO" |
 | **Warm accent** | `coral-500` / `coral` (DEFAULT) | `#dd2622` | clock hands + tagline rule |
 | Energetic secondary | `purple` (DEFAULT) | `#401a8e` | clock 12 o'clock tick |
-| Energetic secondary | `pink` (DEFAULT) | `#ef2558` | clock right ticks |
+| Energetic secondary | `pink` (DEFAULT) | `#e01a4e` | clock right ticks (darkened from sampled `#ef2558` so white button labels pass WCAG AA) |
 | (clock family, gradients only) | — | `#9a1185`, `#d30a70` | clock left / bottom ticks |
 
 `green` and `coral` each ship a full **50–900 scale** plus named aliases
@@ -22,6 +22,9 @@ CSS variables (`--green*`, `--coral*`) in `src/index.css`.
 - **green** — primary buttons/anchors, positive stats (balances, revenue), "Publicado"/
   "Completado" badges (`badge-green`, `btn-green`, `section-label-green`), success states.
   Use `green-dark` (`#316f1c`) for green **text on light** surfaces (AA contrast).
+  Use `green-strong` (`#38801e`) for **solid interactive faces under white labels**
+  (buttons, active chips, numbered step circles): wordmark green is 3.32:1 with white
+  and is decorative-only.
 - **coral** — warm accent, admissions CTA (`nav-admisiones`), `badge-coral`,
   `section-label-coral`, `<Blob tone="coral">`. Use `coral-dark` for coral text on light.
 - **purple** — brand/`brand-*` scale: portal chrome, primary CTA gradient, default anchor.
@@ -33,8 +36,10 @@ CSS variables (`--green*`, `--coral*`) in `src/index.css`.
 tailwind.config.js` → 0.
 
 ## Surfaces / neutrals
-`ink #1A1130` (text) · `muted #6E6885` · `subtle #9A93AE` · `cream #F5F4FA` / `cream-2 #FAF9FD`
-(page bg) · `dark #080516` → `dark-card #2a2342` (hero + portal sidebar).
+`ink #1A1130` (text) · `muted #6E6885` · `subtle #726B89` (darkened from `#9A93AE` for AA
+captions) · `cream #F5F4FA` / `cream-2 #FAF9FD` (page bg) · `dark #080516` →
+`dark-card #2a2342` (hero + portal sidebar). Warning text uses `amber #b45309`
+(darkened from `#d97706` for AA; `amber-bright #f5b300` stays decorative).
 
 ## Gradients (`:root` in index.css)
 - `--grad-bar` — top accent rule: purple → magenta → pink → **green** (logo sweep).

@@ -123,7 +123,7 @@ export default function BookVisitPage() {
             ['3', 'Reciba la confirmación de su visita por correo'],
           ].map(([n, t]) => (
             <div key={n} className="flex items-start gap-2.5 text-ink">
-              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green text-xs font-bold text-white">{n}</span>
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-strong text-xs font-bold text-white">{n}</span>
               <span>{t}</span>
             </div>
           ))}

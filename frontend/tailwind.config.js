@@ -37,6 +37,9 @@ export default {
           dark:   '#316f1c',
           bright: '#8bd15f',
           light:  '#eef7e9',
+          // Interactive face: white labels pass AA (4.91:1); wordmark green (3.32:1)
+          // stays decorative-only. Mirrors --green-strong.
+          strong: '#38801e',
         },
         coral: {
           50:  '#fdecec',
@@ -54,14 +57,17 @@ export default {
           light:  '#fdecec',
         },
         purple:  { DEFAULT: '#401a8e', mid: '#5e3aad', dark: '#4d22a8', light: '#ede8f7', xlight: '#e7e2f7' },
-        pink:    { DEFAULT: '#ef2558', dark: '#d81a49', hot: '#ec1f7f', light: '#fde8ed', soft: '#ff6a8e', pale: '#ff8fa8' },
-        amber:   { DEFAULT: '#d97706', bright: '#f5b300' },
+        // pink darkened (was #ef2558) and amber darkened (was #d97706) for WCAG AA;
+        // mirrors --pink / --amber in index.css.
+        pink:    { DEFAULT: '#e01a4e', dark: '#d81a49', hot: '#ec1f7f', light: '#fde8ed', soft: '#ff6a8e', pale: '#ff8fa8' },
+        amber:   { DEFAULT: '#b45309', bright: '#f5b300' },
         dark:    { DEFAULT: '#080516', 2: '#0f0a24', 3: '#1a1035', card: '#2a2342' },
         // Match CSS tokens / BRAND.md — was #F1EFF8 and drifted from --cream.
         cream:   { DEFAULT: '#F5F4FA', 2: '#FAF9FD' },
         ink:     { DEFAULT: '#1A1130' },
         muted:   '#6E6885',
-        subtle:  '#9A93AE',
+        // Darkened (was #9A93AE, 2.93:1) so caption text passes AA on white and cream.
+        subtle:  '#726B89',
         // Hairline borders / dividers (mirror --border / --border-2 in index.css)
         line:    '#ECEAF3',
         'line-2': '#EEEBF5',
@@ -91,7 +97,7 @@ export default {
       boxShadow: {
         card:   '0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10)',
         purple: '0 12px 28px -10px rgba(64,26,142,0.38)',
-        pink:   '0 12px 28px -10px rgba(239,37,88,0.3)',
+        pink:   '0 12px 28px -10px rgba(224,26,78,0.3)',
         green:  '0 12px 28px -10px rgba(71,160,40,0.32)',
         coral:  '0 12px 28px -10px rgba(221,38,34,0.3)',
       },

@@ -30,7 +30,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
     <>
       <div className="mx-auto w-full max-w-sm overflow-hidden rounded-xl3 shadow-purple ring-1 ring-black/5">
         {/* Gradient face */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-[#7a1f8f] to-pink px-5 pb-5 pt-4 text-white">
+        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-pink-hot to-pink px-5 pb-5 pt-4 text-white">
           <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10 blur-xl" />
           <div className="pointer-events-none absolute -bottom-12 -left-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
 
