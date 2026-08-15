@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { CreditCard, CheckCircle, Clock, XCircle, Receipt, Coffee, ArrowRight } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
@@ -41,10 +41,10 @@ const paymentTypeLabel: Record<string, string> = {
   other:      'Otro',
 };
 
-/** Pagos is a HUB: real payments happen in Colegiaturas (invoice-linked) and
- * Cafetería (top-up-linked), each with gateway selection + secure redirect. The
- * old free-amount "Realizar pago" modal never redirected, so it created orphan
- * PENDING rows that settled nothing — it's replaced by these action cards. */
+/** Pagos is a HUB: real payments happen in Cafetería (top-up-linked), with
+ * gateway selection + secure redirect. The old free-amount "Realizar pago"
+ * modal never redirected, so it created orphan PENDING rows that settled
+ * nothing — it's replaced by the action card. */
 export default function PaymentsPage() {
   const [page, setPage] = useState(1);
 
@@ -65,13 +65,6 @@ export default function PaymentsPage() {
       <PageHeader title="Pagos" subtitle="Realiza pagos con tarjeta y consulta tu historial." />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
-        <ActionCard
-          to="/portal/colegiaturas"
-          icon={Receipt}
-          title="Pagar colegiaturas"
-          desc="Consulta y paga las mensualidades de tus hijos con tarjeta."
-          gradient="from-pink to-purple"
-        />
         <ActionCard
           to="/portal/cafeteria"
           icon={Coffee}

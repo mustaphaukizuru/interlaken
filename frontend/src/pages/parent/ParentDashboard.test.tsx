@@ -86,7 +86,6 @@ describe('ParentDashboard', () => {
       'href',
       '/contacto',
     );
-    expect(screen.queryByRole('link', { name: /Pagar colegiaturas/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Recargar cafetería/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
   });
@@ -107,8 +106,6 @@ describe('ParentDashboard', () => {
           },
         ],
         recent_payments: [],
-        pending_invoices: 0,
-        pending_balance: '0.00',
         needs_family_link: false,
         announcements: [],
         unread_notifications: 0,
@@ -117,11 +114,7 @@ describe('ParentDashboard', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('link', { name: /Pagar colegiaturas/i })).toHaveAttribute(
-      'href',
-      '/portal/colegiaturas',
-    );
-    expect(screen.getByRole('link', { name: /Recargar cafetería/i })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /Recargar cafetería/i })).toHaveAttribute(
       'href',
       '/portal/cafeteria',
     );
@@ -130,28 +123,4 @@ describe('ParentDashboard', () => {
     expect(screen.getByText(/Luis López/i)).toBeInTheDocument();
   });
 
-  it('shows unpaid colegiatura count even when recent_payments is empty', async () => {
-    getDashboard.mockResolvedValue({
-      data: {
-        children_count: 1,
-        children: [
-          { id: 11, name: 'Luis López', grade: '3°', group: 'A', student_id: 'A-11' },
-        ],
-        cafeteria_balances: [],
-        recent_payments: [],
-        pending_invoices: 2,
-        pending_balance: '5000.00',
-        needs_family_link: false,
-        announcements: [],
-        unread_notifications: 0,
-      },
-    } as never);
-
-    renderPage();
-
-    expect(await screen.findByText(/Colegiaturas pendientes/i)).toBeInTheDocument();
-    // Count-up may start at 0; assert the label + that we did not fall back to
-    // inferring zero from empty recent_payments.
-    expect(screen.queryByText(/Pagos Pendientes/i)).not.toBeInTheDocument();
-  });
 });

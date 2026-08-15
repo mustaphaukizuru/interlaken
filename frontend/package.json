@@ -21,6 +21,7 @@
     "axios": "^1.19.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "framer-motion": "^13.1.0",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^1.31.0",
     "qrcode.react": "^4.2.0",

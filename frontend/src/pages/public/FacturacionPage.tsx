@@ -95,8 +95,8 @@ export default function FacturacionPage() {
                 Historial y comprobantes
               </p>
               <p className="mt-3 text-sm leading-relaxed text-muted sm:text-[15px]">
-                En el Portal de Familias puede consultar sus colegiaturas, pagos
-                realizados y descargar comprobantes.
+                En el Portal de Familias puede consultar sus pagos realizados y
+                descargar comprobantes.
               </p>
               <Link to="/login" className="btn-outline mt-5">
                 Ir al Portal <ArrowRight size={15} aria-hidden="true" />

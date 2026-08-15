@@ -73,7 +73,6 @@ test('parent portal routes render', async ({ page }) => {
   await expect(page).toHaveURL(/\/portal\/?$/);
   await expectMainSettled(page);
   await clickNavAndSettle(page, 'Cafetería', /\/portal\/cafeteria/);
-  await clickNavAndSettle(page, 'Colegiaturas', /\/portal\/colegiaturas/);
   await clickNavAndSettle(page, 'Pagos', /\/portal\/pagos/);
 });
 

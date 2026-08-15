@@ -122,8 +122,8 @@ export default function PlataformasPage() {
                 Portal de Familias Interlaken
               </p>
               <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
-                Saldo y recargas de cafetería, pago de colegiaturas, avisos y
-                comunicados, y agenda de visitas — todo con su cuenta del colegio.
+                Saldo y recargas de cafetería, avisos y comunicados, y agenda
+                de visitas — todo con su cuenta del colegio.
               </p>
               <Link to="/login" className="btn-pink mt-5">
                 <LockKeyhole size={15} aria-hidden="true" /> Entrar al Portal

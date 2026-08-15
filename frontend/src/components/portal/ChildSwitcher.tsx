@@ -17,7 +17,7 @@ interface ChildSwitcherProps {
 
 /**
  * Compact chip row to pick among linked children. Persists selection so
- * Colegiaturas / Cafetería can filter to the same alumno.
+ * Cafetería can filter to the same alumno.
  */
 export function ChildSwitcher({ students, allowAll = false, className = '' }: ChildSwitcherProps) {
   const childId = useSelectedChildStore((s) => s.childId);

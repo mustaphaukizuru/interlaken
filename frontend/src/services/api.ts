@@ -379,7 +379,7 @@ export function downloadBlob(data: Blob, filename: string) {
 
 // ── PAYMENTS ─────────────────────────────────────────────
 // Bare POST /payments/initiate/ is fail-closed (no unlinked charge path).
-// Real money starts from finance invoice-pay or cafeteria top-up.
+// Real money starts from the cafeteria top-up.
 export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
@@ -389,21 +389,9 @@ export const paymentsApi = {
 };
 
 // ── FINANCE / TUITION (Prompt 17) ─────────────────────────
+// Admin-only: the parent-facing colegiaturas UI was removed from the portal
+// (the backend endpoints still exist).
 export const financeApi = {
-  // Parent
-  getInvoices: (params?: { student?: number; status?: string; period?: string; page?: number }) =>
-    api.get('/finance/invoices/', { params }),
-
-  getInvoice: (id: number) =>
-    api.get(`/finance/invoices/${id}/`),
-
-  payInvoice: (id: number, gateway?: string) =>
-    api.post(`/finance/invoices/${id}/pay/`, gateway ? { gateway } : {}),
-
-  downloadReceipt: (id: number) =>
-    api.get(`/finance/invoices/${id}/receipt/`, { responseType: 'blob' }),
-
-  // Admin
   getDashboard: (period?: string) =>
     api.get('/finance/admin/dashboard/', { params: period ? { period } : {} }),
 

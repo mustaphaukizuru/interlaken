@@ -32,7 +32,6 @@ export const navByRole: Record<Role, NavEntry[]> = {
   ],
   parent: [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
-    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
     { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
@@ -44,7 +43,6 @@ export const navByRole: Record<Role, NavEntry[]> = {
   // only redirects there. Keep the same destinations as parents.
   student: [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
-    { icon: Receipt,         label: 'Colegiaturas', to: '/portal/colegiaturas' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
     { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },

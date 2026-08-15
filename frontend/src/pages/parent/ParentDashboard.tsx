@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Coffee, CreditCard, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle, MessageCircle, QrCode } from 'lucide-react';
+import { Coffee, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle, MessageCircle, QrCode } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -51,8 +51,6 @@ export default function ParentDashboard() {
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
   const totalBalance = (data?.cafeteria_balances ?? []).reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const hasLowBalance = data?.cafeteria_balances?.some(b => b.low);
-  // Prefer invoice summary from the API; never infer from recent Payment stubs.
-  const pendingInvoices = data?.pending_invoices ?? 0;
 
   return (
     <>
@@ -76,8 +74,8 @@ export default function ParentDashboard() {
         {isError ? (
           <div className="card"><ErrorState onRetry={() => refetch()} /></div>
         ) : isLoading ? (
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
-            {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-[148px]" />)}
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-[18px]">
+            {[0, 1, 2].map(i => <div key={i} className="skeleton h-[148px]" />)}
           </div>
         ) : needsFamilyLink ? (
           <>
@@ -139,11 +137,10 @@ export default function ParentDashboard() {
         )}
 
         {/* Stats */}
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-[18px]">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-[18px]">
           {[
             <StatCard key="a" title="Alumnos" value={data?.children_count ?? data?.children?.length ?? 0} icon={GraduationCap} color="purple" />,
             <StatCard key="b" title="Saldo Cafetería" value={`$${totalBalance.toFixed(2)}`} icon={Coffee} color={hasLowBalance ? 'amber' : 'green'} />,
-            <StatCard key="c" title="Colegiaturas pendientes" value={pendingInvoices} icon={CreditCard} color="coral" />,
             <StatCard key="d" title="Avisos" value={data?.unread_notifications ?? data?.announcements?.length ?? 0} icon={Bell} color="pink" />,
           ].map((card, i) => (
             <Reveal key={i} delay={i * 70}>{card}</Reveal>
@@ -151,8 +148,7 @@ export default function ParentDashboard() {
         </div>
 
         {/* Quick actions — the things parents do most */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <QuickAction to="/portal/colegiaturas" icon={Receipt} title="Pagar colegiaturas" desc="Consulta y paga las mensualidades." gradient="from-pink to-purple" />
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
           <QuickAction to="/portal/cafeteria" icon={Coffee} title="Recargar cafetería" desc="Agrega saldo con tarjeta." gradient="from-green to-green-dark" />
           <QuickAction to="/portal/credencial" icon={QrCode} title="Credencial digital" desc="Código para pagar en caja." gradient="from-purple to-pink" />
         </div>

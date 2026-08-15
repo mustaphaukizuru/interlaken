@@ -124,7 +124,7 @@ export default function LoginPage() {
               <span className="bg-[linear-gradient(100deg,var(--pink)_0%,var(--purple-mid)_100%)] bg-clip-text text-transparent">con Excelencia</span>
             </h1>
             <p className="mt-4 max-w-[420px] text-[15px] leading-relaxed text-white/60">
-              Acceda al portal de Colegio Interlaken para consultar colegiaturas, cafetería y pagos en línea.
+              Acceda al portal de Colegio Interlaken para consultar cafetería y pagos en línea.
             </p>
           </div>
           <div className="relative flex gap-7">
