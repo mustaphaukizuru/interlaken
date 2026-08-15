@@ -36,6 +36,8 @@ export function CommandPalette() {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const q = useDebounced(query.trim());
   const enabled = open && q.length >= 2;
@@ -75,6 +77,42 @@ export function CommandPalette() {
     return () => {
       document.body.style.overflow = prevOverflow;
     };
+  }, [open]);
+
+  // Restore focus to whatever opened the palette (Ctrl+K target or the header
+  // search button) once it closes — Escape, backdrop and X all pass through here.
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    return () => {
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open]);
+
+  // Trap Tab within the palette while open (simplified Modal trap).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>('button, input, [tabindex]:not([tabindex="-1"])')
+      ).filter((el) => el.getClientRects().length > 0);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeEl = document.activeElement;
+      if (e.shiftKey && activeEl === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && activeEl === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open]);
 
   const students = useQuery({
@@ -164,6 +202,7 @@ export function CommandPalette() {
       onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
     >
       <div
+        ref={panelRef}
         className="w-full max-w-lg overflow-hidden rounded-xl2 bg-white shadow-card"
         role="dialog"
         aria-modal="true"
@@ -178,6 +217,11 @@ export function CommandPalette() {
             onKeyDown={onInputKey}
             placeholder="Buscar alumnos, reservas, facturas…"
             aria-label="Buscar alumnos, reservas o facturas"
+            role="combobox"
+            aria-expanded={items.length > 0}
+            aria-controls="cmdk-list"
+            aria-autocomplete="list"
+            aria-activedescendant={items[active] ? `cmdk-opt-${items[active].key}` : undefined}
             className="h-12 w-full bg-transparent text-[15px] text-ink outline-none placeholder:text-subtle"
           />
           <button
@@ -190,7 +234,14 @@ export function CommandPalette() {
           </button>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto p-2" role="listbox" aria-label="Resultados">
+        {/* role="listbox" only when there are options — an empty listbox fails
+            aria-required-children; status messages render in a plain div. */}
+        <div
+          id="cmdk-list"
+          className="max-h-[50vh] overflow-y-auto p-2"
+          role={items.length ? 'listbox' : undefined}
+          aria-label={items.length ? 'Resultados' : undefined}
+        >
           {q.length < 2 ? (
             <p className="px-3 py-6 text-center text-sm text-muted">
               Escriba al menos 2 caracteres. Consejo: <kbd className="rounded border border-ink/15 px-1">Ctrl</kbd>+<kbd className="rounded border border-ink/15 px-1">K</kbd> abre esta búsqueda.
@@ -205,7 +256,7 @@ export function CommandPalette() {
               lastGroup = item.group;
               const Icon = item.icon;
               return (
-                <div key={item.key}>
+                <div key={item.key} role="group">
                   {header && (
                     <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">
                       {header}
@@ -213,6 +264,7 @@ export function CommandPalette() {
                   )}
                   <button
                     type="button"
+                    id={`cmdk-opt-${item.key}`}
                     role="option"
                     aria-selected={i === active}
                     onMouseEnter={() => setActive(i)}

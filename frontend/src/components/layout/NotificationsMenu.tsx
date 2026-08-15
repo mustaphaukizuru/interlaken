@@ -66,13 +66,13 @@ export function NotificationsMenu() {
   return (
     <Dropdown
       width={370}
-      label="Notificaciones"
       trigger={({ open, toggle }) => (
         <button
           type="button"
           onClick={toggle}
           aria-label={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
           aria-expanded={open}
+          aria-haspopup="true"
           className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-white text-muted shadow-card transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           <Bell size={19} />
@@ -92,7 +92,7 @@ export function NotificationsMenu() {
               <button
                 type="button"
                 onClick={() => markAll.mutate()}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-purple transition-colors hover:text-purple-mid"
+                className="inline-flex items-center gap-1 rounded text-xs font-semibold text-purple transition-colors hover:text-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
               >
                 <Check size={13} /> Marcar todas
               </button>
@@ -113,7 +113,7 @@ export function NotificationsMenu() {
                     key={n.id}
                     type="button"
                     onClick={() => openNotif(n, close)}
-                    className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition-colors last:border-0 hover:bg-cream ${
+                    className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition-colors last:border-0 hover:bg-cream focus-visible:bg-cream focus-visible:outline-none ${
                       n.is_read ? '' : 'bg-purple/[0.035]'
                     }`}
                   >

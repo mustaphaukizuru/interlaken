@@ -22,6 +22,11 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // Call sites pass inline arrows for `onClose`; reading it through a ref keeps
+  // the focus-trap effect stable across parent re-renders (otherwise focus
+  // bounces back to the first focusable element on every keystroke).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -36,13 +41,18 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panel) return;
 
+      // `offsetParent` alone would exclude visible position:fixed descendants,
+      // so also keep anything that actually generates a box.
       const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-        (el) => el.offsetParent !== null || el === document.activeElement
+        (el) =>
+          el.offsetParent !== null ||
+          el.getClientRects().length > 0 ||
+          el === document.activeElement
       );
       if (focusable.length === 0) {
         e.preventDefault();
@@ -73,7 +83,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
       // Restore focus to whatever opened the dialog.
       previouslyFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

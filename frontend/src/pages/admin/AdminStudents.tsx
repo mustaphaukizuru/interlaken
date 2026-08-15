@@ -73,6 +73,7 @@ export default function AdminStudents() {
           <input
             className="input-field pl-9"
             placeholder="Buscar por nombre, matrícula, correo o grado…"
+            aria-label="Buscar alumnos"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -88,6 +89,11 @@ export default function AdminStudents() {
             icon={Users}
             title={debouncedSearch ? 'Sin resultados' : 'Sin alumnos'}
             description={debouncedSearch ? 'Ningún alumno coincide con la búsqueda.' : 'Los alumnos registrados aparecerán aquí.'}
+            action={debouncedSearch ? undefined : (
+              <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
+                <FileUp size={16} aria-hidden="true" /> Importar CSV
+              </button>
+            )}
           />
         ) : (
           <>

@@ -20,7 +20,7 @@ export default function MobileTabBar({ role }: { role: Role }) {
           to={to}
           end={end}
           className={({ isActive }) =>
-            `flex min-w-0 flex-1 flex-col items-center gap-1 pb-1.5 pt-2 text-[10px] font-semibold focus-visible:outline-none ${
+            `flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg pb-1.5 pt-2 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/40 ${
               isActive ? 'text-purple' : 'text-subtle'
             }`
           }

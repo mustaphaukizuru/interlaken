@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { portalApi } from '@/services/api';
 
 interface Guardian {
@@ -43,6 +44,7 @@ export function StudentGuardians({ studentId }: Props) {
   const [phone, setPhone] = useState('');
   const [relationship, setRelationship] = useState('Padre/Madre');
   const [open, setOpen] = useState(false);
+  const [toUnlink, setToUnlink] = useState<Guardian | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-student-guardians', studentId],
@@ -96,6 +98,7 @@ export function StudentGuardians({ studentId }: Props) {
     mutationFn: (userId: number) => portalApi.unlinkGuardian(studentId, userId),
     onSuccess: () => {
       toast.success('Tutor desvinculado.');
+      setToUnlink(null);
       invalidate();
     },
     onError: () => toast.error('No se pudo desvincular el tutor.'),
@@ -215,15 +218,9 @@ export function StudentGuardians({ studentId }: Props) {
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={unlink.isPending}
-                onClick={() => {
-                  const label = g.is_self
-                    ? 'la cuenta familiar'
-                    : (g.full_name || g.email);
-                  if (window.confirm(`¿Desvincular a ${label} de este alumno?`)) {
-                    unlink.mutate(g.id);
-                  }
-                }}
+                loading={unlink.isPending && unlink.variables === g.id}
+                disabled={unlink.isPending && unlink.variables === g.id}
+                onClick={() => setToUnlink(g)}
               >
                 <Unlink className="h-4 w-4" aria-hidden="true" />
                 Desvincular
@@ -232,6 +229,18 @@ export function StudentGuardians({ studentId }: Props) {
           ))}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={!!toUnlink}
+        onClose={() => setToUnlink(null)}
+        onConfirm={() => toUnlink && unlink.mutate(toUnlink.id)}
+        title="Desvincular tutor"
+        message={`¿Desvincular a ${
+          toUnlink?.is_self ? 'la cuenta familiar' : (toUnlink?.full_name || toUnlink?.email)
+        } de este alumno?`}
+        confirmLabel="Desvincular"
+        loading={unlink.isPending}
+      />
     </Card>
   );
 }

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { SITE_NAME } from '@/lib/siteMeta';
 import { authApi } from '@/services/api';
 
 /** Confirm password reset / first-time activation from email link. */
@@ -11,6 +12,11 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const uid = params.get('uid') ?? '';
   const token = params.get('token') ?? '';
+
+  // Rendered outside PublicLayout (no <RouteSeo>), so set the title directly.
+  useEffect(() => {
+    document.title = `Restablecer contraseña · ${SITE_NAME}`;
+  }, []);
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -74,13 +80,13 @@ export default function ResetPasswordPage() {
                   type={show ? 'text' : 'password'}
                   required
                   autoComplete="new-password"
-                  className="input-field min-h-[44px] pl-10 pr-10 text-base"
+                  className="input-field min-h-[44px] pl-10 pr-12 text-base sm:pr-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle"
+                  className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-subtle transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:right-2 sm:h-8 sm:w-8"
                   onClick={() => setShow((s) => !s)}
                   aria-label={show ? 'Ocultar' : 'Mostrar'}
                 >

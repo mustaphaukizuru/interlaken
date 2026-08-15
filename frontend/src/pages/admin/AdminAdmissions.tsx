@@ -147,7 +147,7 @@ export default function AdminAdmissions() {
                         <p className="font-medium text-ink">{p.child_name}</p>
                         <p className="text-xs text-subtle">Grado: {p.grade_applying}</p>
                       </div>
-                      <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
+                      <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending && updateStatus.variables?.id === p.id} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
                     </div>
                     <dl className="mt-3 space-y-1 text-sm">
                       <div className="flex justify-between gap-3">
@@ -207,7 +207,7 @@ export default function AdminAdmissions() {
                           {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
                         </td>
                         <td>
-                          <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
+                          <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending && updateStatus.variables?.id === p.id} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
                         </td>
                         <td>
                           <button type="button" disabled={invitingId === p.id}

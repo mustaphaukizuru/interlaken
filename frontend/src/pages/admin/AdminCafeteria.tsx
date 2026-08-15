@@ -205,7 +205,7 @@ function RosterTab() {
                         aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
                         title="Sincronizar saldo"
                         onClick={() => syncOne.mutate(b.student.id)}
-                        loading={syncOne.isPending}
+                        loading={syncOne.isPending && syncOne.variables === b.student.id}
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                       </Button>
@@ -261,7 +261,7 @@ function RosterTab() {
                             aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
                             title="Sincronizar saldo"
                             onClick={() => syncOne.mutate(b.student.id)}
-                            loading={syncOne.isPending}
+                            loading={syncOne.isPending && syncOne.variables === b.student.id}
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
                           </Button>
@@ -723,7 +723,7 @@ function ReconcileTab() {
 function LowBalanceTab() {
   const [page, setPage] = useState(1);
 
-  const { data: paged, isLoading } = useQuery({
+  const { data: paged, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-cafeteria-low-balance', page],
     queryFn: async () => toPaged<CafeteriaBalance>((await cafeteriaApi.getLowBalance({ page })).data),
     placeholderData: keepPreviousData,
@@ -736,6 +736,8 @@ function LowBalanceTab() {
     <Card>
       {isLoading ? (
         <TableSkeleton />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : !data?.length ? (
         <EmptyState icon={CheckCircle2} title="Ningún alumno con saldo bajo" />
       ) : (
