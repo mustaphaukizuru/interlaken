@@ -628,7 +628,7 @@ export default function CafeteriaPage() {
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
           {(balances?.length ?? 0) > 1 && (
             <select
-              className="input-field min-h-[44px] text-sm lg:w-auto"
+              className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
               value={filterStudent}
               onChange={(e) => {
                 const next = e.target.value === 'all' ? 'all' : Number(e.target.value);
@@ -644,7 +644,7 @@ export default function CafeteriaPage() {
             </select>
           )}
           <select
-            className="input-field min-h-[44px] text-sm lg:w-auto"
+            className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as TypeFilter)}
             aria-label="Filtrar por tipo"
@@ -656,14 +656,14 @@ export default function CafeteriaPage() {
           </select>
           <input
             type="date"
-            className="input-field min-h-[44px] text-sm lg:w-auto"
+            className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
             value={filterFrom}
             onChange={(e) => setFilterFrom(e.target.value)}
             aria-label="Desde"
           />
           <input
             type="date"
-            className="input-field min-h-[44px] text-sm lg:w-auto"
+            className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
             value={filterTo}
             onChange={(e) => setFilterTo(e.target.value)}
             aria-label="Hasta"

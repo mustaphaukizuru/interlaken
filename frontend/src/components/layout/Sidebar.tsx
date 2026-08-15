@@ -20,7 +20,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   return (
     <aside
       aria-label="Navegación del portal"
-      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-5 overflow-hidden border-r border-line bg-white px-4 py-6 transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-5 overflow-hidden border-r border-line bg-white px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       }`}
     >

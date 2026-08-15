@@ -18,12 +18,17 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
   const s = card.student;
   const gradeLine = [s.grade, s.group && `Grupo ${s.group}`].filter(Boolean).join(' · ');
 
-  // Escape closes the full-screen scan view.
+  // Escape closes the full-screen scan view; body scroll is locked while open.
   useEffect(() => {
     if (!full) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false); };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKey);
+    };
   }, [full]);
 
   return (
@@ -86,7 +91,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
       {/* Full-screen scan view */}
       {full && card.code && (
         <div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white p-6"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white p-[max(1.5rem,env(safe-area-inset-bottom))]"
           role="dialog"
           aria-modal="true"
           aria-label="Código para escanear en caja"

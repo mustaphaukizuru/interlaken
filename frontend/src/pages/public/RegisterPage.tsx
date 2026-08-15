@@ -449,9 +449,9 @@ function SectionHead({ title, subtitle }: { title: string; subtitle?: string }) 
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-start gap-3 text-sm text-muted">
+    <label className="flex min-h-[44px] items-center gap-3 text-sm text-muted">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+        className="h-4 w-4 shrink-0 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
       <span>{label}</span>
     </label>
   );
@@ -479,9 +479,9 @@ function FileRow({ label, file, onPick, onClear }: {
         <span className="truncate">{file ? file.name : label}</span>
       </span>
       {file ? (
-        <button type="button" onClick={onClear} className="shrink-0 text-xs font-semibold text-coral-dark hover:underline">Quitar</button>
+        <button type="button" onClick={onClear} className="inline-flex min-h-[44px] shrink-0 items-center text-xs font-semibold text-coral-dark hover:underline">Quitar</button>
       ) : (
-        <label htmlFor={id} className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cream px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line">
+        <label htmlFor={id} className="inline-flex min-h-[44px] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cream px-3 py-1.5 text-xs font-semibold text-ink hover:bg-line">
           <UploadCloud className="h-3.5 w-3.5" /> Adjuntar
           <input id={id} type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only"
             onChange={(e) => {

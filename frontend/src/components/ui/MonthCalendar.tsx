@@ -66,7 +66,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
           onClick={() => canGoPrev && setViewMonth((m) => subMonths(m, 1))}
           disabled={!canGoPrev}
           aria-label="Mes anterior"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30"
+          className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30"
         >
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -77,7 +77,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, 1))}
           aria-label="Mes siguiente"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -93,7 +93,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
       </div>
 
       {/* Day grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
         {grid.map((day) => {
           const iso = format(day, 'yyyy-MM-dd');
           const inMonth = isSameMonth(day, viewMonth);
@@ -129,7 +129,9 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
                   ? `, ${count} ${count === 1 ? countLabel.replace(/s$/, '') : countLabel} disponible${count === 1 ? '' : 's'}`
                   : ''
               }`}
-              className={`group relative flex aspect-square flex-col items-center justify-center rounded-xl text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 focus-visible:ring-offset-1 motion-reduce:transition-none ${
+              // aspect-square yields ~40px cells at 360px wide (under the 44px touch
+              // minimum), so phones get min-h instead; squares return from sm: up.
+              className={`group relative flex min-h-[44px] sm:aspect-square sm:min-h-0 flex-col items-center justify-center rounded-xl text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 focus-visible:ring-offset-1 motion-reduce:transition-none ${
                 selected
                   ? 'bg-purple text-white shadow-purple'
                   : 'bg-brand-50 text-brand-700 hover:-translate-y-0.5 hover:bg-brand-100 hover:shadow-sm motion-reduce:hover:translate-y-0'

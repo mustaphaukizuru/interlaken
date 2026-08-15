@@ -93,8 +93,8 @@ export default function AdminFees() {
                           <button type="button" onClick={() => toggle.mutate(f)} className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted hover:bg-cream whitespace-nowrap">
                             {f.active ? 'Desactivar' : 'Activar'}
                           </button>
-                          <button type="button" onClick={() => openEdit(f)} aria-label="Editar" className="rounded-lg p-1.5 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                          <button type="button" onClick={() => setToDelete(f)} aria-label="Eliminar" className="rounded-lg p-1.5 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => openEdit(f)} aria-label="Editar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => setToDelete(f)} aria-label="Eliminar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -124,7 +124,7 @@ export default function AdminFees() {
             <Input label="Monto/%" type="number" inputMode="decimal" value={form.late_fee_amount} onChange={(e) => set('late_fee_amount', e.target.value)} disabled={form.late_fee_type === 'none'} />
             <Input label="Días de gracia" type="number" value={form.late_fee_grace_days} onChange={(e) => set('late_fee_grace_days', Number(e.target.value))} />
           </div>
-          <label className="flex items-center gap-2 text-sm text-muted">
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" /> Activo
           </label>

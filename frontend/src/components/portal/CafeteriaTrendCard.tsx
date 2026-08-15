@@ -54,7 +54,7 @@ export default function CafeteriaTrendCard() {
   const interval = series.length ? Math.max(0, Math.floor(series.length / 6)) : 0;
 
   return (
-    <div className="card overflow-hidden !p-0">
+    <div className="card min-w-0 overflow-hidden !p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cream px-5 py-4">
         <div>
           <h2 className="font-head text-[15px] font-bold text-ink">Consumo de cafetería</h2>
@@ -66,7 +66,7 @@ export default function CafeteriaTrendCard() {
               value={student}
               onChange={(e) => setStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               aria-label="Filtrar consumo por alumno"
-              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
+              className="min-h-[44px] sm:min-h-0 rounded-lg border border-line bg-white px-2.5 py-1.5 text-base sm:text-[12.5px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
             >
               <option value="all">Todos</option>
               {children!.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

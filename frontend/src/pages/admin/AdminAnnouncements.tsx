@@ -191,7 +191,7 @@ export default function AdminAnnouncements() {
               {AUDIENCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm text-muted">
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Publicado (visible en el portal)
@@ -243,7 +243,7 @@ export default function AdminAnnouncements() {
               {AUDIENCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm text-muted">
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input
               type="checkbox"
               checked={alertForm.whatsapp}
@@ -252,12 +252,12 @@ export default function AdminAnnouncements() {
             />
             También WhatsApp (solo números registrados; requiere Cloud API)
           </label>
-          <label className="flex items-start gap-2 text-sm text-ink">
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
               checked={alertConfirm}
               onChange={(e) => setAlertConfirm(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-line text-pink focus-visible:ring-2 focus-visible:ring-pink/40"
+              className="h-4 w-4 rounded border-line text-pink focus-visible:ring-2 focus-visible:ring-pink/40"
             />
             Confirmo que este aviso es urgente y debe enviarse ahora a la audiencia seleccionada.
           </label>

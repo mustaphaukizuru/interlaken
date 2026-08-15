@@ -262,9 +262,9 @@ export function RegistrationReviewModal({ id, open, onClose }: {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[7rem_1fr] gap-3 text-sm">
+    <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-[7rem_1fr] gap-3 text-sm">
       <dt className="text-subtle">{label}</dt>
-      <dd className="text-ink">{children}</dd>
+      <dd className="break-words text-ink">{children}</dd>
     </div>
   );
 }

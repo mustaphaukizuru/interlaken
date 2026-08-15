@@ -101,7 +101,7 @@ export default function AdminAdmissions() {
                 <p className="mt-1 text-xs text-subtle">También se envió por correo al tutor. Comparta el enlace por WhatsApp si lo prefiere.</p>
               </div>
               <button type="button" onClick={() => setInvitedLink(null)} aria-label="Descartar"
-                className="-mr-1 -mt-1 shrink-0 rounded-lg p-1 text-subtle hover:bg-white hover:text-ink">
+                className="-mr-1 -mt-1 shrink-0 rounded-lg p-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-white hover:text-ink">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -169,7 +169,7 @@ export default function AdminAdmissions() {
                     </dl>
                     <button type="button" disabled={invitingId === p.id}
                       onClick={() => invite.mutate({ id: p.id, name: p.child_name })}
-                      className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-purple/10 px-3 py-2 text-xs font-semibold text-purple hover:bg-purple/15 disabled:opacity-50">
+                      className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg bg-purple/10 px-3 py-2 text-xs font-semibold text-purple hover:bg-purple/15 disabled:opacity-50">
                       <Send className="h-3.5 w-3.5" /> {invitingId === p.id ? 'Generando…' : 'Invitar a inscripción'}
                     </button>
                   </li>
@@ -250,7 +250,7 @@ function StatusSelect({ value, variant, onChange, disabled }: {
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       aria-label="Cambiar estado del pre-registro"
-      className={`rounded-lg border bg-white px-2 py-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50 ${VARIANT_CLASS[variant] ?? 'border-line text-muted'}`}
+      className={`min-h-[44px] sm:min-h-0 rounded-lg border bg-white px-2 py-1 text-base sm:text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50 ${VARIANT_CLASS[variant] ?? 'border-line text-muted'}`}
     >
       {Object.entries(statusMeta).map(([k, m]) => (
         <option key={k} value={k}>{m.label}</option>

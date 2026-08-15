@@ -67,6 +67,16 @@ export function CommandPalette() {
     }
   }, [open]);
 
+  // Lock background scroll while the palette is open.
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   const students = useQuery({
     queryKey: ['palette-students', q],
     queryFn: async () => asList<StudentProfile>((await portalApi.getStudents({ search: q })).data),
@@ -150,7 +160,7 @@ export function CommandPalette() {
     // close button.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/40 p-4 pt-[12vh]"
+      className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/40 p-4 pt-[8vh] sm:pt-[12vh]"
       onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
     >
       <div
@@ -174,7 +184,7 @@ export function CommandPalette() {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Cerrar búsqueda"
-            className="rounded p-1 text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
+            className="rounded p-2.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
           >
             <X size={16} aria-hidden="true" />
           </button>

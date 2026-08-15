@@ -95,8 +95,8 @@ export function StudentDiscounts({ studentId }: { studentId: number }) {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <button type="button" onClick={() => openEdit(d)} aria-label="Editar" className="rounded-lg p-1.5 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                  <button type="button" onClick={() => setToDelete(d)} aria-label="Eliminar" className="rounded-lg p-1.5 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => openEdit(d)} aria-label="Editar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => setToDelete(d)} aria-label="Eliminar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             );
@@ -127,7 +127,7 @@ export function StudentDiscounts({ studentId }: { studentId: number }) {
             <Input label="Hasta (YYYY-MM, opcional)" value={form.end_period} onChange={(e) => set('end_period', e.target.value)} placeholder="2027-06" />
           </div>
           <Input label="Nota (opcional)" value={form.note} onChange={(e) => set('note', e.target.value)} />
-          <label className="flex items-center gap-2 text-sm text-muted">
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" /> Activa
           </label>

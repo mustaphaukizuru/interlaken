@@ -52,7 +52,7 @@ export default function AdminCafeteria() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`inline-flex min-h-[44px] items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === key
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-muted hover:text-ink'
@@ -625,8 +625,8 @@ function ReconcileTab() {
           (lotes de {RECONCILE_LIMIT} alumnos).
         </p>
         <div className="flex items-center gap-3">
-          <label className="inline-flex items-center gap-1.5 text-sm text-muted">
-            <input type="checkbox" checked={onlyDrift} onChange={(e) => setOnlyDrift(e.target.checked)} />
+          <label className="inline-flex min-h-[44px] items-center gap-2 text-sm text-muted">
+            <input type="checkbox" className="h-4 w-4" checked={onlyDrift} onChange={(e) => setOnlyDrift(e.target.checked)} />
             Solo diferencias
           </label>
           <Button size="sm" loading={reconcile.isPending} onClick={() => reconcile.mutate(0)}>

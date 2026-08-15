@@ -308,7 +308,7 @@ function SlotManager() {
     <>
       <div className="mb-4">
         <select
-          className="input-field text-sm py-1.5 max-w-xs"
+          className="input-field text-base sm:text-sm py-1.5 max-w-xs"
           aria-label="Filtrar horarios por tipo"
           value={typeFilter}
           onChange={(e) => {
@@ -445,9 +445,9 @@ export default function AdminBookings() {
       <Card
         title="Reservas"
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <select
-              className="input-field text-sm py-1.5"
+              className="input-field w-full sm:w-auto text-base sm:text-sm py-1.5"
               aria-label="Filtrar por tipo de visita"
               value={typeFilter}
               onChange={(e) => {
@@ -460,7 +460,7 @@ export default function AdminBookings() {
               <option value="">Todos los tipos</option>
             </select>
             <select
-              className="input-field text-sm py-1.5"
+              className="input-field w-full sm:w-auto text-base sm:text-sm py-1.5"
               aria-label="Filtrar por estado"
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}

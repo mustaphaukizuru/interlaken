@@ -16,7 +16,7 @@ export function StaffCard({ title, subtitle, children, className = '' }: {
 }) {
   return (
     <section
-      className={`rounded-xl2 border border-line bg-white p-4 shadow-card dark:border-white/10 dark:bg-dark-card dark:shadow-none ${className}`}
+      className={`min-w-0 rounded-xl2 border border-line bg-white p-4 shadow-card dark:border-white/10 dark:bg-dark-card dark:shadow-none ${className}`}
     >
       {title && (
         <h2 className="font-head text-sm font-semibold text-ink dark:text-white">
