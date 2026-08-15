@@ -78,14 +78,14 @@ export function FunnelHero({
         ) : null}
 
         <ol
-          className="mt-8 flex gap-2 overflow-x-auto pb-1 sm:gap-3"
+          className="mt-8 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 sm:gap-3"
           aria-label="Proceso de admisión"
         >
           {FUNNEL_STEPS.map((s, i) => {
             const done = i < active;
             const current = i === active;
             return (
-              <li key={s.n} className="min-w-[7.5rem] flex-1 sm:min-w-0">
+              <li key={s.n} className="min-w-[7.5rem] flex-1 snap-start sm:min-w-0">
                 <Link
                   to={s.to}
                   className={`block rounded-xl2 border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${

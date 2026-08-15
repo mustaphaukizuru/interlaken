@@ -38,7 +38,7 @@ export function ChildSwitcher({ students, allowAll = false, className = '' }: Ch
   if (students.length < 2) return null;
 
   const chip = (active: boolean) =>
-    `min-h-[40px] rounded-xl border px-3.5 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+    `min-h-[44px] rounded-xl border px-3.5 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
       active
         ? 'border-purple/40 bg-purple text-white shadow-[0_6px_14px_-8px_rgba(64,26,142,0.55)]'
         : 'border-line bg-white text-ink hover:border-purple/25 hover:bg-cream'

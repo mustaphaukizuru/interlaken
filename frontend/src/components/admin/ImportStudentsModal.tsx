@@ -103,7 +103,7 @@ export function ImportStudentsModal({ open, onClose }: { open: boolean; onClose:
                 {preview.errors} errores
               </span>
             </p>
-            <div className="max-h-56 overflow-y-auto rounded-lg border border-ink/10">
+            <div className="max-h-56 overflow-auto rounded-lg border border-ink/10">
               <table className="w-full text-left text-xs">
                 <thead className="sticky top-0 bg-cream-2">
                   <tr>

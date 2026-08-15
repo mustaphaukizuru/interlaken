@@ -78,7 +78,7 @@ export function StatCard({ title, value, suffix, icon: Icon, color, trend, subti
       <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-muted)' }}>{title}</div>
       {subtitle && <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 1 }}>{subtitle}</div>}
       <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 36, letterSpacing: -1, color: 'var(--text-main)', lineHeight: 1.1 }}><StatValue value={value} /></span>
+        <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(24px, 8vw, 36px)', letterSpacing: -1, color: 'var(--text-main)', lineHeight: 1.1 }}><StatValue value={value} /></span>
         {suffix && <span style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-light)' }}>{suffix}</span>}
       </div>
     </div>

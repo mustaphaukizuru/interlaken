@@ -103,9 +103,9 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="-mr-1.5 -mt-1.5 rounded-lg p-1.5 text-subtle hover:bg-cream hover:text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
+            className="-mr-1.5 -mt-1.5 rounded-lg p-2.5 text-subtle hover:bg-cream hover:text-ink focus:outline-none focus:ring-2 focus:ring-purple/30"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
         {children}

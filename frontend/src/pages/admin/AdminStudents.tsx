@@ -104,7 +104,7 @@ export default function AdminStudents() {
                       <p className="text-subtle text-xs truncate">{s.user.email}</p>
                     </div>
                   </div>
-                  <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                  <dl className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                     <div>
                       <dt className="text-xs font-semibold text-muted">Matrícula</dt>
                       <dd className="text-muted">{s.student_id}</dd>
