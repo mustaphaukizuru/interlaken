@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { login, DEV_ADMIN, DEV_PARENT } from './helpers';
+import { login, portalNav, DEV_ADMIN, DEV_PARENT } from './helpers';
 
 /**
  * Route smoke test: every route renders a non-empty <main> and authenticated
@@ -22,9 +22,6 @@ async function expectMainSettled(page: Page) {
       { timeout: 15_000, message: `blank content at ${page.url()}` })
     .toBeGreaterThan(30);
 }
-
-/** The portal sidebar nav (admin/parent/student share the same landmark). */
-const portalNav = (page: Page) => page.getByRole('navigation', { name: 'Menú del portal' });
 
 const PUBLIC_ROUTES = [
   '/', '/nosotros', '/admisiones', '/admisiones/documentacion', '/admisiones/costos',

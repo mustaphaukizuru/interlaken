@@ -14,7 +14,12 @@ export default defineConfig({
   testDir: './e2e',
   // Generous: a cold Vite dev server compiles each route chunk on first hit.
   timeout: 60_000,
-  expect: { timeout: 20_000 },
+  expect: {
+    timeout: 20_000,
+    // Visual baselines: absorb sub-pixel AA jitter without hiding real
+    // regressions (≈0.2% of a 1280×800 shot ≈ 2k px).
+    toHaveScreenshot: { maxDiffPixelRatio: 0.002 },
+  },
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
@@ -30,7 +35,13 @@ export default defineConfig({
     {
       command: 'python manage.py runserver 8800',
       cwd: '../backend',
-      env: { SQLITE_LOCAL: '1', DJANGO_SETTINGS_MODULE: 'config.settings.development' },
+      env: {
+        SQLITE_LOCAL: '1',
+        DJANGO_SETTINGS_MODULE: 'config.settings.development',
+        // The suite logs in ~19×/run; without this the 10/min per-IP login
+        // rate limit 429s mid-suite (honored by development.py only).
+        RATELIMIT_DISABLE: '1',
+      },
       url: 'http://localhost:8800/api/v1/content/settings/',
       reuseExistingServer: true,
       timeout: 120_000,

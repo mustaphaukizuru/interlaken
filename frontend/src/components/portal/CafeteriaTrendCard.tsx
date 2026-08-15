@@ -29,16 +29,19 @@ export default function CafeteriaTrendCard() {
   const [student, setStudent] = useState<number | 'all'>('all');
 
   // Children (from balances) power the per-child switcher; shares the balances
-  // cache with the cafetería page.
+  // cache with the cafetería page — so the CACHED value must keep the raw
+  // balance shape (CafeteriaPage reads `b.student.*` from the same key; caching
+  // the mapped {id,name} here crashed it on dashboard → cafetería navigation).
+  // `select` derives the switcher view without touching the cache.
   const { data: children } = useQuery({
     queryKey: ['cafeteria-balances'],
     queryFn: async () => {
       const { data } = await cafeteriaApi.getMyBalance();
-      const arr = Array.isArray(data) ? data : [data];
-      return arr.map((b: { student: { id: number; user: { full_name: string } } }) => ({
-        id: b.student.id, name: b.student.user.full_name,
-      }));
+      return (Array.isArray(data) ? data : [data]) as
+        { student: { id: number; user: { full_name: string } } }[];
     },
+    select: (arr) =>
+      arr.map((b) => ({ id: b.student.id, name: b.student.user.full_name })),
     staleTime: 1000 * 60 * 5,
   });
 
