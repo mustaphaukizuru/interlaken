@@ -21,13 +21,21 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write   # the failure-alert step opens/comments an issue
     steps:
       # postgresql-client-17 explicitly: Supabase upgraded the server to PG 17
       # and pg_dump aborts on a major-version mismatch (backups failed silently
-      # 2026-08-11..15 with the runner's default client 16). The PGDG repo is
-      # preconfigured on GitHub's ubuntu-24.04 runners.
+      # 2026-08-11..15 with the runner's default client 16). The PGDG apt repo
+      # must be added first — it is NOT preconfigured on the runners.
       - name: Install postgresql-client 17
         run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -sSf -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update && sudo apt-get install -y postgresql-client-17
           /usr/lib/postgresql/17/bin/pg_dump --version
       - name: Dump database (gzip)
@@ -61,11 +69,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           title="DB backup failing"
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label db-backup-failure --state open --json number --jq '.[0].number // empty')
           body="Nightly Supabase backup failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh label create db-backup-failure --repo "$GITHUB_REPOSITORY" \
+            --color B60205 --description "Nightly DB backup failed" 2>/dev/null || true
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label db-backup-failure --body "$body" || \
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body" \
+              --label db-backup-failure || \
             gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           fi
