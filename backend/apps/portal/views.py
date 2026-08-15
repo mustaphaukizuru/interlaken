@@ -3,7 +3,7 @@ Portal views: role-aware dashboard, announcements, notifications.
 """
 import logging
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
@@ -73,9 +73,10 @@ class DashboardView(APIView):
             students = family_students
             balances = (CafeteriaBalance.objects.filter(student__in=students)
                         .select_related('student__user'))
-            from apps.finance.models import Invoice
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
+            # (invoice_payment covers historical tuition rows; the app no
+            # longer bills tuition.)
             recent_payments = (
                 Payment.objects.filter(
                     Q(user=user)
@@ -85,18 +86,6 @@ class DashboardView(APIView):
                 if students
                 else []
             )
-            # Real family money signal: unpaid/overdue colegiaturas (not recent
-            # Payment rows, which stay 0 until a checkout is initiated).
-            from decimal import Decimal
-            pending = (
-                Invoice.objects.filter(
-                    student__in=students,
-                    status__in=(Invoice.Status.PENDING, Invoice.Status.OVERDUE),
-                ).aggregate(n=Count('id'), due=Sum(F('amount') - F('amount_paid')))
-                if students else {}
-            )
-            pending_invoices = pending.get('n') or 0
-            pending_balance = pending.get('due') or Decimal('0')
 
             data = {
                 'children_count': len(students),
@@ -129,8 +118,6 @@ class DashboardView(APIView):
                     }
                     for p in recent_payments
                 ],
-                'pending_invoices': pending_invoices,
-                'pending_balance': f'{pending_balance:.2f}',
                 # Stable signal for the SPA: valid login, no linked StudentProfile yet.
                 'needs_family_link': not bool(students),
             }

@@ -16,7 +16,6 @@ from apps.accounts.models import User
 from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
 from apps.cafeteria.models import CafeteriaTransaction
 from apps.core.models import AuditLog
-from apps.finance.models import Invoice
 from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
@@ -74,7 +73,8 @@ class TestEmptySafety:
         assert data['admissions']['referrals'] == []
         assert data['payments']['this_month'] == {'total': 0.0, 'count': 0}
         assert data['payments']['last_month_to_date'] == {'total': 0.0, 'count': 0}
-        assert data['payments']['overdue'] == {'count': 0, 'amount': 0.0}
+        # No overdue-invoice KPI: the app does not bill tuition.
+        assert 'overdue' not in data['payments']
         # Full 30-day series of zeros (all three daily series).
         assert len(data['admissions']['series']) == 30
         assert len(data['payments']['series']) == 30
@@ -110,13 +110,8 @@ class TestAggregation:
 
         Payment.objects.create(amount=Decimal('1500.00'),
                                status=Payment.Status.SUCCESS,
-                               payment_type='tuition', completed_at=now)
+                               payment_type='cafeteria', completed_at=now)
         profile = StudentProfileFactory()
-        Invoice.objects.create(
-            student=profile, period='2026-06', issue_date=now.date(),
-            due_date=(now - timedelta(days=10)).date(),
-            subtotal=Decimal('1000'), amount=Decimal('1000'),
-            amount_paid=Decimal('200'), status=Invoice.Status.OVERDUE)
 
         # loyverse_receipt_id is unique — give each test row a distinct one.
         CafeteriaTransaction.objects.create(
@@ -134,7 +129,6 @@ class TestAggregation:
         assert data['admissions']['reg_funnel']['submitted'] == 1
         assert data['admissions']['referrals'] == [{'source': 'Facebook', 'count': 2}]
         assert data['payments']['this_month'] == {'total': 1500.0, 'count': 1}
-        assert data['payments']['overdue'] == {'count': 1, 'amount': 800.0}
         today_point = data['cafeteria']['series'][-1]
         assert today_point['topups'] == 200.0
         assert today_point['purchases'] == 45.5
@@ -150,7 +144,7 @@ class TestMonthOverMonthWindow:
     def _pay(self, day, amount):
         Payment.objects.create(
             amount=Decimal(amount), status=Payment.Status.SUCCESS,
-            payment_type='tuition',
+            payment_type='cafeteria',
             completed_at=timezone.make_aware(datetime.combine(day, dt_time(12, 0))))
 
     def test_prev_month_to_date_is_a_clamped_prefix(self, api_client, staff_user):
@@ -190,7 +184,7 @@ class TestPerformanceAndCache:
                 loyverse_receipt_id=f't-bulk-{i}')
 
         api_client.force_authenticate(staff_user)
-        with django_assert_max_num_queries(14):
+        with django_assert_max_num_queries(13):
             assert api_client.get(URL).status_code == 200
 
     def test_second_call_served_from_cache(self, api_client, staff_user,

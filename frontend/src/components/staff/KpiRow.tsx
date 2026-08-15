@@ -101,7 +101,7 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
         points: data.payments.series.map((p) => ({ x: p.date, y: p.total })),
         color: theme.semantic.inflow,
       },
-      to: '/admin/finanzas',
+      to: '/admin/cafeteria',
     },
     {
       key: 'preregs',

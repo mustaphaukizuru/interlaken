@@ -1,39 +1,23 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Coffee, Receipt, CheckCircle, Clock, AlertTriangle, XCircle } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { ArrowLeft, Coffee } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StudentDiscounts } from '@/components/admin/StudentDiscounts';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
-import { financeApi } from '@/services/api';
+import { portalApi } from '@/services/api';
+import type { StudentProfile } from '@/types';
 
-const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
-  paid:      { label: 'Pagada',    variant: 'success', icon: CheckCircle },
-  pending:   { label: 'Pendiente', variant: 'warning', icon: Clock },
-  overdue:   { label: 'Vencida',   variant: 'error',   icon: AlertTriangle },
-  cancelled: { label: 'Cancelada', variant: 'neutral', icon: XCircle },
-};
-
-interface Ledger {
-  student: { id: number; name: string; student_code: string; grade: string };
-  outstanding: string;
-  invoices: {
-    id: number; period_label: string; amount: string; balance_due: string;
-    currency: string; status: string; due_date: string;
-  }[];
-}
-
+/**
+ * /admin/alumnos/:studentId — student file: identity, guardians and the
+ * cafetería shortcut. (The app does not bill tuition, so there is no ledger.)
+ */
 export default function AdminStudentDetail() {
   const { studentId } = useParams();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-student-ledger', studentId],
-    queryFn: async () => (await financeApi.getStudentLedger(Number(studentId))).data as Ledger,
+    queryKey: ['admin-student', studentId],
+    queryFn: async () => (await portalApi.getStudent(Number(studentId))).data as StudentProfile,
     enabled: !!studentId,
   });
 
@@ -48,81 +32,48 @@ export default function AdminStudentDetail() {
       ) : isError || !data ? (
         <ErrorState onRetry={() => refetch()} />
       ) : (
-        <StudentLedgerBody data={data} />
+        <StudentDetailBody student={data} />
       )}
     </>
   );
 }
 
-function StudentLedgerBody({ data }: { data: Ledger }) {
-  const s = data.student;
-  const outstanding = parseFloat(data.outstanding);
-  const paidCount = data.invoices.filter((i) => i.status === 'paid').length;
-
+function StudentDetailBody({ student }: { student: StudentProfile }) {
   return (
     <>
       <PageHeader
-        title={s.name}
-        subtitle={`Matrícula ${s.student_code} · ${s.grade}`}
+        title={student.user.full_name}
+        subtitle={`Matrícula ${student.student_id} · ${student.grade}${student.group ? ` ${student.group}` : ''}`}
         actions={(
-          <Link to={`/admin/cafeteria/${s.id}`} className="btn-outline">
+          <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline">
             <Coffee size={16} aria-hidden="true" /> Cafetería
           </Link>
         )}
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Saldo de colegiaturas</p>
-          <p className={`mt-1 font-head text-2xl font-bold ${outstanding > 0 ? 'text-coral' : 'text-green-dark'}`}>
-            ${outstanding.toFixed(2)}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Facturas</p>
-          <p className="mt-1 font-head text-2xl font-bold text-ink">{data.invoices.length}</p>
-        </Card>
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Pagadas</p>
-          <p className="mt-1 font-head text-2xl font-bold text-ink">{paidCount}</p>
-        </Card>
-      </div>
-
-      <Card title="Colegiaturas">
-        {!data.invoices.length ? (
-          <EmptyState icon={Receipt} title="Sin colegiaturas" description="Aún no se han emitido colegiaturas para este alumno." />
-        ) : (
-          <div className="divide-y divide-cream">
-            {data.invoices.map((inv) => {
-              const meta = statusMeta[inv.status] ?? statusMeta.pending;
-              const Icon = meta.icon;
-              return (
-                <div key={inv.id} className="flex items-center justify-between gap-4 py-3.5 first:pt-0 last:pb-0">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cream">
-                      <Icon className="h-4 w-4 text-muted" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-ink">{inv.period_label}</p>
-                      <p className="text-xs text-subtle">
-                        Vence {format(new Date(inv.due_date), "d MMM yyyy", { locale: es })}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-ink">${parseFloat(inv.amount).toFixed(2)} {inv.currency}</p>
-                    <Badge variant={meta.variant}>{meta.label}</Badge>
-                  </div>
-                </div>
-              );
-            })}
+      <Card title="Datos del alumno">
+        <dl className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Matrícula</dt>
+            <dd className="mt-1 text-sm font-medium text-ink">{student.student_id || '—'}</dd>
           </div>
-        )}
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Grado y grupo</dt>
+            <dd className="mt-1 text-sm font-medium text-ink">
+              {student.grade}{student.group ? ` · ${student.group}` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Correo</dt>
+            <dd className="mt-1 truncate text-sm font-medium text-ink" title={student.user.email}>
+              {student.user.email || '—'}
+            </dd>
+          </div>
+        </dl>
       </Card>
 
       <div className="mt-6 space-y-6">
-        <StudentGuardians studentId={s.id} />
-        <StudentDiscounts studentId={s.id} />
+        <StudentGuardians studentId={student.id} />
       </div>
     </>
   );

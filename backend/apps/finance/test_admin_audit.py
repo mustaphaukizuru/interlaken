@@ -1,12 +1,15 @@
 """
-Admin invoice mutations write append-only ``AuditLog`` rows (actor + reason) —
-Admin console v2. The rows are explicit (``services._audit_invoice``) because
-``Invoice`` is not signal-tracked; a log failure must never break the mutation.
+Money mutations write append-only ``AuditLog`` rows (actor + reason).
+
+The finance admin endpoints are gone (the app does not bill tuition), so the
+invoice coverage here is service-level only: the rows are explicit
+(``services._audit_invoice``) because ``Invoice`` is not signal-tracked, and a
+log failure must never break the mutation. Cafetería audit writes (live money
+path) are covered at the bottom.
 """
 from decimal import Decimal
 
 import pytest
-from django.urls import reverse
 
 from apps.accounts.factories import StudentProfileFactory
 from apps.core.models import AuditLog
@@ -32,43 +35,6 @@ def _logs(invoice, context):
 
 
 class TestInvoiceAuditWrites:
-    def test_mark_paid_writes_audit_with_actor_and_reason(self, admin_client, admin_user):
-        invoice = _invoice()
-        resp = admin_client.post(
-            reverse("finance-admin-mark-paid", args=[invoice.id]),
-            {"reason": "Pago en caja"}, format="json")
-        assert resp.status_code == 200, resp.data
-
-        entry = _logs(invoice, "finance.mark_paid").latest("created_at")
-        assert entry.actor_id == admin_user.id
-        assert entry.actor_label == admin_user.email
-        assert entry.changes["reason"] == "Pago en caja"
-        assert entry.changes["status"] == ["pending", "paid"]
-
-    def test_adjust_writes_audit_with_reason(self, admin_client, admin_user):
-        invoice = _invoice()
-        resp = admin_client.post(
-            reverse("finance-admin-adjust", args=[invoice.id]),
-            {"amount": "-500.00", "reason": "Beca especial"}, format="json")
-        assert resp.status_code == 200, resp.data
-
-        entry = _logs(invoice, "finance.adjust").latest("created_at")
-        assert entry.actor_id == admin_user.id
-        assert entry.changes["reason"] == "Beca especial"
-        assert entry.changes["amount"] == "-500.00"
-
-    def test_cancel_writes_audit_with_reason(self, admin_client, admin_user):
-        invoice = _invoice()
-        resp = admin_client.post(
-            reverse("finance-admin-cancel", args=[invoice.id]),
-            {"reason": "Alumno dado de baja"}, format="json")
-        assert resp.status_code == 200, resp.data
-
-        entry = _logs(invoice, "finance.cancel").latest("created_at")
-        assert entry.actor_id == admin_user.id
-        assert entry.changes["reason"] == "Alumno dado de baja"
-        assert entry.changes["status"] == ["pending", "cancelled"]
-
     def test_refund_writes_audit_with_reason(self, admin_user):
         from apps.finance.models import InvoicePayment
         from apps.payments.models import Payment

@@ -61,29 +61,6 @@ vi.mock('@/services/api', () => {
       exportSchool: vi.fn(),
       exportMovements: vi.fn(),
     },
-    financeApi: {
-      getDashboard: ok({
-        period: '2026-08',
-        billed: '1000.00',
-        collected: '800.00',
-        outstanding: '200.00',
-        collection_rate: 80,
-        invoices: 1,
-        paid: 1,
-        overdue: 0,
-        pending: 0,
-        overpaid: 0,
-        overpaid_credit: '0.00',
-      }),
-      getAdminInvoices: ok(emptyPage),
-      generate: vi.fn(),
-      markPaid: vi.fn(),
-      cancelInvoice: vi.fn(),
-      refundOverpayment: vi.fn(),
-      adjustInvoice: vi.fn(),
-      getAdminInvoice: vi.fn(),
-      bulkAction: vi.fn(),
-    },
     contentApi: {
       getPricing: ok({
         enrollment_fees: [
@@ -115,7 +92,6 @@ import ParentDashboard from '@/pages/parent/ParentDashboard';
 import CafeteriaPage from '@/pages/parent/CafeteriaPage';
 import PaymentsPage from '@/pages/parent/PaymentsPage';
 import CostosPage from '@/pages/public/CostosPage';
-import AdminFinance from '@/pages/admin/AdminFinance';
 import AdminCafeteria from '@/pages/admin/AdminCafeteria';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
@@ -144,7 +120,6 @@ const PAGES: { name: string; ui: () => ReactElement; route: string }[] = [
   { name: 'CafeteriaPage', ui: () => <CafeteriaPage />, route: '/portal/cafeteria' },
   { name: 'PaymentsPage', ui: () => <PaymentsPage />, route: '/portal/pagos' },
   { name: 'CostosPage', ui: () => <CostosPage />, route: '/admisiones/costos' },
-  { name: 'AdminFinance', ui: () => <AdminFinance />, route: '/admin/finanzas' },
   { name: 'AdminCafeteria', ui: () => <AdminCafeteria />, route: '/admin/cafeteria' },
 ];
 

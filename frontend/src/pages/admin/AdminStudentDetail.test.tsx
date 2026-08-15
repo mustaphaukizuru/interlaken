@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 
 vi.mock('@/services/api', () => ({
-  financeApi: {
-    getStudentLedger: vi.fn(),
+  portalApi: {
+    getStudent: vi.fn(),
   },
 }));
 
@@ -15,46 +15,28 @@ vi.mock('@/components/admin/StudentGuardians', () => ({
   ),
 }));
 
-vi.mock('@/components/admin/StudentDiscounts', () => ({
-  StudentDiscounts: ({ studentId }: { studentId: number }) => (
-    <div data-testid="student-discounts">{studentId}</div>
-  ),
-}));
-
 import AdminStudentDetail from './AdminStudentDetail';
-import { financeApi } from '@/services/api';
+import { portalApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
-const getStudentLedger = vi.mocked(financeApi.getStudentLedger);
+const getStudent = vi.mocked(portalApi.getStudent);
 
-const LEDGER = {
-  student: {
-    id: 7,
-    name: 'Luis López',
-    student_code: 'A-007',
-    grade: '3° A',
+const STUDENT = {
+  id: 7,
+  user: {
+    id: 70,
+    email: 'luis@interlaken.test',
+    first_name: 'Luis',
+    last_name: 'López',
+    full_name: 'Luis López',
+    role: 'student',
+    avatar: '',
+    whatsapp: '',
   },
-  outstanding: '2500.50',
-  invoices: [
-    {
-      id: 11,
-      period_label: 'Agosto 2026',
-      amount: '2500.50',
-      balance_due: '2500.50',
-      currency: 'MXN',
-      status: 'pending',
-      due_date: '2026-08-10',
-    },
-    {
-      id: 12,
-      period_label: 'Julio 2026',
-      amount: '2500.00',
-      balance_due: '0.00',
-      currency: 'MXN',
-      status: 'paid',
-      due_date: '2026-07-10',
-    },
-  ],
+  student_id: 'A-007',
+  grade: '3°',
+  group: 'A',
+  loyverse_id: 'loy-7',
 };
 
 function renderPage() {
@@ -71,44 +53,43 @@ describe('AdminStudentDetail', () => {
     vi.clearAllMocks();
   });
 
-  it('does not show fake $0.00 KPIs while the ledger is loading', () => {
-    getStudentLedger.mockReturnValue(new Promise(() => {}) as never);
+  it('shows only the back link while the student is loading', () => {
+    getStudent.mockReturnValue(new Promise(() => {}) as never);
 
     renderPage();
 
-    expect(screen.queryByText('Saldo de colegiaturas')).not.toBeInTheDocument();
-    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('Datos del alumno')).not.toBeInTheDocument();
     expect(screen.getByText('Alumnos')).toBeInTheDocument();
   });
 
-  it('shows ErrorState with retry instead of empty KPIs when load fails', async () => {
-    getStudentLedger
+  it('shows ErrorState with retry when the load fails', async () => {
+    getStudent
       .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValueOnce({ data: LEDGER } as never);
+      .mockResolvedValueOnce({ data: STUDENT } as never);
 
     renderPage();
 
     expect(await screen.findByText(/No se pudo cargar la información/i)).toBeInTheDocument();
-    expect(screen.queryByText('Saldo de colegiaturas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Datos del alumno')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Reintentar/i }));
     expect(await screen.findByText('Luis López')).toBeInTheDocument();
   });
 
-  it('renders student KPIs, invoice badges, and child panels on success', async () => {
-    getStudentLedger.mockResolvedValue({ data: LEDGER } as never);
+  it('renders identity, guardians and the cafetería shortcut (no tuition UI)', async () => {
+    getStudent.mockResolvedValue({ data: STUDENT } as never);
 
     renderPage();
 
     expect(await screen.findByText('Luis López')).toBeInTheDocument();
     expect(screen.getByText(/Matrícula A-007 · 3° A/)).toBeInTheDocument();
-    expect(screen.getByText('Saldo de colegiaturas')).toBeInTheDocument();
-    expect(screen.getByText('$2500.50')).toBeInTheDocument();
-    expect(screen.getByText('Agosto 2026')).toBeInTheDocument();
-    expect(screen.getByText('Pendiente')).toBeInTheDocument();
-    expect(screen.getByText('Pagada')).toBeInTheDocument();
+    expect(screen.getByText('Datos del alumno')).toBeInTheDocument();
+    expect(screen.getByText('luis@interlaken.test')).toBeInTheDocument();
     expect(screen.getByTestId('student-guardians')).toHaveTextContent('7');
-    expect(screen.getByTestId('student-discounts')).toHaveTextContent('7');
+
+    // Tuition billing is gone — no ledger, KPIs or discounts may resurface.
+    expect(screen.queryByText(/colegiatura/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('student-discounts')).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /Cafetería/i })).toHaveAttribute(

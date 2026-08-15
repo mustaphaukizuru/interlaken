@@ -1,19 +1,20 @@
-name: Scheduled tasks (finance / cafetería / bookings)
+name: Scheduled tasks (cafetería / bookings)
 
 # Free "cron" for the app's recurring jobs, run against Supabase directly so they
-# fire even while the Render free web service is asleep. Without this, tuition is
-# never billed and reminders/alerts never send. GitHub cron is best-effort (a few
-# min of jitter). Public repos get unlimited Action minutes; a private repo gets
-# 2000/mo — these jobs are ~1 min/day, negligible.
+# fire even while the Render free web service is asleep. Without this, cafetería
+# alerts/digests, booking reminders and notification dispatch never send.
+# GitHub cron is best-effort (a few min of jitter). Public repos get unlimited
+# Action minutes; a private repo gets 2000/mo — these jobs are ~1 min/day,
+# negligible. The app does NOT bill tuition: the old invoice-generation,
+# late-fee and tuition-reminder steps are gone for good.
 #
-# ⚠️ The email-sending jobs (reminders, low-balance & booking alerts) need the
-# SendGrid secrets (EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD) set, or
-# they'll error on send. generate_invoices / apply_late_fees send no mail.
+# ⚠️ The email-sending jobs (low-balance & booking alerts) need the SendGrid
+# secrets (EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD) set, or they'll
+# error on send.
 
 on:
   schedule:
     - cron: '0 9 * * *'    # daily  ~03:00 America/Mexico_City (UTC-6)
-    - cron: '0 8 1 * *'    # monthly 1st ~02:00 CT — invoice generation
   workflow_dispatch: {}
 
 concurrency:
@@ -42,9 +43,8 @@ env:
   CAFETERIA_PURCHASE_DIGEST: ${{ secrets.CAFETERIA_PURCHASE_DIGEST }}
 
 jobs:
-  # Daily jobs (also run on manual dispatch). Skipped on the monthly cron tick.
+  # Daily jobs (also run on manual dispatch).
   daily:
-    if: github.event.schedule != '0 8 1 * *'
     runs-on: ubuntu-latest
     steps:
       # secrets.* cannot be used in job-level `if:` — gate here instead.
@@ -91,14 +91,6 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: python manage.py expire_stale_payments
-      - name: Apply late fees (no email)
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: backend
-        run: python manage.py apply_late_fees
-      - name: Send tuition reminders
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: backend
-        run: python manage.py send_payment_reminders
       - name: Low-balance cafetería alerts
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
@@ -116,45 +108,3 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: python manage.py dispatch_notifications
-
-  # Monthly invoice generation — 1st of the month (and on manual dispatch).
-  monthly-invoices:
-    if: github.event.schedule == '0 8 1 * *' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require DB secrets
-        id: gate
-        run: |
-          missing=0
-          for v in SECRET_KEY DB_HOST DB_NAME DB_USER DB_PASSWORD DB_ENGINE; do
-            if [ -z "${!v}" ]; then
-              echo "::warning::$v is not set in repo secrets"
-              missing=1
-            fi
-          done
-          if [ "$missing" -eq 1 ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Skipping invoice job — configure GitHub Actions secrets first."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: actions/checkout@v7
-        if: steps.gate.outputs.skip != 'true'
-      - uses: actions/setup-python@v7
-        if: steps.gate.outputs.skip != 'true'
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Install backend deps
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: backend
-        run: pip install -r requirements.txt
-      - name: Apply pending migrations
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: backend
-        run: python manage.py migrate --noinput
-      - name: Generate monthly tuition invoices
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: backend
-        run: python manage.py generate_invoices

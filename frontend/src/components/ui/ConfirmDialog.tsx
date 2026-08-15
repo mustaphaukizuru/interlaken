@@ -7,13 +7,13 @@ import { Input } from './Input';
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  /** Consequence statement in es-MX, e.g. "Esto cancelará la colegiatura de Ana López." */
+  /** Consequence statement in es-MX, e.g. "Esto eliminará la reserva de Ana López." */
   message: ReactNode;
   /** Confirm button label (verb + object). */
   confirmLabel: string;
   /**
    * When set, the user must type this exact word to enable the confirm button.
-   * Use for irreversible operations (devoluciones, cancelar factura, anular recarga).
+   * Use for irreversible operations (devoluciones, anular recarga).
    */
   requireText?: string;
   loading?: boolean;

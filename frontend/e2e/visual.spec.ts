@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
-import { login, portalNav, DEV_PARENT } from './helpers';
+import { login, DEV_PARENT } from './helpers';
 
 /**
  * Visual regression — viewport screenshots of the highest-value pages at mobile
@@ -156,36 +156,5 @@ test.describe('Visual baselines', () => {
     await expect(page).toHaveURL(/\/portal\/?$/);
     await expect(page.getByText('$230.00').first()).toBeVisible();
     await snapBothViewports(page, 'portal-dashboard');
-  });
-
-  test('admin finanzas (stubbed data)', async ({ page }) => {
-    await page.route('**/api/v1/finance/admin/dashboard/**', (route) =>
-      route.fulfill({
-        json: {
-          billed: '2500.00', collected: '0.00', outstanding: '2500.00',
-          collection_rate: 0, overpaid: 0, overpaid_credit: '0.00',
-        },
-      }));
-    await page.route('**/api/v1/finance/admin/invoices/**', (route) =>
-      route.fulfill({
-        json: {
-          count: 1,
-          results: [{
-            id: 42, student_name: 'Test Alumno', student_code: 'A-003', grade: '3° Primaria',
-            period: '2026-08', period_label: 'Agosto 2026', amount: '2500.00',
-            amount_paid: '0.00', balance_due: '2500.00', currency: 'MXN',
-            status: 'pending', status_display: 'Pendiente', due_date: '2026-08-05',
-          }],
-        },
-      }));
-
-    await login(page); // admin
-    await portalNav(page).getByRole('link', { name: 'Finanzas', exact: true }).click();
-    await expect(page).toHaveURL(/\/admin\/finanzas/);
-    // Desktop default viewport → assert the table row (the mobile card with the
-    // same text is display:none here).
-    await expect(page.getByRole('table').getByText('Test Alumno')).toBeVisible();
-    // The native month input renders differently across platforms — mask it.
-    await snapBothViewports(page, 'admin-finanzas', [page.getByLabel('Periodo')]);
   });
 });

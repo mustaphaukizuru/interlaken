@@ -11,8 +11,8 @@ and admin/portal data are stubbed with `page.route` so runs are deterministic.
 | `smoke.spec.ts` | Every public + portal route renders a non-empty `<main>` |
 | `auth.spec.ts` | Admin/parent login, bad credentials, reload survival (refresh-cookie bootstrap), logout, forgot-password |
 | `cafeteria.spec.ts` | Top-up from CafeteriaPage and from the dashboard quick chip (`?recarga=200`), gateway choice in the POST payload, stubbed hosted-page redirect, return page success/failed/processing states |
-| `admin.spec.ts` | Finanzas mark-paid through the ConfirmDialog (bulk action payload), comunicado publish, parent portal listing it |
-| `visual.spec.ts` | `toHaveScreenshot` baselines at 390×844 and 1280×800 for home, costos, admisiones, login, parent dashboard (stubbed), admin finanzas (stubbed) |
+| `admin.spec.ts` | Comunicado publish from the admin console, parent portal listing it |
+| `visual.spec.ts` | `toHaveScreenshot` baselines at 390×844 and 1280×800 for home, costos, admisiones, login, parent dashboard (stubbed) |
 
 ## Running locally
 

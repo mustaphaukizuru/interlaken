@@ -388,61 +388,8 @@ export const paymentsApi = {
     api.get('/payments/history/', { params }),
 };
 
-// ── FINANCE / TUITION (Prompt 17) ─────────────────────────
-// Admin-only: the parent-facing colegiaturas UI was removed from the portal
-// (the backend endpoints still exist).
-export const financeApi = {
-  getDashboard: (period?: string) =>
-    api.get('/finance/admin/dashboard/', { params: period ? { period } : {} }),
-
-  getAdminInvoices: (params?: {
-    status?: string; period?: string; student?: number; grade?: string; q?: string; page?: number;
-  }) => api.get('/finance/admin/invoices/', { params }),
-
-  getAdminInvoice: (id: number) =>
-    api.get(`/finance/admin/invoices/${id}/`),
-
-  getStudentLedger: (studentId: number) =>
-    api.get(`/finance/admin/student/${studentId}/`),
-
-  // Tuition plans (Planes de Colegiatura) CRUD.
-  adminListFees: () => api.get('/finance/admin/fee-schedules/'),
-  adminCreateFee: (data: Record<string, unknown>) => api.post('/finance/admin/fee-schedules/', data),
-  adminUpdateFee: (id: number, data: Record<string, unknown>) => api.patch(`/finance/admin/fee-schedules/${id}/`, data),
-  adminDeleteFee: (id: number) => api.delete(`/finance/admin/fee-schedules/${id}/`),
-
-  // Per-student becas / descuentos CRUD.
-  adminListDiscounts: (studentId: number) => api.get('/finance/admin/discounts/', { params: { student: studentId } }),
-  adminCreateDiscount: (data: Record<string, unknown>) => api.post('/finance/admin/discounts/', data),
-  adminUpdateDiscount: (id: number, data: Record<string, unknown>) => api.patch(`/finance/admin/discounts/${id}/`, data),
-  adminDeleteDiscount: (id: number) => api.delete(`/finance/admin/discounts/${id}/`),
-
-  markPaid: (id: number, reason?: string, method?: string) =>
-    api.post(`/finance/admin/invoices/${id}/mark-paid/`, { reason, method }),
-
-  adjustInvoice: (id: number, amount: number, reason: string) =>
-    api.post(`/finance/admin/invoices/${id}/adjust/`, { amount, reason }),
-
-  cancelInvoice: (id: number, reason: string) =>
-    api.post(`/finance/admin/invoices/${id}/cancel/`, { reason }),
-
-  /** Record offline refund of an applied online overpayment (Payment→REFUNDED). */
-  refundOverpayment: (id: number, reason: string, paymentId?: number) =>
-    api.post(`/finance/admin/invoices/${id}/refund/`, {
-      reason,
-      ...(paymentId != null ? { payment_id: paymentId } : {}),
-    }),
-
-  generate: (period?: string) =>
-    api.post('/finance/admin/generate/', period ? { period } : {}),
-
-  bulkAction: (invoiceIds: number[], action: 'mark_paid' | 'cancel' | 'remind', reason?: string) =>
-    api.post('/finance/admin/bulk/', { invoice_ids: invoiceIds, action, reason }),
-
-  /** CSV of the invoice list, respecting the active filters. */
-  exportInvoices: (params?: { status?: string; period?: string; grade?: string; q?: string }) =>
-    api.get('/finance/admin/invoices/export/', { params, responseType: 'blob' }),
-};
+// (financeApi removed: the app does not bill tuition — cafetería top-ups are
+// the only money path. /api/v1/finance/* no longer exists on the backend.)
 
 // ── CORE (audit trail) ────────────────────────────────────
 export const coreApi = {
@@ -553,6 +500,10 @@ export const portalApi = {
 
   getStudents: (params?: { page?: number; search?: string }) =>
     api.get('/accounts/students/', { params }),
+
+  /** One student profile (admin, or a family's own child). */
+  getStudent: (studentId: number) =>
+    api.get(`/accounts/students/${studentId}/`),
 
   /** CSV roster export (grade/group/guardians count), honors ?search=. */
   exportStudents: (search?: string) =>

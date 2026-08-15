@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  CalendarCheck, Download, GraduationCap, Megaphone, Receipt, Search, Settings, X,
+  CalendarCheck, Download, GraduationCap, Megaphone, Search, Settings, X,
 } from 'lucide-react';
-import { bookingsApi, financeApi, portalApi } from '@/services/api';
-import type { Booking, Invoice, StudentProfile } from '@/types';
+import { bookingsApi, portalApi } from '@/services/api';
+import type { Booking, StudentProfile } from '@/types';
 
 interface Item {
   key: string;
-  group: 'Acciones' | 'Alumnos' | 'Reservas' | 'Facturas';
+  group: 'Acciones' | 'Alumnos' | 'Reservas';
   icon: typeof Search;
   title: string;
   detail: string;
@@ -31,10 +31,6 @@ const ACTIONS: Item[] = [
     key: 'act-export-cafeteria', group: 'Acciones', icon: Download,
     title: 'Exportar saldos de cafetería', detail: 'CSV de toda la escuela',
     to: '/admin/cafeteria?exportar=csv',
-  },
-  {
-    key: 'act-finanzas', group: 'Acciones', icon: Receipt,
-    title: 'Ir a Finanzas', detail: '/admin/finanzas', to: '/admin/finanzas',
   },
   {
     key: 'act-visitas', group: 'Acciones', icon: CalendarCheck,
@@ -63,8 +59,8 @@ const asList = <T,>(data: unknown): T[] =>
 
 /**
  * Global admin search + actions (Ctrl/Cmd+K): an 'Acciones' group (quick navs
- * and flows opened via URL params on the target page) plus alumnos, reservas y
- * facturas from one box, grouped, keyboard-navigable. Search hits the existing
+ * and flows opened via URL params on the target page) plus alumnos y reservas
+ * from one box, grouped, keyboard-navigable. Search hits the existing
  * list endpoints (?search= / ?q=) — no new backend surface.
  */
 export function CommandPalette() {
@@ -163,12 +159,6 @@ export function CommandPalette() {
     enabled,
     staleTime: 30_000,
   });
-  const invoices = useQuery({
-    queryKey: ['palette-invoices', q],
-    queryFn: async () => asList<Invoice>((await financeApi.getAdminInvoices({ q })).data),
-    enabled,
-    staleTime: 30_000,
-  });
 
   const items = useMemo<Item[]>(() => {
     // Actions are always available: all of them on an empty box, narrowed
@@ -196,18 +186,10 @@ export function CommandPalette() {
         detail: `${b.slot_date} · ${b.child_name || b.parent_email}`,
         to: '/admin/visitas',
       })),
-      ...(invoices.data ?? []).slice(0, 5).map((f): Item => ({
-        key: `f-${f.id}`,
-        group: 'Facturas',
-        icon: Receipt,
-        title: f.student_name,
-        detail: `${f.period_label || f.period} · ${f.status}`,
-        to: '/admin/finanzas',
-      })),
     ];
-  }, [enabled, q, students.data, bookings.data, invoices.data]);
+  }, [enabled, q, students.data, bookings.data]);
 
-  const searching = enabled && (students.isFetching || bookings.isFetching || invoices.isFetching);
+  const searching = enabled && (students.isFetching || bookings.isFetching);
 
   useEffect(() => setActive(0), [items.length, q]);
 
@@ -258,8 +240,8 @@ export function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Buscar alumnos, reservas, facturas…"
-            aria-label="Buscar alumnos, reservas o facturas"
+            placeholder="Buscar alumnos o reservas…"
+            aria-label="Buscar alumnos o reservas"
             role="combobox"
             aria-expanded={items.length > 0}
             aria-controls="cmdk-list"
