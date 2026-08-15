@@ -1109,3 +1109,64 @@ class TestRepairWalletLedger:
         call_command("repair_wallet_ledger", "--apply")
 
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("300")
+
+
+class TestLedgerSumInvariant:
+    """The books must balance: opening seed + Σ(signed ledger effects) == balance.
+
+    Exercises every mutation path in one mixed sequence — opening seed (not a
+    ledger row), online top-up credit, POS purchase debit, manual adjustment,
+    and a purchase refund — then proves the ledger *derives* the balance and
+    that each row's ``balance_after`` snapshot chains from the previous one.
+    """
+
+    @patch("apps.cafeteria.services.get_customer_by_id")
+    def test_mixed_sequence_sums_to_balance(self, mock_get):
+        from apps.payments.models import Payment
+
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent], loyverse_id="loy-sum")
+
+        # Opening seed from Loyverse: $100 (no ledger row — R1 seed-once).
+        mock_get.return_value = {"total_points": 100}
+        opening = services.sync_student_balance(student)
+        assert opening == Decimal("100")
+
+        # Online top-up +150 via the webhook credit path.
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("150"),
+            method=TopUpRequest.Method.ONLINE,
+        )
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA,
+            amount=Decimal("150"), related_topup=topup,
+            status=Payment.Status.PENDING,
+        )
+        payment.mark_success("GP-SUM-1", {"status": "CAPTURED"})
+        services.complete_online_topup(payment)
+
+        # POS purchase -40 via the shared receipt record path.
+        services.record_receipts([_receipt("loy-sum", "R-SUM-1", 40)])
+
+        # Manual audited adjustment -10.
+        services.adjust_balance(student, Decimal("-10"), "cobro duplicado")
+
+        # Refund the POS purchase (+40, audited).
+        purchase = CafeteriaTransaction.objects.get(
+            student=student, transaction_type=CafeteriaTransaction.TxType.PURCHASE)
+        services.refund_transaction(purchase, reason="devolución de compra")
+
+        cb = CafeteriaBalance.objects.get(student=student)
+        expected = Decimal("100") + 150 - 40 - 10 + 40
+        assert cb.balance == expected == Decimal("240")
+
+        txs = list(CafeteriaTransaction.objects.filter(student=student).order_by("pk"))
+        assert len(txs) == 4
+        # 1. Ledger derives the balance: opening + Σ signed effects == balance.
+        assert opening + sum(services._net_effect(t) for t in txs) == cb.balance
+        # 2. balance_after chains: each snapshot = previous + this row's effect.
+        running = opening
+        for tx in txs:
+            running += services._net_effect(tx)
+            assert tx.balance_after == running
+        assert txs[-1].balance_after == cb.balance
