@@ -49,13 +49,19 @@ export function greetingForHour(hour: number): string {
   return 'Buenas noches';
 }
 
-/** Re-render every minute so the "Actualizado hace X min" hint stays honest. */
-function useMinuteTick() {
-  const [, setTick] = useState(0);
+/**
+ * Current time as state, refreshed every minute — keeps the greeting and the
+ * "Actualizado hace X min" hint honest without reading the clock during
+ * render (react-hooks/purity): the impure `Date.now()` reads live in the
+ * lazy initializer and the interval callback.
+ */
+function useNowMs(): number {
+  const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
+  return nowMs;
 }
 
 export default function ParentDashboard() {
@@ -69,7 +75,7 @@ export default function ParentDashboard() {
   });
 
   useAnnouncementsRead(data?.announcements);
-  useMinuteTick();
+  const nowMs = useNowMs();
 
   const children = data?.children ?? [];
   const needsFamilyLink = Boolean(data?.needs_family_link) || (!isLoading && !isError && children.length === 0);
@@ -80,12 +86,12 @@ export default function ParentDashboard() {
   const hasCafeteria = balances.length > 0;
   const unread = data?.unread_notifications ?? 0;
 
-  const now = new Date();
+  const now = new Date(nowMs);
   const todayLine = format(now, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });
   const todayCapitalized = todayLine.charAt(0).toUpperCase() + todayLine.slice(1);
 
   const updatedMins = dataUpdatedAt
-    ? Math.max(0, Math.floor((Date.now() - dataUpdatedAt) / 60_000))
+    ? Math.max(0, Math.floor((nowMs - dataUpdatedAt) / 60_000))
     : null;
   const updatedLabel = updatedMins == null
     ? null

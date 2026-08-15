@@ -5,18 +5,18 @@
  * so local dev and tests stay clean. Accepting boots analytics immediately;
  * declining keeps every tracker dormant.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Cookie } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { hasConsentDecision, setConsent } from '@/services/consent';
 import { initAnalytics, isAnalyticsConfigured, trackPageView } from '@/services/analytics';
 
 export function CookieConsent() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (isAnalyticsConfigured() && !hasConsentDecision()) setVisible(true);
-  }, []);
+  // Config + stored consent are fixed for the life of the page, so the initial
+  // visibility is computed once (lazy init) instead of synced via an effect.
+  const [visible, setVisible] = useState(
+    () => isAnalyticsConfigured() && !hasConsentDecision(),
+  );
 
   if (!visible) return null;
 

@@ -24,7 +24,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const oauthReturning = params.get('login') === 'ok';
-  const [oauthBootstrapping, setOauthBootstrapping] = useState(oauthReturning);
+  // Derived: we are bootstrapping while the OAuth return param is present and
+  // the silent refresh hasn't failed (no setState needed inside the effect).
+  const [bootstrapFailed, setBootstrapFailed] = useState(false);
+  const oauthBootstrapping = oauthReturning && !bootstrapFailed;
 
   // Rendered outside PublicLayout (no <RouteSeo>), so set the title directly.
   useEffect(() => {
@@ -37,7 +40,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (!oauthReturning) return;
     let cancelled = false;
-    setOauthBootstrapping(true);
     bootstrapSession()
       .then(async (ok) => {
         if (!ok) throw new Error('no-session');
@@ -49,7 +51,7 @@ export default function LoginPage() {
       .catch(() => {
         if (cancelled) return;
         toast.error('Error al iniciar sesión. Intente nuevamente.');
-        setOauthBootstrapping(false);
+        setBootstrapFailed(true);
         navigate('/login', { replace: true });
       });
     return () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -184,11 +184,14 @@ export default function AdminSettings() {
     queryKey: ['admin-site-settings'],
     queryFn: async () => (await contentApi.adminGetSettings()).data as SettingsForm,
   });
-  const [form, setForm] = useState<SettingsForm>(EMPTY);
+  // The form is derived during render: loaded server values overlaid with the
+  // admin's edits — replaces the old state-sync effect, and a background
+  // refetch can no longer clobber in-progress edits.
+  const [edits, setEdits] = useState<Partial<SettingsForm>>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  useEffect(() => { if (data) setForm({ ...EMPTY, ...data }); }, [data]);
+  const form: SettingsForm = { ...EMPTY, ...data, ...edits };
   const set = (k: keyof SettingsForm, v: string) => {
-    setForm((f) => ({ ...f, [k]: v }));
+    setEdits((f) => ({ ...f, [k]: v }));
     setFieldErrors((prev) => (prev[k] ? { ...prev, [k]: undefined } : prev));
   };
 

@@ -114,6 +114,10 @@ export default function AdminAnnouncements() {
   const wantsNew = searchParams.get('nuevo');
   useEffect(() => {
     if (!wantsNew) return;
+    // Suppressed: one-shot URL command — the param is external navigation
+    // state consumed (deleted) right after, so the composer state cannot be
+    // derived from it and the setState cannot cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     openNew();
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);

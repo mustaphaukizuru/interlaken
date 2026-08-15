@@ -23,27 +23,48 @@ type Phase = 'loading' | 'preview' | 'committing' | 'error';
 export function LinkLoyverseModal({ open, onClose, onLinked }: {
   open: boolean; onClose: () => void; onLinked?: () => void;
 }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Vincular alumnos con Loyverse" maxWidth={520}>
+      {/* Modal mounts children only while open, so each open re-previews
+          (roster/customers may have changed) and closing discards the
+          report/error state (no reset effect). */}
+      <LinkLoyverseBody onClose={onClose} onLinked={onLinked} />
+    </Modal>
+  );
+}
+
+function LinkLoyverseBody({ onClose, onLinked }: {
+  onClose: () => void; onLinked?: () => void;
+}) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
-  async function preview() {
-    setPhase('loading'); setError('');
-    try {
-      const { data } = await portalApi.linkLoyverse(false);
-      setReport(data);
-      setPhase('preview');
-    } catch (e: any) {
-      setError(e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
-      setPhase('error');
-    }
-  }
-
-  // Re-preview each time the modal opens (roster/customers may have changed).
+  // Fetch the dry-run preview on mount and on each retry. State already
+  // starts at 'loading', so the effect only updates state from the promise
+  // continuations (no synchronous setState).
   useEffect(() => {
-    if (open) preview();
-    else { setReport(null); setError(''); }
-  }, [open]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await portalApi.linkLoyverse(false);
+        if (cancelled) return;
+        setReport(data);
+        setPhase('preview');
+      } catch (e: any) {
+        if (cancelled) return;
+        setError(e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
+        setPhase('error');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [attempt]);
+
+  const retry = () => {
+    setPhase('loading'); setError('');
+    setAttempt((a) => a + 1);
+  };
 
   async function commit() {
     setPhase('committing');
@@ -59,7 +80,7 @@ export function LinkLoyverseModal({ open, onClose, onLinked }: {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Vincular alumnos con Loyverse" maxWidth={520}>
+    <>
       {phase === 'loading' || phase === 'committing' ? (
         <div className="py-10 text-center">
           <LoadingSpinner />
@@ -79,7 +100,7 @@ export function LinkLoyverseModal({ open, onClose, onLinked }: {
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-            <Button onClick={preview}>Reintentar</Button>
+            <Button onClick={retry}>Reintentar</Button>
           </div>
         </div>
       ) : report ? (
@@ -141,7 +162,7 @@ export function LinkLoyverseModal({ open, onClose, onLinked }: {
           </div>
         </div>
       ) : null}
-    </Modal>
+    </>
   );
 }
 

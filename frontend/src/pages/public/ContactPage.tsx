@@ -219,6 +219,7 @@ export default function ContactPage() {
                     <li>
                       <a
                         href={`tel:${settings.phone_e164}`}
+                        aria-label={`Teléfono de ${d.level}, extensión ${d.ext}`}
                         className="flex items-center gap-2 text-ink/85 hover:text-green-dark"
                       >
                         <Phone size={15} className="text-green-dark" aria-hidden="true" />
@@ -228,6 +229,7 @@ export default function ContactPage() {
                     <li>
                       <a
                         href={`mailto:${d.email}`}
+                        aria-label={`Correo de ${d.level}`}
                         className="flex items-center gap-2 break-all text-ink/85 hover:text-green-dark"
                       >
                         <Mail size={15} className="text-green-dark" aria-hidden="true" />

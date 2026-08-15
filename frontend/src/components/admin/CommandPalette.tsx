@@ -65,14 +65,6 @@ const asList = <T,>(data: unknown): T[] =>
  */
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
-  const navigate = useNavigate();
-  const q = useDebounced(query.trim());
-  const enabled = open && q.length >= 2;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -93,37 +85,50 @@ export function CommandPalette() {
     };
   }, []);
 
+  if (!open) return null;
+  return <PalettePanel onClose={() => setOpen(false)} />;
+}
+
+/**
+ * The open palette. Mounted only while visible, so every open starts with a
+ * fresh query/highlight (no "reset on open" effects) and mount/unmount carry
+ * the scroll lock, focus move and focus restore.
+ */
+function PalettePanel({ onClose }: { onClose: () => void }) {
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const navigate = useNavigate();
+  const q = useDebounced(query.trim());
+  const enabled = q.length >= 2;
+
+  // Move focus into the box shortly after the palette appears.
   useEffect(() => {
-    if (open) {
-      setQuery('');
-      setActive(0);
-      window.setTimeout(() => inputRef.current?.focus(), 30);
-    }
-  }, [open]);
+    const t = window.setTimeout(() => inputRef.current?.focus(), 30);
+    return () => window.clearTimeout(t);
+  }, []);
 
   // Lock background scroll while the palette is open.
   useEffect(() => {
-    if (!open) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prevOverflow;
     };
-  }, [open]);
+  }, []);
 
   // Restore focus to whatever opened the palette (Ctrl+K target or the header
   // search button) once it closes — Escape, backdrop and X all pass through here.
   useEffect(() => {
-    if (!open) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     return () => {
       previouslyFocused.current?.focus?.();
     };
-  }, [open]);
+  }, []);
 
   // Trap Tab within the palette while open (simplified Modal trap).
   useEffect(() => {
-    if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
       const panel = panelRef.current;
@@ -145,7 +150,7 @@ export function CommandPalette() {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  }, []);
 
   const students = useQuery({
     queryKey: ['palette-students', q],
@@ -191,28 +196,32 @@ export function CommandPalette() {
 
   const searching = enabled && (students.isFetching || bookings.isFetching);
 
-  useEffect(() => setActive(0), [items.length, q]);
-
-  if (!open) return null;
+  // The keyboard highlight is keyed to the (query, result set) it was chosen
+  // in; when either changes it derives back to the first item during render —
+  // replacing the old `setActive(0)` reset effect.
+  const [activeSel, setActiveSel] = useState<{ q: string; len: number; index: number } | null>(null);
+  const active =
+    activeSel && activeSel.q === q && activeSel.len === items.length ? activeSel.index : 0;
+  const setActive = (index: number) => setActiveSel({ q, len: items.length, index });
 
   const go = (item: Item) => {
-    setOpen(false);
+    onClose();
     navigate(item.to);
   };
 
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, items.length - 1));
+      setActive(Math.min(active + 1, items.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
+      setActive(Math.max(active - 1, 0));
     } else if (e.key === 'Enter' && items[active]) {
       e.preventDefault();
       go(items[active]);
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      setOpen(false);
+      onClose();
     }
   };
 
@@ -224,7 +233,7 @@ export function CommandPalette() {
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/40 p-4 pt-[8vh] sm:pt-[12vh]"
-      onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         ref={panelRef}
@@ -251,7 +260,7 @@ export function CommandPalette() {
           />
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={onClose}
             aria-label="Cerrar búsqueda"
             className="rounded p-2.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
           >

@@ -1,21 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
-/** Reactive media-query hook (SSR-safe: defaults to false). */
+/**
+ * Reactive media-query hook. A media query is an external store, so this uses
+ * `useSyncExternalStore` (subscribe to `change`, snapshot from `matches`)
+ * rather than mirroring it into local state from an effect.
+ */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(
-    () => window.matchMedia?.(query).matches ?? false,
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const mql = window.matchMedia?.(query);
+      if (!mql) return () => {};
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    },
+    [query],
   );
-
-  useEffect(() => {
-    const mql = window.matchMedia?.(query);
-    if (!mql) return;
-    const onChange = (e: MediaQueryListEvent) => setMatches(e.matches);
-    mql.addEventListener('change', onChange);
-    setMatches(mql.matches);
-    return () => mql.removeEventListener('change', onChange);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(subscribe, () => window.matchMedia?.(query).matches ?? false);
 }
 
 export const useReducedMotion = () =>

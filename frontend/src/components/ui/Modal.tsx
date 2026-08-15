@@ -24,9 +24,12 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
   const previouslyFocused = useRef<HTMLElement | null>(null);
   // Call sites pass inline arrows for `onClose`; reading it through a ref keeps
   // the focus-trap effect stable across parent re-renders (otherwise focus
-  // bounces back to the first focusable element on every keystroke).
+  // bounces back to the first focusable element on every keystroke). Written
+  // from an effect (not during render), per the react-hooks/refs rule.
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
