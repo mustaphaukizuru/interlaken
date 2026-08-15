@@ -95,7 +95,6 @@ function renderPage() {
 
 /** Assert `a` comes before `b` in DOM order (mobile reading order). */
 function expectBefore(a: Node, b: Node) {
-  // eslint-disable-next-line no-bitwise
   expect(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 }
 
