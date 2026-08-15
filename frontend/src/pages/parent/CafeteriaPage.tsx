@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw,
   Search, X, Download, Wallet,
@@ -108,6 +108,30 @@ export default function CafeteriaPage() {
   });
   const transactions = txData?.results;
   const txCount = txData?.count ?? 0;
+
+  // Quick top-up deep link from the dashboard chips (`?recarga=200`): prefill
+  // the amount and open the top-up modal for the active (or first Loyverse-
+  // linked) student. The param is consumed immediately (replace, so Back does
+  // not re-trigger) and out-of-range amounts are ignored. No payment logic
+  // lives here — this only pre-selects what the existing modal already does.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const raw = searchParams.get('recarga');
+    if (raw == null || !balances) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('recarga');
+      return next;
+    }, { replace: true });
+    const amount = Number(raw);
+    const target =
+      balances.find((b) => b.student.id === childId && !!b.student.loyverse_id)
+      ?? balances.find((b) => !!b.student.loyverse_id);
+    if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) return;
+    setSelectedStudent(target.student.id);
+    setTopupAmount(String(amount));
+    setShowTopup(true);
+  }, [searchParams, setSearchParams, balances, childId]);
 
   const topupAmountNum = parseFloat(topupAmount);
   const topupAmountValid =

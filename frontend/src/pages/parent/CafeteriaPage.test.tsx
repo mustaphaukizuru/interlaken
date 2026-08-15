@@ -99,6 +99,28 @@ describe('CafeteriaPage states', () => {
     expect(screen.queryByRole('button', { name: /Recargar/i })).not.toBeInTheDocument();
   });
 
+  it('prefills and opens the top-up modal from a ?recarga deep link', async () => {
+    // Dashboard quick chips navigate to /portal/cafeteria?recarga=<monto>; the
+    // page must honor the prefill: modal open, amount already set.
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+
+    expect(await screen.findByRole('dialog', { name: 'Solicitar recarga' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Monto (MXN)')).toHaveValue(200);
+  });
+
+  it('ignores an out-of-range ?recarga deep link', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=99999' });
+
+    expect(await screen.findByText('Historial de movimientos')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('shows Recargar for a linked cafeteria account', async () => {
     mockedBalance.mockResolvedValue({ data: [account] } as never);
     mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
