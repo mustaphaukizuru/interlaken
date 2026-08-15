@@ -29,8 +29,11 @@ class SiteSettings(models.Model):
         default='5215553791188',
         help_text='Solo dígitos con lada de país, p. ej. 5215553791188 '
                   '(se usa en enlaces wa.me). Vacío = se ocultan los botones de WhatsApp.')
+    # .com.mx: the school's real monitored mailboxes (per-level directory, legal
+    # notice, admin accounts) all live on interlaken.com.mx; .edu.mx is the web
+    # domain only (GO-LIVE-AUDIT #19, resolved 2026-08-15).
     contact_email = models.EmailField(
-        'Correo de contacto', blank=True, default='colegio@interlaken.edu.mx')
+        'Correo de contacto', blank=True, default='colegio@interlaken.com.mx')
     address = models.CharField(
         'Dirección', max_length=200, blank=True,
         default='Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México')

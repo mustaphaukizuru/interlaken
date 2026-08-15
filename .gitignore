@@ -52,3 +52,6 @@ resources/
 # Docker image builds these fresh; only backend/static/admin/ is hand-managed.
 backend/static/*
 !backend/static/admin/
+
+# Local secrets handoff (VAPID) - paste into Render, never commit
+*.local.txt

@@ -11,7 +11,8 @@ export const SITE_DEFAULTS: SiteSettings = {
   phone_display: '(55) 5379-1188',
   phone_e164: '+525553791188',
   whatsapp_number: import.meta.env.VITE_WHATSAPP_NUMBER || '5215553791188',
-  contact_email: 'colegio@interlaken.edu.mx',
+  // Real monitored mailboxes live on .com.mx; .edu.mx is the web domain only.
+  contact_email: 'colegio@interlaken.com.mx',
   address: 'Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México',
   maps_url: 'https://maps.app.goo.gl/Xd241Sht8TmrMHUe6',
   office_hours: 'Lunes–Viernes 8:00–16:00 hrs',

@@ -35,7 +35,7 @@ export const LOCALE = 'es_MX';
 export const ORG = {
   legalName: 'Colegio Interlaken',
   telephone: '+52-55-5379-1188',
-  email: 'colegio@interlaken.edu.mx',
+  email: 'colegio@interlaken.com.mx',
   streetAddress: 'Av. de los Reyes 67, Residencial el Dorado',
   addressLocality: 'Tlalnepantla de Baz',
   addressRegion: 'Estado de México',

@@ -18,6 +18,10 @@ COPY frontend/ ./
 # picks it up (see docs/DEPLOY_RENDER.md §10).
 ARG VITE_VAPID_PUBLIC_KEY=
 ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
+# Frontend Sentry: set VITE_SENTRY_DSN in Render env and it reaches the bundle
+# here; unset keeps Sentry fully tree-shaken out (see src/services/sentry.ts).
+ARG VITE_SENTRY_DSN=
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 RUN npm run build   # → frontend/dist (assets reference /static/)
 
 # ── Stage 2: Django + gunicorn ──────────────────────────────────────────────

@@ -85,20 +85,21 @@ describe('StaffDashboard states (IK-ADMIN item 8)', () => {
     expect(mockedAnalytics).toHaveBeenCalledTimes(2);
   });
 
-  // Explicit timeout: the findBy waits below allow 8s each for the lazy recharts
-  // chunk in jsdom, so the default 5s test timeout fires first under full-suite load.
-  it('renders empty-safe content with zero data (KPIs + empty-state guidance)', { timeout: 20000 }, async () => {
+  // Explicit timeout: the findBy waits below allow 20s each for the lazy recharts
+  // chunk in jsdom; under full-suite load WITH a concurrent backend pytest run the
+  // transform alone has been observed at 28s, so give it generous headroom.
+  it('renders empty-safe content with zero data (KPIs + empty-state guidance)', { timeout: 45000 }, async () => {
     mockedAnalytics.mockResolvedValueOnce({ data: emptyPayload() } as never);
 
     renderDashboard();
     // First find waits out the lazy recharts chunk transform in jsdom.
-    expect(await screen.findByText('Cobrado este mes', {}, { timeout: 8000 }))
+    expect(await screen.findByText('Cobrado este mes', {}, { timeout: 20000 }))
       .toBeInTheDocument();
     expect(screen.getByText('Pre-registros pendientes')).toBeInTheDocument();
     expect(screen.getByText('Documentos por revisar')).toBeInTheDocument();
     expect(screen.getByText('Solicitudes ARCO abiertas')).toBeInTheDocument();
     // Charts fall back to guidance, not blank space.
-    expect(await screen.findByText('Sin pre-registros', {}, { timeout: 8000 }))
+    expect(await screen.findByText('Sin pre-registros', {}, { timeout: 20000 }))
       .toBeInTheDocument();
     expect(screen.getByText('Sin fuentes registradas')).toBeInTheDocument();
     expect(screen.getByText('Sin transacciones')).toBeInTheDocument();
