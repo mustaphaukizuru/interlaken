@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, Plus } from 'lucide-react';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { Award, FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, ShieldCheck, Plus } from 'lucide-react';
+import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
+import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
@@ -250,6 +251,35 @@ export default function AdmissionsPage() {
           </p>
         </div>
       </section>
+
+      {/* ── INCORPORACIÓN SEP — señales de confianza (flyer institucional) ── */}
+      <Section bg="white" spacing="sm">
+        <Reveal>
+          <div className="rounded-[20px] border border-ink/10 bg-cream-2/60 px-5 py-5 shadow-card sm:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple/10 text-purple">
+                  <Award className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="font-head text-[17px] font-bold text-ink">Incorporación oficial SEP</h2>
+                  <p className="text-xs text-muted">
+                    {SCHOOL_YEARS} años de trayectoria con reconocimiento y validez oficial.
+                  </p>
+                </div>
+              </div>
+              <ul className="grid gap-2.5 text-xs leading-relaxed text-ink/80 sm:grid-cols-3 lg:max-w-[660px]">
+                {SEP_INCORPORATIONS.map((r) => (
+                  <li key={r.level} className="flex items-start gap-2">
+                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-dark" aria-hidden="true" />
+                    <span>{r.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Reveal>
+      </Section>
 
       {/* ── PROCESS TIMELINE ── */}
       <Section bg="white">

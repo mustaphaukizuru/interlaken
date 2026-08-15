@@ -83,6 +83,11 @@ class SiteSettingsAdmin(ModelAdmin):
             'fields': ('phone_display', 'phone_e164', 'whatsapp_number',
                        'contact_email', 'address', 'maps_url', 'office_hours'),
         }),
+        ('Video institucional', {
+            'description': 'URL de YouTube o Vimeo mostrada en la página de inicio. '
+                           'Vacío = la sección no se muestra en el sitio.',
+            'fields': ('video_url',),
+        }),
         ('Redes sociales', {
             'description': 'Deje un campo vacío para ocultar ese ícono en el sitio.',
             'fields': ('facebook_url', 'instagram_url', 'youtube_url'),

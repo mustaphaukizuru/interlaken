@@ -27,7 +27,7 @@ class TestPublicRead:
         data = resp.json()
         assert set(data) == {
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
-            'address', 'maps_url', 'office_hours',
+            'address', 'maps_url', 'office_hours', 'video_url',
             'facebook_url', 'instagram_url', 'youtube_url', 'updated_at',
         }
         # Ships with the school's real contact data (confirmado por el cliente):
@@ -36,6 +36,8 @@ class TestPublicRead:
         assert data['facebook_url'] == 'https://www.facebook.com/colegiointerlaken'
         assert data['address'].startswith('Av. de los Reyes 67')
         assert data['instagram_url'] == ''
+        # Video institucional ships EMPTY → the homepage section stays hidden.
+        assert data['video_url'] == ''
 
     def test_first_read_creates_the_singleton(self, api_client):
         assert SiteSettings.objects.count() == 0

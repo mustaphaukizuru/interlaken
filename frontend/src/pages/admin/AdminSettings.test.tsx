@@ -30,6 +30,7 @@ const SAMPLE = {
   address: 'Av. de los Reyes 67, Tlalnepantla',
   maps_url: 'https://maps.app.goo.gl/example',
   office_hours: 'Lunes–Viernes 8:00–16:00 hrs',
+  video_url: '',
   facebook_url: 'https://www.facebook.com/colegiointerlaken',
   instagram_url: '',
   youtube_url: '',

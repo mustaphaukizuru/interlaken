@@ -41,6 +41,11 @@ class SiteSettings(models.Model):
         'Horario de oficina', max_length=100, blank=True,
         default='Lunes–Viernes 8:00–16:00 hrs')
 
+    # ── Video institucional (vacío = la sección no se muestra) ─
+    video_url = models.URLField(
+        'Video institucional', blank=True, default='',
+        help_text='URL de YouTube o Vimeo. Vacío = la sección no se muestra en el sitio.')
+
     # ── Redes sociales (vacío = el ícono no se muestra) ───
     # Confirmado por el cliente: la única red social del colegio es Facebook.
     facebook_url = models.URLField(

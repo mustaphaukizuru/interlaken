@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { legalApi } from '@/services/api';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -66,6 +67,12 @@ function sectionIcon(title: string): LucideIcon {
 }
 
 export default function AvisoPrivacidadPage() {
+  // Contact data comes from the admin-editable site settings (CMS Phase 1) —
+  // never hardcoded, so the page always matches the site chrome.
+  const settings = useSiteSettings();
+  const contactLine = [settings.phone_display, settings.contact_email]
+    .filter(Boolean)
+    .join(' · ');
   const { data, isLoading, isError } = useQuery<PrivacyNotice>({
     queryKey: ['legal-notice'],
     queryFn: async () => {
@@ -113,7 +120,7 @@ export default function AvisoPrivacidadPage() {
         ) : isError || !data?.body ? (
           <EmptyState
             title="Aviso no disponible"
-            description="No fue posible cargar el Aviso de Privacidad en este momento. Intente de nuevo más tarde o escríbanos a colegio@interlaken.edu.mx."
+            description={`No fue posible cargar el Aviso de Privacidad en este momento. Intente de nuevo más tarde${settings.contact_email ? ` o escríbanos a ${settings.contact_email}` : ''}.`}
           />
         ) : (
           <div>
@@ -122,7 +129,7 @@ export default function AvisoPrivacidadPage() {
               {[
                 { icon: Building2, label: 'Responsable', value: 'ADCE EDUCACIÓN, A.C. (Colegio Interlaken)' },
                 { icon: ShieldCheck, label: 'Sus derechos', value: 'Acceso · Rectificación · Cancelación · Oposición (ARCO)' },
-                { icon: Phone, label: 'Ejercerlos', value: '(5255) 5379-1188 · colegio@interlaken.com.mx' },
+                { icon: Phone, label: 'Ejercerlos', value: contactLine },
               ].map((c) => (
                 <div key={c.label} className="rounded-xl2 border border-ink/10 bg-cream-2 p-4">
                   <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-subtle">
