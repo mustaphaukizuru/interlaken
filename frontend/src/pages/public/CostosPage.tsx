@@ -62,7 +62,7 @@ export default function CostosPage() {
               <p className="font-head text-lg font-bold text-ink">¿Cómo se estructura el pago?</p>
               <ol className="space-y-2 text-sm text-muted">
                 <li className="flex gap-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green text-[11px] font-bold text-white">1</span>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-strong text-[11px] font-bold text-white">1</span>
                   <span><strong className="text-ink">Inscripción</strong> — pago único al ingresar o reinscribirse.</span>
                 </li>
                 <li className="flex gap-2.5">

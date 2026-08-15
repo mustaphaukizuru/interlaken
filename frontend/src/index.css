@@ -10,7 +10,8 @@
   --purple-dark: #4d22a8;
   --purple-light: #ede8f7;
   --purple-xlight: #e7e2f7;
-  --pink: #ef2558;
+  /* Pink darkened from #ef2558 so white button labels pass WCAG AA (4.74:1). */
+  --pink: #e01a4e;
   --pink-dark: #d81a49;
   --pink-hot: #ec1f7f;
   --pink-light: #fde8ed;
@@ -24,7 +25,11 @@
   --green-dark: #316f1c;
   --green-bright: #8bd15f;
   --green-light: #eef7e9;
-  --amber: #d97706;
+  /* Interactive green face: white labels need 4.5:1 — wordmark --green (3.32:1)
+     stays decorative-only; buttons/solid chips use green-strong (4.91:1). */
+  --green-strong: #38801e;
+  /* Amber darkened from #d97706 so warning TEXT passes AA (5.02:1 on white). */
+  --amber: #b45309;
   /* Neutrals */
   --dark: #080516;
   --dark-2: #0f0a24;
@@ -34,16 +39,17 @@
   --cream-2: #FAF9FD;
   --text-main: #1A1130;
   --text-muted: #6E6885;
-  --text-light: #9A93AE;
+  /* Darkened from #9A93AE (2.93:1 — failed AA) to pass 4.5:1 on white AND cream. */
+  --text-light: #726B89;
   --border: #ECEAF3;
   --border-2: #EEEBF5;
   /* Gradients */
-  --grad-bar: linear-gradient(90deg, #401a8e 0%, #9a1185 30%, #ef2558 60%, #47a028 100%);
-  --grad-cta: linear-gradient(120deg, #ef2558 0%, #401a8e 100%);
+  --grad-bar: linear-gradient(90deg, #401a8e 0%, #9a1185 30%, #e01a4e 60%, #47a028 100%);
+  --grad-cta: linear-gradient(120deg, #e01a4e 0%, #401a8e 100%);
   --grad-purple: linear-gradient(100deg, #401a8e, #5a27b8);
   --shadow-card: 0 1px 2px rgba(16,12,40,0.03), 0 4px 14px -10px rgba(64,26,142,0.10);
   --shadow-purple: 0 12px 28px -10px rgba(64,26,142,0.38);
-  --shadow-pink: 0 12px 28px -10px rgba(239,37,88,0.3);
+  --shadow-pink: 0 12px 28px -10px rgba(224,26,78,0.3);
   --shadow-green: 0 12px 28px -10px rgba(71,160,40,0.32);
   --shadow-coral: 0 12px 28px -10px rgba(221,38,34,0.3);
   --radius: 18px;
@@ -148,13 +154,13 @@
 
   /* ── New premium buttons ── */
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 50px; transition: var(--transition); cursor: pointer; border: none; white-space: nowrap; }
-  .btn-pink { @apply btn; background: var(--grad-cta); color: #fff; box-shadow: 0 10px 28px -8px rgba(239,37,88,0.55); }
+  .btn-pink { @apply btn; background: var(--grad-cta); color: #fff; box-shadow: 0 10px 28px -8px rgba(224,26,78,0.55); }
   .btn-pink:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -8px rgba(239,37,88,0.75); }
   .btn-outline { @apply btn; background: transparent; border: 2px solid var(--purple); color: var(--purple); }
   .btn-outline:hover { background: var(--purple); color: #fff; }
   .btn-ghost { @apply btn; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.22); }
   .btn-ghost:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.5); }
-  .btn-green { @apply btn; background: var(--green); color: #fff; box-shadow: var(--shadow-green); }
+  .btn-green { @apply btn; background: var(--green-strong); color: #fff; box-shadow: var(--shadow-green); }
   .btn-green:hover { background: var(--green-dark); transform: translateY(-1px); }
   .btn-lg { padding: 16px 32px; font-size: 15px; }
   /* Tactile press — overrides any hover-lift while the button is held. */

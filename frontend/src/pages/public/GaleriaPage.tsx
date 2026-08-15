@@ -173,7 +173,7 @@ export default function GaleriaPage() {
                 onClick={() => { setFilter(f.key); setOpen(null); }}
                 className={`min-h-[44px] rounded-full border-2 px-5 text-sm font-semibold transition-colors ${
                   filter === f.key
-                    ? 'border-green bg-green text-white'
+                    ? 'border-green-strong bg-green-strong text-white'
                     : 'border-ink/15 text-muted hover:border-green hover:text-green-dark'
                 }`}
               >

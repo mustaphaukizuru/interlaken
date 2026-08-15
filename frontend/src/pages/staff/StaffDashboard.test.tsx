@@ -85,7 +85,9 @@ describe('StaffDashboard states (IK-ADMIN item 8)', () => {
     expect(mockedAnalytics).toHaveBeenCalledTimes(2);
   });
 
-  it('renders empty-safe content with zero data (KPIs + empty-state guidance)', async () => {
+  // Explicit timeout: the findBy waits below allow 8s each for the lazy recharts
+  // chunk in jsdom, so the default 5s test timeout fires first under full-suite load.
+  it('renders empty-safe content with zero data (KPIs + empty-state guidance)', { timeout: 20000 }, async () => {
     mockedAnalytics.mockResolvedValueOnce({ data: emptyPayload() } as never);
 
     renderDashboard();
