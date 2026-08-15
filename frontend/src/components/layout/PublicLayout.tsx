@@ -12,6 +12,7 @@ import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { socialEntries } from '@/lib/siteContact';
+import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 
 /** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
@@ -175,6 +176,10 @@ export function PublicLayout() {
   }, [open]);
 
   return (
+    // NOTE: PublicLayout is part of the STATIC app shell (main chunk, shared
+    // with the portal), so the framer-motion provider does NOT live here —
+    // motion-using public pages wrap themselves in <SiteMotionProvider>
+    // (see lib/motion.tsx), keeping framer out of the portal's initial chunks.
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
@@ -486,6 +491,23 @@ export function PublicLayout() {
                 </li>
               </ul>
             </div>
+          </div>
+
+          {/* Incorporación SEP — registros oficiales (flyer institucional). */}
+          <div className="mt-10 border-t border-white/10 pt-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-white/55">
+              Incorporación SEP
+            </p>
+            <p className="mt-1.5 max-w-4xl text-[11px] leading-relaxed text-white/45">
+              {SEP_INCORPORATIONS.map((r, i) => (
+                <span key={r.level} className="block sm:inline">
+                  {r.label}
+                  {i < SEP_INCORPORATIONS.length - 1 && (
+                    <span className="hidden sm:inline" aria-hidden="true">{' · '}</span>
+                  )}
+                </span>
+              ))}
+            </p>
           </div>
         </div>
         <div className="border-t border-white/10">

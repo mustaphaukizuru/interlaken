@@ -36,10 +36,10 @@ export const ORG = {
   legalName: 'Colegio Interlaken',
   telephone: '+52-55-5379-1188',
   email: 'colegio@interlaken.edu.mx',
-  streetAddress: 'Tlalnepantla de Baz',
+  streetAddress: 'Av. de los Reyes 67, Residencial el Dorado',
   addressLocality: 'Tlalnepantla de Baz',
   addressRegion: 'Estado de México',
-  postalCode: '54000',
+  postalCode: '54020',
   addressCountry: 'MX',
   // Approximate campus geo (Tlalnepantla de Baz centre) — refine when surveyed.
   latitude: 19.5407,

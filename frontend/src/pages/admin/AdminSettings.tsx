@@ -19,7 +19,7 @@ type FieldErrors = Partial<Record<keyof SettingsForm, string>>;
 
 const EMPTY: SettingsForm = {
   phone_display: '', phone_e164: '', whatsapp_number: '', contact_email: '',
-  address: '', maps_url: '', office_hours: '',
+  address: '', maps_url: '', office_hours: '', video_url: '',
   facebook_url: '', instagram_url: '', youtube_url: '',
 };
 
@@ -298,6 +298,22 @@ export default function AdminSettings() {
                   error={fieldErrors.office_hours}
                 />
               </div>
+            </Card>
+
+            <Card title="Video institucional">
+              <p className="mb-4 text-sm text-subtle">
+                Se muestra en la página de inicio, en la sección «Conócenos en video».
+              </p>
+              <Input
+                label="URL del video (YouTube o Vimeo)"
+                type="url"
+                className={FIELD}
+                value={form.video_url}
+                onChange={(e) => set('video_url', e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=…"
+                hint="Vacío = la sección no se muestra en el sitio."
+                error={fieldErrors.video_url}
+              />
             </Card>
 
             <Card title="Redes sociales">

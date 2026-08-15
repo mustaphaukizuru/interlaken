@@ -18,6 +18,20 @@ if (!window.ResizeObserver) {
   } as unknown as typeof ResizeObserver;
 }
 
+// jsdom doesn't implement IntersectionObserver; Reveal and framer-motion's
+// whileInView need it. The stub never fires, so reveals simply stay pending.
+if (!window.IntersectionObserver) {
+  window.IntersectionObserver = class {
+    root = null;
+    rootMargin = '';
+    thresholds = [];
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return []; }
+  } as unknown as typeof IntersectionObserver;
+}
+
 // jsdom doesn't implement matchMedia; a few UI components read it.
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({

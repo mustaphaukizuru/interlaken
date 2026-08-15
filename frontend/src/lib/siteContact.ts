@@ -15,6 +15,8 @@ export const SITE_DEFAULTS: SiteSettings = {
   address: 'Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México',
   maps_url: 'https://maps.app.goo.gl/Xd241Sht8TmrMHUe6',
   office_hours: 'Lunes–Viernes 8:00–16:00 hrs',
+  // Empty = la sección «Conócenos en video» no se muestra en el sitio.
+  video_url: '',
   // Empty = icon hidden. Confirmado por el cliente: solo Facebook.
   facebook_url: 'https://www.facebook.com/colegiointerlaken',
   instagram_url: '',

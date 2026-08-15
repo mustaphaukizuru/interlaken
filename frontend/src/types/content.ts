@@ -7,6 +7,8 @@ export interface SiteSettings {
   address: string;
   maps_url: string;
   office_hours: string;
+  /** YouTube/Vimeo URL del video institucional; '' = sección oculta. */
+  video_url: string;
   facebook_url: string;
   instagram_url: string;
   youtube_url: string;

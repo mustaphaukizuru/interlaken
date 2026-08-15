@@ -27,6 +27,24 @@ class TestAdminSiteSettings:
         assert s.whatsapp_number == '5215500000000'
         assert s.contact_email == 'nuevo@interlaken.edu.mx'
 
+    def test_video_url_patch_reaches_public_endpoint(self, api_client):
+        """El video institucional se edita por el admin y aparece en el endpoint público."""
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.patch(URL, {
+            'video_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        }, format='json')
+        assert resp.status_code == 200, resp.content
+        assert SiteSettings.load().video_url == 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+        # The save invalidates the public cache, so the SPA sees it immediately.
+        public = api_client.get(reverse('site-settings')).json()
+        assert public['video_url'] == 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+
+    def test_video_url_rejects_invalid_url(self, api_client):
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.patch(URL, {'video_url': 'no-es-una-url'}, format='json')
+        assert resp.status_code == 400
+        assert 'video_url' in resp.json()
+
     def test_parent_forbidden(self, api_client):
         api_client.force_authenticate(ParentFactory())
         assert api_client.get(URL).status_code == 403
