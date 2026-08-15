@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { CalendarClock, CalendarPlus, Check, Loader2, X, UserCheck } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, FileDown, Loader2, X, UserCheck } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Pagination } from '@/components/ui/Pagination';
-import { bookingsApi } from '@/services/api';
+import { bookingsApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { Booking } from '@/types';
 
@@ -437,6 +437,16 @@ export default function AdminBookings() {
     onError: () => toast.error('No fue posible actualizar la reserva.'),
   });
 
+  const exportCsv = useMutation({
+    mutationFn: async () =>
+      (await bookingsApi.exportBookings({
+        ...(typeFilter ? { type: typeFilter } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      })).data as Blob,
+    onSuccess: (blob) => downloadBlob(blob, 'visitas.csv'),
+    onError: () => toast.error('No se pudo generar el archivo.'),
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -490,6 +500,14 @@ export default function AdminBookings() {
               <option value="cancelled">Canceladas</option>
               <option value="no_show">No asistió</option>
             </select>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={exportCsv.isPending}
+              onClick={() => exportCsv.mutate()}
+            >
+              <FileDown className="w-3.5 h-3.5" /> Exportar CSV
+            </Button>
           </div>
         }
       >

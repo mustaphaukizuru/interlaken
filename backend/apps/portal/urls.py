@@ -12,6 +12,7 @@ urlpatterns = [
     path('announcements/<int:pk>/',      views.AnnouncementDetailView.as_view(),     name='announcement-detail'),
     path('announcements/<int:pk>/comments/', views.AnnouncementCommentListCreateView.as_view(), name='announcement-comments'),
     path('admin/announcements/',         views.AnnouncementAdminListCreateView.as_view(), name='admin-announcements'),
+    path('admin/announcements/recipient-count/', views.AnnouncementRecipientCountView.as_view(), name='admin-announcement-recipient-count'),
     path('admin/announcements/<int:pk>/', views.AnnouncementAdminDetailView.as_view(),   name='admin-announcement-detail'),
     path('admin/broadcast/',             views.EmergencyBroadcastView.as_view(),         name='admin-broadcast'),
     path('notifications/',               views.NotificationListView.as_view(),       name='notifications'),

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Coffee, RefreshCw, Search, Download, ChevronRight, ScrollText,
@@ -15,8 +15,10 @@ import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
+import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
+import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
 
 type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
@@ -33,7 +35,13 @@ const fmtDate = (d: string | null) =>
   d ? format(new Date(d), 'd MMM yyyy, HH:mm', { locale: es }) : '—';
 
 export default function AdminCafeteria() {
-  const [tab, setTab] = useState<Tab>('roster');
+  // Active tab + per-tab filters live in the URL (shareable, survive refresh).
+  // Switching tabs drops the other tab's filter/page params.
+  const { get, set } = useUrlFilters();
+  const tabParam = get('tab');
+  const tab: Tab = TABS.some((t) => t.key === tabParam) ? (tabParam as Tab) : 'roster';
+  const setTab = (key: Tab) =>
+    set({ tab: key === 'roster' ? null : key, q: null, estado: null, page: null });
 
   return (
     <div className="space-y-6">
@@ -73,20 +81,39 @@ export default function AdminCafeteria() {
 }
 
 function SchoolExportButtons() {
+  const { get, set } = useUrlFilters();
+  const [busy, setBusy] = useState<'csv' | 'pdf' | null>(null);
+
   const doExport = async (fmt: 'csv' | 'pdf') => {
+    setBusy(fmt);
     try {
       const { data } = await cafeteriaApi.exportSchool(fmt);
       downloadBlob(data, `saldos_cafeteria_escuela.${fmt}`);
     } catch {
       toast.error('No se pudo generar el archivo.');
+    } finally {
+      setBusy(null);
     }
   };
+
+  // Command-palette deep link: /admin/cafeteria?exportar=csv triggers the same
+  // school-balances export the button runs, then consumes the param.
+  const consumed = useRef(false);
+  const exportParam = get('exportar');
+  useEffect(() => {
+    if (!exportParam || consumed.current) return;
+    consumed.current = true;
+    void doExport(exportParam === 'pdf' ? 'pdf' : 'csv');
+    set({ exportar: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportParam]);
+
   return (
     <div className="flex items-center gap-2">
-      <Button size="sm" variant="secondary" onClick={() => doExport('csv')}>
+      <Button size="sm" variant="secondary" loading={busy === 'csv'} onClick={() => doExport('csv')}>
         <Download className="w-3.5 h-3.5" /> CSV
       </Button>
-      <Button size="sm" variant="secondary" onClick={() => doExport('pdf')}>
+      <Button size="sm" variant="secondary" loading={busy === 'pdf'} onClick={() => doExport('pdf')}>
         <Download className="w-3.5 h-3.5" /> PDF
       </Button>
     </div>
@@ -96,8 +123,10 @@ function SchoolExportButtons() {
 // ── Roster ───────────────────────────────────────────────────────────────────
 function RosterTab() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  // URL-synced (debounced 300 ms) so a filtered roster is shareable; the
+  // filtering itself stays client-side over the current page.
+  const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
+  const [page, setPage] = useUrlPage();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-cafeteria-balances', page],
@@ -170,6 +199,13 @@ function RosterTab() {
         </p>
       )}
       <p className="-mt-2 mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
+
+      <ActiveFilterChips
+        chips={debouncedSearch
+          ? [{ key: 'q', label: `Búsqueda: “${debouncedSearch}”`, onClear: () => setSearch('') }]
+          : []}
+        onClearAll={() => setSearch('')}
+      />
 
       {isLoading ? (
         <TableSkeleton />
@@ -291,8 +327,11 @@ function RosterTab() {
 
 // ── Deposits log ─────────────────────────────────────────────────────────────
 function DepositsTab() {
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
+  // URL-synced filter + page (shareable, survive refresh).
+  const { get, set } = useUrlFilters();
+  const status = get('estado');
+  const setStatus = (value: string) => set({ estado: value || null, page: null });
+  const [page, setPage] = useUrlPage();
 
   const { data: paged, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-cafeteria-topups', status, page],
@@ -315,7 +354,7 @@ function DepositsTab() {
           id="deposit-status"
           className="input-field w-auto"
           value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          onChange={(e) => setStatus(e.target.value)}
         >
           <option value="">Todos</option>
           <option value="pending">Pendiente</option>
@@ -323,6 +362,17 @@ function DepositsTab() {
           <option value="failed">Fallido</option>
         </select>
       </div>
+
+      <ActiveFilterChips
+        chips={status
+          ? [{
+              key: 'estado',
+              label: `Estado: ${status === 'pending' ? 'Pendiente' : status === 'completed' ? 'Completado' : 'Fallido'}`,
+              onClear: () => setStatus(''),
+            }]
+          : []}
+        onClearAll={() => setStatus('')}
+      />
 
       {isLoading ? (
         <TableSkeleton />
@@ -721,7 +771,7 @@ function ReconcileTab() {
 
 // ── Low balance ──────────────────────────────────────────────────────────────
 function LowBalanceTab() {
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useUrlPage();
 
   const { data: paged, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-cafeteria-low-balance', page],

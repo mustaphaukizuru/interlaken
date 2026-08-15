@@ -515,6 +515,17 @@ def notify_invoice_result(payment, *, success: bool) -> int:
 
 # ── manual admin changes (audited) ────────────────────────────────────────────
 
+def _audit_invoice(context, invoice, *, admin=None, **metadata):
+    """Append an ``AuditLog`` row for a manual invoice mutation. Fail-open:
+    a logging failure must never break the money mutation it describes."""
+    try:
+        from apps.core.audit import record
+        record('update', invoice, metadata, actor=admin, context=context)
+    except Exception:  # noqa: BLE001 — audit is best-effort by design
+        logger.warning('AuditLog write failed for invoice #%s (%s)',
+                       invoice.pk, context, exc_info=True)
+
+
 def mark_invoice_paid(invoice, reason='', admin=None, method='efectivo'):
     """Manually settle an invoice (e.g. cash at the cashier). Audited & idempotent.
 
@@ -525,6 +536,7 @@ def mark_invoice_paid(invoice, reason='', admin=None, method='efectivo'):
         inv = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if inv.status == Invoice.Status.PAID and inv.is_settled:
             return None
+        old_status = inv.status
         applied = inv.balance_due
         inv.amount_paid = inv.amount
         inv.status = Invoice.Status.PAID
@@ -537,6 +549,12 @@ def mark_invoice_paid(invoice, reason='', admin=None, method='efectivo'):
             status_after=inv.status, amount_after=inv.amount, amount_paid_after=inv.amount_paid,
         )
 
+    _audit_invoice(
+        'finance.mark_paid', inv, admin=admin,
+        reason=adj.reason, amount=str(applied), method=method,
+        status=[old_status, inv.status], student=inv.student.student_id,
+        period=inv.period,
+    )
     _notify_invoice(
         inv, 'Colegiatura pagada',
         (f'Se registró el pago de la colegiatura de {_period_label(inv.period)} de '
@@ -586,6 +604,11 @@ def adjust_invoice(invoice, amount, reason, admin=None):
             status_after=inv.status, amount_after=inv.amount, amount_paid_after=inv.amount_paid,
         )
 
+    _audit_invoice(
+        'finance.adjust', inv, admin=admin,
+        reason=reason, amount=str(amount), total_after=str(inv.amount),
+        status=inv.status, student=inv.student.student_id, period=inv.period,
+    )
     verb = 'cargo' if amount > 0 else 'crédito'
     _notify_invoice(
         inv, 'Ajuste en su colegiatura',
@@ -651,6 +674,11 @@ def refund_invoice_overpayment(invoice, *, payment_id=None, reason='', admin=Non
             amount_paid_after=inv.amount_paid,
         )
 
+    _audit_invoice(
+        'finance.refund', inv, admin=admin,
+        reason=reason, amount=str(-amount), payment_id=payment.id,
+        status=inv.status, student=inv.student.student_id, period=inv.period,
+    )
     _notify_invoice(
         inv, 'Devolución de colegiatura',
         (f'Se registró una devolución de ${amount:.2f} sobre la colegiatura de '
@@ -674,6 +702,7 @@ def cancel_invoice(invoice, reason, admin=None):
             raise ValueError('No se puede cancelar una factura ya pagada.')
         if inv.status == Invoice.Status.CANCELLED:
             return None
+        old_status = inv.status
         inv.status = Invoice.Status.CANCELLED
         inv.save(update_fields=['status', 'updated_at'])
         adj = InvoiceAdjustment.objects.create(
@@ -681,6 +710,11 @@ def cancel_invoice(invoice, reason, admin=None):
             amount=Decimal('0.00'), reason=reason,
             status_after=inv.status, amount_after=inv.amount, amount_paid_after=inv.amount_paid,
         )
+    _audit_invoice(
+        'finance.cancel', inv, admin=admin,
+        reason=reason, status=[old_status, inv.status],
+        student=inv.student.student_id, period=inv.period,
+    )
     logger.info(f'Invoice #{inv.id} cancelled by {admin} — {reason!r}.')
     return adj
 

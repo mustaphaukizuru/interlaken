@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({
@@ -17,12 +17,19 @@ const students = vi.mocked(portalApi.getStudents);
 const bookings = vi.mocked(bookingsApi.getAdminBookings);
 const invoices = vi.mocked(financeApi.getAdminInvoices);
 
+/** Exposes the router's current URL so tests can assert navigation. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname + location.search}</div>;
+}
+
 function renderPalette() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
         <CommandPalette />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -82,5 +89,34 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the Acciones group before typing and runs an action with its param', async () => {
+    renderPalette();
+    await userEvent.keyboard('{Control>}k{/Control}');
+
+    // Actions are listed without any search (search endpoints untouched).
+    expect(screen.getByText('Acciones')).toBeInTheDocument();
+    expect(students).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('option', { name: /Crear comunicado/ }));
+
+    // Navigates carrying the param AdminAnnouncements consumes to open its
+    // composer (the page keeps its own validations/confirmations).
+    expect(screen.getByTestId('location')).toHaveTextContent('/admin/comunicados?nuevo=1');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('filters actions accent-insensitively while typing', async () => {
+    renderPalette();
+    await userEvent.keyboard('{Control>}k{/Control}');
+    await userEvent.type(screen.getByRole('combobox'), 'cafeteria');
+
+    // The action list narrows once the debounced query settles.
+    await waitFor(() =>
+      expect(screen.queryByRole('option', { name: /Crear comunicado/ })).toBeNull());
+    expect(
+      screen.getByRole('option', { name: /Exportar saldos de cafetería/ }),
+    ).toBeInTheDocument();
   });
 });

@@ -217,6 +217,29 @@ class BookingCancelView(APIView):
         return Response(BookingSerializer(booking).data)
 
 
+def filter_admin_bookings(params):
+    """Admin booking queryset for ``params`` — shared by the list and the CSV
+    export so the download always matches the on-screen filters."""
+    qs = (Booking.objects.select_related('slot')
+          .order_by('-slot__date', '-slot__start_time', '-id'))
+    visit_type = params.get('type')
+    if visit_type:
+        qs = qs.filter(slot__visit_type=visit_type)
+    booking_status = params.get('status')
+    if booking_status:
+        qs = qs.filter(status=booking_status)
+    date = params.get('date')
+    if date:
+        qs = qs.filter(slot__date=date)
+    q = params.get('q')
+    if q:
+        # Powers the admin Ctrl+K palette.
+        qs = qs.filter(
+            Q(parent_name__icontains=q) | Q(parent_email__icontains=q)
+            | Q(child_name__icontains=q))
+    return qs
+
+
 class AdminBookingsView(generics.ListAPIView):
     """GET /api/v1/bookings/admin/bookings/?type=&status=&date=&q= — manage
     bookings. Paginated (DRF PageNumberPagination) so the admin console's pager
@@ -226,25 +249,20 @@ class AdminBookingsView(generics.ListAPIView):
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        qs = (Booking.objects.select_related('slot')
-              .order_by('-slot__date', '-slot__start_time', '-id'))
-        params = self.request.query_params
-        visit_type = params.get('type')
-        if visit_type:
-            qs = qs.filter(slot__visit_type=visit_type)
-        booking_status = params.get('status')
-        if booking_status:
-            qs = qs.filter(status=booking_status)
-        date = params.get('date')
-        if date:
-            qs = qs.filter(slot__date=date)
-        q = params.get('q')
-        if q:
-            # Powers the admin Ctrl+K palette.
-            qs = qs.filter(
-                Q(parent_name__icontains=q) | Q(parent_email__icontains=q)
-                | Q(child_name__icontains=q))
-        return qs
+        return filter_admin_bookings(self.request.query_params)
+
+
+class AdminBookingsExportView(APIView):
+    """GET /api/v1/bookings/admin/bookings/export/ — CSV of the visits list.
+
+    Accepts the same query params as the list endpoint (type / status / date / q)
+    so the download respects the active filters.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from . import exports
+        return exports.bookings_csv(filter_admin_bookings(request.query_params))
 
 
 class AdminBookingActionView(APIView):
