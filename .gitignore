@@ -45,3 +45,8 @@ docs/*.docx
 
 # Local source material (brand PDFs/logos), not app assets
 resources/
+
+# SPA build artifacts staged for Django (scripts/build_frontend.py). The Render
+# Docker image builds these fresh; only backend/static/admin/ is hand-managed.
+backend/static/*
+!backend/static/admin/

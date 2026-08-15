@@ -84,21 +84,14 @@ jobs:
       - name: Build (vite)
         run: npm run build
 
-      # cPanel deploy has no Node — production SPA is the committed
-      # backend/static + templates/index.html tree. Fail CI if that tree
-      # drifts from a fresh Vite build (e.g. missing push-sw.js).
+      # The Render Docker image builds the SPA fresh (Dockerfile stage 1), so no
+      # committed-static freshness gate is needed anymore (it was a cPanel-era
+      # requirement). We still assert the push companion SW ships in dist.
       - name: Assert push companion SW is in dist
         run: |
           test -f dist/push-sw.js
           grep -q showNotification dist/push-sw.js
           grep -q notificationclick dist/push-sw.js
-
-      - name: Stage SPA for Django and verify committed static is fresh
-        working-directory: .
-        run: |
-          python3 scripts/build_frontend.py --skip-build
-          git add -A -- backend/static backend/templates/index.html
-          git diff --cached --exit-code -- backend/static backend/templates/index.html
 
   e2e:
     name: E2E (Playwright — money flows)
