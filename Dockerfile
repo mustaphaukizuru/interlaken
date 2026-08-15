@@ -5,7 +5,11 @@
 # ── Stage 1: build the React SPA (Vite base=/static/) ───────────────────────
 FROM node:20-slim AS frontend
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json ./
+# .npmrc MUST be copied with the manifests: it carries legacy-peer-deps=true,
+# without which `npm ci` dies on eslint-plugin-jsx-a11y's peer range (capped at
+# eslint ^9 while the repo runs eslint 10). CI checks out the whole repo so it
+# never sees this — only the Docker build did, by failing.
+COPY frontend/package.json frontend/package-lock.json frontend/.npmrc ./
 # node:20-slim ships npm 10.8.2, which generates/validates a lock inconsistently
 # for this dependency graph (ajv/json-schema-traverse split) and fails `npm ci`
 # with EUSAGE. Pin a newer npm that resolves it (the committed lock is generated

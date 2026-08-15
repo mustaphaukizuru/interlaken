@@ -18,3 +18,5 @@ backend/.ratelimit-cache
 frontend/coverage
 frontend/playwright-report
 frontend/test-results
+# Playwright specs + ~3MB of visual baselines never run in the image.
+frontend/e2e

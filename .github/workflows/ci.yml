@@ -193,6 +193,25 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
+  docker:
+    # Builds the ACTUAL production image (what Render runs). The other jobs run
+    # against a full repo checkout, so they cannot catch image-only breakage:
+    # on 2026-08-15 the eslint-10 upgrade made `npm ci` need frontend/.npmrc,
+    # which the Dockerfile did not COPY — every job stayed green while the
+    # deploy build was broken. Never delete this job.
+    name: Docker image (production build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   security-audit:
     # Advisory (non-blocking): surfaces known CVEs in dependencies without
     # gating merges. Tighten to blocking once the baseline is clean.
