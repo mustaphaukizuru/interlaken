@@ -66,14 +66,12 @@ const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
 const AdminDashboard  = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
 const AdminSettings   = lazy(() => import('./pages/admin/AdminSettings'));
-const AdminFees       = lazy(() => import('./pages/admin/AdminFees'));
 const AdminAdmissions = lazy(() => import('./pages/admin/AdminAdmissions'));
 const AdminCafeteria  = lazy(() => import('./pages/admin/AdminCafeteria'));
 const AdminCafeteriaStudent = lazy(() => import('./pages/admin/AdminCafeteriaStudent'));
 const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
-const AdminFinance    = lazy(() => import('./pages/admin/AdminFinance'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
 
 const queryClient = new QueryClient({
@@ -199,8 +197,6 @@ export default function App() {
               <Route path="visitas"     element={<AdminBookings />} />
               <Route path="cafeteria"   element={<AdminCafeteria />} />
               <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
-              <Route path="finanzas"    element={<AdminFinance />} />
-              <Route path="planes"      element={<AdminFees />} />
               <Route path="alumnos"     element={<AdminStudents />} />
               <Route path="alumnos/:studentId" element={<AdminStudentDetail />} />
               <Route path="comunicados" element={<AdminAnnouncements />} />

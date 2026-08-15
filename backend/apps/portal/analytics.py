@@ -13,7 +13,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.cache import cache
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import permissions
@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 
-CACHE_KEY_PREFIX = 'staff-analytics-v2'
+CACHE_KEY_PREFIX = 'staff-analytics-v3'  # v3: overdue-invoice KPI removed
 CACHE_TTL_SECONDS = 60
 # Whitelisted trend windows for ?days= (default 30).
 ALLOWED_RANGE_DAYS = (7, 30, 90)
@@ -47,7 +47,6 @@ def _zero_filled(choices, counted):
 def build_payload(days=30):
     from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
     from apps.cafeteria.models import CafeteriaTransaction
-    from apps.finance.models import Invoice
     from apps.legal.models import ArcoRequest
     from apps.payments.models import Payment
     from apps.portal.models import Announcement
@@ -78,7 +77,7 @@ def build_payload(days=30):
         for offset in range(days - 1, -1, -1)
     ]
 
-    # ── Payments: this month vs last (full + to-date) + overdue (4 queries) ──
+    # ── Payments: this month vs last (full + to-date) (3 queries) ──
     def month_window(start, end):
         row = Payment.objects.filter(
             status=Payment.Status.SUCCESS,
@@ -98,8 +97,6 @@ def build_payload(days=30):
     prev_to_date_end = min(prev_month_start + timedelta(days=days_into_month),
                            month_start)
     payments_prev_to_date = month_window(prev_month_start, prev_to_date_end)
-    overdue_row = Invoice.objects.filter(status=Invoice.Status.OVERDUE).aggregate(
-        n=Count('id'), amount=Sum(F('amount') - F('amount_paid')))
     pay_by_day = dict(
         Payment.objects.filter(status=Payment.Status.SUCCESS,
                                completed_at__gte=since)
@@ -178,10 +175,6 @@ def build_payload(days=30):
             'this_month': payments_this,
             'last_month': payments_prev,
             'last_month_to_date': payments_prev_to_date,
-            'overdue': {
-                'count': overdue_row['n'] or 0,
-                'amount': float(overdue_row['amount'] or 0),
-            },
             'series': payments_series,
         },
         'cafeteria': {'series': series},

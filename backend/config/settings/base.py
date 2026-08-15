@@ -672,18 +672,10 @@ UNFOLD = {
                 'title': 'Pagos',
                 'separator': True,
                 'items': [
+                    # finance.* changelists are gone on purpose: the app does
+                    # not bill tuition (models dormant, admin unregistered).
                     {'title': 'Pagos en línea', 'icon': 'payments',
                      'link': reverse_lazy('admin:payments_payment_changelist')},
-                    {'title': 'Colegiaturas (facturas)', 'icon': 'request_quote',
-                     'link': reverse_lazy('admin:finance_invoice_changelist')},
-                    {'title': 'Planes de colegiatura', 'icon': 'price_change',
-                     'link': reverse_lazy('admin:finance_feeschedule_changelist')},
-                    {'title': 'Descuentos y becas', 'icon': 'percent',
-                     'link': reverse_lazy('admin:finance_discount_changelist')},
-                    {'title': 'Pagos aplicados', 'icon': 'receipt',
-                     'link': reverse_lazy('admin:finance_invoicepayment_changelist')},
-                    {'title': 'Ajustes de factura', 'icon': 'edit_note',
-                     'link': reverse_lazy('admin:finance_invoiceadjustment_changelist')},
                 ],
             },
             {

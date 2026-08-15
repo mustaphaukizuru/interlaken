@@ -8,7 +8,7 @@ interface PaginationProps {
   /** Total rows across all pages (DRF `count`). */
   count: number;
   onChange: (page: number) => void;
-  /** es-MX noun for the counted rows, e.g. "alumnos", "colegiaturas". */
+  /** es-MX noun for the counted rows, e.g. "alumnos", "movimientos". */
   itemLabel?: string;
 }
 

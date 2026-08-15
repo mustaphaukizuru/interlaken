@@ -61,7 +61,6 @@ test('admin portal routes render', async ({ page }) => {
   await clickNavAndSettle(page, 'Alumnos', /\/admin\/alumnos/);
   await clickNavAndSettle(page, 'Admisiones', /\/admin\/admisiones/);
   await clickNavAndSettle(page, 'Visitas', /\/admin\/visitas/);
-  await clickNavAndSettle(page, 'Finanzas', /\/admin\/finanzas/);
   await clickNavAndSettle(page, 'Cafetería', /\/admin\/cafeteria/);
 });
 

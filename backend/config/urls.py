@@ -42,7 +42,8 @@ urlpatterns = [
     path('api/v1/cafeteria/',   include('apps.cafeteria.urls')),
     path('api/v1/payments/',    include('apps.payments.urls')),
     path('api/v1/portal/',      include('apps.portal.urls')),
-    path('api/v1/finance/',     include('apps.finance.urls')),
+    # apps.finance is intentionally NOT mounted: the school does not bill
+    # tuition through the app (models stay for the dormant historical tables).
     path('api/v1/bookings/',    include('apps.bookings.urls')),
     path('api/v1/whatsapp/',    include('apps.whatsapp.urls')),
     path('api/v1/legal/',       include('apps.legal.urls')),

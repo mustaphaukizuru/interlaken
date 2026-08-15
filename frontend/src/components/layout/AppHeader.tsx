@@ -46,7 +46,7 @@ export default function AppHeader() {
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
-            aria-label="Buscar alumnos, reservas o facturas"
+            aria-label="Buscar alumnos o reservas"
             className="hidden w-[230px] items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-[9px] text-left shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
           >
             <Search size={15} className="text-subtle" aria-hidden="true" />

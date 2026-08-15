@@ -29,8 +29,6 @@ const PORTAL_TITLES: Record<string, string> = {
   '/admin/alumnos': 'Alumnos',
   '/admin/admisiones': 'Admisiones',
   '/admin/visitas': 'Visitas',
-  '/admin/finanzas': 'Finanzas',
-  '/admin/planes': 'Planes',
   '/admin/cafeteria': 'Cafetería',
   '/admin/comunicados': 'Comunicados',
   '/admin/ajustes': 'Ajustes',

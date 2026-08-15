@@ -7,15 +7,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 vi.mock('@/services/api', () => ({
   portalApi: { getStudents: vi.fn() },
   bookingsApi: { getAdminBookings: vi.fn() },
-  financeApi: { getAdminInvoices: vi.fn() },
 }));
 
 import { CommandPalette } from './CommandPalette';
-import { bookingsApi, financeApi, portalApi } from '@/services/api';
+import { bookingsApi, portalApi } from '@/services/api';
 
 const students = vi.mocked(portalApi.getStudents);
 const bookings = vi.mocked(bookingsApi.getAdminBookings);
-const invoices = vi.mocked(financeApi.getAdminInvoices);
 
 /** Exposes the router's current URL so tests can assert navigation. */
 function LocationProbe() {
@@ -49,7 +47,6 @@ beforeEach(() => {
     },
   } as never);
   bookings.mockResolvedValue({ data: [] } as never);
-  invoices.mockResolvedValue({ data: { results: [] } } as never);
 });
 
 describe('CommandPalette', () => {
@@ -68,7 +65,7 @@ describe('CommandPalette', () => {
     expect(students).not.toHaveBeenCalled();
   });
 
-  it('searches the three endpoints and shows grouped results', async () => {
+  it('searches both endpoints and shows grouped results', async () => {
     renderPalette();
     await userEvent.keyboard('{Control>}k{/Control}');
     // The palette input is a combobox now (aria-activedescendant wiring).
@@ -76,7 +73,6 @@ describe('CommandPalette', () => {
 
     await waitFor(() => expect(students).toHaveBeenCalledWith({ search: 'ana' }));
     expect(bookings).toHaveBeenCalledWith({ q: 'ana' });
-    expect(invoices).toHaveBeenCalledWith({ q: 'ana' });
 
     expect(await screen.findByText('Ana García')).toBeInTheDocument();
     expect(screen.getByText('Alumnos')).toBeInTheDocument();

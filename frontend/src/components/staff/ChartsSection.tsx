@@ -272,12 +272,12 @@ function RevenueTrendChart({ data }: { data: AnalyticsPayload }) {
   const interval = Math.floor(series.length / 6);
 
   return (
-    <StaffCard title={takeaway} subtitle="Ingresos diarios — colegiaturas y otros cobros">
+    <StaffCard title={takeaway} subtitle="Ingresos diarios — cafetería y otros cobros">
       {total === 0 ? (
         <EmptyState
           icon={Receipt}
           title="Sin cobros en el periodo"
-          description="Cada pago registrado en Finanzas alimenta esta tendencia diaria."
+          description="Cada pago en línea registrado alimenta esta tendencia diaria."
         />
       ) : (
         <div className="h-52">

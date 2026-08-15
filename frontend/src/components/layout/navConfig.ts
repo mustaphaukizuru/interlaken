@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Receipt, Megaphone, Settings, ShieldCheck, Wallet, UserCircle, QrCode, type LucideIcon,
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, type LucideIcon,
 } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
@@ -20,8 +20,6 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: Users,         label: 'Alumnos',     to: '/admin/alumnos' },
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
     { icon: CalendarClock, label: 'Visitas',     to: '/admin/visitas' },
-    { icon: Receipt,       label: 'Finanzas',    to: '/admin/finanzas' },
-    { icon: Wallet,        label: 'Planes',      to: '/admin/planes' },
     { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
     { icon: Megaphone,     label: 'Comunicados', to: '/admin/comunicados' },
     { icon: Settings,      label: 'Ajustes',     to: '/admin/ajustes' },
@@ -69,7 +67,7 @@ export const mobileNavByRole: Record<Role, NavEntry[]> = {
     { icon: BarChart3,     label: 'Inicio',      to: '/admin', end: true },
     { icon: Users,         label: 'Alumnos',     to: '/admin/alumnos' },
     { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
-    { icon: Receipt,       label: 'Finanzas',    to: '/admin/finanzas' },
+    { icon: Megaphone,     label: 'Comunicados', to: '/admin/comunicados' },
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
   ],
   staff: navByRole.staff,

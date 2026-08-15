@@ -15,7 +15,7 @@ from .models import (
 @admin.register(TuitionCost)
 class TuitionCostAdmin(ModelAdmin):
     """Costos INFORMATIVOS del sitio público — el colegio los actualiza cada
-    ciclo. Los precios que se facturan viven en Finanzas → Planes de cobro."""
+    ciclo. La aplicación NO cobra colegiaturas; estos montos solo se muestran."""
     list_display = ('section', 'inscripcion', 'colegiatura', 'order',
                     'is_active', 'updated_at')
     list_editable = ('inscripcion', 'colegiatura', 'order', 'is_active')
@@ -23,10 +23,9 @@ class TuitionCostAdmin(ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         from django.contrib import messages
-        messages.info(request, 'Estos costos son informativos (sitio público). '
-                               'Los precios que se facturan se configuran en '
-                               '«Finanzas → Planes de cobro»; mantenga ambos '
-                               'en sincronía.')
+        messages.info(request, 'Estos costos son únicamente informativos: se '
+                               'muestran en el sitio público. La aplicación no '
+                               'cobra colegiaturas.')
         return super().changelist_view(request, extra_context)
 
 
