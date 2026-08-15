@@ -4,6 +4,11 @@
 This ties together all planning docs and adds everything else worth doing, prioritized.
 
 > ## ⚡ Update 2026-07-09 — what remains (everything else below is done or superseded)
+> ⚠️ **2026-08-15:** tuition billing was REMOVED from the app by client decision
+> (PR #121) — cafetería top-ups are the only in-app money path. Ignore this
+> document's tuition/finance items (B1, E1, recurring tuition, CFDI-for-tuition);
+> apps/finance remains installed but dormant.
+
 > **Shipped since generation:** all P0/P1 fixes · cafeteria wallet (full) · tuition billing · bookings + Calendar + WhatsApp · legal/LFPDPPP · CMS Phase 1 · staff analytics · UI/UX refinements (frontend + unfold admin) · tests/CI/Sentry · SEO/PWA · API docs · DB backups · Dependabot · read receipts · Ctrl+K search · 404.
 > **Contract constraints:** payments locked to **Global Payments + Banorte** (no OXXO/SPEI/others) · **academics (D-section) permanently descoped.**
 > **Open — needs the client/owner:** SSL renewal (blocks go-live) · cPanel deploy execution · gateway + WABA + Loyverse credentials · Google SA key + redirect URI · real CMS data · legal review · secret rotation · `git push`.

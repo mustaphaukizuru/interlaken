@@ -1,5 +1,10 @@
 # Colegio Interlaken — Deployment & Infrastructure Alignment
 
+> ⚠️ **SUPERSEDED (2026-08):** the app deploys to **Render + Supabase** — see
+> [DEPLOY_RENDER.md](DEPLOY_RENDER.md). This cPanel/GoDaddy document is kept as
+> historical reference only; its tuition/colegiaturas URLs also predate the
+> client's decision to remove tuition billing from the app entirely.
+
 **Generated:** 2026-07-07 · Host: **GoDaddy cPanel shared hosting** (Jupiter, cPanel 134.0.43)
 Companion to [STATUS_REPORT.md](STATUS_REPORT.md), [CAFETERIA_WALLET_SPEC.md](CAFETERIA_WALLET_SPEC.md), [BOOKING_CALENDAR_SPEC.md](BOOKING_CALENDAR_SPEC.md)
 

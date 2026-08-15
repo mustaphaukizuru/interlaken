@@ -1,5 +1,13 @@
 # Deploy free: Render (web) + Supabase (Postgres)
 
+> ⚠️ **Service branch (2026-08-15 incident):** development merges to **`master`**, but the
+> Render service was created tracking **`admin-refinement`** — deploys silently froze for a
+> day while master moved 131 commits ahead. Either switch the service's branch to `master`
+> (Render dashboard → the service → Settings → Build & Deploy → Branch) or keep
+> `admin-refinement` fast-forwarded (`git push origin master:admin-refinement`) after every
+> merge. Verify a deploy actually shipped by probing `https://<host>/healthz` (must return
+> JSON, not the SPA shell) and comparing the served `index-*.js` hash with the latest build.
+
 One Render **Docker** web service (free) serves the API **and** the React SPA
 (whitenoise); **Supabase** is the free Postgres; **GitHub Actions** runs the
 Loyverse sync so balances stay fresh even while the free web service sleeps.
