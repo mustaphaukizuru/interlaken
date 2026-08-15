@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, XCircle, Clock, Coffee } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Logo from '@/components/ui/Logo';
 import { paymentsApi } from '@/services/api';
@@ -103,7 +102,11 @@ export default function CafeteriaTopupReturn() {
             <div className="h-full w-full rounded-full bg-green" />
           </div>
         )}
-        <div className={`rounded-xl2 border border-line bg-white p-8 text-center shadow-card ring-1 ${content.ring}`}>
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-xl2 border border-line bg-white p-8 text-center shadow-card ring-1 ${content.ring}`}
+        >
           <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${content.accent}`}>
             {content.icon}
           </div>
@@ -115,13 +118,11 @@ export default function CafeteriaTopupReturn() {
           <h1 className="font-head text-fluid-xl font-bold text-ink">{content.title}</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">{content.text}</p>
           <div className="mt-7">
-            <Link to="/portal/cafeteria">
-              <Button
-                variant={outcome === 'success' ? 'primary' : 'secondary'}
-                className="min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
-              >
-                <Coffee className="h-4 w-4" /> Volver a cafetería
-              </Button>
+            <Link
+              to="/portal/cafeteria"
+              className={`${outcome === 'success' ? 'btn-primary' : 'btn-secondary'} min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40`}
+            >
+              <Coffee className="h-4 w-4" /> Volver a cafetería
             </Link>
           </div>
         </div>

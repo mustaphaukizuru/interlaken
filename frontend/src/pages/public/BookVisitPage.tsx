@@ -137,7 +137,7 @@ export default function BookVisitPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {confirmed ? (
-          <div className="text-center py-12 sm:py-16">
+          <div className="text-center py-12 sm:py-16" role="status">
             <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-brand-600" />
             </div>

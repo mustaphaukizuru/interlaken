@@ -64,7 +64,8 @@ describe('CommandPalette', () => {
   it('searches the three endpoints and shows grouped results', async () => {
     renderPalette();
     await userEvent.keyboard('{Control>}k{/Control}');
-    await userEvent.type(screen.getByRole('textbox'), 'ana');
+    // The palette input is a combobox now (aria-activedescendant wiring).
+    await userEvent.type(screen.getByRole('combobox'), 'ana');
 
     await waitFor(() => expect(students).toHaveBeenCalledWith({ search: 'ana' }));
     expect(bookings).toHaveBeenCalledWith({ q: 'ana' });

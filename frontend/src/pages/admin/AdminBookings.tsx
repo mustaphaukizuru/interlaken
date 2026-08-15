@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { CalendarClock, CalendarPlus, Check, X, UserCheck } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, Loader2, X, UserCheck } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -224,39 +224,52 @@ function BookingActions({
   booking,
   onAction,
   onCancelRequest,
+  pendingAct,
 }: {
   booking: Booking;
   onAction: (v: { id: number; act: BookingAct }) => void;
   onCancelRequest: (b: Booking) => void;
+  /** Action currently in flight for THIS booking (undefined when idle). */
+  pendingAct?: BookingAct;
 }) {
   const { id, parent_name: parentName } = booking;
+  const pending = pendingAct !== undefined;
   const base =
-    'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+    'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50';
   return (
     <>
       <button
         title="Marcar asistió"
         aria-label={`Marcar que ${parentName} asistió`}
         onClick={() => onAction({ id, act: 'attended' })}
+        disabled={pending}
         className={`${base} hover:bg-brand-50 hover:text-brand-600`}
       >
-        <UserCheck className="w-4 h-4" />
+        {pendingAct === 'attended'
+          ? <Loader2 className="w-4 h-4 animate-spin" />
+          : <UserCheck className="w-4 h-4" />}
       </button>
       <button
         title="Confirmar"
         aria-label={`Confirmar la reserva de ${parentName}`}
         onClick={() => onAction({ id, act: 'confirm' })}
+        disabled={pending}
         className={`${base} hover:bg-green-50 hover:text-green-600`}
       >
-        <Check className="w-4 h-4" />
+        {pendingAct === 'confirm'
+          ? <Loader2 className="w-4 h-4 animate-spin" />
+          : <Check className="w-4 h-4" />}
       </button>
       <button
         title="Cancelar"
         aria-label={`Cancelar la reserva de ${parentName}`}
         onClick={() => onCancelRequest(booking)}
+        disabled={pending}
         className={`${base} hover:bg-coral-50 hover:text-coral-600`}
       >
-        <X className="w-4 h-4" />
+        {pendingAct === 'cancel' || pendingAct === 'no_show'
+          ? <Loader2 className="w-4 h-4 animate-spin" />
+          : <X className="w-4 h-4" />}
       </button>
     </>
   );
@@ -351,7 +364,12 @@ function SlotManager() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={s.is_active ? 'success' : 'neutral'}>{s.is_active ? 'Activo' : 'Inactivo'}</Badge>
-              <Button variant="secondary" size="sm" onClick={() => toggleActive.mutate(s)} disabled={toggleActive.isPending}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => toggleActive.mutate(s)}
+                loading={toggleActive.isPending && toggleActive.variables?.id === s.id}
+              >
                 {s.is_active ? 'Desactivar' : 'Activar'}
               </Button>
               <Button variant="ghost" size="sm" className="text-coral-600" onClick={() => setDeleteFor(s)}>
@@ -531,7 +549,12 @@ export default function AdminBookings() {
                       <p className="text-subtle text-xs">{b.parent_phone}</p>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1">
-                      <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
+                      <BookingActions
+                        booking={b}
+                        onAction={action.mutate}
+                        onCancelRequest={setCancelFor}
+                        pendingAct={action.isPending && action.variables?.id === b.id ? action.variables?.act : undefined}
+                      />
                     </div>
                   </li>
                 );
@@ -584,7 +607,12 @@ export default function AdminBookings() {
                         </td>
                         <td>
                           <div className="flex items-center gap-1">
-                            <BookingActions booking={b} onAction={action.mutate} onCancelRequest={setCancelFor} />
+                            <BookingActions
+                              booking={b}
+                              onAction={action.mutate}
+                              onCancelRequest={setCancelFor}
+                              pendingAct={action.isPending && action.variables?.id === b.id ? action.variables?.act : undefined}
+                            />
                           </div>
                         </td>
                       </tr>

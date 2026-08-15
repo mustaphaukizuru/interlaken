@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Coffee, Store, CalendarCheck, CalendarClock, Star, ShoppingBag } from 'lucide-react';
@@ -40,7 +41,12 @@ export default function CredencialPage() {
   }, [cards, selectedId]);
 
   const studentId = active?.student.id;
-  const { data: history, isLoading: histLoading } = useQuery({
+  const {
+    data: history,
+    isLoading: histLoading,
+    isError: histError,
+    refetch: refetchHistory,
+  } = useQuery({
     queryKey: ['loyverse-history', studentId],
     queryFn: async () => (await cafeteriaApi.getLoyverseHistory(studentId)).data,
     enabled: !!studentId && !!active?.linked,
@@ -62,7 +68,12 @@ export default function CredencialPage() {
       ) : !cards?.length ? (
         <Card>
           <EmptyState icon={Coffee} title="Sin credencial de cafetería"
-            description="El colegio debe vincular al alumno con el servicio de cafetería (Loyverse) para generar su credencial." />
+            description="El colegio debe vincular al alumno con el servicio de cafetería (Loyverse) para generar su credencial."
+            action={
+              <Link to="/contacto" className="btn-secondary text-sm">
+                Contactar al colegio
+              </Link>
+            } />
         </Card>
       ) : active ? (
         <>
@@ -108,6 +119,8 @@ export default function CredencialPage() {
             <Card title="Compras recientes (Loyverse)">
               {histLoading ? (
                 <ListSkeleton rows={4} />
+              ) : histError ? (
+                <ErrorState onRetry={() => refetchHistory()} />
               ) : !receipts.length ? (
                 <EmptyState icon={ShoppingBag} title="Sin compras recientes"
                   description="No hay compras recientes registradas en Loyverse para este alumno." />

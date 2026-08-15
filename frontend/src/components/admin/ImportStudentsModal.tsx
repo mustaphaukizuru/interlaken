@@ -92,7 +92,7 @@ export function ImportStudentsModal({ open, onClose }: { open: boolean; onClose:
           />
         </label>
 
-        {run.isPending && <p className="text-sm text-muted">Procesando…</p>}
+        {run.isPending && <p role="status" className="text-sm text-muted">Procesando…</p>}
 
         {preview && (
           <div className="space-y-3">

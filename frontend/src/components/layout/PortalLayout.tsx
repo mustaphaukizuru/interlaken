@@ -5,9 +5,45 @@ import AppHeader from './AppHeader';
 import MobileTabBar from './MobileTabBar';
 import { RouteTransition } from './RouteTransition';
 import { CommandPalette } from '@/components/admin/CommandPalette';
+import { SITE_NAME } from '@/lib/siteMeta';
 
 interface Props {
   role: 'parent' | 'student' | 'admin' | 'staff';
+}
+
+/**
+ * Per-route document titles for authenticated surfaces. The public site gets
+ * its titles from <RouteSeo> (react-helmet-async); portal routes set them here
+ * directly so screen-reader users hear where a navigation landed.
+ */
+const PORTAL_TITLES: Record<string, string> = {
+  '/portal': 'Inicio',
+  '/portal/pagos': 'Pagos',
+  '/portal/cafeteria': 'Cafetería',
+  '/portal/credencial': 'Credencial',
+  '/portal/inscripciones': 'Inscripciones',
+  '/portal/comunicados': 'Comunicados',
+  '/portal/perfil': 'Mi perfil',
+  '/portal/privacidad': 'Privacidad',
+  '/admin': 'Dashboard',
+  '/admin/alumnos': 'Alumnos',
+  '/admin/admisiones': 'Admisiones',
+  '/admin/visitas': 'Visitas',
+  '/admin/finanzas': 'Finanzas',
+  '/admin/planes': 'Planes',
+  '/admin/cafeteria': 'Cafetería',
+  '/admin/comunicados': 'Comunicados',
+  '/admin/ajustes': 'Ajustes',
+  '/staff': 'Analítica',
+};
+
+/** Exact match first; detail routes (…/comunicados/:id) inherit their section title. */
+function portalTitleFor(pathname: string): string | undefined {
+  if (PORTAL_TITLES[pathname]) return PORTAL_TITLES[pathname];
+  const prefix = Object.keys(PORTAL_TITLES)
+    .filter((k) => pathname.startsWith(`${k}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return prefix ? PORTAL_TITLES[prefix] : undefined;
 }
 
 /**
@@ -45,6 +81,12 @@ export function PortalLayout({ role }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
   useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [pathname]);
+
+  // Announce the current page in the tab title on each portal navigation.
+  useEffect(() => {
+    const title = portalTitleFor(pathname);
+    if (title) document.title = `${title} · ${SITE_NAME}`;
+  }, [pathname]);
 
   // Lock body scroll while the drawer is open.
   useEffect(() => {

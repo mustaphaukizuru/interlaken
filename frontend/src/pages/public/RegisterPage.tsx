@@ -76,8 +76,13 @@ export default function RegisterPage() {
   const [booting, setBooting] = useState(isInvited);
   const [inviteError, setInviteError] = useState(false);
   const [invited, setInvited] = useState(false);
+  // Per-field messages for empty required fields (step 1) — shown under each input.
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Form, string>>>({});
 
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setFieldErrors((e) => (e[k] ? { ...e, [k]: undefined } : e));
+  };
 
   const hasMedical = !!(form.blood_type || form.allergies || form.medical_notes);
 
@@ -122,9 +127,19 @@ export default function RegisterPage() {
 
   // ── Step 1: create the registration (or, when invited, save edits) ──────
   async function submitStep1() {
-    if (!form.child_first_name || !form.child_last_name || !form.child_dob ||
-        !form.grade_applying || !form.parent1_name || !form.parent1_email || !form.parent1_phone) {
+    const required: (keyof Form)[] = [
+      'child_first_name', 'child_last_name', 'child_dob',
+      'grade_applying', 'parent1_name', 'parent1_email', 'parent1_phone',
+    ];
+    const errors: Partial<Record<keyof Form, string>> = {};
+    for (const k of required) {
+      if (!form[k]) errors[k] = 'Este campo es obligatorio.';
+    }
+    setFieldErrors(errors);
+    const firstInvalid = required.find((k) => errors[k]);
+    if (firstInvalid) {
       toast.error('Complete los campos obligatorios.');
+      document.getElementById(firstInvalid)?.focus();
       return;
     }
     setBusy(true);
@@ -329,17 +344,27 @@ export default function RegisterPage() {
             <>
               <SectionHead title="Datos del alumno" subtitle="Información del candidato a inscripción" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Nombre(s)" className="text-base min-h-[44px]" value={form.child_first_name} onChange={(e) => set('child_first_name', e.target.value)} />
-                <Input label="Apellidos" className="text-base min-h-[44px]" value={form.child_last_name} onChange={(e) => set('child_last_name', e.target.value)} />
+                <Input id="child_first_name" label="Nombre(s)" error={fieldErrors.child_first_name} className="text-base min-h-[44px]" value={form.child_first_name} onChange={(e) => set('child_first_name', e.target.value)} />
+                <Input id="child_last_name" label="Apellidos" error={fieldErrors.child_last_name} className="text-base min-h-[44px]" value={form.child_last_name} onChange={(e) => set('child_last_name', e.target.value)} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Fecha de nacimiento" type="date" max={new Date().toISOString().slice(0, 10)} className="text-base min-h-[44px]" value={form.child_dob} onChange={(e) => set('child_dob', e.target.value)} />
+                <Input id="child_dob" label="Fecha de nacimiento" type="date" max={new Date().toISOString().slice(0, 10)} error={fieldErrors.child_dob} className="text-base min-h-[44px]" value={form.child_dob} onChange={(e) => set('child_dob', e.target.value)} />
                 <div>
-                  <label htmlFor="grade" className="label">Grado al que aplica</label>
-                  <select id="grade" className={selectClass} value={form.grade_applying} onChange={(e) => set('grade_applying', e.target.value)}>
+                  <label htmlFor="grade_applying" className="label">Grado al que aplica</label>
+                  <select
+                    id="grade_applying"
+                    className={selectClass}
+                    value={form.grade_applying}
+                    onChange={(e) => set('grade_applying', e.target.value)}
+                    aria-invalid={fieldErrors.grade_applying ? true : undefined}
+                    aria-describedby={fieldErrors.grade_applying ? 'grade_applying-error' : undefined}
+                  >
                     <option value="">Seleccionar…</option>
                     {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
+                  {fieldErrors.grade_applying && (
+                    <p id="grade_applying-error" className="mt-1.5 text-xs text-coral-600">{fieldErrors.grade_applying}</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -349,10 +374,10 @@ export default function RegisterPage() {
 
               <hr className="border-line" />
               <SectionHead title="Tutor principal" subtitle="Padre, madre o tutor" />
-              <Input label="Nombre completo del tutor" className="text-base min-h-[44px]" value={form.parent1_name} onChange={(e) => set('parent1_name', e.target.value)} />
+              <Input id="parent1_name" label="Nombre completo del tutor" error={fieldErrors.parent1_name} className="text-base min-h-[44px]" value={form.parent1_name} onChange={(e) => set('parent1_name', e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Correo electrónico" type="email" className="text-base min-h-[44px]" value={form.parent1_email} onChange={(e) => set('parent1_email', e.target.value)} />
-                <Input label="Teléfono / WhatsApp" type="tel" className="text-base min-h-[44px]" value={form.parent1_phone} onChange={(e) => set('parent1_phone', e.target.value)} />
+                <Input id="parent1_email" label="Correo electrónico" type="email" error={fieldErrors.parent1_email} className="text-base min-h-[44px]" value={form.parent1_email} onChange={(e) => set('parent1_email', e.target.value)} />
+                <Input id="parent1_phone" label="Teléfono / WhatsApp" type="tel" error={fieldErrors.parent1_phone} className="text-base min-h-[44px]" value={form.parent1_phone} onChange={(e) => set('parent1_phone', e.target.value)} />
               </div>
 
               <div className="flex justify-end">

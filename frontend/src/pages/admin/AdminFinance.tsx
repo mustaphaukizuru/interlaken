@@ -74,7 +74,12 @@ export default function AdminFinance() {
   /** Reset paging + selection whenever the filter set changes. */
   const onFilter = (fn: () => void) => { fn(); setPage(1); setSelected(new Set()); };
 
-  const { data: dashboard } = useQuery<FinanceDashboard>({
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    isError: dashboardError,
+    refetch: refetchDashboard,
+  } = useQuery<FinanceDashboard>({
     queryKey: ['finance-dashboard', period],
     queryFn: async () => (await financeApi.getDashboard(period)).data,
   });
@@ -182,13 +187,35 @@ export default function AdminFinance() {
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Wallet} label="Facturado" value={`$${dashboard?.billed ?? '0.00'}`} tone="muted" />
-        <KpiCard icon={TrendingUp} label="Cobrado" value={`$${dashboard?.collected ?? '0.00'}`} tone="green" />
-        <KpiCard icon={AlertTriangle} label="Pendiente" value={`$${dashboard?.outstanding ?? '0.00'}`} tone="coral" />
-        <KpiCard icon={Receipt} label="Tasa de cobro" value={`${dashboard?.collection_rate ?? 0}%`} tone="brand" />
-      </div>
+      {/* KPIs — skeleton while loading, honest error + retry on failure
+          (never a fabricated $0.00). */}
+      {dashboardLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {['Facturado', 'Cobrado', 'Pendiente', 'Tasa de cobro'].map((label) => (
+            <Card key={label} className="flex items-center gap-3" aria-hidden="true">
+              <div className="skeleton h-10 w-10 rounded-xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="skeleton h-3 w-16" />
+                <div className="skeleton h-5 w-24" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : dashboardError ? (
+        <Card>
+          <ErrorState
+            title="No se pudieron cargar los indicadores"
+            onRetry={() => refetchDashboard()}
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard icon={Wallet} label="Facturado" value={`$${dashboard?.billed ?? '0.00'}`} tone="muted" />
+          <KpiCard icon={TrendingUp} label="Cobrado" value={`$${dashboard?.collected ?? '0.00'}`} tone="green" />
+          <KpiCard icon={AlertTriangle} label="Pendiente" value={`$${dashboard?.outstanding ?? '0.00'}`} tone="coral" />
+          <KpiCard icon={Receipt} label="Tasa de cobro" value={`${dashboard?.collection_rate ?? 0}%`} tone="brand" />
+        </div>
+      )}
 
       {(dashboard?.overpaid ?? 0) > 0 && (
         <button

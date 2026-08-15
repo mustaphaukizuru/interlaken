@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
@@ -137,8 +137,6 @@ describe('StudentGuardians', () => {
     listGuardians.mockResolvedValue({
       data: { student: STUDENT, guardians: [GUARDIAN] },
     } as never);
-    const confirm = vi.fn(() => true);
-    vi.stubGlobal('confirm', confirm);
 
     renderWithProviders(<StudentGuardians studentId={7} />);
 
@@ -150,7 +148,10 @@ describe('StudentGuardians', () => {
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Desvincular/i }));
-    expect(confirm).toHaveBeenCalled();
+    // App-styled ConfirmDialog replaces window.confirm.
+    const dialog = await screen.findByRole('dialog', { name: /Desvincular tutor/i });
+    expect(within(dialog).getByText(/¿Desvincular a Ana López/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Desvincular$/i }));
     await waitFor(() => {
       expect(unlinkGuardian).toHaveBeenCalledWith(7, 31);
     });

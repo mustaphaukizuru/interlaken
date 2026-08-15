@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Mail, ArrowLeft } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
+import { SITE_NAME } from '@/lib/siteMeta';
 import { authApi } from '@/services/api';
 
 /** Request a password-reset / account-activation email. */
@@ -10,6 +11,11 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // Rendered outside PublicLayout (no <RouteSeo>), so set the title directly.
+  useEffect(() => {
+    document.title = `Recuperar contraseña · ${SITE_NAME}`;
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +43,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         {sent ? (
-          <div className="space-y-4 text-center">
+          <div className="space-y-4 text-center" role="status">
             <p className="text-sm text-ink">
               Revise su bandeja de entrada (y spam). El enlace caduca en 24 horas.
             </p>

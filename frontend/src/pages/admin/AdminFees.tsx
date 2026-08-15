@@ -47,6 +47,7 @@ export default function AdminFees() {
   const toggle = useMutation({
     mutationFn: (f: Fee) => financeApi.adminUpdateFee(f.id, { active: !f.active }),
     onSuccess: invalidate,
+    onError: () => toast.error('No fue posible actualizar el plan.'),
   });
   const remove = useMutation({
     mutationFn: (id: number) => financeApi.adminDeleteFee(id),
@@ -74,7 +75,12 @@ export default function AdminFees() {
       <Card>
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState onRetry={() => refetch()} />
           : !data?.length ? (
-            <EmptyState icon={Wallet} title="Sin planes" description="Crea un plan de colegiatura para poder generar facturas." />
+            <EmptyState
+              icon={Wallet}
+              title="Sin planes"
+              description="Crea un plan de colegiatura para poder generar facturas."
+              action={<Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo plan</Button>}
+            />
           ) : (
             <div className="admin-table-wrap">
               <table className="admin-table">
@@ -90,8 +96,15 @@ export default function AdminFees() {
                       <td><Badge variant={f.active ? 'success' : 'neutral'}>{f.active ? 'Activo' : 'Inactivo'}</Badge></td>
                       <td>
                         <div className="flex items-center justify-end gap-1">
-                          <button type="button" onClick={() => toggle.mutate(f)} className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted hover:bg-cream whitespace-nowrap">
-                            {f.active ? 'Desactivar' : 'Activar'}
+                          <button
+                            type="button"
+                            onClick={() => toggle.mutate(f)}
+                            disabled={toggle.isPending && toggle.variables?.id === f.id}
+                            className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted hover:bg-cream whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {toggle.isPending && toggle.variables?.id === f.id
+                              ? 'Guardando…'
+                              : f.active ? 'Desactivar' : 'Activar'}
                           </button>
                           <button type="button" onClick={() => openEdit(f)} aria-label="Editar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
                           <button type="button" onClick={() => setToDelete(f)} aria-label="Eliminar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>

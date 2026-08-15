@@ -98,7 +98,16 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            // Errors linger longer and are announced immediately by screen readers.
+            error: {
+              duration: 6000,
+              ariaProps: { role: 'alert', 'aria-live': 'assertive' },
+            },
+          }}
+        />
         <AnalyticsListener />
         <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>

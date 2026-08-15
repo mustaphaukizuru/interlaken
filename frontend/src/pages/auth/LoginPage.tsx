@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import { SCHOOL_YEARS } from '@/lib/siteMeta';
+import { SCHOOL_YEARS, SITE_NAME } from '@/lib/siteMeta';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,6 +25,11 @@ export default function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const oauthReturning = params.get('login') === 'ok';
   const [oauthBootstrapping, setOauthBootstrapping] = useState(oauthReturning);
+
+  // Rendered outside PublicLayout (no <RouteSeo>), so set the title directly.
+  useEffect(() => {
+    document.title = `Iniciar sesión · ${SITE_NAME}`;
+  }, []);
 
   // Handle the Google OAuth return. The backend set the session as httpOnly
   // cookies and redirected here with ?login=ok (NO tokens in the URL); we mint
@@ -162,7 +167,11 @@ export default function LoginPage() {
               )}
 
               {alertMsg && !oauthBootstrapping && (
-                <div className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark">
+                <div
+                  id="login-error"
+                  role="alert"
+                  className="mb-[18px] rounded-xl border border-pink bg-pink/[0.08] px-3.5 py-2.5 text-[13px] text-pink-dark"
+                >
                   {alertMsg}
                 </div>
               )}
@@ -201,6 +210,8 @@ export default function LoginPage() {
                     onChange={e => setEmail(e.target.value)}
                     placeholder="correo@interlaken.edu.mx"
                     disabled={oauthBootstrapping}
+                    aria-invalid={formError ? true : undefined}
+                    aria-describedby={formError ? 'login-error' : undefined}
                     className="input-field min-h-[44px] pl-10 text-base disabled:opacity-60"
                   />
                 </div>
@@ -216,6 +227,8 @@ export default function LoginPage() {
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••"
                     disabled={oauthBootstrapping}
+                    aria-invalid={formError ? true : undefined}
+                    aria-describedby={formError ? 'login-error' : undefined}
                     className="input-field min-h-[44px] pl-10 pr-11 text-base disabled:opacity-60"
                   />
                   <button

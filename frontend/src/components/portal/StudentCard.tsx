@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Coffee, Maximize2, X, Sun } from 'lucide-react';
 import { Barcode } from '@/components/ui/Barcode';
@@ -18,9 +18,16 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
   const s = card.student;
   const gradeLine = [s.grade, s.group && `Grupo ${s.group}`].filter(Boolean).join(' · ');
 
+  // Focus management for the full-screen view (same pattern as Modal): move
+  // focus to the close button on open, restore it to the opener on close.
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
   // Escape closes the full-screen scan view; body scroll is locked while open.
   useEffect(() => {
     if (!full) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    closeBtnRef.current?.focus();
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false); };
@@ -28,6 +35,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
     return () => {
       document.body.style.overflow = prevOverflow;
       document.removeEventListener('keydown', onKey);
+      previouslyFocused.current?.focus?.();
     };
   }, [full]);
 
@@ -104,6 +112,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             className="absolute inset-0 cursor-default"
           />
           <button
+            ref={closeBtnRef}
             type="button"
             onClick={() => setFull(false)}
             aria-label="Cerrar"

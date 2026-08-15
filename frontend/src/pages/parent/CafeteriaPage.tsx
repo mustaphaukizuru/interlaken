@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw,
   Search, X, Download, Wallet,
@@ -251,6 +252,10 @@ export default function CafeteriaPage() {
     ? (balances ?? [])
     : (balances ?? []).filter((b) => b.student.id === childId);
 
+  // Only offer the "Recargar saldo" shortcut when some child is actually
+  // linked to Loyverse (otherwise there is no top-up section to jump to).
+  const anyLinked = (balances ?? []).some((b) => !!b.student.loyverse_id);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -299,7 +304,7 @@ export default function CafeteriaPage() {
 
       {/* Balance cards */}
       {!balancesLoading && (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div id="saldos-cafeteria" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visibleBalances.map((b) => {
           // Prefer API flag (balance <= threshold); fall back to same inequality.
           const isLow = typeof b.is_low_balance === 'boolean'
@@ -442,6 +447,11 @@ export default function CafeteriaPage() {
             icon={Coffee}
             title="Sin servicio de cafetería"
             description="El colegio debe vincular a tu hijo(a) con el servicio de cafetería (Loyverse) para ver saldo y movimientos aquí. Contacta a la administración escolar si crees que ya debería estar activo."
+            action={
+              <Link to="/contacto" className="btn-secondary text-sm">
+                Contactar al colegio
+              </Link>
+            }
           />
         </Card>
       )}
@@ -693,7 +703,22 @@ export default function CafeteriaPage() {
               action={<Button variant="secondary" size="sm" onClick={clearFilters}>Limpiar filtros</Button>}
             />
           ) : (
-            <EmptyState icon={Coffee} title="Sin movimientos" description="Los movimientos de cafetería aparecerán aquí." />
+            <EmptyState
+              icon={Coffee}
+              title="Sin movimientos"
+              description="Los movimientos de cafetería aparecerán aquí."
+              action={anyLinked ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    document.getElementById('saldos-cafeteria')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" /> Recargar saldo
+                </Button>
+              ) : undefined}
+            />
           )
         ) : (
           <>

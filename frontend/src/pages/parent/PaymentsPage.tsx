@@ -80,7 +80,16 @@ export default function PaymentsPage() {
         ) : isLoading ? (
           <ListSkeleton />
         ) : !payments?.length ? (
-          <EmptyState icon={CreditCard} title="Sin pagos" description="Los pagos realizados aparecerán aquí." />
+          <EmptyState
+            icon={CreditCard}
+            title="Sin pagos"
+            description="Los pagos realizados aparecerán aquí."
+            action={
+              <Link to="/portal/cafeteria" className="btn-secondary text-sm">
+                <Coffee className="h-4 w-4" /> Recargar cafetería
+              </Link>
+            }
+          />
         ) : (
           <>
             <div className="divide-y divide-cream">

@@ -105,7 +105,9 @@ describe('CafeteriaPage states', () => {
 
     renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
 
-    expect(await screen.findByRole('button', { name: /Recargar/i })).toBeInTheDocument();
+    // Two Recargar affordances for a linked account: the top-up CTA and the
+    // empty-movements action that scrolls to it.
+    expect((await screen.findAllByRole('button', { name: /Recargar/i })).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/aún no está vinculado a cafetería\/Loyverse/i)).toBeNull();
   });
 });

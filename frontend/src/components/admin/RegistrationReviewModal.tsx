@@ -124,34 +124,38 @@ export function RegistrationReviewModal({ id, open, onClose }: {
             <span className="text-subtle">· Ciclo {data.cycle}</span>
           </div>
 
-          <Field label="Alumno">
-            {fullName}{data.child_curp ? ` · CURP ${data.child_curp}` : ''} · Nac. {data.child_dob}
-          </Field>
-          <Field label="Tutor principal">
-            {data.parent1_name} · {data.parent1_email} · {data.parent1_phone}
-            {data.parent1_occupation ? ` · ${data.parent1_occupation}` : ''}
-          </Field>
-          {data.parent2_name && (
-            <Field label="Segundo tutor">
-              {data.parent2_name}{data.parent2_email ? ` · ${data.parent2_email}` : ''}{data.parent2_phone ? ` · ${data.parent2_phone}` : ''}
+          {/* dt/dd rows live in a real <dl>; each Field is a div-wrapped group
+              (valid HTML5 and what axe's definition-list rule expects). */}
+          <dl className="space-y-5">
+            <Field label="Alumno">
+              {fullName}{data.child_curp ? ` · CURP ${data.child_curp}` : ''} · Nac. {data.child_dob}
             </Field>
-          )}
-          {data.emergency_name && (
-            <Field label="Emergencia">
-              {data.emergency_name}{data.emergency_rel ? ` (${data.emergency_rel})` : ''}{data.emergency_phone ? ` · ${data.emergency_phone}` : ''}
+            <Field label="Tutor principal">
+              {data.parent1_name} · {data.parent1_email} · {data.parent1_phone}
+              {data.parent1_occupation ? ` · ${data.parent1_occupation}` : ''}
             </Field>
-          )}
-          {hasMedical && (
-            <Field label="Salud">
-              {[
-                data.blood_type && `Sangre: ${data.blood_type}`,
-                data.allergies && `Alergias: ${data.allergies}`,
-                data.estatura && `Estatura: ${data.estatura}`,
-                data.peso && `Peso: ${data.peso}`,
-                data.medical_notes,
-              ].filter(Boolean).join(' · ')}
-            </Field>
-          )}
+            {data.parent2_name && (
+              <Field label="Segundo tutor">
+                {data.parent2_name}{data.parent2_email ? ` · ${data.parent2_email}` : ''}{data.parent2_phone ? ` · ${data.parent2_phone}` : ''}
+              </Field>
+            )}
+            {data.emergency_name && (
+              <Field label="Emergencia">
+                {data.emergency_name}{data.emergency_rel ? ` (${data.emergency_rel})` : ''}{data.emergency_phone ? ` · ${data.emergency_phone}` : ''}
+              </Field>
+            )}
+            {hasMedical && (
+              <Field label="Salud">
+                {[
+                  data.blood_type && `Sangre: ${data.blood_type}`,
+                  data.allergies && `Alergias: ${data.allergies}`,
+                  data.estatura && `Estatura: ${data.estatura}`,
+                  data.peso && `Peso: ${data.peso}`,
+                  data.medical_notes,
+                ].filter(Boolean).join(' · ')}
+              </Field>
+            )}
+          </dl>
 
           {/* LFPDPPP consents — staff must see what the family accepted */}
           <div>

@@ -50,6 +50,7 @@ export function StudentDiscounts({ studentId }: { studentId: number }) {
   const remove = useMutation({
     mutationFn: (id: number) => financeApi.adminDeleteDiscount(id),
     onSuccess: () => { invalidate(); toast.success('Beca eliminada.'); setToDelete(null); },
+    onError: () => toast.error('No se pudo eliminar la beca.'),
   });
 
   const openNew = () => { setEditing(null); setForm(emptyForm(studentId)); setOpen(true); };
@@ -95,8 +96,8 @@ export function StudentDiscounts({ studentId }: { studentId: number }) {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <button type="button" onClick={() => openEdit(d)} aria-label="Editar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                  <button type="button" onClick={() => setToDelete(d)} aria-label="Eliminar" className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => openEdit(d)} aria-label={`Editar la beca "${d.name}"`} className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => setToDelete(d)} aria-label={`Eliminar la beca "${d.name}"`} className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             );

@@ -24,6 +24,8 @@ export default function ProfilePage() {
   const [pushOn, setPushOn] = useState(user?.notif_prefs?.push_enabled ?? true);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Field-level password validation message (mirrors the toast).
+  const [passwordError, setPasswordError] = useState<{ field: 'new' | 'confirm'; message: string } | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => authApi.updateMe({
@@ -94,13 +96,16 @@ export default function ProfilePage() {
   const savePassword = (e: FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 8) {
+      setPasswordError({ field: 'new', message: 'Mínimo 8 caracteres.' });
       toast.error('Mínimo 8 caracteres.');
       return;
     }
     if (newPassword !== confirmPassword) {
+      setPasswordError({ field: 'confirm', message: 'Las contraseñas no coinciden.' });
       toast.error('Las contraseñas no coinciden.');
       return;
     }
+    setPasswordError(null);
     passwordMutation.mutate();
   };
 
@@ -155,11 +160,35 @@ export default function ProfilePage() {
             )}
             <div>
               <label className="label" htmlFor="pf-pass">Nueva contraseña</label>
-              <input id="pf-pass" type="password" autoComplete="new-password" className="input-field min-h-[44px] text-base" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <input
+                id="pf-pass"
+                type="password"
+                autoComplete="new-password"
+                className="input-field min-h-[44px] text-base"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }}
+                aria-invalid={passwordError?.field === 'new' || undefined}
+                aria-describedby={passwordError?.field === 'new' ? 'pf-pass-error' : undefined}
+              />
+              {passwordError?.field === 'new' && (
+                <p id="pf-pass-error" className="mt-1.5 text-xs text-coral-600">{passwordError.message}</p>
+              )}
             </div>
             <div>
               <label className="label" htmlFor="pf-pass2">Confirmar</label>
-              <input id="pf-pass2" type="password" autoComplete="new-password" className="input-field min-h-[44px] text-base" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <input
+                id="pf-pass2"
+                type="password"
+                autoComplete="new-password"
+                className="input-field min-h-[44px] text-base"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(null); }}
+                aria-invalid={passwordError?.field === 'confirm' || undefined}
+                aria-describedby={passwordError?.field === 'confirm' ? 'pf-pass2-error' : undefined}
+              />
+              {passwordError?.field === 'confirm' && (
+                <p id="pf-pass2-error" className="mt-1.5 text-xs text-coral-600">{passwordError.message}</p>
+              )}
             </div>
             <div className="flex justify-end">
               <Button type="submit" variant="secondary" loading={passwordMutation.isPending} disabled={!newPassword} className="min-h-[44px]">

@@ -138,7 +138,8 @@ export default function AdminAnnouncements() {
           <ErrorState onRetry={() => refetch()} />
         ) : !data?.length ? (
           <EmptyState icon={Megaphone} title="Sin comunicados"
-            description="Los avisos que publiques aparecerán aquí y en el portal de las familias." />
+            description="Los avisos que publiques aparecerán aquí y en el portal de las familias."
+            action={<Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>} />
         ) : (
           <ul className="divide-y divide-line">
             {data.map((a) => {
@@ -159,13 +160,16 @@ export default function AdminAnnouncements() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <button type="button" onClick={() => toggleActive.mutate(a)} disabled={toggleActive.isPending}
+                    <button type="button" onClick={() => toggleActive.mutate(a)}
+                      disabled={toggleActive.isPending && toggleActive.variables?.id === a.id}
                       className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-cream disabled:opacity-50">
-                      {a.is_active ? 'Desactivar' : 'Activar'}
+                      {toggleActive.isPending && toggleActive.variables?.id === a.id
+                        ? 'Guardando…'
+                        : a.is_active ? 'Desactivar' : 'Activar'}
                     </button>
-                    <button type="button" onClick={() => openEdit(a)} aria-label="Editar"
+                    <button type="button" onClick={() => openEdit(a)} aria-label={`Editar el comunicado "${a.title}"`}
                       className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                    <button type="button" onClick={() => setToDelete(a)} aria-label="Eliminar"
+                    <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
                       className="rounded-lg p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </li>

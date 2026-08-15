@@ -34,8 +34,7 @@ export function CookieConsent() {
 
   return (
     <div
-      role="dialog"
-      aria-live="polite"
+      role="region"
       aria-label="Aviso de cookies"
       // mb-[76px] keeps the banner above the mobile tab bar / sticky CTA on small screens.
       className="fixed bottom-0 inset-x-0 z-[100] mb-[76px] lg:mb-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]"

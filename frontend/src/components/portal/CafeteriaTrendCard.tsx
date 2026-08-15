@@ -7,6 +7,7 @@ import { fmtDay, fmtMXN, fmtMXNCompact, getChartTheme } from '@/lib/chartTheme';
 import { usePrefersDark, useReducedMotion } from '@/hooks/useMediaQuery';
 import { useChartEntrance } from '@/hooks/useChartEntrance';
 import { SectionEmpty } from '@/components/ui/SectionCard';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 interface TrendPoint { date: string; amount: number; }
 interface TrendResp { days: number; total: number; average: number; series: TrendPoint[]; }
@@ -41,7 +42,7 @@ export default function CafeteriaTrendCard() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['cafeteria-spending-trend', 30, student],
     queryFn: async () =>
       (await cafeteriaApi.getSpendingTrend(30, student === 'all' ? undefined : student)).data as TrendResp,
@@ -81,7 +82,11 @@ export default function CafeteriaTrendCard() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="p-5">
+          <ErrorState onRetry={() => refetch()} />
+        </div>
+      ) : isLoading ? (
         <div className="skeleton m-5 h-44 rounded-xl2" aria-hidden="true" />
       ) : total === 0 ? (
         <SectionEmpty icon={Coffee}>Sin compras registradas en este periodo.</SectionEmpty>
