@@ -12,6 +12,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -39,6 +40,32 @@ def _open_pending_qs():
     )
 
 
+def fail_checkout_if_still_open(pk, *, reason: str, stage: str) -> bool:
+    """Soft-fail one checkout row — but ONLY if it is still an open checkout.
+
+    The expire/supersede sweeps snapshot open PENDING payments without a lock,
+    then write FAILED. A SUCCESS webhook can commit between that snapshot and
+    the write; a blind ``mark_failed`` would then overwrite SUCCESS while the
+    cafeteria ledger keeps the credit (or the invoice stays paid) — books that
+    disagree until the gateway happens to replay. This guard re-reads the row
+    under ``select_for_update`` and re-checks the open-checkout condition
+    (PENDING and no gateway tx id) before failing it, so a payment finalized —
+    or even just advanced by a non-terminal gateway notification — since the
+    snapshot is left untouched.
+
+    Returns True when the payment was failed, False when it was skipped.
+    """
+    with transaction.atomic():
+        payment = Payment.objects.select_for_update().filter(pk=pk).first()
+        if payment is None:
+            return False
+        if payment.status != Payment.Status.PENDING or (payment.gateway_tx_id or ''):
+            return False
+        payment.mark_failed(reason, stage=stage)
+        _cascade_fail_linked_topup(payment)
+        return True
+
+
 def reuse_or_clear_invoice_checkout(invoice) -> Payment | None:
     """Return a fresh open tuition checkout for ``invoice``, or clear stale ones.
 
@@ -62,12 +89,14 @@ def reuse_or_clear_invoice_checkout(invoice) -> Payment | None:
     if payment.created_at >= _fresh_cutoff():
         return payment
 
-    payment.mark_failed('checkout superseded — stale open session', stage='supersede')
-    _cascade_fail_linked_topup(payment)
-    logger.info(
-        'Superseded stale tuition checkout payment=%s invoice=%s',
-        payment.id, invoice.id,
-    )
+    if fail_checkout_if_still_open(
+        payment.pk,
+        reason='checkout superseded — stale open session', stage='supersede',
+    ):
+        logger.info(
+            'Superseded stale tuition checkout payment=%s invoice=%s',
+            payment.id, invoice.id,
+        )
     return None
 
 
@@ -109,12 +138,11 @@ def reuse_or_clear_cafeteria_checkout(
                 if payment.amount != amount or payment.gateway != gateway_name
                 else 'checkout superseded — stale open session'
             )
-            payment.mark_failed(reason, stage='supersede')
-            _cascade_fail_linked_topup(payment)
-            logger.info(
-                'Superseded cafeteria checkout payment=%s student=%s (%s)',
-                payment.id, student.id, reason,
-            )
+            if fail_checkout_if_still_open(payment.pk, reason=reason, stage='supersede'):
+                logger.info(
+                    'Superseded cafeteria checkout payment=%s student=%s (%s)',
+                    payment.id, student.id, reason,
+                )
     return reusable
 
 
@@ -128,18 +156,25 @@ def _cascade_fail_linked_topup(payment: Payment) -> None:
 
 
 def expire_stale_checkouts(*, older_than_minutes: int | None = None) -> int:
-    """Mark stale open PENDING payments as FAILED. Returns count updated."""
+    """Mark stale open PENDING payments as FAILED. Returns count updated.
+
+    Two-phase on purpose: an unlocked pk snapshot, then a per-row locked
+    re-check (``fail_checkout_if_still_open``) so a payment captured between
+    the snapshot and the write is never clobbered. ``created_at`` is immutable,
+    so re-checking only status/tx-id under the lock is sufficient.
+    """
     minutes = older_than_minutes if older_than_minutes is not None else open_checkout_ttl_minutes()
     cutoff = timezone.now() - timedelta(minutes=minutes)
-    qs = _open_pending_qs().filter(created_at__lt=cutoff)
+    pks = list(
+        _open_pending_qs().filter(created_at__lt=cutoff).values_list('pk', flat=True))
     count = 0
-    for payment in qs.iterator():
-        payment.mark_failed(
-            f'checkout expired after {minutes}m without capture',
+    for pk in pks:
+        if fail_checkout_if_still_open(
+            pk,
+            reason=f'checkout expired after {minutes}m without capture',
             stage='expire',
-        )
-        _cascade_fail_linked_topup(payment)
-        count += 1
+        ):
+            count += 1
     if count:
         logger.info('expire_stale_checkouts: marked %s payments FAILED', count)
     return count

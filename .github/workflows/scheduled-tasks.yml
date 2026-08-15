@@ -82,6 +82,15 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
         run: python manage.py migrate --noinput
+      # Abandoned HPP sessions (parent never paid) linger as PENDING forever
+      # unless the same parent re-initiates (which supersedes them on demand).
+      # Sweep them daily so the deposits log / orphan report stay clean. Soft-
+      # fail only: a late SUCCESS webhook still credits (is_soft_failed path),
+      # so no real capture is ever lost. Sends no email.
+      - name: Expire stale payment checkouts (no email)
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: backend
+        run: python manage.py expire_stale_payments
       - name: Apply late fees (no email)
         if: steps.gate.outputs.skip != 'true'
         working-directory: backend
