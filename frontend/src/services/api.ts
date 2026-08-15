@@ -625,6 +625,11 @@ export const contentApi = {
   getCosts: () =>
     api.get('/content/costs/'),
 
+  // Paquete completo de precios 2026-2027: inscripción/reinscripción,
+  // colegiaturas, seguros, extraescolares, estancia y políticas.
+  getPricing: () =>
+    api.get('/content/pricing/'),
+
   // Admin CMS — edit the public contact/social data.
   adminGetSettings: () => api.get('/content/admin/settings/'),
   adminUpdateSettings: (data: Record<string, unknown>) =>

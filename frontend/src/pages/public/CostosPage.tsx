@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight, CalendarDays, CircleDollarSign, GraduationCap, Info, Wallet,
+  ArrowRight, CalendarDays, CircleDollarSign, Clock, GraduationCap, Info,
+  ShieldCheck, Sparkles, Wallet,
 } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -9,11 +11,28 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 
-interface CostRow {
+interface EnrollmentFee {
   section: string;
-  inscripcion: string | null;
-  colegiatura: string;
+  modality: 'nuevo_ingreso' | 'reinscripcion';
+  gastos_administrativos: string;
+  cuota: string;
   order: number;
+}
+interface TuitionRow { section: string; inscripcion: string | null; colegiatura: string; order: number }
+interface FixedConcept { name: string; cost: string; mandatory: boolean; order: number }
+interface Extracurricular { name: string; levels: string; annual_cost: string; order: number }
+interface DaycareRate {
+  schedule: string; service: string; daily_cost: string;
+  monthly_cost: string | null; monthly_note: string; order: number;
+}
+interface PricingPolicy { text: string; order: number }
+interface PricingBundle {
+  enrollment_fees: EnrollmentFee[];
+  tuition: TuitionRow[];
+  fixed_concepts: FixedConcept[];
+  extracurriculars: Extracurricular[];
+  daycare: DaycareRate[];
+  policies: PricingPolicy[];
 }
 
 const mxn = (v: string | null) =>
@@ -21,23 +40,77 @@ const mxn = (v: string | null) =>
     ? 'SIN COSTO'
     : Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 
+/** Card shell shared by every pricing section. */
+function PriceCard({ tone, icon: Icon, label, title, subtitle, children }: {
+  tone: 'green' | 'purple' | 'coral' | 'pink';
+  icon: any; label: string; title: string; subtitle?: string;
+  children: React.ReactNode;
+}) {
+  const tones = {
+    green:  { border: 'border-green/25',  bg: 'bg-green/5',        chip: 'bg-green/15 text-green-dark',  label: 'text-green-dark' },
+    purple: { border: 'border-purple/20', bg: 'bg-purple-light/60', chip: 'bg-purple/15 text-purple',     label: 'text-purple' },
+    coral:  { border: 'border-coral/25',  bg: 'bg-coral/5',        chip: 'bg-coral/15 text-coral-dark',  label: 'text-coral-dark' },
+    pink:   { border: 'border-pink/25',   bg: 'bg-pink-light/60',  chip: 'bg-pink/15 text-pink-dark',    label: 'text-pink-dark' },
+  }[tone];
+  return (
+    <div className={`overflow-hidden rounded-xl2 border ${tones.border} bg-white shadow-card`}>
+      <div className={`flex items-start gap-3 border-b border-ink/10 ${tones.bg} px-5 py-4`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones.chip}`}>
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className={`text-[11px] font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
+          <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
+          {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Row({ left, sub, right, rightMuted }: {
+  left: string; sub?: string; right: string; rightMuted?: string;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-4 border-b border-ink/5 px-5 py-3.5 last:border-0">
+      <span className="min-w-0 text-sm text-ink">
+        {left}
+        {sub && <span className="block text-xs text-muted">{sub}</span>}
+      </span>
+      <span className="shrink-0 text-sm font-bold text-ink">
+        {right}{rightMuted && <span className="font-normal text-muted"> {rightMuted}</span>}
+      </span>
+    </li>
+  );
+}
+
 /**
- * Admisiones → Costos. Las cifras las publica el colegio y son editables en
- * el admin (Contenido → Costos por sección); el ciclo escolar se calcula solo.
+ * Admisiones → Costos, ciclo 2026-2027. Todas las cifras vienen del paquete
+ * /content/pricing/ (editable en el admin: Contenido → precios); el ciclo
+ * escolar se calcula solo.
  */
 export default function CostosPage() {
-  const { data, isLoading, isError, refetch } = useQuery<CostRow[]>({
-    queryKey: ['tuition-costs'],
-    queryFn: async () => (await contentApi.getCosts()).data,
+  const [modality, setModality] = useState<'nuevo_ingreso' | 'reinscripcion'>('nuevo_ingreso');
+  const { data, isLoading, isError, refetch } = useQuery<PricingBundle>({
+    queryKey: ['pricing-bundle'],
+    queryFn: async () => (await contentApi.getPricing()).data,
     staleTime: 5 * 60 * 1000,
   });
-  const rows = data ?? [];
+
+  const fees = (data?.enrollment_fees ?? []).filter((f) => f.modality === modality);
+  const tuition = data?.tuition ?? [];
+  const seguros = data?.fixed_concepts ?? [];
+  const extras = data?.extracurriculars ?? [];
+  const estancia = data?.daycare ?? [];
+  const policies = data?.policies ?? [];
+  const isEmpty = tuition.length === 0 && (data?.enrollment_fees ?? []).length === 0;
 
   return (
     <div>
       <Seo
         title={`Costos ${CURRENT_CYCLE}`}
-        description={`Costos de inscripción y colegiaturas del Colegio Interlaken para el ciclo escolar ${CURRENT_CYCLE}: maternal, preescolar, primaria y secundaria.`}
+        description={`Costos del Colegio Interlaken para el ciclo escolar ${CURRENT_CYCLE}: inscripción, colegiaturas, seguros, extraescolares y estancia para maternal, preescolar, primaria y secundaria.`}
       />
 
       {/* HERO con ciclo automático */}
@@ -56,23 +129,6 @@ export default function CostosPage() {
 
       <section className="bg-cream-2 py-10 sm:py-14">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          {/* Mobile storytelling: two clear payment moments */}
-          {!isLoading && !isError && rows.length > 0 && (
-            <div className="mb-6 space-y-2 md:hidden">
-              <p className="font-head text-lg font-bold text-ink">¿Cómo se estructura el pago?</p>
-              <ol className="space-y-2 text-sm text-muted">
-                <li className="flex gap-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-strong text-[11px] font-bold text-white">1</span>
-                  <span><strong className="text-ink">Inscripción</strong> — pago único al ingresar o reinscribirse.</span>
-                </li>
-                <li className="flex gap-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple text-[11px] font-bold text-white">2</span>
-                  <span><strong className="text-ink">Colegiatura</strong> — 11 mensualidades, de agosto a junio.</span>
-                </li>
-              </ol>
-            </div>
-          )}
-
           {isError ? (
             <ErrorState
               title="No fue posible cargar los costos"
@@ -81,10 +137,11 @@ export default function CostosPage() {
             />
           ) : isLoading ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Cargando costos">
-              <div className="skeleton h-[320px] rounded-xl2" aria-hidden="true" />
-              <div className="skeleton h-[320px] rounded-xl2" aria-hidden="true" />
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />
+              ))}
             </div>
-          ) : rows.length === 0 ? (
+          ) : isEmpty ? (
             <EmptyState
               icon={CircleDollarSign}
               title="Costos próximamente"
@@ -101,95 +158,152 @@ export default function CostosPage() {
               }
             />
           ) : (
-            <>
-              {/* Mobile: stacked hierarchy cards with explicit labels */}
-              <div className="space-y-5 md:hidden">
-                <div className="overflow-hidden rounded-xl2 border border-green/25 bg-white shadow-card">
-                  <div className="flex items-start gap-3 border-b border-ink/10 bg-green/5 px-5 py-4">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green/15 text-green-dark">
-                      <GraduationCap className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-green-dark">Pago único</p>
-                      <h2 className="font-head text-lg font-bold text-ink">Inscripción y reinscripción</h2>
-                    </div>
-                  </div>
-                  <ul>
-                    {rows.map((r) => (
-                      <li key={`m-ins-${r.section}`} className="flex items-center justify-between gap-4 border-b border-ink/5 px-5 py-3.5 last:border-0">
-                        <span className="text-sm text-ink">{r.section}</span>
-                        <span className={`text-sm font-bold ${r.inscripcion === null ? 'text-green-dark' : 'text-ink'}`}>
-                          {mxn(r.inscripcion)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="overflow-hidden rounded-xl2 border border-purple/20 bg-white shadow-card">
-                  <div className="flex items-start gap-3 border-b border-ink/10 bg-purple-light/60 px-5 py-4">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple/15 text-purple">
-                      <Wallet className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-purple">Mensual</p>
-                      <h2 className="font-head text-lg font-bold text-ink">Colegiaturas</h2>
-                      <p className="text-xs text-muted">11 mensualidades, de agosto a junio</p>
-                    </div>
-                  </div>
-                  <ul>
-                    {rows.map((r) => (
-                      <li key={`m-col-${r.section}`} className="flex items-center justify-between gap-4 border-b border-ink/5 px-5 py-3.5 last:border-0">
-                        <span className="text-sm text-ink">{r.section}</span>
-                        <span className="text-sm font-bold text-ink">{mxn(r.colegiatura)} <span className="font-normal text-muted">/ mes</span></span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            <div className="space-y-6">
+              {/* Estructura del pago — explicación breve */}
+              <div className="space-y-2">
+                <p className="font-head text-lg font-bold text-ink">¿Cómo se estructura el pago?</p>
+                <ol className="grid gap-2 text-sm text-muted sm:grid-cols-3">
+                  <li className="flex gap-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-strong text-[11px] font-bold text-white">1</span>
+                    <span><strong className="text-ink">Inscripción</strong> — pago único al ingresar o reinscribirse.</span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple text-[11px] font-bold text-white">2</span>
+                    <span><strong className="text-ink">Colegiatura</strong> — 11 mensualidades, de agosto a junio.</span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-coral text-[11px] font-bold text-white">3</span>
+                    <span><strong className="text-ink">Seguros y credencial</strong> — conceptos anuales obligatorios.</span>
+                  </li>
+                </ol>
               </div>
 
-              {/* Desktop / tablet: side-by-side */}
-              <div className="hidden grid-cols-1 gap-6 md:grid md:grid-cols-2">
-                <div className="overflow-hidden rounded-xl2 border border-ink/10 bg-white shadow-card">
-                  <div className="flex items-center gap-3 border-b border-ink/10 bg-green/5 px-5 py-4">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-green/15 text-green-dark">
-                      <GraduationCap className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <h2 className="font-head text-lg font-bold text-ink">Inscripción y reinscripción</h2>
+              {/* Inscripción / reinscripción con selector de modalidad */}
+              {fees.length > 0 && (
+                <PriceCard
+                  tone="green" icon={GraduationCap} label="Pago único"
+                  title="Inscripción y reinscripción"
+                  subtitle="Se divide en 4 parcialidades, de enero a abril"
+                >
+                  <div className="flex gap-2 border-b border-ink/5 px-5 py-3" role="group" aria-label="Modalidad de inscripción">
+                    {([['nuevo_ingreso', 'Nuevo ingreso'], ['reinscripcion', 'Alumnos Interlaken']] as const).map(([key, tag]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-pressed={modality === key}
+                        onClick={() => setModality(key)}
+                        className={`min-h-[44px] flex-1 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-none ${
+                          modality === key ? 'bg-purple text-white' : 'bg-cream text-muted hover:text-ink'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
                   </div>
                   <ul>
-                    {rows.map((r) => (
-                      <li key={r.section} className="flex items-center justify-between gap-4 border-b border-ink/5 px-5 py-3.5 last:border-0">
-                        <span className="text-sm text-ink">{r.section}</span>
-                        <span className={`text-sm font-bold ${r.inscripcion === null ? 'text-green-dark' : 'text-ink'}`}>
-                          {mxn(r.inscripcion)}
-                        </span>
-                      </li>
+                    {fees.map((f) => (
+                      <Row
+                        key={`${f.section}-${f.modality}`}
+                        left={f.section}
+                        sub={`Gastos administrativos: ${mxn(f.gastos_administrativos)}`}
+                        right={mxn(f.cuota)}
+                      />
                     ))}
                   </ul>
-                </div>
+                </PriceCard>
+              )}
 
-                <div className="overflow-hidden rounded-xl2 border border-ink/10 bg-white shadow-card">
-                  <div className="flex items-center gap-3 border-b border-ink/10 bg-purple-light/60 px-5 py-4">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple/15 text-purple">
-                      <Wallet className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <h2 className="font-head text-lg font-bold text-ink">Colegiaturas</h2>
-                      <p className="text-xs text-muted">11 mensualidades, de agosto a junio</p>
-                    </div>
-                  </div>
+              {/* Colegiaturas + Seguros lado a lado en desktop */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <PriceCard
+                  tone="purple" icon={Wallet} label="Mensual" title="Colegiaturas"
+                  subtitle="11 mensualidades, de agosto a junio"
+                >
                   <ul>
-                    {rows.map((r) => (
-                      <li key={r.section} className="flex items-center justify-between gap-4 border-b border-ink/5 px-5 py-3.5 last:border-0">
-                        <span className="text-sm text-ink">{r.section}</span>
-                        <span className="text-sm font-bold text-ink">{mxn(r.colegiatura)} <span className="font-normal text-muted">/ mes</span></span>
-                      </li>
+                    {tuition.map((r) => (
+                      <Row key={r.section} left={r.section} right={mxn(r.colegiatura)} rightMuted="/ mes" />
                     ))}
                   </ul>
-                </div>
+                </PriceCard>
+
+                {seguros.length > 0 && (
+                  <PriceCard
+                    tone="coral" icon={ShieldCheck} label="Anual · obligatorio"
+                    title="Seguros y credenciales"
+                    subtitle="Contratación obligatoria para todos los alumnos"
+                  >
+                    <ul>
+                      {seguros.map((c) => (
+                        <Row key={c.name} left={c.name} right={mxn(c.cost)} />
+                      ))}
+                    </ul>
+                  </PriceCard>
+                )}
               </div>
-            </>
+
+              {/* Extraescolares + Estancia */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {extras.length > 0 && (
+                  <PriceCard
+                    tone="pink" icon={Sparkles} label="Anualidad"
+                    title="Extraescolares"
+                    subtitle="10 parcialidades de septiembre a junio · se definen en agosto"
+                  >
+                    <ul>
+                      {extras.map((e) => (
+                        <Row key={e.name} left={e.name} sub={e.levels} right={mxn(e.annual_cost)} rightMuted="/ año" />
+                      ))}
+                    </ul>
+                  </PriceCard>
+                )}
+
+                {estancia.length > 0 && (
+                  <PriceCard
+                    tone="purple" icon={Clock} label="Horario extendido"
+                    title="Estancia"
+                    subtitle="Costo diario, con tarifa mensual opcional"
+                  >
+                    <ul>
+                      {estancia.map((d) => (
+                        <Row
+                          key={`${d.schedule}-${d.service}`}
+                          left={d.schedule}
+                          sub={d.service}
+                          right={mxn(d.daily_cost)}
+                          rightMuted={
+                            d.monthly_cost
+                              ? `· ${mxn(d.monthly_cost)} /mes${d.monthly_note ? ` (${d.monthly_note.toLowerCase()})` : ''}`
+                              : d.monthly_note ? `· ${d.monthly_note}` : undefined
+                          }
+                        />
+                      ))}
+                    </ul>
+                  </PriceCard>
+                )}
+              </div>
+
+              {/* Políticas — letra chica visible, recargos/devoluciones destacados */}
+              {policies.length > 0 && (
+                <div className="rounded-xl2 border border-ink/10 bg-white p-5 shadow-card">
+                  <h2 className="font-head text-lg font-bold text-ink">Políticas de pago</h2>
+                  <ul className="mt-3 space-y-2.5">
+                    {policies.map((p) => {
+                      const highlighted = /recargo|devoluci/i.test(p.text);
+                      return (
+                        <li key={p.order} className="flex items-start gap-2.5 text-sm">
+                          <Info
+                            size={16}
+                            className={`mt-0.5 flex-shrink-0 ${highlighted ? 'text-amber' : 'text-purple'}`}
+                            aria-hidden="true"
+                          />
+                          <span className={highlighted ? 'font-medium text-ink' : 'text-muted'}>{p.text}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
 
           {!isError && (

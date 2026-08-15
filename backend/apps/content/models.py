@@ -70,6 +70,10 @@ class SiteSettings(models.Model):
 
 
 COSTS_CACHE_KEY = 'content.tuition-costs.v1'
+# One bundle for the whole public pricing page (inscripción, colegiaturas,
+# seguros, extraescolares, estancia, políticas). Any pricing model save/delete
+# invalidates it so the admin sees changes within one request.
+PRICING_CACHE_KEY = 'content.pricing-bundle.v1'
 
 
 class TuitionCost(models.Model):
@@ -100,7 +104,116 @@ class TuitionCost(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         cache.delete(COSTS_CACHE_KEY)
+        cache.delete(PRICING_CACHE_KEY)
 
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
         cache.delete(COSTS_CACHE_KEY)
+        cache.delete(PRICING_CACHE_KEY)
+
+
+class PricingRow(models.Model):
+    """Base for admin-editable pricing catalog rows (ciclo 2026-2027 flyer).
+
+    Like TuitionCost these are INFORMATIVE (public site); billed prices live in
+    Finanzas. Every save/delete invalidates the pricing-bundle cache.
+    """
+    order      = models.PositiveSmallIntegerField('Orden', default=0)
+    is_active  = models.BooleanField('Visible en el sitio', default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['order', 'id']
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        cache.delete(PRICING_CACHE_KEY)
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        cache.delete(PRICING_CACHE_KEY)
+
+
+class EnrollmentFee(PricingRow):
+    """Inscripción/reinscripción por sección: gastos administrativos + cuota."""
+    class Modality(models.TextChoices):
+        NUEVO_INGRESO = 'nuevo_ingreso', 'Nuevo ingreso'
+        REINSCRIPCION = 'reinscripcion', 'Reinscripción (alumnos Interlaken)'
+
+    section  = models.CharField('Sección', max_length=60)
+    modality = models.CharField('Modalidad', max_length=20, choices=Modality.choices)
+    gastos_administrativos = models.DecimalField(
+        'Gastos administrativos (MXN)', max_digits=8, decimal_places=2)
+    cuota = models.DecimalField(
+        'Cuota de inscripción (MXN)', max_digits=8, decimal_places=2)
+
+    class Meta(PricingRow.Meta):
+        verbose_name = 'Cuota de inscripción'
+        verbose_name_plural = 'Cuotas de inscripción'
+        constraints = [models.UniqueConstraint(
+            fields=['section', 'modality'], name='uniq_enrollment_section_modality')]
+
+    def __str__(self):
+        return f'{self.section} — {self.get_modality_display()}'
+
+
+class FixedConcept(PricingRow):
+    """Conceptos fijos anuales: seguros y credenciales (obligatorios)."""
+    name      = models.CharField('Concepto', max_length=80)
+    cost      = models.DecimalField('Costo (MXN)', max_digits=8, decimal_places=2)
+    mandatory = models.BooleanField('Obligatorio', default=True)
+
+    class Meta(PricingRow.Meta):
+        verbose_name = 'Seguro / credencial'
+        verbose_name_plural = 'Seguros y credenciales'
+
+    def __str__(self):
+        return self.name
+
+
+class ExtracurricularActivity(PricingRow):
+    """Clases extraescolares: anualidad en 10 parcialidades (sep-jun)."""
+    name        = models.CharField('Clase', max_length=80)
+    levels      = models.CharField('Niveles', max_length=120)
+    annual_cost = models.DecimalField('Anualidad (MXN)', max_digits=8, decimal_places=2)
+
+    class Meta(PricingRow.Meta):
+        verbose_name = 'Extraescolar'
+        verbose_name_plural = 'Extraescolares'
+
+    def __str__(self):
+        return self.name
+
+
+class DaycareRate(PricingRow):
+    """Estancia (horario extendido): tarifa por horario."""
+    schedule     = models.CharField('Horario', max_length=60)
+    service      = models.CharField('Servicio', max_length=120)
+    daily_cost   = models.DecimalField(
+        'Costo diario (MXN)', max_digits=8, decimal_places=2)
+    monthly_cost = models.DecimalField(
+        'Costo mensual (MXN)', max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text='Vacío = sin tarifa mensual (p. ej. multa).')
+    monthly_note = models.CharField(
+        'Nota de mensualidad', max_length=120, blank=True, default='',
+        help_text='Texto mostrado en lugar (o además) del costo mensual.')
+
+    class Meta(PricingRow.Meta):
+        verbose_name = 'Tarifa de estancia'
+        verbose_name_plural = 'Estancia'
+
+    def __str__(self):
+        return f'{self.schedule} — {self.service}'
+
+
+class PricingPolicy(PricingRow):
+    """Letra chica del flyer: parcialidades, devoluciones, recargos, becas."""
+    text = models.TextField('Política')
+
+    class Meta(PricingRow.Meta):
+        verbose_name = 'Política de precios'
+        verbose_name_plural = 'Políticas de precios'
+
+    def __str__(self):
+        return self.text[:60]

@@ -62,3 +62,34 @@ class PublicTuitionCostsView(APIView):
             data = TuitionCostSerializer(rows, many=True).data
             cache.set(COSTS_CACHE_KEY, data, CACHE_TTL_SECONDS)
         return Response(data)
+
+
+class PublicPricingView(APIView):
+    """GET /api/v1/content/pricing/ — the whole 2026-2027 pricing bundle for the
+    Costos page: inscripción/reinscripción, colegiaturas, seguros y credenciales,
+    extraescolares, estancia, y políticas. Cached; invalidated on any pricing save."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .models import (
+            PRICING_CACHE_KEY, DaycareRate, EnrollmentFee,
+            ExtracurricularActivity, FixedConcept, PricingPolicy, TuitionCost,
+        )
+        from .serializers import (
+            DaycareRateSerializer, EnrollmentFeeSerializer,
+            ExtracurricularSerializer, FixedConceptSerializer,
+            PricingPolicySerializer, TuitionCostSerializer,
+        )
+        data = cache.get(PRICING_CACHE_KEY)
+        if data is None:
+            active = lambda m: m.objects.filter(is_active=True)  # noqa: E731
+            data = {
+                'enrollment_fees': EnrollmentFeeSerializer(active(EnrollmentFee), many=True).data,
+                'tuition': TuitionCostSerializer(active(TuitionCost), many=True).data,
+                'fixed_concepts': FixedConceptSerializer(active(FixedConcept), many=True).data,
+                'extracurriculars': ExtracurricularSerializer(active(ExtracurricularActivity), many=True).data,
+                'daycare': DaycareRateSerializer(active(DaycareRate), many=True).data,
+                'policies': PricingPolicySerializer(active(PricingPolicy), many=True).data,
+            }
+            cache.set(PRICING_CACHE_KEY, data, CACHE_TTL_SECONDS)
+        return Response(data)

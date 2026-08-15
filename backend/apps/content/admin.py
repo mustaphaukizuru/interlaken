@@ -1,7 +1,10 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from .models import SiteSettings, TuitionCost
+from .models import (
+    DaycareRate, EnrollmentFee, ExtracurricularActivity, FixedConcept,
+    PricingPolicy, SiteSettings, TuitionCost,
+)
 
 
 @admin.register(TuitionCost)
@@ -20,6 +23,49 @@ class TuitionCostAdmin(ModelAdmin):
                                '«Finanzas → Planes de cobro»; mantenga ambos '
                                'en sincronía.')
         return super().changelist_view(request, extra_context)
+
+
+@admin.register(EnrollmentFee)
+class EnrollmentFeeAdmin(ModelAdmin):
+    """Inscripción/reinscripción 2026 (informativo — sitio público)."""
+    list_display = ('section', 'modality', 'gastos_administrativos', 'cuota',
+                    'order', 'is_active', 'updated_at')
+    list_editable = ('gastos_administrativos', 'cuota', 'order', 'is_active')
+    list_filter = ('modality',)
+    ordering = ('modality', 'order')
+
+
+@admin.register(FixedConcept)
+class FixedConceptAdmin(ModelAdmin):
+    """Seguros y credenciales (informativo — sitio público)."""
+    list_display = ('name', 'cost', 'mandatory', 'order', 'is_active', 'updated_at')
+    list_editable = ('cost', 'mandatory', 'order', 'is_active')
+    ordering = ('order',)
+
+
+@admin.register(ExtracurricularActivity)
+class ExtracurricularAdmin(ModelAdmin):
+    """Extraescolares: anualidad en 10 parcialidades sep-jun (informativo)."""
+    list_display = ('name', 'levels', 'annual_cost', 'order', 'is_active', 'updated_at')
+    list_editable = ('annual_cost', 'order', 'is_active')
+    ordering = ('order',)
+
+
+@admin.register(DaycareRate)
+class DaycareRateAdmin(ModelAdmin):
+    """Estancia / horario extendido (informativo — sitio público)."""
+    list_display = ('schedule', 'service', 'daily_cost', 'monthly_cost',
+                    'monthly_note', 'order', 'is_active', 'updated_at')
+    list_editable = ('daily_cost', 'monthly_cost', 'order', 'is_active')
+    ordering = ('order',)
+
+
+@admin.register(PricingPolicy)
+class PricingPolicyAdmin(ModelAdmin):
+    """Letra chica de precios: parcialidades, devoluciones, recargos, becas."""
+    list_display = ('__str__', 'order', 'is_active', 'updated_at')
+    list_editable = ('order', 'is_active')
+    ordering = ('order',)
 
 
 @admin.register(SiteSettings)

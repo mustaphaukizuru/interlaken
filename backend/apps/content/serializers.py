@@ -1,6 +1,9 @@
 from rest_framework import serializers
 
-from .models import SiteSettings, TuitionCost
+from .models import (
+    DaycareRate, EnrollmentFee, ExtracurricularActivity, FixedConcept,
+    PricingPolicy, SiteSettings, TuitionCost,
+)
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
@@ -31,4 +34,39 @@ class TuitionCostSerializer(serializers.ModelSerializer):
     class Meta:
         model = TuitionCost
         fields = ['section', 'inscripcion', 'colegiatura', 'order']
+        read_only_fields = fields
+
+
+class EnrollmentFeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EnrollmentFee
+        fields = ['section', 'modality', 'gastos_administrativos', 'cuota', 'order']
+        read_only_fields = fields
+
+
+class FixedConceptSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FixedConcept
+        fields = ['name', 'cost', 'mandatory', 'order']
+        read_only_fields = fields
+
+
+class ExtracurricularSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExtracurricularActivity
+        fields = ['name', 'levels', 'annual_cost', 'order']
+        read_only_fields = fields
+
+
+class DaycareRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DaycareRate
+        fields = ['schedule', 'service', 'daily_cost', 'monthly_cost', 'monthly_note', 'order']
+        read_only_fields = fields
+
+
+class PricingPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PricingPolicy
+        fields = ['text', 'order']
         read_only_fields = fields
