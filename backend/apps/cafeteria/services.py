@@ -977,7 +977,9 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
                 timeout=_TIMEOUT,
             )
             resp.raise_for_status()
-    except requests.RequestException as e:
+    # LoyverseError too: _session() raises it when the token is unset, and a
+    # best-effort mirror must never undo/500 the already-committed local credit.
+    except (LoyverseError, requests.RequestException) as e:
         logger.warning(
             f'Loyverse remote credit for {loyverse_customer_id} not applied '
             f'(local ledger is source of truth per R1): {e}'
@@ -1104,7 +1106,8 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
                     timeout=_TIMEOUT,
                 )
                 resp.raise_for_status()
-        except requests.RequestException as e:
+        # LoyverseError too: unset token must skip the mirror, not 500 the adjustment.
+        except (LoyverseError, requests.RequestException) as e:
             logger.warning(f'Loyverse mirror after adjustment skipped for {student}: {e}')
 
     if notify:
