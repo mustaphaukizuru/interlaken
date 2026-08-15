@@ -27,7 +27,7 @@ jobs:
       GOOGLE_CLIENT_ID: ci-client-id.apps.googleusercontent.com
       GOOGLE_CLIENT_SECRET: ci-client-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
@@ -61,7 +61,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -105,7 +105,7 @@ jobs:
       GOOGLE_CLIENT_ID: ci-client-id.apps.googleusercontent.com
       GOOGLE_CLIENT_SECRET: ci-client-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
@@ -158,7 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
