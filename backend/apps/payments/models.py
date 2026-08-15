@@ -54,6 +54,12 @@ class Payment(models.Model):
         verbose_name = 'Pago'
         verbose_name_plural = 'Pagos'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['status', 'completed_at']),
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['payment_type', 'status']),
+        ]
 
     def __str__(self):
         return f'{self.get_payment_type_display()} — ${self.amount} {self.currency} ({self.status})'

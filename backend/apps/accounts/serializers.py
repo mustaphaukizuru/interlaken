@@ -27,6 +27,12 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.has_usable_password()
 
     def get_notif_prefs(self, obj):
+        # ``for_user`` is a get_or_create (a write on a read path), so it is
+        # gated: only direct-user views (/accounts/me/, login) pass
+        # ``include_prefs``. Nested users (student rosters, balance lists) get
+        # null and stay O(1) — the frontend only reads prefs from /me.
+        if not self.context.get('include_prefs'):
+            return None
         prefs = NotificationPreference.for_user(obj)
         return NotificationPreferenceSerializer(prefs).data
 

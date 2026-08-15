@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -26,6 +26,28 @@ class LoyverseProfileSerializer(serializers.ModelSerializer):
             'total_points', 'loyverse_created_at', 'synced_at',
         ]
         read_only_fields = fields
+
+
+def build_spend_map(students):
+    """Today/week purchase totals per student in ONE grouped aggregate.
+
+    Passed as ``spend_map`` serializer context by family balance reads so the
+    per-balance ``_spend_since`` pair (2 queries × N children) never runs.
+    Window bounds match ``get_today_spend``/``get_week_spend`` exactly.
+    """
+    now = timezone.localtime()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=now.weekday())
+    return {
+        row['student']: row
+        for row in (CafeteriaTransaction.objects
+                    .filter(student__in=students,
+                            transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                            date__gte=week_start)
+                    .values('student')
+                    .annotate(week=Sum('amount'),
+                              today=Sum('amount', filter=Q(date__gte=today_start))))
+    }
 
 
 class CafeteriaBalanceSerializer(serializers.ModelSerializer):
@@ -54,6 +76,10 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
     def get_today_spend(self, obj):
         if not self.context.get('include_spend'):
             return None
+        spend_map = self.context.get('spend_map')
+        if spend_map is not None:
+            row = spend_map.get(obj.student_id) or {}
+            return str(row.get('today') or Decimal('0'))
         now = timezone.localtime()
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return self._spend_since(obj, start)
@@ -61,6 +87,10 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
     def get_week_spend(self, obj):
         if not self.context.get('include_spend'):
             return None
+        spend_map = self.context.get('spend_map')
+        if spend_map is not None:
+            row = spend_map.get(obj.student_id) or {}
+            return str(row.get('week') or Decimal('0'))
         now = timezone.localtime()
         start = (now.replace(hour=0, minute=0, second=0, microsecond=0)
                  - timedelta(days=now.weekday()))
@@ -149,9 +179,11 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         )
 
     def _payment(self, obj):
-        # ``payments`` is the reverse accessor of Payment.related_topup.
+        # ``payments`` is the reverse accessor of Payment.related_topup. Read
+        # via .all() so the view's ordered Prefetch is honoured (an .order_by()
+        # here would discard the prefetch cache and re-query per row).
         if not hasattr(obj, '_cached_payment'):
-            obj._cached_payment = obj.payments.order_by('-created_at').first()
+            obj._cached_payment = next(iter(obj.payments.all()), None)
         return obj._cached_payment
 
     def get_gateway(self, obj):

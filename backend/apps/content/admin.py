@@ -2,8 +2,13 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 
 from .models import (
-    DaycareRate, EnrollmentFee, ExtracurricularActivity, FixedConcept,
-    PricingPolicy, SiteSettings, TuitionCost,
+    DaycareRate,
+    EnrollmentFee,
+    ExtracurricularActivity,
+    FixedConcept,
+    PricingPolicy,
+    SiteSettings,
+    TuitionCost,
 )
 
 

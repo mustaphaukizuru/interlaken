@@ -58,6 +58,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
         ordering = ['last_name', 'first_name']
+        indexes = [
+            models.Index(fields=['role', 'is_active']),
+        ]
 
     def __str__(self):
         return f'{self.full_name} ({self.email})'
@@ -93,6 +96,10 @@ class StudentProfile(models.Model):
 
     class Meta:
         verbose_name = 'Perfil de Alumno'
+        indexes = [
+            models.Index(fields=['loyverse_id']),
+            models.Index(fields=['is_active', 'loyverse_id']),
+        ]
 
     def __str__(self):
         return f'{self.user.full_name} — {self.grade} {self.group}'

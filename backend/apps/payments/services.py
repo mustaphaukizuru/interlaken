@@ -159,14 +159,23 @@ def payments_visible_to(user):
     if getattr(user, 'role', None) == User.Role.ADMIN:
         return Payment.objects.all()
 
-    q = Q(user=user)
-    q |= Q(invoice_payment__invoice__student__parents=user)
-    q |= Q(related_topup__student__parents=user)
+    # Resolve the family's student ids once — filtering on id lists keeps the
+    # guardian M2M join (which multiplied rows and forced DISTINCT over a wide
+    # join) out of every history/detail query.
+    student_ids = list(
+        StudentProfile.objects.filter(parents=user).values_list('pk', flat=True))
 
     if getattr(user, 'role', None) == User.Role.STUDENT:
-        profile = StudentProfile.objects.filter(user_id=user.pk).only('pk').first()
-        if profile is not None:
-            q |= Q(invoice_payment__invoice__student_id=profile.pk)
-            q |= Q(related_topup__student_id=profile.pk)
+        own_pk = (StudentProfile.objects.filter(user_id=user.pk)
+                  .values_list('pk', flat=True).first())
+        if own_pk is not None and own_pk not in student_ids:
+            student_ids.append(own_pk)
 
+    q = Q(user=user)
+    q |= Q(invoice_payment__invoice__student_id__in=student_ids)
+    q |= Q(related_topup__student_id__in=student_ids)
+
+    # invoice_payment is a reverse OneToOne and related_topup a forward FK, so
+    # no join multiplies rows anymore; DISTINCT kept so the money-path query
+    # result shape is provably unchanged (it is now a no-op, not a crutch).
     return Payment.objects.filter(q).distinct()

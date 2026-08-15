@@ -30,6 +30,9 @@ class Announcement(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Comunicado'
         verbose_name_plural = 'Comunicados'
+        indexes = [
+            models.Index(fields=['is_active', 'audience', '-created_at']),
+        ]
 
     def __str__(self):
         return self.title
@@ -61,6 +64,10 @@ class Notification(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Notificación'
         verbose_name_plural = 'Notificaciones'
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['delivered_at', 'created_at']),
+        ]
 
     def __str__(self):
         return f'{self.user.email} — {self.title}'

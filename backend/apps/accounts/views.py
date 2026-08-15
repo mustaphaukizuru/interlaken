@@ -259,7 +259,10 @@ class GoogleTokenView(APIView):
 
         response = Response()
         access = issue_session(user, response)
-        response.data = {'user': UserSerializer(user).data, 'access': access}
+        response.data = {
+            'user': UserSerializer(user, context={'include_prefs': True}).data,
+            'access': access,
+        }
         return response
 
 
@@ -348,6 +351,12 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+    def get_serializer_context(self):
+        # /me is the one read the frontend consumes notif_prefs from.
+        context = super().get_serializer_context()
+        context['include_prefs'] = True
+        return context
 
 
 class StudentListView(generics.ListAPIView):

@@ -199,6 +199,7 @@ class Invoice(models.Model):
         indexes = [
             models.Index(fields=['status', 'due_date']),
             models.Index(fields=['period']),
+            models.Index(fields=['status', 'late_fee_applied']),
         ]
 
     def __str__(self):

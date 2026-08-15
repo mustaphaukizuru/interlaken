@@ -9,7 +9,8 @@ Capacity is enforced server-side; see views.BookingCreateView which locks the
 slot with ``select_for_update`` before counting.
 """
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Q, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 
@@ -46,17 +47,42 @@ class AvailabilitySlot(models.Model):
         ordering = ['date', 'start_time']
         # Avoid duplicate slots when the recurring generator overlaps a re-run.
         unique_together = ('visit_type', 'date', 'start_time', 'end_time')
+        indexes = [
+            models.Index(fields=['is_active', 'date']),
+            models.Index(fields=['visit_type', 'is_active', 'date']),
+        ]
 
     def __str__(self):
         return f'{self.get_visit_type_display()} — {self.date} {self.start_time:%H:%M}'
 
+    @staticmethod
+    def annotate_booked(qs):
+        """Attach ``booked`` (active attendee total) in the slot query itself.
+
+        List views MUST use this: ``booked_count``/``spots_remaining``/``is_full``
+        each hit the DB per slot otherwise (3 aggregates × N slots).
+        """
+        return qs.annotate(booked=Coalesce(
+            Sum('bookings__num_attendees', filter=Q(bookings__status__in=[
+                Booking.Status.PENDING, Booking.Status.CONFIRMED,
+                Booking.Status.ATTENDED])),
+            0))
+
     @property
     def booked_count(self):
         """Attendees currently occupying the slot (cancelled/no-show free it)."""
-        agg = self.bookings.filter(
-            status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED, Booking.Status.ATTENDED]
-        ).aggregate(total=Sum('num_attendees'))
-        return agg['total'] or 0
+        annotated = getattr(self, 'booked', None)
+        if annotated is not None:
+            return annotated
+        # Single-instance fallback — memoised so spots_remaining/is_full on the
+        # same object cost one aggregate, not three.
+        if not hasattr(self, '_booked_cache'):
+            agg = self.bookings.filter(
+                status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED,
+                            Booking.Status.ATTENDED]
+            ).aggregate(total=Sum('num_attendees'))
+            self._booked_cache = agg['total'] or 0
+        return self._booked_cache
 
     @property
     def spots_remaining(self):
@@ -106,6 +132,10 @@ class Booking(models.Model):
         verbose_name = 'Reserva'
         verbose_name_plural = 'Reservas'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['slot', 'status']),
+            models.Index(fields=['status', '-created_at']),
+        ]
 
     def __str__(self):
         return f'{self.parent_name} — {self.slot.date} {self.slot.start_time:%H:%M} ({self.get_status_display()})'

@@ -6,8 +6,10 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from .models import (
-    PRICING_CACHE_KEY, DaycareRate, EnrollmentFee, ExtracurricularActivity,
-    FixedConcept, PricingPolicy, TuitionCost,
+    PRICING_CACHE_KEY,
+    EnrollmentFee,
+    FixedConcept,
+    TuitionCost,
 )
 
 pytestmark = pytest.mark.django_db

@@ -8,7 +8,7 @@ manual actions (mark-paid / adjust / cancel / bulk).
 """
 from decimal import Decimal
 
-from django.db.models import F, Q
+from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -241,10 +241,15 @@ class AdminStudentLedgerView(APIView):
 
     def get(self, request, pk):
         student = get_object_or_404(StudentProfile.objects.select_related('user'), pk=pk)
+        # Balance owed aggregated in SQL over the FULL history; the serialized
+        # list is capped to the most recent 24 periods (2 school years) so one
+        # long-tenured student can't balloon the response.
+        outstanding = (student.invoices
+                       .exclude(status=Invoice.Status.CANCELLED)
+                       .aggregate(due=Sum(F('amount') - F('amount_paid')))['due']
+                       or Decimal('0'))
         invoices = (student.invoices.select_related('student__user')
-                    .prefetch_related('line_items').order_by('-period'))
-        outstanding = sum((inv.balance_due for inv in invoices
-                           if inv.status != Invoice.Status.CANCELLED), start=Decimal('0'))
+                    .prefetch_related('line_items').order_by('-period')[:24])
         return Response({
             'student': {
                 'id': student.id, 'name': student.user.full_name,

@@ -68,7 +68,8 @@ def _open_slots_qs(params):
     if date_to:
         qs = qs.filter(date__lte=date_to)
 
-    return qs.order_by('date', 'start_time')
+    # One grouped aggregate for booked_count/is_full instead of 3 per slot.
+    return AvailabilitySlot.annotate_booked(qs.order_by('date', 'start_time'))
 
 
 class AvailabilityView(APIView):
@@ -282,7 +283,7 @@ class AdminSlotListView(generics.ListAPIView):
             qs = qs.filter(date__gte=p['from'])
         if p.get('to'):
             qs = qs.filter(date__lte=p['to'])
-        return qs
+        return AvailabilitySlot.annotate_booked(qs)
 
 
 class AdminSlotDetailView(generics.RetrieveUpdateDestroyAPIView):
