@@ -1,42 +1,68 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Award, FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, ShieldCheck, Plus } from 'lucide-react';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
-import { trackEvent, FunnelEvent } from '@/services/analytics';
+import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
+import { CostEstimator } from '@/components/admissions/CostEstimator';
+import { trackEvent, FunnelEvent, ConversionEvent } from '@/services/analytics';
 
-const STEPS = [
+/** Funnel timeline: from any step a parent reaches a human, a visit or the
+ *  pre-registro in one tap. `key` feeds the admissions_step_cta event. */
+const STEPS: {
+  icon: ElementType;
+  step: string;
+  key: string;
+  title: string;
+  desc: string;
+  color: string;
+  /** Internal link CTA; the 'Informes' step renders the WhatsApp CTA instead. */
+  to?: string;
+  ctaLabel?: string;
+}[] = [
   {
-    icon: FileText,
+    icon: WhatsAppIcon,
     step: '01',
-    title: 'Pre-Registro',
-    desc: 'Complete el formulario de pre-registro en línea. Recibirá confirmación inmediata por correo.',
-    color: 'var(--purple)',
+    key: 'informes',
+    title: 'Informes',
+    desc: 'Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.',
+    color: 'var(--green)',
   },
   {
     icon: CalendarDays,
     step: '02',
-    title: 'Puertas Abiertas',
-    desc: 'Asista a nuestro día de puertas abiertas para conocer las instalaciones y al equipo docente.',
-    color: 'var(--green)',
+    key: 'visita_guiada',
+    title: 'Visita guiada',
+    desc: 'Conozca las instalaciones y al equipo docente en un recorrido personalizado.',
+    color: 'var(--purple)',
+    to: '/agendar-visita',
+    ctaLabel: 'Agendar visita',
+  },
+  {
+    icon: FileText,
+    step: '03',
+    key: 'documentacion',
+    title: 'Documentación',
+    desc: 'Consulte la lista de documentos requeridos, con enlaces a trámites oficiales.',
+    color: 'var(--pink)',
+    to: '/admisiones/documentacion',
+    ctaLabel: 'Ver documentación',
   },
   {
     icon: ClipboardList,
-    step: '03',
-    title: 'Inscripción formal',
-    desc: 'Presente los documentos requeridos y complete el proceso de inscripción con el personal administrativo.',
-    color: 'var(--pink)',
-  },
-  {
-    icon: CheckCircle,
     step: '04',
-    title: '¡Bienvenido!',
-    desc: 'Recibirá su kit de bienvenida, credencial escolar y acceso al portal de padres.',
+    key: 'inscripcion',
+    title: 'Inscripción',
+    desc: 'Complete el pre-registro en línea en menos de 5 minutos y asegure su lugar.',
     color: 'var(--green)',
+    to: '/pre-registro',
+    ctaLabel: 'Iniciar pre-registro',
   },
 ];
 
@@ -224,6 +250,10 @@ function FaqExplorer() {
 }
 
 export default function AdmissionsPage() {
+  // WhatsApp number is admin-editable; CTA hidden (fallback to /contacto)
+  // when it's empty, per site convention.
+  const { whatsapp_number } = useSiteSettings();
+
   // Admissions funnel entry point (page views also cover this; the explicit
   // event makes the funnel step unambiguous in the analytics tool).
   useEffect(() => {
@@ -281,7 +311,7 @@ export default function AdmissionsPage() {
         </Reveal>
       </Section>
 
-      {/* ── PROCESS TIMELINE ── */}
+      {/* ── PROCESS TIMELINE — 4 pasos, cada uno con su CTA directo ── */}
       <Section bg="white">
         <Reveal className="mb-10 text-center sm:mb-12">
           <span className="section-label-purple inline-flex">Cómo funciona</span>
@@ -295,29 +325,89 @@ export default function AdmissionsPage() {
             className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-0.5 opacity-35 lg:block"
             style={{ background: 'var(--grad-bar)' }}
           />
-          <ol className="m-0 grid list-none grid-cols-1 gap-7 p-0 sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map(({ icon: Icon, step, title, desc, color }, i) => (
+          <ol className="m-0 flex list-none flex-col p-0 lg:grid lg:grid-cols-4 lg:gap-7">
+            {STEPS.map(({ icon: Icon, step, key, title, desc, color, to, ctaLabel }, i) => (
               <Reveal key={step} delay={i * 100} direction="up">
-                <li className="relative text-center">
-                  {/* Numbered node */}
-                  <div
-                    className="relative z-[1] mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full border-[3px] bg-white"
-                    style={{ borderColor: color, boxShadow: `0 12px 26px -12px color-mix(in srgb, ${color} 53%, transparent)` }}
-                  >
-                    <Icon size={24} color={color} />
-                    <span
-                      className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 font-head text-xs font-bold text-white"
-                      style={{ background: color }}
+                <li className="relative flex gap-4 lg:block lg:text-center">
+                  {/* Numbered node + vertical connector (phones/tablets) */}
+                  <div className="flex flex-col items-center lg:block">
+                    <div
+                      className="relative z-[1] flex h-[58px] w-[58px] flex-shrink-0 items-center justify-center rounded-full border-[3px] bg-white lg:mx-auto"
+                      style={{ borderColor: color, boxShadow: `0 12px 26px -12px color-mix(in srgb, ${color} 53%, transparent)` }}
                     >
-                      {step}
-                    </span>
+                      <Icon className="h-6 w-6" style={{ color }} aria-hidden="true" />
+                      <span
+                        className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 font-head text-xs font-bold text-white"
+                        style={{ background: color }}
+                      >
+                        {step}
+                      </span>
+                    </div>
+                    {i < STEPS.length - 1 && (
+                      <div className="mt-2 w-0.5 flex-1 rounded-full bg-ink/10 lg:hidden" aria-hidden="true" />
+                    )}
                   </div>
-                  <h3 className="mt-4 font-head text-lg font-bold text-ink">{title}</h3>
-                  <p className="mx-auto mt-2 max-w-[240px] text-[13.5px] leading-relaxed text-muted">{desc}</p>
+
+                  <div className={`min-w-0 pt-2 lg:pt-0 ${i < STEPS.length - 1 ? 'pb-9 lg:pb-0' : ''}`}>
+                    <h3 className="font-head text-lg font-bold text-ink lg:mt-4">{title}</h3>
+                    <p className="mt-1.5 max-w-[280px] text-[13.5px] leading-relaxed text-muted lg:mx-auto lg:mt-2 lg:max-w-[240px]">
+                      {desc}
+                    </p>
+                    {to && ctaLabel ? (
+                      <Link
+                        to={to}
+                        onClick={() => trackEvent(ConversionEvent.AdmissionsStepCta, { step: key })}
+                        className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                      >
+                        {ctaLabel} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </Link>
+                    ) : whatsapp_number ? (
+                      <a
+                        href={waLink(whatsapp_number, WA_MESSAGES.admissionsInfo)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          trackEvent(ConversionEvent.AdmissionsStepCta, { step: key });
+                          trackEvent(ConversionEvent.WhatsappCta, { context: 'admisiones_informes' });
+                        }}
+                        className="btn-green mt-3"
+                      >
+                        <WhatsAppIcon className="h-4 w-4" /> WhatsApp
+                      </a>
+                    ) : (
+                      <Link
+                        to="/contacto"
+                        onClick={() => trackEvent(ConversionEvent.AdmissionsStepCta, { step: key })}
+                        className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-purple transition-colors hover:bg-purple/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                      >
+                        Contáctenos <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </Link>
+                    )}
+                  </div>
                 </li>
               </Reveal>
             ))}
           </ol>
+        </div>
+      </Section>
+
+      {/* ── ESTIMADOR DE COSTOS (linkable: /admisiones#estimador) ── */}
+      <Section bg="cream" id="estimador">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-start">
+          <Reveal>
+            <span className="section-label-coral inline-flex">Costos {CURRENT_CYCLE}</span>
+            <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">
+              Estime su inversión
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
+              Elija la sección y la modalidad para ver las cuotas del ciclo.
+              Las cifras son publicadas por la administración del colegio y el
+              desglose completo está en la página de Costos.
+            </p>
+          </Reveal>
+          <Reveal delay={100}>
+            <CostEstimator />
+          </Reveal>
         </div>
       </Section>
 
