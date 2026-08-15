@@ -33,6 +33,7 @@ const SAMPLE = {
   body: 'Reunión el viernes a las 8:00.',
   audience: 'parents',
   is_active: false,
+  push_enabled: true,
   created_at: '2026-08-01T12:00:00Z',
   created_by_name: 'Admin',
   read_count: 3,
@@ -82,9 +83,37 @@ describe('AdminAnnouncements', () => {
         body: 'No hay clases mañana.',
         audience: 'all',
         is_active: true,
+        push_enabled: true,
       });
     });
     expect(toastSuccess).toHaveBeenCalledWith('Comunicado publicado.');
+  });
+
+  it('shows the push toggle ON by default and posts it OFF when unchecked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    const pushToggle = within(dialog).getByLabelText(/Enviar notificación push/i);
+    expect(pushToggle).toBeChecked();
+
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), {
+      target: { value: 'Sin push' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), {
+      target: { value: 'Aviso silencioso.' },
+    });
+    await user.click(pushToggle);
+    expect(pushToggle).not.toBeChecked();
+
+    await user.click(within(dialog).getByRole('button', { name: /^Publicar$/i }));
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ push_enabled: false }),
+      );
+    });
   });
 
   it('requires confirmation before sending an urgent broadcast', async () => {

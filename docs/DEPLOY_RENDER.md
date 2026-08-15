@@ -129,6 +129,37 @@ transaction-mode pooler (port 6543), set `CONN_MAX_AGE=0` (and
 Payment/Loyverse webhooks are signature-verified and not throttled beyond the
 pre-existing generous per-IP ceiling, so a provider burst is never dropped.
 
+## 10 · Web push (VAPID) — comunicados on the lock screen
+
+Inert until the keys exist. Generate a VAPID key pair once (either works):
+
+```
+npx web-push generate-vapid-keys          # Node
+vapid --gen                               # py-vapid CLI (pip install py-vapid)
+```
+
+Then set in the Render service **Environment** (backend, runtime):
+
+| Var | Meaning |
+|---|---|
+| `VAPID_PUBLIC_KEY` | base64url public key — sent to browsers on subscribe. |
+| `VAPID_PRIVATE_KEY` | private key — signs every push. Keep secret. |
+| `VAPID_ADMIN_EMAIL` | `mailto:` contact required by push services (default `colegio@interlaken.edu.mx`). |
+
+And the **same public key** as `VITE_VAPID_PUBLIC_KEY` — this one is
+**build-time** (baked into the SPA bundle): the Dockerfile declares
+`ARG VITE_VAPID_PUBLIC_KEY`, and Render passes service env vars to Docker
+builds, so setting it in the same Environment tab and redeploying is enough.
+Without it the opt-in card never renders.
+
+Flow once configured: parents opt in on the portal dashboard (subscription is
+stored per user+device) → publishing a comunicado with **“Enviar notificación
+push”** on sends the first batch inline and the `dispatch_notifications` run in
+`.github/workflows/scheduled-tasks.yml` drains the rest → taps deep-link to
+`/portal/comunicados/<id>` → expired subscriptions (HTTP 404/410) are pruned
+automatically on send. Also mirrored in `backend/.env.production.example` and
+`frontend/.env.example`.
+
 ## Limits to expect (free)
 - **Render free sleeps** after ~15 min idle → first hit is a ~30–60s cold start.
   The Actions cron keeps the *data* fresh regardless.

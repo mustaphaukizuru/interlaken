@@ -18,7 +18,8 @@ import { portalApi } from '@/services/api';
 
 interface Announcement {
   id: number; title: string; body: string; audience: string;
-  is_active: boolean; created_at: string; created_by_name: string; read_count: number;
+  is_active: boolean; push_enabled: boolean; created_at: string;
+  created_by_name: string; read_count: number;
 }
 
 const AUDIENCE: { value: string; label: string; variant: 'info' | 'success' | 'warning' | 'neutral' }[] = [
@@ -29,7 +30,7 @@ const AUDIENCE: { value: string; label: string; variant: 'info' | 'success' | 'w
 ];
 const audienceMeta = (a: string) => AUDIENCE.find((x) => x.value === a) ?? AUDIENCE[0];
 
-const EMPTY = { title: '', body: '', audience: 'all', is_active: true };
+const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true };
 const EMPTY_ALERT = { title: '', message: '', audience: 'parents', whatsapp: false };
 
 export default function AdminAnnouncements() {
@@ -107,7 +108,10 @@ export default function AdminAnnouncements() {
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (a: Announcement) => {
     setEditing(a);
-    setForm({ title: a.title, body: a.body, audience: a.audience, is_active: a.is_active });
+    setForm({
+      title: a.title, body: a.body, audience: a.audience,
+      is_active: a.is_active, push_enabled: a.push_enabled ?? true,
+    });
     setOpen(true);
   };
   const openAlert = () => {
@@ -199,6 +203,11 @@ export default function AdminAnnouncements() {
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Publicado (visible en el portal)
+          </label>
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={form.push_enabled} onChange={(e) => setForm((f) => ({ ...f, push_enabled: e.target.checked }))}
+              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+            Enviar notificación push a los dispositivos suscritos
           </label>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>

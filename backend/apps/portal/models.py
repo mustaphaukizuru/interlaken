@@ -20,6 +20,9 @@ class Announcement(models.Model):
                      on_delete=models.SET_NULL, null=True,
                      related_name='announcements')
     is_active  = models.BooleanField(default=True)
+    # Admin toggle 'Enviar notificación push': when off, publishing still fans
+    # out in-app + email, but no web-push is sent for this comunicado.
+    push_enabled = models.BooleanField(default=True)
     # Set when the audience has been fan-out notified (create or first activate).
     # Prevents re-notify on deactivate→reactivate (GO-LIVE-AUDIT #16 follow-up).
     fanout_at  = models.DateTimeField(null=True, blank=True)
@@ -53,6 +56,12 @@ class Notification(models.Model):
     title      = models.CharField(max_length=200)
     message    = models.TextField()
     is_read    = models.BooleanField(default=False)
+    # Set on announcement fan-out rows: lets the dispatcher deep-link the push
+    # to /portal/comunicados/<id> and honor the comunicado's push_enabled
+    # toggle. SET_NULL so deleting a comunicado never erases the notification.
+    announcement = models.ForeignKey(
+                     'Announcement', on_delete=models.SET_NULL,
+                     null=True, blank=True, related_name='notifications')
     # NULL until email + web-push for this notification have been dispatched.
     # notify() (per-user) sends inline and stamps this immediately; bulk fan-out
     # (fanout_announcement) leaves it NULL for the dispatch_notifications cron to

@@ -157,7 +157,8 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     kind = notif_type or Notification.NotifType.INFO
     Notification.objects.bulk_create(
         [Notification(user_id=uid, notif_type=kind,
-                      title=announcement.title, message=message)
+                      title=announcement.title, message=message,
+                      announcement=announcement)
          for uid in user_ids],
         batch_size=500,
     )
@@ -290,7 +291,7 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     cutoff = now - timedelta(days=max_age_days)
     pending = list(
         Notification.objects.filter(delivered_at__isnull=True)
-        .select_related('user').order_by('created_at')[:limit])
+        .select_related('user', 'announcement').order_by('created_at')[:limit])
     if not pending:
         return 0
 
@@ -301,7 +302,12 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
             continue  # too old — mark delivered below, don't send
         if getattr(n.user, 'email', ''):
             send_email(subject=n.title, message=n.message, recipients=[n.user.email])
-        send_web_push(n.user, n.title, n.message)
+        # Comunicado rows deep-link the push to the announcement and honor its
+        # 'Enviar notificación push' toggle; standalone rows keep /portal.
+        ann = n.announcement
+        if ann is None or ann.push_enabled:
+            url = f'/portal/comunicados/{ann.pk}' if ann else '/portal'
+            send_web_push(n.user, n.title, n.message, url=url)
         sent += 1
 
     Notification.objects.filter(id__in=handled_ids).update(delivered_at=now)

@@ -14,6 +14,7 @@ import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { portalApi } from '@/services/api';
 import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
 import { PushOptIn } from '@/components/portal/PushOptIn';
+import { InstallHint } from '@/components/portal/InstallHint';
 import type { DashboardData } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -66,8 +67,9 @@ export default function ParentDashboard() {
         </div>
       )}
 
-        {/* Web-push opt-in (renders only when supported and not yet enabled) */}
-        <div className="mb-5">
+        {/* Install + web-push hints (each renders only when relevant) */}
+        <div className="mb-5 space-y-3">
+          <InstallHint />
           <PushOptIn />
         </div>
 
