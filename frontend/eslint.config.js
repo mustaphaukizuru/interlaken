@@ -22,20 +22,17 @@ export default defineConfig([
       tseslint.configs.recommended,
       jsxA11y.flatConfigs.recommended,
       reactRefresh.configs.vite,
+      // v7 flat recommended preset: classic pair (rules-of-hooks error,
+      // exhaustive-deps warn) plus the React Compiler rule set
+      // (set-state-in-effect, purity, refs, …) at their preset severities.
+      reactHooks.configs.flat.recommended,
     ],
-    plugins: { 'react-hooks': reactHooks },
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: { ...globals.browser, ...globals.es2020 },
     },
     rules: {
-      // react-hooks v7's recommended preset bundles the React Compiler rule set
-      // (set-state-in-effect, purity, …) at error severity, which flags existing
-      // patterns throughout src. Keep the classic v4-recommended pair; adopt the
-      // compiler rules as a deliberate follow-up, not as a lint-migration side effect.
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',

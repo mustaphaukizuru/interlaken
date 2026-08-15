@@ -41,26 +41,47 @@ type Phase = 'loading' | 'preview' | 'committing' | 'error';
 export function ImportLoyverseModal({ open, onClose, onImported }: {
   open: boolean; onClose: () => void; onImported?: () => void;
 }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Importar desde Loyverse" maxWidth={520}>
+      {/* Modal mounts children only while open, so each open starts a fresh
+          preview and closing discards report/error state (no reset effect). */}
+      <ImportLoyverseBody onClose={onClose} onImported={onImported} />
+    </Modal>
+  );
+}
+
+function ImportLoyverseBody({ onClose, onImported }: {
+  onClose: () => void; onImported?: () => void;
+}) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [report, setReport] = useState<CombinedReport | null>(null);
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
-  async function preview() {
-    setPhase('loading'); setError('');
-    try {
-      const { data } = await portalApi.importLoyverse(false);
-      setReport(data);
-      setPhase('preview');
-    } catch (e: any) {
-      setError(e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
-      setPhase('error');
-    }
-  }
-
+  // Fetch the dry-run preview on mount and on each retry. State already
+  // starts at 'loading', so the effect only updates state from the promise
+  // continuations (no synchronous setState).
   useEffect(() => {
-    if (open) preview();
-    else { setReport(null); setError(''); }
-  }, [open]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await portalApi.importLoyverse(false);
+        if (cancelled) return;
+        setReport(data);
+        setPhase('preview');
+      } catch (e: any) {
+        if (cancelled) return;
+        setError(e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
+        setPhase('error');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [attempt]);
+
+  const retry = () => {
+    setPhase('loading'); setError('');
+    setAttempt((a) => a + 1);
+  };
 
   async function commit() {
     setPhase('committing');
@@ -85,7 +106,7 @@ export function ImportLoyverseModal({ open, onClose, onImported }: {
   const wouldChange = (imp?.created ?? 0) + (imp?.updated ?? 0) + (link?.linked ?? 0);
 
   return (
-    <Modal open={open} onClose={onClose} title="Importar desde Loyverse" maxWidth={520}>
+    <>
       {phase === 'loading' || phase === 'committing' ? (
         <div className="py-10 text-center">
           <LoadingSpinner />
@@ -101,7 +122,7 @@ export function ImportLoyverseModal({ open, onClose, onImported }: {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-            <Button onClick={preview}>Reintentar</Button>
+            <Button onClick={retry}>Reintentar</Button>
           </div>
         </div>
       ) : imp && link ? (
@@ -161,7 +182,7 @@ export function ImportLoyverseModal({ open, onClose, onImported }: {
           </div>
         </div>
       ) : null}
-    </Modal>
+    </>
   );
 }
 

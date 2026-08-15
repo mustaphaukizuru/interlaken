@@ -70,12 +70,18 @@ export function InstallHint() {
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(DISMISS_KEY) === '1',
   );
-  const [visits, setVisits] = useState(0);
+  // The count `countVisit()` will report, read (not written) up front: stored
+  // total plus this session's visit if it hasn't been counted yet. The write
+  // itself stays in the mount effect below.
+  const [visits] = useState(() => {
+    const current = parseInt(localStorage.getItem(VISITS_KEY) ?? '0', 10) || 0;
+    return sessionStorage.getItem(SESSION_KEY) ? current : current + 1;
+  });
   const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(capturedPrompt);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setVisits(countVisit());
+    countVisit();
     const sync = () => setPrompt(capturedPrompt);
     subscribers.add(sync);
     const onInstalled = () => {

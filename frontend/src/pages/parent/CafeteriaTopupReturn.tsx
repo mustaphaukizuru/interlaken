@@ -17,13 +17,13 @@ const POLL_MS = 2000;
 export default function CafeteriaTopupReturn() {
   const [params] = useSearchParams();
   const paymentId = params.get('payment_id');
-  const [outcome, setOutcome] = useState<Outcome>('loading');
+  // Without a payment_id there is nothing to poll — that outcome is derived
+  // at render (the old code set it from the effect), state only tracks polling.
+  const [polledOutcome, setPolledOutcome] = useState<Outcome>('loading');
+  const outcome: Outcome = paymentId ? polledOutcome : 'failed';
 
   useEffect(() => {
-    if (!paymentId) {
-      setOutcome('failed');
-      return;
-    }
+    if (!paymentId) return;
 
     let active = true;
     let attempts = 0;
@@ -34,12 +34,12 @@ export default function CafeteriaTopupReturn() {
         const { data } = await paymentsApi.getPaymentStatus(Number(paymentId));
         if (!active) return;
         if (data.status === 'success') {
-          setOutcome('success');
+          setPolledOutcome('success');
           toast.success('Pago confirmado. El colegio cargará el saldo en el POS.');
           return;
         }
         if (data.status === 'failed' || data.status === 'refunded') {
-          setOutcome('failed');
+          setPolledOutcome('failed');
           return;
         }
       } catch {
@@ -47,7 +47,7 @@ export default function CafeteriaTopupReturn() {
       }
       attempts += 1;
       if (attempts >= MAX_POLLS) {
-        if (active) setOutcome('pending');
+        if (active) setPolledOutcome('pending');
         return;
       }
       timer = setTimeout(poll, POLL_MS);

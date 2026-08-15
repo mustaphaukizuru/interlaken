@@ -109,12 +109,17 @@ function Lightbox({
         <ChevronLeft className="h-6 w-6" aria-hidden="true" />
       </button>
 
-      <figure className="max-h-full">
-        <img
-          src={photos[index].src}
-          alt={altFor(photos[index].cat)}
-          className="max-h-[82vh] w-auto max-w-full rounded-xl2 object-contain"
-        />
+      <figure className="w-full max-w-4xl">
+        {/* Lienzo de tamaño estable: la foto se acomoda (object-contain) dentro
+            de una caja fija, así el lightbox no re-fluye (botones/caption no
+            saltan) mientras cada imagen se decodifica al navegar. */}
+        <div className="flex h-[82vh] items-center justify-center">
+          <img
+            src={photos[index].src}
+            alt={altFor(photos[index].cat)}
+            className="max-h-full max-w-full rounded-xl2 object-contain"
+          />
+        </div>
         <figcaption className="mt-3 text-center text-sm text-white/70">
           {index + 1} / {photos.length}
         </figcaption>

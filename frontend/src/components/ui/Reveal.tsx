@@ -36,11 +36,12 @@ export function Reveal({
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+  // Reduced motion renders fully visible from the first paint — derived here
+  // instead of setState in the effect (which then only manages the observer).
+  const shown = visible || reduced;
+
   useEffect(() => {
-    if (reduced) {
-      setVisible(true);
-      return;
-    }
+    if (reduced) return;
     const el = ref.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -64,8 +65,8 @@ export function Reveal({
     <div
       ref={ref}
       style={{
-        opacity: visible ? 1 : 0,
-        transform: visible || reduced ? 'none' : travel,
+        opacity: shown ? 1 : 0,
+        transform: shown ? 'none' : travel,
         transition: reduced
           ? 'none'
           : `opacity 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}ms, transform 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}ms`,

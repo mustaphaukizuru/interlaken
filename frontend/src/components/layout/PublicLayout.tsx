@@ -124,17 +124,16 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
       </button>
 
       {open && (
-        <div
-          role="menu"
-          aria-label={label}
-          className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-64"
-        >
+        // Plain popover semantics (like ui/Dropdown): the trigger carries
+        // aria-expanded/aria-haspopup; the panel is an unrole'd container of
+        // ordinary links — role="menu"/"menuitem" would promise app-menu
+        // keyboard behavior these plain links don't implement.
+        <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-64">
           <ul className="overflow-hidden rounded-2xl border border-line bg-white p-2 shadow-xl ring-1 ring-ink/5">
             {items.map((item) => (
               <li key={item.label}>
                 <Link
                   to={item.to}
-                  role="menuitem"
                   onClick={() => setOpen(false)}
                   className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >

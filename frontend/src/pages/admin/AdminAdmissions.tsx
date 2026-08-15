@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ClipboardList, GraduationCap, Search, Send, Copy, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -41,11 +41,15 @@ async function copyToClipboard(text: string): Promise<boolean> {
 
 export default function AdminAdmissions() {
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [invitedLink, setInvitedLink] = useState<{ name: string; url: string } | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 350);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch]);
+  // The page is keyed to the search it was chosen for; a new search derives
+  // back to page 1 during render (replaces the old reset effect, and never
+  // fires a transient old-page/new-search fetch).
+  const [pageSel, setPageSel] = useState<{ search: string; page: number } | null>(null);
+  const page = pageSel && pageSel.search === debouncedSearch ? pageSel.page : 1;
+  const setPage = (p: number) => setPageSel({ search: debouncedSearch, page: p });
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-preregistrations', page, debouncedSearch],

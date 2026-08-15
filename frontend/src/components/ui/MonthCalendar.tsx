@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth,
   isToday, parseISO, startOfDay, startOfMonth, startOfWeek, subMonths,
@@ -38,22 +38,21 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
     return m;
   }, [days]);
 
-  const [viewMonth, setViewMonth] = useState(() => startOfMonth(today));
-
-  // Once availability loads, open on the first month that actually has days.
-  const didInit = useRef(false);
-  useEffect(() => {
-    if (didInit.current || days.length === 0) return;
+  // Derived, not synced: until the user pages with prev/next, the calendar
+  // opens on the first month that has availability (the current month while
+  // loading); after manual navigation the user's choice wins.
+  const [navMonth, setNavMonth] = useState<Date | null>(null);
+  const firstAvailableMonth = useMemo(() => {
     const first = [...byDate.keys()].sort()[0];
-    if (first) setViewMonth(startOfMonth(parseISO(first)));
-    didInit.current = true;
-  }, [days.length, byDate]);
+    return first ? startOfMonth(parseISO(first)) : null;
+  }, [byDate]);
+  const viewMonth = navMonth ?? firstAvailableMonth ?? startOfMonth(today);
 
-  const grid = useMemo(() => {
-    const start = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
-    const end = endOfWeek(endOfMonth(viewMonth), { weekStartsOn: 1 });
-    return eachDayOfInterval({ start, end });
-  }, [viewMonth]);
+  // ~42 cells; cheap enough to compute inline (a manual useMemo keyed on the
+  // derived Date can't be preserved by the React Compiler).
+  const gridStart = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
+  const gridEnd = endOfWeek(endOfMonth(viewMonth), { weekStartsOn: 1 });
+  const grid = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
   const canGoPrev = startOfMonth(viewMonth) > startOfMonth(today);
 
@@ -63,7 +62,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
       <div className="mb-4 flex items-center justify-between">
         <button
           type="button"
-          onClick={() => canGoPrev && setViewMonth((m) => subMonths(m, 1))}
+          onClick={() => canGoPrev && setNavMonth(subMonths(viewMonth, 1))}
           disabled={!canGoPrev}
           aria-label="Mes anterior"
           className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:pointer-events-none disabled:opacity-30"
@@ -75,7 +74,7 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
         </h3>
         <button
           type="button"
-          onClick={() => setViewMonth((m) => addMonths(m, 1))}
+          onClick={() => setNavMonth(addMonths(viewMonth, 1))}
           aria-label="Mes siguiente"
           className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
         >

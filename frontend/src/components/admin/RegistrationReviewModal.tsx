@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Circle, Download, FileText, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -41,8 +41,6 @@ export function RegistrationReviewModal({ id, open, onClose }: {
     enabled: open && id != null,
   });
 
-  const [status, setStatus] = useState('submitted');
-  const [notes, setNotes] = useState('');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   // Prod serves no /media/, so we fetch the file with auth (JWT via the api
@@ -66,11 +64,6 @@ export function RegistrationReviewModal({ id, open, onClose }: {
     }
   };
 
-  // Sync local controls whenever a different registration loads.
-  useEffect(() => {
-    if (data) { setStatus(data.status); setNotes(data.admin_notes ?? ''); }
-  }, [data]);
-
   const verifyDoc = useMutation({
     mutationFn: ({ docId, next }: { docId: number; next: boolean }) =>
       admissionsAdminApi.verifyDocument(docId, next),
@@ -79,17 +72,6 @@ export function RegistrationReviewModal({ id, open, onClose }: {
       qc.invalidateQueries({ queryKey: ['admin-registrations'] });
     },
     onError: () => toast.error('No se pudo actualizar el documento.'),
-  });
-
-  const save = useMutation({
-    mutationFn: () => admissionsAdminApi.updateRegistrationStatus(id!, { status, admin_notes: notes }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-registrations'] });
-      qc.invalidateQueries({ queryKey: ['admin-registration', id] });
-      toast.success('Inscripción actualizada.');
-      onClose();
-    },
-    onError: () => toast.error('No se pudo guardar la revisión.'),
   });
 
   const fullName = data ? `${data.child_first_name} ${data.child_last_name}`.trim() : 'Inscripción';
@@ -236,31 +218,57 @@ export function RegistrationReviewModal({ id, open, onClose }: {
             )}
           </div>
 
-          {/* Review decision */}
-          <div className="rounded-xl2 border border-line bg-cream/40 p-4 space-y-3">
-            <div>
-              <label htmlFor="reg-status" className="label">Estado de la revisión</label>
-              <select id="reg-status" className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}>
-                {REGISTRATION_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="reg-notes" className="label">Notas internas</label>
-              <textarea id="reg-notes" className="input-field min-h-[72px] resize-none" value={notes}
-                onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones de admisiones (no visibles para la familia)…" />
-            </div>
-            <p className="flex items-center gap-1.5 text-xs text-subtle">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Aprobar o rechazar envía un correo automático al tutor.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-              <Button onClick={() => save.mutate()} loading={save.isPending}>Guardar revisión</Button>
-            </div>
-          </div>
+          {/* Review decision — keyed so switching to a different registration
+              reseeds the controls, while refetches of the same one (e.g. after
+              verifying a document) keep any in-progress edits. */}
+          <ReviewDecision key={data.id} registration={data} onClose={onClose} />
         </div>
       )}
     </Modal>
+  );
+}
+
+function ReviewDecision({ registration, onClose }: { registration: Reg; onClose: () => void }) {
+  const qc = useQueryClient();
+  // Editable controls seeded from the loaded registration on mount (the parent
+  // remounts this block per registration id) — no sync effect needed.
+  const [status, setStatus] = useState(registration.status);
+  const [notes, setNotes] = useState(registration.admin_notes ?? '');
+
+  const save = useMutation({
+    mutationFn: () =>
+      admissionsAdminApi.updateRegistrationStatus(registration.id, { status, admin_notes: notes }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-registrations'] });
+      qc.invalidateQueries({ queryKey: ['admin-registration', registration.id] });
+      toast.success('Inscripción actualizada.');
+      onClose();
+    },
+    onError: () => toast.error('No se pudo guardar la revisión.'),
+  });
+
+  return (
+    <div className="rounded-xl2 border border-line bg-cream/40 p-4 space-y-3">
+      <div>
+        <label htmlFor="reg-status" className="label">Estado de la revisión</label>
+        <select id="reg-status" className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {REGISTRATION_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="reg-notes" className="label">Notas internas</label>
+        <textarea id="reg-notes" className="input-field min-h-[72px] resize-none" value={notes}
+          onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones de admisiones (no visibles para la familia)…" />
+      </div>
+      <p className="flex items-center gap-1.5 text-xs text-subtle">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        Aprobar o rechazar envía un correo automático al tutor.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+        <Button onClick={() => save.mutate()} loading={save.isPending}>Guardar revisión</Button>
+      </div>
+    </div>
   );
 }
 

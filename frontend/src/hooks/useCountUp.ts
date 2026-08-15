@@ -25,8 +25,11 @@ export function useCountUp(target: number, duration = 900): number {
   useEffect(() => {
     if (reduced || !canAnimate) {
       fromRef.current = target;
-      setDisplay(target);
-      return;
+      // The derived return below already shows `target`; this deferred write
+      // only reconciles the tween state so a later reduced→animated switch
+      // starts from the right value (avoids setState synchronously in effect).
+      const id = window.setTimeout(() => setDisplay(target), 0);
+      return () => window.clearTimeout(id);
     }
     const from = fromRef.current;
     const delta = target - from;
@@ -59,7 +62,9 @@ export function useCountUp(target: number, duration = 900): number {
     };
   }, [target, duration, reduced, canAnimate]);
 
-  return display;
+  // With animation off, the shown value is simply the target (derived at
+  // render, so it is correct even before the effect above reconciles state).
+  return reduced || !canAnimate ? target : display;
 }
 
 export default useCountUp;

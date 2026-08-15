@@ -67,19 +67,27 @@ export default function CafeteriaPage() {
   const [budgetWeekly, setBudgetWeekly] = useState('');
 
   // History filters + pagination — default student filter follows portal child switcher.
-  const [filterStudent, setFilterStudent] = useState<number | 'all'>(() => childId ?? 'all');
+  // A manual selection here is keyed to the childId it was made under, so when
+  // the parent switches alumno elsewhere in the portal the filter derives back
+  // to that child during render (replaces the old sync effect).
+  const [filterStudentSel, setFilterStudentSel] =
+    useState<{ child: number | null; value: number | 'all' } | null>(null);
+  const filterStudent: number | 'all' =
+    filterStudentSel && filterStudentSel.child === childId
+      ? filterStudentSel.value
+      : (childId ?? 'all');
+  const setFilterStudent = (value: number | 'all') =>
+    setFilterStudentSel({ child: childId, value });
   const [filterType, setFilterType] = useState<TypeFilter>('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
-  const [page, setPage] = useState(1);
 
-  // Keep history filter aligned when the parent switches alumno elsewhere in the portal.
-  useEffect(() => {
-    setFilterStudent(childId ?? 'all');
-  }, [childId]);
-
-  // Any filter change resets to the first page (stale page would show empty).
-  useEffect(() => { setPage(1); }, [filterStudent, filterType, filterFrom, filterTo]);
+  // The page is keyed to the filters it was chosen for; any filter change
+  // derives back to page 1 (stale page would show empty) — no reset effect.
+  const filterKey = `${filterStudent}|${filterType}|${filterFrom}|${filterTo}`;
+  const [pageSel, setPageSel] = useState<{ key: string; page: number } | null>(null);
+  const page = pageSel && pageSel.key === filterKey ? pageSel.page : 1;
+  const setPage = (p: number) => setPageSel({ key: filterKey, page: p });
 
   const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
@@ -128,9 +136,14 @@ export default function CafeteriaPage() {
       balances.find((b) => b.student.id === childId && !!b.student.loyverse_id)
       ?? balances.find((b) => !!b.student.loyverse_id);
     if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) return;
+    // Suppressed: one-shot URL command — the param is external navigation
+    // state consumed (deleted) right above, so the modal state cannot be
+    // derived from it and these one-time writes cannot cascade.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setSelectedStudent(target.student.id);
     setTopupAmount(String(amount));
     setShowTopup(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [searchParams, setSearchParams, balances, childId]);
 
   const topupAmountNum = parseFloat(topupAmount);
