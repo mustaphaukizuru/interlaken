@@ -43,11 +43,14 @@ class ContactCreateView(APIView):
 
 
 class HealthView(APIView):
-    """GET /api/v1/health/ — liveness + dependency probe for uptime monitors.
+    """GET /healthz (root, Render health check) and /api/v1/health/ (legacy).
 
-    Public, unauthenticated, read-only (exempt from audit logging like all
-    reads). Returns 200 when DB and cache respond, 503 otherwise, so any
-    HTTP monitor (UptimeRobot/BetterStack/cron curl) can alert on it.
+    Liveness + dependency probe for uptime monitors: one DB ``SELECT 1`` plus a
+    cache set/get round-trip. Public, unauthenticated, read-only (exempt from
+    audit logging like all reads). Returns 200 when both respond, 503 otherwise,
+    so any HTTP monitor (Render/UptimeRobot/BetterStack/cron curl) can alert.
+    Top-level ``db``/``cache`` booleans are the documented shape; the nested
+    ``checks`` object is kept for pre-existing monitors.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -71,6 +74,8 @@ class HealthView(APIView):
         return Response(
             {
                 'status': 'ok' if healthy else 'degraded',
+                'db': checks['db'],
+                'cache': checks['cache'],
                 'checks': checks,
                 'time': timezone.now().isoformat(),
             },

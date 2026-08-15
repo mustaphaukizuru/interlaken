@@ -24,3 +24,21 @@ class TestHealth:
         before = AuditLog.objects.count()
         api_client.get(URL)
         assert AuditLog.objects.count() == before
+
+
+class TestHealthz:
+    """Root-level /healthz — Render's healthCheckPath (no /api/v1 prefix)."""
+
+    def test_root_healthz_200_with_flat_shape(self, api_client):
+        resp = api_client.get('/healthz')
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['status'] == 'ok'
+        assert data['db'] is True
+        assert data['cache'] is True
+
+    def test_healthz_is_json_not_spa_html(self, api_client):
+        # Must be registered before the SPA catch-all — an HTML index here
+        # would make Render's health check green on a broken API.
+        resp = api_client.get('/healthz')
+        assert resp['Content-Type'].startswith('application/json')

@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.ratelimit import ratelimit
+from apps.core.throttling import SharedScopedRateThrottle
 
 from .gateways import get_gateway, iter_gateways
 from .gateways.base import WebhookEvent
@@ -40,6 +41,10 @@ class PaymentInitiateView(APIView):
     endpoint for a future linked fee type.
     """
     permission_classes = [permissions.IsAuthenticated]
+    # Per-user (DRF throttles run after JWT auth): each initiate creates a
+    # Payment row + a gateway checkout session, so bound it.
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'payment-initiate'
 
     def post(self, request):
         serializer = PaymentInitiateSerializer(data=request.data)

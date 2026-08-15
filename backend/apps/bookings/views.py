@@ -3,6 +3,7 @@ bookings/views.py — Public slot picker + booking, admin availability & managem
 """
 from datetime import datetime, timedelta
 
+from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -82,11 +83,24 @@ class AvailabilityView(APIView):
             return [IsAdmin()]
         return [permissions.AllowAny()]
 
+    # Public availability micro-cache (P7b): TTL-only, keyed on the filter
+    # params — no invalidation web. The annotated query is already 1-query, so
+    # this only shaves repeat traffic; ≤60s staleness is safe because
+    # create_booking re-checks capacity server-side on every booking.
+    CACHE_TTL = 60
+
     def get(self, request):
-        now = timezone.now()
-        slots = [s for s in _open_slots_qs(request.query_params)
-                 if not s.is_full and _slot_start(s) >= now]  # hide already-started
-        return Response(AvailabilitySlotSerializer(slots, many=True).data)
+        params = request.query_params
+        cache_key = 'bookings:availability:' + '&'.join(
+            f'{k}={params.get(k, "")}' for k in ('type', 'from', 'to'))
+        data = cache.get(cache_key)
+        if data is None:
+            now = timezone.now()
+            slots = [s for s in _open_slots_qs(params)
+                     if not s.is_full and _slot_start(s) >= now]  # hide already-started
+            data = AvailabilitySlotSerializer(slots, many=True).data
+            cache.set(cache_key, data, self.CACHE_TTL)
+        return Response(data)
 
     def post(self, request):
         serializer = SlotGeneratorSerializer(data=request.data)

@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db.models import F
 from django.utils import timezone
 
 from apps.accounts.family import family_notify_recipients
@@ -36,18 +37,20 @@ class Command(BaseCommand):
 
         alerted_students = 0
         notified_parents = 0
-        cleared = 0
 
-        balances = CafeteriaBalance.objects.select_related('student__user')
+        # Recovered balances: clear the dedup marker in ONE UPDATE so a future
+        # drop re-alerts (was a per-row Python check + save over the full roster).
+        cleared = (CafeteriaBalance.objects
+                   .filter(balance__gt=F('low_balance_threshold'),
+                           last_low_balance_alert_at__isnull=False)
+                   .update(last_low_balance_alert_at=None))
+
+        # Only rows at/below their own threshold — the same SQL filter
+        # AdminLowBalanceView uses — instead of scanning every balance.
+        balances = (CafeteriaBalance.objects
+                    .select_related('student__user')
+                    .filter(balance__lte=F('low_balance_threshold')))
         for cb in balances:
-            if not cb.is_low_balance:
-                # Recovered: clear the marker so a future drop alerts again.
-                if cb.last_low_balance_alert_at is not None:
-                    cb.last_low_balance_alert_at = None
-                    cb.save(update_fields=['last_low_balance_alert_at'])
-                    cleared += 1
-                continue
-
             recently_alerted = (
                 cb.last_low_balance_alert_at is not None
                 and cb.last_low_balance_alert_at > cutoff

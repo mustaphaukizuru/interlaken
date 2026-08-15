@@ -31,6 +31,11 @@ class ConsentPurpose(models.TextChoices):
     MEDICAL_DATA             = 'medical_data',             'Datos de salud'
 
 
+# Public current-notice cache (see legal/views.py CurrentNoticeView). Mirrors
+# the content-app pattern: TTL + explicit invalidation on every version save.
+NOTICE_CACHE_KEY = 'legal:current-notice'
+
+
 class PrivacyNoticeVersion(models.Model):
     """A versioned Aviso de Privacidad (ADCE EDUCACIÓN A.C.)."""
     version              = models.CharField(max_length=30, unique=True)  # e.g. '2026.1'
@@ -54,6 +59,20 @@ class PrivacyNoticeVersion(models.Model):
     def current(cls):
         """The active notice version applicants must accept (newest active)."""
         return cls.objects.filter(is_active=True).order_by('-effective_date').first()
+
+    def save(self, *args, **kwargs):
+        # Any edit/activation may change which notice is "current" — drop the
+        # public cache so CurrentNoticeView re-reads on the next request.
+        from django.core.cache import cache
+        result = super().save(*args, **kwargs)
+        cache.delete(NOTICE_CACHE_KEY)
+        return result
+
+    def delete(self, *args, **kwargs):
+        from django.core.cache import cache
+        result = super().delete(*args, **kwargs)
+        cache.delete(NOTICE_CACHE_KEY)
+        return result
 
 
 class ConsentRecordQuerySet(models.QuerySet):

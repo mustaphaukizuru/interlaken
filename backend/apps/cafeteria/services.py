@@ -493,14 +493,22 @@ def _maybe_budget_alert(cb, now):
     return notified
 
 
-def _students_by_loyverse_id():
-    """Map ``loyverse_id`` → active StudentProfile for receipt matching."""
+def _students_by_loyverse_id(loyverse_ids=None):
+    """Map ``loyverse_id`` → active StudentProfile for receipt matching.
+
+    ``loyverse_ids=None`` loads the whole linked roster (the ``sync_purchases``
+    cron, which must match receipts from *any* student). When given, the fetch
+    is scoped to just those customer ids — the webhook path passes the payload's
+    ids so a 1-receipt delivery doesn't load hundreds of profiles (P7b audit).
+    Matching semantics are identical either way: ids outside the roster simply
+    aren't in the map and count as unmatched.
+    """
     from apps.accounts.models import StudentProfile
 
-    return {
-        s.loyverse_id: s
-        for s in StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
-    }
+    qs = StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
+    if loyverse_ids is not None:
+        qs = qs.filter(loyverse_id__in=loyverse_ids)
+    return {s.loyverse_id: s for s in qs}
 
 
 def record_receipts(receipts, students=None):
@@ -519,7 +527,11 @@ def record_receipts(receipts, students=None):
     from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
 
     if students is None:
-        students = _students_by_loyverse_id()
+        # Webhook path (no pre-built roster map): fetch only the students the
+        # payload's receipts can actually match instead of the whole roster.
+        # The cron passes its full map explicitly, so its behaviour is unchanged.
+        ids = {r.get('customer_id') for r in (receipts or []) if r.get('customer_id')}
+        students = _students_by_loyverse_id(ids)
     now = timezone.now()
     per_purchase_notify = not getattr(settings, 'CAFETERIA_PURCHASE_DIGEST', False)
 

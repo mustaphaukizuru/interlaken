@@ -1,6 +1,7 @@
 """
 legal/views.py — privacy notice + consent capture (B2) + ARCO rights (B3).
 """
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
@@ -9,7 +10,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
 
-from .models import ArcoRequest, PrivacyNoticeVersion
+from .models import NOTICE_CACHE_KEY, ArcoRequest, PrivacyNoticeVersion
 from .serializers import (
     ArcoRequestSerializer,
     ArcoStatusInputSerializer,
@@ -26,15 +27,26 @@ class IsAdmin(permissions.BasePermission):
 
 
 class CurrentNoticeView(APIView):
-    """GET /api/v1/legal/notice/ — the current Aviso de Privacidad (public)."""
+    """GET /api/v1/legal/notice/ — the current Aviso de Privacidad (public).
+
+    Cached 5 min (content-app pattern) and invalidated on every
+    ``PrivacyNoticeVersion.save``/``delete`` so a newly published version is
+    served immediately. The missing-notice 404 is never cached.
+    """
     permission_classes = [permissions.AllowAny]
 
+    CACHE_TTL = 300
+
     def get(self, request):
-        notice = PrivacyNoticeVersion.current()
-        if notice is None:
-            return Response({'detail': 'No hay un aviso de privacidad vigente.'},
-                            status=status.HTTP_404_NOT_FOUND)
-        return Response(PrivacyNoticeSerializer(notice).data)
+        data = cache.get(NOTICE_CACHE_KEY)
+        if data is None:
+            notice = PrivacyNoticeVersion.current()
+            if notice is None:
+                return Response({'detail': 'No hay un aviso de privacidad vigente.'},
+                                status=status.HTTP_404_NOT_FOUND)
+            data = PrivacyNoticeSerializer(notice).data
+            cache.set(NOTICE_CACHE_KEY, data, self.CACHE_TTL)
+        return Response(data)
 
 
 class ConsentView(APIView):

@@ -55,6 +55,10 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ── MIDDLEWARE ────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Generates/propagates X-Request-ID and injects it into log records so one
+    # request's log lines can be correlated (apps/core/request_id.py). First so
+    # every later middleware/view log line carries the id.
+    'apps.core.request_id.RequestIDMiddleware',
     # CSP + Permissions-Policy on every response (apps/core/security_headers.py).
     'apps.core.security_headers.SecurityHeadersMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -111,6 +115,13 @@ DATABASES = {
         'PASSWORD': env('DB_PASSWORD', default=''),
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='5432'),
+        # Persistent DB connections (seconds). Safe with Supabase's SESSION-mode
+        # pooler on port 5432 (each Django connection maps to one pooler session).
+        # If you ever switch to the TRANSACTION-mode pooler (port 6543), set
+        # CONN_MAX_AGE=0 and DISABLE_SERVER_SIDE_CURSORS=True — transaction mode
+        # can hand each query a different server connection, so persistent
+        # connections and server-side cursors both break.
+        'CONN_MAX_AGE': env.int('CONN_MAX_AGE', default=60),
         'OPTIONS': _DB_OPTIONS,
     }
 }
@@ -187,6 +198,14 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Scoped throttles for money-initiation endpoints (per-user; anonymous
+    # abuse-prone public forms are covered by django-ratelimit decorators).
+    # Views opt in with apps.core.throttling.SharedScopedRateThrottle, which
+    # counts in the shared 'ratelimit' cache alias in production and honours
+    # RATELIMIT_ENABLE=False so the test suite isn't throttled by default.
+    'DEFAULT_THROTTLE_RATES': {
+        'payment-initiate': '10/min',
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -412,9 +431,12 @@ if SENTRY_DSN:
         'password', 'secret', 'token', 'authorization', 'api_key', 'apikey',
         'credential', 'cookie', 'ssn', 'curp',
     )
+    # Direct-PII keys stripped from the event's user/extra payloads even with
+    # send_default_pii=False (defence in depth — e.g. a log `extra=` kwarg).
+    _PII_KEYS = ('email', 'first_name', 'last_name', 'username', 'ip_address')
 
     def _scrub_sensitive(event, _hint):
-        """Best-effort removal of secret-looking values before an event is sent."""
+        """Best-effort removal of secrets + user PII before an event is sent."""
         request = event.get('request') or {}
         headers = request.get('headers')
         if isinstance(headers, dict):
@@ -424,15 +446,29 @@ if SENTRY_DSN:
         extra = event.get('extra')
         if isinstance(extra, dict):
             for key in list(extra):
-                if any(s in key.lower() for s in _SENSITIVE_KEYS):
+                lowered = key.lower()
+                if lowered in _PII_KEYS or any(s in lowered for s in _SENSITIVE_KEYS):
                     extra[key] = '[Filtered]'
+        # Keep only the opaque user id — never email/name/IP.
+        user = event.get('user')
+        if isinstance(user, dict):
+            for key in list(user):
+                if key != 'id':
+                    user.pop(key, None)
         return event
 
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration()],
-        environment=env('SENTRY_ENVIRONMENT', default='development' if DEBUG else 'production'),
-        release=env('SENTRY_RELEASE', default=None),
+        # RENDER_ENV can label preview/staging services; explicit SENTRY_ENVIRONMENT wins.
+        environment=env('SENTRY_ENVIRONMENT', default=env(
+            'RENDER_ENV', default='development' if DEBUG else 'production')),
+        # Release tag: explicit SENTRY_RELEASE, else the deployed commit —
+        # GIT_SHA (CI-provided) or RENDER_GIT_COMMIT (set automatically by Render).
+        release=(env('SENTRY_RELEASE', default='')
+                 or env('GIT_SHA', default='')
+                 or env('RENDER_GIT_COMMIT', default='')
+                 or None),
         traces_sample_rate=env.float('SENTRY_TRACES_SAMPLE_RATE', default=0.0),
         send_default_pii=False,
         before_send=_scrub_sensitive,
@@ -448,6 +484,42 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         'LOCATION': 'interlaken-default',
     }
+}
+
+# ── LOGGING ───────────────────────────────────────────────
+# Console-only (Render captures stdout). Every record carries the request id
+# injected by apps.core.request_id (RequestIDFilter); production.py swaps the
+# console handler's formatter to the JSON one for machine-parseable logs.
+LOG_LEVEL = env('LOG_LEVEL', default='INFO')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'request_id': {'()': 'apps.core.request_id.RequestIDFilter'},
+    },
+    'formatters': {
+        # Dev: human-readable single line.
+        'console': {
+            'format': '[{asctime}] {levelname} {name} [rid={request_id}] {message}',
+            'style': '{',
+        },
+        # Prod: one JSON object per line (see production.py).
+        'json': {'()': 'apps.core.request_id.JSONFormatter'},
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['request_id'],
+            'formatter': 'console',
+        },
+    },
+    'root': {'handlers': ['console'], 'level': LOG_LEVEL},
+    'loggers': {
+        # 4xx/5xx summaries from Django's request handler.
+        'django.request': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        # Project apps log at LOG_LEVEL (cron summaries, webhook processing, …).
+        'apps': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+    },
 }
 
 # ── FILE UPLOAD ───────────────────────────────────────────

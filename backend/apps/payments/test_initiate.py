@@ -29,6 +29,29 @@ def test_initiate_rejects_all_unlinked_types(api_client, payment_type):
     assert not Payment.objects.exists()
 
 
+def test_initiate_is_throttled_per_user(api_client, settings):
+    """SharedScopedRateThrottle ('payment-initiate') answers 429 past the rate.
+
+    The throttle runs in DRF initial() — before the serializer — so even the
+    fail-closed 400 responses count toward the window.
+    """
+    settings.RATELIMIT_ENABLE = True
+    settings.REST_FRAMEWORK = {
+        **settings.REST_FRAMEWORK,
+        'DEFAULT_THROTTLE_RATES': {'payment-initiate': '2/min'},
+    }
+    from django.core.cache import cache
+    cache.clear()
+
+    api_client.force_authenticate(user=ParentFactory())
+    url = reverse('payment-initiate')
+    codes = [api_client.post(url, {}, format='json').status_code for _ in range(4)]
+
+    assert codes[:2] == [400, 400]            # normal validation answers
+    assert all(c == 429 for c in codes[2:])   # then throttled per user
+    assert not Payment.objects.exists()
+
+
 def test_find_orphan_payments_reports_and_does_not_mutate(api_client):
     # An old-style orphan: PENDING with no gateway tx id.
     orphan = Payment.objects.create(
