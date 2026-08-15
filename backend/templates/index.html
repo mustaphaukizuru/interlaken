@@ -67,6 +67,11 @@
     <meta name="twitter:description" content="Educación bilingüe de excelencia en Tlalnepantla, Estado de México." />
     <meta name="twitter:image" content="https://interlaken.edu.mx/og-image.png" />
 
+    <!-- Home-only LCP preload: starts the hero image download during HTML
+         parse, in parallel with the JS bundles (external file + defer because
+         the public CSP has no 'unsafe-inline' and must not block parsing). -->
+    <script src="/static/preload-lcp.js" defer></script>
+
     <!-- Fonts: Poppins (display) + Inter (body), loaded once here -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -74,10 +79,10 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/static/assets/index-q8Cj9xXx.js"></script>
-    <link rel="modulepreload" crossorigin href="/static/assets/vendor-CI3ruxnr.js">
-    <link rel="modulepreload" crossorigin href="/static/assets/query-oiPSYn0q.js">
-    <link rel="stylesheet" crossorigin href="/static/assets/index-8_Hez6jF.css">
+    <script type="module" crossorigin src="/static/assets/index-BAWVpij0.js"></script>
+    <link rel="modulepreload" crossorigin href="/static/assets/vendor-Dne7GYaB.js">
+    <link rel="modulepreload" crossorigin href="/static/assets/query-Cq-xxsIV.js">
+    <link rel="stylesheet" crossorigin href="/static/assets/index-B1tdl0Iz.css">
   </head>
   <body>
     <div id="root"></div>
