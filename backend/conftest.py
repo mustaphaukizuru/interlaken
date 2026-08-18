@@ -48,7 +48,6 @@ def _test_settings(settings):
         **getattr(settings, "STORAGES", {}),
         "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
-    settings.STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 
 @pytest.fixture

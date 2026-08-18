@@ -257,7 +257,15 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Django 5.1 REMOVED STATICFILES_STORAGE and DEFAULT_FILE_STORAGE. On Django 6.1
+# both names are silently INERT -- Django ignores unknown settings, so assigning
+# them looks correct, raises nothing, and does nothing. The STORAGES dict is the
+# only way to select a backend. (This is exactly how the S3 media backend below
+# sat dead while uploaded documents went to the container's ephemeral disk.)
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 
 MEDIA_URL = env('MEDIA_URL', default='/media/')
 MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
@@ -274,7 +282,7 @@ MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 # behind the existing role + MEDICAL_DATA consent checks.
 AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default='')
 if AWS_STORAGE_BUCKET_NAME:
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'}
     AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
     AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
     AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL', default='')
