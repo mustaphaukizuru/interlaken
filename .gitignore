@@ -44,6 +44,7 @@ backups/
 # Generated client deliverables (progress report / feature checklist). They are
 # rebuilt from the docs in this folder, so the binaries stay out of git.
 docs/*.docx
+docs/*.pdf
 
 # Local source material (brand PDFs/logos), not app assets
 resources/

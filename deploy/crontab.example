@@ -1,0 +1,56 @@
+# Scheduled jobs for the VPS. Install with:
+#
+#   crontab -e        (as the user that owns /opt/interlaken)
+#
+# Prerequisite, or every line below fails silently into a directory that does
+# not exist:
+#   sudo mkdir -p /var/log/interlaken && sudo chown $USER /var/log/interlaken
+#
+# Real cron honours */5 exactly. GitHub Actions was scheduled every 5 minutes
+# but in practice fired about hourly, so this is a genuine improvement in how
+# quickly a missed cafeteria webhook gets picked up.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+COMPOSE=/opt/interlaken/deploy
+
+# A stock Ubuntu VPS runs on UTC, so "6 AM" here would fire at midnight local
+# time. Pin the zone rather than doing the arithmetic by hand twice a year.
+CRON_TZ=America/Mexico_City
+
+# ── Cafeteria sync, every 5 minutes ─────────────────────────────────────────
+# Order matters: seed opening balances for newly linked students BEFORE polling
+# purchases, or a first purchase can land on a student with no balance row.
+# flock prevents a slow Loyverse call from stacking runs until memory runs out.
+*/5 * * * * cd $COMPOSE && flock -n /tmp/interlaken-loyverse.lock bash -c 'docker compose exec -T app python manage.py sync_balances --no-profiles && docker compose exec -T app python manage.py sync_purchases' >> /var/log/interlaken/loyverse.log 2>&1
+
+# ── Daily tasks, 06:15 local ────────────────────────────────────────────────
+# ';' not '&&' on purpose: these are independent, and one failure must not
+# cancel the reminders that follow it.
+15 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-daily.lock bash -c 'docker compose exec -T app python manage.py expire_stale_payments; docker compose exec -T app python manage.py low_balance_alerts; docker compose exec -T app python manage.py send_booking_reminders; docker compose exec -T app python manage.py dispatch_notifications' >> /var/log/interlaken/daily.log 2>&1
+
+# ── Spending digest, 18:00 local ────────────────────────────────────────────
+# Deliberately separate from the 06:15 block: the digest summarises the day's
+# cafeteria spending, and at 06:15 that window is always empty. It also only
+# does anything when CAFETERIA_PURCHASE_DIGEST is on; with per-purchase alerts
+# enabled (the default) it is a harmless no-op.
+0 18 * * 1-5 cd $COMPOSE && flock -n /tmp/interlaken-digest.lock docker compose exec -T app python manage.py send_spending_digest >> /var/log/interlaken/daily.log 2>&1
+
+# ── Alert if the cafeteria sync stops running ───────────────────────────────
+# Without this a broken sync is invisible for days: the site looks fine and
+# balances just quietly stop moving. If the log has not been touched in 30
+# minutes, something is wrong. Replace `mail` with whatever you actually read.
+*/30 * * * * find /var/log/interlaken/loyverse.log -mmin +30 2>/dev/null | grep -q . && echo "Interlaken: cafeteria sync has not run in 30+ minutes on $(hostname)" | mail -s "Interlaken cron stalled" mustaphaukizuru@gmail.com
+
+# ── Log rotation so the files above cannot fill the disk ────────────────────
+0 3 * * 0 find /var/log/interlaken -name '*.log' -size +50M -exec truncate -s 0 {} \;
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GitHub Actions: disable "Loyverse cafeteria sync" and "scheduled-tasks" once
+# the above is running, or both fire against the same database. The work is
+# idempotent so nothing is double charged, but the Actions runs also execute
+# `migrate`, which can collide with a container restart.
+#
+# KEEP "db-backup" ENABLED. It is the only thing backing up the database, it
+# does not conflict with anything here, and nothing on this VPS replaces it.
+# ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,139 @@
+# Hostinger VPS deployment: Caddy terminates TLS and proxies to the Django
+# container. Postgres is NOT here - the database stays on Supabase, so this box
+# only serves the application.
+#
+#   ./deploy.sh          (from this directory - do not run compose by hand)
+#
+# The app container publishes NO host port. Only Caddy is reachable from the
+# internet; the app is reachable only on the private compose network. That is
+# what makes trusting Caddy's client-IP header safe (see TRUST_PROXY_IP_HEADER).
+
+name: interlaken
+
+x-logging: &logging
+  # Docker's json-file driver is UNBOUNDED by default. Gunicorn logs a line per
+  # request, so without this the disk fills silently and the whole box dies,
+  # taking the school website's neighbour services with it if they share it.
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    build:
+      # The Dockerfile expects the repo root as its build context (it copies
+      # both frontend/ and backend/), so the context climbs out of deploy/.
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        # Baked into the SPA bundle at build time, not read at runtime.
+        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+    restart: unless-stopped
+    env_file: .env
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL          # the image runs as uid 10001 on port 8000; needs nothing
+    environment:
+      # ── The public address is defined ONCE, in .env, as PORTAL_DOMAIN ──────
+      # Django needs it in six different shapes. Deriving them here instead of
+      # listing them in .env means changing the domain is a one-line edit and
+      # cannot leave one of them stale, which would fail as a confusing 400 or
+      # a CORS error rather than an obvious mistake.
+      # (`environment:` wins over `env_file:`, so these are authoritative.)
+      ALLOWED_HOSTS: ${PORTAL_DOMAIN:?set PORTAL_DOMAIN in deploy/.env}
+      CSRF_TRUSTED_ORIGINS: https://${PORTAL_DOMAIN}
+      CORS_ALLOWED_ORIGINS: https://${PORTAL_DOMAIN}
+      FRONTEND_URL: https://${PORTAL_DOMAIN}
+      BACKEND_URL: https://${PORTAL_DOMAIN}
+      # Must match the authorised redirect URI registered in Google Cloud.
+      GOOGLE_REDIRECT_URI: https://${PORTAL_DOMAIN}/auth/google/callback/
+
+      # Behind a proxy, REMOTE_ADDR is Caddy for EVERY visitor, which silently
+      # collapses all key='ip' rate limits into one global bucket and reduces
+      # the axes (username, ip) lockout to username alone - so anyone could
+      # lock out any parent, and ten requests a minute could block every login
+      # in the school. Caddy SETS X-Real-IP (replace, not append) and the app
+      # port is unpublished, so this header cannot be forged by a client.
+      TRUST_PROXY_IP_HEADER: "true"
+      PROXY_IP_HEADER: X-Real-IP
+
+      # Caddy already writes an access log. Gunicorn's duplicate would also put
+      # the Loyverse webhook secret (it lives in the URL path) into the Docker
+      # log in cleartext.
+      GUNICORN_ACCESS_LOG: none
+
+      # Gunicorn workers. KVM 2 has 2 vCPU; 3 sync workers is the safe default.
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
+
+      # Uploads must land on the mounted volume below, never the container's
+      # own filesystem, or they vanish on the next deploy. This is only the
+      # fallback path: once object storage is configured the volume goes unused.
+      MEDIA_ROOT: /data/media
+    volumes:
+      - media:/data/media
+    healthcheck:
+      # SECURE_SSL_REDIRECT is on, so a plain HTTP probe would be answered with
+      # a 301 to https and never reach the view. Send the same X-Forwarded-Proto
+      # Caddy sends, and a Host that satisfies ALLOWED_HOSTS.
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          req = urllib.request.Request(
+              "http://127.0.0.1:8000/healthz",
+              headers={"X-Forwarded-Proto": "https", "Host": "${PORTAL_DOMAIN}"},
+          )
+          sys.exit(0 if urllib.request.urlopen(req, timeout=5).status == 200 else 1)
+      interval: 30s
+      timeout: 10s
+      start_period: 90s   # first boot runs migrations before gunicorn binds
+      retries: 3
+    networks: [internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3. Caddy advertises it via Alt-Svc whether or not this is open, so
+      # without the UDP port browsers race a QUIC connection that can never
+      # complete and fall back, adding latency to the first visit.
+      - "443:443/udp"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE   # the only capability needed to listen on 80/443
+    environment:
+      PORTAL_DOMAIN: ${PORTAL_DOMAIN:?set PORTAL_DOMAIN in deploy/.env}
+      # Caddy fails to start on an empty value here, which takes the whole site
+      # down, so compose refuses to come up instead of half-starting.
+      TLS_EMAIL: ${TLS_EMAIL:?set TLS_EMAIL in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account key live here. Losing this volume
+      # means re-issuing certs and burning Let's Encrypt rate limits, so never
+      # prune it casually.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_started
+    networks: [internal]
+
+volumes:
+  media:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:

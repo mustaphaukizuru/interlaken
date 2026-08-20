@@ -54,6 +54,11 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 # ── MIDDLEWARE ────────────────────────────────────────────
 MIDDLEWARE = [
+    # FIRST: behind a reverse proxy, REMOTE_ADDR is the proxy, so every visitor
+    # looks like one client and axes lockout + all key='ip' rate limits collapse
+    # into a single global bucket. Restores the real IP before anything reads it.
+    # Inert unless TRUST_PROXY_IP_HEADER is on (see apps/core/client_ip.py).
+    'apps.core.client_ip.RealClientIPMiddleware',
     'django.middleware.security.SecurityMiddleware',
     # Generates/propagates X-Request-ID and injects it into log records so one
     # request's log lines can be correlated (apps/core/request_id.py). First so
@@ -142,6 +147,13 @@ AUTHENTICATION_BACKENDS = [
 # endpoint (simplejwt calls authenticate() with the DRF request). Lockout is
 # per username+IP pair, so an attacker can't lock a user out globally and a
 # shared school NAT doesn't lock out everyone at once.
+# Trust the reverse proxy's client-IP header (see apps/core/client_ip.py).
+# MUST stay False unless a proxy that OVERWRITES this header sits in front and
+# the app port is not otherwise reachable, or clients can forge their own IP and
+# bypass every rate limit. Enabled in the VPS deployment; Render sets its own.
+TRUST_PROXY_IP_HEADER = env.bool('TRUST_PROXY_IP_HEADER', default=False)
+PROXY_IP_HEADER = env('PROXY_IP_HEADER', default='X-Real-IP')
+
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = timedelta(minutes=15)
 AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
@@ -257,7 +269,15 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Django 5.1 REMOVED STATICFILES_STORAGE and DEFAULT_FILE_STORAGE. On Django 6.1
+# both names are silently INERT -- Django ignores unknown settings, so assigning
+# them looks correct, raises nothing, and does nothing. The STORAGES dict is the
+# only way to select a backend. (This is exactly how the S3 media backend below
+# sat dead while uploaded documents went to the container's ephemeral disk.)
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 
 MEDIA_URL = env('MEDIA_URL', default='/media/')
 MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
@@ -274,7 +294,7 @@ MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 # behind the existing role + MEDICAL_DATA consent checks.
 AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default='')
 if AWS_STORAGE_BUCKET_NAME:
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'}
     AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
     AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
     AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL', default='')
