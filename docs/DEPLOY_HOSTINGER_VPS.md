@@ -5,7 +5,7 @@ built React SPA), behind Caddy which handles HTTPS. The database is **not** on
 this server: it stays on Supabase. This box only serves the application.
 
 ```
-portal.interlaken.com.mx
+interlaken.edu.mx
         |
    Caddy  :80 :443        automatic Let's Encrypt certificate, auto-renewing
         |
@@ -32,7 +32,7 @@ Collect these. Steps stall without them.
 | VPS IP address | hPanel → VPS → Overview |
 | Root SSH access | hPanel → VPS → SSH access (or the password emailed at setup) |
 | Current Render environment variables | Render dashboard → Environment (copy the values) |
-| DNS access for `interlaken.com.mx` | hPanel → Domains → DNS Zone (you already control this) |
+| DNS access for `interlaken.edu.mx` | Akky (`ns1.akkyservicios.mx`) - this domain is NOT on Hostinger nameservers |
 
 Two Render values must be copied **verbatim**, not regenerated:
 
@@ -156,23 +156,22 @@ Leave `AWS_STORAGE_BUCKET_NAME` empty for now if Supabase Storage is not set up.
 Uploads then land on the `media` Docker volume, which survives deploys. Switching
 to object storage later is just filling in those four lines and redeploying.
 
-## Step 5 — Point the DNS
+## Step 5 — Confirm the DNS
 
-In hPanel → Domains → `interlaken.com.mx` → DNS Zone, add:
-
-```
-Type: A      Name: portal      Points to: YOUR_VPS_IP      TTL: 3600
-```
-
-Nothing else changes. The school website on the apex and `www` is untouched.
-
-Wait until it resolves before continuing:
+Already done: both names point at the VPS.
 
 ```bash
-dig +short portal.interlaken.com.mx
+dig +short interlaken.edu.mx        # expect 93.188.162.163
+dig +short www.interlaken.edu.mx    # expect 93.188.162.163
 ```
 
-When that prints your VPS IP, move on. It is usually a few minutes.
+The domain is delegated to **Akky** (`ns1.akkyservicios.mx`), not Hostinger, so
+any future record change happens there rather than in hPanel.
+
+Because these are the live school addresses rather than a spare subdomain, the
+old site is already gone from them: until this deploy succeeds, visitors get the
+VPS's default page. That makes the deploy time-sensitive in a way a subdomain
+would not have been.
 
 ## Step 6 — Deploy
 
@@ -191,7 +190,7 @@ separate migrate step.
 ## Step 7 — Verify
 
 ```bash
-curl -I https://portal.interlaken.com.mx/healthz
+curl -I https://interlaken.edu.mx/healthz
 ```
 
 You want `HTTP/2 200`. Then open the site in a browser and confirm the padlock.
@@ -199,7 +198,7 @@ You want `HTTP/2 200`. Then open the site in a browser and confirm the padlock.
 Check that HTTP is redirected rather than served:
 
 ```bash
-curl -sI http://portal.interlaken.com.mx | head -1     # expect 308
+curl -sI http://interlaken.edu.mx | head -1     # expect 308
 ```
 
 Then sign in as a parent and confirm the cafeteria balance loads. That single
@@ -212,8 +211,8 @@ updating. Skipping any one of these breaks that feature silently.
 
 | Service | What to change | Where |
 |---|---|---|
-| **Google sign-in** | Add `https://portal.interlaken.com.mx/auth/google/callback/` as an authorised redirect URI | Google Cloud console → Credentials |
-| **Loyverse** | Point the receipts webhook at `https://portal.interlaken.com.mx/api/v1/cafeteria/loyverse/webhook/<SECRET>/` | Loyverse → Integrations → Webhooks |
+| **Google sign-in** | Add `https://interlaken.edu.mx/auth/google/callback/` as an authorised redirect URI | Google Cloud console → Credentials |
+| **Loyverse** | Point the receipts webhook at `https://interlaken.edu.mx/api/v1/cafeteria/loyverse/webhook/<SECRET>/` | Loyverse → Integrations → Webhooks |
 | **Global Payments** | Update the webhook and return URLs | Merchant dashboard |
 | **Banorte** | Update the webhook and return URLs | Merchant dashboard |
 
@@ -377,7 +376,7 @@ so leaving an admin password sitting in a file on disk buys nothing.
 ## Troubleshooting
 
 **The certificate is not issued.** Caddy needs port 80 reachable from the
-internet and DNS already pointing here. Check `dig +short portal.interlaken.com.mx`
+internet and DNS already pointing here. Check `dig +short interlaken.edu.mx`
 matches the VPS IP, that `ufw status` allows 80, and then
 `docker compose logs caddy`.
 

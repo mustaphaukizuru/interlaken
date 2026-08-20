@@ -1,6 +1,6 @@
-# Caddy obtains and renews the Let's Encrypt certificate automatically. There is
-# no certbot and no renewal cron to forget; that is the reason Caddy is here
-# rather than nginx.
+# Caddy obtains and renews the Let's Encrypt certificates automatically. There
+# is no certbot and no renewal cron to forget; that is the reason Caddy is here
+# rather than nginx or the OpenLiteSpeed the VPS template shipped with.
 
 {
 	# Caddy will not start if this is empty, so compose refuses to bring the
@@ -8,6 +8,17 @@
 	email {$TLS_EMAIL}
 }
 
+# ── www redirects to the apex ───────────────────────────────────────────────
+# The app declares https://interlaken.edu.mx as its canonical URL in its own
+# metadata and structured data, so serving both names would split search
+# ranking and produce two URLs for every page. Its own certificate is issued
+# here too, otherwise visitors typing www would hit a TLS warning before the
+# redirect could ever run.
+www.{$PORTAL_DOMAIN} {
+	redir https://{$PORTAL_DOMAIN}{uri} permanent
+}
+
+# ── the site ────────────────────────────────────────────────────────────────
 {$PORTAL_DOMAIN} {
 	encode zstd gzip
 
@@ -41,7 +52,10 @@
 	}
 
 	# Django emits its own HSTS header (one year, includeSubDomains), so Caddy
-	# must not add a second one.
+	# must not add a second one. Note this is served from the APEX: any future
+	# subdomain of interlaken.edu.mx will be forced to HTTPS by browsers that
+	# have visited this site. Nothing else exists under the domain today (no
+	# mail, webmail or LMS host), which is what makes that safe.
 
 	log {
 		output file /data/access.log {
