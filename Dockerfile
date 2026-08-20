@@ -64,5 +64,18 @@ RUN SECRET_KEY=build-only \
     python manage.py collectstatic --noinput
 
 RUN chmod +x ./entrypoint.sh
+
+# Drop root. This image is internet-facing and accepts unauthenticated POSTs
+# (contact form, admissions pre-registro, payment and Loyverse webhooks), so a
+# single RCE in any dependency would otherwise land as uid 0 -- able to rewrite
+# the application code in place (surviving every restart) and one container
+# escape away from root on the host. Nothing here needs root at runtime: the
+# cache is in-memory, logs go to stdout, and the only writable path is the
+# media directory created below. Port 8000 is unprivileged.
+# The uid also owns /data/media so a FRESH named volume inherits that ownership;
+# an EXISTING volume written to as root must be chowned once at cutover.
+RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin app  && mkdir -p /data/media  && chown -R app:app /app /data/media
+USER app
+
 EXPOSE 8000
 CMD ["./entrypoint.sh"]

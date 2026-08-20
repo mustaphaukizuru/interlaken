@@ -1,0 +1,52 @@
+# Caddy obtains and renews the Let's Encrypt certificate automatically. There is
+# no certbot and no renewal cron to forget; that is the reason Caddy is here
+# rather than nginx.
+
+{
+	# Caddy will not start if this is empty, so compose refuses to bring the
+	# stack up with an unset TLS_EMAIL rather than leaving the site dark.
+	email {$TLS_EMAIL}
+}
+
+{$PORTAL_DOMAIN} {
+	encode zstd gzip
+
+	# The Loyverse receipts webhook authenticates with a shared secret carried
+	# in the URL PATH (Loyverse's dashboard webhooks cannot send headers). The
+	# access log records the URI, so logging this route would write a live
+	# credential in cleartext into the same volume that holds the TLS private
+	# key - the volume most likely to be snapshotted or copied off the box.
+	# Anyone holding that secret can post forged receipts and move real money
+	# in the cafeteria ledger, so this route is excluded from the log entirely.
+	@loyverse_webhook path /api/v1/cafeteria/loyverse/webhook/*
+	log_skip @loyverse_webhook
+
+	reverse_proxy app:8000 {
+		# Django runs with SECURE_SSL_REDIRECT and trusts
+		# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https').
+		# Without this header every request would be redirected to https
+		# forever, in a loop. Caddy sets it by default; it is written out
+		# explicitly so a future edit cannot silently remove it.
+		header_up X-Forwarded-Proto {scheme}
+
+		# USE_X_FORWARDED_HOST is NOT enabled, so Django validates the real
+		# Host header against ALLOWED_HOSTS. Pass the original host through.
+		header_up Host {host}
+
+		# The app reads this to restore the true client address (see
+		# apps/core/client_ip.py). This is a SET, not an append, so a value
+		# supplied by the client is discarded and cannot forge an identity.
+		# Rate limiting and brute-force lockout both depend on it.
+		header_up X-Real-IP {remote_host}
+	}
+
+	# Django emits its own HSTS header (one year, includeSubDomains), so Caddy
+	# must not add a second one.
+
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}
