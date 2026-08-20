@@ -43,6 +43,42 @@ Two Render values must be copied **verbatim**, not regenerated:
 
 ---
 
+## Step 0 — Clear the preinstalled web server
+
+Hostinger's **"OpenLiteSpeed and Django"** template ships a running LiteSpeed
+server holding ports 80 and 443. Caddy cannot bind them while it is there, and
+the failure is confusing: Caddy exits, the app container looks healthy, and the
+site is simply unreachable.
+
+Confirm what is listening:
+
+```bash
+sudo ss -tulpn | grep -E ':(80|443)'
+```
+
+Then stop it permanently. `mask` is deliberate: `disable` alone lets a package
+update or a dependency start it again, and it would then fight Caddy for the
+port on a reboot.
+
+```bash
+sudo systemctl disable --now lshttpd 2>/dev/null || sudo /usr/local/lsws/bin/lswsctrl stop
+sudo systemctl mask lshttpd 2>/dev/null || true
+```
+
+Verify both ports are free before going further. This must print nothing:
+
+```bash
+sudo ss -tulpn | grep -E ':(80|443)'
+```
+
+The template's sample Django app is unrelated to ours and can be left alone;
+nothing references it once LiteSpeed is stopped.
+
+> Alternative, and slightly cleaner if the server is brand new: reinstall the OS
+> from hPanel with a **plain Ubuntu 24.04** template. That removes the unused
+> LiteSpeed stack entirely rather than leaving it dormant. It also resets root
+> access, so redo Step 1 afterwards.
+
 ## Step 1 — Secure the server
 
 Log in as root the first time:
