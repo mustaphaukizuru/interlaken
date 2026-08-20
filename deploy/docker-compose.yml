@@ -44,8 +44,10 @@ services:
       # cannot leave one of them stale, which would fail as a confusing 400 or
       # a CORS error rather than an obvious mistake.
       # (`environment:` wins over `env_file:`, so these are authoritative.)
-      ALLOWED_HOSTS: ${PORTAL_DOMAIN:?set PORTAL_DOMAIN in deploy/.env}
-      CSRF_TRUSTED_ORIGINS: https://${PORTAL_DOMAIN}
+      # www is redirected to the apex by Caddy and normally never reaches
+      # Django, but it is listed so a direct hit cannot 400.
+      ALLOWED_HOSTS: ${PORTAL_DOMAIN:?set PORTAL_DOMAIN in deploy/.env},www.${PORTAL_DOMAIN}
+      CSRF_TRUSTED_ORIGINS: https://${PORTAL_DOMAIN},https://www.${PORTAL_DOMAIN}
       CORS_ALLOWED_ORIGINS: https://${PORTAL_DOMAIN}
       FRONTEND_URL: https://${PORTAL_DOMAIN}
       BACKEND_URL: https://${PORTAL_DOMAIN}
