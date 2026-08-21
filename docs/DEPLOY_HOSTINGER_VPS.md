@@ -493,11 +493,19 @@ Three separate things need backing up, and only one of them is handled for you.
 
 | What | Where it lives | Who backs it up |
 |---|---|---|
-| School data (parents, payments, ledger) | the external database (or `pgdata` here, if you moved it) | `deploy/backup-db.sh`, nightly at 02:30 |
+| School data (parents, payments, ledger) | the external database (or `pgdata` here, if you moved it) | two: `deploy/backup-db.sh` on this box, and the `db-backup` GitHub workflow off-site, both nightly |
 | Uploaded documents | the `media` Docker volume on this VPS | **nobody, until you set this up** |
 | TLS certificate | the `caddy_data` volume | re-issued automatically if lost |
 
-**The database backup runs from this box.** `backup-db.sh` (installed by the
+**Two backups, on purpose.** The `db-backup` GitHub workflow dumps the managed
+database nightly and keeps the gzip as a build artifact for 30 days — somewhere
+that is not this VPS, which is the only property that helps when the VPS is what
+failed. It opens an issue if it fails, so a silent stop is not possible. It only
+works while the database is reachable from the internet: if you ever move the
+database onto this box, delete that workflow, because from then on the cron
+below is the only thing that can take a dump at all.
+
+**And the backup that runs from this box.** `backup-db.sh` (installed by the
 crontab in Step 9) dumps whichever database the app is actually using — it reads
 `DB_HOST` the same way the app does, so it cannot end up backing up the wrong,
 empty one. It always runs pg_dump from a Postgres 17 image so client and server
