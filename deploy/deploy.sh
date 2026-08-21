@@ -41,6 +41,18 @@ for var in DB_NAME DB_USER DB_PASSWORD; do
   [[ -n "${!var:-}" ]] || fail "$var is not set in .env (the db service needs it; see env.example)"
 done
 
+# Say out loud which database this deploy will talk to. The two are one line
+# apart in .env, and picking the wrong one shows up as a site that works
+# perfectly and is completely empty.
+if [[ -n "${DB_HOST:-}" && "$DB_HOST" != "db" ]]; then
+  echo "  database: EXTERNAL ($DB_HOST) - the local db container will run but go unused."
+  echo "            To move the data onto this box, follow 'Moving the data off"
+  echo "            Supabase' in docs/DEPLOY_HOSTINGER_VPS.md, then delete DB_HOST"
+  echo "            from .env."
+else
+  echo "  database: local db container (pgdata volume on this box)."
+fi
+
 # DNS must already point here or Caddy cannot complete the ACME challenge.
 if command -v dig >/dev/null; then
   resolved="$(dig +short "$PORTAL_DOMAIN" | tail -1)"

@@ -272,12 +272,21 @@ docker run --rm -e PGPASSWORD='<old DB_PASSWORD>' postgres:17-alpine   pg_dump -
 gunzip -t /root/supabase-final.sql.gz && echo "dump is a valid gzip"
 ```
 
-**3. Point `.env` at the local database** — set `DB_NAME`, `DB_USER` and a fresh
-`DB_PASSWORD` (`openssl rand -base64 32`). `DB_HOST`, `DB_PORT` and `DB_SSLMODE`
-come from `docker-compose.yml`; delete any of those three left in `.env` so the
-old Supabase host cannot come back.
+**3. Set the local credentials, but do NOT flip the switch yet** — set
+`DB_NAME`, `DB_USER` and a fresh `DB_PASSWORD` (`openssl rand -base64 32`).
+Leave `DB_HOST` alone for the moment: while it still names the Supabase host,
+every deploy keeps reading Supabase, which is what makes this reversible.
 
-**4. Start the database and restore into it:**
+`deploy.sh` prints which database it is about to use on every run, so there is
+no guessing:
+
+```
+  database: EXTERNAL (aws-0-….pooler.supabase.com) - the local db container will run but go unused.
+  database: local db container (pgdata volume on this box).
+```
+
+**4. Start the database and restore into it** (still pointing at Supabase, so
+the site keeps serving while this runs):
 
 ```bash
 docker compose up -d db
@@ -294,10 +303,13 @@ docker compose exec db psql -U <DB_USER> -d <DB_NAME> -c   "SELECT (SELECT count
           (SELECT count(*) FROM payments_payment) AS payments;"
 ```
 
-**6. Bring it back up:**
+**6. Flip the switch and bring it back up.** Delete the `DB_HOST` line from
+`.env` (and `DB_PORT`/`DB_SSLMODE` if present) — that, and only that, is what
+moves production onto the local database:
 
 ```bash
-./deploy.sh                                      # migrate runs at boot; should be a no-op
+sed -i '/^DB_HOST=/d;/^DB_PORT=/d;/^DB_SSLMODE=/d' .env
+./deploy.sh                                      # prints "database: local db container"; migrate is a no-op
 crontab /tmp/cron.bak                            # restore the scheduled jobs
 ./backup-db.sh                                   # first local backup, immediately
 ```
