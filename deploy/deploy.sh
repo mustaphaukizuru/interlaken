@@ -44,6 +44,16 @@ done
 # Say out loud which database this deploy will talk to. The two are one line
 # apart in .env, and picking the wrong one shows up as a site that works
 # perfectly and is completely empty.
+localdb_enabled=false
+[[ "${COMPOSE_FILE:-}" == *docker-compose.localdb.yml* ]] && localdb_enabled=true
+
+if [[ -z "${DB_HOST:-}" ]] && ! $localdb_enabled; then
+  fail "no database is configured: .env has no DB_HOST and the local-db overlay
+       is not enabled. Set DB_HOST to your database host, or add
+       COMPOSE_FILE=docker-compose.yml:docker-compose.localdb.yml to .env to run
+       Postgres on this box (see env.example)."
+fi
+
 if [[ -n "${DB_HOST:-}" && "$DB_HOST" != "db" ]]; then
   echo "  database: EXTERNAL ($DB_HOST) - the local db container will run but go unused."
   echo "            To move the data onto this box, follow 'Moving the data off"

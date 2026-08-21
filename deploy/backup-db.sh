@@ -23,15 +23,23 @@ MIN_BYTES="${BACKUP_MIN_BYTES:-10240}"
 set -a; source ./.env; set +a
 : "${DB_NAME:?DB_NAME not set in .env}"
 : "${DB_USER:?DB_USER not set in .env}"
+: "${DB_PASSWORD:?DB_PASSWORD not set in .env}"
 
 mkdir -p "$DEST"
 out="$DEST/db-$(date +%F-%H%M).sql.gz"
 
+# Back up whichever database the app actually reads, decided exactly the way
+# the app decides it (docker-compose.yml: DB_HOST defaults to the db service).
+# Getting this wrong is the worst kind of backup bug: it succeeds every night
+# against the wrong, empty database and nobody finds out until a restore.
 # --clean --if-exists so the dump can be replayed onto a non-empty database.
-docker compose exec -T db \
-  pg_dump --no-owner --no-privileges --clean --if-exists \
-          -U "$DB_USER" "$DB_NAME" \
-  | gzip > "$out"
+if [[ -n "${DB_HOST:-}" && "$DB_HOST" != "db" ]]; then
+  target="external ($DB_HOST)"
+  docker run --rm -e PGPASSWORD="$DB_PASSWORD" postgres:17-alpine     pg_dump --no-owner --no-privileges --clean --if-exists             -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME"     | gzip > "$out"
+else
+  target="local db container"
+  docker compose exec -T db     pg_dump --no-owner --no-privileges --clean --if-exists             -U "$DB_USER" "$DB_NAME"     | gzip > "$out"
+fi
 
 size=$(stat -c%s "$out")
 if (( size < MIN_BYTES )); then
@@ -43,7 +51,7 @@ fi
 # Rotate only after a verified-good dump exists.
 find "$DEST" -name 'db-*.sql.gz' -mtime "+$KEEP_DAYS" -delete
 
-echo "$(date -Is) backup ok: $out ($((size / 1024)) KB)"
+echo "$(date -Is) backup ok: $out ($((size / 1024)) KB) from $target"
 
 # A backup that only exists on the machine it protects is not a backup. Set
 # BACKUP_REMOTE (e.g. user@host:/path or an rclone remote) to copy it off.
