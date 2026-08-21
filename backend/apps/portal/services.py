@@ -3,7 +3,7 @@ portal/services.py — the single place notifications are created & sent.
 
 Both cafeteria (purchase / low-balance alerts) and bookings (visit confirmations)
 route through here. In dev, ``EMAIL_BACKEND`` is the console backend, so emails
-print to stdout; in prod it's cPanel SMTP (see DEPLOYMENT.md §2/§4).
+print to stdout; in prod it's SMTP configured in deploy/.env (see DEPLOY_HOSTINGER_VPS.md).
 
 WhatsApp: when ``whatsapp=True`` and the user has a ``whatsapp`` number, we call
 ``apps.whatsapp.services.send_text`` (fail-soft). If Cloud API creds are unset,

@@ -18,7 +18,7 @@ This ties together all planning docs and adds everything else worth doing, prior
 | Doc | Covers |
 |---|---|
 | [STATUS_REPORT.md](STATUS_REPORT.md) | Current state, confirmed bugs (login broken), security holes, hygiene |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | GoDaddy cPanel/Passenger, MySQL, cron, SSL, Google OAuth prod, go-live checklist |
+| [DEPLOY_HOSTINGER_VPS.md](DEPLOY_HOSTINGER_VPS.md) | Hostinger VPS: Docker + Caddy + Postgres, cron, TLS, backups, rollback |
 | [DESIGN.md](DESIGN.md) | Design system: tokens, component patterns, motion, a11y |
 | [BRAND_LOGO_GUIDE.md](BRAND_LOGO_GUIDE.md) | Official logo usage, favicon/PWA, palette reconciliation |
 | [CAFETERIA_WALLET_SPEC.md](CAFETERIA_WALLET_SPEC.md) | Loyverse wallet: purchase alerts, balance/history, top-ups |

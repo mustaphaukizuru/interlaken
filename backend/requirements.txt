@@ -20,8 +20,8 @@ social-auth-core==5.1.0
 PyJWT==2.13.0
 
 # Storage & Files
+# Pillow is reportlab's image dependency (PDF receipts), not a direct import.
 Pillow==12.3.0
-python-magic==0.4.27
 # Durable object storage for uploaded media (admissions documents) — the
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
@@ -33,7 +33,6 @@ pywebpush==2.4.0
 
 # HTTP & APIs
 requests==2.34.2
-httpx==0.28.1
 
 # Google Calendar (service-account writes for confirmed bookings — Prompt 13).
 # Fail-soft: bookings never depend on these being importable/configured.
@@ -44,14 +43,11 @@ google-auth==2.56.3
 # webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
 # globalpayments-api==1.0.0 pin was unused and isn't even on PyPI.)
 
-# Email
-django-anymail==15.1
-
-# Utilities
-python-decouple==3.8
-# NOTE: Celery/Redis removed — the cPanel shared host cannot run background
-# workers or a Redis broker. Scheduled jobs run via cron (see Prompt 08 /
-# DEPLOYMENT.md), not celery beat.
+# NOTE: Celery/Redis removed — scheduled jobs run via cron on the VPS
+# (deploy/crontab.example), not celery beat.
+# NOTE: django-anymail, python-decouple, python-magic and httpx were removed on
+# 2026-08-21: nothing imported them. Email goes through Django's SMTP backend,
+# configuration through django-environ, and HTTP through requests.
 
 # Security
 django-ratelimit==4.1.0

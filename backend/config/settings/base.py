@@ -409,7 +409,7 @@ TUITION_REMINDER_OVERDUE_DAYS = env.int('TUITION_REMINDER_OVERDUE_DAYS', default
 # Server-side calendar writes for confirmed bookings use a *service account*
 # (NOT the OAuth login client). Both empty → calendar integration is a no-op and
 # bookings still succeed (fail-soft, picked up later by `manage.py sync_calendar`).
-# See BOOKING_CALENDAR_SPEC.md §3 / DEPLOYMENT.md §8 for the GCP setup. Never
+# See BOOKING_CALENDAR_SPEC.md §3 for the GCP setup. Never
 # commit the key file — GOOGLE_CALENDAR_SA_KEY is a path read from the env.
 GOOGLE_CALENDAR_ID = env('GOOGLE_CALENDAR_ID', default='')
 GOOGLE_CALENDAR_SA_KEY = env('GOOGLE_CALENDAR_SA_KEY', default='')
@@ -419,7 +419,7 @@ GOOGLE_CALENDAR_SA_KEY = env('GOOGLE_CALENDAR_SA_KEY', default='')
 # button — zero external setup. Tier 2 (conversational Cloud API bot) is behind
 # the keys below; all empty → the webhook still verifies signatures and answers
 # Meta's handshake, but outbound sends are no-ops (no crash). See
-# BOOKING_CALENDAR_SPEC.md §5 / DEPLOYMENT.md §9 for the Meta WABA setup.
+# BOOKING_CALENDAR_SPEC.md §5 for the Meta WABA setup.
 WHATSAPP_NUMBER = env('WHATSAPP_NUMBER', default='')
 # Meta WhatsApp Business (Cloud API) credentials — Tier 2 self-service booking.
 WHATSAPP_TOKEN = env('WHATSAPP_TOKEN', default='')            # permanent/system-user access token

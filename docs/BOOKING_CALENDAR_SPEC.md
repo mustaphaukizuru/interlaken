@@ -1,6 +1,6 @@
 # Colegio Interlaken — Booking, Google Calendar & WhatsApp Spec
 
-**Generated:** 2026-07-07 · Companion to [DEPLOYMENT.md](DEPLOYMENT.md), [STATUS_REPORT.md](STATUS_REPORT.md)
+**Generated:** 2026-07-07 · Companion to [DEPLOY_HOSTINGER_VPS.md](DEPLOY_HOSTINGER_VPS.md), [STATUS_REPORT.md](STATUS_REPORT.md)
 
 **Goal:** parents can book a school visit in **two situations**, the **admin controls availability**, confirmed bookings land on **Google Calendar**, and parents can also book **from WhatsApp**.
 
@@ -73,7 +73,7 @@ class Booking:
 > `sync_booking_cancelled` lifecycle helpers), wired into `bookings/views.py`
 > (create/confirm → event, cancel → delete) and the `sync_calendar` retry command.
 > **Fail-soft:** a booking never fails on a calendar error. **Manual GCP + env setup
-> is required** for events to actually appear — see [DEPLOYMENT.md §8](DEPLOYMENT.md#8-google-calendar-for-bookings-service-account--prompt-13).
+> is required** for events to actually appear — set `GOOGLE_CALENDAR_ID` and `GOOGLE_CALENDAR_SA_KEY` in `deploy/.env`.
 
 **Recommended: a service account writing to a shared school calendar** (server-side, no per-parent OAuth, cron-friendly).
 
