@@ -1,0 +1,721 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for frontend/scripts/check-budgets.mjs</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">frontend/scripts</a> check-budgets.mjs</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/212</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/212</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >#!/usr/bin/env node</span></span></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * check-budgets.mjs — CI performance-budget gate (see docs/PERFORMANCE.md).</span>
+<span class="cstat-no" title="statement not covered" > *</span>
+<span class="cstat-no" title="statement not covered" > * Reads dist/.vite/manifest.json (build.manifest: true) after `npm run build`</span>
+<span class="cstat-no" title="statement not covered" > * and computes, for each budgeted PUBLIC route, the gzipped total of every JS</span>
+<span class="cstat-no" title="statement not covered" > * chunk a cold visit to that route downloads:</span>
+<span class="cstat-no" title="statement not covered" > *</span>
+<span class="cstat-no" title="statement not covered" > *   entry closure (index + vendor + query, via &lt;script&gt;/modulepreload)</span>
+<span class="cstat-no" title="statement not covered" > *   + the route's lazy page chunk and its static-import closure</span>
+<span class="cstat-no" title="statement not covered" > *   + chunks the page is known to eagerly dynamic-import on mount</span>
+<span class="cstat-no" title="statement not covered" > *     (EAGER_DYNAMIC below — e.g. the framer-motion engine on the home page).</span>
+<span class="cstat-no" title="statement not covered" > *</span>
+<span class="cstat-no" title="statement not covered" > * Fails (exit 1) when:</span>
+<span class="cstat-no" title="statement not covered" > *   1. a budgeted route's total exceeds its budget (default 150 kB gz;</span>
+<span class="cstat-no" title="statement not covered" > *      documented overrides in ROUTE_BUDGET_OVERRIDES),</span>
+<span class="cstat-no" title="statement not covered" > *   2. any single emitted JS chunk exceeds CHUNK_CAP_KB (120 kB gz) without an</span>
+<span class="cstat-no" title="statement not covered" > *      entry in CHUNK_ALLOWLIST,</span>
+<span class="cstat-no" title="statement not covered" > *   3. a portal/staff/admin-only chunk (FORBIDDEN_ON_PUBLIC) appears in a</span>
+<span class="cstat-no" title="statement not covered" > *      public route's closure — catches import-graph leaks even when the</span>
+<span class="cstat-no" title="statement not covered" > *      budget still happens to pass,</span>
+<span class="cstat-no" title="statement not covered" > *   4. the manifest or a listed route module is missing (so file renames force</span>
+<span class="cstat-no" title="statement not covered" > *      this map to be updated instead of silently skipping the check).</span>
+<span class="cstat-no" title="statement not covered" > *</span>
+<span class="cstat-no" title="statement not covered" > * Sizes are gzip level 9 of the emitted files; they differ slightly from the</span>
+<span class="cstat-no" title="statement not covered" > * numbers vite prints (level 6) — the budget tracks THIS script's numbers.</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >import { readFileSync, readdirSync, existsSync } from 'node:fs';</span>
+<span class="cstat-no" title="statement not covered" >import { gzipSync } from 'node:zlib';</span>
+<span class="cstat-no" title="statement not covered" >import { join, dirname } from 'node:path';</span>
+<span class="cstat-no" title="statement not covered" >import { fileURLToPath } from 'node:url';</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');</span>
+<span class="cstat-no" title="statement not covered" >const MANIFEST_PATH = join(DIST, '.vite', 'manifest.json');</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/** Default budget for every budgeted public route, kB gzipped. */</span>
+<span class="cstat-no" title="statement not covered" >const DEFAULT_BUDGET_KB = 150;</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/** Hard cap for any single emitted JS chunk, kB gzipped. */</span>
+<span class="cstat-no" title="statement not covered" >const CHUNK_CAP_KB = 120;</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Public routes under budget → their page module in the manifest.</span>
+<span class="cstat-no" title="statement not covered" > * If a page file is renamed/moved, update the path here (the script fails</span>
+<span class="cstat-no" title="statement not covered" > * loudly on a missing key rather than skipping it).</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >const PUBLIC_ROUTES = {</span>
+<span class="cstat-no" title="statement not covered" >  '/': 'src/pages/public/HomePage.tsx',</span>
+<span class="cstat-no" title="statement not covered" >  '/admisiones': 'src/pages/public/AdmissionsPage.tsx',</span>
+<span class="cstat-no" title="statement not covered" >  '/admisiones/costos': 'src/pages/public/CostosPage.tsx',</span>
+<span class="cstat-no" title="statement not covered" >};</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Chunks a route eagerly dynamic-imports on mount (they download on every cold</span>
+<span class="cstat-no" title="statement not covered" > * visit, so they count toward the route's total even though they are not in</span>
+<span class="cstat-no" title="statement not covered" > * its static closure). Home: &lt;LazyMotion features&gt; fetches the framer-motion</span>
+<span class="cstat-no" title="statement not covered" > * engine (lib/motionFeatures) immediately after render.</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >const EAGER_DYNAMIC = {</span>
+<span class="cstat-no" title="statement not covered" >  '/': ['src/lib/motionFeatures.ts'],</span>
+<span class="cstat-no" title="statement not covered" >};</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * ALLOWLIST — documented, deliberate exceptions to DEFAULT_BUDGET_KB.</span>
+<span class="cstat-no" title="statement not covered" > * Raising a number here must be a reviewed decision, never a drive-by fix.</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >const ROUTE_BUDGET_OVERRIDES = {</span>
+<span class="cstat-no" title="statement not covered" >  // Home ships the framer-motion entrance/scroll animations by design</span>
+<span class="cstat-no" title="statement not covered" >  // (HomePage chunk carries the m/LazyMotion runtime, plus the deferred</span>
+<span class="cstat-no" title="statement not covered" >  // ~14.5 kB gz motionFeatures engine — see src/lib/motion.tsx). That's</span>
+<span class="cstat-no" title="statement not covered" >  // ~30 kB gz of intentional motion; dropping framer for CSS reveals would</span>
+<span class="cstat-no" title="statement not covered" >  // reclaim it. Measured 2026-08: ~162 kB gz total.</span>
+<span class="cstat-no" title="statement not covered" >  '/': { budgetKb: 170, reason: 'intentional framer-motion animations (~30 kB gz)' },</span>
+<span class="cstat-no" title="statement not covered" >};</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * ALLOWLIST — single chunks allowed to exceed CHUNK_CAP_KB, keyed by the</span>
+<span class="cstat-no" title="statement not covered" > * chunk's name prefix (file name up to the content hash). Currently empty:</span>
+<span class="cstat-no" title="statement not covered" > * the largest chunk today is AreaChart (~90 kB gz). Add entries with a reason.</span>
+<span class="cstat-no" title="statement not covered" > * Example: { prefix: 'AreaChart', maxKb: 130, reason: 'recharts core' }</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >const CHUNK_ALLOWLIST = [];</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/** Chunk-name fragments that must never appear in a public route's closure. */</span>
+<span class="cstat-no" title="statement not covered" >const FORBIDDEN_ON_PUBLIC = [</span>
+<span class="cstat-no" title="statement not covered" >  'AreaChart',        // recharts — portal/staff/admin only</span>
+<span class="cstat-no" title="statement not covered" >  'useChartEntrance', // recharts core + es-toolkit</span>
+<span class="cstat-no" title="statement not covered" >  'ChartsSection',    // staff analytics</span>
+<span class="cstat-no" title="statement not covered" >  'KpiRow',           // staff analytics</span>
+<span class="cstat-no" title="statement not covered" >  'schemas',          // zod + react-hook-form (public FORM pages only — never home/costos/admisiones)</span>
+<span class="cstat-no" title="statement not covered" >  'PortalLayout',     // authenticated chrome (sidebar, notifications, date-fns es locale)</span>
+<span class="cstat-no" title="statement not covered" >  'CredencialPage',   // jsbarcode + qrcode</span>
+<span class="cstat-no" title="statement not covered" >];</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >// ── helpers ────────────────────────────────────────────────────────────────</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >function fail(msg) {</span>
+<span class="cstat-no" title="statement not covered" >  console.error(`\nBUDGET CHECK FAILED: ${msg}`);</span>
+<span class="cstat-no" title="statement not covered" >  process.exitCode = 1;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >if (!existsSync(MANIFEST_PATH)) {</span>
+<span class="cstat-no" title="statement not covered" >  console.error(`Missing ${MANIFEST_PATH} — run \`npm run build\` first (build.manifest must stay enabled in vite.config.ts).`);</span>
+<span class="cstat-no" title="statement not covered" >  process.exit(1);</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" >const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >const gzCache = new Map();</span>
+<span class="cstat-no" title="statement not covered" >function gzKb(file) {</span>
+<span class="cstat-no" title="statement not covered" >  if (!gzCache.has(file)) {</span>
+<span class="cstat-no" title="statement not covered" >    const abs = join(DIST, file);</span>
+<span class="cstat-no" title="statement not covered" >    if (!existsSync(abs)) {</span>
+<span class="cstat-no" title="statement not covered" >      fail(`chunk listed in manifest but missing from dist: ${file}`);</span>
+<span class="cstat-no" title="statement not covered" >      gzCache.set(file, 0);</span>
+<span class="cstat-no" title="statement not covered" >    } else {</span>
+<span class="cstat-no" title="statement not covered" >      gzCache.set(file, gzipSync(readFileSync(abs), { level: 9 }).length / 1024);</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" >  return gzCache.get(file);</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Resolve a source path to its manifest key. Usually the src path itself; but</span>
+<span class="cstat-no" title="statement not covered" > * when a lazy page chunk absorbs a module that another chunk statically</span>
+<span class="cstat-no" title="statement not covered" > * imports (e.g. framer-motion lives inside the HomePage chunk and</span>
+<span class="cstat-no" title="statement not covered" > * motionFeatures imports it), Rollup drops the facade and the manifest keys</span>
+<span class="cstat-no" title="statement not covered" > * the chunk as "_&lt;Name&gt;-&lt;hash&gt;.js" instead. Fall back to matching the emitted</span>
+<span class="cstat-no" title="statement not covered" > * chunk name, and fail loudly if neither resolves (renames must update the map).</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >function resolveKey(srcPath) {</span>
+<span class="cstat-no" title="statement not covered" >  if (manifest[srcPath]) return srcPath;</span>
+<span class="cstat-no" title="statement not covered" >  const base = srcPath.split('/').pop().replace(/\.(tsx?|jsx?)$/, '');</span>
+<span class="cstat-no" title="statement not covered" >  const matches = Object.entries(manifest).filter(</span>
+<span class="cstat-no" title="statement not covered" >    ([, v]) =&gt; typeof v.file === 'string' &amp;&amp; v.file.startsWith(`assets/${base}-`),</span>
+<span class="cstat-no" title="statement not covered" >  );</span>
+<span class="cstat-no" title="statement not covered" >  if (matches.length === 1) return matches[0][0];</span>
+<span class="cstat-no" title="statement not covered" >  fail(`cannot resolve "${srcPath}" in the manifest (${matches.length} chunk-name matches) — was the file renamed? Update PUBLIC_ROUTES/EAGER_DYNAMIC in scripts/check-budgets.mjs.`);</span>
+<span class="cstat-no" title="statement not covered" >  return null;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/** Static-import closure of a manifest key → Set of emitted JS files. */</span>
+<span class="cstat-no" title="statement not covered" >function closure(key, seen = new Set()) {</span>
+<span class="cstat-no" title="statement not covered" >  if (key === null) return seen;</span>
+<span class="cstat-no" title="statement not covered" >  const entry = manifest[key];</span>
+<span class="cstat-no" title="statement not covered" >  if (!entry) {</span>
+<span class="cstat-no" title="statement not covered" >    fail(`manifest key not found: "${key}" — was the file renamed? Update PUBLIC_ROUTES/EAGER_DYNAMIC in scripts/check-budgets.mjs.`);</span>
+<span class="cstat-no" title="statement not covered" >    return seen;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" >  if (seen.has(entry.file)) return seen;</span>
+<span class="cstat-no" title="statement not covered" >  seen.add(entry.file);</span>
+<span class="cstat-no" title="statement not covered" >  for (const imp of entry.imports ?? []) closure(imp, seen);</span>
+<span class="cstat-no" title="statement not covered" >  return seen;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >const fmt = (kb) =&gt; `${kb.toFixed(1)} kB`;</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >// ── 1+3: per-route budgets + forbidden-chunk leak check ────────────────────</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >const entryFiles = closure('index.html');</span>
+<span class="cstat-no" title="statement not covered" >console.log(`Shared entry JS (index + vendor + query): ${fmt([...entryFiles].reduce((s, f) =&gt; s + gzKb(f), 0))} gz\n`);</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >for (const [route, modulePath] of Object.entries(PUBLIC_ROUTES)) {</span>
+<span class="cstat-no" title="statement not covered" >  const files = new Set(entryFiles);</span>
+<span class="cstat-no" title="statement not covered" >  closure(resolveKey(modulePath), files);</span>
+<span class="cstat-no" title="statement not covered" >  for (const eager of EAGER_DYNAMIC[route] ?? []) closure(resolveKey(eager), files);</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  const total = [...files].reduce((s, f) =&gt; s + gzKb(f), 0);</span>
+<span class="cstat-no" title="statement not covered" >  const override = ROUTE_BUDGET_OVERRIDES[route];</span>
+<span class="cstat-no" title="statement not covered" >  const budget = override?.budgetKb ?? DEFAULT_BUDGET_KB;</span>
+<span class="cstat-no" title="statement not covered" >  const status = total &lt;= budget ? 'OK  ' : 'OVER';</span>
+<span class="cstat-no" title="statement not covered" >  const note = override ? `  [override: ${override.reason}]` : '';</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  console.log(`${status}  ${route.padEnd(20)} ${fmt(total).padStart(9)} gz  / budget ${budget} kB  (${files.size} chunks)${note}`);</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  if (total &gt; budget) {</span>
+<span class="cstat-no" title="statement not covered" >    const rows = [...files]</span>
+<span class="cstat-no" title="statement not covered" >      .map((f) =&gt; [f, gzKb(f)])</span>
+<span class="cstat-no" title="statement not covered" >      .sort((a, b) =&gt; b[1] - a[1])</span>
+<span class="cstat-no" title="statement not covered" >      .slice(0, 12)</span>
+<span class="cstat-no" title="statement not covered" >      .map(([f, kb]) =&gt; `    ${fmt(kb).padStart(9)}  ${f}`)</span>
+<span class="cstat-no" title="statement not covered" >      .join('\n');</span>
+<span class="cstat-no" title="statement not covered" >    fail(`route ${route} loads ${fmt(total)} gz of JS — over its ${budget} kB budget.\n  Largest chunks:\n${rows}\n  Shrink the regression, or (reviewed!) raise ROUTE_BUDGET_OVERRIDES with a reason.`);</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  for (const f of files) {</span>
+<span class="cstat-no" title="statement not covered" >    const hit = FORBIDDEN_ON_PUBLIC.find((frag) =&gt; f.includes(frag));</span>
+<span class="cstat-no" title="statement not covered" >    if (hit) {</span>
+<span class="cstat-no" title="statement not covered" >      fail(`portal-only chunk "${hit}" (${f}) is imported by public route ${route} — a static import is leaking portal code into the public site.`);</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >// ── 2: single-chunk cap across the whole build ─────────────────────────────</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >console.log('');</span>
+<span class="cstat-no" title="statement not covered" >for (const file of readdirSync(join(DIST, 'assets'))) {</span>
+<span class="cstat-no" title="statement not covered" >  if (!file.endsWith('.js')) continue;</span>
+<span class="cstat-no" title="statement not covered" >  const kb = gzKb(join('assets', file));</span>
+<span class="cstat-no" title="statement not covered" >  if (kb &lt;= CHUNK_CAP_KB) continue;</span>
+<span class="cstat-no" title="statement not covered" >  const allowed = CHUNK_ALLOWLIST.find((a) =&gt; file.startsWith(a.prefix));</span>
+<span class="cstat-no" title="statement not covered" >  if (allowed &amp;&amp; kb &lt;= allowed.maxKb) {</span>
+<span class="cstat-no" title="statement not covered" >    console.log(`allowlisted oversize chunk: assets/${file} (${fmt(kb)} gz ≤ ${allowed.maxKb} kB — ${allowed.reason})`);</span>
+<span class="cstat-no" title="statement not covered" >    continue;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" >  fail(`chunk assets/${file} is ${fmt(kb)} gz (cap ${CHUNK_CAP_KB} kB). Split it, or (reviewed!) add a CHUNK_ALLOWLIST entry with a reason.`);</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >if (process.exitCode) {</span>
+<span class="cstat-no" title="statement not covered" >  console.error('\nSee docs/PERFORMANCE.md for what these budgets mean and how to change them.');</span>
+<span class="cstat-no" title="statement not covered" >} else {</span>
+<span class="cstat-no" title="statement not covered" >  console.log('All performance budgets OK.');</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-21T06:06:03.114Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    
