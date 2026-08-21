@@ -65,6 +65,13 @@ export default defineConfig(({ command }) => ({
         // stays simple (GO-LIVE-AUDIT #15).
         importScripts: ['push-sw.js'],
         cleanupOutdatedCaches: true,
+        // generateSW's default navigateFallback ('index.html') registers a
+        // NavigationRoute AHEAD of runtimeCaching, answering EVERY navigation
+        // with the SPA shell — including /admin/ and /auth/, which broke the
+        // Django admin (SPA 404 at /admin/login/ in any SW-controlled browser).
+        // Disable it; the 'pages' route below owns navigations and already
+        // excludes the server-rendered paths + provides the offline fallback.
+        navigateFallback: null,
         // First matching route wins — keep money/health NetworkOnly ABOVE the
         // generic API route. Routes register for GET only (Workbox default), so
         // POST/PUT/DELETE are never cached or served from cache.

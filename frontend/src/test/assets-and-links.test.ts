@@ -81,3 +81,67 @@ describe('public assets', () => {
     expect(dupes).toEqual([]);
   });
 });
+
+/**
+ * Internal links must point at routes that exist. Removing a feature deletes
+ * its <Route>, but a <Link> left behind elsewhere still renders and still
+ * looks clickable — it just lands on the 404 page. That is how the parent
+ * portal kept offering "Pagar colegiaturas" after tuition billing was removed.
+ */
+const APP_TSX = path.join(FRONTEND, 'src', 'App.tsx');
+
+function declaredRoutes(): string[] {
+  const routes: string[] = [];
+  const stack: string[] = [];
+  for (const raw of readFileSync(APP_TSX, 'utf8').split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('<Route')) {
+      const m = line.match(/<Route\s+(?:index\s+)?(?:path="([^"]*)")?/);
+      const p = m?.[1];
+      if (p !== undefined || line.includes('index')) {
+        const full = `/${[...stack, p ?? ''].join('/')}`.replace(/\/+/g, '/');
+        routes.push(full.length > 1 ? full.replace(/\/$/, '') : '/');
+      }
+      if (!line.endsWith('/>')) stack.push(p ?? '');
+    }
+    if (line.includes('</Route>') && stack.length) stack.pop();
+  }
+  return routes;
+}
+
+function matches(link: string, route: string): boolean {
+  if (route.endsWith('/*')) return link === route.slice(0, -2) || link.startsWith(route.slice(0, -1));
+  const rx = new RegExp(`^${route.replace(/:[^/]+/g, '[^/]+')}$`);
+  return rx.test(link);
+}
+
+describe('internal links', () => {
+  it('every <Link to="/..."> and navigate("/...") target resolves to a route', () => {
+    const routes = declaredRoutes().filter((r) => r !== '/*');
+    const dead: string[] = [];
+    // Tests are excluded: they reference routes as fixtures (MemoryRouter
+    // entries, and this file's own documentation of the pattern it matches).
+    const tsx = codeFiles.filter(
+      (f) => ['.ts', '.tsx'].includes(path.extname(f))
+        && !f.includes(`${path.sep}test${path.sep}`)
+        && !/\.test\.tsx?$/.test(f),
+    );
+    for (const file of tsx) {
+      if (file.endsWith('App.tsx')) continue;
+      const text = readFileSync(file, 'utf8');
+      const targets = [
+        ...[...text.matchAll(/\bto="(\/[^"]*)"/g)].map((m) => m[1]),
+        ...[...text.matchAll(/navigate\(\s*'(\/[^']*)'/g)].map((m) => m[1]),
+      ];
+      for (const raw of targets) {
+        // Drop query/hash, and skip anything built at runtime.
+        const link = raw.split(/[?#]/)[0];
+        if (link.includes('${') || link === '/') continue;
+        if (!routes.some((r) => matches(link, r))) {
+          dead.push(`${path.relative(FRONTEND, file)} -> ${link}`);
+        }
+      }
+    }
+    expect(dead).toEqual([]);
+  });
+});
