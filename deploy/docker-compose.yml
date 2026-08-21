@@ -108,16 +108,22 @@ services:
       # log in cleartext.
       GUNICORN_ACCESS_LOG: none
 
-      # ── Database: the db service above, on the private network ──────────
-      # Authoritative here rather than in .env so a leftover Supabase host in
-      # an old .env cannot silently point production at the retired cloud
-      # database. Only the credentials come from .env.
-      DB_ENGINE: django.db.backends.postgresql
-      DB_HOST: db
-      DB_PORT: "5432"
-      # TLS would be theatre on a private compose network the internet cannot
-      # reach, and it costs a handshake per connection.
-      DB_SSLMODE: disable
+      # ── Database ────────────────────────────────────────────────────────
+      # Defaults to the db service above, but .env still wins. That ordering is
+      # deliberate and load-bearing: on a box whose data has NOT been migrated
+      # yet, .env still holds the external host, and hardcoding `db` here would
+      # silently point the next deploy at the empty local database - migrations
+      # would run, the site would come up, and every parent would see an empty
+      # portal. Moving the data is an explicit act (see the runbook in
+      # docs/DEPLOY_HOSTINGER_VPS.md); deleting DB_HOST from .env afterwards is
+      # what flips the switch.
+      DB_ENGINE: ${DB_ENGINE:-django.db.backends.postgresql}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      # On the private compose network TLS is theatre the internet cannot reach
+      # and costs a handshake per connection; an external host still needs it,
+      # hence the default rather than a fixed value.
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
 
       # Gunicorn workers. KVM 2 has 2 vCPU; 3 sync workers is the safe default.
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
