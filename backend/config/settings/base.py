@@ -191,6 +191,22 @@ LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/portal/'
 LOGOUT_REDIRECT_URL = '/'
 
+# ── PASSWORD POLICY ───────────────────────────────────────
+# Every endpoint that accepts a password (self-service reset/activation,
+# authenticated set-password, admin-managed family reset) calls
+# ``validate_password``. Without this list Django's default is EMPTY, so those
+# calls were no-ops and "1234" was an acceptable family password. The stock
+# four validators are the floor: 10 characters (the school hands out 16-char
+# generated ones), not similar to the account's own email/name, not in the
+# 20k-common list, not all digits.
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+     'OPTIONS': {'min_length': 10}},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
 # ── REST FRAMEWORK ────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -217,6 +233,10 @@ REST_FRAMEWORK = {
     # RATELIMIT_ENABLE=False so the test suite isn't throttled by default.
     'DEFAULT_THROTTLE_RATES': {
         'payment-initiate': '10/min',
+        # Admin-managed family password reset: a front-desk admin resets a
+        # handful per minute; the ceiling blunts scripted mass-rewriting of
+        # every family credential from one compromised admin session.
+        'admin-set-password': '20/min',
     },
 }
 

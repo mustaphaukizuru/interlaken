@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import password_views, views
+from .admin_password import AdminSetPasswordView
 from .exports import AdminExportStudentsView
 from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsView
@@ -16,6 +17,10 @@ urlpatterns = [
          name='student-guardians'),
     path('admin/students/<int:pk>/guardians/<int:user_id>/',
          StudentGuardianDetailView.as_view(), name='student-guardian-detail'),
+    # School policy: only an admin resets a family's password (the imported
+    # accounts have no usable one and cannot receive reset mail).
+    path('admin/users/<int:pk>/set-password/', AdminSetPasswordView.as_view(),
+         name='admin-set-password'),
     path('token/',           views.RateLimitedTokenObtainView.as_view(), name='token-obtain'),
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),
