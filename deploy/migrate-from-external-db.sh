@@ -81,7 +81,7 @@ echo "    stopped (the site is down from here until the last step)"
 
 step "Dumping the source database"
 docker run --rm -e PGPASSWORD="$DB_PASSWORD" postgres:17-alpine \
-  pg_dump --no-owner --no-privileges --clean --if-exists \
+  pg_dump --no-owner --no-privileges --clean --if-exists --schema=public \
           -h "$SRC_HOST" -p "$SRC_PORT" -U "$DB_USER" -d "$DB_NAME" \
   | gzip > "$DUMP"
 gunzip -t "$DUMP" || fail "the dump is not a valid gzip file. Nothing was changed."

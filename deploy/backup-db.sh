@@ -33,12 +33,17 @@ out="$DEST/db-$(date +%F-%H%M).sql.gz"
 # Getting this wrong is the worst kind of backup bug: it succeeds every night
 # against the wrong, empty database and nobody finds out until a restore.
 # --clean --if-exists so the dump can be replayed onto a non-empty database.
+# --schema=public because a managed database also holds the platform's own
+# schemas (auth, storage, realtime, vault...). They are not this app's - Django
+# keeps everything in public - and including them makes the dump refuse to
+# restore anywhere except that platform: a verified restore of a real backup
+# into vanilla Postgres 17 threw three supabase_vault errors before the data.
 if [[ -n "${DB_HOST:-}" && "$DB_HOST" != "db" ]]; then
   target="external ($DB_HOST)"
-  docker run --rm -e PGPASSWORD="$DB_PASSWORD" postgres:17-alpine     pg_dump --no-owner --no-privileges --clean --if-exists             -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME"     | gzip > "$out"
+  docker run --rm -e PGPASSWORD="$DB_PASSWORD" postgres:17-alpine     pg_dump --no-owner --no-privileges --clean --if-exists --schema=public             -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME"     | gzip > "$out"
 else
   target="local db container"
-  docker compose exec -T db     pg_dump --no-owner --no-privileges --clean --if-exists             -U "$DB_USER" "$DB_NAME"     | gzip > "$out"
+  docker compose exec -T db     pg_dump --no-owner --no-privileges --clean --if-exists --schema=public             -U "$DB_USER" "$DB_NAME"     | gzip > "$out"
 fi
 
 size=$(stat -c%s "$out")
