@@ -33,7 +33,7 @@ const LEVELS = [
 
 const PROGRAMS = [
   { name: 'Inglés', img: '/assets/classroom.webp', accent: 'var(--purple)', icon: Languages },
-  { name: 'Deportes', img: '/assets/campus-court.webp', accent: 'var(--green)', icon: Trophy },
+  { name: 'Deportes', img: '/assets/court-wide.webp', accent: 'var(--green)', icon: Trophy },
   { name: 'Arte y Música', img: '/assets/campus-mural.webp', accent: 'var(--pink)', icon: Palette },
   { name: 'Ciencia y Robótica', img: '/assets/secundaria.webp', accent: 'var(--green)', icon: FlaskConical },
 ];
@@ -84,7 +84,20 @@ const STRENGTHS = [
   },
 ];
 
-const GALLERY = Array.from({ length: 8 }, (_, i) => `/assets/interlaken-image (${i + 1}).webp`);
+// Curated, explicit list — not a generated range. Building filenames from an
+// index silently pointed at whatever happened to be numbered 1-8, which mixed
+// brand logos in among the photographs and broke the moment a file was renamed
+// or de-duplicated. Static paths are also the only kind an asset audit can check.
+const GALLERY = [
+  '/assets/interlaken-image (1).webp',
+  '/assets/interlaken-image (2).webp',
+  '/assets/interlaken-image (4).webp',
+  '/assets/facade.webp',
+  '/assets/classroom.webp',
+  '/assets/hopscotch.webp',
+  '/assets/court-wide.webp',
+  '/assets/campus-mural.webp',
+];
 
 /* ── Motion (framer `m` — engine lazy-loaded via PublicLayout's provider) ──
  * Section reveals: fade + small rise, played once as each section approaches

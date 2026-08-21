@@ -14,29 +14,27 @@ const altFor = (cat: Category) =>
     ? 'Vida escolar en el Colegio Interlaken'
     : 'Instalaciones del Colegio Interlaken';
 
-// Real campus / school-life photos only. The brand logos that were mixed into
-// this set (vertical & horizontal wordmarks, the 40-años mark and the bare
-// isotipo — files 5, 6, 8, 9) were removed, along with a duplicate court shot,
-// so the gallery reads as photography rather than a logo sheet.
+// Real campus / school-life photos only, one entry per distinct image.
+// The brand logos that were mixed into this set (vertical & horizontal
+// wordmarks, the 40-años mark and the bare isotipo) are not photography and
+// were removed. Several photos also shipped twice under a generic
+// "interlaken-image (n)" name and a descriptive one; the descriptive file is
+// the single copy that remains, so the same shot cannot appear twice here.
 const PHOTOS: Photo[] = [
-  { src: '/assets/interlaken-image (1).webp', cat: 'instalaciones' },
+{ src: '/assets/interlaken-image (1).webp', cat: 'instalaciones' },
   { src: '/assets/interlaken-image (2).webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (3).webp', cat: 'instalaciones' },
+  { src: '/assets/secundaria.webp', cat: 'instalaciones' },
   { src: '/assets/interlaken-image (4).webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (7).webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (10).webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (11).webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (12).webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (13).webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (14).webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (15).webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (17).webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (18).webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (19).webp', cat: 'instalaciones' },
-  { src: '/assets/campus-court.webp', cat: 'vida' },
-  { src: '/assets/campus-mural.webp', cat: 'instalaciones' },
-  { src: '/assets/classroom.webp', cat: 'instalaciones' },
+  { src: '/assets/primaria-gate.webp', cat: 'instalaciones' },
+  { src: '/assets/court-logo.webp', cat: 'vida' },
   { src: '/assets/facade.webp', cat: 'instalaciones' },
+  { src: '/assets/hopscotch.webp', cat: 'vida' },
+  { src: '/assets/campus-mural.webp', cat: 'vida' },
+  { src: '/assets/court-wide.webp', cat: 'vida' },
+  { src: '/assets/interlaken-image (15).webp', cat: 'vida' },
+  { src: '/assets/court-primaria.webp', cat: 'vida' },
+  { src: '/assets/facade-sign.webp', cat: 'instalaciones' },
+  { src: '/assets/classroom.webp', cat: 'instalaciones' },
 ];
 
 const FILTERS: { key: Category | 'todas'; label: string }[] = [

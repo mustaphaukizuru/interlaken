@@ -18,10 +18,12 @@ function renderPage() {
 describe('GaleriaPage', () => {
   it('filters photos by category', async () => {
     renderPage();
-    // 18 fotos en "Todas" (logos removidos); "Instalaciones" deja 11.
-    expect(screen.getAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(18);
+    // 14 fotos distintas en "Todas" (logos removidos y duplicados
+    // consolidados: varias se publicaban dos veces con nombres distintos);
+    // "Instalaciones" deja 8.
+    expect(screen.getAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(14);
     await userEvent.click(screen.getByRole('button', { name: 'Instalaciones' }));
-    expect(screen.getAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(11);
+    expect(screen.getAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(8);
   });
 
   it('opens the lightbox, navigates with arrow keys and closes with Escape', async () => {
@@ -30,12 +32,12 @@ describe('GaleriaPage', () => {
       screen.getAllByRole('button', { name: /ampliar imagen/i })[0],
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('1 / 18')).toBeInTheDocument();
+    expect(screen.getByText('1 / 14')).toBeInTheDocument();
 
     await userEvent.keyboard('{ArrowRight}');
-    expect(screen.getByText('2 / 18')).toBeInTheDocument();
+    expect(screen.getByText('2 / 14')).toBeInTheDocument();
     await userEvent.keyboard('{ArrowLeft}');
-    expect(screen.getByText('1 / 18')).toBeInTheDocument();
+    expect(screen.getByText('1 / 14')).toBeInTheDocument();
 
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

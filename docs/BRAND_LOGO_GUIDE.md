@@ -7,7 +7,7 @@ Purpose: use the **official Interlaken logos professionally** and consistently a
 
 ## 1. The official assets (what you provided)
 
-Source files (high-res) are in `frontend/assets/` — **currently git-ignored, so they don't deploy**:
+Source files (high-res) are tracked in `frontend/assets/`. They are the master copies and are never served to browsers; the optimized exports in `frontend/public/assets/` are what ships:
 | File | What it is | Use for |
 |---|---|---|
 | `logo-horizontal.png` | clock isotipo **+** wordmark **+** tagline, vertical red divider | nav bar, email signatures, wide headers |
@@ -19,10 +19,16 @@ The **clock isotipo** should also exist on its own (crop from the vertical logo)
 
 ---
 
-## 2. Two problems to fix (why it's not "professional" yet)
+## 2. Both original problems are fixed (kept for context)
 
-1. **The real artwork isn't wired in.** `Logo.tsx` (horizontal variant) shows only the clock icon and then **re-typesets "COLEGIO INTERLAKEN" in Poppins** — a font that is **not** the logo's typeface — and **omits the tagline** *"Tiempo de educar, tiempo de aprender."* Result: an approximation, not the official mark. → Render the **actual** `logo-horizontal` artwork instead.
-2. **The official logos don't deploy.** `frontend/assets/` is git-ignored; only older `public/assets/*.webp` versions ship. → Export the new official files into `frontend/public/assets/` (optimized `.webp` + `.png` fallback) so they're served and committed.
+1. ~~The real artwork isn't wired in.~~ **Done.** `Logo.tsx` renders the actual
+   artwork for every variant (horizontal, stacked, icon, seal) and never
+   re-typesets the wordmark.
+2. ~~The official logos don't deploy.~~ **Done.** `frontend/public/assets/`
+   ships `logo-horizontal`, `logo-vertical`, `logo-isotipo` and `logo-seal-40`
+   as optimized `.webp` (what the app requests) with `.png` alongside as the
+   source/fallback. `frontend/assets/` is tracked as the high-resolution
+   source-of-truth folder and never shipped to browsers.
 
 ---
 
@@ -100,11 +106,16 @@ The official logo defines the brand colors. Sampled approximately (⚠️ **samp
 
 ---
 
-## 8. Tasks added
+## 8. Status
 
-1. **Ship the assets:** export official `logo-horizontal` / `logo-vertical` / `logo-40 anos` + isotipo into `frontend/public/assets/` (webp + png), commit them; keep the high-res PNGs as source. *(Optionally un-ignore `frontend/assets/` as the source-of-truth folder.)*
-2. **Rewrite `Logo.tsx`** to use the real artwork + tagline; add `seal` variant; add knockout (dark) treatment. Update `PublicLayout`, `LoginPage`, `Sidebar`.
-3. **Favicon/PWA/OG:** isotipo favicon set + `site.webmanifest` + OG image (§6).
-4. **(Optional) Palette reconciliation:** extract exact logo hex; retire teal; wire green + coral into `tailwind.config.js` / `index.css` tokens (§7).
+1. ~~Ship the assets~~ — done (webp + png in `public/assets/`, sources in
+   `frontend/assets/`).
+2. ~~Rewrite `Logo.tsx`~~ — done, including the `seal` variant and the knockout
+   (dark) treatment used by the footer, login panel and sidebar.
+3. ~~Favicon/PWA/OG~~ — done: isotipo favicon set, `site.webmanifest`, OG image.
+4. ~~Palette reconciliation~~ — done: teal retired, the logo-sampled green,
+   coral, purple and pink are the tokens in `tailwind.config.js` / `index.css`,
+   and every token pair meets WCAG AA (see `docs/DESIGN.md`).
 
-These fold into **Phase 1/3** of the UI/UX plan (foundation + polish).
+Nothing outstanding. Treat this file as the reference for *how* the mark is
+used, not as a to-do list.
