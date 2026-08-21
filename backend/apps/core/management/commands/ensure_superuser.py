@@ -1,7 +1,7 @@
 """
 ensure_superuser — idempotent, env-driven admin bootstrap.
 
-Render's free tier has no persistent shell, so the production superuser is
+Provisioning without a shell on the box: the production superuser is
 declared by env vars and reconciled on every deploy:
 
     DJANGO_SUPERUSER_EMAIL          (required — the login / username)

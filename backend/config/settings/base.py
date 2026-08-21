@@ -104,7 +104,7 @@ TEMPLATES = [
 ]
 
 # ── DATABASE ──────────────────────────────────────────────
-# Postgres (Supabase / Render) needs SSL — default sslmode=require; override
+# A remote Postgres needs SSL — default sslmode=require; override
 # with DB_SSLMODE=disable for a local Postgres. Local dev uses SQLite
 # (development.py); no MySQL driver is installed.
 _DB_ENGINE = env('DB_ENGINE', default='django.db.backends.postgresql')
@@ -150,7 +150,7 @@ AUTHENTICATION_BACKENDS = [
 # Trust the reverse proxy's client-IP header (see apps/core/client_ip.py).
 # MUST stay False unless a proxy that OVERWRITES this header sits in front and
 # the app port is not otherwise reachable, or clients can forge their own IP and
-# bypass every rate limit. Enabled in the VPS deployment; Render sets its own.
+# bypass every rate limit. Enabled in the VPS deployment (Caddy sets the header).
 TRUST_PROXY_IP_HEADER = env.bool('TRUST_PROXY_IP_HEADER', default=False)
 PROXY_IP_HEADER = env('PROXY_IP_HEADER', default='X-Real-IP')
 
@@ -262,7 +262,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # HTTPS origins Django trusts for unsafe (POST) requests — needed by the Django
 # admin form on the deployed domain (the same-origin SPA + JWT API don't need
-# it). Comma-separated, full scheme, e.g. https://interlaken.onrender.com
+# it). Comma-separated, full scheme, e.g. https://interlaken.edu.mx
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 # ── STATIC & MEDIA ────────────────────────────────────────
@@ -283,7 +283,7 @@ MEDIA_URL = env('MEDIA_URL', default='/media/')
 MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 
 # ── OBJECT STORAGE FOR MEDIA (uploaded documents) ─────────
-# Render's container filesystem is EPHEMERAL — anything written to MEDIA_ROOT
+# The container filesystem is EPHEMERAL — anything written to MEDIA_ROOT
 # (admissions documents: birth certificates, CURP, proof of address — legally
 # retained, ARCO-scoped) is wiped on every deploy/restart/spin-down. Set the
 # S3-compatible env vars below to store uploads in durable object storage.
@@ -480,14 +480,12 @@ if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration()],
-        # RENDER_ENV can label preview/staging services; explicit SENTRY_ENVIRONMENT wins.
-        environment=env('SENTRY_ENVIRONMENT', default=env(
-            'RENDER_ENV', default='development' if DEBUG else 'production')),
-        # Release tag: explicit SENTRY_RELEASE, else the deployed commit —
-        # GIT_SHA (CI-provided) or RENDER_GIT_COMMIT (set automatically by Render).
+        environment=env('SENTRY_ENVIRONMENT',
+                        default='development' if DEBUG else 'production'),
+        # Release tag: explicit SENTRY_RELEASE, else the deployed commit if the
+        # deploy exports GIT_SHA.
         release=(env('SENTRY_RELEASE', default='')
                  or env('GIT_SHA', default='')
-                 or env('RENDER_GIT_COMMIT', default='')
                  or None),
         traces_sample_rate=env.float('SENTRY_TRACES_SAMPLE_RATE', default=0.0),
         send_default_pii=False,
@@ -507,7 +505,7 @@ CACHES = {
 }
 
 # ── LOGGING ───────────────────────────────────────────────
-# Console-only (Render captures stdout). Every record carries the request id
+# Console-only (the container runtime captures stdout). Every record carries the request id
 # injected by apps.core.request_id (RequestIDFilter); production.py swaps the
 # console handler's formatter to the JSON one for machine-parseable logs.
 LOG_LEVEL = env('LOG_LEVEL', default='INFO')

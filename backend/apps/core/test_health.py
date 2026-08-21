@@ -27,7 +27,7 @@ class TestHealth:
 
 
 class TestHealthz:
-    """Root-level /healthz — Render's healthCheckPath (no /api/v1 prefix)."""
+    """Root-level /healthz — the deploy health check path (no /api/v1 prefix)."""
 
     def test_root_healthz_200_with_flat_shape(self, api_client):
         resp = api_client.get('/healthz')
@@ -39,6 +39,6 @@ class TestHealthz:
 
     def test_healthz_is_json_not_spa_html(self, api_client):
         # Must be registered before the SPA catch-all — an HTML index here
-        # would make Render's health check green on a broken API.
+        # would make the health check green on a broken API.
         resp = api_client.get('/healthz')
         assert resp['Content-Type'].startswith('application/json')

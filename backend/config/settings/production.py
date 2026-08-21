@@ -23,7 +23,7 @@ AUTH_COOKIE_SECURE = True
 
 # ── Structured logs ───────────────────────────────────────────────────────
 # Same handlers/levels as base; only the formatter changes: one JSON object per
-# line on stdout (Render's log stream), each carrying the X-Request-ID so a
+# line on stdout (collected by the container runtime), each carrying the X-Request-ID so a
 # request's lines can be correlated. Dev keeps the readable console format.
 LOGGING['handlers']['console']['formatter'] = 'json'
 

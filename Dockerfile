@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Single-image deploy (Render): build the Vite SPA, serve it + the API from one
+# Single-image deploy (Hostinger VPS): build the Vite SPA, serve it + the API from one
 # Django/gunicorn process (whitenoise for static). Build context = repo root.
 
 # ── Stage 1: build the React SPA (Vite base=/static/) ───────────────────────
@@ -13,16 +13,16 @@ COPY frontend/package.json frontend/package-lock.json frontend/.npmrc ./
 # node:20-slim ships npm 10.8.2, which generates/validates a lock inconsistently
 # for this dependency graph (ajv/json-schema-traverse split) and fails `npm ci`
 # with EUSAGE. Pin a newer npm that resolves it (the committed lock is generated
-# with the same version), so the Render build stops failing.
+# with the same version), so the image build stops failing.
 RUN npm install -g npm@11.19.0 && npm ci
 COPY frontend/ ./
 # Build-time SPA config. VITE_VAPID_PUBLIC_KEY enables web-push opt-in in the
 # bundle (same public key as the backend's VAPID_PUBLIC_KEY); leave unset and
-# push stays inert. Render passes service env vars to Docker builds — this ARG
-# picks it up (see docs/DEPLOY_RENDER.md §10).
+# push stays inert. deploy/docker-compose.yml passes it as a build arg — this ARG
+# picks it up (see docs/DEPLOY_HOSTINGER_VPS.md, observability section).
 ARG VITE_VAPID_PUBLIC_KEY=
 ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
-# Frontend Sentry: set VITE_SENTRY_DSN in Render env and it reaches the bundle
+# Frontend Sentry: set VITE_SENTRY_DSN in deploy/.env and it reaches the bundle
 # here; unset keeps Sentry fully tree-shaken out (see src/services/sentry.ts).
 ARG VITE_SENTRY_DSN=
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
@@ -42,7 +42,7 @@ COPY backend/requirements.txt ./
 # There is now NO C compiler in this image: every dependency must ship a
 # manylinux wheel (cryptography, Pillow, psycopg2-binary do) or be pure Python
 # (http-ece, the one sdist, is). Adding a dependency that compiles C means
-# re-adding build-essential here, or the Render build fails.
+# re-adding build-essential here, or the image build fails.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpq5 \
  && pip install -r requirements.txt \

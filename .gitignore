@@ -49,10 +49,10 @@ docs/*.pdf
 # Local source material (brand PDFs/logos), not app assets
 resources/
 
-# SPA build artifacts staged for Django (scripts/build_frontend.py). The Render
+# SPA build artifacts staged for Django (scripts/build_frontend.py). The deploy
 # Docker image builds these fresh; only backend/static/admin/ is hand-managed.
 backend/static/*
 !backend/static/admin/
 
-# Local secrets handoff (VAPID) - paste into Render, never commit
+# Local secrets handoff (VAPID) - paste into deploy/.env, never commit
 *.local.txt

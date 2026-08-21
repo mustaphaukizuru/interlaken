@@ -242,14 +242,93 @@ Confirm cron is working after ten minutes:
 tail -n 30 /var/log/interlaken/loyverse.log
 ```
 
-## Step 10 — Retire Render
+## Step 10 — Render is retired
 
-Leave the Render service running for a few days as a fallback. Once the VPS has
-handled a full school day, including a cafeteria purchase and a parent login,
-suspend it.
+Render is gone: the service, its blueprint (`render.yaml`) and its deploy doc were
+removed once the VPS had served a full school day. Nothing in this repository
+targets Render any more.
 
-Do not delete the Render service until you are certain, since it is the fastest
-rollback available: point DNS back and it serves again.
+Rollback is now local to this box and faster than the old DNS swap:
+
+```
+cd /opt/interlaken && git log --oneline -5      # pick the last good commit
+git reset --hard <commit> && ./deploy.sh        # rebuild and restart
+```
+
+Docker keeps the previous image layers, so a rebuild of an older commit is quick.
+The database is unaffected by an application rollback.
+
+---
+
+## Observability, push, and hardening
+
+All optional — every item below is inert until its variable is set in
+`deploy/.env` (see `deploy/env.example`).
+
+**Sentry (backend)**
+
+| Var | Meaning |
+|---|---|
+| `SENTRY_DSN` | Enables the SDK. Unset (default) → Sentry is never even imported. |
+| `SENTRY_ENVIRONMENT` | Event environment tag. Defaults to `production`. |
+| `SENTRY_RELEASE` | Release tag; falls back to `GIT_SHA` if the deploy exports one. |
+| `SENTRY_TRACES_SAMPLE_RATE` | Tracing sample rate `0`–`1`. Default `0` (errors only). |
+
+PII is scrubbed in `before_send` (user email/name/IP, secret-looking headers and
+extras) and `send_default_pii=False`.
+
+**Sentry (frontend)** — *build-time* Vite vars, baked into the bundle when the
+image is built: `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`,
+`VITE_SENTRY_TRACES_SAMPLE_RATE`, `VITE_GIT_SHA`. `docker-compose.yml` passes
+`VITE_SENTRY_DSN` through as a build arg, so setting it in `deploy/.env` and
+running `./deploy.sh` is enough. Without it the bundle never initialises Sentry.
+Source-map upload (`SENTRY_AUTH_TOKEN` + `@sentry/vite-plugin`) is deliberately
+not wired in, so events arrive minified until you add it.
+
+**Logs** — JSON lines on stdout, one object per record with `ts`, `level`,
+`logger`, `message` and `request_id`; every response carries `X-Request-ID`
+(inbound ids from Caddy are propagated) so a request can be traced end to end.
+`LOG_LEVEL` (default `INFO`) adjusts verbosity. Read them with
+`docker compose logs -f app` — the json-file driver is capped at 3 × 10 MB per
+container, so logs cannot fill the disk.
+
+**Database** — `CONN_MAX_AGE` (default `60`) keeps connections warm. With the
+database container on the same private network there is no pooler and no TLS
+handshake per request, so this is purely a latency win.
+
+**Rate limiting** — abuse-prone endpoints are throttled (login 10/min/IP, reset
+5/h/IP, public forms 5/min/IP, booking 10/min/IP, payment initiation
+10/min/user). Counters live in a file cache shared across gunicorn workers;
+`RATELIMIT_CACHE_DIR` overrides its location. Payment/Loyverse webhooks are
+signature-verified and not throttled beyond a generous per-IP ceiling, so a
+provider burst is never dropped. Caddy is trusted for the real client IP
+(`TRUST_PROXY_IP_HEADER`), which is what makes these limits per-visitor rather
+than one global bucket.
+
+**Web push (VAPID)** — inert until the keys exist. Generate a pair once:
+
+```
+npx web-push generate-vapid-keys          # Node
+vapid --gen                               # py-vapid (pip install py-vapid)
+```
+
+Set in `deploy/.env`:
+
+| Var | Meaning |
+|---|---|
+| `VAPID_PUBLIC_KEY` | base64url public key — sent to browsers on subscribe. |
+| `VAPID_PRIVATE_KEY` | private key — signs every push. Keep secret. |
+| `VAPID_ADMIN_EMAIL` | `mailto:` contact required by push services. |
+| `VITE_VAPID_PUBLIC_KEY` | the **same public key**, build-time: it is baked into the SPA. |
+
+`VITE_VAPID_PUBLIC_KEY` is a Docker build arg, so it only takes effect on the
+next `./deploy.sh`. Without it the opt-in card never renders.
+
+Flow once configured: parents opt in on the portal dashboard (subscription
+stored per user + device) → publishing a comunicado with **“Enviar notificación
+push”** sends the first batch inline and the `dispatch_notifications` cron on
+this box drains the rest → taps deep-link to `/portal/comunicados/<id>` →
+expired subscriptions (HTTP 404/410) are pruned automatically on send.
 
 ---
 
