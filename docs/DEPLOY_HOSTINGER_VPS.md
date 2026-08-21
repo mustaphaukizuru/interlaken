@@ -255,6 +255,23 @@ The cutover is a dump and a restore. It takes minutes at this data size, and the
 old database keeps working until you point the app away from it, so a failed
 attempt costs nothing but a retry.
 
+**The short version — one command:**
+
+```bash
+cd /opt/interlaken/deploy && ./migrate-from-external-db.sh
+```
+
+It refuses unless `.env` still names an external host, refuses if the local
+database already holds data, stops the app so nothing is written mid-copy,
+records the source row counts *before* dumping, restores, and compares the
+counts afterwards — restarting the app against the external database and
+keeping the dump if they do not match. It never writes to the external
+database. When it finishes it prints the single line to delete to make the
+switch.
+
+The manual steps below are what it does, kept for when you want to run them
+yourself or something needs unpicking.
+
 **1. Take the site down for the few minutes of the copy** — otherwise a payment
 or a cafeteria sync lands in Supabase after the dump and is lost:
 
