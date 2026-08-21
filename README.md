@@ -88,7 +88,7 @@ Specs, status and ops notes live in [`docs/`](docs/):
 
 - [`docs/STATUS_REPORT.md`](docs/STATUS_REPORT.md) — known issues, remediation order
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — feature roadmap
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — cPanel/Passenger go-live notes
+- [`docs/DEPLOY_HOSTINGER_VPS.md`](docs/DEPLOY_HOSTINGER_VPS.md) — deploying and operating the VPS
 - [`docs/AUTH.md`](docs/AUTH.md) — auth/session model (httpOnly refresh + CSRF)
 - [`docs/DESIGN.md`](docs/DESIGN.md) — design system & tokens
 - [`docs/BRAND_LOGO_GUIDE.md`](docs/BRAND_LOGO_GUIDE.md) — brand & logo usage

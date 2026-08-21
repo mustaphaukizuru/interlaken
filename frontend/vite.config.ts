@@ -7,7 +7,8 @@ import path from 'path';
 
 export default defineConfig(({ command }) => ({
   // In production the SPA is served by Django/whitenoise under /static/, so
-  // hashed asset URLs must resolve there (see DEPLOYMENT.md §5). The dev server
+  // hashed asset URLs must resolve there (the Dockerfile stages dist/ into
+  // Django's static root). The dev server
   // serves from the root, so keep base '/' during `vite dev`.
   base: command === 'build' ? '/static/' : '/',
   plugins: [

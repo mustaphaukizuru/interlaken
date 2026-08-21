@@ -8,7 +8,7 @@ print('VAPID_PUBLIC_KEY(base64url)=', __import__('base64').urlsafe_b64encode(\
 v.public_key.public_bytes(__import__('cryptography.hazmat.primitives.serialization', \
 fromlist=['Encoding']).Encoding.X962, __import__('cryptography.hazmat.primitives.serialization', \
 fromlist=['PublicFormat']).PublicFormat.UncompressedPoint)).rstrip(b'=').decode())"
-(or simply run `vapid --gen` from the pywebpush/py-vapid CLI — see DEPLOYMENT.md).
+(or simply run `vapid --gen` from the pywebpush/py-vapid CLI — see DEPLOY_HOSTINGER_VPS.md).
 
 The same base64url public key goes to the frontend as VITE_VAPID_PUBLIC_KEY.
 Sending never raises into callers: failures are logged and 404/410 (expired)

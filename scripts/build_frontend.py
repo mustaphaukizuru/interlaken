@@ -2,7 +2,7 @@
 """
 Build the React SPA and place its output where Django/whitenoise serves it.
 
-Automates DEPLOYMENT.md §5 steps 2–4:
+Mirrors what the Dockerfile does, for prod-style serving without Docker:
   1. `npm run build` in frontend/  (Vite base '/static/' — see vite.config.ts)
   2. dist/index.html            -> backend/templates/index.html
   3. dist/assets/*              -> backend/static/assets/

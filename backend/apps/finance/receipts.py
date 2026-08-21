@@ -3,7 +3,7 @@ finance/receipts.py — printable tuition payment receipt (comprobante de pago).
 
 Produces a dependency-free PDF via ``apps.core.pdf`` for a **paid** invoice. This
 is an internal receipt, not a fiscal CFDI: a real CFDI 4.0 is issued through a PAC
-(see Prompt 16 / DEPLOYMENT.md). ``cfdi_available`` stays False until that PAC
+(a PAC provider account is required). ``cfdi_available`` stays False until that PAC
 integration lands, so the UI can offer the receipt now and the CFDI later.
 """
 from decimal import Decimal
