@@ -1,8 +1,9 @@
 # Deploying the parent portal to a Hostinger VPS
 
-The portal runs as a single Docker container (Django + gunicorn, serving the
-built React SPA), behind Caddy which handles HTTPS. The database is **not** on
-this server: it stays on Supabase. This box only serves the application.
+The portal runs as Docker containers on one box: Django + gunicorn serving the
+built React SPA, Postgres holding the data, and Caddy handling HTTPS. Nothing
+depends on a third-party cloud — code comes from GitHub, everything else runs
+here.
 
 ```
 interlaken.edu.mx
@@ -11,7 +12,7 @@ interlaken.edu.mx
         |
    app    :8000           gunicorn, not reachable from the internet
         |
-   Supabase Postgres      external, unchanged
+   db     :5432           Postgres 17, private network only, pgdata volume
 ```
 
 Everything below assumes a Hostinger **KVM 2** running **Ubuntu 22.04 or 24.04**
@@ -152,7 +153,7 @@ Fill in every value. The file documents which ones matter and why. The block
 labelled "Public address" is the one that changes because of the move; the rest
 are copied from Render as they are.
 
-Leave `AWS_STORAGE_BUCKET_NAME` empty for now if Supabase Storage is not set up.
+Leave `AWS_STORAGE_BUCKET_NAME` empty unless object storage is set up.
 Uploads then land on the `media` Docker volume, which survives deploys. Switching
 to object storage later is just filling in those four lines and redeploying.
 
@@ -219,28 +220,98 @@ updating. Skipping any one of these breaks that feature silently.
 Test the Loyverse webhook with a real purchase at the till. The parent's balance
 should move within seconds.
 
-## Step 9 — Move the scheduled jobs
+## Step 9 — Install the scheduled jobs
 
-The cafeteria sync and the daily reminders currently run on GitHub Actions.
-Move them here, where cron actually honours a five minute interval (Actions was
-scheduled every five minutes but fired roughly hourly).
+Cron on this box is the only scheduler: the GitHub workflows that used to run
+the cafeteria sync, the daily reminders and the database backup were deleted
+when the database moved here (Actions cannot reach a database that listens only
+on the private network — and Actions fired the "every five minutes" sync
+roughly hourly anyway).
 
 ```bash
+sudo mkdir -p /var/log/interlaken /var/backups/interlaken
 crontab -e            # paste the contents of deploy/crontab.example
 ```
 
-Then **disable the GitHub workflows**, or both will run against the same
-database. The work itself is idempotent so nothing is double charged, but the
-Actions runs also execute `migrate`, which can collide with a container restart.
+That installs four things: the cafeteria sync every five minutes, the daily
+reminder/notification batch, the nightly database backup at 02:30, and two
+watchdogs that email if either the sync or the backup stops producing output.
 
-In the repository, go to Actions and disable **Loyverse cafeteria sync** and
-**scheduled-tasks**. Keep **db-backup** running unless you replace it here.
-
-Confirm cron is working after ten minutes:
+Confirm after ten minutes:
 
 ```bash
 tail -n 30 /var/log/interlaken/loyverse.log
+cd /opt/interlaken/deploy && ./backup-db.sh     # prove the backup path works now
+ls -lh /var/backups/interlaken/
 ```
+
+## Moving the data off Supabase (one time)
+
+Skip this on a fresh install — `migrate` creates an empty schema at first boot
+and there is nothing to move. Do it if the school's live data is still on
+Supabase.
+
+The cutover is a dump and a restore. It takes minutes at this data size, and the
+old database keeps working until you point the app away from it, so a failed
+attempt costs nothing but a retry.
+
+**1. Take the site down for the few minutes of the copy** — otherwise a payment
+or a cafeteria sync lands in Supabase after the dump and is lost:
+
+```bash
+cd /opt/interlaken/deploy
+crontab -l > /tmp/cron.bak && crontab -r        # stop the sync/reminder jobs
+docker compose stop app                          # stop writes; Caddy still answers
+```
+
+**2. Dump Supabase** (from this box, using the pooler host that is still in the
+old `.env`; the client must be Postgres 17 to match the server):
+
+```bash
+docker run --rm -e PGPASSWORD='<old DB_PASSWORD>' postgres:17-alpine   pg_dump --no-owner --no-privileges           -h '<old DB_HOST>' -p 5432 -U '<old DB_USER>' -d '<old DB_NAME>'   | gzip > /root/supabase-final.sql.gz
+gunzip -t /root/supabase-final.sql.gz && echo "dump is a valid gzip"
+```
+
+**3. Point `.env` at the local database** — set `DB_NAME`, `DB_USER` and a fresh
+`DB_PASSWORD` (`openssl rand -base64 32`). `DB_HOST`, `DB_PORT` and `DB_SSLMODE`
+come from `docker-compose.yml`; delete any of those three left in `.env` so the
+old Supabase host cannot come back.
+
+**4. Start the database and restore into it:**
+
+```bash
+docker compose up -d db
+docker compose exec db pg_isready -U <DB_USER> -d <DB_NAME>      # wait for ready
+gunzip -c /root/supabase-final.sql.gz | docker compose exec -T db psql -q -U <DB_USER> -d <DB_NAME>
+```
+
+**5. Verify before trusting it.** Compare against the numbers you know:
+
+```bash
+docker compose exec db psql -U <DB_USER> -d <DB_NAME> -c   "SELECT (SELECT count(*) FROM accounts_user) AS users,
+          (SELECT count(*) FROM accounts_studentprofile) AS students,
+          (SELECT count(*) FROM cafeteria_cafeteriatransaction) AS ledger,
+          (SELECT count(*) FROM payments_payment) AS payments;"
+```
+
+**6. Bring it back up:**
+
+```bash
+./deploy.sh                                      # migrate runs at boot; should be a no-op
+crontab /tmp/cron.bak                            # restore the scheduled jobs
+./backup-db.sh                                   # first local backup, immediately
+```
+
+Then log in, open the cafeteria page for a student with a balance, and check the
+figure matches what it was before the move.
+
+**Keep the Supabase project for a week**, paused but not deleted: it is the only
+rollback that still holds the data. To roll back, put the old `DB_*` values back
+in `.env`, remove the `DB_HOST`/`DB_PORT`/`DB_SSLMODE` overrides from
+`docker-compose.yml`, and redeploy. Delete the project once the local backups
+have run for several nights and been restored once as a test.
+
+---
 
 ## Step 10 — Render is retired
 
@@ -372,18 +443,30 @@ Three separate things need backing up, and only one of them is handled for you.
 
 | What | Where it lives | Who backs it up |
 |---|---|---|
-| School data (parents, payments, ledger) | Supabase | Supabase, plus the `db-backup` GitHub workflow |
+| School data (parents, payments, ledger) | the `pgdata` volume on this VPS | `deploy/backup-db.sh`, nightly at 02:30 |
 | Uploaded documents | the `media` Docker volume on this VPS | **nobody, until you set this up** |
 | TLS certificate | the `caddy_data` volume | re-issued automatically if lost |
 
-**Leave the `db-backup` GitHub workflow enabled.** It is the only thing taking
-database backups, it does not conflict with the VPS cron jobs, and nothing here
-replaces it.
+**The database backup is yours now.** Nothing off this machine holds a copy, so
+`backup-db.sh` (installed by the crontab in Step 9) is the only thing standing
+between a disk failure and starting over. It dumps from inside the db container
+so the client and server versions always match, refuses to rotate old copies
+away behind a suspiciously small dump, and a second cron entry emails you if a
+night passes with no backup at all. Set `BACKUP_REMOTE` in `deploy/.env` to
+copy each dump off the box — an on-box backup does not survive the failure it
+exists for.
+
+Restore one:
+
+```bash
+cd /opt/interlaken/deploy
+gunzip -c /var/backups/interlaken/db-<date>.sql.gz | docker compose exec -T db psql -U <DB_USER> -d <DB_NAME>
+docker compose restart app
+```
 
 **Uploaded documents are the gap.** Admission documents are legally retained,
-and a Docker volume on a single VPS is one failed disk away from gone. Either
-switch on Supabase Storage (below), which is the better answer, or back the
-volume up nightly:
+and a Docker volume on a single VPS is one failed disk away from gone. Back the
+volume up nightly and copy the archives off the box:
 
 ```bash
 sudo tee /etc/cron.daily/interlaken-media >/dev/null <<'SH'
@@ -397,11 +480,13 @@ sudo chmod +x /etc/cron.daily/interlaken-media
 Copy those archives off the machine as well. A backup that only exists on the
 server it protects is not a backup.
 
-### Moving documents to Supabase Storage later
+### Moving documents to object storage later (optional)
 
-Filling in the `AWS_*` values switches new uploads to object storage, but it
-does **not** move the files already on the volume, and Django will keep looking
-for them in the new place. They become broken links.
+The app speaks S3, so any S3-compatible bucket works if you later decide the
+media volume should not live on this box. Filling in the `AWS_*` values switches
+new uploads to object storage, but it does **not** move the files already on the
+volume, and Django will keep looking for them in the new place. They become
+broken links.
 
 Copy them across before switching:
 
@@ -442,9 +527,8 @@ which means every uploaded document and the TLS certificate. Plain
 `caddy_data` if the stack is stopped. Losing `caddy_data` also burns Let's
 Encrypt rate limits when the certificate has to be re-issued.
 
-**The database is not backed up by this server.** Supabase holds the data and
-its own backups. If you disable the `db-backup` GitHub workflow, arrange a
-replacement before you do.
+**Never `docker compose down -v`.** The `-v` deletes named volumes, and
+`pgdata` is the school's entire database. `down` on its own is safe.
 
 **Deleting the `DJANGO_SUPERUSER_*` lines is deliberate.** They exist so the
 first boot can create an admin account. On a VPS you have `docker compose exec`,
@@ -467,8 +551,10 @@ sends `X-Forwarded-Proto: https`. Confirm that line is still present in the
 `ALLOWED_HOSTS` in `.env`. Add it and redeploy.
 
 **The container keeps restarting.** Almost always a database connection problem.
-`docker compose logs app` will show it. Check the `DB_*` values, and that
-Supabase is reachable from this server.
+`docker compose logs app` will show it, and `docker compose logs db` shows the
+other side. Check `DB_NAME`/`DB_USER`/`DB_PASSWORD` in `.env` — remember the
+password is baked into the volume at first boot, so editing it later in `.env`
+authenticates against the old one until you `ALTER USER` inside the container.
 
 **Permission denied writing an upload, after switching to the non-root image.**
 A named volume created earlier is owned by root, while the container now runs as
