@@ -93,7 +93,7 @@ jobs:
       - name: Check performance budgets
         run: npm run check:budgets
 
-      # The Render Docker image builds the SPA fresh (Dockerfile stage 1), so no
+      # The deploy image builds the SPA fresh (Dockerfile stage 1), so no
       # committed-static freshness gate is needed anymore (it was a cPanel-era
       # requirement). We still assert the push companion SW ships in dist.
       - name: Assert push companion SW is in dist
@@ -194,7 +194,7 @@ jobs:
           retention-days: 7
 
   docker:
-    # Builds the ACTUAL production image (what Render runs). The other jobs run
+    # Builds the ACTUAL production image (what the VPS runs). The other jobs run
     # against a full repo checkout, so they cannot catch image-only breakage:
     # on 2026-08-15 the eslint-10 upgrade made `npm ci` need frontend/.npmrc,
     # which the Dockerfile did not COPY — every job stayed green while the

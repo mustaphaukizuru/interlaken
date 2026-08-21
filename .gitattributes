@@ -1,7 +1,7 @@
 # Normalize line endings: LF in the repo AND in Windows working trees.
 # Ends the recurring CRLF traps (CI hash mismatches, PowerShell mojibake edits,
 # noisy "CRLF will be replaced" warnings on every commit) documented in
-# docs/DEPLOY_RENDER.md and the 2026-08-12 incident notes.
+# docs/DEPLOY_HOSTINGER_VPS.md and the 2026-08-12 incident notes.
 * text=auto eol=lf
 
 # Windows-native scripts keep CRLF.

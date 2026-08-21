@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Render container start: run migrations, then serve. Static was already
+# Container start: run migrations, then serve. Static was already
 # collected at image-build time (see Dockerfile).
 set -e
 
@@ -8,7 +8,7 @@ python manage.py migrate --noinput
 # Admin bootstrap: idempotently reconcile the superuser declared by the
 # DJANGO_SUPERUSER_* env vars (create if missing, else ensure it is an active
 # admin). Pointing DJANGO_SUPERUSER_EMAIL at a new address provisions that admin
-# on the next deploy — Render free has no persistent shell. Safe every boot; a
+# on the next deploy, without needing a shell on the box. Safe every boot; a
 # no-op when DJANGO_SUPERUSER_EMAIL is unset.
 python manage.py ensure_superuser
 

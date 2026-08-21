@@ -89,7 +89,7 @@ export default function PlataformasPage() {
 
       <section className="relative overflow-hidden bg-dark text-white">
         <img
-          src="/assets/court-mural.webp"
+          src="/assets/campus-mural.webp"
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-30"
           loading="eager"

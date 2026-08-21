@@ -43,6 +43,14 @@ CRON_TZ=America/Mexico_City
 */30 * * * * find /var/log/interlaken/loyverse.log -mmin +30 2>/dev/null | grep -q . && echo "Interlaken: cafeteria sync has not run in 30+ minutes on $(hostname)" | mail -s "Interlaken cron stalled" mustaphaukizuru@gmail.com
 
 # ── Log rotation so the files above cannot fill the disk ────────────────────
+# Nightly database backup at 02:30 (see backup-db.sh). The database now runs on
+# this box, so nothing off-site backs it up: if this stops, there is no copy.
+30 2 * * * cd $COMPOSE && flock -n /tmp/interlaken-backup.lock ./backup-db.sh >> /var/log/interlaken/backup.log 2>&1
+
+# Shout if last night's backup did not land. Silence from a backup job looks
+# exactly like success, which is how the previous one failed for five nights.
+45 7 * * * find /var/backups/interlaken -name 'db-*.sql.gz' -mtime -1 2>/dev/null | grep -q . || echo "Interlaken: NO database backup in the last 24h on $(hostname)" | mail -s "Interlaken backup missing" mustaphaukizuru@gmail.com
+
 0 3 * * 0 find /var/log/interlaken -name '*.log' -size +50M -exec truncate -s 0 {} \;
 
 # ─────────────────────────────────────────────────────────────────────────────
