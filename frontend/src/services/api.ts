@@ -600,6 +600,14 @@ export const portalApi = {
   ) => api.post(`/accounts/admin/students/${studentId}/guardians/`, data),
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
+
+  // Admin-managed password reset (school policy: only an admin resets a family
+  // password — imported accounts have no usable one and their synthetic
+  // @alumnos address receives no mail). Omit `password` and the server mints a
+  // temporary one, returned ONCE as `temporary_password`. Never targets another
+  // admin. Setting the password kills the account's existing sessions.
+  setUserPassword: (userId: number, data: { password?: string; reason?: string }) =>
+    api.post(`/accounts/admin/users/${userId}/set-password/`, data),
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────

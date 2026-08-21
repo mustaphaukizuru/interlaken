@@ -50,6 +50,38 @@ the header.
 - `POST /auth/logout/` (auth + CSRF): **blacklists** the refresh token and clears
   both cookies. The client drops the in-memory access token and redirects home.
 
+### Admin-managed password reset (family accounts)
+`POST /api/v1/accounts/admin/users/<id>/set-password/` — admin only.
+
+Imported families (`import_students`, `loyverse_import`) are created with
+`set_unusable_password()`, and their synthetic
+`<matricula>@alumnos.interlaken.edu.mx` address receives no mail, so neither
+self-service reset nor Google OAuth can bootstrap them. School policy is that
+**only an administrator resets a family password**; this endpoint is that path
+(UI: *Alumnos → ficha del alumno → Padres y tutores → Restablecer contraseña*).
+
+| Body | Effect |
+|------|--------|
+| `{}` | Server generates a 16-char password over a look-alike-free alphabet and returns it **once** as `temporary_password`. |
+| `{"password": "…"}` | Uses it, after `validate_password`; **never echoed back**. 400 + messages if it fails the policy. |
+| `{"reason": "…"}` | Optional; stored on the audit row. |
+
+Rails: refuses (403) when the target is `role == 'admin'` or `is_superuser` (an
+admin rewriting a peer's password would be an account-takeover primitive —
+admins use the normal flow); blacklists **every outstanding refresh token** for
+the target, so sessions opened with the old credential die with the reset
+(`sessions_revoked` in the response); throttled at `admin-set-password`
+(20/min, per user); writes one append-only `AuditLog` row
+(`action=permission`, `context=accounts.set_password`) with the actor, the
+target and the reason — never the password.
+
+### Password policy
+`AUTH_PASSWORD_VALIDATORS` (base settings) applies to every endpoint that
+accepts a password — self-service reset/activation, authenticated
+`set-password`, and the admin reset above: minimum **10** characters, not
+similar to the account's own email/name, not in Django's common-password list,
+not all digits.
+
 ## Configuration
 
 Backend (`config/settings/base.py`, overridable via env — see `.env.example`):

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Users, UserPlus, Unlink, Link2 } from 'lucide-react';
+import { Users, UserPlus, Unlink, Link2, KeyRound } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,6 +9,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import {
+  ResetPasswordDialog,
+  type ResetPasswordTarget,
+} from '@/components/admin/ResetPasswordDialog';
 import { portalApi } from '@/services/api';
 
 interface Guardian {
@@ -45,6 +49,9 @@ export function StudentGuardians({ studentId }: Props) {
   const [relationship, setRelationship] = useState('Padre/Madre');
   const [open, setOpen] = useState(false);
   const [toUnlink, setToUnlink] = useState<Guardian | null>(null);
+  // School policy: families never reset their own password (their school email
+  // receives no mail), so every account listed here gets an admin reset action.
+  const [toReset, setToReset] = useState<ResetPasswordTarget | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-student-guardians', studentId],
@@ -106,6 +113,7 @@ export function StudentGuardians({ studentId }: Props) {
 
   const guardians = data?.guardians ?? [];
   const studentEmail = data?.student?.email ?? '';
+  const studentUserId = data?.student?.user_id ?? 0;
   const selfLinked = guardians.some((g) => g.is_self);
 
   return (
@@ -124,17 +132,37 @@ export function StudentGuardians({ studentId }: Props) {
             En Interlaken la familia entra con el correo escolar del alumno.
             <span className="mt-0.5 block truncate text-xs text-subtle">{studentEmail}</span>
           </p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            loading={link.isPending}
-            disabled={link.isPending}
-            onClick={() => link.mutate({ email: studentEmail })}
-          >
-            <Link2 className="h-4 w-4" aria-hidden="true" />
-            Vincular cuenta del alumno
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={link.isPending}
+              disabled={link.isPending}
+              onClick={() => link.mutate({ email: studentEmail })}
+            >
+              <Link2 className="h-4 w-4" aria-hidden="true" />
+              Vincular cuenta del alumno
+            </Button>
+            {studentUserId ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label={`Restablecer la contraseña de la cuenta del alumno ${studentEmail}`}
+                onClick={() =>
+                  setToReset({
+                    id: studentUserId,
+                    email: studentEmail,
+                    label: 'Cuenta del alumno',
+                  })
+                }
+              >
+                <KeyRound className="h-4 w-4" aria-hidden="true" />
+                Restablecer contraseña
+              </Button>
+            ) : null}
+          </div>
         </div>
       )}
 
@@ -214,17 +242,35 @@ export function StudentGuardians({ studentId }: Props) {
                   {!g.is_self && (g.phone || g.whatsapp) ? ` · ${g.phone || g.whatsapp}` : ''}
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                loading={unlink.isPending && unlink.variables === g.id}
-                disabled={unlink.isPending && unlink.variables === g.id}
-                onClick={() => setToUnlink(g)}
-              >
-                <Unlink className="h-4 w-4" aria-hidden="true" />
-                Desvincular
-              </Button>
+              <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Restablecer la contraseña de ${g.full_name || g.email}`}
+                  onClick={() =>
+                    setToReset({
+                      id: g.id,
+                      email: g.email,
+                      label: g.is_self ? 'Cuenta familiar' : g.full_name || g.email,
+                    })
+                  }
+                >
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                  Restablecer contraseña
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  loading={unlink.isPending && unlink.variables === g.id}
+                  disabled={unlink.isPending && unlink.variables === g.id}
+                  onClick={() => setToUnlink(g)}
+                >
+                  <Unlink className="h-4 w-4" aria-hidden="true" />
+                  Desvincular
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
@@ -240,6 +286,14 @@ export function StudentGuardians({ studentId }: Props) {
         } de este alumno?`}
         confirmLabel="Desvincular"
         loading={unlink.isPending}
+      />
+
+      {/* Keyed by account: opening it for another account remounts it, so a
+          revealed temporary password can never survive into the next reset. */}
+      <ResetPasswordDialog
+        key={toReset?.id ?? 'none'}
+        target={toReset}
+        onClose={() => setToReset(null)}
       />
     </Card>
   );
