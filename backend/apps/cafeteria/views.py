@@ -106,14 +106,20 @@ class MyBalanceView(APIView):
             return Response(CafeteriaBalanceSerializer(
                 balance, context={'include_spend': True}).data)
 
-        if user.role == User.Role.PARENT:
-            students = list(StudentProfile.objects.filter(parents=user))
-            include_spend = True
-        else:
-            # Admin/staff wide view: skip the per-student spend aggregates so a
+        if user.role == User.Role.ADMIN:
+            # Admin wide view: skip the per-student spend aggregates so a
             # full-roster list stays cheap (matches AdminBalancesView).
             students = list(StudentProfile.objects.all())
             include_spend = False
+        else:
+            # Everyone else - parents, staff, and any role added later - sees
+            # only the children they are a guardian of. Staff used to fall into
+            # the wide branch through a bare else, which handed every teacher
+            # the whole school's wallets from an endpoint called "my balance";
+            # the staff dashboard reads aggregates, never per-child balances,
+            # and admins have the paginated /cafeteria/admin/balances/.
+            students = list(StudentProfile.objects.filter(parents=user))
+            include_spend = True
 
         # Constant query count regardless of family size: create any missing
         # wallet rows in one INSERT … ON CONFLICT, then fetch them in one query.

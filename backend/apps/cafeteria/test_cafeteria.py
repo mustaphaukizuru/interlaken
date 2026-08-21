@@ -14,7 +14,13 @@ from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
+from apps.accounts.factories import (
+    AdminFactory,
+    ParentFactory,
+    StudentProfileFactory,
+    UserFactory,
+)
+from apps.accounts.models import User
 from apps.cafeteria import services
 from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from apps.cafeteria.serializers import TopUpRequestSerializer
@@ -788,6 +794,33 @@ class TestReviewFixes:
         assert resp.status_code == 200
         assert all(row["today_spend"] is None and row["week_spend"] is None
                    for row in resp.data)
+
+    def test_staff_does_not_get_the_whole_roster(self, api_client):
+        """Least privilege: /cafeteria/balance/ is a family endpoint. Staff used
+        to fall through a bare else into the admin wide view, which handed every
+        teacher the whole school's wallets. The staff dashboard reads aggregates
+        (portal analytics), never per-child balances, and administration has the
+        paginated /cafeteria/admin/balances/."""
+        other = StudentProfileFactory()
+        CafeteriaBalance.objects.create(student=other, balance=Decimal("100"))
+        staff = UserFactory(role=User.Role.STAFF)
+        api_client.force_authenticate(user=staff)
+        resp = api_client.get(reverse("cafeteria-balance"))
+        assert resp.status_code == 200
+        assert resp.data == [], "staff must not see wallets of children they do not guard"
+
+    def test_staff_who_is_also_a_guardian_sees_only_that_child(self, api_client):
+        """A staff member with a child at the school is still a parent to that
+        child - and to that child only."""
+        staff = UserFactory(role=User.Role.STAFF)
+        mine = StudentProfileFactory(parents=[staff])
+        theirs = StudentProfileFactory()
+        CafeteriaBalance.objects.create(student=mine, balance=Decimal("50"))
+        CafeteriaBalance.objects.create(student=theirs, balance=Decimal("70"))
+        api_client.force_authenticate(user=staff)
+        resp = api_client.get(reverse("cafeteria-balance"))
+        assert resp.status_code == 200
+        assert [row["student"]["id"] for row in resp.data] == [mine.pk]
 
     def test_parent_balance_includes_spend(self, api_client):
         parent = ParentFactory()
