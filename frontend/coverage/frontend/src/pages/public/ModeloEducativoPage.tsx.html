@@ -1,0 +1,367 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for frontend/src/pages/public/ModeloEducativoPage.tsx</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../../prettify.css" />
+    <link rel="stylesheet" href="../../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../../index.html">All files</a> / <a href="index.html">frontend/src/pages/public</a> ModeloEducativoPage.tsx</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/79</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/79</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import { Link } from 'react-router-dom';</span></span></span>
+import { ArrowRight, BookOpenCheck, Globe2, HeartHandshake, Laptop, Leaf, Trophy } from 'lucide-react';
+import { Seo } from '@/components/seo/Seo';
+import { Reveal } from '@/components/ui/Reveal';
+&nbsp;
+<span class="cstat-no" title="statement not covered" >const PILLARS = [</span>
+<span class="cstat-no" title="statement not covered" >  {</span>
+<span class="cstat-no" title="statement not covered" >    icon: Globe2,</span>
+<span class="cstat-no" title="statement not covered" >    title: 'Educación bilingüe',</span>
+<span class="cstat-no" title="statement not covered" >    text: 'Español–Inglés en los tres niveles, con preparación para el First Certificate de la Universidad de Cambridge en Secundaria.',</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >  {</span>
+<span class="cstat-no" title="statement not covered" >    icon: BookOpenCheck,</span>
+<span class="cstat-no" title="statement not covered" >    title: 'Alto nivel académico',</span>
+<span class="cstat-no" title="statement not covered" >    text: 'Planes y Programas de la SEP enriquecidos con horas clase adicionales, Proyecto de Activación a la Inteligencia y Taller de Lectura y Redacción.',</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >  {</span>
+<span class="cstat-no" title="statement not covered" >    icon: HeartHandshake,</span>
+<span class="cstat-no" title="statement not covered" >    title: 'Educación en Valores',</span>
+<span class="cstat-no" title="statement not covered" >    text: 'Formamos mejores seres humanos: valores en el quehacer diario, ayuda y servicio a la comunidad, ceremonias y convivencia.',</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >  {</span>
+<span class="cstat-no" title="statement not covered" >    icon: Laptop,</span>
+<span class="cstat-no" title="statement not covered" >    title: 'Tecnología en el aula',</span>
+<span class="cstat-no" title="statement not covered" >    text: 'iPad integrado al salón de clases (de 4º de Primaria en adelante) y Educación Tecnológica con certificación en Word, Excel y PowerPoint.',</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >  {</span>
+<span class="cstat-no" title="statement not covered" >    icon: Leaf,</span>
+<span class="cstat-no" title="statement not covered" >    title: 'Cultura Ecológica',</span>
+<span class="cstat-no" title="statement not covered" >    text: 'Conciencia ambiental transversal en actividades, campañas y proyectos escolares.',</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >  {</span>
+<span class="cstat-no" title="statement not covered" >    icon: Trophy,</span>
+<span class="cstat-no" title="statement not covered" >    title: 'Actividades que complementan',</span>
+<span class="cstat-no" title="statement not covered" >    text: 'Visitas, concursos, exposiciones, festivales, ExpoInterlaken · Maratón de Conocimientos y actividades extraescolares deportivas y culturales.',</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >];</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >export default function ModeloEducativoPage() {</span>
+<span class="cstat-no" title="statement not covered" >  return (</span>
+<span class="cstat-no" title="statement not covered" >    &lt;div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;Seo</span>
+<span class="cstat-no" title="statement not covered" >        title="Modelo Educativo"</span>
+<span class="cstat-no" title="statement not covered" >        description="El modelo del Colegio Interlaken: educación bilingüe, alto nivel académico, valores, tecnología en el aula y cultura ecológica, de Preescolar a Secundaria."</span>
+<span class="cstat-no" title="statement not covered" >      /&gt;</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >      &lt;section className="relative overflow-hidden bg-dark text-white"&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;img src="/assets/campus-mural.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20"&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span className="section-label-green inline-flex"&gt;El Colegio&lt;/span&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]"&gt;</span>
+            Modelo Educativo
+<span class="cstat-no" title="statement not covered" >          &lt;/h1&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p className="mt-4 max-w-2xl text-[15.5px] leading-relaxed text-white/80"&gt;</span>
+            Un modelo propio orientado a una formación de calidad: los alumnos
+            adquieren conocimientos y desarrollan habilidades y actitudes que los
+            hacen competentes en la vida diaria y los preparan para su siguiente
+            nivel educativo.
+<span class="cstat-no" title="statement not covered" >          &lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;/section&gt;</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >      &lt;section className="bg-white py-12 sm:py-16"&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div className="mx-auto max-w-6xl px-4 sm:px-6"&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"&gt;</span>
+<span class="cstat-no" title="statement not covered" >            {PILLARS.map((p) =&gt; (</span>
+<span class="cstat-no" title="statement not covered" >              &lt;Reveal key={p.title}&gt;</span>
+<span class="cstat-no" title="statement not covered" >                &lt;div className="h-full rounded-xl2 border border-ink/10 bg-cream-2 p-6"&gt;</span>
+<span class="cstat-no" title="statement not covered" >                  &lt;p.icon size={22} className="text-green-dark" aria-hidden="true" /&gt;</span>
+<span class="cstat-no" title="statement not covered" >                  &lt;h2 className="mt-3 font-head text-lg font-bold text-ink"&gt;{p.title}&lt;/h2&gt;</span>
+<span class="cstat-no" title="statement not covered" >                  &lt;p className="mt-2 text-sm leading-relaxed text-muted"&gt;{p.text}&lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >                &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >              &lt;/Reveal&gt;</span>
+<span class="cstat-no" title="statement not covered" >            ))}</span>
+<span class="cstat-no" title="statement not covered" >          &lt;/div&gt;</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >          &lt;div className="mt-12 rounded-xl2 bg-dark p-8 text-center text-white sm:p-10"&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;h2 className="font-head text-fluid-xl font-bold"&gt;</span>
+              Conózcalo en acción, nivel por nivel
+<span class="cstat-no" title="statement not covered" >            &lt;/h2&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;div className="mt-5 flex flex-wrap justify-center gap-3"&gt;</span>
+<span class="cstat-no" title="statement not covered" >              {(['preescolar', 'primaria', 'secundaria'] as const).map((slug) =&gt; (</span>
+<span class="cstat-no" title="statement not covered" >                &lt;Link key={slug} to={`/niveles/${slug}`} className="btn-ghost capitalize"&gt;</span>
+<span class="cstat-no" title="statement not covered" >                  {slug} &lt;ArrowRight size={15} aria-hidden="true" /&gt;</span>
+<span class="cstat-no" title="statement not covered" >                &lt;/Link&gt;</span>
+<span class="cstat-no" title="statement not covered" >              ))}</span>
+<span class="cstat-no" title="statement not covered" >            &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;/section&gt;</span>
+<span class="cstat-no" title="statement not covered" >    &lt;/div&gt;</span>
+  );
+<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-21T06:06:03.114Z
+            </div>
+        <script src="../../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../../sorter.js"></script>
+        <script src="../../../../block-navigation.js"></script>
+    </body>
+</html>
+    

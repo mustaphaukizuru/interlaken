@@ -1,0 +1,406 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for frontend/tailwind.config.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">frontend</a> tailwind.config.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/107</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/107</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >/** @type {import('tailwindcss').Config} */</span></span></span>
+<span class="cstat-no" title="statement not covered" >export default {</span>
+<span class="cstat-no" title="statement not covered" >  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],</span>
+<span class="cstat-no" title="statement not covered" >  theme: {</span>
+<span class="cstat-no" title="statement not covered" >    extend: {</span>
+<span class="cstat-no" title="statement not covered" >      colors: {</span>
+<span class="cstat-no" title="statement not covered" >        // `brand` remapped to the Interlaken purple scale so every existing</span>
+<span class="cstat-no" title="statement not covered" >        // `brand-*` utility across the app rebrands automatically.</span>
+<span class="cstat-no" title="statement not covered" >        brand: {</span>
+<span class="cstat-no" title="statement not covered" >          50:  '#ede8f7',</span>
+<span class="cstat-no" title="statement not covered" >          100: '#e7e2f7',</span>
+<span class="cstat-no" title="statement not covered" >          200: '#d9cff0',</span>
+<span class="cstat-no" title="statement not covered" >          300: '#b9a5e0',</span>
+<span class="cstat-no" title="statement not covered" >          400: '#8f6fd0',</span>
+<span class="cstat-no" title="statement not covered" >          500: '#5e3aad',</span>
+<span class="cstat-no" title="statement not covered" >          600: '#401a8e',</span>
+<span class="cstat-no" title="statement not covered" >          700: '#37167a',</span>
+<span class="cstat-no" title="statement not covered" >          800: '#2c1163',</span>
+<span class="cstat-no" title="statement not covered" >          900: '#1f0c47',</span>
+<span class="cstat-no" title="statement not covered" >        },</span>
+<span class="cstat-no" title="statement not covered" >        // ── Official logo colors (sampled from public/assets/logo-vertical.png) ──</span>
+<span class="cstat-no" title="statement not covered" >        // GREEN = wordmark → primary/anchor. CORAL = tagline + clock hands + rule → warm accent.</span>
+<span class="cstat-no" title="statement not covered" >        // PURPLE + PINK = clock accents (energetic secondary family). See frontend/BRAND.md.</span>
+<span class="cstat-no" title="statement not covered" >        green: {</span>
+<span class="cstat-no" title="statement not covered" >          50:  '#eef7e9',</span>
+<span class="cstat-no" title="statement not covered" >          100: '#dcefd0',</span>
+<span class="cstat-no" title="statement not covered" >          200: '#bce0a3',</span>
+<span class="cstat-no" title="statement not covered" >          300: '#97cf73',</span>
+<span class="cstat-no" title="statement not covered" >          400: '#6fbb46',</span>
+<span class="cstat-no" title="statement not covered" >          500: '#47a028',   // wordmark green — primary anchor</span>
+<span class="cstat-no" title="statement not covered" >          600: '#3c8a20',</span>
+<span class="cstat-no" title="statement not covered" >          700: '#316f1c',</span>
+<span class="cstat-no" title="statement not covered" >          800: '#285a1a',</span>
+<span class="cstat-no" title="statement not covered" >          900: '#224b18',</span>
+<span class="cstat-no" title="statement not covered" >          DEFAULT: '#47a028',</span>
+<span class="cstat-no" title="statement not covered" >          mid:    '#6fbb46',</span>
+<span class="cstat-no" title="statement not covered" >          dark:   '#316f1c',</span>
+<span class="cstat-no" title="statement not covered" >          bright: '#8bd15f',</span>
+<span class="cstat-no" title="statement not covered" >          light:  '#eef7e9',</span>
+<span class="cstat-no" title="statement not covered" >          // Interactive face: white labels pass AA (4.91:1); wordmark green (3.32:1)</span>
+<span class="cstat-no" title="statement not covered" >          // stays decorative-only. Mirrors --green-strong.</span>
+<span class="cstat-no" title="statement not covered" >          strong: '#38801e',</span>
+<span class="cstat-no" title="statement not covered" >        },</span>
+<span class="cstat-no" title="statement not covered" >        coral: {</span>
+<span class="cstat-no" title="statement not covered" >          50:  '#fdecec',</span>
+<span class="cstat-no" title="statement not covered" >          100: '#fbd5d3',</span>
+<span class="cstat-no" title="statement not covered" >          200: '#f6aaa6',</span>
+<span class="cstat-no" title="statement not covered" >          300: '#ef7a75',</span>
+<span class="cstat-no" title="statement not covered" >          400: '#e64a44',</span>
+<span class="cstat-no" title="statement not covered" >          500: '#dd2622',   // clock hands / tagline rule — warm accent</span>
+<span class="cstat-no" title="statement not covered" >          600: '#c51d1a',</span>
+<span class="cstat-no" title="statement not covered" >          700: '#a11816',</span>
+<span class="cstat-no" title="statement not covered" >          800: '#841715',</span>
+<span class="cstat-no" title="statement not covered" >          900: '#6d1614',</span>
+<span class="cstat-no" title="statement not covered" >          DEFAULT: '#dd2622',</span>
+<span class="cstat-no" title="statement not covered" >          dark:   '#c51d1a',</span>
+<span class="cstat-no" title="statement not covered" >          light:  '#fdecec',</span>
+<span class="cstat-no" title="statement not covered" >        },</span>
+<span class="cstat-no" title="statement not covered" >        purple:  { DEFAULT: '#401a8e', mid: '#5e3aad', dark: '#4d22a8', light: '#ede8f7', xlight: '#e7e2f7' },</span>
+<span class="cstat-no" title="statement not covered" >        // pink darkened (was #ef2558) and amber darkened (was #d97706) for WCAG AA;</span>
+<span class="cstat-no" title="statement not covered" >        // mirrors --pink / --amber in index.css.</span>
+<span class="cstat-no" title="statement not covered" >        pink:    { DEFAULT: '#e01a4e', dark: '#d81a49', hot: '#ec1f7f', light: '#fde8ed', soft: '#ff6a8e', pale: '#ff8fa8' },</span>
+<span class="cstat-no" title="statement not covered" >        amber:   { DEFAULT: '#b45309', bright: '#f5b300' },</span>
+<span class="cstat-no" title="statement not covered" >        dark:    { DEFAULT: '#080516', 2: '#0f0a24', 3: '#1a1035', card: '#2a2342' },</span>
+<span class="cstat-no" title="statement not covered" >        // Match CSS tokens / BRAND.md — was #F1EFF8 and drifted from --cream.</span>
+<span class="cstat-no" title="statement not covered" >        cream:   { DEFAULT: '#F5F4FA', 2: '#FAF9FD' },</span>
+<span class="cstat-no" title="statement not covered" >        ink:     { DEFAULT: '#1A1130' },</span>
+<span class="cstat-no" title="statement not covered" >        muted:   '#6E6885',</span>
+<span class="cstat-no" title="statement not covered" >        // Darkened (was #9A93AE, 2.93:1) so caption text passes AA on white and cream.</span>
+<span class="cstat-no" title="statement not covered" >        subtle:  '#726B89',</span>
+<span class="cstat-no" title="statement not covered" >        // Hairline borders / dividers (mirror --border / --border-2 in index.css)</span>
+<span class="cstat-no" title="statement not covered" >        line:    '#ECEAF3',</span>
+<span class="cstat-no" title="statement not covered" >        'line-2': '#EEEBF5',</span>
+<span class="cstat-no" title="statement not covered" >        'nav-admisiones':  '#dd2622',</span>
+<span class="cstat-no" title="statement not covered" >        'nav-circulares':  '#c84040',</span>
+<span class="cstat-no" title="statement not covered" >        'nav-plataformas': '#47a028',</span>
+<span class="cstat-no" title="statement not covered" >        'nav-galeria':     '#6b8c2e',</span>
+<span class="cstat-no" title="statement not covered" >        'nav-contacto':    '#8b1a2e',</span>
+<span class="cstat-no" title="statement not covered" >      },</span>
+<span class="cstat-no" title="statement not covered" >      fontFamily: {</span>
+<span class="cstat-no" title="statement not covered" >        head: ['Poppins', 'sans-serif'],</span>
+<span class="cstat-no" title="statement not covered" >        body: ['Inter', 'sans-serif'],</span>
+<span class="cstat-no" title="statement not covered" >        sans: ['Inter', 'system-ui', 'sans-serif'],</span>
+<span class="cstat-no" title="statement not covered" >      },</span>
+<span class="cstat-no" title="statement not covered" >      // Fluid type scale — clamp() so display type shrinks gracefully on mobile.</span>
+<span class="cstat-no" title="statement not covered" >      fontSize: {</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-sm':   'clamp(0.8125rem, 0.78rem + 0.16vw, 0.875rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-base': 'clamp(0.9375rem, 0.9rem + 0.19vw, 1rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-lg':   'clamp(1.0625rem, 1rem + 0.31vw, 1.25rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-xl':   'clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-2xl':  'clamp(1.5rem, 1.3rem + 1vw, 2rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-3xl':  'clamp(1.875rem, 1.5rem + 1.9vw, 2.75rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-4xl':  'clamp(2.25rem, 1.7rem + 2.7vw, 3.5rem)',</span>
+<span class="cstat-no" title="statement not covered" >        'fluid-5xl':  'clamp(2.75rem, 1.9rem + 4.2vw, 4.75rem)',</span>
+<span class="cstat-no" title="statement not covered" >      },</span>
+<span class="cstat-no" title="statement not covered" >      borderRadius: { xl2: '18px', xl3: '24px', xl4: '32px' },</span>
+<span class="cstat-no" title="statement not covered" >      boxShadow: {</span>
+<span class="cstat-no" title="statement not covered" >        card:   '0 1px 2px rgba(16,12,40,0.04), 0 4px 14px -10px rgba(64,26,142,0.10)',</span>
+<span class="cstat-no" title="statement not covered" >        purple: '0 12px 28px -10px rgba(64,26,142,0.38)',</span>
+<span class="cstat-no" title="statement not covered" >        pink:   '0 12px 28px -10px rgba(224,26,78,0.3)',</span>
+<span class="cstat-no" title="statement not covered" >        green:  '0 12px 28px -10px rgba(71,160,40,0.32)',</span>
+<span class="cstat-no" title="statement not covered" >        coral:  '0 12px 28px -10px rgba(221,38,34,0.3)',</span>
+<span class="cstat-no" title="statement not covered" >      },</span>
+<span class="cstat-no" title="statement not covered" >    },</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
+<span class="cstat-no" title="statement not covered" >  plugins: [],</span>
+<span class="cstat-no" title="statement not covered" >};</span>
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-21T06:06:03.114Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    
