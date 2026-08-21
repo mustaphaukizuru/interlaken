@@ -230,9 +230,19 @@ export default defineConfig(({ command }) => ({
     manifest: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          query: ['@tanstack/react-query'],
+        // Rolldown (vite 8) dropped manualChunks in favour of advancedChunks;
+        // the groups below reproduce the previous two shared chunks.
+        advancedChunks: {
+          groups: [
+            {
+              name: 'vendor',
+              test: /[\/]node_modules[\/](react|react-dom|react-router|react-router-dom|scheduler)[\/]/,
+            },
+            {
+              name: 'query',
+              test: /[\/]node_modules[\/]@tanstack[\/]/,
+            },
+          ],
         },
       },
     },
