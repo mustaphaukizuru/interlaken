@@ -34,6 +34,13 @@ set -a; source ./.env; set +a
 [[ -n "${TLS_EMAIL:-}" ]] || fail "TLS_EMAIL is not set in .env (Caddy will not start without it)"
 [[ -n "${SECRET_KEY:-}" ]] || fail "SECRET_KEY is not set in .env"
 
+# The database runs on this box now, and compose refuses to interpolate these,
+# so an empty one fails mid-deploy with a raw interpolation error. Catch it here
+# instead, before anything is rebuilt.
+for var in DB_NAME DB_USER DB_PASSWORD; do
+  [[ -n "${!var:-}" ]] || fail "$var is not set in .env (the db service needs it; see env.example)"
+done
+
 # DNS must already point here or Caddy cannot complete the ACME challenge.
 if command -v dig >/dev/null; then
   resolved="$(dig +short "$PORTAL_DOMAIN" | tail -1)"
@@ -86,6 +93,17 @@ if [[ "$healthy" != true ]]; then
   echo "" >&2
   echo "DEPLOY FAILED: the container never became healthy. Recent logs:" >&2
   docker compose logs --tail 40 app >&2
+  # The app's own log usually only says it cannot reach the database; the
+  # reason is in the database's log, so print both rather than sending you
+  # looking for the second command yourself.
+  echo "" >&2
+  echo "Database logs (the app cannot start without it):" >&2
+  docker compose logs --tail 20 db >&2
+  echo "" >&2
+  echo "If these say password authentication failed: DB_PASSWORD in .env is" >&2
+  echo "only used when the volume is FIRST created. Change it inside the" >&2
+  echo "database instead:" >&2
+  echo "  docker compose exec db psql -U $DB_USER -d $DB_NAME -c \"ALTER USER $DB_USER WITH PASSWORD '<the value in .env>';\"" >&2
   echo "" >&2
   echo "To roll back to the previous image:" >&2
   echo "  docker tag interlaken-app:previous interlaken-app:current && docker compose up -d --force-recreate app" >&2
