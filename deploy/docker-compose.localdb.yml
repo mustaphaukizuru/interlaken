@@ -1,0 +1,72 @@
+# Runs Postgres on this box instead of an external database.
+#
+# Enable by adding ONE line to deploy/.env:
+#     COMPOSE_FILE=docker-compose.yml:docker-compose.localdb.yml
+# and removing DB_HOST from .env. Every compose command (including deploy.sh
+# and backup-db.sh) then picks both files up automatically.
+#
+# Disabled by default on purpose: the school's data lives in an external
+# database today, and an idle, empty Postgres container sitting next to it is
+# the kind of thing someone restores into by mistake at 2am.
+name: interlaken
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    # Pinned to the SAME major the data came from, so a dump taken before the
+    # move restores without a version mismatch. Changing this major later means
+    # dump -> restore, never an in-place volume upgrade: Postgres refuses to
+    # start on a data directory written by a different major.
+    image: postgres:17-alpine
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    # NOTE: no `cap_drop: ALL` here, unlike the other services. The official
+    # image starts as root to fix data-directory ownership and then drops to
+    # the postgres user with gosu, which needs SETUID/SETGID. Dropping all
+    # capabilities makes the container fail at boot.
+    environment:
+      POSTGRES_DB: ${DB_NAME:?set DB_NAME in deploy/.env}
+      POSTGRES_USER: ${DB_USER:?set DB_USER in deploy/.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in deploy/.env}
+      # Deterministic collation: the default depends on the image locale, and a
+      # collation change silently corrupts index ordering on restore.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    # 64 MB (the Docker default) is small for sorts and parallel scans; the
+    # admin exports and analytics aggregates are the queries that notice.
+    shm_size: 256mb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The app waits on this, so a slow first boot (initdb) cannot produce a
+      # container that starts, fails to connect and crash-loops.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -q"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
+    # NO published ports: the database is reachable only from the private
+    # compose network. Nothing on the internet, and nothing else on this host,
+    # can open a connection to it.
+    networks: [internal]
+
+
+  app:
+    # Supplies the host the base file requires, and waits for the database to
+    # be accepting connections before the entrypoint runs migrations.
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  # The school's entire database. Never `docker compose down -v` on this box.
+  pgdata:

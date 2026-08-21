@@ -21,45 +21,6 @@ x-logging: &logging
     max-file: "3"
 
 services:
-  db:
-    # Pinned to the SAME major the data came from, so a dump taken before the
-    # move restores without a version mismatch. Changing this major later means
-    # dump -> restore, never an in-place volume upgrade: Postgres refuses to
-    # start on a data directory written by a different major.
-    image: postgres:17-alpine
-    restart: unless-stopped
-    logging: *logging
-    security_opt:
-      - no-new-privileges:true
-    # NOTE: no `cap_drop: ALL` here, unlike the other services. The official
-    # image starts as root to fix data-directory ownership and then drops to
-    # the postgres user with gosu, which needs SETUID/SETGID. Dropping all
-    # capabilities makes the container fail at boot.
-    environment:
-      POSTGRES_DB: ${DB_NAME:?set DB_NAME in deploy/.env}
-      POSTGRES_USER: ${DB_USER:?set DB_USER in deploy/.env}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in deploy/.env}
-      # Deterministic collation: the default depends on the image locale, and a
-      # collation change silently corrupts index ordering on restore.
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-    # 64 MB (the Docker default) is small for sorts and parallel scans; the
-    # admin exports and analytics aggregates are the queries that notice.
-    shm_size: 256mb
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      # The app waits on this, so a slow first boot (initdb) cannot produce a
-      # container that starts, fails to connect and crash-loops.
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -q"]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-      retries: 6
-    # NO published ports: the database is reachable only from the private
-    # compose network. Nothing on the internet, and nothing else on this host,
-    # can open a connection to it.
-    networks: [internal]
-
   app:
     build:
       # The Dockerfile expects the repo root as its build context (it copies
@@ -118,6 +79,10 @@ services:
       # docs/DEPLOY_HOSTINGER_VPS.md); deleting DB_HOST from .env afterwards is
       # what flips the switch.
       DB_ENGINE: ${DB_ENGINE:-django.db.backends.postgresql}
+      # .env names the database. With the local-db overlay enabled (see
+      # env.example) this defaults to the db container it adds; without either,
+      # the app fails to resolve the host and says so in the log - loudly, and
+      # without ever creating an empty database to serve from.
       DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-5432}
       # On the private compose network TLS is theatre the internet cannot reach
@@ -153,9 +118,6 @@ services:
       timeout: 10s
       start_period: 90s   # first boot runs migrations before gunicorn binds
       retries: 3
-    depends_on:
-      db:
-        condition: service_healthy
     networks: [internal]
 
   caddy:
@@ -193,8 +155,6 @@ services:
     networks: [internal]
 
 volumes:
-  # The school's entire database. Never `docker compose down -v` on this box.
-  pgdata:
   media:
   caddy_data:
   caddy_config:

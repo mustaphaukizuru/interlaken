@@ -58,12 +58,12 @@ read -r -p "Type MIGRATE to continue: " answer
 [[ "$answer" == "MIGRATE" ]] || fail "aborted."
 
 step "Checking the local database is empty"
-docker compose up -d db >/dev/null
+docker compose -f docker-compose.yml -f docker-compose.localdb.yml up -d db >/dev/null
 for _ in $(seq 1 30); do
-  docker compose exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" -q && break
+  docker compose -f docker-compose.yml -f docker-compose.localdb.yml exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" -q && break
   sleep 2
 done
-local_tables=$(docker compose exec -T db psql -tA -U "$DB_USER" -d "$DB_NAME" \
+local_tables=$(docker compose -f docker-compose.yml -f docker-compose.localdb.yml exec -T db psql -tA -U "$DB_USER" -d "$DB_NAME" \
   -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" | tr -d '[:space:]')
 if [[ "$local_tables" != "0" ]] && ! $FORCE; then
   fail "the local database already has $local_tables tables. Re-run with --force
@@ -90,10 +90,10 @@ size=$(stat -c%s "$DUMP")
 echo "    $DUMP ($((size / 1024)) KB)"
 
 step "Restoring into the local database"
-gunzip -c "$DUMP" | docker compose exec -T db psql -q -U "$DB_USER" -d "$DB_NAME"
+gunzip -c "$DUMP" | docker compose -f docker-compose.yml -f docker-compose.localdb.yml exec -T db psql -q -U "$DB_USER" -d "$DB_NAME"
 
 step "Comparing row counts"
-DST_COUNTS=$(docker compose exec -T db psql -tA -U "$DB_USER" -d "$DB_NAME" -c "$COUNT_SQL" | tr -d '\r')
+DST_COUNTS=$(docker compose -f docker-compose.yml -f docker-compose.localdb.yml exec -T db psql -tA -U "$DB_USER" -d "$DB_NAME" -c "$COUNT_SQL" | tr -d '\r')
 echo "    source: $SRC_COUNTS"
 echo "    local : $DST_COUNTS"
 if [[ "$SRC_COUNTS" != "$DST_COUNTS" ]]; then
@@ -109,6 +109,7 @@ cat <<EOF
 The copy is done and verified, and the site is still configured to read the
 external database. One line makes the switch:
 
+    echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.localdb.yml' >> .env
     sed -i '/^DB_HOST=/d;/^DB_PORT=/d;/^DB_SSLMODE=/d' .env
     ./deploy.sh          # must print: database: local db container
     ./backup-db.sh       # first local backup, straight away

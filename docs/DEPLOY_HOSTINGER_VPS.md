@@ -1,9 +1,8 @@
 # Deploying the parent portal to a Hostinger VPS
 
 The portal runs as Docker containers on one box: Django + gunicorn serving the
-built React SPA, Postgres holding the data, and Caddy handling HTTPS. Nothing
-depends on a third-party cloud — code comes from GitHub, everything else runs
-here.
+built React SPA, behind Caddy for HTTPS. The database is external — the managed
+Postgres named by `DB_HOST` in `deploy/.env`.
 
 ```
 interlaken.edu.mx
@@ -12,8 +11,12 @@ interlaken.edu.mx
         |
    app    :8000           gunicorn, not reachable from the internet
         |
-   db     :5432           Postgres 17, private network only, pgdata volume
+   managed Postgres       external, named by DB_HOST
 ```
+
+Running Postgres on this box instead is supported and one line away — see
+[Running the database on this box](#running-the-database-on-this-box) — but it
+is not the default, and nothing in day-to-day operation requires it.
 
 Everything below assumes a Hostinger **KVM 2** running **Ubuntu 22.04 or 24.04**
 with Docker. Allow about 45 minutes for a first deployment.
@@ -245,6 +248,24 @@ cd /opt/interlaken/deploy && ./backup-db.sh     # prove the backup path works no
 ls -lh /var/backups/interlaken/
 ```
 
+## Running the database on this box
+
+Optional. The default is an external managed Postgres, and it is a perfectly
+good place for it to stay. Move it here only if you want one less external
+dependency (or one less bill).
+
+Two lines in `deploy/.env` switch the stack over — the overlay adds the Postgres
+container, and removing `DB_HOST` points the app at it:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.localdb.yml
+# DB_HOST=…  ← delete this line
+```
+
+`deploy.sh` refuses if neither is configured, and prints which database each run
+is using either way. If there is existing data to bring across, the section
+below does it for you; on a fresh install there is nothing to move.
+
 ## Moving the data off Supabase (one time)
 
 Skip this on a fresh install — `migrate` creates an empty schema at first boot
@@ -472,18 +493,19 @@ Three separate things need backing up, and only one of them is handled for you.
 
 | What | Where it lives | Who backs it up |
 |---|---|---|
-| School data (parents, payments, ledger) | the `pgdata` volume on this VPS | `deploy/backup-db.sh`, nightly at 02:30 |
+| School data (parents, payments, ledger) | the external database (or `pgdata` here, if you moved it) | `deploy/backup-db.sh`, nightly at 02:30 |
 | Uploaded documents | the `media` Docker volume on this VPS | **nobody, until you set this up** |
 | TLS certificate | the `caddy_data` volume | re-issued automatically if lost |
 
-**The database backup is yours now.** Nothing off this machine holds a copy, so
-`backup-db.sh` (installed by the crontab in Step 9) is the only thing standing
-between a disk failure and starting over. It dumps from inside the db container
-so the client and server versions always match, refuses to rotate old copies
-away behind a suspiciously small dump, and a second cron entry emails you if a
-night passes with no backup at all. Set `BACKUP_REMOTE` in `deploy/.env` to
-copy each dump off the box — an on-box backup does not survive the failure it
-exists for.
+**The database backup runs from this box.** `backup-db.sh` (installed by the
+crontab in Step 9) dumps whichever database the app is actually using — it reads
+`DB_HOST` the same way the app does, so it cannot end up backing up the wrong,
+empty one. It always runs pg_dump from a Postgres 17 image so client and server
+versions match (a mismatch is what silently broke the previous GitHub Actions
+backup for five nights), refuses to rotate old copies away behind a
+suspiciously small dump, and a second cron entry emails you if a night passes
+with no backup at all. Set `BACKUP_REMOTE` in `deploy/.env` to copy each dump
+off the box — an on-box backup does not survive the failure it exists for.
 
 Restore one:
 
