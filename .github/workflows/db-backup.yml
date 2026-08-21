@@ -1,0 +1,91 @@
+name: Database backup (Supabase Postgres)
+
+# OFF-SITE nightly backup of the managed Postgres, kept as a GitHub Actions
+# artifact (30-day retention). Restore with:
+#   gunzip -c interlaken-db-*.sql.gz | psql "<connection-string>"
+#
+# This is the second of two backups, and deliberately so. deploy/backup-db.sh
+# runs on the VPS and writes to that box; this one runs somewhere else entirely,
+# which is the only difference that matters when the box is what failed. The
+# managed database has no scheduled backups of its own on the current plan.
+#
+# It works because the database is reachable from the internet. If the database
+# is ever moved onto the VPS (deploy/docker-compose.localdb.yml), it becomes
+# unreachable from here and this workflow should be deleted — the VPS cron is
+# then the only thing that can take a dump at all.
+#
+# Uses the DB_* secrets (session pooler host: IPv4 and pg_dump-compatible; the
+# direct host is IPv6-only and unreachable from Actions runners).
+
+on:
+  schedule:
+    - cron: '30 8 * * *'   # 02:30 America/Mexico_City (UTC-6)
+  workflow_dispatch: {}
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write   # the failure-alert step opens/comments an issue
+    steps:
+      # postgresql-client-17 explicitly: Supabase upgraded the server to PG 17
+      # and pg_dump aborts on a major-version mismatch (backups failed silently
+      # 2026-08-11..15 with the runner's default client 16). The PGDG apt repo
+      # must be added first — it is NOT preconfigured on the runners.
+      - name: Install postgresql-client 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -sSf -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update && sudo apt-get install -y postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - name: Dump database (gzip)
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          stamp=$(date -u +%Y%m%d-%H%M%S)
+          out="interlaken-db-${stamp}.sql.gz"
+          /usr/lib/postgresql/17/bin/pg_dump \
+            --no-owner --no-privileges \
+            --host="${{ secrets.DB_HOST }}" \
+            --port="${{ secrets.DB_PORT }}" \
+            --username="${{ secrets.DB_USER }}" \
+            "${{ secrets.DB_NAME }}" \
+            | gzip > "$out"
+          ls -lh "$out"
+          # A dump that silently produced (near-)nothing is not a backup.
+          test "$(stat -c%s "$out")" -gt 10240
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: interlaken-db-backup
+          path: interlaken-db-*.sql.gz
+          retention-days: 30
+      # Backups failed for 5 days with nobody noticing — failures now open/refresh
+      # a labeled issue so they surface outside the Actions tab.
+      - name: Alert on failure (issue)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="DB backup failing"
+          body="Nightly Supabase backup failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh label create db-backup-failure --repo "$GITHUB_REPOSITORY" \
+            --color B60205 --description "Nightly DB backup failed" 2>/dev/null || true
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body" \
+              --label db-backup-failure || \
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
