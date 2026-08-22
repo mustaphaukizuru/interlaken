@@ -20,6 +20,7 @@ export interface User {
   avatar: string;
   whatsapp: string;
   has_usable_password?: boolean;
+  last_login?: string | null;
   notif_prefs?: {
     email_enabled: boolean;
     in_app_enabled: boolean;

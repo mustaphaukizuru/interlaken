@@ -1,4 +1,8 @@
 import { useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
+import { portalApi } from '@/services/api';
+import { Coffee, QrCode, Users, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Save, Bell, Shield } from 'lucide-react';
@@ -15,8 +19,34 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /** "Mi información" — name, WhatsApp, notification prefs (password is admin-managed). */
+type Tab = 'perfil' | 'seguridad' | 'avisos' | 'privacidad';
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'perfil', label: 'Perfil' },
+  { key: 'seguridad', label: 'Seguridad' },
+  { key: 'avisos', label: 'Notificaciones' },
+  { key: 'privacidad', label: 'Privacidad' },
+];
+
 export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
+  const { get, set } = useUrlFilters();
+  const tab = (['perfil', 'seguridad', 'avisos', 'privacidad'].includes(get('tab')) ? get('tab') : 'perfil') as Tab;
+  const isFamily = user?.role === 'parent' || user?.role === 'student';
+  const { data: dash } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: async () => (await portalApi.getDashboard()).data as import('@/types').DashboardData,
+    enabled: isFamily,
+    staleTime: 60_000,
+  });
+  const children = dash?.children ?? [];
+  // Profile completeness (BACKLOG P1-F4): the fields the school actually needs.
+  const checks = [
+    { ok: !!user?.first_name && !!user?.last_name, label: 'Nombre completo' },
+    { ok: !!user?.whatsapp, label: 'WhatsApp para avisos' },
+    { ok: !!user?.notif_prefs, label: 'Preferencias de avisos revisadas' },
+    ...(isFamily ? [{ ok: children.length > 0, label: 'Alumno(s) vinculado(s)' }] : []),
+  ];
+  const completeness = Math.round((checks.filter((c) => c.ok).length / checks.length) * 100);
   const [firstName, setFirstName] = useState(user?.first_name ?? '');
   const [lastName, setLastName] = useState(user?.last_name ?? '');
   const [whatsapp, setWhatsapp] = useState(user?.whatsapp ?? '');
@@ -86,8 +116,32 @@ export default function ProfilePage() {
 
   return (
     <>
-      <PageHeader title="Mi información" subtitle="Actualiza tus datos de contacto y avisos" />
-      <div className="mx-auto max-w-xl space-y-4">
+      <PageHeader title="Mi información" subtitle="Tus datos, tu familia, tu seguridad y tus avisos." />
+      <div className="mx-auto max-w-2xl space-y-4">
+        <div role="tablist" aria-label="Secciones" className="flex gap-1 overflow-x-auto rounded-xl bg-cream-2 p-1">
+          {TABS.map((t) => (
+            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => set({ tab: t.key === 'perfil' ? null : t.key })}
+              className={`min-h-[40px] flex-1 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'perfil' && (<>
+        <Card>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-ink">Perfil completo al {completeness}%</p>
+            <span className="text-xs text-subtle">{checks.filter((c) => c.ok).length} de {checks.length}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-cream-2" role="progressbar" aria-valuenow={completeness} aria-valuemin={0} aria-valuemax={100} aria-label="Perfil completo">
+            <div className="h-full rounded-full bg-green transition-[width]" style={{ width: `${completeness}%` }} />
+          </div>
+          {completeness < 100 && (
+            <ul className="mt-3 space-y-1 text-xs text-muted">
+              {checks.filter((c) => !c.ok).map((c) => <li key={c.label}>· Falta: {c.label}</li>)}
+            </ul>
+          )}
+        </Card>
         <Card>
           <form onSubmit={submit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -122,11 +176,52 @@ export default function ProfilePage() {
             </div>
           </form>
         </Card>
+        {isFamily && (
+          <Card>
+            <div className="mb-3 flex items-center gap-2">
+              <Users className="h-4 w-4 text-purple" />
+              <h2 className="font-head text-base font-semibold text-ink">Mi familia</h2>
+            </div>
+            {children.length === 0 ? (
+              <p className="text-sm text-muted">Aún no hay alumnos vinculados a esta cuenta. Solicite la vinculación al colegio.</p>
+            ) : (
+              <ul className="divide-y divide-cream">
+                {children.map((c) => (
+                  <li key={c.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-ink">{c.name}</p>
+                      <p className="text-xs text-subtle">{c.grade}{c.group ? ` ${c.group}` : ''} · Matrícula {c.student_id}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Link to={`/portal/cafeteria?hijo=${c.id}`} className="btn-outline min-h-[36px] px-3 text-xs"><Coffee className="h-3.5 w-3.5" aria-hidden="true" /> Cafetería</Link>
+                      <Link to="/portal/credencial" className="btn-outline min-h-[36px] px-3 text-xs"><QrCode className="h-3.5 w-3.5" aria-hidden="true" /> Credencial</Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-xs text-subtle">¿Un dato incorrecto? <a href={`mailto:${'info@interlaken.com.mx'}?subject=${encodeURIComponent('Corrección de datos del alumno')}`} className="font-semibold text-purple hover:underline">Solicitar corrección</a>.</p>
+          </Card>
+        )}
+        </>)}
 
+        {tab === 'seguridad' && (<>
         <Card>
           <PasswordHelp email={user?.email} />
         </Card>
+        <Card>
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-purple" />
+            <h2 className="font-head text-base font-semibold text-ink">Sesión</h2>
+          </div>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Último acceso</dt><dd className="mt-0.5 text-ink">{user?.last_login ? new Date(user.last_login).toLocaleString('es-MX') : 'Esta sesión'}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Acceso con Google</dt><dd className="mt-0.5 text-ink">{user?.has_usable_password === false ? 'Sí (sin contraseña local)' : 'Contraseña asignada por el colegio'}</dd></div>
+          </dl>
+        </Card>
+        </>)}
 
+        {tab === 'avisos' && (
         <Card>
           <div className="mb-3 flex items-center gap-2">
             <Bell className="h-4 w-4 text-purple" />
@@ -169,7 +264,9 @@ export default function ProfilePage() {
             </Button>
           </div>
         </Card>
+        )}
 
+        {tab === 'privacidad' && (
         <Card>
           <div className="mb-3 flex items-center gap-2">
             <Shield className="h-4 w-4 text-purple" />
@@ -186,6 +283,7 @@ export default function ProfilePage() {
             Ir a Privacidad y ARCO
           </Link>
         </Card>
+        )}
       </div>
     </>
   );

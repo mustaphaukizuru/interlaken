@@ -56,7 +56,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-A7 | Student status lifecycle (activo, baja temporal, egresado) and effects on login, cafetería, comunicados. | DONE 2026-08-22 (StudentProfile.status + apply_status(): mirrors is_active and toggles the student login; migration 0006 backfills) |
 | P1-A8 | Roster table: column chooser, sort, nivel/grado/grupo filters, bulk actions, density toggle, sticky header, mobile cards. | Partial (estado/acceso filters + status/último acceso columns done; rest folded into P1-B6) |
 | P1-A9 | Staff credencial view: preview, print, reissue payment code. | DONE 2026-08-22 (student file shows the card + Imprimir; reissue = relink Loyverse from Cafetería) |
-| P1-A10 | Parent-side student card with the same read-only data and "Solicitar corrección". | Refine |
+| P1-A10 | Parent-side student card with the same read-only data and "Solicitar corrección". | DONE 2026-08-22 (Mi familia block in Mi información) |
 | P1-A11 | Flip StudentProfile/ParentProfile to read-only in Django admin after A1/A3. | DONE 2026-08-22 (ReadOnlyMirror mixin) |
 
 ### P1-B. Responsiveness and mobile-first
@@ -122,12 +122,12 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-F1 | Tabs: Perfil, Seguridad, Notificaciones, Privacidad (fold `/portal/privacidad`). | Refine |
+| P1-F1 | Tabs: Perfil, Seguridad, Notificaciones, Privacidad (fold `/portal/privacidad`). | DONE 2026-08-22 (URL-synced ?tab=; Privacidad tab links to the ARCO page) |
 | P1-F2 | Avatar upload/crop (Supabase Storage). | Missing |
-| P1-F3 | Seguridad tab: no password form; "solicítalo al colegio" CTA; last login; Google-linked indicator. | Refine |
-| P1-F4 | Profile completeness meter. | Missing |
-| P1-F5 | Family block: linked students with nivel color, links to Credencial and Cafetería; other guardians read-only. | Missing |
-| P1-F6 | Profile page for admin/staff roles. | Missing |
+| P1-F3 | Seguridad tab: no password form; "solicítalo al colegio" CTA; last login; Google-linked indicator. | DONE 2026-08-22 |
+| P1-F4 | Profile completeness meter. | DONE 2026-08-22 |
+| P1-F5 | Family block: linked students with nivel color, links to Credencial and Cafetería; other guardians read-only. | DONE 2026-08-22 (Mi familia card with Cafetería/Credencial links and 'Solicitar corrección'; other-guardians list deferred) |
+| P1-F6 | Profile page for admin/staff roles. | DONE (reachable at /portal/perfil from the account menu for every role; family-only cards hidden) |
 
 ### P1-G. Forms (admissions and public)
 
