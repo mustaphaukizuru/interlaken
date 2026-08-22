@@ -72,7 +72,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-B7 | Forms on mobile: single column, 44px inputs, inputmode/autocomplete, sticky submit, step indicator. | Partial 2026-08-22 (44px/16px inputs and buttons already global; inputMode/autoComplete added to every tel/email field; sticky submit + step indicator move to the recarga wizard P1-D1 and the CMS forms P3-6) |
 | P1-B8 | Modals as full-screen sheets under md, centered above. | DONE 2026-08-22 (Modal was already a bottom sheet under sm with focus trap; added grab handle) |
 | P1-B9 | Fluid typography, 16px minimum body, spacing scale, max content width 1200 to 1320 on large screens. | DONE 2026-08-22 (fluid scale existed; portal max width 1320) |
-| P1-B10 | Large-screen layouts: 12-col grid, 3 to 4 KPI tiles per row at xl, list + detail two-pane at 2xl. | Missing |
+| P1-B10 | Large-screen layouts: 12-col grid, 3 to 4 KPI tiles per row at xl, list + detail two-pane at 2xl. | DONE 2026-08-22 (portal container 1680px at 2xl; dashboard KPIs 4-up at xl and activity + avisos side by side at 2xl; Alumnos opens the student detail in a sticky right pane at 2xl (links still navigate below 2xl and with ctrl/cmd-click); `AdminStudentDetail` accepts `id`/`embedded`) |
 | P1-B11 | Touch affordances for hover-only actions; swipe on ChildSwitcher and galería. | Refine |
 | P1-B12 | Playwright viewport matrix (360/768/1440) screenshots; Lighthouse mobile gate in CI. | Partial (visual suite covers 390/1280 with platform baselines; extra viewports need linux baselines from CI, Lighthouse gate under P5-3) |
 

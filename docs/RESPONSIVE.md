@@ -31,3 +31,10 @@ Audit every new screen at **360, 390, 768, 1024, 1440, 1920**. The Playwright vi
 - **Notifications**: bell opens a bottom sheet under `md`, popover above; `/portal/notificaciones` for the full list.
 - **Toasts**: `components/ui/ToastHost`, bottom-center on phones (above the tab bar), top-right on desktop, max 3 visible.
 - **Drawer**: swipe-left closes, first item focused on open, Escape closes; tab bar hides while the soft keyboard is open.
+
+## Large screens (P1-B10, 2026-08-22)
+
+- Portal container: 1320px up to xl, 1680px at 2xl.
+- KPI tiles: 1 / 2 / 3 / 4 per row at base / sm / lg / xl.
+- Two-pane pattern at 2xl: list on the left, sticky detail on the right (`AdminStudents` + `AdminStudentDetail embedded`). Row links keep working as links below 2xl and with ctrl/cmd-click, so nothing depends on the pane.
+- Dashboard secondary cards (activity, avisos) sit side by side at 2xl.

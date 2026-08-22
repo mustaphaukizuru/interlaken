@@ -78,9 +78,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Large screens (P1-B10): activity and avisos side by side at 2xl */}
+        <div className="grid gap-6 2xl:grid-cols-2">
         {/* Recent activity (audit trail) */}
         {!isError && data?.recent_activity && data.recent_activity.length > 0 && (
-          <Reveal delay={40} className="card mb-6">
+          <Reveal delay={40} className="card mb-6 2xl:mb-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-head text-[15px] font-bold text-ink"><Activity size={16} className="text-purple" aria-hidden="true" /> Actividad reciente</h2>
               <Link to="/admin/auditoria" className="flex items-center gap-1 text-[12.5px] font-semibold text-purple">Auditoría <ArrowRight size={13} /></Link>
@@ -145,6 +147,7 @@ export default function AdminDashboard() {
           )}
         </Reveal>
         )}
+        </div>
     </>
   );
 }

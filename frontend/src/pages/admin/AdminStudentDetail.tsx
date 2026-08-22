@@ -21,8 +21,10 @@ import type { StudentProfile } from '@/types';
  * /admin/alumnos/:studentId — student file: identity, guardians and the
  * cafetería shortcut. (The app does not bill tuition, so there is no ledger.)
  */
-export default function AdminStudentDetail() {
-  const { studentId } = useParams();
+/** Full page at /admin/alumnos/:id, or embedded as the right pane of the 2xl two-pane roster (BACKLOG P1-B10). */
+export default function AdminStudentDetail({ id, embedded = false }: { id?: number; embedded?: boolean } = {}) {
+  const params = useParams();
+  const studentId = id ?? params.studentId;
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-student', studentId],
     queryFn: async () => (await portalApi.getStudent(Number(studentId))).data as StudentProfile,
@@ -31,9 +33,11 @@ export default function AdminStudentDetail() {
 
   return (
     <>
-      <Link to="/admin/alumnos" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink">
-        <ArrowLeft className="h-4 w-4" /> Alumnos
-      </Link>
+      {!embedded && (
+        <Link to="/admin/alumnos" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink">
+          <ArrowLeft className="h-4 w-4" /> Alumnos
+        </Link>
+      )}
 
       {isLoading ? (
         <LoadingSpinner />

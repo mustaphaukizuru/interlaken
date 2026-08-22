@@ -1,5 +1,5 @@
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Search, FileUp, Link2, Download, FileDown, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -18,6 +18,8 @@ import { portalApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import AdminStudentDetail from './AdminStudentDetail';
 import { Badge } from '@/components/ui/Badge';
 import type { StudentProfile } from '@/types';
 
@@ -53,8 +55,18 @@ export default function AdminStudents() {
   const students = data?.results;
   const count = data?.count ?? 0;
 
+  // Large screens (2xl, docs/RESPONSIVE.md): list on the left, detail on the right, no navigation.
+  const twoPane = useMediaQuery('(min-width: 1536px)');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const openStudent = (e: MouseEvent, id: number) => {
+    if (!twoPane || e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    setSelectedId(id);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
+    <div className="space-y-6 min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Alumnos</h1>
@@ -152,7 +164,7 @@ export default function AdminStudents() {
                       {s.user.first_name[0]}
                     </div>
                     <div className="min-w-0">
-                      <Link to={`/admin/alumnos/${s.id}`} className="block truncate font-medium text-ink hover:text-purple hover:underline">{s.user.full_name}</Link>
+                      <Link to={`/admin/alumnos/${s.id}`} onClick={(e) => openStudent(e, s.id)} className="block truncate font-medium text-ink hover:text-purple hover:underline">{s.user.full_name}</Link>
                       <p className="text-subtle text-xs truncate">{s.user.email}</p>
                     </div>
                   </div>
@@ -196,7 +208,7 @@ export default function AdminStudents() {
                           <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                             {s.user.first_name[0]}
                           </div>
-                          <Link to={`/admin/alumnos/${s.id}`} className="font-medium text-ink hover:text-purple hover:underline">{s.user.full_name}</Link>
+                          <Link to={`/admin/alumnos/${s.id}`} onClick={(e) => openStudent(e, s.id)} className="font-medium text-ink hover:text-purple hover:underline" aria-current={selectedId === s.id ? 'true' : undefined}>{s.user.full_name}</Link>
                         </div>
                       </td>
                       <td className="text-muted">{s.student_id}</td>
@@ -215,6 +227,13 @@ export default function AdminStudents() {
 
         <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="alumnos" />
       </Card>
+    </div>
+    {twoPane && selectedId && (
+      <aside className="min-w-0 rounded-xl2 border border-line bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto" aria-label="Detalle del alumno">
+        <div className="mb-2 flex justify-end"><button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelectedId(null)}>Cerrar panel</button></div>
+        <AdminStudentDetail id={selectedId} embedded />
+      </aside>
+    )}
     </div>
   );
 }
