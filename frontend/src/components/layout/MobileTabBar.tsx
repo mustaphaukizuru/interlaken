@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { mobileNavByRole, type Role } from './navConfig';
 
@@ -6,8 +7,23 @@ import { mobileNavByRole, type Role } from './navConfig';
  * this keeps the curated daily destinations one tap away. Hidden at lg+ where the
  * static sidebar is present.
  */
+/** True while the on-screen keyboard shrinks the visual viewport (BACKLOG P1-B5). */
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setOpen(vv.height < window.innerHeight * 0.75);
+    vv.addEventListener('resize', check);
+    return () => vv.removeEventListener('resize', check);
+  }, []);
+  return open;
+}
+
 export default function MobileTabBar({ role }: { role: Role }) {
   const items = mobileNavByRole[role] ?? mobileNavByRole.parent;
+  const keyboardOpen = useKeyboardOpen();
+  if (keyboardOpen) return null;
 
   return (
     <nav

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
@@ -14,11 +15,32 @@ interface SidebarProps {
 
 export default function Sidebar({ role, open = false, onNavigate }: SidebarProps) {
   const { user } = useAuthStore();
+  const asideRef = useRef<HTMLElement>(null);
+  const touchX = useRef<number | null>(null);
+
+  // Mobile drawer (BACKLOG P1-B5): move focus in when it opens so keyboard and
+  // screen-reader users land on the menu, and let a leftward swipe close it.
+  useEffect(() => {
+    if (!open) return;
+    if (window.matchMedia?.('(min-width: 1024px)').matches) return;
+    asideRef.current?.querySelector<HTMLElement>('a, button')?.focus();
+  }, [open]);
+  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0]?.clientX ?? null; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchX.current;
+    touchX.current = null;
+    if (start === null) return;
+    const dx = (e.changedTouches[0]?.clientX ?? start) - start;
+    if (dx < -60) onNavigate?.();
+  };
   const items = navByRole[role] ?? navByRole.parent;
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
 
   return (
     <aside
+      ref={asideRef}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       aria-label="Navegación del portal"
       className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] flex-shrink-0 flex-col gap-5 overflow-hidden border-r border-line bg-white px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-out [padding-left:max(1rem,env(safe-area-inset-left))] lg:static lg:h-screen lg:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'

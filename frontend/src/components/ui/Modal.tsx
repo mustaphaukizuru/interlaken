@@ -110,6 +110,8 @@ export function Modal({ open, onClose, title, children, maxWidth = 384 }: ModalP
         className="card w-full max-h-[92dvh] space-y-4 overflow-y-auto rounded-b-none rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] focus:outline-none max-sm:!max-w-none sm:rounded-2xl sm:pb-6"
         style={{ maxWidth }}
       >
+        {/* Sheet grab handle (phones only): signals 'this slides down / tap outside to close'. */}
+        <div className="mx-auto -mt-1 mb-1 h-1.5 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
         <div className="flex items-start justify-between gap-4">
           <h3 id={titleId} className="font-semibold text-ink">{title}</h3>
           <button
