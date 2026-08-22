@@ -96,7 +96,7 @@ class Command(BaseCommand):
                 + f'. Total: ${bucket["total"]:.2f}.'
             )
             use_wa = bool(getattr(parent, 'whatsapp', '') or '')
-            notify(parent, Notification.NotifType.CAFETERIA, title, message,
+            notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False,
                    whatsapp=use_wa)
             sent += 1
 

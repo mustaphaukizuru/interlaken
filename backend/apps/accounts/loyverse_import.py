@@ -19,8 +19,7 @@ from apps.cafeteria.services import (
     import_students_from_loyverse,
     link_students_to_loyverse,
 )
-
-from .import_students import IsAdmin
+from apps.core.permissions import IsAdmin
 
 
 def _truthy(value) -> bool:

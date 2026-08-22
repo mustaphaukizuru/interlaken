@@ -54,10 +54,14 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
         return False
 
 
-def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bool = False):
+def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bool = False,
+           fanout: bool = True):
     """Create an in-app ``Notification`` for ``user`` and optionally email them.
 
     Respects ``NotificationPreference`` toggles when present (defaults = all on).
+    ``fanout`` (default) also delivers a student's email/push to every linked
+    guardian; pass ``fanout=False`` when the caller already iterates the family
+    (``family_notify_recipients``) so nobody is notified twice.
     """
     from apps.accounts.models import NotificationPreference
     from apps.portal.models import Notification
@@ -84,16 +88,18 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
 
     # A student's notification must reach the student's real mailbox (if any)
     # AND every linked guardian; synthetic importer addresses are skipped.
-    from apps.accounts.recipients import delivery_users, email_recipients
+    from apps.accounts.recipients import delivery_users, email_recipients, is_synthetic_email
 
+    targets = delivery_users(user) if fanout else [user]
     if want_email:
-        recipients = email_recipients(user)
+        recipients = email_recipients(user) if fanout else (
+            [user.email] if getattr(user, 'email', '') and not is_synthetic_email(user.email) else [])
         if recipients:
             send_email(subject=title, message=message, recipients=recipients)
 
     if want_push:
         from apps.portal.push import send_web_push
-        for target in delivery_users(user):
+        for target in targets:
             send_web_push(target, title, message)
 
     if whatsapp:

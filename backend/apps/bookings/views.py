@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 
 from .models import AvailabilitySlot, Booking
@@ -23,13 +24,6 @@ from .serializers import (
     SlotGeneratorSerializer,
 )
 from .services import SlotUnavailable, calendar, create_booking, send_booking_confirmation
-
-
-class IsAdmin(permissions.BasePermission):
-    """Authenticated admin users only (matches cafeteria/portal convention)."""
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 def _can_access_booking(user, booking):

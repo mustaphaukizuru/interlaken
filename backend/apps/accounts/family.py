@@ -1,37 +1,29 @@
 """
 Family notification recipients for a student.
 
-School-email family login often uses the alumno's User (role=student). Loyverse
-import usually self-links via ``student.parents``, but when that M2M row is
-missing the student can still pay — notifications must still reach them.
+Thin wrapper over ``apps.accounts.recipients.delivery_users`` (the single
+source of truth for "who receives what is addressed to this student"):
+active linked guardians first, then the student's own User when it is a
+school-email family login. Callers that loop over this list must call
+``notify(..., fanout=False)`` so guardians are not notified twice.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable
 
 from .models import StudentProfile, User
+from .recipients import delivery_users
 
 
 def family_notify_recipients(student: StudentProfile) -> list[User]:
-    """Users who should receive money/cafeteria notices for ``student``.
-
-    Returns linked guardians (``student.parents``) plus the student's own User
-    when that account is a school-email family login and is not already linked.
-    Deduped by primary key, order: linked guardians first, then own user.
-    """
-    seen: dict[int, User] = {}
-    for guardian in student.parents.all():
-        seen[guardian.pk] = guardian
-
+    """Guardians (active) first, then the student's own school-email User."""
     owner = getattr(student, 'user', None)
-    if (
-        owner is not None
-        and owner.pk not in seen
-        and getattr(owner, 'role', None) == User.Role.STUDENT
-    ):
-        seen[owner.pk] = owner
-
-    return list(seen.values())
+    if owner is None:
+        return [g for g in student.parents.filter(is_active=True).order_by('pk')]
+    users = delivery_users(owner)
+    guardians = [u for u in users if u.pk != owner.pk]
+    own = [u for u in users if u.pk == owner.pk and getattr(u, 'role', None) == User.Role.STUDENT]
+    return guardians + own
 
 
 def iter_family_notify_recipients(students: Iterable[StudentProfile]) -> list[User]:

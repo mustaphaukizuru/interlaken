@@ -27,12 +27,11 @@ def delivery_users(user) -> list[User]:
     if user is None:
         return []
     targets: list[User] = [user]
-    if getattr(user, 'role', None) == User.Role.STUDENT:
-        profile = getattr(user, 'student_profile', None)
-        if profile is not None:
-            for guardian in profile.parents.filter(is_active=True).order_by('pk'):
-                if guardian.pk != user.pk:
-                    targets.append(guardian)
+    profile = getattr(user, 'student_profile', None) if getattr(user, 'role', None) == User.Role.STUDENT else None
+    if profile is not None:
+        for guardian in profile.parents.filter(is_active=True).order_by('pk'):
+            if guardian.pk != user.pk:
+                targets.append(guardian)
     seen, unique = set(), []
     for u in targets:
         if u.pk not in seen:

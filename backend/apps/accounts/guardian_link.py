@@ -18,7 +18,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .import_students import IsAdmin, _split_name
+from apps.core.permissions import IsAdmin
+
+from .import_students import _split_name
 from .models import ParentProfile, StudentProfile, User
 
 

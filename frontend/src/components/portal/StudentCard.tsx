@@ -3,9 +3,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Coffee, Maximize2, X, Sun } from 'lucide-react';
 import { Barcode } from '@/components/ui/Barcode';
 import type { CafeteriaCard } from '@/types';
+import { formatMXN } from '@/lib/format';
 
-const money = (v: string | number) =>
-  Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+const money = formatMXN;
 
 /**
  * Digital cafetería card — the student's phone becomes their POS card. Shows

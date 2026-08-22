@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
@@ -14,14 +14,6 @@ import { Pagination } from '@/components/ui/Pagination';
 import { ADMIN_PAGE_SIZE, toPaged } from '@/lib/pagination';
 import { paymentsApi } from '@/services/api';
 import type { Payment } from '@/types';
-
-function RotateCcw({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10a9 9 0 1 0 2.636-6.364M3 10H9M3 10V4" />
-    </svg>
-  );
-}
 
 const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
   // Key MUST match the backend Payment.Status values ('success', not

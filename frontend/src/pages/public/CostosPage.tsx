@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { formatPrice } from '@/lib/format';
 
 interface EnrollmentFee {
   section: string;
@@ -35,10 +36,7 @@ interface PricingBundle {
   policies: PricingPolicy[];
 }
 
-const mxn = (v: string | null) =>
-  v === null
-    ? 'SIN COSTO'
-    : Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+const mxn = formatPrice;
 
 /** Card shell shared by every pricing section. */
 function PriceCard({ tone, icon: Icon, label, title, subtitle, children }: {

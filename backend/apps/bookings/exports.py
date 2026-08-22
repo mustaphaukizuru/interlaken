@@ -9,18 +9,9 @@ import csv
 from django.http import HttpResponse
 from django.utils import timezone
 
+from apps.core.exports import export_filename, fmt_dt
+
 VISIT_TYPE_LABEL = {'individual': 'Individual', 'open_class': 'Puertas Abiertas'}
-
-
-def _fmt_dt(dt) -> str:
-    if not dt:
-        return ''
-    return timezone.localtime(dt).strftime('%Y-%m-%d %H:%M')
-
-
-def _filename(prefix: str) -> str:
-    stamp = timezone.localtime(timezone.now()).strftime('%Y%m%d')
-    return f'{prefix}_{stamp}.csv'
 
 
 def bookings_csv(bookings) -> HttpResponse:
@@ -32,7 +23,7 @@ def bookings_csv(bookings) -> HttpResponse:
     response.write('﻿')  # BOM so Excel opens UTF-8 accents correctly
     writer = csv.writer(response)
     writer.writerow(['Visitas'])
-    writer.writerow(['Generado', _fmt_dt(timezone.now())])
+    writer.writerow(['Generado', fmt_dt(timezone.now())])
     writer.writerow([])
     writer.writerow(header)
     for b in bookings:
@@ -49,5 +40,5 @@ def bookings_csv(bookings) -> HttpResponse:
             b.num_attendees,
             b.get_status_display(),
         ])
-    response['Content-Disposition'] = f'attachment; filename="{_filename("visitas")}"'
+    response['Content-Disposition'] = f'attachment; filename="{export_filename("visitas")}"'
     return response

@@ -38,7 +38,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P0-9 | Contacto: form sends to `info@`; remove `colegio@interlaken.edu.mx`; show "Lunes a Viernes 7:30 - 15:00". | Public | DONE 2026-08-22 (defaults + data migration content.0012) |
 | P0-10 | Plataformas: rename "Portal de Familias" to "Cafetería"; keep only "Checar saldo y recargas de cafetería". | Public | DONE 2026-08-22 |
 | P0-11 | Header/footer: remove Facebook icon and logo in footer; top bar phone left, email right. | Public | DONE 2026-08-22 (also logos +30%: 40→52px) |
-| P0-12 | Duplicate audit: remove duplicated content/components across the system and on the same page. | Quality | Missing |
+| P0-12 | Duplicate audit: remove duplicated content/components across the system and on the same page. | Quality | DONE 2026-08-22 (32 findings audited; consolidated IsAdmin x5, CSV helpers x3, recipient resolvers, MXN formatter x4, WhatsApp icon, RotateCcw, footer address). Remaining low-impact items tracked under P1-I6 |
 | P0-13 | Pytest coverage for P0-2, P0-4, P0-5 (student with 2 guardians sends max 3 emails, synthetic skipped, enrollment payment rejected). | Tests | DONE 2026-08-22 (test_recipients, test_notification_prefs, payments tests) |
 
 ## P1. Portal foundations

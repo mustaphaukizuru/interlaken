@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
@@ -78,12 +79,6 @@ def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
             pass
         return student.parents.filter(pk=user.pk).exists()
     return False
-
-
-class IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 class MyBalanceView(APIView):

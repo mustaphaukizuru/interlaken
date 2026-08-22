@@ -396,7 +396,7 @@ export function PublicLayout() {
                             title={settings.address}
                             className="hover:text-white transition-colors"
                           >
-                            Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                            {settings.address}
                           </a>
                         </li>
                       </ul>
@@ -453,7 +453,7 @@ export function PublicLayout() {
                     title={settings.address}
                     className="hover:text-white transition-colors"
                   >
-                    Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                    {settings.address}
                   </a>
                 </li>
               </ul>

@@ -36,9 +36,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsAdmin
 from apps.core.throttling import SharedScopedRateThrottle
 
-from .import_students import IsAdmin
 from .models import User
 
 logger = logging.getLogger(__name__)

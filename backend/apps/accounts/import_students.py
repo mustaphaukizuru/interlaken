@@ -23,9 +23,11 @@ import csv
 import io
 
 from django.db import transaction
-from rest_framework import permissions, status
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from apps.core.permissions import IsAdmin
 
 from .models import StudentProfile, User
 
@@ -34,12 +36,6 @@ REQUIRED = ('matricula', 'nombre', 'apellidos', 'grado')
 KNOWN_HEADERS = REQUIRED + ('grupo', 'email_alumno', 'loyverse_id',
                             'nombre_padre', 'email_padre', 'telefono_padre')
 STUDENT_EMAIL_DOMAIN = 'alumnos.interlaken.edu.mx'
-
-
-class IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated
-                    and request.user.role == User.Role.ADMIN)
 
 
 def _clean_headers(fieldnames):

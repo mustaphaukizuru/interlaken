@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waLink, waSectionMessage } from '@/lib/whatsapp';
+import { formatPrice } from '@/lib/format';
 import { contentApi } from '@/services/api';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 
@@ -30,10 +31,7 @@ type Modality = 'nuevo_ingreso' | 'reinscripcion';
 const SECTIONS = ['Maternal', 'Preescolar', 'Primaria', 'Secundaria'] as const;
 type SectionLabel = (typeof SECTIONS)[number];
 
-const mxn = (v: string | number | null) =>
-  v === null
-    ? 'SIN COSTO'
-    : Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+const mxn = formatPrice;
 
 /** Accent/case-insensitive needle for matching backend section names. */
 const norm = (s: string) =>

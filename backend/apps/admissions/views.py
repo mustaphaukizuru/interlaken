@@ -16,10 +16,10 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import User
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.portal.services import send_email
 
@@ -39,13 +39,6 @@ from .serializers import (
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
 logger = logging.getLogger(__name__)
-
-
-class IsAdmin(permissions.BasePermission):
-    """Authenticated admin users only (matches bookings/cafeteria convention)."""
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 def _is_staff(request):
