@@ -5,6 +5,8 @@ import { Seo } from '@/components/seo/Seo';
 type Category = 'instalaciones' | 'vida';
 
 interface Photo {
+  /** Short description shown on the card and in the lightbox (BACKLOG P2-10). */
+  caption?: string;
   src: string;
   cat: Category;
 }
@@ -21,20 +23,20 @@ const altFor = (cat: Category) =>
 // "interlaken-image (n)" name and a descriptive one; the descriptive file is
 // the single copy that remains, so the same shot cannot appear twice here.
 const PHOTOS: Photo[] = [
-{ src: '/assets/interlaken-image (1).webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (2).webp', cat: 'instalaciones' },
-  { src: '/assets/secundaria.webp', cat: 'instalaciones' },
-  { src: '/assets/interlaken-image (4).webp', cat: 'instalaciones' },
-  { src: '/assets/primaria-gate.webp', cat: 'instalaciones' },
-  { src: '/assets/court-logo.webp', cat: 'vida' },
-  { src: '/assets/facade.webp', cat: 'instalaciones' },
-  { src: '/assets/hopscotch.webp', cat: 'vida' },
-  { src: '/assets/campus-mural.webp', cat: 'vida' },
-  { src: '/assets/court-wide.webp', cat: 'vida' },
-  { src: '/assets/interlaken-image (15).webp', cat: 'vida' },
-  { src: '/assets/court-primaria.webp', cat: 'vida' },
-  { src: '/assets/facade-sign.webp', cat: 'instalaciones' },
-  { src: '/assets/classroom.webp', cat: 'instalaciones' },
+{ src: '/assets/interlaken-image (1).webp', cat: 'instalaciones', caption: 'Entrada principal del campus' },
+  { src: '/assets/interlaken-image (2).webp', cat: 'instalaciones', caption: 'Pasillos y áreas comunes' },
+  { src: '/assets/secundaria.webp', cat: 'instalaciones', caption: 'Edificio de secundaria' },
+  { src: '/assets/interlaken-image (4).webp', cat: 'instalaciones', caption: 'Aulas con luz natural' },
+  { src: '/assets/primaria-gate.webp', cat: 'instalaciones', caption: 'Acceso de primaria' },
+  { src: '/assets/court-logo.webp', cat: 'vida', caption: 'Cancha techada con el escudo del colegio' },
+  { src: '/assets/facade.webp', cat: 'instalaciones', caption: 'Fachada del colegio' },
+  { src: '/assets/hopscotch.webp', cat: 'vida', caption: 'Juegos en el patio de preescolar' },
+  { src: '/assets/campus-mural.webp', cat: 'vida', caption: 'Mural de la comunidad Interlaken' },
+  { src: '/assets/court-wide.webp', cat: 'vida', caption: 'Canchas deportivas' },
+  { src: '/assets/interlaken-image (15).webp', cat: 'vida', caption: 'Actividades deportivas' },
+  { src: '/assets/court-primaria.webp', cat: 'vida', caption: 'Recreo en primaria' },
+  { src: '/assets/facade-sign.webp', cat: 'instalaciones', caption: 'Letrero de la fachada' },
+  { src: '/assets/classroom.webp', cat: 'instalaciones', caption: 'Salón de clases' },
 ];
 
 const FILTERS: { key: Category | 'todas'; label: string }[] = [
@@ -114,11 +116,12 @@ function Lightbox({
         <div className="flex h-[82vh] items-center justify-center">
           <img
             src={photos[index].src}
-            alt={altFor(photos[index].cat)}
+            alt={photos[index].caption ?? altFor(photos[index].cat)}
             className="max-h-full max-w-full rounded-xl2 object-contain"
           />
         </div>
         <figcaption className="mt-3 text-center text-sm text-white/70">
+          {photos[index].caption && <span className="block text-base font-semibold text-white">{photos[index].caption}</span>}
           {index + 1} / {photos.length}
         </figcaption>
       </figure>
@@ -201,7 +204,7 @@ export default function GaleriaPage() {
               >
                 <img
                   src={photo.src}
-                  alt={altFor(photo.cat)}
+                  alt={photo.caption ?? altFor(photo.cat)}
                   loading={i < 6 ? 'eager' : 'lazy'}
                   width={480}
                   height={360}
@@ -213,6 +216,11 @@ export default function GaleriaPage() {
                 <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex translate-y-1.5 items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-bold text-ink opacity-0 shadow-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
                   <Maximize2 className="h-3 w-3 text-green-dark" /> Ampliar
                 </span>
+                {photo.caption && (
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-3 pb-2.5 pt-8 text-left text-[12.5px] font-semibold text-white opacity-90 transition-opacity group-hover:opacity-0">
+                    {photo.caption}
+                  </span>
+                )}
               </button>
             ))}
           </div>
