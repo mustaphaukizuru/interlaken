@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { formatMXN } from '@/lib/format';
 import { CheckCircle2, XCircle, Clock, Coffee } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -20,6 +21,8 @@ export default function CafeteriaTopupReturn() {
   // Without a payment_id there is nothing to poll — that outcome is derived
   // at render (the old code set it from the effect), state only tracks polling.
   const [polledOutcome, setPolledOutcome] = useState<Outcome>('loading');
+  // Details of the confirmed payment for the receipt line (BACKLOG P1-D7).
+  const [paid, setPaid] = useState<{ amount?: string; student_name?: string; gateway_tx_id?: string } | null>(null);
   const outcome: Outcome = paymentId ? polledOutcome : 'failed';
 
   useEffect(() => {
@@ -34,6 +37,7 @@ export default function CafeteriaTopupReturn() {
         const { data } = await paymentsApi.getPaymentStatus(Number(paymentId));
         if (!active) return;
         if (data.status === 'success') {
+          setPaid({ amount: data.amount, student_name: data.student_name, gateway_tx_id: data.gateway_tx_id });
           setPolledOutcome('success');
           toast.success('Pago confirmado. El colegio cargará el saldo en el POS.');
           return;
@@ -117,13 +121,23 @@ export default function CafeteriaTopupReturn() {
           )}
           <h1 className="font-head text-fluid-xl font-bold text-ink">{content.title}</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">{content.text}</p>
-          <div className="mt-7">
+          {outcome === 'success' && paid && (
+            <dl className="mt-5 divide-y divide-line rounded-xl border border-line text-left text-sm">
+              {paid.student_name && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{paid.student_name}</dd></div>}
+              {paid.amount && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Recarga</dt><dd className="font-bold text-ink">{formatMXN(paid.amount)}</dd></div>}
+              {paid.gateway_tx_id && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Referencia</dt><dd className="font-mono text-xs text-ink">{paid.gateway_tx_id}</dd></div>}
+            </dl>
+          )}
+          <div className="mt-7 grid gap-2">
             <Link
               to="/portal/cafeteria"
               className={`${outcome === 'success' ? 'btn-primary' : 'btn-secondary'} min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40`}
             >
-              <Coffee className="h-4 w-4" /> Volver a cafetería
+              <Coffee className="h-4 w-4" /> {outcome === 'failed' ? 'Intentar de nuevo' : 'Ver saldo de cafetería'}
             </Link>
+            {outcome !== 'loading' && (
+              <Link to="/portal/pagos" className="btn-outline min-h-[44px] w-full text-sm">Ver historial de pagos</Link>
+            )}
           </div>
         </div>
       </div>

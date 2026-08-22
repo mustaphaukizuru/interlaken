@@ -59,6 +59,8 @@ export default function CafeteriaPage() {
   const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
   const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
+  // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
+  const [topupStep, setTopupStep] = useState<1 | 2 | 3>(1);
   const [showTopup, setShowTopup] = useState(false);
   const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
   const [thresholdValue, setThresholdValue] = useState('');
@@ -173,6 +175,7 @@ export default function CafeteriaPage() {
       );
       setShowTopup(false);
       setTopupAmount('');
+      setTopupStep(1);
       queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
     },
     onError: (err) => toast.error(topupErrorMessage(err)),
@@ -493,81 +496,152 @@ export default function CafeteriaPage() {
         </Card>
       )}
 
-      {/* Top-up modal */}
-      <Modal open={showTopup} onClose={() => { setShowTopup(false); setTopupAmount(''); }} title="Solicitar recarga">
-        <div>
-          <label className="label" htmlFor="topup-amount">Monto (MXN)</label>
-          <input
-            id="topup-amount"
-            type="number"
-            inputMode="decimal"
-            min={TOPUP_MIN}
-            max={TOPUP_MAX}
-            className="input-field min-h-[44px] text-base"
-            placeholder="Ej. 200"
-            value={topupAmount}
-            onChange={(e) => setTopupAmount(e.target.value)}
-          />
-          <p className="mt-1 text-xs text-subtle">Mínimo ${TOPUP_MIN} · Máximo ${TOPUP_MAX.toLocaleString('es-MX')}</p>
-          {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > TOPUP_MAX && (
-            <p className="mt-1 text-xs text-coral">El monto máximo por recarga es ${TOPUP_MAX.toLocaleString('es-MX')}.</p>
-          )}
-          {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > 0 && topupAmountNum < TOPUP_MIN && (
-            <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${TOPUP_MIN}.</p>
-          )}
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            {[100, 200, 300, 500].map((amt) => (
-              <button
-                key={amt}
-                type="button"
-                onClick={() => setTopupAmount(String(amt))}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
-                  topupAmount === String(amt)
-                    ? 'border-purple bg-purple text-white'
-                    : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
-                }`}
-              >
-                ${amt}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="label" htmlFor="topup-method">Método de pago</label>
-          <select
-            id="topup-method"
-            className="input-field min-h-[44px] text-base"
-            value={topupMethod}
-            onChange={(e) => setTopupMethod(e.target.value as 'online' | 'office')}
-          >
-            <option value="online">Pago en línea (Global Payments / Banorte)</option>
-            <option value="office">Pago en caja escolar</option>
-          </select>
-        </div>
-        {topupMethod === 'online' && (
+      {/* Top-up modal — 3-step wizard (BACKLOG P1-D1) */}
+      <Modal
+        open={showTopup}
+        onClose={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }}
+        title="Recargar cafetería"
+        maxWidth={520}
+      >
+        <ol className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide" aria-label="Pasos">
+          {(['Alumno y monto', 'Método de pago', 'Revisar'] as const).map((label, i) => {
+            const n = (i + 1) as 1 | 2 | 3;
+            const state = n < topupStep ? 'done' : n === topupStep ? 'current' : 'todo';
+            return (
+              <li key={label} className="flex items-center gap-2" aria-current={state === 'current' ? 'step' : undefined}>
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${state === 'todo' ? 'bg-cream-2 text-subtle' : 'bg-purple text-white'}`}>{n}</span>
+                <span className={`hidden sm:inline ${state === 'current' ? 'text-ink' : 'text-subtle'}`}>{label}</span>
+                {n < 3 && <span className="h-px w-4 bg-line" aria-hidden="true" />}
+              </li>
+            );
+          })}
+        </ol>
+
+        {topupStep === 1 && (
           <>
-            <PaymentMethodPicker
-              value={topupGateway}
-              onChange={(v) => setTopupGateway(v as 'global_payments' | 'banorte')}
-              disabled={topupMutation.isPending}
-            />
-            <p className="mb-3 text-xs leading-snug text-muted">
-              Al confirmar el pago verá el saldo en el portal. El colegio lo carga
-              en el POS de cafetería para que su hijo(a) pueda comprar.
-            </p>
+            <div>
+              <label className="label" htmlFor="topup-student">Alumno</label>
+              <select
+                id="topup-student"
+                className="input-field min-h-[44px] text-base"
+                value={selectedStudent ?? ''}
+                onChange={(e) => setSelectedStudent(Number(e.target.value) || null)}
+              >
+                {(balances ?? []).filter((b) => !!b.student.loyverse_id).map((b) => (
+                  <option key={b.student.id} value={b.student.id}>
+                    {b.student.user.full_name} · saldo ${parseFloat(b.balance).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="topup-amount">Monto (MXN)</label>
+              <input
+                id="topup-amount"
+                type="number"
+                inputMode="decimal"
+                min={TOPUP_MIN}
+                max={TOPUP_MAX}
+                className="input-field min-h-[44px] text-base"
+                placeholder="Ej. 200"
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-subtle">Mínimo ${TOPUP_MIN} · Máximo ${TOPUP_MAX.toLocaleString('es-MX')}</p>
+              {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > TOPUP_MAX && (
+                <p className="mt-1 text-xs text-coral">El monto máximo por recarga es ${TOPUP_MAX.toLocaleString('es-MX')}.</p>
+              )}
+              {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > 0 && topupAmountNum < TOPUP_MIN && (
+                <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${TOPUP_MIN}.</p>
+              )}
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {[100, 200, 300, 500].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTopupAmount(String(amt))}
+                    className={`min-h-[40px] rounded-full border px-4 text-sm font-semibold transition ${
+                      topupAmount === String(amt)
+                        ? 'border-purple bg-purple text-white'
+                        : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
+                    }`}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         )}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); }} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>
-          <Button
-            variant="primary"
-            loading={topupMutation.isPending}
-            onClick={() => topupMutation.mutate()}
-            disabled={!topupAmountValid}
-            className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40"
-          >
-            {topupMethod === 'online' ? 'Continuar al pago' : 'Solicitar recarga'}
-          </Button>
+
+        {topupStep === 2 && (
+          <>
+            <fieldset>
+              <legend className="label">Método de pago</legend>
+              <div className="grid gap-2">
+                {([
+                  ['online', 'Pago en línea con tarjeta', 'Global Payments o Banorte. El saldo se aplica en minutos.'],
+                  ['office', 'Pago en caja escolar', 'Registra la solicitud; paga en efectivo en el colegio.'],
+                ] as const).map(([v, title, desc]) => (
+                  <label key={v} htmlFor={`topup-method-${v}`} className={`flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border p-3 ${topupMethod === v ? 'border-purple bg-purple/[0.04]' : 'border-line'}`}>
+                    <input id={`topup-method-${v}`} type="radio" name="topup-method" className="mt-1" value={v} checked={topupMethod === v} onChange={() => setTopupMethod(v)} aria-label={title} />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink">{title}</span>
+                      <span className="block text-xs text-muted">{desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {topupMethod === 'online' && (
+              <PaymentMethodPicker
+                value={topupGateway}
+                onChange={(v) => setTopupGateway(v as 'global_payments' | 'banorte')}
+                disabled={topupMutation.isPending}
+              />
+            )}
+          </>
+        )}
+
+        {topupStep === 3 && (
+          <dl className="divide-y divide-line rounded-xl border border-line text-sm">
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">{topupMethod === 'online' ? `Tarjeta · ${topupGateway === 'banorte' ? 'Banorte' : 'Global Payments'}` : 'Caja escolar'}</dd></div>
+            <div className="px-4 py-3 text-xs text-muted">
+              {topupMethod === 'online'
+                ? 'Al continuar se abrirá la página segura de pago. Cuando el banco confirme, verá el saldo en el portal.'
+                : 'Se registrará la solicitud. El saldo se aplica cuando el colegio reciba el pago en caja.'}
+            </div>
+          </dl>
+        )}
+
+        <div className="sticky bottom-0 -mx-1 flex flex-col gap-2 bg-white pt-2 sm:flex-row">
+          {topupStep > 1 ? (
+            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as 1 | 2 | 3)} className="min-h-[44px] flex-1">Atrás</Button>
+          ) : (
+            <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }} className="min-h-[44px] flex-1">Cancelar</Button>
+          )}
+          {topupStep < 3 ? (
+            <Button
+              variant="primary"
+              onClick={() => setTopupStep((s) => (s + 1) as 1 | 2 | 3)}
+              disabled={topupStep === 1 && (!topupAmountValid || !selectedStudent)}
+              className="min-h-[44px] flex-1"
+            >
+              Continuar
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              loading={topupMutation.isPending}
+              onClick={() => topupMutation.mutate()}
+              disabled={!topupAmountValid || !selectedStudent}
+              className="min-h-[44px] flex-1"
+            >
+              {topupMethod === 'online' ? 'Ir a pagar' : 'Solicitar recarga'}
+            </Button>
+          )}
         </div>
       </Modal>
 

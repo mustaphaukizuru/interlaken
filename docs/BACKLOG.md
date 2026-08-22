@@ -93,13 +93,13 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-D1 | Unified recarga wizard: child, amount presets + min/max, method picker (card, SPEI, caja), review, redirect/confirm; reachable from Pagos, Cafetería, dashboard chips. | Refine |
+| P1-D1 | Unified recarga wizard: child, amount presets + min/max, method picker (card, SPEI, caja), review, redirect/confirm; reachable from Pagos, Cafetería, dashboard chips. | DONE 2026-08-22 (3-step wizard with step indicator and review; SPEI out of scope per contract: Global Payments + Banorte only) |
 | P1-D2 | Pagos summary header: balance per child, last top-up, month spend, one CTA. | DONE 2026-08-22 (/payments/summary/: month total, last recarga, pending; per-child totals feed the filter) |
 | P1-D3 | History as filterable table (child, status, date range, method), URL-synced; cards on mobile. | DONE 2026-08-22 (child/status/date filters URL-synced with chips; gateway + reference shown) |
 | P1-D4 | Payment detail drawer with reference and gateway; comprobante PDF download and email. | Missing |
 | P1-D5 | Family CSV export of payment history by date range. | DONE 2026-08-22 (/payments/history/export/ honors the filters) |
 | P1-D6 | Status clarity: pending next steps, failed retry, refunded reason. | DONE 2026-08-22 (per-status guidance under each row; Reintentar link) |
-| P1-D7 | Return page polish: success state, new balance, next actions. | Refine |
+| P1-D7 | Return page polish: success state, new balance, next actions. | DONE 2026-08-22 (receipt line with alumno/monto/referencia, next actions) |
 | P1-D8 | Admin payments view: reconcile, mark paid (caja), refund, filters, CSV/PDF, daily totals chart. | Partial |
 | P1-D9 | Sandbox checkout clearly marked test-only, dev only. | Refine |
 
