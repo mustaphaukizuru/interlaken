@@ -144,12 +144,12 @@ function StudentForm({ student, onClose, onSaved, qc }: {
         <Input
           label="Correo del alumno (opcional)"
           type="email"
+          inputMode="email"
+          autoComplete="off"
           value={form.email ?? ''}
           onChange={(e) => set('email', e.target.value)}
           error={errors.email}
           hint="Vacío = acceso con matrícula@alumnos.interlaken.edu.mx. La contraseña la asigna un administrador."
-          inputMode="email"
-          autoComplete="off"
         />
         <fieldset className="space-y-4 rounded-xl border border-line p-4">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Datos personales</legend>

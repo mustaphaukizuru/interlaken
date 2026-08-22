@@ -186,7 +186,7 @@ export default function PreRegisterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Correo electrónico"
-              type="email"
+              type="email" inputMode="email" autoComplete="email"
               placeholder="correo@ejemplo.com"
               error={errors.email?.message}
               className="text-base min-h-[44px]"
@@ -194,7 +194,7 @@ export default function PreRegisterPage() {
             />
             <Input
               label="Teléfono / WhatsApp"
-              type="tel"
+              type="tel" inputMode="tel" autoComplete="tel"
               placeholder="55 1234 5678"
               error={errors.phone?.message}
               className="text-base min-h-[44px]"

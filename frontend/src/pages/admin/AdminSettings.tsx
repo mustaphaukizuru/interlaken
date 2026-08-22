@@ -268,7 +268,7 @@ export default function AdminSettings() {
                 />
                 <Input
                   label="Correo de contacto"
-                  type="email"
+                  type="email" inputMode="email" autoComplete="email"
                   className={FIELD}
                   value={form.contact_email}
                   onChange={(e) => set('contact_email', e.target.value)}

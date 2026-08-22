@@ -173,7 +173,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <label className="label" htmlFor="contact-email">Correo electrónico</label>
-                  <input id="contact-email" className="input-field text-base" type="email" placeholder="correo@ejemplo.com" aria-invalid={!!errors.email} {...register('email')} />
+                  <input id="contact-email" className="input-field text-base" type="email" inputMode="email" autoComplete="email" placeholder="correo@ejemplo.com" aria-invalid={!!errors.email} {...register('email')} />
                   {errors.email && <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>}
                 </div>
                 <div>

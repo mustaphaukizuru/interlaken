@@ -189,9 +189,9 @@ export function StudentGuardians({ studentId }: Props) {
         >
           <Input
             label="Correo del tutor"
-            type="email"
+            type="email" inputMode="email" autoComplete="email"
             required
-            autoComplete="email"
+            
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             hint="Si no existe, se crea la cuenta (sin contraseña usable)."

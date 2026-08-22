@@ -192,7 +192,7 @@ function NewsletterCTA() {
               className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_180px]"
             />
             <input
-              type="email"
+              type="email" inputMode="email" autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

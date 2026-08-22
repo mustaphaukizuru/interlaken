@@ -68,8 +68,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-B3 | `/portal/notificaciones` full page with filters, infinite scroll, deep links. | DONE 2026-08-22 (type/unread filters, pagination, comunicado deep links) |
 | P1-B4 | Toast positioning and stacking (bottom-center mobile, top-right desktop, never over tab bar or WhatsApp float). | DONE 2026-08-22 (ToastHost: responsive position, lifted above tab bar, max 3 visible) |
 | P1-B5 | Shell coordination: drawer + MobileTabBar, hide tab bar when keyboard open, safe-area insets, swipe-to-close, focus trap. | DONE 2026-08-22 (tab bar hides on soft keyboard via visualViewport; drawer swipe-left closes and focuses first item; safe areas already present) |
-| P1-B6 | Tables to cards under md for every admin and parent table; sticky header + horizontal scroll above md. | Refine |
-| P1-B7 | Forms on mobile: single column, 44px inputs, inputmode/autocomplete, sticky submit, step indicator. | Refine |
+| P1-B6 | Tables to cards under md for every admin and parent table; sticky header + horizontal scroll above md. | DONE 2026-08-22 (audit: all admin tables either ship a bespoke md:hidden card list or stack via the data-label CSS; desktop keeps sticky thead + scroll) |
+| P1-B7 | Forms on mobile: single column, 44px inputs, inputmode/autocomplete, sticky submit, step indicator. | Partial 2026-08-22 (44px/16px inputs and buttons already global; inputMode/autoComplete added to every tel/email field; sticky submit + step indicator move to the recarga wizard P1-D1 and the CMS forms P3-6) |
 | P1-B8 | Modals as full-screen sheets under md, centered above. | DONE 2026-08-22 (Modal was already a bottom sheet under sm with focus trap; added grab handle) |
 | P1-B9 | Fluid typography, 16px minimum body, spacing scale, max content width 1200 to 1320 on large screens. | Refine |
 | P1-B10 | Large-screen layouts: 12-col grid, 3 to 4 KPI tiles per row at xl, list + detail two-pane at 2xl. | Missing |
