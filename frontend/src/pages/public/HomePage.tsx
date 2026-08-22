@@ -12,6 +12,7 @@ import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { m, SiteMotionProvider } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
@@ -548,6 +549,11 @@ export default function HomePage() {
           </m.div>
         </Section>
       )}
+
+      {/* ── TESTIMONIOS (BACKLOG P2-15) ── */}
+      <Section bg="cream">
+        <Testimonials />
+      </Section>
 
       {/* ── GALLERY ── */}
       <Section bg="dark">

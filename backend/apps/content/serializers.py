@@ -8,6 +8,7 @@ from .models import (
     PricingPolicy,
     SchoolEvent,
     SiteSettings,
+    Testimonial,
     TuitionCost,
 )
 
@@ -93,3 +94,10 @@ class SchoolEventSerializer(serializers.ModelSerializer):
         if start and end and end < start:
             raise serializers.ValidationError({'end_date': 'La fecha final no puede ser anterior al inicio.'})
         return attrs
+
+
+class TestimonialSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Testimonial
+        fields = ['id', 'quote', 'author', 'role', 'level', 'is_published', 'order', 'created_at']
+        read_only_fields = ['id', 'created_at']

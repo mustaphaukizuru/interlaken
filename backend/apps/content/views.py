@@ -150,3 +150,54 @@ class AdminCalendarDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         from .models import SchoolEvent
         return SchoolEvent.objects.all()
+
+
+class PublicTestimonialsView(APIView):
+    """GET /api/v1/content/testimonials/ — published quotes (cached 5 min)."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .models import Testimonial
+        from .serializers import TestimonialSerializer
+
+        data = cache.get('content:testimonials')
+        if data is None:
+            data = TestimonialSerializer(Testimonial.objects.filter(is_published=True), many=True).data
+            cache.set('content:testimonials', data, 300)
+        return Response(data)
+
+
+class AdminTestimonialsView(generics.ListCreateAPIView):
+    permission_classes = [_IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import TestimonialSerializer
+        return TestimonialSerializer
+
+    def get_queryset(self):
+        from .models import Testimonial
+        return Testimonial.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save()
+        cache.delete('content:testimonials')
+
+
+class AdminTestimonialDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [_IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import TestimonialSerializer
+        return TestimonialSerializer
+
+    def get_queryset(self):
+        from .models import Testimonial
+        return Testimonial.objects.all()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        cache.delete('content:testimonials')
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        cache.delete('content:testimonials')

@@ -72,6 +72,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       items: [
         { icon: Megaphone, label: 'Comunicados', to: '/admin/comunicados' },
         { icon: CalendarClock, label: 'Calendario', to: '/admin/calendario' },
+        { icon: Megaphone, label: 'Testimonios', to: '/admin/testimonios' },
         { icon: Inbox,     label: 'Mensajes',    to: '/admin/mensajes', badgeKey: 'mensajes' },
         { icon: KeyRound,  label: 'Contraseñas', to: '/admin/contrasenas', badgeKey: 'contrasenas' },
       ],

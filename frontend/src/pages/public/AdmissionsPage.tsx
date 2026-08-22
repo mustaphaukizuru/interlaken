@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Award, FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, ShieldCheck, Plus } from 'lucide-react';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { Testimonials } from '@/components/public/Testimonials';
 import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Section } from '@/components/ui/Section';
@@ -281,6 +282,11 @@ export default function AdmissionsPage() {
           </p>
         </div>
       </section>
+
+      {/* ── TESTIMONIOS (BACKLOG P2-15) ── */}
+      <Section bg="white">
+        <Testimonials title="Familias que ya son Interlaken" />
+      </Section>
 
       {/* ── INCORPORACIÓN SEP — señales de confianza (flyer institucional) ── */}
       <Section bg="white" spacing="sm">

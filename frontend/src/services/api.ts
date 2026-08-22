@@ -785,6 +785,18 @@ export interface SchoolEvent {
   description: string;
   is_published: boolean;
 }
+export interface Testimonial {
+  id: number;
+  quote: string;
+  author: string;
+  role: string;
+  level: string;
+  is_published: boolean;
+  order: number;
+  created_at: string;
+}
+export type TestimonialWrite = Omit<Testimonial, 'id' | 'created_at'>;
+
 export type SchoolEventWrite = Omit<SchoolEvent, 'id' | 'kind_label' | 'end_date'> & { end_date?: string | null };
 
 export const contentApi = {
@@ -797,6 +809,12 @@ export const contentApi = {
   adminCreateCalendar: (data: SchoolEventWrite) => api.post<SchoolEvent>('/content/admin/calendar/', data),
   adminUpdateCalendar: (id: number, data: Partial<SchoolEventWrite>) => api.patch<SchoolEvent>(`/content/admin/calendar/${id}/`, data),
   adminDeleteCalendar: (id: number) => api.delete(`/content/admin/calendar/${id}/`),
+  /** Testimonials (BACKLOG P2-15). */
+  getTestimonials: () => api.get('/content/testimonials/'),
+  adminListTestimonials: () => api.get('/content/admin/testimonials/'),
+  adminCreateTestimonial: (data: TestimonialWrite) => api.post<Testimonial>('/content/admin/testimonials/', data),
+  adminUpdateTestimonial: (id: number, data: Partial<TestimonialWrite>) => api.patch<Testimonial>(`/content/admin/testimonials/${id}/`, data),
+  adminDeleteTestimonial: (id: number) => api.delete(`/content/admin/testimonials/${id}/`),
 
   // Costos por sección (editables por el colegio en el admin).
   getCosts: () =>

@@ -266,3 +266,25 @@ class SchoolEvent(models.Model):
 
     def __str__(self):
         return f'{self.start_date} {self.title}'
+
+
+class Testimonial(models.Model):
+    """Family / alumni quotes shown on Home and Admisiones (BACKLOG P2-15).
+    Admin-managed; only published rows reach the site."""
+
+    quote = models.TextField('Testimonio', max_length=400)
+    author = models.CharField('Nombre', max_length=120)
+    role = models.CharField('Relación', max_length=120, blank=True,
+                            help_text='Ej. "Mamá de alumno de 3° de primaria" o "Egresado 2019".')
+    level = models.CharField('Nivel', max_length=12, blank=True)
+    is_published = models.BooleanField('Publicado', default=True)
+    order = models.PositiveSmallIntegerField('Orden', default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = 'Testimonio'
+        verbose_name_plural = 'Testimonios'
+
+    def __str__(self):
+        return f'{self.author}: {self.quote[:40]}'
