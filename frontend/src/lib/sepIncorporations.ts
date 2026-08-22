@@ -20,3 +20,8 @@ export const SEP_INCORPORATIONS: SepIncorporation[] = [
     label: 'Secundaria Particular No. 0245, C.T. 15PES0730K (Acuerdo 206-016-1695-AC-052/93)',
   },
 ];
+
+/** CMS override (Ajustes → Incorporaciones SEP) or the built-in flyer values. */
+export function resolveSep(cms: SepIncorporation[] | undefined): SepIncorporation[] {
+  return cms && cms.length > 0 ? cms : SEP_INCORPORATIONS;
+}

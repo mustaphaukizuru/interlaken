@@ -34,7 +34,7 @@ function Field({ spec, value, onChange }: { spec: FieldSpec; value: unknown; onC
         <div>
           <label className="label" htmlFor={`f-${spec.key}`}>{spec.label + req}</label>
           <textarea id={`f-${spec.key}`} className="input-field min-h-[120px] font-mono text-sm" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} />
-          {spec.kind === 'richtext' && <p className="mt-1 text-xs text-subtle">HTML sencillo: &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;/&lt;li&gt;, &lt;h2&gt;, &lt;a href&gt;. Lo demás se elimina al mostrarse.</p>}
+          {spec.kind === 'richtext' && <p className="mt-1 text-xs text-subtle">HTML sencillo: &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;/&lt;li&gt;, &lt;h2&gt;, &lt;a href&gt;. Lo demás se elimina al mostrarse. Atajos: {'{{direccion}}'}, {'{{horario}}'}, {'{{telefono}}'}, {'{{correo}}'} se sustituyen por los datos de Ajustes.</p>}
         </div>
       );
     case 'image':

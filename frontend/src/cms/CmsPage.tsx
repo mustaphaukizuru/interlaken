@@ -13,7 +13,7 @@ import { PricingSections } from '@/pages/public/CostosPage';
 import { CmsForm } from './CmsForm';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { LEVELS } from '@/lib/levels';
-import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { useSep } from '@/hooks/useSep';
 import { admissionsApi, contentApi, type SchoolEvent } from '@/services/api';
 import { sanitizeHtml } from './sanitize';
 import type { Block } from './blocks/registry';
@@ -131,13 +131,7 @@ function BlockView({ block }: { block: Block }) {
     case 'pricing_table': return <PricingSections />;
     case 'open_school_events': return <OpenSchoolBlock />;
     case 'form': return <FormBlock slug={String(p.form ?? '')} />;
-    case 'sep_incorporation': return (
-      <Section bg="cream" containerSize="md">
-        <ul className="space-y-2">{SEP_INCORPORATIONS.map((r) => (
-          <li key={r.level} className="flex items-start gap-2 text-sm text-ink"><ShieldCheck size={16} className="mt-0.5 text-green-dark" aria-hidden="true" /> {r.label}</li>
-        ))}</ul>
-      </Section>
-    );
+    case 'sep_incorporation': return <SepBlock />;
     default: return null;
   }
 }
@@ -157,8 +151,26 @@ function HeroBlock({ title, subtitle, image, cta }: HeroProps) {
   );
 }
 
+function SepBlock() {
+  const rows = useSep();
+  return (
+    <Section bg="cream" containerSize="md">
+      <ul className="space-y-2">{rows.map((r) => (
+        <li key={r.level} className="flex items-start gap-2 text-sm text-ink"><ShieldCheck size={16} className="mt-0.5 text-green-dark" aria-hidden="true" /> {r.label}</li>
+      ))}</ul>
+    </Section>
+  );
+}
+
+/** Site-wide snippets usable inside rich text: {{direccion}}, {{horario}}, {{telefono}}, {{correo}}, {{whatsapp}}. */
+export function applySnippets(html: string, s: Record<string, string | undefined>): string {
+  const map: Record<string, string> = { direccion: s.address ?? '', horario: s.office_hours ?? '', telefono: s.phone_display ?? '', correo: s.contact_email ?? '', whatsapp: s.whatsapp_number ?? '' };
+  return html.replace(/\{\{\s*(direccion|horario|telefono|correo|whatsapp)\s*\}\}/g, (_, k: string) => map[k]);
+}
+
 function RichText({ html }: { html: string }) {
-  const safe = useMemo(() => sanitizeHtml(html), [html]);
+  const settings = useSiteSettings();
+  const safe = useMemo(() => sanitizeHtml(applySnippets(html, settings as unknown as Record<string, string | undefined>)), [html, settings]);
   return <Section bg="white" containerSize="md"><div className="prose prose-sm max-w-none text-ink sm:prose-base" dangerouslySetInnerHTML={{ __html: safe }} /></Section>;
 }
 

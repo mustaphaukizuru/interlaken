@@ -28,7 +28,7 @@ class TestPublicRead:
         assert set(data) == {
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
-            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'updated_at',
+            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'sep_incorporations', 'updated_at',
         }
         # Ships with the school's real contact data (confirmado por el cliente):
         # Facebook es la única red social; Instagram/YouTube quedan ocultos.

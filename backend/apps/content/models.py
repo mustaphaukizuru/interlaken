@@ -55,6 +55,11 @@ class SiteSettings(models.Model):
         'Video del hero (MP4/WebM)', blank=True, default='',
         help_text='URL directa a un MP4/WebM corto (≤ 15 s, sin audio). Vacío = imagen fija.')
 
+    # ── Snippets (CMS phase 7, BACKLOG P3-8): texto oficial editado una sola vez ───
+    sep_incorporations = models.JSONField(
+        'Incorporaciones SEP', default=list, blank=True,
+        help_text='[{level, label}] tal como aparece en el documento oficial. Vacío = valores integrados.')
+
     # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
     menu = models.JSONField('Menú del sitio', default=list, blank=True)
 

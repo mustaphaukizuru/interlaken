@@ -18,5 +18,7 @@ export interface SiteSettings {
   youtube_url: string;
   /** CMS menu (P3-7). Empty = built-in menu. */
   menu?: MenuGroup[];
+  /** Official SEP registrations (P3-8). Empty = built-in flyer values. */
+  sep_incorporations?: { level: 'Preescolar' | 'Primaria' | 'Secundaria'; label: string }[];
   updated_at?: string;
 }

@@ -3,7 +3,7 @@ import { ArrowRight, CalendarCheck, CheckCircle2, Users } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { Reveal } from '@/components/ui/Reveal';
 import { LEVELS, getLevel } from '@/lib/levels';
-import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { useSep } from '@/hooks/useSep';
 import { ShieldCheck } from 'lucide-react';
 
 const ACCENT = {
@@ -15,6 +15,7 @@ const ACCENT = {
 /** Un template para los tres niveles (contenido en src/lib/levels.ts). */
 export default function NivelPage() {
   const { nivel } = useParams();
+  const sepRows = useSep();
   const level = getLevel(nivel);
   if (!level) return <Navigate to="/niveles/preescolar" replace />;
   const accent = ACCENT[level.accent];
@@ -103,7 +104,7 @@ export default function NivelPage() {
 
             {/* Incorporación SEP de este nivel (moved here from the footer, school instruction 2026-08-21) */}
             {(() => {
-              const sep = SEP_INCORPORATIONS.find((r) => r.level === level.name);
+              const sep = sepRows.find((r) => r.level === level.name);
               return sep ? (
                 <Reveal>
                   <div className="rounded-xl2 border border-line bg-cream-2 p-5" style={{ borderLeft: `4px solid ${level.color}` }}>
