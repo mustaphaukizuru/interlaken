@@ -123,16 +123,27 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     from apps.accounts.recipients import delivery_users, email_recipients, is_synthetic_email
 
     targets = delivery_users(user) if fanout else [user]
+    email_status = Notification.Delivery.SKIPPED
     if want_email:
         recipients = email_recipients(user) if fanout else (
             [user.email] if getattr(user, 'email', '') and not is_synthetic_email(user.email) else [])
         if recipients:
-            send_email(subject=title, message=message, recipients=recipients)
+            ok = send_email(subject=title, message=message, recipients=recipients)
+            email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
 
+    push_status = Notification.Delivery.SKIPPED
     if want_push:
         from apps.portal.push import send_web_push
+        delivered = 0
         for target in targets:
-            send_web_push(target, title, message)
+            delivered += send_web_push(target, title, message)
+        push_status = Notification.Delivery.SENT if delivered else Notification.Delivery.SKIPPED
+
+    if notification is not None:
+        notification.email_status = email_status
+        notification.push_status = push_status
+        notification.attempts = 1
+        notification.save(update_fields=['email_status', 'push_status', 'attempts'])
 
     if whatsapp:
         wa = (getattr(user, 'whatsapp', '') or '').strip()
@@ -342,10 +353,14 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
 
     from apps.accounts.recipients import delivery_users, is_synthetic_email
 
-    sent, handled_ids = 0, []
+    max_attempts = getattr(settings, 'NOTIFICATION_MAX_ATTEMPTS', 3)
+    sent, handled_ids, retry_ids, failures = 0, [], [], []
     for n in pending:
-        handled_ids.append(n.id)
         if n.created_at < cutoff:
+            handled_ids.append(n.id)
+            Notification.objects.filter(pk=n.pk).update(
+                email_status=Notification.Delivery.SKIPPED, push_status=Notification.Delivery.SKIPPED,
+                last_error='Caducó sin enviarse')
             continue  # too old — mark delivered below, don't send
         ann = n.announcement
         # Student rows also reach the guardians — unless a guardian already has
@@ -362,15 +377,60 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
             addr = (getattr(target, 'email', '') or '').strip()
             if addr and not is_synthetic_email(addr) and addr.lower() not in {e.lower() for e in emails}:
                 emails.append(addr)
+        email_status = Notification.Delivery.SKIPPED
         if emails:
-            send_email(subject=n.title, message=n.message, recipients=emails)
+            ok = send_email(subject=n.title, message=n.message, recipients=emails)
+            email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
         # Comunicado rows deep-link the push to the announcement and honor its
         # 'Enviar notificación push' toggle; standalone rows keep /portal.
+        push_status = Notification.Delivery.SKIPPED
         if ann is None or ann.push_enabled:
             url = f'/portal/comunicados/{ann.pk}' if ann else '/portal'
+            delivered = 0
             for target in targets:
-                send_web_push(target, n.title, n.message, url=url)
-        sent += 1
+                delivered += send_web_push(target, n.title, n.message, url=url)
+            push_status = Notification.Delivery.SENT if delivered else Notification.Delivery.SKIPPED
+
+        attempts = n.attempts + 1
+        failed = email_status == Notification.Delivery.FAILED
+        if failed and attempts < max_attempts:
+            # Leave delivered_at NULL so the next cron run retries the email.
+            retry_ids.append(n.id)
+            Notification.objects.filter(pk=n.pk).update(
+                attempts=attempts, email_status=email_status, push_status=push_status,
+                last_error=f'Intento {attempts} falló')
+            continue
+        handled_ids.append(n.id)
+        Notification.objects.filter(pk=n.pk).update(
+            attempts=attempts, email_status=email_status, push_status=push_status,
+            last_error=f'Correo no entregado tras {attempts} intentos' if failed else '')
+        if failed:
+            failures.append(n)
+        else:
+            sent += 1
 
     Notification.objects.filter(id__in=handled_ids).update(delivered_at=now)
+    if failures:
+        _alert_ops_on_failures(failures)
     return sent
+
+
+def _alert_ops_on_failures(failures) -> None:
+    """One email to OPS_EMAIL per dispatch batch listing exhausted failures (P1-C5)."""
+    ops = getattr(settings, 'OPS_EMAIL', '')
+    if not ops:
+        return
+    lines = [f'- #{n.id} {n.title} → {n.user.email} ({n.last_error})' for n in failures[:50]]
+    more = '' if len(failures) <= 50 else f'\n… y {len(failures) - 50} más'
+    send_email(
+        f'[Interlaken] {len(failures)} notificación(es) no entregada(s)',
+        'El despachador agotó los reintentos de correo para:\n\n' + '\n'.join(lines) + more
+        + '\n\nRevise la configuración SMTP y la bandeja de Auditoría.',
+        [ops], html=False,
+    )
+    try:
+        from apps.core.audit import record
+        record('update', failures[0], {'undelivered': len(failures), 'ids': [n.id for n in failures[:50]]},
+               actor_label='dispatch_notifications', context='notifications.delivery_failed')
+    except Exception:  # pragma: no cover
+        logger.warning('Audit write for delivery failures failed', exc_info=True)

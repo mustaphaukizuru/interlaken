@@ -370,3 +370,46 @@ class EmergencyBroadcastView(APIView):
         except ValueError as exc:
             return Response({'error': str(exc)}, status=400)
         return Response(result, status=201)
+
+
+class AnnouncementDeliveryView(APIView):
+    """GET  /api/v1/portal/admin/announcements/<pk>/delivery/ — per-channel delivery report.
+    POST ... /delivery/ {"action": "resend_failed"} — requeue exhausted email failures.
+
+    BACKLOG P1-C6: shows admins how many recipients got the comunicado by
+    in-app/email/push, who failed, and lets them retry after fixing SMTP.
+    """
+    permission_classes = [_IsAdmin]
+
+    def _qs(self, pk):
+        announcement = get_object_or_404(Announcement, pk=pk)
+        return announcement, Notification.objects.filter(announcement=announcement).select_related('user')
+
+    def get(self, request, pk):
+        announcement, qs = self._qs(pk)
+        by = {}
+        for field in ('email_status', 'push_status'):
+            counts = dict(qs.values_list(field).annotate(c=Count('id')).values_list(field, 'c'))
+            by[field.replace('_status', '')] = {k: counts.get(k, 0) for k in Notification.Delivery.values}
+        failed = [
+            {'id': n.id, 'user': n.user.full_name, 'email': n.user.email,
+             'attempts': n.attempts, 'error': n.last_error}
+            for n in qs.filter(email_status=Notification.Delivery.FAILED).order_by('id')[:200]
+        ]
+        return Response({
+            'announcement': announcement.id,
+            'recipients': qs.count(),
+            'pending_dispatch': qs.filter(delivered_at__isnull=True).count(),
+            'read': qs.filter(is_read=True).count(),
+            'email': by['email'],
+            'push': by['push'],
+            'failed': failed,
+        })
+
+    def post(self, request, pk):
+        _, qs = self._qs(pk)
+        if request.data.get('action') != 'resend_failed':
+            return Response({'action': ['Use "resend_failed".']}, status=400)
+        n = qs.filter(email_status=Notification.Delivery.FAILED).update(
+            delivered_at=None, attempts=0, email_status=Notification.Delivery.PENDING, last_error='')
+        return Response({'requeued': n})

@@ -84,9 +84,9 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-C2 | Notification matrix (event x channel x audience) documented and enforced in code. | DONE 2026-08-22 (docs/NOTIFICATION-MATRIX.md; code paths referenced) |
 | P1-C3 | Branded HTML email base template with plain-text alternative. | DONE 2026-08-22 (send_email sends multipart; templates/email/base.html; Reply-To defaults to CONTACT_EMAIL) |
 | P1-C4 | Preferences UI: per-channel, per-category, quiet hours, digest vs instant, per-child. | Partial |
-| P1-C5 | Delivery reliability: queue, retry/backoff, per-recipient status (sent/bounced/failed), failures to `sistemas@` and Auditoría. | Partial |
-| P1-C6 | Comunicados delivery report per recipient; resend failed. | Missing |
-| P1-C7 | Push parity with email audience (student + guardians subscriptions). | Missing |
+| P1-C5 | Delivery reliability: queue, retry/backoff, per-recipient status (sent/bounced/failed), failures to `sistemas@` and Auditoría. | DONE 2026-08-22 (email/push status + attempts per notification; cron retries up to NOTIFICATION_MAX_ATTEMPTS; exhausted failures emailed to OPS_EMAIL and audited; bounce webhooks depend on the SMTP provider) |
+| P1-C6 | Comunicados delivery report per recipient; resend failed. | DONE 2026-08-22 (delivery endpoint + DeliveryReportModal with Reintentar fallidos) |
+| P1-C7 | Push parity with email audience (student + guardians subscriptions). | DONE 2026-08-22 (delivered with P0-5: push targets = delivery_users) |
 | P1-C8 | `manage.py send_test_email` command. | DONE 2026-08-22 |
 
 ### P1-D. Payments (cafetería wallet only)

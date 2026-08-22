@@ -32,6 +32,16 @@ export interface PasswordRequestResolved extends PasswordRequest {
   whatsapp_number: string;
 }
 
+export interface DeliveryReport {
+  announcement: number;
+  recipients: number;
+  pending_dispatch: number;
+  read: number;
+  email: Record<string, number>;
+  push: Record<string, number>;
+  failed: { id: number; user: string; email: string; attempts: number; error: string }[];
+}
+
 export interface GuardianWrite {
   first_name: string;
   last_name: string;
@@ -591,6 +601,9 @@ export const portalApi = {
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  getAnnouncementDelivery: (id: number) => api.get<DeliveryReport>(`/portal/admin/announcements/${id}/delivery/`),
+  resendAnnouncementFailed: (id: number) =>
+    api.post<{ requeued: number }>(`/portal/admin/announcements/${id}/delivery/`, { action: 'resend_failed' }),
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
     is_active?: boolean; push_enabled?: boolean;

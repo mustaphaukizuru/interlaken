@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Megaphone, Plus, Pencil, Trash2, Eye, Siren } from 'lucide-react';
+import { Megaphone, Plus, Pencil, Trash2, Eye, Siren, Send } from 'lucide-react';
+import { DeliveryReportModal } from '@/components/admin/DeliveryReportModal';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -40,6 +41,7 @@ export default function AdminAnnouncements() {
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
   const [open, setOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
+  const [report, setReport] = useState<Announcement | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertForm, setAlertForm] = useState(EMPTY_ALERT);
   const [alertConfirm, setAlertConfirm] = useState(false);
@@ -192,6 +194,8 @@ export default function AdminAnnouncements() {
                         ? 'Guardando…'
                         : a.is_active ? 'Desactivar' : 'Activar'}
                     </button>
+                    <button type="button" onClick={() => setReport(a)} aria-label={`Ver entrega del comunicado "${a.title}"`}
+                      className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Send className="h-4 w-4" /></button>
                     <button type="button" onClick={() => openEdit(a)} aria-label={`Editar el comunicado "${a.title}"`}
                       className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
                     <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
@@ -317,6 +321,8 @@ export default function AdminAnnouncements() {
           </div>
         </div>
       </Modal>
+
+      <DeliveryReportModal announcementId={report?.id ?? null} title={report?.title} onClose={() => setReport(null)} />
 
       <ConfirmDialog
         open={!!toDelete}

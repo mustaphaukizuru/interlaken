@@ -69,6 +69,19 @@ class Notification(models.Model):
     delivered_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Per-channel delivery status (BACKLOG P1-C5). ``pending`` until dispatched;
+    # ``skipped`` = no real address / push disabled / no subscription.
+    class Delivery(models.TextChoices):
+        PENDING = 'pending', 'Pendiente'
+        SENT = 'sent', 'Enviado'
+        SKIPPED = 'skipped', 'Omitido'
+        FAILED = 'failed', 'Falló'
+
+    email_status = models.CharField(max_length=8, choices=Delivery.choices, default=Delivery.PENDING)
+    push_status = models.CharField(max_length=8, choices=Delivery.choices, default=Delivery.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.CharField(max_length=200, blank=True)
+
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Notificación'

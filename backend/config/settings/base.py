@@ -352,6 +352,9 @@ CONTACT_EMAIL = env('CONTACT_EMAIL', default='info@interlaken.com.mx')          
 ADMISSIONS_EMAIL = env('ADMISSIONS_EMAIL', default=CONTACT_EMAIL)               # pre-registro, inscripción, visitas
 BILLING_EMAIL = env('BILLING_EMAIL', default='facturas@interlaken.com.mx')      # facturación (CFDI)
 SUPPORT_EMAIL = env('SUPPORT_EMAIL', default=CONTACT_EMAIL)                     # portal access / passwords
+OPS_EMAIL = env('OPS_EMAIL', default='sistemas@interlaken.com.mx')             # delivery failures, cron alerts
+# A notification is retried by the dispatcher until this many attempts failed.
+NOTIFICATION_MAX_ATTEMPTS = env.int('NOTIFICATION_MAX_ATTEMPTS', default=3)
 
 # ── LOYVERSE ──────────────────────────────────────────────
 LOYVERSE_API_TOKEN = env('LOYVERSE_API_TOKEN', default='')
