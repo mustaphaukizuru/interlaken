@@ -308,9 +308,10 @@ export default function CostosPage() {
             <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
               <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
               <p>
-                Los costos son publicados por la administración del colegio y pueden
-                actualizarse cada ciclo escolar. Para becas, hermanos o planes de
-                pago, <Link to="/contacto" className="font-medium text-green-dark underline">contáctenos</Link>.
+                Información de referencia: los costos los publica la administración y pueden
+                actualizarse cada ciclo escolar. <strong className="text-ink">Inscripciones y colegiaturas se pagan
+                directamente con el colegio, no en este sitio.</strong> Para becas, hermanos o planes de
+                pago, <Link to="/contacto" className="font-medium text-green-dark underline">contacte a admisiones</Link>.
               </p>
             </div>
           )}

@@ -182,8 +182,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P2-10 | Galería: albums with events/dates, captions, grid, bulk upload. | Refine |
 | P2-11 | Admisiones and Comunidad: images. | Content |
 | P2-12 | Admissions funnel stepper page (Pre-registro, Visita, Documentos, Inscripción). | Missing |
-| P2-13 | Costos: per-nivel cards, PDF, information only with "Contactar admisiones" CTA and disclaimer. | Refine |
-| P2-14 | Unified floating launcher: WhatsApp, Recuperar contraseña, Agendar visita. | Refine |
+| P2-13 | Costos: per-nivel cards, PDF, information only with "Contactar admisiones" CTA and disclaimer. | DONE 2026-08-22 (explicit 'se pagan directamente con el colegio' disclaimer; no pay buttons; PDF deferred to CMS pricing block) |
+| P2-14 | Unified floating launcher: WhatsApp, Recuperar contraseña, Agendar visita. | DONE 2026-08-22 |
 | P2-15 | Testimonials block on Home and Admisiones. | Missing |
 | P2-16 | Calendario escolar public page. | Missing |
 | P2-17 | Google Maps embed and "Cómo llegar" on Contacto. | Missing |
