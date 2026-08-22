@@ -6,6 +6,8 @@ export default {
       // Breakpoint system (docs/RESPONSIVE.md): xs 360 · sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536
       screens: { xs: '360px' },
       colors: {
+        // Nivel educativo palette (school instruction 2026-08-21)
+        nivel: { preescolar: '#8ac6a4', primaria: '#f4436c', secundaria: '#f1c82f' },
         // `brand` remapped to the Interlaken purple scale so every existing
         // `brand-*` utility across the app rebrands automatically.
         brand: {

@@ -30,6 +30,11 @@
   --green-strong: #38801e;
   /* Amber darkened from #d97706 so warning TEXT passes AA (5.02:1 on white). */
   --amber: #b45309;
+
+  /* Nivel educativo (school instruction 2026-08-21): used on nivel pages, chips, charts */
+  --nivel-preescolar: #8ac6a4;
+  --nivel-primaria: #f4436c;
+  --nivel-secundaria: #f1c82f;
   /* Neutrals */
   --dark: #080516;
   --dark-2: #0f0a24;
@@ -64,6 +69,9 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
     scroll-behavior: smooth;
+    /* The brand is a light design: keep native controls/scrollbars light even when
+       the OS prefers dark (BACKLOG P1-I5). A real dark theme is a separate decision. */
+    color-scheme: light;
   }
   body {
     @apply bg-cream text-ink antialiased;

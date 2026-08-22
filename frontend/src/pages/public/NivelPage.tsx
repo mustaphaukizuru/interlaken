@@ -34,7 +34,7 @@ export default function NivelPage() {
           onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <span className={`${accent.label} inline-flex`}>Niveles Educativos</span>
+          <span className={`${accent.label} inline-flex`} style={{ borderLeft: `4px solid ${level.color}`, paddingLeft: 10 }}>Niveles Educativos</span>
           <h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]">
             {level.name}
           </h1>
