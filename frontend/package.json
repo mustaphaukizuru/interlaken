@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "check:budgets": "node scripts/check-budgets.mjs"
+    "check:budgets": "node scripts/check-budgets.mjs",
+    "check:sw": "node scripts/check-sw.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.8.0",

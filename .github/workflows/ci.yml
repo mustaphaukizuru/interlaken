@@ -93,9 +93,12 @@ jobs:
       - name: Check performance budgets
         run: npm run check:budgets
 
-      # The deploy image builds the SPA fresh (Dockerfile stage 1), so no
-      # committed-static freshness gate is needed anymore (it was a cPanel-era
-      # requirement). We still assert the push companion SW ships in dist.
+      # Service-worker gate: the built worker must not register a global
+      # NavigationRoute (that hijacked /auth/google/ and /admin/ in production,
+      # 2026-08-21), must keep excluding server-rendered paths, and must still
+      # import the push companion. See frontend/scripts/check-sw.mjs.
+      - name: Check service worker
+        run: npm run check:sw
       - name: Assert push companion SW is in dist
         run: |
           test -f dist/push-sw.js
