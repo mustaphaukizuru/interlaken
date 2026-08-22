@@ -64,8 +64,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | ID | Task | Status |
 |----|------|--------|
 | P1-B1 | Breakpoint system (xs 360, sm 640, md 768, lg 1024, xl 1280, 2xl 1536); audit every page at 360/390/768/1024/1440/1920. | Missing |
-| P1-B2 | Notifications on mobile: bottom sheet/full-screen panel under md, grouped Hoy/Semana/Anteriores, mark-all, swipe dismiss, 44px targets, safe areas; desktop popover widened with "Ver todas". | Refine |
-| P1-B3 | `/portal/notificaciones` full page with filters, infinite scroll, deep links. | Missing |
+| P1-B2 | Notifications on mobile: bottom sheet/full-screen panel under md, grouped Hoy/Semana/Anteriores, mark-all, swipe dismiss, 44px targets, safe areas; desktop popover widened with "Ver todas". | DONE 2026-08-22 (bottom sheet with scroll lock/Escape/backdrop; grouped list; 400px popover; swipe-dismiss deferred) |
+| P1-B3 | `/portal/notificaciones` full page with filters, infinite scroll, deep links. | DONE 2026-08-22 (type/unread filters, pagination, comunicado deep links) |
 | P1-B4 | Toast positioning and stacking (bottom-center mobile, top-right desktop, never over tab bar or WhatsApp float). | Refine |
 | P1-B5 | Shell coordination: drawer + MobileTabBar, hide tab bar when keyboard open, safe-area insets, swipe-to-close, focus trap. | Refine |
 | P1-B6 | Tables to cards under md for every admin and parent table; sticky header + horizontal scroll above md. | Refine |

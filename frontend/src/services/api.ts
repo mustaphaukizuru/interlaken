@@ -584,7 +584,8 @@ export const portalApi = {
     api.post(`/portal/announcements/${id}/comments/`, { body }),
 
   // Personal notifications (header bell menu).
-  getNotifications: () => api.get('/portal/notifications/'),
+  getNotifications: (params?: { page?: number; type?: string; unread?: string }) =>
+    api.get('/portal/notifications/', { params }),
   markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),
   markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 

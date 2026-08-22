@@ -256,7 +256,15 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
+        qs = Notification.objects.filter(user=self.request.user)
+        # /portal/notificaciones filters (BACKLOG P1-B3).
+        p = self.request.query_params
+        if p.get('unread') in ('1', 'true'):
+            qs = qs.filter(is_read=False)
+        t = p.get('type')
+        if t in Notification.NotifType.values:
+            qs = qs.filter(notif_type=t)
+        return qs.order_by('-created_at')
 
 
 class AnnouncementMarkReadView(APIView):

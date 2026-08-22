@@ -1,30 +1,24 @@
-import { Bell, Info, AlertTriangle, Receipt, Coffee, Check, type LucideIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, Check, X, ChevronRight } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Link, useNavigate } from 'react-router-dom';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { NotificationList } from '@/components/portal/NotificationList';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { notifDestination, type Notif } from '@/lib/notifications';
 import { portalApi } from '@/services/api';
 
-interface Notif {
-  id: number;
-  notif_type: 'info' | 'warning' | 'payment' | 'cafeteria';
-  title: string;
-  message: string;
-  is_read: boolean;
-  created_at: string;
-}
-
-const META: Record<Notif['notif_type'], { icon: LucideIcon; cls: string }> = {
-  info:      { icon: Info,          cls: 'bg-purple/10 text-purple' },
-  warning:   { icon: AlertTriangle, cls: 'bg-amber/10 text-amber' },
-  payment:   { icon: Receipt,       cls: 'bg-coral/10 text-coral' },
-  cafeteria: { icon: Coffee,        cls: 'bg-green/10 text-green-dark' },
-};
-
-/** Header bell + live notifications panel (unread badge, tap-to-read, mark-all). */
+/**
+ * Header bell. Desktop: anchored popover. Mobile (< md): a bottom sheet with
+ * 44px targets, safe-area padding and scroll lock (BACKLOG P1-B2). Both link
+ * to the full /portal/notificaciones page (P1-B3).
+ */
 export function NotificationsMenu() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const isMobile = !useMediaQuery('(min-width: 768px)');
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const { data = [] } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
@@ -37,104 +31,109 @@ export function NotificationsMenu() {
 
   const unread = data.filter((n) => !n.is_read).length;
   const invalidate = () => qc.invalidateQueries({ queryKey: ['notifications'] });
-  const markRead = useMutation({
-    mutationFn: (id: number) => portalApi.markNotificationRead(id),
-    onSuccess: invalidate,
-  });
-  const markAll = useMutation({
-    mutationFn: () => portalApi.markAllNotificationsRead(),
-    onSuccess: invalidate,
-  });
+  const markRead = useMutation({ mutationFn: (id: number) => portalApi.markNotificationRead(id), onSuccess: invalidate });
+  const markAll = useMutation({ mutationFn: () => portalApi.markAllNotificationsRead(), onSuccess: invalidate });
 
-  // Where a notification takes you when tapped — a notification with no relevant
-  // destination just marks read in place. (Students use the family /portal too.)
-  const navigate = useNavigate();
-  const destFor = (type: Notif['notif_type']): string | null => {
-    if (type === 'payment') return '/portal/pagos';
-    if (type === 'cafeteria') return '/portal/cafeteria';
-    return null;
-  };
   const openNotif = (n: Notif, close: () => void) => {
     if (!n.is_read) markRead.mutate(n.id);
-    const dest = destFor(n.notif_type);
+    const dest = notifDestination(n);
     if (dest) {
       navigate(dest);
       close();
     }
   };
 
-  return (
-    <Dropdown
-      width={370}
-      trigger={({ open, toggle }) => (
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
-          aria-expanded={open}
-          aria-haspopup="true"
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-white text-muted shadow-card transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
-        >
-          <Bell size={19} />
-          {unread > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold text-white ring-2 ring-cream">
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </button>
-      )}
+  // Scroll lock + Escape for the sheet.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheetOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+  }, [sheetOpen]);
+
+  const bell = (open: boolean, toggle: () => void) => (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
+      aria-expanded={open}
+      aria-haspopup="dialog"
+      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-white text-muted shadow-card transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
     >
+      <Bell size={19} />
+      {unread > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold text-white ring-2 ring-cream">
+          {unread > 9 ? '9+' : unread}
+        </span>
+      )}
+    </button>
+  );
+
+  const header = (close: () => void, withClose: boolean) => (
+    <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+      <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
+      <div className="flex items-center gap-3">
+        {unread > 0 && (
+          <button
+            type="button"
+            onClick={() => markAll.mutate()}
+            className="inline-flex min-h-[32px] items-center gap-1 rounded text-xs font-semibold text-purple transition-colors hover:text-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+          >
+            <Check size={13} /> Marcar todas
+          </button>
+        )}
+        {withClose && (
+          <button type="button" onClick={close} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-cream hover:text-ink">
+            <X size={18} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const footer = (close: () => void) => (
+    <Link
+      to="/portal/notificaciones"
+      onClick={close}
+      className="flex min-h-[48px] items-center justify-center gap-1 border-t border-line text-sm font-semibold text-purple hover:bg-cream"
+    >
+      Ver todas <ChevronRight size={16} aria-hidden="true" />
+    </Link>
+  );
+
+  if (isMobile) {
+    const close = () => setSheetOpen(false);
+    return (
+      <>
+        {bell(sheetOpen, () => setSheetOpen((v) => !v))}
+        {sheetOpen && (
+          <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label="Notificaciones">
+            <button type="button" aria-label="Cerrar" onClick={close} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+            <div className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl bg-white shadow-[0_-12px_40px_-12px_rgba(16,12,40,0.45)] pb-[env(safe-area-inset-bottom)]">
+              <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-line" aria-hidden="true" />
+              {header(close, true)}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <NotificationList items={data} onOpen={(n) => openNotif(n, close)} limit={30} />
+              </div>
+              {footer(close)}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <Dropdown width={400} trigger={({ open, toggle }) => bell(open, toggle)}>
       {({ close }) => (
         <>
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
-            {unread > 0 && (
-              <button
-                type="button"
-                onClick={() => markAll.mutate()}
-                className="inline-flex items-center gap-1 rounded text-xs font-semibold text-purple transition-colors hover:text-purple-mid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
-              >
-                <Check size={13} /> Marcar todas
-              </button>
-            )}
+          {header(close, false)}
+          <div className="max-h-[420px] overflow-y-auto">
+            <NotificationList items={data} onOpen={(n) => openNotif(n, close)} limit={15} />
           </div>
-          <div className="max-h-[360px] overflow-y-auto">
-            {data.length === 0 ? (
-              <div className="px-4 py-12 text-center">
-                <Bell size={22} className="mx-auto mb-2 text-subtle" />
-                <p className="text-sm text-muted">Sin notificaciones</p>
-              </div>
-            ) : (
-              data.slice(0, 15).map((n) => {
-                const m = META[n.notif_type] ?? META.info;
-                const Icon = m.icon;
-                return (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => openNotif(n, close)}
-                    className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition-colors last:border-0 hover:bg-cream focus-visible:bg-cream focus-visible:outline-none ${
-                      n.is_read ? '' : 'bg-purple/[0.035]'
-                    }`}
-                  >
-                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${m.cls}`}>
-                      <Icon size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-[13px] font-semibold text-ink">{n.title}</span>
-                        {!n.is_read && <span className="h-2 w-2 shrink-0 rounded-full bg-coral" aria-hidden="true" />}
-                      </span>
-                      <span className="mt-0.5 line-clamp-2 block text-xs text-muted">{n.message}</span>
-                      <span className="mt-1 block text-[11px] text-subtle">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: es })}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
+          {footer(close)}
         </>
       )}
     </Dropdown>

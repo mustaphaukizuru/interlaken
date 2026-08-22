@@ -53,6 +53,7 @@ const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
 const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
 const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
 const InscripcionesPage = lazy(() => import('./pages/parent/InscripcionesPage'));
+const NotificationsPage = lazy(() => import('./pages/parent/NotificationsPage'));
 const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
 const PrivacyPage = lazy(() => import('./pages/parent/PrivacyPage'));
 
@@ -168,6 +169,7 @@ export default function App() {
               <Route path="comunicados" element={<ComunicadosPage />} />
               <Route path="comunicados/:id" element={<ComunicadoDetailPage />} />
               <Route path="perfil"    element={<ProfilePage />} />
+              <Route path="notificaciones" element={<NotificationsPage />} />
               <Route path="privacidad" element={<PrivacyPage />} />
             </Route>
 
