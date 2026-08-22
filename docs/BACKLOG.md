@@ -145,7 +145,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-H1 | Staff user management in portal: invite, role (per D7), deactivate, reset password; roles matrix enforced in backend permissions. | Missing |
+| P1-H1 | Staff user management in portal: invite, role (per D7), deactivate, reset password; roles matrix enforced in backend permissions. | DONE 2026-08-22 (/admin/usuarios; roles admin/staff per D7; self/last-admin/superuser guards; finer roles in P4) |
 | P1-H2 | Shared ExportMenu (CSV, XLSX, PDF, date range, current filters); exports logged in audit. | Partial |
 | P1-H3 | Add exports: admisiones, comunicados stats, auditoría, payments, monthly dashboard PDF. | Missing |
 | P1-H4 | Family exports: payments, cafetería movements per child, credential PDF. | Partial |

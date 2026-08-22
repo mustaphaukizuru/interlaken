@@ -72,6 +72,7 @@ const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail')
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
 const DocumentsUploadPage = lazy(() => import('./pages/public/DocumentsUploadPage'));
+const AdminStaffUsers = lazy(() => import('./pages/admin/AdminStaffUsers'));
 const AdminContactInbox = lazy(() => import('./pages/admin/AdminContactInbox'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const AdminPasswordRequests = lazy(() => import('./pages/admin/AdminPasswordRequests'));
@@ -199,6 +200,7 @@ export default function App() {
               <Route path="contrasenas" element={<AdminPasswordRequests />} />
               <Route path="pagos"       element={<AdminPayments />} />
               <Route path="mensajes"    element={<AdminContactInbox />} />
+              <Route path="usuarios"    element={<AdminStaffUsers />} />
             </Route>
 
           </Routes>

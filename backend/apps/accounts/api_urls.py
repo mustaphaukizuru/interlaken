@@ -8,6 +8,7 @@ from .import_students import ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
 from .password_requests import PasswordRequestDetailView, PasswordRequestListCreateView
+from .staff_users import StaffDetailView, StaffListCreateView, StaffResetPasswordView
 from .student_admin import AdminStudentCreateView, AdminStudentUpdateView
 
 urlpatterns = [
@@ -26,6 +27,10 @@ urlpatterns = [
     # accounts have no usable one and cannot receive reset mail).
     path('admin/users/<int:pk>/set-password/', AdminSetPasswordView.as_view(),
          name='admin-set-password'),
+    # Staff user management (P1-H1).
+    path('admin/staff/', StaffListCreateView.as_view(), name='admin-staff'),
+    path('admin/staff/<int:pk>/', StaffDetailView.as_view(), name='admin-staff-detail'),
+    path('admin/staff/<int:pk>/reset-password/', StaffResetPasswordView.as_view(), name='admin-staff-reset'),
     # Password request inbox (families ask by WhatsApp/email; admins resolve here).
     path('admin/password-requests/', PasswordRequestListCreateView.as_view(), name='password-requests'),
     path('admin/password-requests/<int:pk>/', PasswordRequestDetailView.as_view(), name='password-request-detail'),
