@@ -6,12 +6,10 @@ import {
   FileText, CircleDollarSign, UserPlus, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Facebook, Instagram, Youtube } from '@/components/icons/brand-icons';
 import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { socialEntries } from '@/lib/siteContact';
 import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
 import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
@@ -66,13 +64,6 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
 /** El pie refleja los mismos 4 grupos del menú; Portal/Aviso van en la barra inferior. */
 const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
 
-// Icons per social key; URLs come from the admin-editable site settings
-// (CMS Phase 1) — entries without a configured URL are not rendered.
-const SOCIAL_ICONS = {
-  facebook: Facebook,
-  instagram: Instagram,
-  youtube: Youtube,
-} as const;
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
@@ -155,7 +146,6 @@ export function PublicLayout() {
   const { pathname } = useLocation();
   const settings = useSiteSettings();
   // Only socials with a real URL — never render href="#" (GO-LIVE-AUDIT #41).
-  const displaySocials = socialEntries(settings);
   const showStickyCta = !HIDE_STICKY_CTA.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
@@ -181,34 +171,18 @@ export function PublicLayout() {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      {/* Preheader — solo escritorio/tablet. Mismo contenedor que la barra de
-          navegación: las redes quedan alineadas al borde del logo y el correo
-          termina al ras del botón «Portal». */}
+      {/* Preheader — solo escritorio/tablet. Petición del colegio (2026-08-21):
+          teléfono a la izquierda, correo a la derecha; sin redes sociales. */}
       <div className="hidden md:block bg-brand-800 text-white text-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-1.5 sm:px-6">
-          <div className="flex items-center gap-2">
-            {displaySocials.map(({ key, label, href }) => {
-              const Icon = SOCIAL_ICONS[key];
-              return (
-                <a
-                  key={key}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors hover:bg-white/25 hover:text-white"
-                >
-                  <Icon className="h-3 w-3" aria-hidden="true" />
-                </a>
-              );
-            })}
-          </div>
           <div className="flex items-center gap-6">
             {settings.phone_display && (
               <a href={`tel:${settings.phone_e164}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
                 <Phone className="w-3 h-3" aria-hidden="true" /> {settings.phone_display}
               </a>
             )}
+          </div>
+          <div className="flex items-center gap-6">
             {settings.contact_email && (
               <a href={`mailto:${settings.contact_email}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
                 <Mail className="w-3 h-3" aria-hidden="true" /> {settings.contact_email}
@@ -221,10 +195,10 @@ export function PublicLayout() {
       {/* Main nav */}
       <div className="accent-bar" />
       <header className="bg-white border-b border-line sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
-            <Logo variant="horizontal" size={40} theme="light" eager />
+            <Logo variant="horizontal" size={52} theme="light" eager />
           </Link>
 
           {/* Desktop nav — menú confirmado por el cliente */}
@@ -374,31 +348,12 @@ export function PublicLayout() {
           {/* Brand always visible */}
           <div className="mb-8 max-w-sm">
             <div className="mb-3">
-              <Logo variant="horizontal" size={40} theme="dark" />
+              <Logo variant="horizontal" size={52} theme="dark" />
             </div>
             <p className="text-xs leading-relaxed">
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
               Tlalnepantla, Estado de México.
             </p>
-            {displaySocials.length > 0 && (
-              <div className="flex items-center gap-3 mt-5">
-                {displaySocials.map(({ key, label, href }) => {
-                  const Icon = SOCIAL_ICONS[key];
-                  return (
-                    <a
-                      key={key}
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={label}
-                      className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
-                    >
-                      <Icon className="w-4 h-4" />
-                    </a>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* Mobile (&lt;md): accordion link groups — desktop: open grid */}

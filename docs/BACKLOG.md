@@ -37,7 +37,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P0-8 | Puertas Abiertas: remove `/puertas-abiertas` from public site and menus; keep backend. Add redirect. | Public | DONE 2026-08-22 (redirects to /agendar-visita; admin Visitas keeps events) |
 | P0-9 | Contacto: form sends to `info@`; remove `colegio@interlaken.edu.mx`; show "Lunes a Viernes 7:30 - 15:00". | Public | DONE 2026-08-22 (defaults + data migration content.0012) |
 | P0-10 | Plataformas: rename "Portal de Familias" to "Cafetería"; keep only "Checar saldo y recargas de cafetería". | Public | DONE 2026-08-22 |
-| P0-11 | Header/footer: remove Facebook icon and logo in footer; top bar phone left, email right. | Public | Refine |
+| P0-11 | Header/footer: remove Facebook icon and logo in footer; top bar phone left, email right. | Public | DONE 2026-08-22 (also logos +30%: 40→52px) |
 | P0-12 | Duplicate audit: remove duplicated content/components across the system and on the same page. | Quality | Missing |
 | P0-13 | Pytest coverage for P0-2, P0-4, P0-5 (student with 2 guardians sends max 3 emails, synthetic skipped, enrollment payment rejected). | Tests | DONE 2026-08-22 (test_recipients, test_notification_prefs, payments tests) |
 
@@ -174,8 +174,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P2-2 | Stats band: 1200+ Alumnos, 80+ Maestros, 45+ Años, 95+ (D2). | Content |
 | P2-3 | Niveles block with per-level identity and CTA. | Refine |
 | P2-4 | "Solicite informes" CTA strengthened. | Refine |
-| P2-5 | Header: logo +30%, menu/mobile/scroll enhancements. | Refine |
-| P2-6 | Footer: logo +30%, link menu enhancement, SEP info moved to nivel pages. | Refine |
+| P2-5 | Header: logo +30% (DONE), menu/mobile/scroll enhancements. | Partial |
+| P2-6 | Footer: logo +30% (DONE), link menu enhancement, SEP info moved to nivel pages. | Partial |
 | P2-7 | Nivel pages: images, icons, graphs, colors (Pre #8AC6A4, Prim #F4436C, Sec #F1C82F), full info, SEP incorporation. | Content |
 | P2-8 | Quiénes Somos: images + history timeline. | Content |
 | P2-9 | Modelo Educativo: images and content. | Content |
