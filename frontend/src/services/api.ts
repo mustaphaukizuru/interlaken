@@ -48,6 +48,13 @@ export interface AdminPaymentsSummary {
   stuck_pending: number;
 }
 
+export interface DocumentsListing {
+  registration: number;
+  child_name: string;
+  required: { code: string; label: string }[];
+  documents: { id: number; doc_type: string; filename: string; file_size: number; uploaded_at: string; is_verified: boolean; status: 'pending' | 'approved' | 'rejected'; review_note: string; download_url: string }[];
+}
+
 export interface DeliveryReport {
   announcement: number;
   recipients: number;
@@ -240,6 +247,10 @@ export const admissionsApi = {
   submitRegistration: (id: number, sessionToken?: string, acceptPrivacy = true) =>
     api.post(`/admissions/register/${id}/submit/`, { accept_privacy: acceptPrivacy }, sessionHeaders(sessionToken)),
 
+  /** Applicant's documents with review status (BACKLOG P1-G4). */
+  listDocuments: (registrationId: number, sessionToken?: string) =>
+    api.get(`/admissions/register/${registrationId}/documents/list/`, sessionHeaders(sessionToken)),
+
   uploadDocument: (registrationId: number, file: File, docType: string, sessionToken?: string) => {
     const form = new FormData();
     form.append('file', file);
@@ -286,6 +297,12 @@ export const admissionsAdminApi = {
   /** Mark an uploaded document verified (or clear it). */
   verifyDocument: (docId: number, isVerified: boolean) =>
     api.patch(`/admissions/documents/${docId}/verify/`, { is_verified: isVerified }),
+  /** Approve / reject with a note (P1-G4). */
+  reviewDocument: (docId: number, status: 'approved' | 'rejected' | 'pending', note = '') =>
+    api.patch(`/admissions/documents/${docId}/verify/`, { status, review_note: note }),
+  /** Issue and email a fresh single-use documents link. */
+  sendDocumentsLink: (registrationId: number) =>
+    api.post<{ url: string; missing: string[] }>(`/admissions/register/${registrationId}/documents-link/`, {}),
 
   /** Download an uploaded document as a blob (prod serves no /media/, so this
    *  authenticated endpoint carries the JWT and streams the file). */

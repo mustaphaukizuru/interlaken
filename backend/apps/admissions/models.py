@@ -177,6 +177,16 @@ class RegistrationDocument(models.Model):
     uploaded_at  = models.DateTimeField(default=timezone.now)
     is_verified  = models.BooleanField(default=False)
 
+    # Per-document review (BACKLOG P1-G4). ``is_verified`` mirrors approved so
+    # existing badges/filters keep working.
+    class Review(models.TextChoices):
+        PENDING = 'pending', 'Pendiente'
+        APPROVED = 'approved', 'Aprobado'
+        REJECTED = 'rejected', 'Rechazado'
+
+    status       = models.CharField(max_length=10, choices=Review.choices, default=Review.PENDING)
+    review_note  = models.CharField(max_length=300, blank=True)
+
     class Meta:
         verbose_name = 'Documento'
         verbose_name_plural = 'Documentos'

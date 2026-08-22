@@ -21,6 +21,7 @@ const HIDE_STICKY_CTA = [
   '/agendar-visita',
   '/pre-registro',
   '/registro',
+  '/inscripcion/documentos',
   '/login',
 ];
 

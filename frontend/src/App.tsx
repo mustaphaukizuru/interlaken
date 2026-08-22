@@ -71,6 +71,7 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
+const DocumentsUploadPage = lazy(() => import('./pages/public/DocumentsUploadPage'));
 const AdminContactInbox = lazy(() => import('./pages/admin/AdminContactInbox'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const AdminPasswordRequests = lazy(() => import('./pages/admin/AdminPasswordRequests'));
@@ -120,6 +121,7 @@ export default function App() {
               <Route path="/admisiones/costos" element={<CostosPage />} />
               <Route path="/pre-registro"  element={<PreRegisterPage />} />
               <Route path="/inscripcion"   element={<RegisterPage />} />
+              <Route path="/inscripcion/documentos" element={<DocumentsUploadPage />} />
               {/* Puertas Abiertas is admin-only now (bookings console); public URL redirects. */}
               <Route path="/puertas-abiertas" element={<Navigate to="/agendar-visita" replace />} />
               <Route path="/agendar-visita" element={<BookVisitPage />} />
