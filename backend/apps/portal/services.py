@@ -82,12 +82,19 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
             delivered_at=timezone.now(),
         )
 
-    if want_email and getattr(user, 'email', ''):
-        send_email(subject=title, message=message, recipients=[user.email])
+    # A student's notification must reach the student's real mailbox (if any)
+    # AND every linked guardian; synthetic importer addresses are skipped.
+    from apps.accounts.recipients import delivery_users, email_recipients
+
+    if want_email:
+        recipients = email_recipients(user)
+        if recipients:
+            send_email(subject=title, message=message, recipients=recipients)
 
     if want_push:
         from apps.portal.push import send_web_push
-        send_web_push(user, title, message)
+        for target in delivery_users(user):
+            send_web_push(target, title, message)
 
     if whatsapp:
         wa = (getattr(user, 'whatsapp', '') or '').strip()
@@ -295,19 +302,36 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     if not pending:
         return 0
 
+    from apps.accounts.recipients import delivery_users, is_synthetic_email
+
     sent, handled_ids = 0, []
     for n in pending:
         handled_ids.append(n.id)
         if n.created_at < cutoff:
             continue  # too old — mark delivered below, don't send
-        if getattr(n.user, 'email', ''):
-            send_email(subject=n.title, message=n.message, recipients=[n.user.email])
+        ann = n.announcement
+        # Student rows also reach the guardians — unless a guardian already has
+        # their own row for the same comunicado (audience fan-out), in which
+        # case that row carries their copy and we must not double-send.
+        targets = []
+        for target in delivery_users(n.user):
+            if target.pk != n.user_id and ann is not None and Notification.objects.filter(
+                user=target, announcement=ann).exists():
+                continue
+            targets.append(target)
+        emails = []
+        for target in targets:
+            addr = (getattr(target, 'email', '') or '').strip()
+            if addr and not is_synthetic_email(addr) and addr.lower() not in {e.lower() for e in emails}:
+                emails.append(addr)
+        if emails:
+            send_email(subject=n.title, message=n.message, recipients=emails)
         # Comunicado rows deep-link the push to the announcement and honor its
         # 'Enviar notificación push' toggle; standalone rows keep /portal.
-        ann = n.announcement
         if ann is None or ann.push_enabled:
             url = f'/portal/comunicados/{ann.pk}' if ann else '/portal'
-            send_web_push(n.user, n.title, n.message, url=url)
+            for target in targets:
+                send_web_push(target, n.title, n.message, url=url)
         sent += 1
 
     Notification.objects.filter(id__in=handled_ids).update(delivered_at=now)

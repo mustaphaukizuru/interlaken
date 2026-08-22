@@ -31,7 +31,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P0-2 | Remove self-service password reset and change: delete `/olvide-contrasena`, `/restablecer-contrasena`, ProfilePage password card, and the backend forgot/reset endpoints. | Auth | DONE 2026-08-22 |
 | P0-3 | Login page rewrite: "¿Olvidaste tu contraseña? Solicítala al colegio" with WhatsApp deep link and contact mailto (PasswordHelp component, also in Mi información). | Auth | DONE 2026-08-22 |
 | P0-4 | Hard-block `tuition` and `enrollment` payment types at model/API level; remove labels, copy, and related KPIs from UI (per D4). | Payments | DONE 2026-08-22 (branch feat/retire-tuition-enrollment) |
-| P0-5 | Notifications reach student AND guardians: `notify()` / dispatcher email and push to the student's real email plus every linked guardian; skip synthetic `@alumnos.` addresses; add `Student.recipients()`. | Notifications | Missing |
+| P0-5 | Notifications reach student AND guardians: `notify()` / dispatcher email and push to the student's real email plus every linked guardian; skip synthetic `@alumnos.` addresses; add `Student.recipients()`. | Notifications | DONE 2026-08-22 (accounts/recipients.py) |
 | P0-6 | Fix hardcoded `colegio@interlaken.com.mx` in admissions email and align `.env` addresses with D1. | Email | Missing |
 | P0-7 | Verify student login sees only own data; verify parent login sees linked students; fix any leak. | Auth | Partial |
 | P0-8 | Puertas Abiertas: remove `/puertas-abiertas` from public site and menus; keep backend. Add redirect. | Public | Missing |
@@ -39,7 +39,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P0-10 | Plataformas: rename "Portal de Familias" to "Cafetería"; keep only "Checar saldo y recargas de cafetería". | Public | Content |
 | P0-11 | Header/footer: remove Facebook icon and logo in footer; top bar phone left, email right. | Public | Refine |
 | P0-12 | Duplicate audit: remove duplicated content/components across the system and on the same page. | Quality | Missing |
-| P0-13 | Pytest coverage for P0-2, P0-4, P0-5 (student with 2 guardians sends max 3 emails, synthetic skipped, enrollment payment rejected). | Tests | Missing |
+| P0-13 | Pytest coverage for P0-2, P0-4, P0-5 (student with 2 guardians sends max 3 emails, synthetic skipped, enrollment payment rejected). | Tests | DONE 2026-08-22 (test_recipients, test_notification_prefs, payments tests) |
 
 ## P1. Portal foundations
 
