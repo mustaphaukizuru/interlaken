@@ -6,7 +6,8 @@ from .models import NotificationPreference, ParentProfile, StudentProfile, User
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationPreference
-        fields = ['email_enabled', 'in_app_enabled', 'push_enabled', 'updated_at']
+        fields = ['email_enabled', 'in_app_enabled', 'push_enabled',
+                  'cat_cafeteria', 'cat_payment', 'cat_info', 'updated_at']
         read_only_fields = ['updated_at']
 
 

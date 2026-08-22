@@ -173,6 +173,12 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=True)
     in_app_enabled = models.BooleanField(default=True)
     push_enabled = models.BooleanField(default=True)
+    # Per-category toggles (BACKLOG P1-C4). Channel toggles above are the master
+    # switches; a category off silences every channel for that category.
+    # Warnings (emergencies, low balance) cannot be silenced.
+    cat_cafeteria = models.BooleanField('Cafetería', default=True)
+    cat_payment = models.BooleanField('Pagos', default=True)
+    cat_info = models.BooleanField('Comunicados y avisos', default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -186,6 +192,13 @@ class NotificationPreference(models.Model):
         """Return prefs, creating defaults if missing."""
         prefs, _ = cls.objects.get_or_create(user=user)
         return prefs
+
+    CATEGORY_FIELD = {'cafeteria': 'cat_cafeteria', 'payment': 'cat_payment', 'info': 'cat_info'}
+
+    def allows(self, notif_type: str) -> bool:
+        """False when the user muted this category; warnings are never muted."""
+        field = self.CATEGORY_FIELD.get(notif_type)
+        return True if field is None else bool(getattr(self, field, True))
 
 
 class PasswordRequest(models.Model):

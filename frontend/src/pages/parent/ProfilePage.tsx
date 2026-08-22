@@ -23,6 +23,9 @@ export default function ProfilePage() {
   const [emailOn, setEmailOn] = useState(user?.notif_prefs?.email_enabled ?? true);
   const [inAppOn, setInAppOn] = useState(user?.notif_prefs?.in_app_enabled ?? true);
   const [pushOn, setPushOn] = useState(user?.notif_prefs?.push_enabled ?? true);
+  const [catCaf, setCatCaf] = useState(user?.notif_prefs?.cat_cafeteria ?? true);
+  const [catPay, setCatPay] = useState(user?.notif_prefs?.cat_payment ?? true);
+  const [catInfo, setCatInfo] = useState(user?.notif_prefs?.cat_info ?? true);
 
   const mutation = useMutation({
     mutationFn: () => authApi.updateMe({
@@ -43,6 +46,9 @@ export default function ProfilePage() {
         email_enabled: emailOn,
         in_app_enabled: inAppOn,
         push_enabled: pushOn,
+        cat_cafeteria: catCaf,
+        cat_payment: catPay,
+        cat_info: catInfo,
       });
       // Best-effort device subscribe/unsubscribe when the push preference flips.
       const { isPushSupported, enablePush, disablePush } = await import('@/services/push');
@@ -68,7 +74,10 @@ export default function ProfilePage() {
   const prefsDirty =
     emailOn !== (user?.notif_prefs?.email_enabled ?? true) ||
     inAppOn !== (user?.notif_prefs?.in_app_enabled ?? true) ||
-    pushOn !== (user?.notif_prefs?.push_enabled ?? true);
+    pushOn !== (user?.notif_prefs?.push_enabled ?? true) ||
+    catCaf !== (user?.notif_prefs?.cat_cafeteria ?? true) ||
+    catPay !== (user?.notif_prefs?.cat_payment ?? true) ||
+    catInfo !== (user?.notif_prefs?.cat_info ?? true);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -134,9 +143,25 @@ export default function ProfilePage() {
               <input type="checkbox" className="h-5 w-5" checked={inAppOn} onChange={(e) => setInAppOn(e.target.checked)} />
             </label>
             <label className="flex min-h-[44px] items-center justify-between gap-3 text-sm text-ink">
-              <span>Notificaciones push (si estánó)</span>
+              <span>Notificaciones push (si están activadas en este dispositivo)</span>
               <input type="checkbox" className="h-5 w-5" checked={pushOn} onChange={(e) => setPushOn(e.target.checked)} />
             </label>
+          </div>
+          <p className="mb-2 mt-5 text-xs font-bold uppercase tracking-wide text-subtle">Qué avisos recibir</p>
+          <div className="space-y-3">
+            <label className="flex min-h-[44px] items-center justify-between gap-3 text-sm text-ink">
+              <span>Cafetería (compras, recargas, saldo)</span>
+              <input type="checkbox" className="h-5 w-5" checked={catCaf} onChange={(e) => setCatCaf(e.target.checked)} />
+            </label>
+            <label className="flex min-h-[44px] items-center justify-between gap-3 text-sm text-ink">
+              <span>Pagos en línea</span>
+              <input type="checkbox" className="h-5 w-5" checked={catPay} onChange={(e) => setCatPay(e.target.checked)} />
+            </label>
+            <label className="flex min-h-[44px] items-center justify-between gap-3 text-sm text-ink">
+              <span>Comunicados y avisos del colegio</span>
+              <input type="checkbox" className="h-5 w-5" checked={catInfo} onChange={(e) => setCatInfo(e.target.checked)} />
+            </label>
+            <p className="text-xs text-subtle">Las alertas urgentes (emergencias, saldo muy bajo) siempre se envían.</p>
           </div>
           <div className="mt-4 flex justify-end">
             <Button type="button" variant="primary" loading={prefsMutation.isPending} disabled={!prefsDirty} onClick={() => prefsMutation.mutate()} className="min-h-[44px]">

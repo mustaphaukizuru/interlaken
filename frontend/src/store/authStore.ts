@@ -24,6 +24,9 @@ export interface User {
     email_enabled: boolean;
     in_app_enabled: boolean;
     push_enabled: boolean;
+    cat_cafeteria?: boolean;
+    cat_payment?: boolean;
+    cat_info?: boolean;
   };
 }
 

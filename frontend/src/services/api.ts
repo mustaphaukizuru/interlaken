@@ -176,7 +176,7 @@ export const authApi = {
     api.get<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>(
       '/accounts/notification-preferences/',
     ),
-  updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>) =>
+  updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>
     api.patch('/accounts/notification-preferences/', data),
   logout: async () => {
     const csrf = getCookie(CSRF_COOKIE);

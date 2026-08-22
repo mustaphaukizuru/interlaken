@@ -54,3 +54,16 @@ class TestNotificationPreferences:
         assert resp.data['email_enabled'] is False
         prefs = NotificationPreference.objects.get(user=user)
         assert prefs.email_enabled is False
+
+
+class TestCategoryPrefs:
+    def test_muted_category_silences_all_channels_but_warnings(self, api_client):
+        user = ParentFactory(email='cat@test.mx')
+        api_client.force_authenticate(user=user)
+        resp = api_client.patch(reverse('notification-preferences'), {'cat_cafeteria': False}, format='json')
+        assert resp.status_code == 200 and resp.data['cat_cafeteria'] is False
+        mail.outbox.clear()
+        assert notify(user, 'cafeteria', 'Compra', 'x') is None
+        assert Notification.objects.filter(user=user).count() == 0 and not mail.outbox
+        assert notify(user, 'warning', 'Saldo bajo', 'x') is not None
+        assert notify(user, 'info', 'Aviso', 'x') is not None

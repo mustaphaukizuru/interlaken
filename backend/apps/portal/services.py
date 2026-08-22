@@ -102,6 +102,9 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
         return None
 
     prefs = NotificationPreference.for_user(user)
+    if not prefs.allows(notif_type):
+        logger.info('Notification muted by category for %s: %s', user, title)
+        return None
     want_in_app = prefs.in_app_enabled
     want_email = email and prefs.email_enabled
     want_push = prefs.push_enabled
