@@ -180,6 +180,24 @@ export default function ParentDashboard() {
         </div>
       )}
 
+      {/* 1b. Per-child tiles (BACKLOG P1-H6): balance + quick top-up per alumno */}
+      {balances.length > 1 && (
+        <ul className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Saldo por alumno">
+          {balances.map((b) => (
+            <li key={b.student_name} className={`rounded-2xl border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
+              <p className="truncate text-sm font-semibold text-ink">{b.student_name}</p>
+              <p className={`mt-1 font-head text-2xl font-extrabold ${b.low ? 'text-amber' : 'text-ink'}`}>${parseFloat(b.balance).toFixed(2)}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[100, 200].map((amt) => (
+                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}`} className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-purple hover:border-purple/40">+${amt}</Link>
+                ))}
+                <Link to="/portal/cafeteria" className="rounded-full px-3 py-1 text-xs font-semibold text-muted hover:text-ink">Ver más →</Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* 2. Child switcher */}
       {children.length > 1 && (
         <div className="mb-5">

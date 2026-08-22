@@ -119,17 +119,40 @@ class DashboardView(APIView):
             }
 
         elif user.role == User.Role.ADMIN:
-            total_revenue = Payment.objects.filter(
-                status=Payment.Status.SUCCESS
-            ).aggregate(total=Sum('amount'))['total'] or 0
+            # BACKLOG P1-H5: cafetería is the only money path, so the KPIs are
+            # wallet health + the operational queues, not tuition revenue.
+            from django.db.models import F
+            from django.utils import timezone as tz
 
+            from apps.accounts.models import PasswordRequest
+            from apps.bookings.models import Booking
+            from apps.cafeteria.models import TopUpRequest
+            from apps.core.models import AuditLog, ContactMessage
+
+            now = tz.localtime()
+            month_revenue = Payment.objects.filter(
+                status=Payment.Status.SUCCESS, created_at__year=now.year, created_at__month=now.month,
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            active_balances = CafeteriaBalance.objects.filter(student__is_active=True)
             data = {
-                'total_students': StudentProfile.objects.count(),
+                'total_students': StudentProfile.objects.filter(is_active=True).count(),
                 'total_users': User.objects.count(),
                 'pending_preregistrations': PreRegistration.objects.filter(status='pending').count(),
                 'pending_registrations': Registration.objects.filter(status='submitted').count(),
                 'pending_payments': Payment.objects.filter(status=Payment.Status.PENDING).count(),
-                'total_revenue': str(total_revenue),
+                'total_revenue': str(month_revenue),
+                'cafeteria_total_balance': str(active_balances.aggregate(t=Sum('balance'))['t'] or 0),
+                'low_balance_count': active_balances.filter(balance__lte=F('low_balance_threshold')).count(),
+                'pending_topups': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
+                'visits_today': Booking.objects.filter(slot__date=now.date()).exclude(status='cancelled').count()
+                if hasattr(Booking, 'slot') else 0,
+                'open_password_requests': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
+                'unhandled_messages': ContactMessage.objects.filter(is_handled=False).count(),
+                'recent_activity': [
+                    {'id': a.id, 'when': a.created_at, 'actor': a.actor_label or (a.actor.email if a.actor else 'sistema'),
+                     'action': a.action, 'object_type': a.object_type, 'object_id': a.object_id, 'context': a.context}
+                    for a in AuditLog.objects.select_related('actor').order_by('-created_at')[:8]
+                ],
             }
 
         # Common: announcements + unread notifications

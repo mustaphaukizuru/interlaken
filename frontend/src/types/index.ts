@@ -281,6 +281,13 @@ export interface DashboardData {
   pending_registrations?: number;
   pending_payments?: number;
   total_revenue?: string;
+  cafeteria_total_balance?: string;
+  low_balance_count?: number;
+  pending_topups?: number;
+  visits_today?: number;
+  open_password_requests?: number;
+  unhandled_messages?: number;
+  recent_activity?: { id: number; when: string; actor: string; action: string; object_type: string; object_id: string; context: string }[];
   announcements?: Announcement[];
   unread_notifications?: number;
 }

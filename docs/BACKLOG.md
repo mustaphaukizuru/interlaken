@@ -149,8 +149,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-H2 | Shared ExportMenu (CSV, XLSX, PDF, date range, current filters); exports logged in audit. | DONE 2026-08-22 (ExportMenu component honoring current filters; new exports audited; XLSX not needed, CSV opens in Excel) |
 | P1-H3 | Add exports: admisiones, comunicados stats, auditoría, payments, monthly dashboard PDF. | DONE 2026-08-22 (pre-registros, inscripciones, auditoría, pagos; comunicados stats via delivery report; monthly PDF deferred to P4) |
 | P1-H4 | Family exports: payments, cafetería movements per child, credential PDF. | DONE 2026-08-22 (payments CSV + comprobante PDF; cafetería CSV/PDF existed; credencial prints from the portal) |
-| P1-H5 | Admin dashboard re-cut: cafetería total balance, low-balance count, today's visitas, activity feed, quick actions. | Refine |
-| P1-H6 | Parent dashboard: per-child tiles, low-balance warning with quick top-up, announcements preview. | Refine |
+| P1-H5 | Admin dashboard re-cut: cafetería total balance, low-balance count, today's visitas, activity feed, quick actions. | DONE 2026-08-22 (8 KPIs incl. saldo total, saldos bajos, recargas por aplicar, visitas hoy, por atender; actividad reciente from AuditLog) |
+| P1-H6 | Parent dashboard: per-child tiles, low-balance warning with quick top-up, announcements preview. | DONE 2026-08-22 (per-child balance tiles with +$100/+$200 deep links when >1 child; alert and announcements existed) |
 | P1-H7 | Staff analytics: date range picker and export. | Refine |
 | P1-H8 | Chart palette with nivel colors, empty/loading states, es-MX currency. | Refine |
 
