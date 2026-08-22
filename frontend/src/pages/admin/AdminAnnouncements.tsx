@@ -21,6 +21,7 @@ import { portalApi } from '@/services/api';
 interface Announcement {
   id: number; title: string; body: string; audience: string;
   is_active: boolean; push_enabled: boolean; created_at: string;
+  show_on_site?: boolean; site_until?: string | null; site_link?: string;
   created_by_name: string; read_count: number;
 }
 
@@ -32,7 +33,7 @@ const AUDIENCE: { value: string; label: string; variant: 'info' | 'success' | 'w
 ];
 const audienceMeta = (a: string) => AUDIENCE.find((x) => x.value === a) ?? AUDIENCE[0];
 
-const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true };
+const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true, show_on_site: false, site_until: null as string | null, site_link: '' };
 const EMPTY_ALERT = { title: '', message: '', audience: 'parents', whatsapp: false };
 
 export default function AdminAnnouncements() {
@@ -135,6 +136,7 @@ export default function AdminAnnouncements() {
     setForm({
       title: a.title, body: a.body, audience: a.audience,
       is_active: a.is_active, push_enabled: a.push_enabled ?? true,
+      show_on_site: a.show_on_site ?? false, site_until: a.site_until ?? null, site_link: a.site_link ?? '',
     });
     setOpen(true);
   };
@@ -236,6 +238,17 @@ export default function AdminAnnouncements() {
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
             Enviar notificación push a los dispositivos suscritos
           </label>
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={form.show_on_site} onChange={(e) => setForm((f) => ({ ...f, show_on_site: e.target.checked }))}
+              className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+            Publicar en el sitio público (franja de aviso arriba del encabezado)
+          </label>
+          {form.show_on_site && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input label="Mostrar hasta (opcional)" type="date" value={form.site_until ?? ''} onChange={(e) => setForm((f) => ({ ...f, site_until: e.target.value || null }))} />
+              <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setForm((f) => ({ ...f, site_link: e.target.value }))} placeholder="/calendario" />
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!form.title.trim() || !form.body.trim()}>

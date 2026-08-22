@@ -7,6 +7,7 @@ from .push import PushSubscribeView, PushUnsubscribeView
 urlpatterns = [
     path('dashboard/',                   views.DashboardView.as_view(),             name='dashboard'),
     path('analytics/',                   StaffAnalyticsView.as_view(),               name='staff-analytics'),
+    path('avisos/',                      views.SiteNoticesView.as_view(),            name='site-notices'),
     path('announcements/',               views.AnnouncementListView.as_view(),       name='announcements'),
     path('announcements/mark-read/',     views.AnnouncementMarkReadView.as_view(),   name='announcements-mark-read'),
     path('announcements/<int:pk>/',      views.AnnouncementDetailView.as_view(),     name='announcement-detail'),

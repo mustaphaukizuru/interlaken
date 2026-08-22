@@ -677,12 +677,14 @@ export const portalApi = {
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  /** Public avisos banner (BACKLOG P3-9). */
+  getSiteNotices: () => api.get<SiteNotice[]>('/portal/avisos/'),
   getAnnouncementDelivery: (id: number) => api.get<DeliveryReport>(`/portal/admin/announcements/${id}/delivery/`),
   resendAnnouncementFailed: (id: number) =>
     api.post<{ requeued: number }>(`/portal/admin/announcements/${id}/delivery/`, { action: 'resend_failed' }),
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
-    is_active?: boolean; push_enabled?: boolean;
+    is_active?: boolean; push_enabled?: boolean; show_on_site?: boolean; site_until?: string | null; site_link?: string;
   }) => api.post('/portal/admin/announcements/', data),
   adminUpdateAnnouncement: (id: number, data: Record<string, unknown>) =>
     api.patch(`/portal/admin/announcements/${id}/`, data),
@@ -825,6 +827,8 @@ export interface FormSubmission {
 }
 
 export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
+
+export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
 export interface CmsPageAdmin {
   id: number;

@@ -167,6 +167,33 @@ class DashboardView(APIView):
         return Response(data)
 
 
+SITE_NOTICES_CACHE = 'portal:site-notices'
+
+
+class SiteNoticesView(APIView):
+    """GET /portal/avisos/ — public banner notices (BACKLOG P3-9): active announcements
+    flagged "publicar en el sitio", not past site_until. Cached 5 min; saving an
+    announcement clears the cache."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.core.cache import cache
+        from django.utils import timezone
+
+        data = cache.get(SITE_NOTICES_CACHE)
+        if data is None:
+            today = timezone.localdate()
+            qs = (Announcement.objects.filter(is_active=True, show_on_site=True)
+                  .filter(Q(site_until__isnull=True) | Q(site_until__gte=today))
+                  .order_by('-created_at')[:3])
+            data = [{'id': a.id, 'title': a.title, 'body': a.body[:280], 'link': a.site_link, 'until': a.site_until.isoformat() if a.site_until else None}
+                    for a in qs]
+            cache.set(SITE_NOTICES_CACHE, data, 300)
+        resp = Response(data)
+        resp['Cache-Control'] = 'public, max-age=120'
+        return resp
+
+
 class AnnouncementListView(generics.ListAPIView):
     """GET /api/v1/portal/announcements/"""
     serializer_class = AnnouncementSerializer

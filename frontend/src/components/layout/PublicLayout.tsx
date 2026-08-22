@@ -15,6 +15,7 @@ import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
+import { SiteNoticeBanner } from '@/components/public/SiteNoticeBanner';
 
 /** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
 const HIDE_STICKY_CTA = [
@@ -188,6 +189,7 @@ export function PublicLayout() {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
+      <SiteNoticeBanner />
       {/* Preheader — solo escritorio/tablet. Petición del colegio (2026-08-21):
           teléfono a la izquierda, correo a la derecha; sin redes sociales. */}
       <div className="hidden md:block bg-brand-800 text-white text-xs">
