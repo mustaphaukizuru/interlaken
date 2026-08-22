@@ -9,6 +9,29 @@
  */
 import axios from 'axios';
 
+export interface PasswordRequest {
+  id: number;
+  user: number | null;
+  user_name: string;
+  user_email: string;
+  requested_email: string;
+  requester_name: string;
+  channel: string;
+  note: string;
+  status: 'open' | 'resolved' | 'rejected';
+  created_by_name: string;
+  created_at: string;
+  resolved_by_name: string;
+  resolved_at: string | null;
+  delivered_via: string;
+}
+
+export interface PasswordRequestResolved extends PasswordRequest {
+  temporary_password: string;
+  templates: { whatsapp_text: string; email_subject: string; email_body: string };
+  whatsapp_number: string;
+}
+
 export interface GuardianWrite {
   first_name: string;
   last_name: string;
@@ -618,6 +641,13 @@ export const portalApi = {
   ) => api.post(`/accounts/admin/students/${studentId}/guardians/`, data),
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
+  /** Password request inbox (admin). */
+  getPasswordRequests: (status?: string) =>
+    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: status ? { status } : undefined }),
+  createPasswordRequest: (data: { requested_email: string; requester_name?: string; channel: string; note?: string }) =>
+    api.post<PasswordRequest>('/accounts/admin/password-requests/', data),
+  updatePasswordRequest: (id: number, data: { action: 'resolve' | 'reject'; delivered_via?: string; note?: string }) =>
+    api.patch<PasswordRequest | PasswordRequestResolved>(`/accounts/admin/password-requests/${id}/`, data),
   /** Edit a linked guardian's identity/contact (admin). */
   updateGuardian: (studentId: number, userId: number, data: Partial<GuardianWrite>) =>
     api.patch(`/accounts/admin/students/${studentId}/guardians/${userId}/`, data),

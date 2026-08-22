@@ -7,6 +7,7 @@ from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
+from .password_requests import PasswordRequestDetailView, PasswordRequestListCreateView
 from .student_admin import AdminStudentCreateView, AdminStudentUpdateView
 
 urlpatterns = [
@@ -25,6 +26,9 @@ urlpatterns = [
     # accounts have no usable one and cannot receive reset mail).
     path('admin/users/<int:pk>/set-password/', AdminSetPasswordView.as_view(),
          name='admin-set-password'),
+    # Password request inbox (families ask by WhatsApp/email; admins resolve here).
+    path('admin/password-requests/', PasswordRequestListCreateView.as_view(), name='password-requests'),
+    path('admin/password-requests/<int:pk>/', PasswordRequestDetailView.as_view(), name='password-request-detail'),
     path('token/',           views.RateLimitedTokenObtainView.as_view(), name='token-obtain'),
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),

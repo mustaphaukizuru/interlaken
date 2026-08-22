@@ -267,6 +267,8 @@ export function StudentGuardians({ studentId }: Props) {
                       id: g.id,
                       email: g.email,
                       label: g.is_self ? 'Cuenta familiar' : g.full_name || g.email,
+                      whatsapp: g.whatsapp || g.phone,
+                      firstName: g.first_name,
                     })
                   }
                 >

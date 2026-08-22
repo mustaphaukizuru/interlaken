@@ -137,3 +137,47 @@ class NotificationPreference(models.Model):
         """Return prefs, creating defaults if missing."""
         prefs, _ = cls.objects.get_or_create(user=user)
         return prefs
+
+
+class PasswordRequest(models.Model):
+    """A family's request for a (new) password, received by WhatsApp, email,
+    phone or in person (BACKLOG P1-A4 / AE5).
+
+    Self-service reset does not exist; this row is the traceable record of
+    "who asked, through which channel, who verified them and who set the
+    password". Resolving it runs the same admin set-password flow.
+    """
+
+    class Channel(models.TextChoices):
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        EMAIL = 'email', 'Correo'
+        PHONE = 'phone', 'Teléfono'
+        IN_PERSON = 'in_person', 'Presencial'
+
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Pendiente'
+        RESOLVED = 'resolved', 'Resuelta'
+        REJECTED = 'rejected', 'Rechazada'
+
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name='password_requests')
+    requested_email = models.EmailField(blank=True)
+    requester_name = models.CharField(max_length=150, blank=True)
+    channel = models.CharField(max_length=12, choices=Channel.choices, default=Channel.WHATSAPP)
+    note = models.CharField(max_length=300, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN, db_index=True)
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name='+')
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    delivered_via = models.CharField(max_length=12, choices=Channel.choices, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Solicitud de contraseña'
+        verbose_name_plural = 'Solicitudes de contraseña'
+
+    def __str__(self):
+        return f'PasswordRequest({self.requested_email or self.user_id}, {self.status})'
