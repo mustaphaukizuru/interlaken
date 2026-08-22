@@ -36,7 +36,7 @@ const payBadge = (s: string) => {
 };
 
 const paymentTypeLabel: Record<string, string> = {
-  tuition: 'Colegiatura', enrollment: 'Inscripción', cafeteria: 'Cafetería', other: 'Otro',
+  cafeteria: 'Cafetería', other: 'Otro',
 };
 
 /** Dashboard quick top-up amounts; CafeteriaPage reads `?recarga=<amount>`. */

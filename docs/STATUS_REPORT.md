@@ -53,7 +53,7 @@ The application is **fully scaffolded and largely written to completion** (~2,16
 - **accounts** — custom `User` (email login, `role` ∈ admin/parent/student/staff), `StudentProfile` (loyverse_id, M2M `parents`), `ParentProfile`.
 - **admissions** — `PreRegistration` (lead), `Registration` (full enrollment w/ CURP, medical), `RegistrationDocument`, `OpenSchoolDay`.
 - **cafeteria** — `CafeteriaBalance`, `CafeteriaTransaction`, `TopUpRequest` (1 Loyverse point = 1 MXN).
-- **payments** — `Payment` (tuition/enrollment/cafeteria, gateway fields).
+- **payments** — `Payment` (cafetería top-ups only; gateway fields). Tuition/enrollment are not billed through the app.
 - **portal** — `Announcement`, `Notification`.
 - **core** — SPA catch-all + WhatsApp redirect (no models).
 

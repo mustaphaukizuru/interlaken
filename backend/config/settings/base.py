@@ -412,19 +412,6 @@ PAYMENT_RETURN_URL = env(
 GLOBAL_PAYMENTS_WEBHOOK_SECRET = env('GLOBAL_PAYMENTS_WEBHOOK_SECRET', default='')
 BANORTE_WEBHOOK_SECRET = env('BANORTE_WEBHOOK_SECRET', default='')
 
-# Where the hosted page returns the parent after paying a tuition invoice.
-TUITION_RETURN_URL = env(
-    'TUITION_RETURN_URL',
-    default=f'{FRONTEND_URL}/portal/colegiaturas/retorno',
-)
-
-# ── FINANCE / TUITION (Prompt 17) ─────────────────────────
-# Days *before* the due date to send the "próxima a vencer" reminder, and days
-# *after* the due date to send the "vencida" reminder. send_payment_reminders is
-# a cron command; each reminder is deduped per invoice.
-TUITION_REMINDER_BEFORE_DAYS = env.int('TUITION_REMINDER_BEFORE_DAYS', default=3)
-TUITION_REMINDER_OVERDUE_DAYS = env.int('TUITION_REMINDER_OVERDUE_DAYS', default=1)
-
 # ── GOOGLE CALENDAR ───────────────────────────────────────
 # Server-side calendar writes for confirmed bookings use a *service account*
 # (NOT the OAuth login client). Both empty → calendar integration is a no-op and
@@ -672,10 +659,8 @@ UNFOLD = {
                      'badge': 'apps.core.badges.documents_in_review',
                      'badge_variant': 'warning',
                      'link': reverse_lazy('admin:admissions_registrationdocument_changelist')},
-                    {'title': 'Disponibilidad de visitas', 'icon': 'event_available',
-                     'link': reverse_lazy('admin:bookings_availabilityslot_changelist')},
-                    {'title': 'Reservas de visita', 'icon': 'calendar_month',
-                     'link': reverse_lazy('admin:bookings_booking_changelist')},
+                    # Visit slots/bookings are operated in the portal (/admin/visitas);
+                    # their Django admin pages are read-only and reachable via search.
                 ],
             },
             {
@@ -691,29 +676,18 @@ UNFOLD = {
                 ],
             },
             {
-                'title': 'Cafetería',
+                # Cafetería money (balances, top-ups, adjustments) is operated
+                # only in the portal (/admin/cafeteria). The Django admin keeps
+                # read-only ledgers under "Sistema" (see docs/ADMIN-VS-PORTAL.md).
+                'title': 'Registros (solo lectura)',
                 'separator': True,
                 'items': [
-                    {'title': 'Saldos', 'icon': 'account_balance_wallet',
-                     'link': reverse_lazy('admin:cafeteria_cafeteriabalance_changelist')},
-                    {'title': 'Transacciones', 'icon': 'receipt_long',
-                     'link': reverse_lazy('admin:cafeteria_cafeteriatransaction_changelist')},
-                    {'title': 'Solicitudes de recarga', 'icon': 'add_card',
-                     'link': reverse_lazy('admin:cafeteria_topuprequest_changelist')},
+                    {'title': 'Pagos en línea', 'icon': 'payments',
+                     'link': reverse_lazy('admin:payments_payment_changelist')},
                     {'title': 'Ajustes de saldo', 'icon': 'published_with_changes',
                      'link': reverse_lazy('admin:cafeteria_balanceadjustment_changelist')},
                     {'title': 'Perfiles de Loyverse', 'icon': 'badge',
                      'link': reverse_lazy('admin:cafeteria_loyverseprofile_changelist')},
-                ],
-            },
-            {
-                'title': 'Pagos',
-                'separator': True,
-                'items': [
-                    # finance.* changelists are gone on purpose: the app does
-                    # not bill tuition (models dormant, admin unregistered).
-                    {'title': 'Pagos en línea', 'icon': 'payments',
-                     'link': reverse_lazy('admin:payments_payment_changelist')},
                 ],
             },
             {
@@ -728,11 +702,10 @@ UNFOLD = {
                 'title': 'Comunicaciones',
                 'separator': True,
                 'items': [
-                    {'title': 'Comunicados', 'icon': 'campaign',
-                     'link': reverse_lazy('admin:portal_announcement_changelist')},
+                    # Comunicados are authored/sent in the portal (/admin/comunicados).
                     {'title': 'Notificaciones', 'icon': 'notifications',
                      'link': reverse_lazy('admin:portal_notification_changelist')},
-                    {'title': 'Comentarios', 'icon': 'forum',
+                    {'title': 'Comentarios (moderación)', 'icon': 'forum',
                      'link': reverse_lazy('admin:portal_announcementcomment_changelist')},
                     {'title': 'Mensajes de contacto', 'icon': 'mail',
                      'badge': 'apps.core.badges.unhandled_contact_messages',

@@ -7,8 +7,6 @@ from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.accounts.family import family_notify_recipients
 from apps.cafeteria.models import TopUpRequest
 from apps.cafeteria.services import notify_topup_result
-from apps.finance import services as finance_services
-from apps.finance.models import FeeSchedule
 from apps.payments.models import Payment
 from apps.portal.models import Notification
 
@@ -49,22 +47,3 @@ class TestFamilyNotifyRecipients:
             user=student.user, notif_type=Notification.NotifType.PAYMENT,
         )
         assert 'POS' in notif.message
-
-    def test_invoice_notify_reaches_student_without_m2m(self):
-        student = StudentProfileFactory()
-        FeeSchedule.objects.create(
-            name="Mensual", grade="", monthly_amount=Decimal("1500.00"),
-            due_day=5, active=True,
-        )
-        finance_services.generate_invoices("2025-08")
-        invoice = student.invoices.get(period="2025-08")
-        payment, _ = finance_services.start_invoice_payment(invoice, student.user)
-        payment.status = Payment.Status.SUCCESS
-        payment.gateway_tx_id = "tx-tuition"
-        payment.save(update_fields=["status", "gateway_tx_id"])
-
-        n = finance_services.notify_invoice_result(payment, success=True)
-        assert n >= 1
-        assert Notification.objects.filter(
-            user=student.user, notif_type=Notification.NotifType.PAYMENT,
-        ).exists()

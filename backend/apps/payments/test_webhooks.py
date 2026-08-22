@@ -3,8 +3,8 @@ Payment webhook security + idempotency, and the initiate endpoint.
 
 The webhook verifies an HMAC-SHA256 signature over the raw body and must be a
 no-op for a payment that already reached a final state (replay protection).
-A later ``REFUNDED`` event on a successful payment reverses cafeteria/tuition
-credits.
+A later ``REFUNDED`` event on a successful payment reverses the cafeteria
+credit.
 """
 
 import hashlib
@@ -17,8 +17,6 @@ from django.urls import reverse
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
-from apps.finance import services as finance_services
-from apps.finance.models import FeeSchedule, InvoicePayment
 from apps.payments.factories import PaymentFactory
 from apps.payments.models import Payment
 
@@ -210,36 +208,6 @@ class TestWebhookRefund:
         assert topup.pos_unload_needed_at is not None
         assert topup.pos_unloaded_at is None
 
-    def test_refund_reopens_tuition_invoice(self, api_client, settings):
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
-        FeeSchedule.objects.create(
-            name='Mensual', grade='', monthly_amount=Decimal('1500.00'),
-            due_day=5, active=True,
-        )
-        parent = ParentFactory()
-        student = StudentProfileFactory(parents=[parent])
-        finance_services.generate_invoices('2026-08')
-        from apps.finance.models import Invoice
-        invoice = Invoice.objects.get(student=student, period='2026-08')
-        payment, _ = finance_services.start_invoice_payment(invoice, parent)
-
-        assert _signed(api_client, {
-            'order_id': payment.id, 'status': 'CAPTURED', 'id': 'tu-1',
-        }).status_code == 200
-        invoice.refresh_from_db()
-        assert invoice.status == invoice.Status.PAID
-
-        resp = _signed(api_client, {
-            'order_id': payment.id, 'status': 'REFUNDED', 'id': 'tu-refund',
-        })
-        assert resp.status_code == 200
-        payment.refresh_from_db()
-        invoice.refresh_from_db()
-        assert payment.status == Payment.Status.REFUNDED
-        assert invoice.amount_paid == Decimal('0.00')
-        assert invoice.status in (invoice.Status.PENDING, invoice.Status.OVERDUE)
-        assert InvoicePayment.objects.get(payment=payment).applied_at is None
-
 
 class TestPaymentInitiate:
     def test_requires_authentication(self, api_client):
@@ -253,7 +221,7 @@ class TestPaymentInitiate:
         )
         assert resp.status_code == 401
 
-    @pytest.mark.parametrize("payment_type", ["tuition", "cafeteria", "enrollment", "other"])
+    @pytest.mark.parametrize("payment_type", ["cafeteria", "other"])
     def test_rejects_unlinked_money_types(self, api_client, payment_type):
         """Bare initiate must not open an HPP session that credits nothing."""
         api_client.force_authenticate(user=ParentFactory())

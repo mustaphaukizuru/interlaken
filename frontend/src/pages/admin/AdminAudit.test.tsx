@@ -18,10 +18,10 @@ const rows = [
     actor_label: 'ada@interlaken.mx',
     action: 'update',
     action_display: 'Modificación',
-    object_type: 'finance.invoice',
+    object_type: 'cafeteria.balanceadjustment',
     object_id: '42',
-    changes: { reason: 'Pago en caja', status: ['pending', 'paid'] },
-    context: 'finance.mark_paid',
+    changes: { reason: 'Pago en caja', amount: '150.00' },
+    context: 'cafeteria.adjust',
     created_at: '2026-08-14T10:30:00Z',
   },
   {
@@ -48,9 +48,9 @@ describe('AdminAudit', () => {
 
     expect(await screen.findByText('ada@interlaken.mx')).toBeInTheDocument();
     expect(screen.getByText('system:webhook')).toBeInTheDocument();
-    expect(screen.getByText('finance.mark_paid')).toBeInTheDocument();
+    expect(screen.getByText('cafeteria.adjust')).toBeInTheDocument();
     expect(screen.getByText(/Motivo: Pago en caja/)).toBeInTheDocument();
-    expect(screen.getByText('finance.invoice#42')).toBeInTheDocument();
+    expect(screen.getByText('cafeteria.balanceadjustment#42')).toBeInTheDocument();
     expect(mockedAudit).toHaveBeenCalledWith({
       page: 1, actor: undefined, action: undefined, from: undefined, to: undefined,
     });

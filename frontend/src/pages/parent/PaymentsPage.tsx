@@ -35,10 +35,8 @@ const statusMeta: Record<string, { label: string; variant: any; icon: any }> = {
 };
 
 const paymentTypeLabel: Record<string, string> = {
-  tuition:    'Colegiatura',
-  enrollment: 'Inscripción',
-  cafeteria:  'Cafetería',
-  other:      'Otro',
+  cafeteria: 'Cafetería',
+  other:     'Otro',
 };
 
 /** Pagos is a HUB: real payments happen in Cafetería (top-up-linked), with
@@ -62,7 +60,7 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <PageHeader title="Pagos" subtitle="Realiza pagos con tarjeta y consulta tu historial." />
+      <PageHeader title="Pagos" subtitle="Recargas de cafetería con tarjeta y su historial." />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <ActionCard

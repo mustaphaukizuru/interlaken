@@ -7,7 +7,8 @@ This ties together all planning docs and adds everything else worth doing, prior
 > ⚠️ **2026-08-15:** tuition billing was REMOVED from the app by client decision
 > (PR #121) — cafetería top-ups are the only in-app money path. Ignore this
 > document's tuition/finance items (B1, E1, recurring tuition, CFDI-for-tuition);
-> apps/finance remains installed but dormant.
+> apps/finance is retired (migration finance.0006 drops its tables; 2026-08-22) and
+> `Payment.Type` is cafeteria-only. See docs/ADMIN-VS-PORTAL.md for the money scope.
 
 > **Shipped since generation:** all P0/P1 fixes · cafeteria wallet (full) · tuition billing · bookings + Calendar + WhatsApp · legal/LFPDPPP · CMS Phase 1 · staff analytics · UI/UX refinements (frontend + unfold admin) · tests/CI/Sentry · SEO/PWA · API docs · DB backups · Dependabot · read receipts · Ctrl+K search · 404.
 > **Contract constraints:** payments locked to **Global Payments + Banorte** (no OXXO/SPEI/others) · **academics (D-section) permanently descoped.**

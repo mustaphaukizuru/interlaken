@@ -388,8 +388,7 @@ export const paymentsApi = {
     api.get('/payments/history/', { params }),
 };
 
-// (financeApi removed: the app does not bill tuition — cafetería top-ups are
-// the only money path. /api/v1/finance/* no longer exists on the backend.)
+// Cafetería top-ups are the only money path; there is no tuition/finance API.
 
 // ── CORE (audit trail) ────────────────────────────────────
 export const coreApi = {

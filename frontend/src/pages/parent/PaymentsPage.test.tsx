@@ -54,7 +54,7 @@ describe('PaymentsPage states', () => {
     // 'success', so paid rows fell through to the 'pending' default.
     mockedPayments.mockResolvedValue({
       data: { results: [{
-        id: 1, status: 'success', payment_type: 'tuition',
+        id: 1, status: 'success', payment_type: 'cafeteria',
         amount: '1500.00', currency: 'MXN', created_at: '2026-07-10T12:00:00Z',
       }] },
     } as never);

@@ -35,10 +35,11 @@ CLOSED_STATUSES = (Payment.Status.FAILED, Payment.Status.REFUNDED)
 class PaymentInitiateView(APIView):
     """POST /api/v1/payments/initiate/ — fail-closed for unlinked money types.
 
-    All current ``payment_type`` values are rejected: tuition/cafeteria must use
-    invoice-pay / cafeteria top-up; enrollment has no Registration fee link yet;
-    ``other`` would leave a SUCCESS webhook with nothing to credit. Keep the
-    endpoint for a future linked fee type.
+    Every ``payment_type`` is rejected: cafeteria must go through the top-up
+    flow (``POST /cafeteria/topup/``) so a SUCCESS webhook has a ledger to
+    credit, and ``other`` would leave an orphan. The cafetería wallet is the
+    only money path the app implements; the endpoint stays for a future
+    linked fee type.
     """
     permission_classes = [permissions.IsAuthenticated]
     # Per-user (DRF throttles run after JWT auth): each initiate creates a
@@ -115,11 +116,6 @@ class _WebhookProcessMixin:
             fail_online_topup,
             reverse_online_topup,
         )
-        from apps.finance.services import (
-            complete_invoice_payment,
-            fail_invoice_payment,
-            reverse_invoice_payment,
-        )
 
         notify_arg = None
         with db_transaction.atomic():
@@ -151,13 +147,11 @@ class _WebhookProcessMixin:
                     'status', 'gateway_tx_id', 'gateway_raw', 'updated_at',
                 ])
                 reverse_online_topup(payment)
-                reverse_invoice_payment(payment)
                 return status.HTTP_200_OK, {'detail': 'refunded'}, None
 
             if event.status == 'success':
                 payment.mark_success(event.transaction_id or payment.gateway_tx_id, event.raw)
                 complete_online_topup(payment)     # None for non-cafeteria payments
-                complete_invoice_payment(payment)  # None for non-tuition payments
                 notify_arg = (payment, True)
             elif event.status == 'failed':
                 payment.status = Payment.Status.FAILED
@@ -166,7 +160,6 @@ class _WebhookProcessMixin:
                 payment.gateway_raw = event.raw
                 payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
                 fail_online_topup(payment)
-                fail_invoice_payment(payment)
                 notify_arg = (payment, False)
             elif event.status == 'refunded':
                 # Refund before capture is unusual — mark refunded, reverse no-ops.
@@ -176,7 +169,6 @@ class _WebhookProcessMixin:
                 payment.gateway_raw = event.raw
                 payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
                 reverse_online_topup(payment)
-                reverse_invoice_payment(payment)
             else:
                 # Non-terminal notification (PENDING/PROCESSING): record raw only.
                 payment.gateway_raw = event.raw
@@ -209,9 +201,6 @@ class _WebhookProcessMixin:
             if payment.payment_type == Payment.Type.CAFETERIA:
                 from apps.cafeteria.services import notify_topup_result
                 notify_topup_result(payment, success=success)
-            elif payment.payment_type == Payment.Type.TUITION:
-                from apps.finance.services import notify_invoice_result
-                notify_invoice_result(payment, success=success)
 
         return Response(body, status=http_status)
 
@@ -266,7 +255,7 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
 
     Lets the mock hosted-payment page finish the flow end-to-end without a live
     gateway. Reuses the EXACT webhook completion path (mark success/fail, credit
-    the cafeteria ledger / mark the invoice paid, notify the family) — only the
+    the cafeteria ledger, notify the family) — only the
     HMAC signature check is skipped — so sandbox behaviour matches production.
     Returns 404 unless DEBUG/SQLITE_LOCAL.
     """
@@ -293,9 +282,6 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
             if payment.payment_type == Payment.Type.CAFETERIA:
                 from apps.cafeteria.services import notify_topup_result
                 notify_topup_result(payment, success=success)
-            elif payment.payment_type == Payment.Type.TUITION:
-                from apps.finance.services import notify_invoice_result
-                notify_invoice_result(payment, success=success)
         return Response(body, status=http_status)
 
 

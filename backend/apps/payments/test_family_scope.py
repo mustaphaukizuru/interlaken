@@ -6,26 +6,29 @@ from django.urls import reverse
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.cafeteria.models import TopUpRequest
-from apps.finance import services as finance_services
-from apps.finance.models import FeeSchedule
 from apps.payments.factories import PaymentFactory
 from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
 
 
+def _family_topup_payment(student, payer, amount="1500.00"):
+    """A cafeteria top-up payment made by ``payer`` for ``student``."""
+    topup = TopUpRequest.objects.create(
+        student=student, amount=Decimal(amount), method=TopUpRequest.Method.ONLINE,
+    )
+    return Payment.objects.create(
+        user=payer, payment_type=Payment.Type.CAFETERIA, amount=Decimal(amount),
+        related_topup=topup, status=Payment.Status.PENDING,
+    )
+
+
 class TestFamilyScopedPayments:
-    def test_co_guardian_sees_sibling_parent_tuition_payment(self, api_client):
+    def test_co_guardian_sees_sibling_parent_topup_payment(self, api_client):
         parent_a = ParentFactory()
         parent_b = ParentFactory()
         student = StudentProfileFactory(parents=[parent_a, parent_b])
-        FeeSchedule.objects.create(
-            name="Mensual", grade="", monthly_amount=Decimal("1500.00"),
-            due_day=5, active=True,
-        )
-        finance_services.generate_invoices("2025-08")
-        invoice = student.invoices.get(period="2025-08")
-        payment, _ = finance_services.start_invoice_payment(invoice, parent_a)
+        payment = _family_topup_payment(student, parent_a)
 
         api_client.force_authenticate(user=parent_b)
         history = api_client.get(reverse("payment-history"))
@@ -60,16 +63,10 @@ class TestFamilyScopedPayments:
         rows = rows.get("results", rows)
         assert any(row["id"] == payment.id for row in rows)
 
-    def test_student_without_m2m_sees_own_tuition_payment(self, api_client):
+    def test_student_without_m2m_sees_own_topup_payment(self, api_client):
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])  # student not self-guardian
-        FeeSchedule.objects.create(
-            name="Mensual", grade="", monthly_amount=Decimal("1500.00"),
-            due_day=5, active=True,
-        )
-        finance_services.generate_invoices("2025-08")
-        invoice = student.invoices.get(period="2025-08")
-        payment, _ = finance_services.start_invoice_payment(invoice, parent)
+        payment = _family_topup_payment(student, parent)
 
         api_client.force_authenticate(user=student.user)
         detail = api_client.get(reverse("payment-detail", args=[payment.id]))

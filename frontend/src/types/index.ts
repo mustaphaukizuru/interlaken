@@ -170,7 +170,8 @@ export interface CafeteriaStudentDetail {
 
 export interface Payment {
   id: number;
-  payment_type: 'tuition' | 'enrollment' | 'cafeteria' | 'other';
+  // Only cafetería top-ups are sold through the app; 'other' is a legacy bucket.
+  payment_type: 'cafeteria' | 'other';
   amount: string;
   currency: string;
   description: string;
@@ -180,7 +181,6 @@ export interface Payment {
   updated_at: string;
 }
 
-// (Finance/tuition types removed: the app does not bill tuition.)
 
 export interface Announcement {
   id: number;

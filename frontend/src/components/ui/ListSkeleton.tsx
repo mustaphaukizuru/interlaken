@@ -1,5 +1,5 @@
 /**
- * Content-shaped loading placeholder for row lists (payments, invoices,
+ * Content-shaped loading placeholder for row lists (payments, top-ups,
  * cafeteria movements). Mirrors the real row layout — icon, two text lines and
  * a right-aligned amount — so the page doesn't jump when data arrives, and reads
  * as "loading this list" rather than a generic centered spinner.

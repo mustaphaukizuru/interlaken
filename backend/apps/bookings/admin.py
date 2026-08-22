@@ -16,6 +16,14 @@ class AvailabilitySlotAdmin(ModelAdmin):
     # Calendar sync state is machine-managed.
     readonly_fields = ('google_event_id', 'created_at')
 
+    # Operated from the staff portal (/admin/visitas); the Django admin is a
+    # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     @admin.display(description='Reservados')
     def booked_count(self, obj):
         return obj.booked_count
@@ -34,3 +42,11 @@ class BookingAdmin(ModelAdmin):
     date_hierarchy = 'created_at'
     # Sync/notification state is machine-managed.
     readonly_fields = ('google_event_id', 'confirmation_sent', 'created_at', 'updated_at')
+
+    # Operated from the staff portal (/admin/visitas); the Django admin is a
+    # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

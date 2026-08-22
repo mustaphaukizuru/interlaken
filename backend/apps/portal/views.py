@@ -75,13 +75,9 @@ class DashboardView(APIView):
                         .select_related('student__user'))
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
-            # (invoice_payment covers historical tuition rows; the app no
-            # longer bills tuition.)
             recent_payments = (
                 Payment.objects.filter(
-                    Q(user=user)
-                    | Q(invoice_payment__invoice__student__in=students)
-                    | Q(related_topup__student__in=students)
+                    Q(user=user) | Q(related_topup__student__in=students)
                 ).distinct().order_by('-created_at')[:5]
                 if students
                 else []
