@@ -118,21 +118,6 @@ class ParentProfile(models.Model):
         return f'{self.user.full_name}'
 
 
-class PasswordResetToken(models.Model):
-    """One-time password reset / account-activation token (hashed at rest)."""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
-    token_hash = models.CharField(max_length=64, db_index=True)
-    expires_at = models.DateTimeField()
-    used_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'ResetToken(user={self.user_id}, used={bool(self.used_at)})'
-
-
 class NotificationPreference(models.Model):
     """Per-user channel toggles for portal.services.notify()."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notif_prefs')

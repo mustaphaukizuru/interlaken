@@ -8,12 +8,13 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore, type User } from '@/store/authStore';
 import { authApi } from '@/services/api';
+import { PasswordHelp } from '@/components/portal/PasswordHelp';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',
 };
 
-/** "Mi información" — name, WhatsApp, password, notification prefs. */
+/** "Mi información" — name, WhatsApp, notification prefs (password is admin-managed). */
 export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
   const [firstName, setFirstName] = useState(user?.first_name ?? '');
@@ -22,10 +23,6 @@ export default function ProfilePage() {
   const [emailOn, setEmailOn] = useState(user?.notif_prefs?.email_enabled ?? true);
   const [inAppOn, setInAppOn] = useState(user?.notif_prefs?.in_app_enabled ?? true);
   const [pushOn, setPushOn] = useState(user?.notif_prefs?.push_enabled ?? true);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  // Field-level password validation message (mirrors the toast).
-  const [passwordError, setPasswordError] = useState<{ field: 'new' | 'confirm'; message: string } | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => authApi.updateMe({
@@ -63,21 +60,6 @@ export default function ProfilePage() {
     onError: () => toast.error('No se pudieron guardar las preferencias.'),
   });
 
-  const passwordMutation = useMutation({
-    mutationFn: () => authApi.setPassword(newPassword),
-    onSuccess: async () => {
-      setNewPassword('');
-      setConfirmPassword('');
-      const { data } = await authApi.me();
-      setUser(data as User);
-      toast.success('Contraseña guardada.');
-    },
-    onError: (err: unknown) => {
-      const data = (err as { response?: { data?: { password?: string[]; detail?: string } } })?.response?.data;
-      toast.error(data?.password?.[0] || data?.detail || 'No se pudo guardar la contraseña.');
-    },
-  });
-
   const dirty =
     firstName !== (user?.first_name ?? '') ||
     lastName !== (user?.last_name ?? '') ||
@@ -91,22 +73,6 @@ export default function ProfilePage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (firstName.trim() && lastName.trim()) mutation.mutate();
-  };
-
-  const savePassword = (e: FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 8) {
-      setPasswordError({ field: 'new', message: 'Mínimo 8 caracteres.' });
-      toast.error('Mínimo 8 caracteres.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError({ field: 'confirm', message: 'Las contraseñas no coinciden.' });
-      toast.error('Las contraseñas no coinciden.');
-      return;
-    }
-    setPasswordError(null);
-    passwordMutation.mutate();
   };
 
   return (
@@ -149,53 +115,7 @@ export default function ProfilePage() {
         </Card>
 
         <Card>
-          <form onSubmit={savePassword} className="space-y-4">
-            <h2 className="font-head text-base font-semibold text-ink">
-              {user?.has_usable_password ? 'Cambiar contraseña' : 'Establecer contraseña'}
-            </h2>
-            {!user?.has_usable_password && (
-              <p className="text-sm text-muted">
-                Su cuenta aún no tiene contraseña local (acceso solo con Google o pendiente de activación).
-              </p>
-            )}
-            <div>
-              <label className="label" htmlFor="pf-pass">Nueva contraseña</label>
-              <input
-                id="pf-pass"
-                type="password"
-                autoComplete="new-password"
-                className="input-field min-h-[44px] text-base"
-                value={newPassword}
-                onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }}
-                aria-invalid={passwordError?.field === 'new' || undefined}
-                aria-describedby={passwordError?.field === 'new' ? 'pf-pass-error' : undefined}
-              />
-              {passwordError?.field === 'new' && (
-                <p id="pf-pass-error" className="mt-1.5 text-xs text-coral-600">{passwordError.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="label" htmlFor="pf-pass2">Confirmar</label>
-              <input
-                id="pf-pass2"
-                type="password"
-                autoComplete="new-password"
-                className="input-field min-h-[44px] text-base"
-                value={confirmPassword}
-                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(null); }}
-                aria-invalid={passwordError?.field === 'confirm' || undefined}
-                aria-describedby={passwordError?.field === 'confirm' ? 'pf-pass2-error' : undefined}
-              />
-              {passwordError?.field === 'confirm' && (
-                <p id="pf-pass2-error" className="mt-1.5 text-xs text-coral-600">{passwordError.message}</p>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <Button type="submit" variant="secondary" loading={passwordMutation.isPending} disabled={!newPassword} className="min-h-[44px]">
-                Guardar contraseña
-              </Button>
-            </div>
-          </form>
+          <PasswordHelp email={user?.email} />
         </Card>
 
         <Card>

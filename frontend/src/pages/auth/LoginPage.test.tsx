@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 // Mock the API module so no real HTTP happens and we can drive both paths.
+vi.mock('@/hooks/useSiteSettings', () => ({
+  useSiteSettings: () => ({ whatsapp_number: '5215553791188', contact_email: 'info@interlaken.com.mx' }),
+}));
+
 vi.mock('@/services/api', () => ({
   api: { post: vi.fn() },
   authApi: { me: vi.fn(), googleLogin: vi.fn() },
@@ -80,12 +84,11 @@ describe('LoginPage email/password submit', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 
-  it('links to the forgot-password / first-access page', () => {
+  it('has no self-service reset; points families to WhatsApp or email', () => {
     renderLogin();
-    expect(screen.getByRole('link', { name: /activar \/ restablecer/i })).toHaveAttribute(
-      'href',
-      '/olvide-contrasena',
-    );
+    expect(screen.queryByRole('link', { name: /activar \/ restablecer/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /whatsapp/i })).toHaveAttribute('href', expect.stringMatching(/^https:\/\/wa\.me\//));
+    expect(screen.getByRole('link', { name: /^correo$/i })).toHaveAttribute('href', expect.stringMatching(/^mailto:/));
   });
 });
 

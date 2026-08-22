@@ -5,6 +5,7 @@ import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
 import { SCHOOL_YEARS, SITE_NAME } from '@/lib/siteMeta';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import { PasswordHelp } from '@/components/portal/PasswordHelp';
 import toast from 'react-hot-toast';
 
 const ROLE_PATHS: Record<string, string> = {
@@ -254,12 +255,7 @@ export default function LoginPage() {
                       ? 'Ingresando…'
                       : (<><LogIn className="h-4 w-4" aria-hidden="true" /> Ingresar</>)}
                 </button>
-                <p className="mt-3.5 text-center text-[12px] text-subtle">
-                  ¿Olvidó su contraseña o es su primer acceso?{' '}
-                  <Link to="/olvide-contrasena" className="font-semibold text-purple hover:underline">
-                    Activar / restablecer
-                  </Link>
-                </p>
+                <PasswordHelp variant="inline" email={email.trim() || undefined} />
                 <p className="mt-2 text-center text-[12px] text-subtle">
                   ¿Problemas?{' '}
                   <Link to="/contacto" className="font-semibold text-purple hover:underline">Contacte al colegio</Link>

@@ -25,8 +25,6 @@ const HIDE_STICKY_CTA = [
   '/registro',
   '/puertas-abiertas',
   '/login',
-  '/olvide-contrasena',
-  '/restablecer-contrasena',
 ];
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.

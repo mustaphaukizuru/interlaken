@@ -28,9 +28,9 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | ID | Task | Area | Status |
 |----|------|------|--------|
 | P0-1 | Deploy the PWA service-worker fix (navigateFallback hijacked /admin and Google OAuth). | Ops | Deploy |
-| P0-2 | Remove self-service password reset and change: delete `/olvide-contrasena`, `/restablecer-contrasena`, ProfilePage password card, and the backend forgot/reset endpoints. | Auth | Missing |
-| P0-3 | Login page rewrite: "¿Olvidaste tu contraseña? Solicítala al colegio" with WhatsApp deep link and `soporte@` mailto (optionally opens chatbot). | Auth | Missing |
-| P0-4 | Hard-block `tuition` and `enrollment` payment types at model/API level; remove labels, copy, and related KPIs from UI (per D4). | Payments | Missing |
+| P0-2 | Remove self-service password reset and change: delete `/olvide-contrasena`, `/restablecer-contrasena`, ProfilePage password card, and the backend forgot/reset endpoints. | Auth | DONE 2026-08-22 |
+| P0-3 | Login page rewrite: "¿Olvidaste tu contraseña? Solicítala al colegio" with WhatsApp deep link and contact mailto (PasswordHelp component, also in Mi información). | Auth | DONE 2026-08-22 |
+| P0-4 | Hard-block `tuition` and `enrollment` payment types at model/API level; remove labels, copy, and related KPIs from UI (per D4). | Payments | DONE 2026-08-22 (branch feat/retire-tuition-enrollment) |
 | P0-5 | Notifications reach student AND guardians: `notify()` / dispatcher email and push to the student's real email plus every linked guardian; skip synthetic `@alumnos.` addresses; add `Student.recipients()`. | Notifications | Missing |
 | P0-6 | Fix hardcoded `colegio@interlaken.com.mx` in admissions email and align `.env` addresses with D1. | Email | Missing |
 | P0-7 | Verify student login sees only own data; verify parent login sees linked students; fix any leak. | Auth | Partial |

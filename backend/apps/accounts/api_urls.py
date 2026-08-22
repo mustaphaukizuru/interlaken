@@ -25,9 +25,7 @@ urlpatterns = [
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),
     path('me/',              views.CurrentUserView.as_view(),     name='current-user'),
-    path('password-reset/',  password_views.PasswordResetRequestView.as_view(), name='password-reset'),
-    path('password-reset/confirm/', password_views.PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
-    path('set-password/',    password_views.SetPasswordView.as_view(), name='set-password'),
+    # No self-service password reset/change (school policy): see admin-set-password.
     path('notification-preferences/', password_views.NotificationPreferenceView.as_view(), name='notification-preferences'),
     path('students/',        views.StudentListView.as_view(),     name='students'),
     path('students/<int:pk>/', views.StudentDetailView.as_view(), name='student-detail'),
