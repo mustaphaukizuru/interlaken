@@ -3,6 +3,8 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // Breakpoint system (docs/RESPONSIVE.md): xs 360 · sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536
+      screens: { xs: '360px' },
       colors: {
         // `brand` remapped to the Interlaken purple scale so every existing
         // `brand-*` utility across the app rebrands automatically.

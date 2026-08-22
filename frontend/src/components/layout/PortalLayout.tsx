@@ -133,7 +133,7 @@ export function PortalLayout({ role }: Props) {
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
             className="flex-1 overflow-y-auto overflow-x-hidden"
           >
-            <div className="mx-auto w-full max-w-[1400px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
+            <div className="mx-auto w-full max-w-[1320px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
               <RouteTransition><Outlet /></RouteTransition>
             </div>
           </div>

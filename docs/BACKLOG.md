@@ -63,7 +63,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-B1 | Breakpoint system (xs 360, sm 640, md 768, lg 1024, xl 1280, 2xl 1536); audit every page at 360/390/768/1024/1440/1920. | Missing |
+| P1-B1 | Breakpoint system (xs 360, sm 640, md 768, lg 1024, xl 1280, 2xl 1536); audit every page at 360/390/768/1024/1440/1920. | DONE 2026-08-22 (docs/RESPONSIVE.md, `xs` screen; per-page audit continues under P1-I7) |
 | P1-B2 | Notifications on mobile: bottom sheet/full-screen panel under md, grouped Hoy/Semana/Anteriores, mark-all, swipe dismiss, 44px targets, safe areas; desktop popover widened with "Ver todas". | DONE 2026-08-22 (bottom sheet with scroll lock/Escape/backdrop; grouped list; 400px popover; swipe-dismiss deferred) |
 | P1-B3 | `/portal/notificaciones` full page with filters, infinite scroll, deep links. | DONE 2026-08-22 (type/unread filters, pagination, comunicado deep links) |
 | P1-B4 | Toast positioning and stacking (bottom-center mobile, top-right desktop, never over tab bar or WhatsApp float). | DONE 2026-08-22 (ToastHost: responsive position, lifted above tab bar, max 3 visible) |
@@ -71,10 +71,10 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-B6 | Tables to cards under md for every admin and parent table; sticky header + horizontal scroll above md. | DONE 2026-08-22 (audit: all admin tables either ship a bespoke md:hidden card list or stack via the data-label CSS; desktop keeps sticky thead + scroll) |
 | P1-B7 | Forms on mobile: single column, 44px inputs, inputmode/autocomplete, sticky submit, step indicator. | Partial 2026-08-22 (44px/16px inputs and buttons already global; inputMode/autoComplete added to every tel/email field; sticky submit + step indicator move to the recarga wizard P1-D1 and the CMS forms P3-6) |
 | P1-B8 | Modals as full-screen sheets under md, centered above. | DONE 2026-08-22 (Modal was already a bottom sheet under sm with focus trap; added grab handle) |
-| P1-B9 | Fluid typography, 16px minimum body, spacing scale, max content width 1200 to 1320 on large screens. | Refine |
+| P1-B9 | Fluid typography, 16px minimum body, spacing scale, max content width 1200 to 1320 on large screens. | DONE 2026-08-22 (fluid scale existed; portal max width 1320) |
 | P1-B10 | Large-screen layouts: 12-col grid, 3 to 4 KPI tiles per row at xl, list + detail two-pane at 2xl. | Missing |
 | P1-B11 | Touch affordances for hover-only actions; swipe on ChildSwitcher and galería. | Refine |
-| P1-B12 | Playwright viewport matrix (360/768/1440) screenshots; Lighthouse mobile gate in CI. | Missing |
+| P1-B12 | Playwright viewport matrix (360/768/1440) screenshots; Lighthouse mobile gate in CI. | Partial (visual suite covers 390/1280 with platform baselines; extra viewports need linux baselines from CI, Lighthouse gate under P5-3) |
 
 ### P1-C. Notifications and email
 
