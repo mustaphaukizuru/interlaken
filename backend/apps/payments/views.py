@@ -9,6 +9,7 @@ nothing.
 """
 import logging
 
+from django.conf import settings
 from django.db import transaction as db_transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -442,3 +443,45 @@ class AdminPaymentsSummaryView(APIView):
                          'stuck_pending': Payment.objects.filter(
                              status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING],
                              created_at__lt=timezone.now() - timedelta(hours=24)).count()})
+
+
+class PaymentReceiptView(APIView):
+    """GET /api/v1/payments/<pk>/receipt/ — comprobante PDF of a successful or refunded
+    payment (BACKLOG P1-D4). Family-scoped like the detail view; admins may fetch any."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        from django.http import HttpResponse
+        from django.shortcuts import get_object_or_404
+
+        from apps.core.exports import as_download, fmt_dt
+        from apps.core.pdf import simple_document_pdf
+
+        from .services import payments_visible_to
+
+        p = get_object_or_404(payments_visible_to(request.user).select_related(
+            'user', 'related_topup__student__user'), pk=pk)
+        if p.status not in (Payment.Status.SUCCESS, Payment.Status.REFUNDED):
+            return Response({'detail': 'Solo los pagos completados tienen comprobante.'}, status=409)
+        topup = p.related_topup
+        student = topup.student.user.full_name if topup else ''
+        lines = [
+            f'Folio: {p.id}',
+            f'Fecha: {fmt_dt(p.created_at)}',
+            f'Estado: {p.get_status_display()}',
+            '',
+            f'Concepto: {p.description or p.get_payment_type_display()}',
+            f'Alumno: {student or "-"}',
+            f'Pagó: {p.user.full_name if p.user else "-"} ({p.user.email if p.user else "-"})',
+            '',
+            f'Monto: ${p.amount} {p.currency}',
+            f'Pasarela: {p.get_gateway_display()}',
+            f'Referencia: {p.gateway_tx_id or p.gateway_ref or "-"}',
+            '',
+            'Este comprobante acredita una recarga de saldo de cafetería. No es un CFDI;',
+            f'para facturación escriba a {getattr(settings, "BILLING_EMAIL", "")}.',
+        ]
+        pdf = simple_document_pdf('Comprobante de pago - Colegio Interlaken', lines,
+                                  subtitle='Portal de Familias')
+        resp = HttpResponse(pdf, content_type='application/pdf')
+        return as_download(resp, f'comprobante_{p.id}.pdf')

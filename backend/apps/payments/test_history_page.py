@@ -71,3 +71,14 @@ def test_admin_ledger_and_summary(api_client, family):
     parent = ParentFactory()
     api_client.force_authenticate(user=parent)
     assert api_client.get(reverse('admin-payments')).status_code == 403
+
+
+def test_receipt_pdf_only_for_settled_and_family_scoped(api_client, family):
+    parent, a, _ = family
+    ok = Payment.objects.filter(related_topup__student=a, status=Payment.Status.SUCCESS).first()
+    pending = Payment.objects.filter(related_topup__student=a, status=Payment.Status.PENDING).first()
+    resp = api_client.get(reverse('payment-receipt', args=[ok.pk]))
+    assert resp.status_code == 200 and resp['Content-Type'] == 'application/pdf' and resp.content.startswith(b'%PDF')
+    assert api_client.get(reverse('payment-receipt', args=[pending.pk])).status_code == 409
+    other = Payment.objects.exclude(related_topup__student__parents=parent).first()
+    assert api_client.get(reverse('payment-receipt', args=[other.pk])).status_code == 404

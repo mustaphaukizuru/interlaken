@@ -466,6 +466,7 @@ export const paymentsApi = {
   exportMyPayments: (params?: { status?: string; student?: string; from?: string; to?: string }) =>
     api.get('/payments/history/export/', { params, responseType: 'blob' }),
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
+  getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
   /** Admin ledger (BACKLOG P1-D9). */
   adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; from?: string; to?: string }) =>
     api.get('/payments/admin/', { params }),

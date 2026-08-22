@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, RotateCcw, FileDown, Wallet, CalendarDays } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, RotateCcw, FileDown, Wallet, CalendarDays, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -51,6 +51,11 @@ export default function PaymentsPage() {
     queryKey: ['payments', params],
     queryFn: async () => toPaged<Payment>((await paymentsApi.getMyPayments(params)).data),
     placeholderData: keepPreviousData,
+  });
+  const receipt = useMutation({
+    mutationFn: async (id: number) => ({ id, blob: (await paymentsApi.getReceipt(id)).data as Blob }),
+    onSuccess: ({ id, blob }) => downloadBlob(blob, `comprobante_${id}.pdf`),
+    onError: () => toast.error('No se pudo generar el comprobante.'),
   });
   const exportCsv = useMutation({
     mutationFn: async () => (await paymentsApi.exportMyPayments(params)).data as Blob,
@@ -162,6 +167,14 @@ export default function PaymentsPage() {
                         <Badge variant={meta.variant}>{meta.label}</Badge>
                       </div>
                     </div>
+                    {(p.status === 'success' || p.status === 'refunded') && (
+                      <div className="mt-2 pl-12">
+                        <button type="button" onClick={() => receipt.mutate(p.id)} disabled={receipt.isPending && receipt.variables === p.id}
+                          className="inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-purple hover:underline disabled:opacity-60">
+                          <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Descargar comprobante (PDF)
+                        </button>
+                      </div>
+                    )}
                     {meta.help && (
                       <p className="mt-2 pl-12 text-xs text-muted">
                         {meta.help}
