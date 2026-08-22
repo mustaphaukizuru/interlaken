@@ -74,6 +74,8 @@ const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminPages = lazy(() => import('./pages/admin/AdminPages'));
+const AdminPageEditor = lazy(() => import('./pages/admin/AdminPageEditor'));
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
 const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
@@ -211,7 +213,9 @@ export default function App() {
               <Route path="usuarios"    element={<AdminStaffUsers />} />
               <Route path="calendario"  element={<AdminCalendar />} />
               <Route path="testimonios" element={<AdminTestimonials />} />
+              <Route path="contenido" element={<AdminPages />} />
               <Route path="contenido/medios" element={<AdminMedia />} />
+              <Route path="contenido/:id" element={<AdminPageEditor />} />
             </Route>
 
           </Routes>
