@@ -72,6 +72,7 @@ const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail')
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
 const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
 const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const DocumentsUploadPage = lazy(() => import('./pages/public/DocumentsUploadPage'));
@@ -207,6 +208,7 @@ export default function App() {
               <Route path="usuarios"    element={<AdminStaffUsers />} />
               <Route path="calendario"  element={<AdminCalendar />} />
               <Route path="testimonios" element={<AdminTestimonials />} />
+              <Route path="contenido/medios" element={<AdminMedia />} />
             </Route>
 
           </Routes>

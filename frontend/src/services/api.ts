@@ -785,6 +785,22 @@ export interface SchoolEvent {
   description: string;
   is_published: boolean;
 }
+export interface MediaAsset {
+  id: number;
+  filename: string;
+  content_type: string;
+  size: number;
+  width: number;
+  height: number;
+  alt: string;
+  caption: string;
+  focal_x: number;
+  focal_y: number;
+  tags: string;
+  urls: Record<string, string>;
+  created_at: string;
+}
+
 export interface Testimonial {
   id: number;
   quote: string;
@@ -809,6 +825,17 @@ export const contentApi = {
   adminCreateCalendar: (data: SchoolEventWrite) => api.post<SchoolEvent>('/content/admin/calendar/', data),
   adminUpdateCalendar: (id: number, data: Partial<SchoolEventWrite>) => api.patch<SchoolEvent>(`/content/admin/calendar/${id}/`, data),
   adminDeleteCalendar: (id: number) => api.delete(`/content/admin/calendar/${id}/`),
+  /** CMS media library (BACKLOG P3-1). */
+  adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),
+  adminUploadMedia: (file: File, meta?: { alt?: string; caption?: string; tags?: string }) => {
+    const form = new FormData();
+    form.append('file', file);
+    Object.entries(meta ?? {}).forEach(([k, v]) => { if (v) form.append(k, v); });
+    return api.post<MediaAsset>('/content/admin/media/', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  adminUpdateMedia: (id: number, data: Partial<Pick<MediaAsset, 'alt' | 'caption' | 'tags' | 'focal_x' | 'focal_y'>>) =>
+    api.patch<MediaAsset>(`/content/admin/media/${id}/`, data),
+  adminDeleteMedia: (id: number) => api.delete(`/content/admin/media/${id}/`),
   /** Testimonials (BACKLOG P2-15). */
   getTestimonials: () => api.get('/content/testimonials/'),
   adminListTestimonials: () => api.get('/content/admin/testimonials/'),

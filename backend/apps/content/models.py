@@ -288,3 +288,7 @@ class Testimonial(models.Model):
 
     def __str__(self):
         return f'{self.author}: {self.quote[:40]}'
+
+
+# CMS media library lives in content/media.py (model + views); re-exported for migrations/admin.
+from .media import MediaAsset  # noqa: E402,F401

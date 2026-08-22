@@ -195,7 +195,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P3-1 | Phase 1: MediaAsset model, Supabase Storage variants (Pillow), media library UI, picker, alt required; Logo/SiteSettings use it. | Missing |
+| P3-1 | Phase 1: MediaAsset model, Supabase Storage variants (Pillow), media library UI, picker, alt required; Logo/SiteSettings use it. | DONE 2026-08-22 (MediaAsset + WebP variants thumb/md/lg; public cached serving through /content/media/<id>/<variant>/ so the bucket stays private; /admin/contenido/medios library with upload, search, alt/caption/tags, delete; picker component arrives with the block editor P3-3) |
 | P3-2 | Content seeding script: extract current copy and 26 images into version 1 of each page. | Missing |
 | P3-3 | Phase 2: Page, PageVersion, blocks JSON, block schema registry (`frontend/src/cms/blocks/*.schema.ts` generating backend validator + editor form), public cached API with ETag, `<CmsPage>` renderer, 6 core blocks (hero, stats, levels_cards, rich_text, image, cta_band), Home ported. | Missing |
 | P3-4 | Phase 3: visual editor at `/admin/contenido`: split view, preview token iframe, edit mode (hover outlines, click select, inline text, drag reorder), autosave, publish, schedule, unpublish, version history with diff, rollback, device-width toggle. | Missing |

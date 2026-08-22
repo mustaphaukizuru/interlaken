@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, type LucideIcon,
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, type LucideIcon,
 } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
@@ -71,10 +71,16 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       heading: 'Comunicación',
       items: [
         { icon: Megaphone, label: 'Comunicados', to: '/admin/comunicados' },
-        { icon: CalendarClock, label: 'Calendario', to: '/admin/calendario' },
-        { icon: Megaphone, label: 'Testimonios', to: '/admin/testimonios' },
         { icon: Inbox,     label: 'Mensajes',    to: '/admin/mensajes', badgeKey: 'mensajes' },
         { icon: KeyRound,  label: 'Contraseñas', to: '/admin/contrasenas', badgeKey: 'contrasenas' },
+      ],
+    },
+    {
+      heading: 'Contenido del sitio',
+      items: [
+        { icon: Image,         label: 'Biblioteca de medios', to: '/admin/contenido/medios' },
+        { icon: CalendarClock, label: 'Calendario',  to: '/admin/calendario' },
+        { icon: Megaphone,     label: 'Testimonios', to: '/admin/testimonios' },
       ],
     },
     {
