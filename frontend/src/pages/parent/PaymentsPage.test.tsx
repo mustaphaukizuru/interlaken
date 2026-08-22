@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({
-  paymentsApi: { getMyPayments: vi.fn() },
+  paymentsApi: { getMyPayments: vi.fn(), getSummary: vi.fn(async () => ({ data: null })), exportMyPayments: vi.fn() },
+  downloadBlob: vi.fn(),
 }));
 
 import PaymentsPage from './PaymentsPage';
@@ -61,7 +62,8 @@ describe('PaymentsPage states', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Completado')).toBeInTheDocument();
-    expect(screen.queryByText('Pendiente')).toBeNull();
+    // The status filter <select> also lists every label; assert on the badge only.
+    expect(await screen.findByText('Completado', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByText('Pendiente', { selector: 'span' })).toBeNull();
   });
 });

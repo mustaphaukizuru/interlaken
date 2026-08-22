@@ -11,5 +11,7 @@ urlpatterns = [
          name='payment-webhook-banorte'),
     path('sandbox/complete/', views.SandboxCompleteView.as_view(), name='payment-sandbox-complete'),
     path('history/',    views.PaymentHistoryView.as_view(),   name='payment-history'),
+    path('history/export/', views.PaymentHistoryExportView.as_view(), name='payment-history-export'),
+    path('summary/',    views.PaymentSummaryView.as_view(),   name='payment-summary'),
     path('<int:pk>/',   views.PaymentDetailView.as_view(),    name='payment-detail'),
 ]

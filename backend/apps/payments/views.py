@@ -295,11 +295,88 @@ class PaymentDetailView(generics.RetrieveAPIView):
         return payments_visible_to(self.request.user)
 
 
+def _filtered_history(request):
+    """Family-scoped payments with the Pagos page filters (BACKLOG P1-D3).
+
+    ?status=  ?student=<profile id>  ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
+    """
+    from django.utils.dateparse import parse_date
+
+    from .services import payments_visible_to
+
+    qs = payments_visible_to(request.user).select_related('related_topup__student__user')
+    p = request.query_params
+    if p.get('status') in Payment.Status.values:
+        qs = qs.filter(status=p['status'])
+    if p.get('student', '').isdigit():
+        qs = qs.filter(related_topup__student_id=int(p['student']))
+    d = parse_date(p.get('from', '') or '')
+    if d:
+        qs = qs.filter(created_at__date__gte=d)
+    d = parse_date(p.get('to', '') or '')
+    if d:
+        qs = qs.filter(created_at__date__lte=d)
+    return qs.order_by('-created_at')
+
+
 class PaymentHistoryView(generics.ListAPIView):
-    """GET /api/v1/payments/history/ — family-scoped payment history."""
+    """GET /api/v1/payments/history/ — family-scoped, filterable payment history."""
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        return _filtered_history(self.request)
+
+
+class PaymentSummaryView(APIView):
+    """GET /api/v1/payments/summary/ — header tiles for the Pagos page (P1-D2):
+    month total, last successful top-up, pending count, per-child totals."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count, Sum
+        from django.utils import timezone
+
         from .services import payments_visible_to
-        return payments_visible_to(self.request.user).order_by('-created_at')
+
+        qs = payments_visible_to(request.user)
+        now = timezone.localtime()
+        month = qs.filter(status=Payment.Status.SUCCESS, created_at__year=now.year, created_at__month=now.month)
+        last = qs.filter(status=Payment.Status.SUCCESS).order_by('-created_at').first()
+        per_child = (qs.filter(status=Payment.Status.SUCCESS, related_topup__isnull=False)
+                     .values('related_topup__student_id', 'related_topup__student__user__first_name',
+                             'related_topup__student__user__last_name')
+                     .annotate(total=Sum('amount'), count=Count('id')).order_by('-total'))
+        return Response({
+            'month_total': str(month.aggregate(t=Sum('amount'))['t'] or 0),
+            'month_count': month.count(),
+            'pending_count': qs.filter(status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING]).count(),
+            'last_success': PaymentSerializer(last).data if last else None,
+            'per_child': [
+                {'student_id': r['related_topup__student_id'],
+                 'name': f"{r['related_topup__student__user__first_name']} {r['related_topup__student__user__last_name']}".strip(),
+                 'total': str(r['total']), 'count': r['count']} for r in per_child],
+        })
+
+
+class PaymentHistoryExportView(APIView):
+    """GET /api/v1/payments/history/export/ — CSV of the filtered family history (P1-D5)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        import csv
+
+        from django.http import HttpResponse
+
+        from apps.core.exports import as_download, export_filename, fmt_dt
+
+        resp = HttpResponse(content_type='text/csv; charset=utf-8')
+        resp.write('\ufeff')
+        w = csv.writer(resp)
+        w.writerow(['Fecha', 'Alumno', 'Concepto', 'Monto', 'Moneda', 'Estado', 'Pasarela', 'Referencia'])
+        for p in _filtered_history(request)[:5000]:
+            topup = p.related_topup
+            w.writerow([fmt_dt(p.created_at), topup.student.user.full_name if topup else '',
+                        p.description or p.get_payment_type_display(), p.amount, p.currency,
+                        p.get_status_display(), p.get_gateway_display(), p.gateway_tx_id or p.gateway_ref])
+        return as_download(resp, export_filename('pagos'))

@@ -189,7 +189,12 @@ export interface Payment {
   currency: string;
   description: string;
   status: 'pending' | 'processing' | 'success' | 'failed' | 'refunded';
+  gateway?: string;
+  gateway_label?: string;
   gateway_tx_id: string;
+  gateway_ref?: string;
+  student_id?: number | null;
+  student_name?: string;
   created_at: string;
   updated_at: string;
 }

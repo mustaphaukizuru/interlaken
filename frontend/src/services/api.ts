@@ -32,6 +32,14 @@ export interface PasswordRequestResolved extends PasswordRequest {
   whatsapp_number: string;
 }
 
+export interface PaymentSummary {
+  month_total: string;
+  month_count: number;
+  pending_count: number;
+  last_success: import('@/types').Payment | null;
+  per_child: { student_id: number; name: string; total: string; count: number }[];
+}
+
 export interface DeliveryReport {
   announcement: number;
   recipients: number;
@@ -445,8 +453,11 @@ export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
-  getMyPayments: (params?: { page?: number }) =>
+  getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string }) =>
     api.get('/payments/history/', { params }),
+  exportMyPayments: (params?: { status?: string; student?: string; from?: string; to?: string }) =>
+    api.get('/payments/history/export/', { params, responseType: 'blob' }),
+  getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
 };
 
 // Cafetería top-ups are the only money path; there is no tuition/finance API.

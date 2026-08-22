@@ -6,13 +6,18 @@ from .models import Payment
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    student_id = serializers.IntegerField(source='related_topup.student_id', read_only=True, default=None)
+    student_name = serializers.CharField(source='related_topup.student.user.full_name', read_only=True, default='')
+    gateway_label = serializers.CharField(source='get_gateway_display', read_only=True)
+
     class Meta:
         model = Payment
         fields = [
             'id', 'payment_type', 'amount', 'currency', 'description',
-            'status', 'gateway_tx_id', 'created_at', 'updated_at',
+            'status', 'gateway', 'gateway_label', 'gateway_tx_id', 'gateway_ref',
+            'student_id', 'student_name', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'gateway_tx_id', 'created_at', 'updated_at']
+        read_only_fields = fields
 
 
 # Bare initiate credits nothing on SUCCESS: cafeteria needs its linked top-up
