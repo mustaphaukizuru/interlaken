@@ -21,11 +21,13 @@ import re
 from django.conf import settings
 from django.db import models
 from django.http import Http404
+from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsAdmin
+from apps.core.ratelimit import ratelimit
 
 FIELD_TYPES = ('text', 'email', 'phone', 'textarea', 'select', 'radio', 'checkbox', 'date', 'number')
 KEY_RE = re.compile(r'^[a-z][a-z0-9_]{0,39}$')
@@ -229,6 +231,7 @@ class PublicFormView(APIView):
         return Response(FormPublicSerializer(_get_published(slug)).data)
 
 
+@method_decorator(ratelimit('cms-form', '5/m', method='POST'), name='dispatch')
 class PublicFormSubmitView(APIView):
     permission_classes = [permissions.AllowAny]
 

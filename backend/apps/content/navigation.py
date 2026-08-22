@@ -16,11 +16,13 @@ from django.core.cache import cache
 from django.db import models
 from django.http import HttpResponse
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsAdmin
+from apps.core.ratelimit import ratelimit
 
 PATH_RE = re.compile(r'^/[A-Za-z0-9\-._~/]*$')
 SITEMAP_CACHE_KEY = 'cms:sitemap'
@@ -125,6 +127,7 @@ class PublicRedirectsView(APIView):
         return resp
 
 
+@method_decorator(ratelimit('cms-redirect-hit', '30/m', method='POST'), name='dispatch')
 class RedirectHitView(APIView):
     """POST /content/redirects/hit/ {from} — counts usage so stale redirects can be retired."""
     permission_classes = [permissions.AllowAny]
