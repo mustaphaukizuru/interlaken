@@ -138,8 +138,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-G3 | Agendar visita form enhancement. | Refine |
 | P1-G4 | Separate document upload form with per-document status. | Missing |
 | P1-G5 | Inscripción review; uploads move to G4. | Refine |
-| P1-G6 | Facturación form to `facturacion@`/`facturas@` (per D1), modeled on the old site. | Missing |
-| P1-G7 | Contact messages inbox in the portal (status, assignee, reply, SLA); remove from Django admin. | Missing |
+| P1-G6 | Facturación form to `facturacion@`/`facturas@` (per D1), modeled on the old site. | DONE 2026-08-22 (POST /facturacion/: emails BILLING_EMAIL with Reply-To requester + confirmation; copy in the inbox) |
+| P1-G7 | Contact messages inbox in the portal (status, assignee, reply, SLA); remove from Django admin. | DONE 2026-08-22 (/admin/mensajes with pending/handled, search, mailto reply, badge; assignee/SLA deferred) |
 
 ### P1-H. Staff users, exports, dashboards
 
