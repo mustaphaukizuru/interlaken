@@ -177,19 +177,19 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P2-5 | Header: logo +30% (DONE), menu/mobile/scroll enhancements. | DONE 2026-08-22 (sticky header, phone/email bar, drawer; further polish via CMS menus P3-7) |
 | P2-6 | Footer: logo +30% (DONE), link menu enhancement, SEP info moved to nivel pages. | DONE 2026-08-22 (SEP block removed from footer; grouped link columns/accordion kept) |
 | P2-7 | Nivel pages: images, icons, graphs, colors (Pre #8AC6A4, Prim #F4436C, Sec #F1C82F), full info, SEP incorporation. | Partial 2026-08-22 (official colors + per-level SEP incorporation card done; extra images/graphs are content work for the CMS seed) |
-| P2-8 | Quiénes Somos: images + history timeline. | Content |
+| P2-8 | Quiénes Somos: images + history timeline. | DONE 2026-08-22 (HistoryTimeline with year-derived milestones; copy to be refined by the school in the CMS timeline block) |
 | P2-9 | Modelo Educativo: images and content. | Content |
 | P2-10 | Galería: albums with events/dates, captions, grid, bulk upload. | Refine |
 | P2-11 | Admisiones and Comunidad: images. | Content |
-| P2-12 | Admissions funnel stepper page (Pre-registro, Visita, Documentos, Inscripción). | Missing |
+| P2-12 | Admissions funnel stepper page (Pre-registro, Visita, Documentos, Inscripción). | DONE (FunnelHero 4-step progress already on every funnel page) |
 | P2-13 | Costos: per-nivel cards, PDF, information only with "Contactar admisiones" CTA and disclaimer. | DONE 2026-08-22 (explicit 'se pagan directamente con el colegio' disclaimer; no pay buttons; PDF deferred to CMS pricing block) |
 | P2-14 | Unified floating launcher: WhatsApp, Recuperar contraseña, Agendar visita. | DONE 2026-08-22 |
 | P2-15 | Testimonials block on Home and Admisiones. | Missing |
 | P2-16 | Calendario escolar public page. | Missing |
-| P2-17 | Google Maps embed and "Cómo llegar" on Contacto. | Missing |
+| P2-17 | Google Maps embed and "Cómo llegar" on Contacto. | DONE (already live: maps_url + 'Cómo llegar' CTA) |
 | P2-18 | Consent banner review (must not cover WhatsApp button on mobile). | Refine |
-| P2-19 | 404/error pages with brand and links. | Refine |
-| P2-20 | Images: srcset, lazy loading, WebP on hero/galería/nivel pages. | Refine |
+| P2-19 | 404/error pages with brand and links. | DONE (NotFoundPage with Inicio/Contacto; ErrorBoundary in App) |
+| P2-20 | Images: srcset, lazy loading, WebP on hero/galería/nivel pages. | Partial (WebP + loading=lazy everywhere; srcset variants arrive with the CMS media library P3-1) |
 
 ## P3. CMS (strategic build, per CMS-PLAN.md)
 

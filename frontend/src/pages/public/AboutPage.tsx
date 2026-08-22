@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { SCHOOL_YEARS } from '@/lib/siteMeta';
+import { HistoryTimeline } from '@/components/public/HistoryTimeline';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
 
@@ -114,6 +115,17 @@ export default function AboutPage() {
               </div>
             </div>
           </Reveal>
+        </div>
+      </Section>
+
+      {/* ── LÍNEA DE TIEMPO (BACKLOG P2-8) ── */}
+      <Section bg="white">
+        <Reveal className="mb-8 text-center sm:mb-10">
+          <span className="section-label-green inline-flex">Trayectoria</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">{SCHOOL_YEARS} años formando líderes</h2>
+        </Reveal>
+        <div className="mx-auto max-w-3xl">
+          <HistoryTimeline />
         </div>
       </Section>
 
