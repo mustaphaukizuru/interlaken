@@ -16,7 +16,9 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { portalApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
-import { useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
+import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
+import { STUDENT_STATUS } from '@/lib/studentStatus';
+import { Badge } from '@/components/ui/Badge';
 import type { StudentProfile } from '@/types';
 
 export default function AdminStudents() {
@@ -24,16 +26,19 @@ export default function AdminStudents() {
   // debounced (300 ms) so the URL doesn't churn per keystroke.
   const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
   const [page, setPage] = useUrlPage();
+  const { get, set } = useUrlFilters();
+  const estado = get('estado');
+  const acceso = get('acceso');
   const [importOpen, setImportOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-students', page, debouncedSearch],
+    queryKey: ['admin-students', page, debouncedSearch, estado, acceso],
     queryFn: async () =>
       toPaged<StudentProfile>(
-        (await portalApi.getStudents({ page, search: debouncedSearch || undefined })).data),
+        (await portalApi.getStudents({ page, search: debouncedSearch || undefined, estado: estado || undefined, acceso: acceso || undefined })).data),
     placeholderData: keepPreviousData,
   });
 
@@ -93,13 +98,32 @@ export default function AdminStudents() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <p className="mb-4 text-xs text-subtle">Busca en todo el directorio de alumnos.</p>
+        <p className="mb-3 text-xs text-subtle">Busca en todo el directorio de alumnos.</p>
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:max-w-xl">
+          <div>
+            <label className="label" htmlFor="f-estado">Estado</label>
+            <select id="f-estado" className="input-field min-h-[44px]" value={estado} onChange={(e) => set({ estado: e.target.value || null, page: null })}>
+              <option value="">Todos</option>
+              {Object.entries(STUDENT_STATUS).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="f-acceso">Acceso al portal</label>
+            <select id="f-acceso" className="input-field min-h-[44px]" value={acceso} onChange={(e) => set({ acceso: e.target.value || null, page: null })}>
+              <option value="">Todos</option>
+              <option value="never">Nunca ha iniciado sesión</option>
+              <option value="nopass">Sin contraseña asignada</option>
+            </select>
+          </div>
+        </div>
 
         <ActiveFilterChips
-          chips={debouncedSearch
-            ? [{ key: 'q', label: `Búsqueda: “${debouncedSearch}”`, onClear: () => setSearch('') }]
-            : []}
-          onClearAll={() => setSearch('')}
+          chips={[
+            ...(debouncedSearch ? [{ key: 'q', label: `Búsqueda: “${debouncedSearch}”`, onClear: () => setSearch('') }] : []),
+            ...(estado ? [{ key: 'estado', label: `Estado: ${STUDENT_STATUS[estado as keyof typeof STUDENT_STATUS]?.label ?? estado}`, onClear: () => set({ estado: null }) }] : []),
+            ...(acceso ? [{ key: 'acceso', label: acceso === 'never' ? 'Nunca ha iniciado sesión' : 'Sin contraseña', onClear: () => set({ acceso: null }) }] : []),
+          ]}
+          onClearAll={() => { setSearch(''); set({ estado: null, acceso: null }); }}
         />
 
         {isError ? (
@@ -160,6 +184,8 @@ export default function AdminStudents() {
                     <th>Grado</th>
                     <th>Grupo</th>
                     <th>Correo</th>
+                    <th>Estado</th>
+                    <th>Último acceso</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,6 +203,8 @@ export default function AdminStudents() {
                       <td className="text-muted">{s.grade}</td>
                       <td className="text-muted">{s.group}</td>
                       <td className="text-subtle text-xs">{s.user.email}</td>
+                      <td><Badge variant={STUDENT_STATUS[s.status ?? 'active']?.variant ?? 'neutral'}>{STUDENT_STATUS[s.status ?? 'active']?.label ?? s.status}</Badge></td>
+                      <td className="text-subtle text-xs">{s.user.last_login ? new Date(s.user.last_login).toLocaleDateString('es-MX') : <span className="text-coral-600">Nunca</span>}</td>
                     </tr>
                   ))}
                 </tbody>

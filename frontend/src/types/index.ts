@@ -1,4 +1,5 @@
 export interface User {
+  last_login?: string | null;
   id: number;
   email: string;
   first_name: string;
@@ -24,6 +25,7 @@ export interface StudentProfile {
   loyverse_id: string;
   enrollment_date?: string | null;
   is_active?: boolean;
+  status?: 'active' | 'on_leave' | 'graduated' | 'withdrawn';
 }
 
 export interface CafeteriaBalance {

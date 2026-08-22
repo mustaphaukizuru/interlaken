@@ -24,7 +24,7 @@ from .import_students import STUDENT_EMAIL_DOMAIN
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer
 
-EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id')
+EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id', 'status')
 EDITABLE_USER = ('first_name', 'last_name', 'email')
 
 
@@ -37,6 +37,7 @@ class StudentWriteSerializer(serializers.Serializer):
     group = serializers.CharField(max_length=5, required=False, allow_blank=True)
     enrollment_date = serializers.DateField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False)
+    status = serializers.ChoiceField(choices=StudentProfile.Status.choices, required=False)
     loyverse_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     def __init__(self, *args, partial=False, **kwargs):
@@ -103,6 +104,8 @@ class AdminStudentCreateView(APIView):
                 user=user, student_id=d['student_id'], grade=d['grade'].strip(),
                 group=(d.get('group') or '').strip(), loyverse_id=(d.get('loyverse_id') or '').strip(),
                 enrollment_date=d.get('enrollment_date'), is_active=d.get('is_active', True))
+            if 'status' in d:
+                profile.save(update_fields=profile.apply_status(d['status']))
             profile.parents.add(user)  # school-email family login sees its own file
             # StudentProfile is auto-audited by core.audit signals; add the actor context.
             record('create', profile, {'via': 'portal', 'snapshot': _snapshot(profile)},
@@ -137,9 +140,16 @@ class AdminStudentUpdateView(APIView):
                 user.save(update_fields=user_fields)
             prof_fields = []
             for k in EDITABLE_PROFILE:
-                if k in d:
+                if k in d and k != 'status':
                     setattr(profile, k, d[k].strip() if isinstance(d[k], str) else d[k])
                     prof_fields.append(k)
+            if 'status' in d:
+                prof_fields += profile.apply_status(d['status'])
+            elif 'is_active' in d:
+                # Legacy toggle: keep status coherent with the boolean.
+                prof_fields += profile.apply_status(
+                    StudentProfile.Status.ACTIVE if d['is_active'] else StudentProfile.Status.WITHDRAWN)
+            prof_fields = list(dict.fromkeys(prof_fields))
             if prof_fields:
                 profile.save(update_fields=prof_fields)
             changes = _changes(before, _snapshot(profile))

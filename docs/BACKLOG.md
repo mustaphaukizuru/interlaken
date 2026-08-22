@@ -52,8 +52,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-A3 | Family/guardian editor: create/edit names, email, phone, relationship, address; link/unlink to students; co-guardians and siblings; merge duplicates. | DONE 2026-08-22 (create/link existed; added PATCH guardian + GuardianEditModal). Address field and merge tool deferred to P4-6 |
 | P1-A4 | Password request inbox: log each WhatsApp/email request (channel, verified by, set by, timestamp); set password from the inbox with audit. | DONE 2026-08-22 (/admin/contrasenas, PasswordRequest model + API) |
 | P1-A5 | Credentials delivery templates (WhatsApp + email) for new and reset passwords. | DONE 2026-08-22 (backend delivery_templates + lib/credentialTemplates; one-tap WhatsApp/mailto in inbox and reset dialog) |
-| P1-A6 | Welcome/invite resend; "never logged in" roster filter. | Missing |
-| P1-A7 | Student status lifecycle (activo, baja temporal, egresado) and effects on login, cafetería, comunicados. | Missing |
+| P1-A6 | Welcome/invite resend; "never logged in" roster filter. | DONE 2026-08-22 (roster filters ?acceso=never/nopass + Último acceso column; "resend" = log a password request, per AE5 there is no self-activation) |
+| P1-A7 | Student status lifecycle (activo, baja temporal, egresado) and effects on login, cafetería, comunicados. | DONE 2026-08-22 (StudentProfile.status + apply_status(): mirrors is_active and toggles the student login; migration 0006 backfills) |
 | P1-A8 | Roster table: column chooser, sort, nivel/grado/grupo filters, bulk actions, density toggle, sticky header, mobile cards. | Refine |
 | P1-A9 | Staff credencial view: preview, print, reissue payment code. | Missing |
 | P1-A10 | Parent-side student card with the same read-only data and "Solicitar corrección". | Refine |

@@ -374,7 +374,19 @@ class StudentListView(generics.ListAPIView):
         # (StudentProfile has no Meta.ordering).
         order = ('user__last_name', 'user__first_name', 'id')
         if user.role == User.Role.ADMIN:
-            return StudentProfile.objects.select_related('user').order_by(*order)
+            qs = StudentProfile.objects.select_related('user')
+            # Roster filters (BACKLOG P1-A6/A7): ?estado=active|on_leave|graduated|withdrawn
+            # and ?acceso=never (family login never used) | nopass (no password yet).
+            estado = self.request.query_params.get('estado')
+            if estado in StudentProfile.Status.values:
+                qs = qs.filter(status=estado)
+            acceso = self.request.query_params.get('acceso')
+            if acceso == 'never':
+                qs = qs.filter(user__last_login__isnull=True)
+            elif acceso == 'nopass':
+                # Django stores unusable passwords with a leading '!'.
+                qs = qs.filter(user__password__startswith='!')
+            return qs.order_by(*order)
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
             return (StudentProfile.objects.filter(parents=user)

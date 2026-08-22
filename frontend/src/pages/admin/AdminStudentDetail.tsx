@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { Badge } from '@/components/ui/Badge';
+import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { portalApi } from '@/services/api';
 import type { StudentProfile } from '@/types';
 
@@ -85,7 +86,7 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Estado</dt>
-            <dd className="mt-1"><Badge variant={student.is_active === false ? 'neutral' : 'success'}>{student.is_active === false ? 'Inactivo' : 'Activo'}</Badge></dd>
+            <dd className="mt-1"><Badge variant={STUDENT_STATUS[student.status ?? 'active']?.variant ?? 'neutral'}>{STUDENT_STATUS[student.status ?? 'active']?.label ?? 'Activo'}</Badge></dd>
           </div>
         </dl>
       </Card>

@@ -50,7 +50,10 @@ export interface StudentWrite {
   group?: string;
   enrollment_date?: string | null;
   is_active?: boolean;
+  status?: StudentStatus;
 }
+
+export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';
 
 import { useAuthStore } from '@/store/authStore';
 
@@ -534,7 +537,7 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number; search?: string }) =>
+  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string }) =>
     api.get('/accounts/students/', { params }),
 
   /** One student profile (admin, or a family's own child). */

@@ -94,6 +94,33 @@ class StudentProfile(models.Model):
     enrollment_date = models.DateField(null=True, blank=True)
     is_active     = models.BooleanField(default=True)
 
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Activo'
+        ON_LEAVE = 'on_leave', 'Baja temporal'
+        GRADUATED = 'graduated', 'Egresado'
+        WITHDRAWN = 'withdrawn', 'Baja definitiva'
+
+    # Lifecycle (BACKLOG P1-A7). ``is_active`` mirrors ``status == active`` so
+    # every existing ``is_active`` filter (cafetería sync, comunicados) keeps
+    # working; ``apply_status()`` also toggles the student's own login.
+    status        = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE,
+                                     db_index=True)
+
+    def apply_status(self, status: str) -> list[str]:
+        """Set ``status`` + derived flags; returns the profile fields to save.
+
+        The student's own User (school-email family login) is deactivated when
+        the student is not active, so the account cannot log in; guardians keep
+        their access because they may have other children.
+        """
+        self.status = status
+        self.is_active = status == self.Status.ACTIVE
+        user = self.user
+        if user.role == User.Role.STUDENT and user.is_active != self.is_active:
+            user.is_active = self.is_active
+            user.save(update_fields=['is_active'])
+        return ['status', 'is_active']
+
     class Meta:
         verbose_name = 'Perfil de Alumno'
         indexes = [

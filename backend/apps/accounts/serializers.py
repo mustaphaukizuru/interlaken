@@ -19,9 +19,9 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'full_name', 'role',
-            'avatar', 'whatsapp', 'has_usable_password', 'notif_prefs',
+            'avatar', 'whatsapp', 'has_usable_password', 'notif_prefs', 'last_login',
         ]
-        read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs']
+        read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs', 'last_login']
 
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
@@ -43,7 +43,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
         fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id',
-                  'enrollment_date', 'is_active']
+                  'enrollment_date', 'is_active', 'status']
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):

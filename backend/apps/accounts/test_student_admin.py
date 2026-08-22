@@ -53,7 +53,8 @@ class TestUpdate:
         assert (p.grade, p.user.first_name, p.is_active) == ('2° Primaria', 'Nuevo', False)
         log = AuditLog.objects.get(object_type='accounts.studentprofile', action='update',
                                    context='portal: edición de alumno')
-        assert set(log.changes) == {'via', 'grade', 'first_name', 'is_active'}
+        # is_active=False now also flips the lifecycle status (P1-A7)
+        assert set(log.changes) == {'via', 'grade', 'first_name', 'is_active', 'status'}
         assert log.changes['grade'] == {'from': '1° Primaria', 'to': '2° Primaria'}
 
     def test_email_uniqueness(self, admin_client):

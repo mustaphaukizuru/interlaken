@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { portalApi, type StudentWrite } from '@/services/api';
+import { portalApi, type StudentWrite, type StudentStatus } from '@/services/api';
+import { STUDENT_STATUS } from '@/lib/studentStatus';
 import type { StudentProfile } from '@/types';
 
 interface Props {
@@ -44,6 +45,7 @@ function initial(student?: StudentProfile | null): StudentWrite {
     group: student?.group ?? '',
     enrollment_date: student?.enrollment_date ?? '',
     is_active: student?.is_active ?? true,
+    status: student?.status ?? 'active',
   };
 }
 
@@ -141,10 +143,13 @@ function StudentForm({ student, onClose, onSaved, qc }: {
           inputMode="email"
           autoComplete="off"
         />
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input type="checkbox" checked={form.is_active ?? true} onChange={(e) => set('is_active', e.target.checked)} />
-          Alumno activo
-        </label>
+        <div>
+          <label className="label" htmlFor="sf-status">Estado</label>
+          <select id="sf-status" className="input-field min-h-[44px]" value={form.status ?? 'active'} onChange={(e) => set('status', e.target.value as StudentStatus)}>
+            {Object.entries(STUDENT_STATUS).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+          </select>
+          <p className="mt-1.5 text-xs text-subtle">Si no está activo, su acceso familiar al portal se desactiva y deja de recibir comunicados y sincronización de cafetería.</p>
+        </div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
           <Button type="submit" loading={mutation.isPending} className="min-h-[44px]">
