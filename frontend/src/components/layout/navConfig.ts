@@ -21,6 +21,7 @@ export const navByRole: Record<Role, NavEntry[]> = {
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones' },
     { icon: CalendarClock, label: 'Visitas',     to: '/admin/visitas' },
     { icon: Coffee,        label: 'Cafetería',   to: '/admin/cafeteria' },
+    { icon: CreditCard,    label: 'Pagos',       to: '/admin/pagos' },
     { icon: Megaphone,     label: 'Comunicados', to: '/admin/comunicados' },
     { icon: KeyRound,      label: 'Contraseñas', to: '/admin/contrasenas' },
     { icon: Settings,      label: 'Ajustes',     to: '/admin/ajustes' },

@@ -100,8 +100,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-D5 | Family CSV export of payment history by date range. | DONE 2026-08-22 (/payments/history/export/ honors the filters) |
 | P1-D6 | Status clarity: pending next steps, failed retry, refunded reason. | DONE 2026-08-22 (per-status guidance under each row; Reintentar link) |
 | P1-D7 | Return page polish: success state, new balance, next actions. | DONE 2026-08-22 (receipt line with alumno/monto/referencia, next actions) |
-| P1-D8 | Admin payments view: reconcile, mark paid (caja), refund, filters, CSV/PDF, daily totals chart. | Partial |
-| P1-D9 | Sandbox checkout clearly marked test-only, dev only. | Refine |
+| P1-D8 | Admin payments view: reconcile, mark paid (caja), refund, filters, CSV/PDF, daily totals chart. | DONE 2026-08-22 (/admin/pagos ledger with search/status/gateway/date filters, 30-day totals + daily bars, stuck-pending KPI, CSV; refunds and cash approvals stay in Cafetería) |
+| P1-D9 | Sandbox checkout clearly marked test-only, dev only. | DONE (already marked 'Modo de prueba', settle only in DEBUG) |
 
 ### P1-E. Portal shell
 

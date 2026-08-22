@@ -55,3 +55,19 @@ def test_csv_export(api_client, family):
     assert resp.status_code == 200 and resp['Content-Disposition'].startswith('attachment; filename="pagos_')
     body = resp.content.decode('utf-8-sig')
     assert body.count('\n') == 3 and '999.00' not in body  # header + 2 family rows, other family excluded
+
+
+def test_admin_ledger_and_summary(api_client, family):
+    from apps.accounts.factories import AdminFactory
+    api_client.force_authenticate(user=AdminFactory())
+    rows = api_client.get(reverse('admin-payments')).data['results']
+    assert len(rows) == 4  # both families
+    _, a, _ = family
+    rows = api_client.get(reverse('admin-payments'), {'q': a.user.last_name}).data['results']
+    assert rows and all(r['student_id'] == a.id for r in rows)
+    summ = api_client.get(reverse('admin-payments-summary'), {'days': 7}).data
+    assert summ['by_status']['success']['count'] == 3 and summ['series'] and summ['stuck_pending'] == 0
+    # families cannot reach the ledger
+    parent = ParentFactory()
+    api_client.force_authenticate(user=parent)
+    assert api_client.get(reverse('admin-payments')).status_code == 403

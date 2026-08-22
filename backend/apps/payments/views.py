@@ -16,6 +16,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
@@ -380,3 +381,64 @@ class PaymentHistoryExportView(APIView):
                         p.description or p.get_payment_type_display(), p.amount, p.currency,
                         p.get_status_display(), p.get_gateway_display(), p.gateway_tx_id or p.gateway_ref])
         return as_download(resp, export_filename('pagos'))
+
+
+class AdminPaymentsView(generics.ListAPIView):
+    """GET /api/v1/payments/admin/ — every gateway payment, filterable (BACKLOG P1-D9).
+
+    Same filters as the family history plus ?gateway= and ?q= (student name,
+    payer email, gateway reference). Refunds live in the cafetería console;
+    cash top-ups are approved there too, so this page is the ledger view.
+    """
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = _filtered_history(self.request)
+        p = self.request.query_params
+        if p.get('gateway') in Payment.Gateway.values:
+            qs = qs.filter(gateway=p['gateway'])
+        q = (p.get('q') or '').strip()
+        if q:
+            qs = qs.filter(
+                Q(related_topup__student__user__first_name__icontains=q)
+                | Q(related_topup__student__user__last_name__icontains=q)
+                | Q(related_topup__student__student_id__icontains=q)
+                | Q(user__email__icontains=q)
+                | Q(gateway_tx_id__icontains=q)
+                | Q(gateway_ref__icontains=q))
+        return qs
+
+
+class AdminPaymentsSummaryView(APIView):
+    """GET /api/v1/payments/admin/summary/?days=30 — totals by status and per-day series."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.db.models import Count, Sum
+        from django.db.models.functions import TruncDate
+        from django.utils import timezone
+
+        try:
+            days = max(7, min(int(request.query_params.get('days', 30)), 365))
+        except ValueError:
+            days = 30
+        since = timezone.localdate() - timedelta(days=days - 1)
+        qs = Payment.objects.filter(created_at__date__gte=since)
+        by_status = {
+            r['status']: {'count': r['c'], 'total': str(r['t'] or 0)}
+            for r in qs.values('status').annotate(c=Count('id'), t=Sum('amount'))
+        }
+        series = [
+            {'date': r['d'].isoformat(), 'total': str(r['t'] or 0), 'count': r['c']}
+            for r in (qs.filter(status=Payment.Status.SUCCESS).annotate(d=TruncDate('created_at'))
+                      .values('d').annotate(t=Sum('amount'), c=Count('id')).order_by('d'))
+        ]
+        return Response({'days': days, 'since': since.isoformat(), 'by_status': by_status, 'series': series,
+                         'stuck_pending': Payment.objects.filter(
+                             status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING],
+                             created_at__lt=timezone.now() - timedelta(hours=24)).count()})

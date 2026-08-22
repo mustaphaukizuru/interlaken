@@ -40,6 +40,14 @@ export interface PaymentSummary {
   per_child: { student_id: number; name: string; total: string; count: number }[];
 }
 
+export interface AdminPaymentsSummary {
+  days: number;
+  since: string;
+  by_status: Record<string, { count: number; total: string }>;
+  series: { date: string; total: string; count: number }[];
+  stuck_pending: number;
+}
+
 export interface DeliveryReport {
   announcement: number;
   recipients: number;
@@ -458,6 +466,10 @@ export const paymentsApi = {
   exportMyPayments: (params?: { status?: string; student?: string; from?: string; to?: string }) =>
     api.get('/payments/history/export/', { params, responseType: 'blob' }),
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
+  /** Admin ledger (BACKLOG P1-D9). */
+  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; from?: string; to?: string }) =>
+    api.get('/payments/admin/', { params }),
+  adminSummary: (days = 30) => api.get<AdminPaymentsSummary>('/payments/admin/summary/', { params: { days } }),
 };
 
 // Cafetería top-ups are the only money path; there is no tuition/finance API.
