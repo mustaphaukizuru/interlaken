@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
   GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
-  FileText, CircleDollarSign, DoorOpen, UserPlus, MonitorSmartphone, Receipt,
+  FileText, CircleDollarSign, UserPlus, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Facebook, Instagram, Youtube } from '@/components/icons/brand-icons';
@@ -23,7 +23,6 @@ const HIDE_STICKY_CTA = [
   '/agendar-visita',
   '/pre-registro',
   '/registro',
-  '/puertas-abiertas',
   '/login',
 ];
 
@@ -52,7 +51,6 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
       { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
       { label: 'Documentación', to: '/admisiones/documentacion', icon: FileText },
       { label: 'Costos', to: '/admisiones/costos', icon: CircleDollarSign },
-      { label: 'Puertas Abiertas', to: '/puertas-abiertas', icon: DoorOpen },
       { label: 'Pre-Registro', to: '/pre-registro', icon: UserPlus },
     ],
   },

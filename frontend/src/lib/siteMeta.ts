@@ -85,11 +85,6 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       'Completa el proceso de inscripción formal en Colegio Interlaken tras tu pre-registro y contacto con el equipo de admisiones.',
   },
-  '/puertas-abiertas': {
-    title: 'Puertas Abiertas',
-    description:
-      'Asiste a un evento de Puertas Abiertas en Colegio Interlaken: conoce nuestras instalaciones, el modelo educativo y a la comunidad.',
-  },
   '/agendar-visita': {
     title: 'Agendar Visita',
     description:

@@ -30,7 +30,6 @@ const DocumentacionPage = lazy(() => import('./pages/public/DocumentacionPage'))
 const CostosPage      = lazy(() => import('./pages/public/CostosPage'));
 const PreRegisterPage = lazy(() => import('./pages/public/PreRegisterPage'));
 const RegisterPage    = lazy(() => import('./pages/public/RegisterPage'));
-const OpenSchoolPage  = lazy(() => import('./pages/public/OpenSchoolPage'));
 const BookVisitPage   = lazy(() => import('./pages/public/BookVisitPage'));
 const ContactPage     = lazy(() => import('./pages/public/ContactPage'));
 const AvisoPrivacidadPage = lazy(() => import('./pages/public/AvisoPrivacidadPage'));
@@ -126,7 +125,8 @@ export default function App() {
               <Route path="/admisiones/costos" element={<CostosPage />} />
               <Route path="/pre-registro"  element={<PreRegisterPage />} />
               <Route path="/inscripcion"   element={<RegisterPage />} />
-              <Route path="/puertas-abiertas" element={<OpenSchoolPage />} />
+              {/* Puertas Abiertas is admin-only now (bookings console); public URL redirects. */}
+              <Route path="/puertas-abiertas" element={<Navigate to="/agendar-visita" replace />} />
               <Route path="/agendar-visita" element={<BookVisitPage />} />
               <Route path="/contacto"      element={<ContactPage />} />
               <Route path="/aviso-de-privacidad" element={<AvisoPrivacidadPage />} />

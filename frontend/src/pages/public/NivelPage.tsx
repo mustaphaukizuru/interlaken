@@ -110,7 +110,7 @@ export default function NivelPage() {
                 { to: '/admisiones', label: 'Proceso de inscripción' },
                 { to: '/admisiones/documentacion', label: 'Documentación' },
                 { to: '/admisiones/costos', label: 'Costos y colegiaturas' },
-                { to: '/puertas-abiertas', label: 'Puertas Abiertas' },
+                { to: '/agendar-visita', label: 'Agendar visita' },
                 { to: '/contacto', label: 'Contacto por nivel' },
               ].map((l) => (
                 <li key={l.label}>

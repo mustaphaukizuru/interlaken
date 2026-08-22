@@ -486,10 +486,10 @@ export default function AdmissionsPage() {
                     Inicie su pre-registro <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                   <Link
-                    to="/puertas-abiertas"
+                    to="/agendar-visita"
                     className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border-2 border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                   >
-                    Ver Puertas Abiertas
+                    Agendar una visita
                   </Link>
                 </div>
               </div>

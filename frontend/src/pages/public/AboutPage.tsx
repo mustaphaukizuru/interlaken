@@ -187,7 +187,7 @@ export default function AboutPage() {
         <p className="mx-auto mt-3 max-w-xl text-fluid-base opacity-90">Agende una visita o inicie su pre-registro en línea en solo unos minutos.</p>
         <div className="mt-7 flex flex-wrap justify-center gap-3.5">
           <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Inicie su pre-registro <ArrowRight size={17} /></Link>
-          <Link to="/puertas-abiertas" className="btn-ghost btn-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Puertas Abiertas</Link>
+          <Link to="/agendar-visita" className="btn-ghost btn-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Agendar visita</Link>
         </div>
       </Section>
     </div>
