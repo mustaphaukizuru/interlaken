@@ -9,10 +9,11 @@ import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Testimonials } from '@/components/public/Testimonials';
 import { HistoryTimeline } from '@/components/public/HistoryTimeline';
+import { PricingSections } from '@/pages/public/CostosPage';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { LEVELS } from '@/lib/levels';
 import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
-import { contentApi, type SchoolEvent } from '@/services/api';
+import { admissionsApi, contentApi, type SchoolEvent } from '@/services/api';
 import { sanitizeHtml } from './sanitize';
 import type { Block } from './blocks/registry';
 
@@ -126,6 +127,9 @@ function BlockView({ block }: { block: Block }) {
     case 'testimonials': return <Section bg="cream"><Testimonials /></Section>;
     case 'map_contact': return <MapContactBlock />;
     case 'calendar': return <CalendarBlock />;
+    case 'pricing_table': return <PricingSections />;
+    case 'open_school_events': return <OpenSchoolBlock />;
+    case 'form': return <FormBlock slug={String(p.form ?? '')} />;
     case 'sep_incorporation': return (
       <Section bg="cream" containerSize="md">
         <ul className="space-y-2">{SEP_INCORPORATIONS.map((r) => (
@@ -180,6 +184,36 @@ function CalendarBlock() {
       <Link to="/calendario" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-purple">Ver calendario completo <ArrowRight size={14} /></Link>
     </Section>
   );
+}
+
+interface OpenClassEvent { id: number; date: string; title: string; description?: string; spots_remaining: number }
+function OpenSchoolBlock() {
+  const { data } = useQuery({ queryKey: ['open-school-events', 'block'], queryFn: async () => (await admissionsApi.getOpenSchoolEvents()).data as OpenClassEvent[], staleTime: 300_000 });
+  const events = data ?? [];
+  return (
+    <Section bg="white" containerSize="md">
+      <h2 className="mb-4 font-head text-xl font-bold text-ink">Clases abiertas</h2>
+      {events.length === 0 ? <p className="text-sm text-muted">Por ahora no hay clases abiertas programadas. Puede agendar una visita individual.</p> : (
+        <ul className="divide-y divide-line rounded-xl2 border border-line bg-white">{events.map((e) => (
+          <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><div><p className="font-semibold text-ink">{e.title}</p><p className="text-muted">{e.date}{e.description ? ` · ${e.description}` : ''}</p></div><span className="shrink-0 text-xs text-subtle">{e.spots_remaining} lugares</span></li>
+        ))}</ul>
+      )}
+      <Link to="/agendar-visita" className="btn-pink mt-5">Agendar visita <ArrowRight size={16} /></Link>
+    </Section>
+  );
+}
+
+/** Form block: until the forms builder (P3-6) ships, it links to the matching built-in form. */
+const BUILTIN_FORMS: Record<string, { label: string; to: string }> = {
+  'pre-registro': { label: 'Ir al pre-registro', to: '/pre-registro' },
+  'contacto': { label: 'Escribirnos', to: '/contacto' },
+  'facturacion': { label: 'Solicitar factura', to: '/comunidad/facturacion' },
+  'agendar-visita': { label: 'Agendar visita', to: '/agendar-visita' },
+};
+function FormBlock({ slug }: { slug: string }) {
+  const f = BUILTIN_FORMS[slug];
+  if (!f) return null;
+  return <Section bg="cream" containerSize="md"><div className="text-center"><Link to={f.to} className="btn-pink">{f.label} <ArrowRight size={16} /></Link></div></Section>;
 }
 
 /** Route element: renders a published CMS page by slug, or the draft when ?preview=<token>. */

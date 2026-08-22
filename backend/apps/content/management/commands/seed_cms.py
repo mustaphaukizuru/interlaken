@@ -87,6 +87,77 @@ def page_definitions(img: dict[str, int]) -> list[dict]:
             ],
         },
         {
+            'slug': 'admisiones', 'title': 'Admisiones', 'template': 'landing',
+            'seo': {'title': 'Admisiones · Colegio Interlaken', 'description': 'Proceso de admisión en 4 pasos, preguntas frecuentes y pre-registro en línea.'},
+            'blocks': [
+                _b('hero', title='Admisiones', subtitle='Un proceso claro en cuatro pasos, con un asesor que le acompaña.',
+                   image=pic('classroom.webp'), cta={'label': 'Pre-registro en línea', 'href': '/pre-registro'}),
+                _b('feature_grid', title='Cómo funciona', items=[
+                    {'title': '1. Pre-registro', 'text': 'Complete el pre-registro en línea en menos de 5 minutos y asegure su lugar.'},
+                    {'title': '2. Visita', 'text': 'Conozca las instalaciones y al equipo docente en un recorrido personalizado.'},
+                    {'title': '3. Documentos', 'text': 'Consulte la lista de documentos requeridos, con enlaces a trámites oficiales.'},
+                    {'title': '4. Asesoría', 'text': 'Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.'},
+                ]),
+                _b('open_school_events'),
+                _b('faq', items=[
+                    {'q': '¿Qué niveles educativos ofrece Colegio Interlaken?', 'a': 'Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe (español–inglés) en cada nivel.'},
+                    {'q': '¿Cómo es el proceso de admisión?', 'a': 'Pre-registro en línea, entrega de documentos, examen de valoración y confirmación de lugar. Un asesor le guía en cada paso.'},
+                    {'q': '¿Cómo están estructurados los costos?', 'a': 'Las colegiaturas se pagan en 11 mensualidades, de agosto a junio. Consulte el desglose por sección en la página de Costos.'},
+                    {'q': '¿Ofrecen becas o descuentos?', 'a': 'Contamos con apoyos para hermanos y casos especiales. Escríbanos desde la sección de Contacto para conocer las opciones vigentes.'},
+                    {'q': '¿El colegio cuenta con incorporación oficial ante la SEP?', 'a': 'Sí. Nuestros planes de estudio tienen reconocimiento y validez oficial ante la Secretaría de Educación Pública.'},
+                ]),
+                _b('testimonials'),
+                _b('cta_band', title='Asegure su lugar', text='El pre-registro toma menos de 5 minutos.', cta={'label': 'Pre-registro en línea', 'href': '/pre-registro'}),
+            ],
+        },
+        {
+            'slug': 'costos', 'title': 'Costos', 'template': 'simple',
+            'seo': {'title': 'Costos · Colegio Interlaken', 'description': 'Inscripción, colegiaturas, seguros, extraescolares y estancia por nivel.'},
+            'blocks': [
+                _b('hero', title='Costos', subtitle='Inscripción, colegiaturas, seguros, extraescolares y estancia del ciclo vigente.', image=pic('facade.webp')),
+                _b('pricing_table'),
+                _b('rich_text', html='<p><small>Cifras informativas. Los pagos se realizan en la administración del colegio o por los medios que ésta indique.</small></p>'),
+            ],
+        },
+        {
+            'slug': 'modelo-educativo', 'title': 'Modelo educativo', 'template': 'simple',
+            'seo': {'title': 'Modelo educativo · Colegio Interlaken', 'description': 'Bilingüismo, valores y conciencia ambiental en los tres niveles.'},
+            'blocks': [
+                _b('hero', title='Modelo educativo', subtitle='Bilingüismo, valores y conciencia ambiental en cada etapa.', image=pic('campus-mural.webp')),
+                _b('feature_grid', items=[
+                    {'title': 'Bilingüe', 'text': 'Español–Inglés en los tres niveles, con preparación para el First Certificate de la Universidad de Cambridge en Secundaria.'},
+                    {'title': 'Valores', 'text': 'Formamos mejores seres humanos: valores en el quehacer diario, ayuda y servicio a la comunidad, ceremonias y convivencia.'},
+                    {'title': 'Medio ambiente', 'text': 'Conciencia ambiental transversal en actividades, campañas y proyectos escolares.'},
+                ]),
+                _b('levels_cards'),
+                _b('sep_incorporation'),
+            ],
+        },
+        {
+            'slug': 'plataformas', 'title': 'Plataformas', 'template': 'simple',
+            'seo': {'title': 'Plataformas · Colegio Interlaken', 'description': 'Aula digital, correo institucional y registro de iPad.'},
+            'blocks': [
+                _b('hero', title='Plataformas', subtitle='Las herramientas digitales de la comunidad Interlaken.', image=pic('secundaria.webp')),
+                _b('feature_grid', items=[
+                    {'title': 'Aula digital', 'text': 'Aulas virtuales del colegio: tareas, materiales y seguimiento de cada clase.'},
+                    {'title': 'Correo institucional', 'text': 'Correo electrónico oficial de alumnos y docentes (@interlaken).'},
+                    {'title': 'Mosyle, registro de iPad', 'text': 'Inscripción del iPad al sistema del colegio para usarlo en el salón de clases.'},
+                    {'title': 'Escuela para padres', 'text': 'Cursos y contenidos diseñados para fortalecer la dinámica familiar y acompañar la crianza.'},
+                ]),
+            ],
+        },
+        {
+            'slug': 'documentacion', 'title': 'Documentación', 'template': 'simple',
+            'seo': {'title': 'Documentación · Colegio Interlaken', 'description': 'Documentos requeridos para la inscripción.'},
+            'blocks': [
+                _b('hero', title='Documentación', subtitle='Lo que necesita para completar la inscripción.', image=pic('primaria-gate.webp')),
+                _b('rich_text', html='<ul><li>Acta de nacimiento (copia)</li><li>CURP del alumno</li><li>Boleta o constancia del último grado cursado</li>'
+                                     '<li>Certificado médico reciente</li><li>Identificación oficial de madre, padre o tutor</li><li>Comprobante de domicilio</li>'
+                                     '<li>Fotografías tamaño infantil</li></ul>'),
+                _b('form', form='pre-registro'),
+            ],
+        },
+        {
             'slug': 'galeria', 'title': 'Galería', 'template': 'simple',
             'seo': {'title': 'Galería · Colegio Interlaken', 'description': 'Imágenes de la vida escolar en Interlaken.'},
             'blocks': [

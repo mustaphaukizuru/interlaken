@@ -22,7 +22,7 @@ def test_seed_is_idempotent_and_validates(tmp_path, settings):
     call_command('seed_cms', assets=str(assets), stdout=out)
     assert Page.objects.filter(slug='inicio', status='draft').exists()
     n_pages, n_media = Page.objects.count(), MediaAsset.objects.count()
-    assert n_pages == 4 and n_media == (1 if src else 0)
+    assert n_pages == 9 and n_media == (1 if src else 0)
     hero = Page.objects.get(slug='inicio').draft_blocks[0]
     assert hero['type'] == 'hero'
     if src:
