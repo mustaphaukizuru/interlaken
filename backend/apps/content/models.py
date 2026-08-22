@@ -231,3 +231,38 @@ class PricingPolicy(PricingRow):
 
     def __str__(self):
         return self.text[:60]
+
+
+class SchoolEvent(models.Model):
+    """Calendario escolar (BACKLOG P2-16): holidays, exams, ceremonies, vacations.
+
+    Admin-managed from the portal; the public /calendario page lists the
+    current cycle. Separate from bookings.OpenSchoolEvent (visits with capacity).
+    """
+
+    class Kind(models.TextChoices):
+        HOLIDAY = 'holiday', 'Suspensión de clases'
+        VACATION = 'vacation', 'Vacaciones'
+        EXAM = 'exam', 'Evaluaciones'
+        EVENT = 'event', 'Evento escolar'
+        MEETING = 'meeting', 'Junta de padres'
+        DEADLINE = 'deadline', 'Fecha límite'
+
+    title = models.CharField('Título', max_length=160)
+    kind = models.CharField('Tipo', max_length=12, choices=Kind.choices, default=Kind.EVENT)
+    start_date = models.DateField('Inicio')
+    end_date = models.DateField('Fin', null=True, blank=True, help_text='Vacío = un solo día.')
+    level = models.CharField('Nivel', max_length=12, blank=True,
+                             help_text="Vacío = todos; o 'preescolar' / 'primaria' / 'secundaria'.")
+    description = models.CharField('Descripción', max_length=300, blank=True)
+    is_published = models.BooleanField('Publicado', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['start_date', 'title']
+        verbose_name = 'Evento del calendario'
+        verbose_name_plural = 'Calendario escolar'
+
+    def __str__(self):
+        return f'{self.start_date} {self.title}'

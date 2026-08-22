@@ -71,6 +71,8 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
+const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const DocumentsUploadPage = lazy(() => import('./pages/public/DocumentsUploadPage'));
 const AdminStaffUsers = lazy(() => import('./pages/admin/AdminStaffUsers'));
 const AdminContactInbox = lazy(() => import('./pages/admin/AdminContactInbox'));
@@ -133,6 +135,7 @@ export default function App() {
               <Route path="/galeria"          element={<GaleriaPage />} />
               <Route path="/niveles/:nivel"   element={<NivelPage />} />
               <Route path="/comunidad/plataformas" element={<PlataformasPage />} />
+              <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
               <Route path="*" element={<NotFoundPage />} />
@@ -201,6 +204,7 @@ export default function App() {
               <Route path="pagos"       element={<AdminPayments />} />
               <Route path="mensajes"    element={<AdminContactInbox />} />
               <Route path="usuarios"    element={<AdminStaffUsers />} />
+              <Route path="calendario"  element={<AdminCalendar />} />
             </Route>
 
           </Routes>

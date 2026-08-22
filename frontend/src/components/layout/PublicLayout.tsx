@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
   GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
-  FileText, CircleDollarSign, UserPlus, MonitorSmartphone, Receipt,
+  FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
@@ -56,6 +56,7 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
     label: 'Comunidad',
     items: [
       { label: 'Plataformas', to: '/comunidad/plataformas', icon: MonitorSmartphone },
+      { label: 'Calendario escolar', to: '/calendario', icon: CalendarDays },
       { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
     ],
   },

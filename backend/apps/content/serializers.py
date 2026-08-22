@@ -6,6 +6,7 @@ from .models import (
     ExtracurricularActivity,
     FixedConcept,
     PricingPolicy,
+    SchoolEvent,
     SiteSettings,
     TuitionCost,
 )
@@ -75,3 +76,20 @@ class PricingPolicySerializer(serializers.ModelSerializer):
         model = PricingPolicy
         fields = ['text', 'order']
         read_only_fields = fields
+
+
+class SchoolEventSerializer(serializers.ModelSerializer):
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+
+    class Meta:
+        model = SchoolEvent
+        fields = ['id', 'title', 'kind', 'kind_label', 'start_date', 'end_date', 'level',
+                  'description', 'is_published', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        start = attrs.get('start_date', getattr(self.instance, 'start_date', None))
+        end = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if start and end and end < start:
+            raise serializers.ValidationError({'end_date': 'La fecha final no puede ser anterior al inicio.'})
+        return attrs

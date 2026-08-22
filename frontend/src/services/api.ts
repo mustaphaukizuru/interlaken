@@ -774,10 +774,29 @@ export const portalApi = {
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────
+export interface SchoolEvent {
+  id: number;
+  title: string;
+  kind: 'holiday' | 'vacation' | 'exam' | 'event' | 'meeting' | 'deadline';
+  kind_label: string;
+  start_date: string;
+  end_date: string | null;
+  level: string;
+  description: string;
+  is_published: boolean;
+}
+export type SchoolEventWrite = Omit<SchoolEvent, 'id' | 'kind_label' | 'end_date'> & { end_date?: string | null };
+
 export const contentApi = {
   // Public site settings — phone/social/contact data (server-cached 5 min).
   getSettings: () =>
     api.get('/content/settings/'),
+  /** School calendar (BACKLOG P2-16). */
+  getCalendar: (params?: { from?: string; to?: string; level?: string }) => api.get('/content/calendar/', { params }),
+  adminListCalendar: () => api.get('/content/admin/calendar/'),
+  adminCreateCalendar: (data: SchoolEventWrite) => api.post<SchoolEvent>('/content/admin/calendar/', data),
+  adminUpdateCalendar: (id: number, data: Partial<SchoolEventWrite>) => api.patch<SchoolEvent>(`/content/admin/calendar/${id}/`, data),
+  adminDeleteCalendar: (id: number) => api.delete(`/content/admin/calendar/${id}/`),
 
   // Costos por sección (editables por el colegio en el admin).
   getCosts: () =>

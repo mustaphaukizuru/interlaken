@@ -85,6 +85,10 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       'Completa el proceso de inscripción formal en Colegio Interlaken tras tu pre-registro y contacto con el equipo de admisiones.',
   },
+  '/calendario': {
+    title: 'Calendario escolar',
+    description: 'Fechas importantes del ciclo escolar en Colegio Interlaken: vacaciones, evaluaciones, eventos y juntas.',
+  },
   '/agendar-visita': {
     title: 'Agendar Visita',
     description:

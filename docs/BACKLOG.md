@@ -185,7 +185,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P2-13 | Costos: per-nivel cards, PDF, information only with "Contactar admisiones" CTA and disclaimer. | DONE 2026-08-22 (explicit 'se pagan directamente con el colegio' disclaimer; no pay buttons; PDF deferred to CMS pricing block) |
 | P2-14 | Unified floating launcher: WhatsApp, Recuperar contraseña, Agendar visita. | DONE 2026-08-22 |
 | P2-15 | Testimonials block on Home and Admisiones. | Missing |
-| P2-16 | Calendario escolar public page. | Missing |
+| P2-16 | Calendario escolar public page. | DONE 2026-08-22 (SchoolEvent model; /calendario by month with level filter; /admin/calendario editor; in Comunidad menu + sitemap) |
 | P2-17 | Google Maps embed and "Cómo llegar" on Contacto. | DONE (already live: maps_url + 'Cómo llegar' CTA) |
 | P2-18 | Consent banner review (must not cover WhatsApp button on mobile). | DONE (banner sits above the sticky CTA bar on phones via mb-[76px]; the launcher is desktop-only while that bar is visible) |
 | P2-19 | 404/error pages with brand and links. | DONE (NotFoundPage with Inicio/Contacto; ErrorBoundary in App) |
