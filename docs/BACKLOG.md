@@ -80,14 +80,14 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-C1 | Dedicated mailboxes and settings: `noreply@`, `admisiones@`, `info@`, `cafeteria@`, `pagos@`, `facturacion@`, `soporte@`, `privacidad@`, `direccion@`, `sistemas@`; SPF/DKIM/DMARC; Reply-To per feature. | Missing |
-| P1-C2 | Notification matrix (event x channel x audience) documented and enforced in code. | Missing |
-| P1-C3 | Branded HTML email base template with plain-text alternative. | Missing |
+| P1-C1 | Dedicated mailboxes and settings: `noreply@`, `admisiones@`, `info@`, `cafeteria@`, `pagos@`, `facturacion@`, `soporte@`, `privacidad@`, `direccion@`, `sistemas@`; SPF/DKIM/DMARC; Reply-To per feature. | Partial (settings CONTACT/ADMISSIONS/BILLING/SUPPORT_EMAIL + Reply-To in send_email; mailbox creation and DNS records are school/ops tasks) |
+| P1-C2 | Notification matrix (event x channel x audience) documented and enforced in code. | DONE 2026-08-22 (docs/NOTIFICATION-MATRIX.md; code paths referenced) |
+| P1-C3 | Branded HTML email base template with plain-text alternative. | DONE 2026-08-22 (send_email sends multipart; templates/email/base.html; Reply-To defaults to CONTACT_EMAIL) |
 | P1-C4 | Preferences UI: per-channel, per-category, quiet hours, digest vs instant, per-child. | Partial |
 | P1-C5 | Delivery reliability: queue, retry/backoff, per-recipient status (sent/bounced/failed), failures to `sistemas@` and Auditoría. | Partial |
 | P1-C6 | Comunicados delivery report per recipient; resend failed. | Missing |
 | P1-C7 | Push parity with email audience (student + guardians subscriptions). | Missing |
-| P1-C8 | `manage.py send_test_email` command. | Missing |
+| P1-C8 | `manage.py send_test_email` command. | DONE 2026-08-22 |
 
 ### P1-D. Payments (cafetería wallet only)
 

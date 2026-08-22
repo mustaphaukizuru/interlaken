@@ -13,37 +13,69 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 
-def send_email(subject: str, message: str, recipients, *, fail_silently: bool = True) -> bool:
-    """Send a plain-text email from ``DEFAULT_FROM_EMAIL``.
+def render_email_html(subject: str, message: str, *, cta_url: str = '', cta_label: str = '') -> str:
+    """Brand the plain-text ``message`` as HTML (BACKLOG P1-C3).
+
+    Paragraphs are split on blank lines; the text itself is autoescaped, so
+    callers keep writing plain text and never hand-roll markup. A rendering
+    failure must never block the send: fall back to no HTML part.
+    """
+    from django.template.loader import render_to_string
+
+    paragraphs = [p.strip() for p in (message or '').split('\n\n') if p.strip()]
+    try:
+        return render_to_string('email/base.html', {
+            'subject': subject,
+            'paragraphs': paragraphs,
+            'cta_url': cta_url,
+            'cta_label': cta_label,
+            'contact_email': getattr(settings, 'CONTACT_EMAIL', ''),
+            'portal_url': f"{(settings.FRONTEND_URL or '').rstrip('/')}/portal",
+        })
+    except Exception as e:  # pragma: no cover - template errors are logged, not raised
+        logger.warning('Email HTML render failed (%r): %s', subject, e)
+        return ''
+
+
+def send_email(subject: str, message: str, recipients, *, fail_silently: bool = True,
+               reply_to: str | None = None, cta_url: str = '', cta_label: str = '',
+               html: bool = True) -> bool:
+    """Send a plain-text email (plus a branded HTML alternative) from ``DEFAULT_FROM_EMAIL``.
 
     Best-effort by default: mail failures are **logged**, never raised, so a
     broken SMTP config can't block the action that triggered the notification.
     Returns ``True`` when at least one recipient was accepted.
 
-    Internally always calls Django with ``fail_silently=False`` so exceptions
-    surface into this helper (Django's own fail_silently=True would swallow
-    without a log line).
+    ``reply_to`` defaults to ``CONTACT_EMAIL`` so a family that hits "reply"
+    reaches a monitored mailbox, never noreply@ (BACKLOG P1-C1).
     """
+    from django.core.mail import EmailMultiAlternatives
+
     if isinstance(recipients, str):
         recipients = [recipients]
     recipients = [r for r in (recipients or []) if r]
     if not recipients:
         return False
 
+    reply = reply_to or getattr(settings, 'CONTACT_EMAIL', '') or ''
     try:
-        sent = send_mail(
+        msg = EmailMultiAlternatives(
             subject=subject,
-            message=message,
+            body=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=recipients,
-            fail_silently=False,
+            to=recipients,
+            reply_to=[reply] if reply else None,
         )
+        if html:
+            rendered = render_email_html(subject, message, cta_url=cta_url, cta_label=cta_label)
+            if rendered:
+                msg.attach_alternative(rendered, 'text/html')
+        sent = msg.send(fail_silently=False)
         if not sent:
             logger.error('Email send returned 0 (%r → %s)', subject, recipients)
         return bool(sent)

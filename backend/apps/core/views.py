@@ -3,7 +3,6 @@ Core API views: public contact form, health check + admin audit viewer.
 """
 from django.conf import settings
 from django.core.cache import cache
-from django.core.mail import send_mail
 from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
@@ -30,16 +29,19 @@ class ContactCreateView(APIView):
         message = serializer.save()
 
         recipient = settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
-        send_mail(
-            subject=f'[Contacto web] {message.subject}',
-            message=(
+        # Reply-To is the visitor, so staff answer them with one click.
+        # (lazy import: apps.portal.services imports from apps.core at module load)
+        from apps.portal.services import send_email
+
+        send_email(
+            f'[Contacto web] {message.subject}',
+            (
                 f'Nombre: {message.name}\n'
                 f'Correo: {message.email}\n\n'
                 f'{message.message}'
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[recipient],
-            fail_silently=True,
+            [recipient],
+            reply_to=message.email,
         )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
