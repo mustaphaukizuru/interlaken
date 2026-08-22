@@ -30,3 +30,14 @@ describe('cms editor helpers', () => {
     expect(apiErrors(new Error('x'))).toEqual({});
   });
 });
+
+describe('approval helpers', () => {
+  it('pageStatusLabel shows pending approval first', async () => {
+    const { pageStatusLabel: f, cmsBase, toLocalInput } = await import('./helpers');
+    expect(f({ status: 'draft', has_unpublished_changes: false, review_requested_at: '2026-08-22T10:00:00Z' }).label).toBe('Pendiente de aprobación');
+    expect(cmsBase('staff')).toBe('/staff/contenido');
+    expect(cmsBase('admin')).toBe('/admin/contenido');
+    expect(toLocalInput(null)).toBe('');
+    expect(toLocalInput('2026-08-22T10:05:00Z')).toMatch(/^2026-08-22T\d\d:\d\d$/);
+  });
+});

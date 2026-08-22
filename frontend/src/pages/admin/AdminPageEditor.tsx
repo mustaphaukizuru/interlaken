@@ -15,7 +15,9 @@ import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { BlockRenderer } from '@/cms/CmsPage';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
-import { apiErrors, moveBlock, newBlock, newBlockId, pageStatusLabel } from '@/cms/editor/helpers';
+import { apiErrors, cmsBase, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
+import { useAuthStore } from '@/store/authStore';
+import { CalendarClock, Send } from 'lucide-react';
 
 type Device = 'mobile' | 'tablet' | 'desktop';
 const DEVICE_WIDTH: Record<Device, number | undefined> = { mobile: 390, tablet: 820, desktop: undefined };
@@ -25,10 +27,15 @@ export default function AdminPageEditor() {
   const { id } = useParams();
   const pageId = Number(id);
   const qc = useQueryClient();
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdmin = role === 'admin';
+  const base = cmsBase(role);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
   const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [meta, setMeta] = useState<{ title: string; slug: string; seo: CmsPageAdmin['seo'] }>({ title: '', slug: '', seo: {} });
+  const [meta, setMeta] = useState<{ title: string; slug: string; seo: CmsPageAdmin['seo']; publish_at: string | null; unpublish_at: string | null }>({ title: '', slug: '', seo: {}, publish_at: null, unpublish_at: null });
   const [selected, setSelected] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [device, setDevice] = useState<Device>('desktop');
@@ -43,13 +50,13 @@ export default function AdminPageEditor() {
     if (page && loadedFor.current !== page.id) {
       loadedFor.current = page.id;
       setBlocks(page.draft_blocks ?? []);
-      setMeta({ title: page.title, slug: page.slug, seo: page.seo ?? {} });
+      setMeta({ title: page.title, slug: page.slug, seo: page.seo ?? {}, publish_at: page.publish_at ?? null, unpublish_at: page.unpublish_at ?? null });
       setDirty(false);
     }
   }, [page]);
 
   const save = useMutation({
-    mutationFn: () => contentApi.adminUpdatePage(pageId, { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo }),
+    mutationFn: () => contentApi.adminUpdatePage(pageId, { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }),
     onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] }); },
     onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
   });
@@ -72,6 +79,16 @@ export default function AdminPageEditor() {
     onError: (e) => { const f = apiErrors(e); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
   });
 
+  const review = useMutation({
+    mutationFn: async (args: { action: 'request' | 'reject'; note?: string }) => { if (dirty) await save.mutateAsync(); return contentApi.adminReviewPage(pageId, args.action, args.note); },
+    onSuccess: (res, args) => {
+      toast.success(args.action === 'request' ? 'Solicitud enviada a Dirección.' : 'Cambios solicitados al editor.');
+      setRejecting(false); setRejectNote('');
+      qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] });
+    },
+    onError: (e) => toast.error(apiErrors(e).detail || 'No se pudo enviar.'),
+  });
+
   const previewLink = useMutation({
     mutationFn: () => contentApi.adminPreviewToken(pageId),
     onSuccess: async ({ data }) => {
@@ -89,7 +106,7 @@ export default function AdminPageEditor() {
   if (!Number.isFinite(pageId)) return <ErrorState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (isLoading || !page) return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
-  const st = pageStatusLabel({ status: page.status, has_unpublished_changes: page.has_unpublished_changes || dirty });
+  const st = pageStatusLabel({ status: page.status, has_unpublished_changes: page.has_unpublished_changes || dirty, review_requested_at: page.review_requested_at });
 
   return (
     <div className="flex min-h-[calc(100svh-7rem)] flex-col">
@@ -98,24 +115,40 @@ export default function AdminPageEditor() {
         subtitle={`/${meta.slug}`}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/admin/contenido" className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
+            <Link to={base} className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
             <Button variant="secondary" size="sm" onClick={() => setShowSeo(true)}>SEO</Button>
             <Button variant="secondary" size="sm" onClick={() => setShowVersions(true)}><History size={16} aria-hidden="true" /> Versiones</Button>
             <Button variant="secondary" size="sm" onClick={() => previewLink.mutate()} loading={previewLink.isPending}><Copy size={16} aria-hidden="true" /> Enlace de vista previa</Button>
-            {page.status === 'published' && (
+            {!isAdmin && (
+              <Button variant="cta" size="sm" onClick={() => review.mutate({ action: 'request' })} loading={review.isPending} disabled={!!page.review_requested_at}>
+                <Send size={16} aria-hidden="true" /> {page.review_requested_at ? 'Esperando aprobación' : 'Solicitar aprobación'}
+              </Button>
+            )}
+            {isAdmin && page.review_requested_at && (
+              <Button variant="secondary" size="sm" onClick={() => setRejecting(true)}>Pedir cambios</Button>
+            )}
+            {isAdmin && page.status === 'published' && (
               <>
                 <a href={`/${page.slug}`} target="_blank" rel="noopener noreferrer" className="btn-outline inline-flex items-center gap-1 text-sm"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
                 <Button variant="danger" size="sm" onClick={() => setConfirmUnpublish(true)}><XCircle size={16} aria-hidden="true" /> Retirar</Button>
               </>
             )}
-            <Button variant="cta" size="sm" onClick={() => publish.mutate('publish')} loading={publish.isPending} disabled={page.status === 'published' && !page.has_unpublished_changes && !dirty}>
-              <Upload size={16} aria-hidden="true" /> Publicar
-            </Button>
+            {isAdmin && (
+              <Button variant="cta" size="sm" onClick={() => publish.mutate('publish')} loading={publish.isPending} disabled={page.status === 'published' && !page.has_unpublished_changes && !dirty}>
+                <Upload size={16} aria-hidden="true" /> Publicar
+              </Button>
+            )}
           </div>
         )}
       />
 
-      <p className="mb-3 inline-flex flex-wrap items-center gap-2 text-xs text-subtle" aria-live="polite"><Badge variant={st.tone}>{st.label}</Badge> {save.isPending ? 'Guardando…' : dirty ? 'Cambios sin guardar' : 'Borrador guardado'}</p>
+      <p className="mb-3 inline-flex flex-wrap items-center gap-2 text-xs text-subtle" aria-live="polite">
+        <Badge variant={st.tone}>{st.label}</Badge> {save.isPending ? 'Guardando…' : dirty ? 'Cambios sin guardar' : 'Borrador guardado'}
+        {page.review_requested_by_name && page.review_requested_at && <span>· solicitó {page.review_requested_by_name}</span>}
+        {page.review_note && !page.review_requested_at && <span className="text-coral-600">· Dirección pidió cambios: {page.review_note}</span>}
+        {meta.publish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se publica {new Date(meta.publish_at).toLocaleString('es-MX')}</span>}
+        {meta.unpublish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se retira {new Date(meta.unpublish_at).toLocaleString('es-MX')}</span>}
+      </p>
       <div className="grid flex-1 gap-4 lg:grid-cols-[320px_1fr]">
         {/* Left: block list + properties */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:overflow-y-auto" aria-label="Bloques">
@@ -182,7 +215,17 @@ export default function AdminPageEditor() {
           <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} hint="Máx. 60 caracteres recomendados." />
           <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!meta.seo.noindex} onChange={(e) => updateMeta({ seo: { ...meta.seo, noindex: e.target.checked } })} /> No indexar en buscadores</label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Publicar automáticamente el" type="datetime-local" value={toLocalInput(meta.publish_at)} onChange={(e) => updateMeta({ publish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Vacío = manual." />
+            <Input label="Retirar del sitio el" type="datetime-local" value={toLocalInput(meta.unpublish_at)} onChange={(e) => updateMeta({ unpublish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Para contenido con fecha de caducidad." />
+          </div>
           <div className="flex justify-end"><Button onClick={() => setShowSeo(false)}>Listo</Button></div>
+        </div>
+      </Modal>
+      <Modal open={rejecting} onClose={() => setRejecting(false)} title="Pedir cambios al editor" maxWidth={480}>
+        <div className="space-y-3">
+          <div><label className="label" htmlFor="reject-note">¿Qué debe corregirse?</label><textarea id="reject-note" className="input-field" rows={3} value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} /></div>
+          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setRejecting(false)}>Cancelar</Button><Button onClick={() => review.mutate({ action: 'reject', note: rejectNote })} loading={review.isPending} disabled={!rejectNote.trim()}>Enviar</Button></div>
         </div>
       </Modal>
       <ConfirmDialog open={confirmUnpublish} title="¿Retirar la página del sitio?" message="Las visitas verán un 404 hasta volver a publicarla. El borrador se conserva."

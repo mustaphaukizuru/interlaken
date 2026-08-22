@@ -192,6 +192,9 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<StaffDashboard />} />
+              <Route path="contenido" element={<AdminPages />} />
+              <Route path="contenido/medios" element={<AdminMedia />} />
+              <Route path="contenido/:id" element={<AdminPageEditor />} />
             </Route>
 
             {/* ── ADMIN PORTAL ────────────────────────────── */}

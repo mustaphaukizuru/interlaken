@@ -153,7 +153,7 @@ def build_sitemap() -> str:
     redirected = set(Redirect.objects.values_list('from_path', flat=True))
     rows = [(p, f, pr, None) for p, f, pr in STATIC_ROUTES if p not in redirected]
     for page in Page.objects.filter(status=Page.Status.PUBLISHED):
-        if (page.seo or {}).get('noindex'):
+        if (page.seo or {}).get('noindex') or (page.unpublish_at and page.unpublish_at <= timezone.now()):
             continue
         path = f'/{page.slug}' if page.slug != 'inicio' else '/'
         if any(r[0] == path for r in rows) or path in redirected:

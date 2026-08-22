@@ -102,6 +102,13 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         { icon: LayoutDashboard, label: 'Portal',    to: '/portal', end: true },
       ],
     },
+    {
+      heading: 'Contenido del sitio',
+      items: [
+        { icon: FileText, label: 'Páginas',              to: '/staff/contenido' },
+        { icon: Image,    label: 'Biblioteca de medios', to: '/staff/contenido/medios' },
+      ],
+    },
   ],
   parent: FAMILY_GROUPS,
   // School-email students use the family portal shell (`/portal/*`); `/alumno/*`

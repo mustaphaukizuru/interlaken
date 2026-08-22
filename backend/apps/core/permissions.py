@@ -8,6 +8,14 @@ definition now. Staff-role granularity (BACKLOG P1-H1) will extend this file.
 from rest_framework import permissions
 
 
+class IsAdminOrStaff(permissions.BasePermission):
+    """Authenticated ``admin`` or ``staff`` (content editors, BACKLOG P3-10)."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and getattr(user, 'role', None) in ('admin', 'staff'))
+
+
 class IsAdmin(permissions.BasePermission):
     """Authenticated users with ``role == 'admin'`` only."""
 

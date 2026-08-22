@@ -14,7 +14,8 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
-import { apiErrors, pageStatusLabel, slugify } from '@/cms/editor/helpers';
+import { apiErrors, cmsBase, pageStatusLabel, slugify } from '@/cms/editor/helpers';
+import { useAuthStore } from '@/store/authStore';
 
 const TEMPLATES: { value: CmsPageAdmin['template']; label: string }[] = [
   { value: 'simple', label: 'Página sencilla' },
@@ -26,6 +27,8 @@ const TEMPLATES: { value: CmsPageAdmin['template']; label: string }[] = [
 /** /admin/contenido — CMS page list (BACKLOG P3-4). */
 export default function AdminPages() {
   const qc = useQueryClient();
+  const role = useAuthStore((s) => s.user?.role);
+  const base = cmsBase(role);
   const [creating, setCreating] = useState(false);
   const [toDelete, setToDelete] = useState<CmsPageAdmin | null>(null);
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-pages'], queryFn: async () => (await contentApi.adminListPages()).data });
@@ -47,13 +50,13 @@ export default function AdminPages() {
             {rows.map((p) => { const st = pageStatusLabel(p); return (
               <li key={p.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <Link to={`/admin/contenido/${p.id}`} className="font-semibold text-ink hover:text-purple">{p.title}</Link>
-                  <p className="truncate text-xs text-subtle">/{p.slug} · {TEMPLATES.find((t) => t.value === p.template)?.label ?? p.template}</p>
+                  <Link to={`${base}/${p.id}`} className="font-semibold text-ink hover:text-purple">{p.title}</Link>
+                  <p className="truncate text-xs text-subtle">/{p.slug} · {TEMPLATES.find((t) => t.value === p.template)?.label ?? p.template}{p.review_requested_by_name ? ` · solicitó ${p.review_requested_by_name}` : ''}{p.review_note && !p.review_requested_at ? ` · cambios solicitados: ${p.review_note}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={st.tone}>{st.label}</Badge>
-                  <Link to={`/admin/contenido/${p.id}`} className="btn-outline btn-sm inline-flex items-center gap-1" aria-label={`Editar ${p.title}`}><Pencil size={14} aria-hidden="true" /> Editar</Link>
-                  <Button size="sm" variant="ghost" onClick={() => setToDelete(p)} aria-label={`Eliminar ${p.title}`}><Trash2 size={14} aria-hidden="true" /></Button>
+                  <Link to={`${base}/${p.id}`} className="btn-outline btn-sm inline-flex items-center gap-1" aria-label={`Editar ${p.title}`}><Pencil size={14} aria-hidden="true" /> Editar</Link>
+                  {role === 'admin' && <Button size="sm" variant="ghost" onClick={() => setToDelete(p)} aria-label={`Eliminar ${p.title}`}><Trash2 size={14} aria-hidden="true" /></Button>}
                 </div>
               </li>
             ); })}

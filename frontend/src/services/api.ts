@@ -841,6 +841,11 @@ export interface CmsPageAdmin {
   published_version_number: number | null;
   has_unpublished_changes: boolean;
   published_at: string | null;
+  review_requested_at?: string | null;
+  review_requested_by_name?: string;
+  review_note?: string;
+  publish_at?: string | null;
+  unpublish_at?: string | null;
   updated_at: string;
 }
 
@@ -895,6 +900,7 @@ export const contentApi = {
   adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
   adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
+  adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),
   adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
   /** Navigation, redirects (BACKLOG P3-7). */
   getRedirects: () => api.get<Record<string, { to: string; permanent: boolean }>>('/content/redirects/'),

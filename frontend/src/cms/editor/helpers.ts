@@ -23,10 +23,23 @@ export function moveBlock(list: Block[], from: number, to: number): Block[] {
   return next;
 }
 
+/** CMS pages live under /admin for Dirección and under /staff for Comunicación (P3-10). */
+export const cmsBase = (role: string | undefined) => (role === 'staff' ? '/staff/contenido' : '/admin/contenido');
+
+/** ISO datetime → value for <input type="datetime-local"> (local time). */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export const slugify = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
-export function pageStatusLabel(p: Pick<CmsPageAdmin, 'status' | 'has_unpublished_changes'>): { label: string; tone: 'success' | 'warning' | 'neutral' } {
+export function pageStatusLabel(p: Pick<CmsPageAdmin, 'status' | 'has_unpublished_changes'> & { review_requested_at?: string | null }): { label: string; tone: 'success' | 'warning' | 'neutral' | 'info' } {
+  if (p.review_requested_at) return { label: 'Pendiente de aprobación', tone: 'info' };
   if (p.status !== 'published') return { label: 'Borrador', tone: 'neutral' };
   if (p.has_unpublished_changes) return { label: 'Publicada · cambios sin publicar', tone: 'warning' };
   return { label: 'Publicada', tone: 'success' };

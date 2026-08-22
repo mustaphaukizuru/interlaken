@@ -22,7 +22,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions import IsAdmin
+from apps.core.permissions import IsAdmin, IsAdminOrStaff
 
 MAX_UPLOAD = 10 * 1024 * 1024
 VARIANTS = {'thumb': 320, 'md': 960, 'lg': 1600}
@@ -125,7 +125,7 @@ class MediaAssetSerializer(serializers.ModelSerializer):
 
 class MediaListCreateView(generics.ListCreateAPIView):
     """GET /content/admin/media/?q=   POST multipart {file, alt, caption, tags}"""
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrStaff]
     serializer_class = MediaAssetSerializer
     parser_classes = [MultiPartParser, FormParser]
 
@@ -162,7 +162,7 @@ class MediaListCreateView(generics.ListCreateAPIView):
 
 
 class MediaDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrStaff]
     serializer_class = MediaAssetSerializer
     queryset = MediaAsset.objects.all()
 
