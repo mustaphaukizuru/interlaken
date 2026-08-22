@@ -38,6 +38,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name  = models.CharField(max_length=100)
     role       = models.CharField(max_length=20, choices=Role.choices, default=Role.PARENT)
     avatar     = models.URLField(blank=True)          # Google profile picture
+    avatar_file = models.FileField(upload_to='avatars/', blank=True, null=True)  # uploaded photo (P1-F2), 256px WebP
 
     # Status
     is_active  = models.BooleanField(default=True)

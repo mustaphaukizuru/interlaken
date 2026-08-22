@@ -18,6 +18,7 @@ export interface User {
   full_name: string;
   role: 'admin' | 'parent' | 'student' | 'staff';
   avatar: string;
+  has_custom_avatar?: boolean;
   whatsapp: string;
   has_usable_password?: boolean;
   last_login?: string | null;

@@ -37,9 +37,13 @@ export function AccountMenu() {
             </div>
             <div className="text-[11px] text-subtle">{ROLE_LABEL[role] ?? role}</div>
           </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-pink to-purple font-head text-[13px] font-bold text-white">
-            {initials}
-          </div>
+          {user?.avatar ? (
+            <img src={user.avatar} alt="" className="h-9 w-9 rounded-[10px] object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-pink to-purple font-head text-[13px] font-bold text-white">
+              {initials}
+            </div>
+          )}
           <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       )}

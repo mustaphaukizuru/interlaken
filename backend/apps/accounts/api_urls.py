@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import password_views, views
 from .admin_password import AdminSetPasswordView
+from .avatar import AvatarServeView, MyAvatarView
 from .exports import AdminExportStudentsView
 from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsView
@@ -38,6 +39,8 @@ urlpatterns = [
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),
     path('me/',              views.CurrentUserView.as_view(),     name='current-user'),
+    path('me/avatar/',       MyAvatarView.as_view(),              name='my-avatar'),
+    path('avatar/<int:user_id>/<str:token>/', AvatarServeView.as_view(), name='avatar-serve'),
     # No self-service password reset/change (school policy): see admin-set-password.
     path('notification-preferences/', password_views.NotificationPreferenceView.as_view(), name='notification-preferences'),
     path('students/',        views.StudentListView.as_view(),     name='students'),

@@ -207,6 +207,9 @@ export const authApi = {
     window.location.href = `${API_BASE}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
+  /** Profile photo (BACKLOG P1-F2). */
+  uploadAvatar: (blob: Blob) => { const fd = new FormData(); fd.append('file', blob, 'avatar.webp'); return api.post('/accounts/me/avatar/', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); },
+  deleteAvatar: () => api.delete('/accounts/me/avatar/'),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
   getNotifPrefs: () =>

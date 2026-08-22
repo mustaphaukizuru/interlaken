@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore, type User } from '@/store/authStore';
+import { AvatarUpload } from '@/components/portal/AvatarUpload';
 import { authApi } from '@/services/api';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
 
@@ -143,6 +144,7 @@ export default function ProfilePage() {
           )}
         </Card>
         <Card>
+          <div className="mb-5 border-b border-line pb-5"><AvatarUpload /></div>
           <form onSubmit={submit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>

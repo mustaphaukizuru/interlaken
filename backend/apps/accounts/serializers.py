@@ -24,6 +24,13 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs', 'last_login']
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from .avatar import avatar_url
+        data['avatar'] = avatar_url(instance)
+        data['has_custom_avatar'] = bool(instance.avatar_file)
+        return data
+
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
 

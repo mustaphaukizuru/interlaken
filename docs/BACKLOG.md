@@ -123,7 +123,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | ID | Task | Status |
 |----|------|--------|
 | P1-F1 | Tabs: Perfil, Seguridad, Notificaciones, Privacidad (fold `/portal/privacidad`). | DONE 2026-08-22 (URL-synced ?tab=; Privacidad tab links to the ARCO page) |
-| P1-F2 | Avatar upload/crop (Supabase Storage). | Missing |
+| P1-F2 | Avatar upload/crop (Supabase Storage). | DONE 2026-08-22 (`AvatarUpload` in Mi perfil: pick, drag + zoom square crop on canvas, upload; server re-encodes to 256px WebP, stores on the default storage (local now, Supabase/S3 automatically once AWS_STORAGE_BUCKET_NAME is set), serves via unguessable tokenized URL; delete falls back to the Google picture; header avatar shows the photo) |
 | P1-F3 | Seguridad tab: no password form; "solicítalo al colegio" CTA; last login; Google-linked indicator. | DONE 2026-08-22 |
 | P1-F4 | Profile completeness meter. | DONE 2026-08-22 |
 | P1-F5 | Family block: linked students with nivel color, links to Credencial and Cafetería; other guardians read-only. | DONE 2026-08-22 (Mi familia card with Cafetería/Credencial links and 'Solicitar corrección'; other-guardians list deferred) |
