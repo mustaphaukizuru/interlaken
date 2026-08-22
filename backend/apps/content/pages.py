@@ -119,6 +119,7 @@ class Page(models.Model):
             self.published_at = timezone.now()
             self.save(update_fields=['published_version', 'status', 'published_at'])
         cache.delete(PAGE_CACHE.format(slug=self.slug))
+        cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
             record('update', self, {'published_version': number}, actor=user, context='cms.publish')
@@ -130,6 +131,7 @@ class Page(models.Model):
         self.status = self.Status.DRAFT
         self.save(update_fields=['status'])
         cache.delete(PAGE_CACHE.format(slug=self.slug))
+        cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
             record('update', self, {'status': 'draft'}, actor=user, context='cms.unpublish')

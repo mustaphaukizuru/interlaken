@@ -19,7 +19,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
-            'facebook_url', 'instagram_url', 'youtube_url',
+            'facebook_url', 'instagram_url', 'youtube_url', 'menu',
             'updated_at',
         ]
         read_only_fields = fields
@@ -32,9 +32,13 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
-            'facebook_url', 'instagram_url', 'youtube_url', 'updated_at',
+            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'updated_at',
         ]
         read_only_fields = ['updated_at']
+
+    def validate_menu(self, value):
+        from .navigation import validate_menu
+        return validate_menu(value)
 
 
 class TuitionCostSerializer(serializers.ModelSerializer):

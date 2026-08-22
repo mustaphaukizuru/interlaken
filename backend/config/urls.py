@@ -9,6 +9,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAdminUser
 
+from apps.content.navigation import sitemap_view
 from apps.core.views import ContactCreateView, FacturacionRequestView, HealthView
 
 # Staff-gated API docs: session auth so a Django-admin login is enough to
@@ -51,6 +52,7 @@ urlpatterns = [
     path('api/v1/facturacion/', FacturacionRequestView.as_view(), name='facturacion-request'),
     path('api/v1/health/',      HealthView.as_view(),        name='health'),
 
+    path('sitemap.xml', sitemap_view, name='sitemap'),
     # React SPA catch-all (serves index.html for all unmatched routes)
     path('', include('apps.core.urls')),
 ]

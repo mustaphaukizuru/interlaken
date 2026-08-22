@@ -6,6 +6,7 @@ import {
   FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { MenuGroup } from '@/types/content';
 import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
@@ -26,7 +27,21 @@ const HIDE_STICKY_CTA = [
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
  *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra. */
-const MENU: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }[] = [
+type MenuEntry = { label: string; to: string; icon: LucideIcon };
+type MenuGroupEntry = { label: string; items: MenuEntry[] };
+
+/** Icons the CMS menu editor can name (falls back to FileText). */
+const ICONS: Record<string, LucideIcon> = {
+  Users, BookOpen, Camera, Blocks, Pencil, GraduationCap, ClipboardList, FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt, Phone, Mail, MapPin,
+};
+
+/** CMS menu → renderable groups; empty/invalid CMS menu keeps the built-in one. */
+export function resolveMenu(cms: MenuGroup[] | undefined, fallback: MenuGroupEntry[]): MenuGroupEntry[] {
+  if (!cms || cms.length === 0) return fallback;
+  return cms.map((g) => ({ label: g.label, items: g.items.map((it) => ({ label: it.label, to: it.to, icon: ICONS[it.icon ?? ''] ?? FileText })) }));
+}
+
+const DEFAULT_MENU: MenuGroupEntry[] = [
   {
     label: 'El Colegio',
     items: [
@@ -62,8 +77,6 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
   },
 ];
 
-/** El pie refleja los mismos 4 grupos del menú; Portal/Aviso van en la barra inferior. */
-const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
 
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
@@ -146,6 +159,9 @@ export function PublicLayout() {
   const [footerOpen, setFooterOpen] = useState<string | null>(null);
   const { pathname } = useLocation();
   const settings = useSiteSettings();
+  const MENU = resolveMenu(settings.menu, DEFAULT_MENU);
+  /** El pie refleja los mismos grupos del menú; Portal/Aviso van en la barra inferior. */
+  const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
   // Only socials with a real URL — never render href="#" (GO-LIVE-AUDIT #41).
   const showStickyCta = !HIDE_STICKY_CTA.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),

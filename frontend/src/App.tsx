@@ -75,6 +75,7 @@ import { CmsOverride } from './cms/CmsOverride';
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminNavigation = lazy(() => import('./pages/admin/AdminNavigation'));
 const AdminForms = lazy(() => import('./pages/admin/AdminForms'));
 const AdminPages = lazy(() => import('./pages/admin/AdminPages'));
 const AdminPageEditor = lazy(() => import('./pages/admin/AdminPageEditor'));
@@ -217,6 +218,7 @@ export default function App() {
               <Route path="testimonios" element={<AdminTestimonials />} />
               <Route path="contenido" element={<AdminPages />} />
               <Route path="formularios" element={<AdminForms />} />
+              <Route path="navegacion" element={<AdminNavigation />} />
               <Route path="contenido/medios" element={<AdminMedia />} />
               <Route path="contenido/:id" element={<AdminPageEditor />} />
             </Route>

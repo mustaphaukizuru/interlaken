@@ -824,6 +824,8 @@ export interface FormSubmission {
   created_at: string;
 }
 
+export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
+
 export interface CmsPageAdmin {
   id: number;
   slug: string;
@@ -890,6 +892,12 @@ export const contentApi = {
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
   adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
   adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
+  /** Navigation, redirects (BACKLOG P3-7). */
+  getRedirects: () => api.get<Record<string, { to: string; permanent: boolean }>>('/content/redirects/'),
+  hitRedirect: (from: string) => api.post('/content/redirects/hit/', { from }),
+  adminListRedirects: () => api.get<SiteRedirect[]>('/content/admin/redirects/'),
+  adminCreateRedirect: (data: Partial<SiteRedirect>) => api.post<SiteRedirect>('/content/admin/redirects/', data),
+  adminDeleteRedirect: (id: number) => api.delete(`/content/admin/redirects/${id}/`),
   /** CMS forms builder (BACKLOG P3-6). */
   getForm: (slug: string) => api.get<FormDefinitionPublic>(`/content/forms/${encodeURIComponent(slug)}/`),
   submitForm: (slug: string, data: Record<string, unknown>) => api.post<{ ok: boolean; message: string }>(`/content/forms/${encodeURIComponent(slug)}/submit/`, data),

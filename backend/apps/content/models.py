@@ -55,6 +55,9 @@ class SiteSettings(models.Model):
         'Video del hero (MP4/WebM)', blank=True, default='',
         help_text='URL directa a un MP4/WebM corto (≤ 15 s, sin audio). Vacío = imagen fija.')
 
+    # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
+    menu = models.JSONField('Menú del sitio', default=list, blank=True)
+
     # ── Redes sociales (vacío = el ícono no se muestra) ───
     # Confirmado por el cliente: la única red social del colegio es Facebook.
     facebook_url = models.URLField(
@@ -293,4 +296,5 @@ class Testimonial(models.Model):
 # CMS media library lives in content/media.py (model + views); re-exported for migrations/admin.
 from .forms import FormDefinition, FormSubmission  # noqa: E402,F401
 from .media import MediaAsset  # noqa: E402,F401
+from .navigation import Redirect  # noqa: E402,F401
 from .pages import Page, PageVersion  # noqa: E402,F401

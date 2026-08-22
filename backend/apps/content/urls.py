@@ -9,6 +9,12 @@ from .forms import (
     PublicFormView,
 )
 from .media import MediaDetailView, MediaListCreateView, MediaServeView
+from .navigation import (
+    AdminRedirectDetailView,
+    AdminRedirectsView,
+    PublicRedirectsView,
+    RedirectHitView,
+)
 from .pages import (
     PageDetailView,
     PageListCreateView,
@@ -48,6 +54,10 @@ urlpatterns = [
     path('admin/pages/<int:pk>/publish/', PagePublishView.as_view(), name='admin-page-publish'),
     path('admin/pages/<int:pk>/versions/', PageVersionsView.as_view(), name='admin-page-versions'),
     path('admin/pages/<int:pk>/preview-token/', PagePreviewTokenView.as_view(), name='admin-page-preview-token'),
+    path('redirects/', PublicRedirectsView.as_view(), name='cms-redirects'),
+    path('redirects/hit/', RedirectHitView.as_view(), name='cms-redirect-hit'),
+    path('admin/redirects/', AdminRedirectsView.as_view(), name='admin-redirects'),
+    path('admin/redirects/<int:pk>/', AdminRedirectDetailView.as_view(), name='admin-redirect-detail'),
     path('forms/<slug:slug>/', PublicFormView.as_view(), name='cms-form'),
     path('forms/<slug:slug>/submit/', PublicFormSubmitView.as_view(), name='cms-form-submit'),
     path('admin/forms/', FormListCreateView.as_view(), name='admin-forms'),

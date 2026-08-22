@@ -1,4 +1,7 @@
 /** Shape of GET /api/v1/content/settings/ (apps/content — CMS Phase 1). */
+export interface MenuItem { label: string; to: string; icon?: string }
+export interface MenuGroup { label: string; items: MenuItem[] }
+
 export interface SiteSettings {
   phone_display: string;
   phone_e164: string;
@@ -13,5 +16,7 @@ export interface SiteSettings {
   facebook_url: string;
   instagram_url: string;
   youtube_url: string;
+  /** CMS menu (P3-7). Empty = built-in menu. */
+  menu?: MenuGroup[];
   updated_at?: string;
 }
