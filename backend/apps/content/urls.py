@@ -1,6 +1,16 @@
 from django.urls import path
 
 from .media import MediaDetailView, MediaListCreateView, MediaServeView
+from .pages import (
+    PageDetailView,
+    PageListCreateView,
+    PagePreviewByTokenView,
+    PagePreviewTokenView,
+    PagePreviewView,
+    PagePublishView,
+    PageVersionsView,
+    PublicPageView,
+)
 from .views import (
     AdminCalendarDetailView,
     AdminCalendarView,
@@ -22,6 +32,14 @@ urlpatterns = [
     path('calendar/', PublicCalendarView.as_view(), name='school-calendar'),
     path('testimonials/', PublicTestimonialsView.as_view(), name='testimonials'),
     path('media/<int:pk>/<str:variant>/', MediaServeView.as_view(), name='media-serve'),
+    path('pages/preview/', PagePreviewByTokenView.as_view(), name='cms-page-preview-token'),
+    path('pages/<slug:slug>/', PublicPageView.as_view(), name='cms-page'),
+    path('pages/<int:pk>/preview/', PagePreviewView.as_view(), name='cms-page-preview'),
+    path('admin/pages/', PageListCreateView.as_view(), name='admin-pages'),
+    path('admin/pages/<int:pk>/', PageDetailView.as_view(), name='admin-page-detail'),
+    path('admin/pages/<int:pk>/publish/', PagePublishView.as_view(), name='admin-page-publish'),
+    path('admin/pages/<int:pk>/versions/', PageVersionsView.as_view(), name='admin-page-versions'),
+    path('admin/pages/<int:pk>/preview-token/', PagePreviewTokenView.as_view(), name='admin-page-preview-token'),
     path('admin/media/', MediaListCreateView.as_view(), name='admin-media'),
     path('admin/media/<int:pk>/', MediaDetailView.as_view(), name='admin-media-detail'),
     path('admin/testimonials/', AdminTestimonialsView.as_view(), name='admin-testimonials'),

@@ -71,6 +71,8 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
+const CmsPage = lazy(() => import('./cms/CmsPage'));
+const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
 const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
@@ -140,7 +142,8 @@ export default function App() {
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="p/:slug" element={<CmsPage />} />
+              <Route path="*" element={<CmsOrNotFound />} />
             </Route>
 
             {/* ── AUTH ────────────────────────────────────── */}

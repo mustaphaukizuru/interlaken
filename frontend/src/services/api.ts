@@ -785,6 +785,20 @@ export interface SchoolEvent {
   description: string;
   is_published: boolean;
 }
+export interface CmsPageAdmin {
+  id: number;
+  slug: string;
+  title: string;
+  template: 'home' | 'level' | 'simple' | 'landing';
+  status: 'draft' | 'published';
+  draft_blocks: { id: string; type: string; props: Record<string, unknown> }[];
+  seo: { title?: string; description?: string; og_image?: string; noindex?: boolean };
+  published_version_number: number | null;
+  has_unpublished_changes: boolean;
+  published_at: string | null;
+  updated_at: string;
+}
+
 export interface MediaAsset {
   id: number;
   filename: string;
@@ -825,6 +839,18 @@ export const contentApi = {
   adminCreateCalendar: (data: SchoolEventWrite) => api.post<SchoolEvent>('/content/admin/calendar/', data),
   adminUpdateCalendar: (id: number, data: Partial<SchoolEventWrite>) => api.patch<SchoolEvent>(`/content/admin/calendar/${id}/`, data),
   adminDeleteCalendar: (id: number) => api.delete(`/content/admin/calendar/${id}/`),
+  /** CMS pages (BACKLOG P3-3). */
+  getPage: (slug: string) => api.get(`/content/pages/${encodeURIComponent(slug)}/`),
+  getPagePreviewBySlug: (_slug: string, token: string) => api.get('/content/pages/preview/', { params: { token } }),
+  adminListPages: () => api.get('/content/admin/pages/'),
+  adminGetPage: (id: number) => api.get<CmsPageAdmin>(`/content/admin/pages/${id}/`),
+  adminCreatePage: (data: Partial<CmsPageAdmin>) => api.post<CmsPageAdmin>('/content/admin/pages/', data),
+  adminUpdatePage: (id: number, data: Partial<CmsPageAdmin>) => api.patch<CmsPageAdmin>(`/content/admin/pages/${id}/`, data),
+  adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
+  adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
+  adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
+  adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
+  adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
   /** CMS media library (BACKLOG P3-1). */
   adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),
   adminUploadMedia: (file: File, meta?: { alt?: string; caption?: string; tags?: string }) => {
