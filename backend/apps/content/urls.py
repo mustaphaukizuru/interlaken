@@ -16,6 +16,7 @@ from .navigation import (
     RedirectHitView,
 )
 from .pages import (
+    PageChecksView,
     PageDetailView,
     PageListCreateView,
     PagePreviewByTokenView,
@@ -55,6 +56,7 @@ urlpatterns = [
     path('admin/pages/<int:pk>/publish/', PagePublishView.as_view(), name='admin-page-publish'),
     path('admin/pages/<int:pk>/versions/', PageVersionsView.as_view(), name='admin-page-versions'),
     path('admin/pages/<int:pk>/preview-token/', PagePreviewTokenView.as_view(), name='admin-page-preview-token'),
+    path('admin/pages/<int:pk>/checks/', PageChecksView.as_view(), name='admin-page-checks'),
     path('admin/pages/<int:pk>/review/', PageReviewView.as_view(), name='admin-page-review'),
     path('redirects/', PublicRedirectsView.as_view(), name='cms-redirects'),
     path('redirects/hit/', RedirectHitView.as_view(), name='cms-redirect-hit'),

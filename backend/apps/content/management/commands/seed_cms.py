@@ -81,7 +81,8 @@ def page_definitions(img: dict[str, int]) -> list[dict]:
                 _b('hero', title='Nosotros', subtitle='Una comunidad educativa con décadas de trayectoria.', image=pic('facade-sign.webp')),
                 _b('rich_text', html='<h2>Misión</h2><p>Formar personas íntegras, bilingües y felices, capaces de transformar su entorno.</p>'
                                      '<h2>Visión</h2><p>Ser el colegio de referencia en formación bilingüe con valores en la región.</p>'),
-                _b('timeline', items=[]),
+                _b('timeline', items=[{'year': '1990', 'title': 'Fundación', 'text': 'Nace el Colegio Interlaken con el nivel preescolar.'},
+                                      {'year': 'Hoy', 'title': 'Tres niveles', 'text': 'Preescolar, Primaria y Secundaria con incorporación SEP.'}]),
                 _b('sep_incorporation'),
                 _b('map_contact'),
             ],

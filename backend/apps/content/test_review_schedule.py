@@ -30,7 +30,7 @@ def _cache():
 class TestApproval:
     def test_staff_edits_and_requests_review_admin_publishes(self, staff_client, admin_user, settings):
         settings.EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
-        r = staff_client.post(reverse('admin-pages'), {'slug': 'verano', 'title': 'Verano', 'draft_blocks': [], 'seo': {}}, format='json')
+        r = staff_client.post(reverse('admin-pages'), {'slug': 'verano', 'title': 'Verano', 'draft_blocks': [{'id': 'a', 'type': 'rich_text', 'props': {'html': '<p>Hola</p>'}}], 'seo': {}}, format='json')
         assert r.status_code == 201
         pk = r.data['id']
         assert staff_client.patch(reverse('admin-page-detail', args=[pk]), {'title': 'Curso de verano'}, format='json').status_code == 200

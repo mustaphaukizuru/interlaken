@@ -17,7 +17,8 @@ import { BlockRenderer } from '@/cms/CmsPage';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
 import { apiErrors, cmsBase, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
 import { useAuthStore } from '@/store/authStore';
-import { CalendarClock, Send } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Send } from 'lucide-react';
+import type { PageIssue } from '@/services/api';
 
 type Device = 'mobile' | 'tablet' | 'desktop';
 const DEVICE_WIDTH: Record<Device, number | undefined> = { mobile: 390, tablet: 820, desktop: undefined };
@@ -31,6 +32,7 @@ export default function AdminPageEditor() {
   const isAdmin = role === 'admin';
   const base = cmsBase(role);
   const [rejecting, setRejecting] = useState(false);
+  const [issues, setIssues] = useState<PageIssue[] | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
@@ -76,7 +78,7 @@ export default function AdminPageEditor() {
       setConfirmUnpublish(false);
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] }); qc.invalidateQueries({ queryKey: ['cms-page'] });
     },
-    onError: (e) => { const f = apiErrors(e); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
+    onError: (e) => { const f = apiErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
   });
 
   const review = useMutation({
@@ -87,6 +89,12 @@ export default function AdminPageEditor() {
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] });
     },
     onError: (e) => toast.error(apiErrors(e).detail || 'No se pudo enviar.'),
+  });
+
+  const checks = useMutation({
+    mutationFn: async () => { if (dirty) await save.mutateAsync(); return contentApi.adminPageChecks(pageId); },
+    onSuccess: ({ data }) => { setIssues(data.issues); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
+    onError: () => toast.error('No se pudo revisar la página.'),
   });
 
   const previewLink = useMutation({
@@ -117,6 +125,7 @@ export default function AdminPageEditor() {
           <div className="flex flex-wrap items-center gap-2">
             <Link to={base} className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
             <Button variant="secondary" size="sm" onClick={() => setShowSeo(true)}>SEO</Button>
+            <Button variant="secondary" size="sm" onClick={() => checks.mutate()} loading={checks.isPending}><ClipboardCheck size={16} aria-hidden="true" /> Revisar</Button>
             <Button variant="secondary" size="sm" onClick={() => setShowVersions(true)}><History size={16} aria-hidden="true" /> Versiones</Button>
             <Button variant="secondary" size="sm" onClick={() => previewLink.mutate()} loading={previewLink.isPending}><Copy size={16} aria-hidden="true" /> Enlace de vista previa</Button>
             {!isAdmin && (
@@ -149,6 +158,22 @@ export default function AdminPageEditor() {
         {meta.publish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se publica {new Date(meta.publish_at).toLocaleString('es-MX')}</span>}
         {meta.unpublish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se retira {new Date(meta.unpublish_at).toLocaleString('es-MX')}</span>}
       </p>
+      {issues && issues.length > 0 && (
+        <div className="mb-4 rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-ink">Revisión: {issues.filter((i) => i.level === 'error').length} por corregir · {issues.filter((i) => i.level === 'warning').length} sugerencias</h2>
+            <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setIssues(null)}>Ocultar</button>
+          </div>
+          <ul className="space-y-1 text-sm">
+            {issues.map((i, k) => (
+              <li key={k} className="flex items-start gap-2">
+                {i.level === 'error' ? <AlertTriangle size={16} className="mt-0.5 shrink-0 text-coral-600" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />}
+                {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => setSelected(i.block_id)}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="grid flex-1 gap-4 lg:grid-cols-[320px_1fr]">
         {/* Left: block list + properties */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:overflow-y-auto" aria-label="Bloques">

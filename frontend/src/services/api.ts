@@ -830,6 +830,8 @@ export interface SiteRedirect { id: number; from_path: string; to_path: string; 
 
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
+export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }
+
 export interface CmsPageAdmin {
   id: number;
   slug: string;
@@ -900,6 +902,7 @@ export const contentApi = {
   adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
   adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
+  adminPageChecks: (id: number) => api.get<{ ok: boolean; issues: PageIssue[] }>(`/content/admin/pages/${id}/checks/`),
   adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),
   adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
   /** Navigation, redirects (BACKLOG P3-7). */

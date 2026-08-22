@@ -315,13 +315,13 @@ class PagePublishView(APIView):
         if action == 'unpublish':
             page.unpublish(request.user)
             return Response(PageAdminSerializer(page).data)
-        # Alt text is required on every image block before publishing (guardrail).
-        from .media import MediaAsset
-        ids = [b['props'].get('image') for b in page.draft_blocks if b['type'] in ('image', 'hero') and b['props'].get('image')]
-        ids += [im.get('image') for b in page.draft_blocks if b['type'] == 'gallery' for im in b['props'].get('images', [])]
-        missing = MediaAsset.objects.filter(pk__in=[i for i in ids if i], alt='').values_list('filename', flat=True)
-        if missing:
-            return Response({'detail': 'Agregue texto alternativo a: ' + ', '.join(missing)}, status=status.HTTP_400_BAD_REQUEST)
+        # Pre-publish checks (P3-12): errors block, warnings are informative.
+        from .checks import run_checks
+        issues = run_checks(page)
+        errors = [i for i in issues if i['level'] == 'error']
+        if errors:
+            return Response({'detail': 'Corrija antes de publicar: ' + ' · '.join(e['message'] for e in errors[:5]), 'issues': issues},
+                            status=status.HTTP_400_BAD_REQUEST)
         v = page.publish(request.user)
         data = PageAdminSerializer(page).data
         data['version'] = v.number
@@ -349,6 +349,19 @@ class PageVersionsView(APIView):
         page.save(update_fields=['draft_blocks', 'seo'])
         nv = page.publish(request.user)
         return Response({'restored_from': v.number, 'version': nv.number})
+
+
+class PageChecksView(APIView):
+    """GET /content/admin/pages/<pk>/checks/ — pre-publish checklist (P3-12)."""
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request, pk):
+        page = Page.objects.filter(pk=pk).first()
+        if page is None:
+            raise Http404
+        from .checks import run_checks
+        issues = run_checks(page)
+        return Response({'issues': issues, 'ok': not any(i['level'] == 'error' for i in issues)})
 
 
 class PageReviewView(APIView):

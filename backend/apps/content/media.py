@@ -22,7 +22,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions import IsAdmin, IsAdminOrStaff
+from apps.core.permissions import IsAdminOrStaff
 
 MAX_UPLOAD = 10 * 1024 * 1024
 VARIANTS = {'thumb': 320, 'md': 960, 'lg': 1600}
