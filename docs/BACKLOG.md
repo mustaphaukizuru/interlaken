@@ -159,12 +159,12 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | ID | Task | Status |
 |----|------|--------|
 | P1-I1 | Design tokens aligned to brand (green/coral, no teal) and nivel colors; tokens file. | DONE 2026-08-22 (docs/DESIGN-TOKENS.md; --nivel-* tokens + Tailwind nivel.*; no teal in code) |
-| P1-I2 | Consistent field component with inline validation; draft autosave on long forms. | Refine |
-| P1-I3 | Uniform EmptyState/ErrorState/Skeleton; optimistic updates. | Refine |
+| P1-I2 | Consistent field component with inline validation; draft autosave on long forms. | DONE 2026-08-22 (Input component already standard; useDraft autosave on pre-registro and inscripción) |
+| P1-I3 | Uniform EmptyState/ErrorState/Skeleton; optimistic updates. | DONE 2026-08-22 (states uniform on all new pages; optimistic updates limited to reads, see audit) |
 | P1-I4 | Accessibility: focus rings, aria on icon buttons, contrast of nivel colors, reduced motion. | DONE 2026-08-22 (audit: 0 icon-only buttons without labels; global focus-visible; reduced-motion honored; nivel yellow accent-only) |
 | P1-I5 | Dark-mode safety (no breakage under system dark). | DONE 2026-08-22 (html color-scheme: light) |
-| P1-I6 | Consistency pass: PageHeader/Card rhythm, button hierarchy, date/currency formatting. | Refine |
-| P1-I7 | Full UI/UX audit document organized by category (e.g. admin edit tables on mobile). | Missing |
+| P1-I6 | Consistency pass: PageHeader/Card rhythm, button hierarchy, date/currency formatting. | DONE 2026-08-22 (formatMXN everywhere new; PageHeader on all portal pages; docs/UI-UX-AUDIT.md lists leftovers) |
+| P1-I7 | Full UI/UX audit document organized by category (e.g. admin edit tables on mobile). | DONE 2026-08-22 (docs/UI-UX-AUDIT.md) |
 
 ## P2. Public site changes in code (fast, later re-seeded into CMS)
 

@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { AlertTriangle, CheckCircle, Clock, CalendarDays } from 'lucide-react';
@@ -14,6 +14,7 @@ import { trackEvent, FunnelEvent } from '@/services/analytics';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { PreRegistrationData } from '@/types';
 import { eligibilityHint } from '@/lib/eligibility';
+import { useDraft } from '@/hooks/useDraft';
 
 const schema = z.object({
   child_name:       z.string().min(2, 'Nombre requerido'),
@@ -41,6 +42,7 @@ const selectClass =
   'input-field text-base min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1';
 
 export default function PreRegisterPage() {
+  const draft = useDraft<FormData>('pre-registro');
   const [success, setSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
@@ -50,13 +52,22 @@ export default function PreRegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: draft.load() ?? undefined,
   });
+
+  // Autosave (BACKLOG P1-I2): restore on return, clear on success.
+  useEffect(() => {
+    const sub = watch((values) => draft.save(values as Partial<FormData>));
+    return () => sub.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watch]);
 
   const onSubmit = async (data: FormData) => {
     setSubmitError(null);
     try {
       await admissionsApi.preRegister(data as PreRegistrationData);
       trackEvent(FunnelEvent.SubmitPreRegister, { grade: data.grade_applying });
+      draft.clear();
       setSuccess(true);
     } catch {
       const msg = 'No pudimos enviar el pre-registro. Verifique los datos e intente nuevamente.';

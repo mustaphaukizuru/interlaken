@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CheckCircle, ArrowRight, ArrowLeft, UploadCloud, FileText, MailCheck, AlertTriangle } from 'lucide-react';
+import { useDraft } from '@/hooks/useDraft';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -65,7 +66,10 @@ export default function RegisterPage() {
   const isInvited = !!(inviteRid && inviteToken);
 
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<Form>(EMPTY);
+  // Autosave the (text-only) wizard state (BACKLOG P1-I2); invite flows seed from the server instead.
+  const draft = useDraft<Form>('inscripcion');
+  const [form, setForm] = useState<Form>(() => ({ ...EMPTY, ...(draft.load() ?? {}) }));
+  useEffect(() => { draft.save(form); }, [form, draft]);
   const [regId, setRegId] = useState<number | null>(null);
   const [session, setSession] = useState<string>('');
   const [files, setFiles] = useState<Record<string, File>>({});
@@ -226,6 +230,7 @@ export default function RegisterPage() {
       }
 
       await admissionsApi.submitRegistration(regId, session, true);
+      draft.clear();
       setSuccess(true);
     } catch {
       toast.error('No se pudo enviar la inscripción. Intente de nuevo.');
