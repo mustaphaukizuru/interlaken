@@ -33,7 +33,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P0-4 | Hard-block `tuition` and `enrollment` payment types at model/API level; remove labels, copy, and related KPIs from UI (per D4). | Payments | DONE 2026-08-22 (branch feat/retire-tuition-enrollment) |
 | P0-5 | Notifications reach student AND guardians: `notify()` / dispatcher email and push to the student's real email plus every linked guardian; skip synthetic `@alumnos.` addresses; add `Student.recipients()`. | Notifications | DONE 2026-08-22 (accounts/recipients.py) |
 | P0-6 | Fix hardcoded `colegio@interlaken.com.mx` in admissions email and align `.env` addresses with D1. | Email | DONE 2026-08-22 (CONTACT/ADMISSIONS/BILLING/SUPPORT_EMAIL settings; D1 = sender .edu.mx, inboxes .com.mx) |
-| P0-7 | Verify student login sees only own data; verify parent login sees linked students; fix any leak. | Auth | Partial |
+| P0-7 | Verify student login sees only own data; verify parent login sees linked students; fix any leak. | Auth | DONE 2026-08-22 (fixed StudentListView for student role; test_family_isolation.py) |
 | P0-8 | Puertas Abiertas: remove `/puertas-abiertas` from public site and menus; keep backend. Add redirect. | Public | DONE 2026-08-22 (redirects to /agendar-visita; admin Visitas keeps events) |
 | P0-9 | Contacto: form sends to `info@`; remove `colegio@interlaken.edu.mx`; show "Lunes a Viernes 7:30 - 15:00". | Public | DONE 2026-08-22 (defaults + data migration content.0012) |
 | P0-10 | Plataformas: rename "Portal de Familias" to "Cafetería"; keep only "Checar saldo y recargas de cafetería". | Public | DONE 2026-08-22 |

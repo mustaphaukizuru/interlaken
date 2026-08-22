@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.contrib.auth import logout
+from django.db.models import Q
 from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
 from google.auth.transport import requests as google_requests
@@ -378,6 +379,11 @@ class StudentListView(generics.ListAPIView):
             # Return only children linked to this parent
             return (StudentProfile.objects.filter(parents=user)
                     .select_related('user').order_by(*order))
+        elif user.role == User.Role.STUDENT:
+            # A school-email student sees its own file (and any sibling it is a
+            # self-guardian of) — same rule as StudentDetailView and the dashboard.
+            return (StudentProfile.objects.filter(Q(user=user) | Q(parents=user))
+                    .distinct().select_related('user').order_by(*order))
         return StudentProfile.objects.none()
 
 
