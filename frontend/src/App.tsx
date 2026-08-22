@@ -71,6 +71,7 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
+const AdminContactInbox = lazy(() => import('./pages/admin/AdminContactInbox'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const AdminPasswordRequests = lazy(() => import('./pages/admin/AdminPasswordRequests'));
 
@@ -195,6 +196,7 @@ export default function App() {
               <Route path="auditoria"   element={<AdminAudit />} />
               <Route path="contrasenas" element={<AdminPasswordRequests />} />
               <Route path="pagos"       element={<AdminPayments />} />
+              <Route path="mensajes"    element={<AdminContactInbox />} />
             </Route>
 
           </Routes>

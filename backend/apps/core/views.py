@@ -147,3 +147,103 @@ class PortalBadgesView(APIView):
         from .badges import portal_badges
 
         return Response(portal_badges(request.user))
+
+
+@method_decorator(ratelimit('facturacion', '5/m', method='POST'), name='dispatch')
+class FacturacionRequestView(APIView):
+    """POST /api/v1/facturacion/ — CFDI request form (BACKLOG P1-G6).
+
+    Emails BILLING_EMAIL with the fiscal data (Reply-To the requester) and keeps
+    a ContactMessage copy tagged [Facturación] so it shows up in the inbox.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    FIELDS = ('name', 'email', 'phone', 'student', 'rfc', 'razon_social', 'regimen', 'cp',
+              'uso_cfdi', 'concepto', 'monto', 'fecha_pago', 'referencia', 'notes')
+
+    def post(self, request):
+        from apps.portal.services import send_email
+
+        from .models import ContactMessage
+
+        d = {k: str(request.data.get(k, '') or '').strip() for k in self.FIELDS}
+        errors = {}
+        for k in ('name', 'email', 'rfc', 'razon_social', 'cp', 'concepto', 'monto', 'fecha_pago'):
+            if not d[k]:
+                errors[k] = ['Requerido.']
+        if d['email'] and '@' not in d['email']:
+            errors['email'] = ['Correo inválido.']
+        if d['rfc'] and not (12 <= len(d['rfc']) <= 13):
+            errors['rfc'] = ['El RFC debe tener 12 o 13 caracteres.']
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+        body = '\n'.join([
+            f'Solicitante: {d["name"]} <{d["email"]}> {d["phone"]}'.rstrip(),
+            f'Alumno: {d["student"] or "-"}',
+            '',
+            f'RFC: {d["rfc"].upper()}',
+            f'Razón social: {d["razon_social"]}',
+            f'Régimen fiscal: {d["regimen"] or "-"}',
+            f'Código postal: {d["cp"]}',
+            f'Uso de CFDI: {d["uso_cfdi"] or "-"}',
+            '',
+            f'Concepto: {d["concepto"]}',
+            f'Monto: {d["monto"]}',
+            f'Fecha de pago: {d["fecha_pago"]}',
+            f'Referencia / comprobante: {d["referencia"] or "-"}',
+            '',
+            f'Notas: {d["notes"] or "-"}',
+        ])
+        ContactMessage.objects.create(
+            name=d['name'], email=d['email'],
+            subject=f'[Facturación] {d["rfc"].upper()} · {d["concepto"]}'[:200], message=body)
+        recipient = getattr(settings, 'BILLING_EMAIL', '') or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
+        send_email(f'[Facturación] Solicitud de CFDI: {d["razon_social"]}', body, [recipient],
+                   reply_to=d['email'], html=False)
+        send_email('Recibimos su solicitud de factura - Colegio Interlaken',
+                   f'Hola {d["name"]},\n\nRecibimos su solicitud de CFDI para {d["razon_social"]} '
+                   f'({d["rfc"].upper()}). Recuerde que las facturas solo se emiten dentro del mes del pago.\n\n'
+                   f'Le responderemos desde {recipient}.\n\nColegio Interlaken',
+                   [d['email']], reply_to=recipient)
+        return Response({'detail': 'Solicitud enviada.'}, status=status.HTTP_201_CREATED)
+
+
+class ContactInboxView(generics.ListAPIView):
+    """GET /api/v1/core/admin/contact-messages/?handled=0 — website inbox (BACKLOG P1-G7)."""
+    serializer_class = None
+    permission_classes = [IsAdminRole]
+
+    def get_serializer_class(self):
+        from .serializers import ContactMessageAdminSerializer
+        return ContactMessageAdminSerializer
+
+    def get_queryset(self):
+        from .models import ContactMessage
+
+        qs = ContactMessage.objects.all()
+        handled = self.request.query_params.get('handled')
+        if handled in ('0', 'false'):
+            qs = qs.filter(is_handled=False)
+        elif handled in ('1', 'true'):
+            qs = qs.filter(is_handled=True)
+        q = (self.request.query_params.get('q') or '').strip()
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(email__icontains=q) | Q(subject__icontains=q))
+        return qs.order_by('-created_at')
+
+
+class ContactMessageHandleView(APIView):
+    """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool}"""
+    permission_classes = [IsAdminRole]
+
+    def patch(self, request, pk):
+        from django.shortcuts import get_object_or_404
+
+        from .models import ContactMessage
+        from .serializers import ContactMessageAdminSerializer
+
+        m = get_object_or_404(ContactMessage, pk=pk)
+        m.is_handled = bool(request.data.get('is_handled', True))
+        m.save(update_fields=['is_handled'])
+        return Response(ContactMessageAdminSerializer(m).data)

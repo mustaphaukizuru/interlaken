@@ -19,3 +19,9 @@ class AuditLogSerializer(serializers.ModelSerializer):
         fields = ['id', 'actor', 'actor_label', 'action', 'action_display',
                   'object_type', 'object_id', 'changes', 'context', 'created_at']
         read_only_fields = fields
+
+
+class ContactMessageAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ['id', 'name', 'email', 'subject', 'message', 'is_handled', 'created_at']

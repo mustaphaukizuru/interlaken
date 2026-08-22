@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, FileText, Mail, ReceiptText } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { FacturacionForm } from '@/components/public/FacturacionForm';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 
@@ -14,8 +15,11 @@ const REQUIRED_DATA = [
 ];
 
 /** Comunidad → Facturación: cómo solicitar factura (CFDI) de pagos al colegio. */
+const BILLING_EMAIL = 'facturas@interlaken.com.mx';
+
 export default function FacturacionPage() {
   const settings = useSiteSettings();
+  void settings;
 
   return (
     <div>
@@ -71,18 +75,14 @@ export default function FacturacionPage() {
                 Cómo solicitarla
               </p>
               <p className="mt-3 text-sm leading-relaxed text-muted sm:text-[15px]">
-                Envíe sus datos fiscales y el comprobante de pago al correo de
-                administración{' '}
-                <a
-                  href={`mailto:${settings.contact_email}`}
-                  className="font-medium text-green-dark underline"
-                >
-                  {settings.contact_email}
-                </a>{' '}
-                dentro del mismo mes del pago. Recibirá su CFDI por correo
-                electrónico. Importante: las facturas solo pueden emitirse dentro
+                Complete el formulario; la solicitud llega a{' '}
+                <a href={`mailto:${BILLING_EMAIL}`} className="font-medium text-green-dark underline">{BILLING_EMAIL}</a>{' '}
+                y recibirá su CFDI por correo. Importante: las facturas solo pueden emitirse dentro
                 del mes en que se efectuó el pago.
               </p>
+              <div className="mt-5">
+                <FacturacionForm billingEmail={BILLING_EMAIL} />
+              </div>
             </div>
           </Reveal>
 

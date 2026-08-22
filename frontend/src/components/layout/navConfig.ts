@@ -1,12 +1,12 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, type LucideIcon,
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, type LucideIcon,
 } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 /** Keys returned by GET /core/badges/ (BACKLOG P1-E3). */
-export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones';
+export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones' | 'mensajes';
 
 export interface NavEntry {
   icon: LucideIcon;
@@ -71,6 +71,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       heading: 'Comunicación',
       items: [
         { icon: Megaphone, label: 'Comunicados', to: '/admin/comunicados' },
+        { icon: Inbox,     label: 'Mensajes',    to: '/admin/mensajes', badgeKey: 'mensajes' },
         { icon: KeyRound,  label: 'Contraseñas', to: '/admin/contrasenas', badgeKey: 'contrasenas' },
       ],
     },

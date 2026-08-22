@@ -48,5 +48,6 @@ def portal_badges(user) -> dict:
         'visitas': Booking.objects.filter(status=Booking.Status.PENDING).count(),
         'cafeteria': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
         'contrasenas': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
+        'mensajes': unhandled_contact_messages(None),
     })
     return out

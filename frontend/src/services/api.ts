@@ -476,7 +476,22 @@ export const paymentsApi = {
 // Cafetería top-ups are the only money path; there is no tuition/finance API.
 
 // ── CORE (audit trail) ────────────────────────────────────
+export interface ContactMessage {
+  id: number;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  is_handled: boolean;
+  created_at: string;
+}
+
 export const coreApi = {
+  /** Website inbox (BACKLOG P1-G7). */
+  getContactMessages: (params?: { page?: number; q?: string; handled?: string }) =>
+    api.get('/core/admin/contact-messages/', { params }),
+  setContactHandled: (id: number, is_handled: boolean) =>
+    api.patch<ContactMessage>(`/core/admin/contact-messages/${id}/`, { is_handled }),
   /** Live sidebar counters (BACKLOG P1-E3). */
   getBadges: () => api.get<Record<string, number>>('/core/badges/'),
   /** Read-only admin audit log (append-only), paginated + filterable. */
@@ -522,6 +537,8 @@ export const legalApi = {
 export const contactApi = {
   send: (data: { name: string; email: string; subject: string; message: string }) =>
     api.post('/contact/', data),
+  /** CFDI request (BACKLOG P1-G6). */
+  requestInvoice: (data: Record<string, string>) => api.post('/facturacion/', data),
 };
 
 // ── BOOKINGS ──────────────────────────────────────────────
