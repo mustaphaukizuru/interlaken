@@ -297,7 +297,7 @@ export default function AdminSettings() {
                   className={FIELD}
                   value={form.office_hours}
                   onChange={(e) => set('office_hours', e.target.value)}
-                  placeholder="Lunes–Viernes 8:00–16:00 hrs"
+                  placeholder="Lunes a Viernes 7:30 - 15:00"
                   error={fieldErrors.office_hours}
                 />
               </div>

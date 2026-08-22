@@ -342,9 +342,16 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@interlaken.edu.m
 # the public key is also exposed to the SPA as VITE_VAPID_PUBLIC_KEY.
 VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY', default='')
 VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY', default='')
-VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='colegio@interlaken.com.mx')
-# Where public contact-form messages are delivered (falls back to DEFAULT_FROM_EMAIL).
-CONTACT_EMAIL = env('CONTACT_EMAIL', default='')
+VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='info@interlaken.com.mx')
+
+# ── SCHOOL MAILBOXES ──────────────────────────────────────
+# interlaken.edu.mx has NO MX records: it can send (noreply@) but never receive.
+# Every human-monitored inbox lives on interlaken.com.mx (addresses given by the
+# school, 2026-08-21). Per-feature so replies land with the right team.
+CONTACT_EMAIL = env('CONTACT_EMAIL', default='info@interlaken.com.mx')          # contacto / general
+ADMISSIONS_EMAIL = env('ADMISSIONS_EMAIL', default=CONTACT_EMAIL)               # pre-registro, inscripción, visitas
+BILLING_EMAIL = env('BILLING_EMAIL', default='facturas@interlaken.com.mx')      # facturación (CFDI)
+SUPPORT_EMAIL = env('SUPPORT_EMAIL', default=CONTACT_EMAIL)                     # portal access / passwords
 
 # ── LOYVERSE ──────────────────────────────────────────────
 LOYVERSE_API_TOKEN = env('LOYVERSE_API_TOKEN', default='')

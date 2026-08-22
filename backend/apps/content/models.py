@@ -33,7 +33,7 @@ class SiteSettings(models.Model):
     # notice, admin accounts) all live on interlaken.com.mx; .edu.mx is the web
     # domain only (GO-LIVE-AUDIT #19, resolved 2026-08-15).
     contact_email = models.EmailField(
-        'Correo de contacto', blank=True, default='colegio@interlaken.com.mx')
+        'Correo de contacto', blank=True, default='info@interlaken.com.mx')
     address = models.CharField(
         'Dirección', max_length=200, blank=True,
         default='Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México')
@@ -42,7 +42,7 @@ class SiteSettings(models.Model):
         default='https://maps.app.goo.gl/Xd241Sht8TmrMHUe6')
     office_hours = models.CharField(
         'Horario de oficina', max_length=100, blank=True,
-        default='Lunes–Viernes 8:00–16:00 hrs')
+        default='Lunes a Viernes 7:30 - 15:00')
 
     # ── Video institucional (vacío = la sección no se muestra) ─
     video_url = models.URLField(

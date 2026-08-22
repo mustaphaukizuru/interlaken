@@ -29,7 +29,7 @@ class ContactCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         message = serializer.save()
 
-        recipient = getattr(settings, 'CONTACT_EMAIL', '') or settings.DEFAULT_FROM_EMAIL
+        recipient = settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
         send_mail(
             subject=f'[Contacto web] {message.subject}',
             message=(

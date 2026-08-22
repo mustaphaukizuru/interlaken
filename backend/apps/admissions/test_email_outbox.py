@@ -10,7 +10,7 @@ pytestmark = pytest.mark.django_db
 
 
 def test_pre_register_emails_parent_and_school(api_client, settings):
-    settings.CONTACT_EMAIL = "colegio@interlaken.edu.mx"
+    settings.ADMISSIONS_EMAIL = "info@interlaken.com.mx"
     settings.RATELIMIT_ENABLE = False
     mail.outbox.clear()
 
@@ -30,7 +30,7 @@ def test_pre_register_emails_parent_and_school(api_client, settings):
     parent_mail = next(m for m in mail.outbox if "Pre-registro recibido" in m.subject)
     assert parent_mail.to == ["roberto@test.mx"]
     school_mail = next(m for m in mail.outbox if "Nuevo pre-registro" in m.subject)
-    assert school_mail.to == ["colegio@interlaken.edu.mx"]
+    assert school_mail.to == ["info@interlaken.com.mx"]
 
 
 def test_invite_and_approval_email_parent(api_client, settings):

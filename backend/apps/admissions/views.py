@@ -117,7 +117,7 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
                 f'Estimado/a {obj.parent_name},\n\n'
                 f'Hemos recibido su solicitud de pre-registro para {obj.child_first_name} '
                 f'{obj.child_last_name}. En breve nos pondremos en contacto con usted.\n\n'
-                f'Colegio Interlaken\ncolegio@interlaken.com.mx'
+                f'Colegio Interlaken\n{settings.ADMISSIONS_EMAIL}'
             ),
             [obj.parent_email],
         )
@@ -125,7 +125,7 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
     def _notify_admin(self, obj):
         # Deliver to the school's contact inbox (NOT EMAIL_HOST_USER, which is the
         # SMTP auth user and is empty by default), mirroring the contact form.
-        recipient = getattr(settings, 'CONTACT_EMAIL', '') or settings.DEFAULT_FROM_EMAIL
+        recipient = settings.ADMISSIONS_EMAIL or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
         send_email(
             f'[Interlaken] Nuevo pre-registro: {obj.child_first_name} {obj.child_last_name}',
             (
