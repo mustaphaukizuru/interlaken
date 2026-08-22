@@ -9,6 +9,7 @@ from .import_students import ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
 from .password_requests import PasswordRequestDetailView, PasswordRequestListCreateView
+from .school_year import SchoolYearPreviewView, SchoolYearRunView
 from .staff_users import StaffDetailView, StaffListCreateView, StaffResetPasswordView
 from .student_admin import AdminStudentCreateView, AdminStudentUpdateView
 
@@ -19,6 +20,8 @@ urlpatterns = [
     path('admin/link-loyverse/',   LinkLoyverseView.as_view(),   name='link-loyverse'),
     # Portal student editor (ownership map: people are edited in the portal only).
     path('admin/students/', AdminStudentCreateView.as_view(), name='admin-student-create'),
+    path('admin/school-year/preview/', SchoolYearPreviewView.as_view(), name='school-year-preview'),
+    path('admin/school-year/run/', SchoolYearRunView.as_view(), name='school-year-run'),
     path('admin/students/<int:pk>/', AdminStudentUpdateView.as_view(), name='admin-student-update'),
     path('admin/students/<int:pk>/guardians/', StudentGuardiansView.as_view(),
          name='student-guardians'),

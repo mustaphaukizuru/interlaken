@@ -19,7 +19,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
-            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'sep_incorporations',
+            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'sep_incorporations', 'school_year',
             'updated_at',
         ]
         read_only_fields = fields
@@ -32,7 +32,7 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'phone_display', 'phone_e164', 'whatsapp_number', 'contact_email',
             'address', 'maps_url', 'office_hours', 'video_url', 'hero_video_url',
-            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'sep_incorporations', 'updated_at',
+            'facebook_url', 'instagram_url', 'youtube_url', 'menu', 'sep_incorporations', 'school_year', 'updated_at',
         ]
         read_only_fields = ['updated_at']
 

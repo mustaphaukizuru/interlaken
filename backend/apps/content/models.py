@@ -60,6 +60,10 @@ class SiteSettings(models.Model):
         'Incorporaciones SEP', default=list, blank=True,
         help_text='[{level, label}] tal como aparece en el documento oficial. Vacío = valores integrados.')
 
+    # ── Ciclo escolar (BACKLOG P4-5): lo avanza el asistente de nuevo ciclo ───
+    school_year = models.CharField('Ciclo escolar', max_length=9, blank=True, help_text='AAAA-AAAA')
+    last_rollover_at = models.DateTimeField(null=True, blank=True)
+
     # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
     menu = models.JSONField('Menú del sitio', default=list, blank=True)
 

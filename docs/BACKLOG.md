@@ -218,7 +218,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P4-2 | Visitas: weekly calendar with drag reschedule, 24h reminders, no-show, post-visit outcome linked to pre-registro. | Partial |
 | P4-3 | Cafetería: low-balance push with family threshold, weekly reminder or auto-recarga if gateway tokens allow, daily spend limit per child, monthly statement PDF, bulk top-up by group, reconciliation with Loyverse report. | Partial |
 | P4-4 | Comunicados: audience targeting, scheduling, read receipts, attachments/rich text, acknowledgement type, push on publish. | Partial |
-| P4-5 | New school year wizard: promote grades, graduate, archive, reset thresholds, new cycle label. | Missing |
+| P4-5 | New school year wizard: promote grades, graduate, archive, reset thresholds, new cycle label. | DONE 2026-08-22 (`/admin/nuevo-ciclo`: preview per grade, type-AVANZAR confirmation, atomic run that promotes active students, graduates 3° Secundaria via `apply_status` (archive = egresado, login off), optional low-balance threshold reset, `SiteSettings.school_year` + `last_rollover_at`, AuditLog `school-year.rollover`, refuses the same cycle twice) |
 | P4-6 | Guardian merge tool. | Missing |
 | P4-7 | Security: idle timeout, close other sessions, login history, TOTP 2FA for admin. | Missing |
 | P4-8 | Audit log UX: filters, diff view, export. | Refine |

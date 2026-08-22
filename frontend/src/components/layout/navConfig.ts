@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
@@ -91,6 +91,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         { icon: Settings,    label: 'Ajustes',   to: '/admin/ajustes' },
         { icon: UserCog,     label: 'Usuarios',  to: '/admin/usuarios' },
         { icon: ShieldCheck, label: 'Auditoría', to: '/admin/auditoria' },
+        { icon: CalendarRange, label: 'Nuevo ciclo', to: '/admin/nuevo-ciclo' },
       ],
     },
   ],

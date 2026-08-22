@@ -685,6 +685,9 @@ export const portalApi = {
   getAnnouncementDelivery: (id: number) => api.get<DeliveryReport>(`/portal/admin/announcements/${id}/delivery/`),
   resendAnnouncementFailed: (id: number) =>
     api.post<{ requeued: number }>(`/portal/admin/announcements/${id}/delivery/`, { action: 'resend_failed' }),
+  /** New school year wizard (BACKLOG P4-5). */
+  schoolYearPreview: () => api.get<SchoolYearPreview>('/accounts/admin/school-year/preview/'),
+  schoolYearRun: (data: { confirm: string; new_cycle: string; reset_threshold: number | null }) => api.post<SchoolYearResult>('/accounts/admin/school-year/run/', data),
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
     is_active?: boolean; push_enabled?: boolean; show_on_site?: boolean; site_until?: string | null; site_link?: string;
@@ -834,6 +837,9 @@ export interface SiteRedirect { id: number; from_path: string; to_path: string; 
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
 export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }
+
+export interface SchoolYearPreview { moves: { from: string; to: string; count: number }[]; graduates: number; active_total: number; skipped: number; current_cycle: string; suggested_cycle: string; last_rollover_at: string | null }
+export interface SchoolYearResult { promoted: number; graduated: number; thresholds_reset: number; school_year: string }
 
 export interface CmsPageAdmin {
   id: number;
