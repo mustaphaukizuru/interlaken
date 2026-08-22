@@ -477,6 +477,8 @@ export const paymentsApi = {
 
 // ── CORE (audit trail) ────────────────────────────────────
 export const coreApi = {
+  /** Live sidebar counters (BACKLOG P1-E3). */
+  getBadges: () => api.get<Record<string, number>>('/core/badges/'),
   /** Read-only admin audit log (append-only), paginated + filterable. */
   getAuditLog: (params?: {
     page?: number;

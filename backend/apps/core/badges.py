@@ -27,3 +27,26 @@ def open_arco_requests(request):
 def unhandled_contact_messages(request):
     from apps.core.models import ContactMessage
     return ContactMessage.objects.filter(is_handled=False).count()
+
+
+def portal_badges(user) -> dict:
+    """Live counts for the portal sidebar (BACKLOG P1-E3). Admins get work
+    queues; families get their unread notifications. Cheap COUNT queries only."""
+    from apps.accounts.models import PasswordRequest, User
+    from apps.portal.models import Notification
+
+    out = {'notificaciones': Notification.objects.filter(user=user, is_read=False).count()}
+    if getattr(user, 'role', None) != User.Role.ADMIN:
+        return out
+    from apps.admissions.models import PreRegistration, Registration
+    from apps.bookings.models import Booking
+    from apps.cafeteria.models import TopUpRequest
+
+    out.update({
+        'admisiones': PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
+        + Registration.objects.filter(status=Registration.Status.SUBMITTED).count(),
+        'visitas': Booking.objects.filter(status=Booking.Status.PENDING).count(),
+        'cafeteria': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
+        'contrasenas': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
+    })
+    return out

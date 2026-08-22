@@ -107,11 +107,11 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-E1 | Collapsible sidebar rail (72px) with tooltips, persisted. | Missing |
-| P1-E2 | Grouped navigation per role (Operación, Cafetería, Comunicación, Sistema / Familia, Cafetería y pagos, Cuenta). | Refine |
-| P1-E3 | Live badges (pending admisiones, unread comunicados, pending visitas). | Partial |
+| P1-E1 | Collapsible sidebar rail (72px) with tooltips, persisted. | DONE 2026-08-22 (76px rail, title tooltips, localStorage) |
+| P1-E2 | Grouped navigation per role (Operación, Cafetería, Comunicación, Sistema / Familia, Cafetería y pagos, Cuenta). | DONE 2026-08-22 |
+| P1-E3 | Live badges (pending admisiones, unread comunicados, pending visitas). | DONE 2026-08-22 (/core/badges/: admisiones, visitas, cafetería top-ups, contraseñas, notificaciones; sidebar + tab bar) |
 | P1-E4 | ChildSwitcher in sidebar top for parents. | Refine |
-| P1-E5 | Sidebar user card opens AccountMenu. | Refine |
+| P1-E5 | Sidebar user card opens AccountMenu. | DONE 2026-08-22 |
 | P1-E6 | Header breadcrumbs replacing back-links. | Missing |
 | P1-E7 | Command palette for parents or clean hide on mobile. | Partial |
 | P1-E8 | Admin "+ Nuevo" quick actions. | Missing |

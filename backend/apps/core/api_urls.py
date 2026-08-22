@@ -8,4 +8,5 @@ from . import views
 
 urlpatterns = [
     path('admin/audit/', views.AdminAuditLogView.as_view(), name='core-admin-audit'),
+    path('badges/', views.PortalBadgesView.as_view(), name='core-badges'),
 ]

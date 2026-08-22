@@ -137,3 +137,13 @@ class AdminAuditLogView(generics.ListAPIView):
             qs = qs.filter(created_at__date__lte=date_to)
 
         return qs.order_by('-created_at')
+
+
+class PortalBadgesView(APIView):
+    """GET /api/v1/core/badges/ — sidebar counters for the current user (BACKLOG P1-E3)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .badges import portal_badges
+
+        return Response(portal_badges(request.user))
