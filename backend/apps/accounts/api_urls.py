@@ -7,12 +7,16 @@ from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
+from .student_admin import AdminStudentCreateView, AdminStudentUpdateView
 
 urlpatterns = [
     path('admin/import-students/', ImportStudentsView.as_view(), name='import-students'),
     path('admin/export/students/', AdminExportStudentsView.as_view(), name='export-students'),
     path('admin/import-loyverse/', ImportLoyverseView.as_view(), name='import-loyverse'),
     path('admin/link-loyverse/',   LinkLoyverseView.as_view(),   name='link-loyverse'),
+    # Portal student editor (ownership map: people are edited in the portal only).
+    path('admin/students/', AdminStudentCreateView.as_view(), name='admin-student-create'),
+    path('admin/students/<int:pk>/', AdminStudentUpdateView.as_view(), name='admin-student-update'),
     path('admin/students/<int:pk>/guardians/', StudentGuardiansView.as_view(),
          name='student-guardians'),
     path('admin/students/<int:pk>/guardians/<int:user_id>/',

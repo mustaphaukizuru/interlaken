@@ -22,6 +22,8 @@ export interface StudentProfile {
   grade: string;
   group: string;
   loyverse_id: string;
+  enrollment_date?: string | null;
+  is_active?: boolean;
 }
 
 export interface CafeteriaBalance {

@@ -9,6 +9,17 @@
  */
 import axios from 'axios';
 
+export interface StudentWrite {
+  first_name: string;
+  last_name: string;
+  email?: string;
+  student_id: string;
+  grade: string;
+  group?: string;
+  enrollment_date?: string | null;
+  is_active?: boolean;
+}
+
 import { useAuthStore } from '@/store/authStore';
 
 // Relative by default so the SPA is same-origin with the API (prod: served by
@@ -497,6 +508,11 @@ export const portalApi = {
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
+
+  /** Portal student editor (admin). Blank email = synthetic school login. */
+  createStudent: (data: StudentWrite) => api.post('/accounts/admin/students/', data),
+  updateStudent: (studentId: number, data: Partial<StudentWrite>) =>
+    api.patch(`/accounts/admin/students/${studentId}/`, data),
 
   /** CSV roster export (grade/group/guardians count), honors ?search=. */
   exportStudents: (search?: string) =>

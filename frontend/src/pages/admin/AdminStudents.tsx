@@ -1,11 +1,12 @@
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, FileUp, Link2, Download, FileDown } from 'lucide-react';
+import { Users, Search, FileUp, Link2, Download, FileDown, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
+import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +25,7 @@ export default function AdminStudents() {
   const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
   const [page, setPage] = useUrlPage();
   const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
@@ -54,6 +56,9 @@ export default function AdminStudents() {
           <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
+            <Plus size={16} aria-hidden="true" /> Nuevo alumno
+          </button>
           <button type="button" className="btn-outline" onClick={() => setImportLoyverseOpen(true)}>
             <Download size={16} aria-hidden="true" /> Importar desde Loyverse
           </button>
@@ -68,6 +73,7 @@ export default function AdminStudents() {
           </Button>
         </div>
       </div>
+      <StudentFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => refetch()} />
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
       <ImportLoyverseModal
         open={importLoyverseOpen}

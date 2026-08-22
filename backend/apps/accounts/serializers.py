@@ -42,7 +42,8 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentProfile
-        fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id']
+        fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id',
+                  'enrollment_date', 'is_active']
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):

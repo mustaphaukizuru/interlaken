@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Coffee } from 'lucide-react';
+import { ArrowLeft, Coffee, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
+import { StudentFormModal } from '@/components/admin/StudentFormModal';
+import { Badge } from '@/components/ui/Badge';
 import { portalApi } from '@/services/api';
 import type { StudentProfile } from '@/types';
 
@@ -39,20 +42,27 @@ export default function AdminStudentDetail() {
 }
 
 function StudentDetailBody({ student }: { student: StudentProfile }) {
+  const [editOpen, setEditOpen] = useState(false);
   return (
     <>
+      <StudentFormModal open={editOpen} onClose={() => setEditOpen(false)} student={student} />
       <PageHeader
         title={student.user.full_name}
         subtitle={`Matrícula ${student.student_id} · ${student.grade}${student.group ? ` ${student.group}` : ''}`}
         actions={(
-          <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline">
-            <Coffee size={16} aria-hidden="true" /> Cafetería
-          </Link>
+          <>
+            <button type="button" className="btn-outline" onClick={() => setEditOpen(true)}>
+              <Pencil size={16} aria-hidden="true" /> Editar
+            </button>
+            <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline">
+              <Coffee size={16} aria-hidden="true" /> Cafetería
+            </Link>
+          </>
         )}
       />
 
       <Card title="Datos del alumno">
-        <dl className="grid gap-4 sm:grid-cols-3">
+        <dl className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Matrícula</dt>
             <dd className="mt-1 text-sm font-medium text-ink">{student.student_id || '—'}</dd>
@@ -68,6 +78,14 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
             <dd className="mt-1 truncate text-sm font-medium text-ink" title={student.user.email}>
               {student.user.email || '—'}
             </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Ingreso</dt>
+            <dd className="mt-1 text-sm font-medium text-ink">{student.enrollment_date || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Estado</dt>
+            <dd className="mt-1"><Badge variant={student.is_active === false ? 'neutral' : 'success'}>{student.is_active === false ? 'Inactivo' : 'Activo'}</Badge></dd>
           </div>
         </dl>
       </Card>
