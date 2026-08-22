@@ -149,3 +149,53 @@ class TestStudentGuardians:
         api_client.force_authenticate(parent)
         resp = api_client.get(reverse('student-guardians', kwargs={'pk': student.pk}))
         assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+class TestGuardianEdit:
+    """P1-A3: admin edits a linked guardian's identity/contact from the portal."""
+
+    def _setup(self, api_client):
+        from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
+        admin = AdminFactory()
+        parent = ParentFactory(email='mom@test.mx', first_name='Ma', last_name='Pérez')
+        student = StudentProfileFactory(parents=[parent])
+        api_client.force_authenticate(user=admin)
+        return parent, student
+
+    def test_patch_updates_user_and_profile_with_audit(self, api_client):
+        from django.urls import reverse
+
+        from apps.accounts.models import ParentProfile
+        from apps.core.models import AuditLog
+        parent, student = self._setup(api_client)
+        resp = api_client.patch(reverse('student-guardian-detail', args=[student.pk, parent.pk]), {
+            'first_name': 'María', 'whatsapp': '5215512345678', 'phone': '5512345678', 'relationship': 'Madre',
+        }, format='json')
+        assert resp.status_code == 200, resp.data
+        parent.refresh_from_db()
+        assert parent.first_name == 'María' and parent.whatsapp == '5215512345678'
+        assert ParentProfile.objects.get(user=parent).relationship == 'Madre'
+        assert resp.data['phone'] == '5512345678'
+        log = AuditLog.objects.get(context='portal: edición de tutor')
+        assert {'first_name', 'whatsapp', 'phone', 'relationship'} <= set(log.changes)
+
+    def test_email_must_be_unique(self, api_client):
+        from django.urls import reverse
+
+        from apps.accounts.factories import ParentFactory
+        parent, student = self._setup(api_client)
+        ParentFactory(email='taken@test.mx')
+        resp = api_client.patch(reverse('student-guardian-detail', args=[student.pk, parent.pk]),
+                                {'email': 'Taken@test.mx'}, format='json')
+        assert resp.status_code == 400 and 'email' in resp.data
+
+    def test_unlinked_guardian_404(self, api_client):
+        from django.urls import reverse
+
+        from apps.accounts.factories import ParentFactory
+        _, student = self._setup(api_client)
+        other = ParentFactory()
+        resp = api_client.patch(reverse('student-guardian-detail', args=[student.pk, other.pk]),
+                                {'first_name': 'X'}, format='json')
+        assert resp.status_code == 404

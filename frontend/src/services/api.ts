@@ -9,6 +9,15 @@
  */
 import axios from 'axios';
 
+export interface GuardianWrite {
+  first_name: string;
+  last_name: string;
+  email: string;
+  whatsapp: string;
+  phone: string;
+  relationship: string;
+}
+
 export interface StudentWrite {
   first_name: string;
   last_name: string;
@@ -609,6 +618,9 @@ export const portalApi = {
   ) => api.post(`/accounts/admin/students/${studentId}/guardians/`, data),
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
+  /** Edit a linked guardian's identity/contact (admin). */
+  updateGuardian: (studentId: number, userId: number, data: Partial<GuardianWrite>) =>
+    api.patch(`/accounts/admin/students/${studentId}/guardians/${userId}/`, data),
 
   // Admin-managed password reset (school policy: only an admin resets a family
   // password — imported accounts have no usable one and their synthetic

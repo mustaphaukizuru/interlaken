@@ -49,7 +49,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 |----|------|--------|
 | P1-A1 | Portal student editor: create/edit names, student email, matrícula, grade, group, nivel, active/inactive, enrollment date, photo; inline edit with validation and audit log. | DONE 2026-08-22 (StudentFormModal + admin/students API; photo deferred to P1-F2 avatar work) |
 | P1-A2 | Student file tabs: Datos, Tutores, Cafetería, Documentos, Pagos, Historial; extended data (birth date/age, CURP, emergency contacts, medical/allergies with role restriction). | Missing |
-| P1-A3 | Family/guardian editor: create/edit names, email, phone, relationship, address; link/unlink to students; co-guardians and siblings; merge duplicates. | Partial |
+| P1-A3 | Family/guardian editor: create/edit names, email, phone, relationship, address; link/unlink to students; co-guardians and siblings; merge duplicates. | DONE 2026-08-22 (create/link existed; added PATCH guardian + GuardianEditModal). Address field and merge tool deferred to P4-6 |
 | P1-A4 | Password request inbox: log each WhatsApp/email request (channel, verified by, set by, timestamp); set password from the inbox with audit. | Missing |
 | P1-A5 | Credentials delivery templates (WhatsApp + email) for new and reset passwords. | Missing |
 | P1-A6 | Welcome/invite resend; "never logged in" roster filter. | Missing |
