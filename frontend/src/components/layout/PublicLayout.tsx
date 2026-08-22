@@ -11,7 +11,6 @@ import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
-import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
@@ -461,22 +460,6 @@ export function PublicLayout() {
             </div>
           </div>
 
-          {/* Incorporación SEP — registros oficiales (flyer institucional). */}
-          <div className="mt-10 border-t border-white/10 pt-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-white/55">
-              Incorporación SEP
-            </p>
-            <p className="mt-1.5 max-w-4xl text-[11px] leading-relaxed text-white/45">
-              {SEP_INCORPORATIONS.map((r, i) => (
-                <span key={r.level} className="block sm:inline">
-                  {r.label}
-                  {i < SEP_INCORPORATIONS.length - 1 && (
-                    <span className="hidden sm:inline" aria-hidden="true">{' · '}</span>
-                  )}
-                </span>
-              ))}
-            </p>
-          </div>
         </div>
         <div className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">

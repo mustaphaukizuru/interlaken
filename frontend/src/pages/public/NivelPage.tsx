@@ -3,6 +3,8 @@ import { ArrowRight, CalendarCheck, CheckCircle2, Users } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { Reveal } from '@/components/ui/Reveal';
 import { LEVELS, getLevel } from '@/lib/levels';
+import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { ShieldCheck } from 'lucide-react';
 
 const ACCENT = {
   green: { label: 'section-label-green', text: 'text-green-dark', ring: 'border-green/30', soft: 'bg-green/5' },
@@ -98,6 +100,22 @@ export default function NivelPage() {
                 ))}
               </ul>
             </Reveal>
+
+            {/* Incorporación SEP de este nivel (moved here from the footer, school instruction 2026-08-21) */}
+            {(() => {
+              const sep = SEP_INCORPORATIONS.find((r) => r.level === level.name);
+              return sep ? (
+                <Reveal>
+                  <div className="rounded-xl2 border border-line bg-cream-2 p-5" style={{ borderLeft: `4px solid ${level.color}` }}>
+                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[1.2px] text-subtle">
+                      <ShieldCheck size={14} aria-hidden="true" /> Incorporación oficial SEP
+                    </p>
+                    <p className="mt-1.5 text-sm font-medium text-ink">{sep.label}</p>
+                    <p className="mt-1 text-xs text-muted">Estudios con reconocimiento de validez oficial.</p>
+                  </div>
+                </Reveal>
+              ) : null;
+            })()}
           </div>
 
           {/* Sidebar de acciones (paralela al menú del sitio anterior) */}

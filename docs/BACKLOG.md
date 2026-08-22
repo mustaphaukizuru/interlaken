@@ -173,10 +173,10 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P2-1 | Home hero with video (poster fallback, image-only on mobile). | DONE 2026-08-22 (SiteSettings.hero_video_url editable in Ajustes; autoplay muted ≥ md, image on phones and reduced-motion) |
 | P2-2 | Stats band: 1200+ Alumnos, 80+ Maestros, 45+ Años, 95+ (D2). | DONE (already live: 1,200+ / 80+ / SCHOOL_YEARS / 95% Aprovechamiento) |
 | P2-3 | Niveles block with per-level identity and CTA. | DONE 2026-08-22 (official nivel colors, cards link to /niveles/:slug) |
-| P2-4 | "Solicite informes" CTA strengthened. | Refine |
-| P2-5 | Header: logo +30% (DONE), menu/mobile/scroll enhancements. | Partial |
-| P2-6 | Footer: logo +30% (DONE), link menu enhancement, SEP info moved to nivel pages. | Partial |
-| P2-7 | Nivel pages: images, icons, graphs, colors (Pre #8AC6A4, Prim #F4436C, Sec #F1C82F), full info, SEP incorporation. | Content |
+| P2-4 | "Solicite informes" CTA strengthened. | DONE (home NewsletterCTA + sticky visit bar + admissions CTA pair already in place) |
+| P2-5 | Header: logo +30% (DONE), menu/mobile/scroll enhancements. | DONE 2026-08-22 (sticky header, phone/email bar, drawer; further polish via CMS menus P3-7) |
+| P2-6 | Footer: logo +30% (DONE), link menu enhancement, SEP info moved to nivel pages. | DONE 2026-08-22 (SEP block removed from footer; grouped link columns/accordion kept) |
+| P2-7 | Nivel pages: images, icons, graphs, colors (Pre #8AC6A4, Prim #F4436C, Sec #F1C82F), full info, SEP incorporation. | Partial 2026-08-22 (official colors + per-level SEP incorporation card done; extra images/graphs are content work for the CMS seed) |
 | P2-8 | Quiénes Somos: images + history timeline. | Content |
 | P2-9 | Modelo Educativo: images and content. | Content |
 | P2-10 | Galería: albums with events/dates, captions, grid, bulk upload. | Refine |
