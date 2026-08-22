@@ -49,6 +49,12 @@ class SiteSettings(models.Model):
         'Video institucional', blank=True, default='',
         help_text='URL de YouTube o Vimeo. Vacío = la sección no se muestra en el sitio.')
 
+    # ── Hero video (BACKLOG P2-1): direct MP4/WebM URL, autoplay muted on ≥ md;
+    # phones keep the poster image (data + battery). Vacío = imagen.
+    hero_video_url = models.URLField(
+        'Video del hero (MP4/WebM)', blank=True, default='',
+        help_text='URL directa a un MP4/WebM corto (≤ 15 s, sin audio). Vacío = imagen fija.')
+
     # ── Redes sociales (vacío = el ícono no se muestra) ───
     # Confirmado por el cliente: la única red social del colegio es Facebook.
     facebook_url = models.URLField(

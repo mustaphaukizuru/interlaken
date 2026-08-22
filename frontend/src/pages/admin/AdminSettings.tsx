@@ -19,7 +19,7 @@ type FieldErrors = Partial<Record<keyof SettingsForm, string>>;
 
 const EMPTY: SettingsForm = {
   phone_display: '', phone_e164: '', whatsapp_number: '', contact_email: '',
-  address: '', maps_url: '', office_hours: '', video_url: '',
+  address: '', maps_url: '', office_hours: '', video_url: '', hero_video_url: '',
   facebook_url: '', instagram_url: '', youtube_url: '',
 };
 
@@ -316,6 +316,16 @@ export default function AdminSettings() {
                 placeholder="https://www.youtube.com/watch?v=…"
                 hint="Vacío = la sección no se muestra en el sitio."
                 error={fieldErrors.video_url}
+              />
+              <Input
+                label="Video de fondo del hero (MP4/WebM directo)"
+                type="url"
+                className={FIELD}
+                value={form.hero_video_url ?? ''}
+                onChange={(e) => set('hero_video_url', e.target.value)}
+                placeholder="https://…/campus.mp4"
+                hint="Se reproduce en silencio en pantallas grandes; en móvil se muestra la imagen. Vacío = imagen fija."
+                error={fieldErrors.hero_video_url}
               />
             </Card>
 

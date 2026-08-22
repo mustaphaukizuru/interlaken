@@ -170,9 +170,9 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P2-1 | Home hero with video (poster fallback, image-only on mobile). | Refine |
-| P2-2 | Stats band: 1200+ Alumnos, 80+ Maestros, 45+ Años, 95+ (D2). | Content |
-| P2-3 | Niveles block with per-level identity and CTA. | Refine |
+| P2-1 | Home hero with video (poster fallback, image-only on mobile). | DONE 2026-08-22 (SiteSettings.hero_video_url editable in Ajustes; autoplay muted ≥ md, image on phones and reduced-motion) |
+| P2-2 | Stats band: 1200+ Alumnos, 80+ Maestros, 45+ Años, 95+ (D2). | DONE (already live: 1,200+ / 80+ / SCHOOL_YEARS / 95% Aprovechamiento) |
+| P2-3 | Niveles block with per-level identity and CTA. | DONE 2026-08-22 (official nivel colors, cards link to /niveles/:slug) |
 | P2-4 | "Solicite informes" CTA strengthened. | Refine |
 | P2-5 | Header: logo +30% (DONE), menu/mobile/scroll enhancements. | Partial |
 | P2-6 | Footer: logo +30% (DONE), link menu enhancement, SEP info moved to nivel pages. | Partial |

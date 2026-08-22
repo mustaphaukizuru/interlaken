@@ -11,6 +11,7 @@ import { contactApi } from '@/services/api';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { m, SiteMotionProvider } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
@@ -23,10 +24,11 @@ const STATS = [
   { value: '95%', label: 'Aprovechamiento', color: 'var(--green-mid)', icon: TrendingUp },
 ];
 
+// Official nivel colors (school instruction 2026-08-21); cards link to each nivel page.
 const LEVELS = [
-  { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: 'var(--green)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
-  { name: 'Primaria', img: '/assets/facade.webp', accent: 'var(--purple)', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
-  { name: 'Secundaria', img: '/assets/secundaria.webp', accent: 'var(--pink)', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
+  { name: 'Preescolar', slug: 'preescolar', img: '/assets/court-primaria.webp', accent: 'var(--nivel-preescolar)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
+  { name: 'Primaria', slug: 'primaria', img: '/assets/facade.webp', accent: 'var(--nivel-primaria)', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
+  { name: 'Secundaria', slug: 'secundaria', img: '/assets/secundaria.webp', accent: 'var(--nivel-secundaria)', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
 ];
 
 const PROGRAMS = [
@@ -217,6 +219,8 @@ function NewsletterCTA() {
 export default function HomePage() {
   const settings = useSiteSettings();
   const hasVideo = settings.video_url.trim() !== '';
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const heroVideo = !reducedMotion && (settings.hero_video_url ?? '').trim() ? settings.hero_video_url : '';
 
   return (
     // Motion provider lives HERE (not in the shared layout) so the framer
@@ -235,6 +239,20 @@ export default function HomePage() {
           className="absolute inset-0 h-full w-full object-cover object-center"
           onError={hideOnError}
         />
+        {heroVideo && (
+          // BACKLOG P2-1: silent looping video on ≥ md; the poster image stays as LCP/fallback.
+          <video
+            className="absolute inset-0 hidden h-full w-full object-cover object-center md:block"
+            src={heroVideo}
+            poster="/assets/court-wide.webp"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{
@@ -390,7 +408,7 @@ export default function HomePage() {
                 </div>
                 <div className="px-5 py-[18px]">
                   <p className="text-sm leading-relaxed text-muted">{l.desc}</p>
-                  <Link to="/admisiones" className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold focus-visible:ring-2 focus-visible:ring-offset-2 rounded" style={{ color: l.accent }}>Ver admisiones <ArrowRight size={14} /></Link>
+                  <Link to={`/niveles/${l.slug}`} className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2 rounded">Conocer {l.name} <ArrowRight size={14} style={{ color: l.accent }} /></Link>
                 </div>
               </div>
             </m.div>

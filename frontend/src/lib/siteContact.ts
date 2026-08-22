@@ -18,6 +18,7 @@ export const SITE_DEFAULTS: SiteSettings = {
   office_hours: 'Lunes a Viernes 7:30 - 15:00',
   // Empty = la sección «Conócenos en video» no se muestra en el sitio.
   video_url: '',
+  hero_video_url: '',
   // Empty = icon hidden. Confirmado por el cliente: solo Facebook.
   facebook_url: 'https://www.facebook.com/colegiointerlaken',
   instagram_url: '',
