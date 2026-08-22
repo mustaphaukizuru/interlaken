@@ -3,6 +3,7 @@ import { ShieldCheck, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
+import { ExportMenu } from '@/components/admin/ExportMenu';
 import { Badge } from '@/components/ui/Badge';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -95,11 +96,15 @@ export default function AdminAudit() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Auditoría</h1>
-        <p className="text-muted text-sm mt-0.5">
-          Registro inmutable de acciones sensibles: dinero, saldos, datos de alumnos y roles.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Auditoría</h1>
+          <p className="text-muted text-sm mt-0.5">
+            Registro inmutable de acciones sensibles: dinero, saldos, datos de alumnos y roles.
+          </p>
+        </div>
+        <ExportMenu options={[{ key: 'csv', label: 'Exportar CSV', filename: 'auditoria_{date}.csv',
+          fetch: async () => (await coreApi.exportAuditLog({ actor: debouncedActor || undefined, action: action || undefined, from: from || undefined, to: to || undefined })).data as Blob }]} />
       </div>
 
       <Card>

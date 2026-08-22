@@ -1,12 +1,15 @@
 from django.urls import path
 
 from . import views
+from .exports import PreRegistrationExportView, RegistrationExportView
 
 urlpatterns = [
+    path('pre-register/export/',       PreRegistrationExportView.as_view(),          name='pre-register-export'),
     path('pre-register/',              views.PreRegistrationListCreateView.as_view(), name='pre-register'),
     path('pre-register/<int:pk>/',     views.PreRegistrationDetailView.as_view(),     name='pre-register-detail'),
     path('pre-register/<int:pk>/invite/', views.PreRegistrationInviteView.as_view(),  name='pre-register-invite'),
     path('my-registrations/',          views.MyRegistrationsView.as_view(),         name='my-registrations'),
+    path('register/export/',           RegistrationExportView.as_view(),             name='register-export'),
     path('register/',                  views.RegistrationListCreateView.as_view(),  name='register-create'),
     path('register/<int:pk>/access/',  views.RegistrationAccessView.as_view(),      name='register-access'),
     path('register/<int:pk>/status/',  views.RegistrationStatusView.as_view(),      name='register-status'),

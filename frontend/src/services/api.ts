@@ -518,6 +518,8 @@ export interface ContactMessage {
 }
 
 export const coreApi = {
+  exportAuditLog: (params?: { actor?: string; action?: string; from?: string; to?: string }) =>
+    api.get('/core/admin/audit/export/', { params, responseType: 'blob' }),
   /** Website inbox (BACKLOG P1-G7). */
   getContactMessages: (params?: { page?: number; q?: string; handled?: string }) =>
     api.get('/core/admin/contact-messages/', { params }),

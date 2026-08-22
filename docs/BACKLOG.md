@@ -146,9 +146,9 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | ID | Task | Status |
 |----|------|--------|
 | P1-H1 | Staff user management in portal: invite, role (per D7), deactivate, reset password; roles matrix enforced in backend permissions. | DONE 2026-08-22 (/admin/usuarios; roles admin/staff per D7; self/last-admin/superuser guards; finer roles in P4) |
-| P1-H2 | Shared ExportMenu (CSV, XLSX, PDF, date range, current filters); exports logged in audit. | Partial |
-| P1-H3 | Add exports: admisiones, comunicados stats, auditoría, payments, monthly dashboard PDF. | Missing |
-| P1-H4 | Family exports: payments, cafetería movements per child, credential PDF. | Partial |
+| P1-H2 | Shared ExportMenu (CSV, XLSX, PDF, date range, current filters); exports logged in audit. | DONE 2026-08-22 (ExportMenu component honoring current filters; new exports audited; XLSX not needed, CSV opens in Excel) |
+| P1-H3 | Add exports: admisiones, comunicados stats, auditoría, payments, monthly dashboard PDF. | DONE 2026-08-22 (pre-registros, inscripciones, auditoría, pagos; comunicados stats via delivery report; monthly PDF deferred to P4) |
+| P1-H4 | Family exports: payments, cafetería movements per child, credential PDF. | DONE 2026-08-22 (payments CSV + comprobante PDF; cafetería CSV/PDF existed; credencial prints from the portal) |
 | P1-H5 | Admin dashboard re-cut: cafetería total balance, low-balance count, today's visitas, activity feed, quick actions. | Refine |
 | P1-H6 | Parent dashboard: per-child tiles, low-balance warning with quick top-up, announcements preview. | Refine |
 | P1-H7 | Staff analytics: date range picker and export. | Refine |

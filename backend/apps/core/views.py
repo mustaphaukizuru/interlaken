@@ -247,3 +247,24 @@ class ContactMessageHandleView(APIView):
         m.is_handled = bool(request.data.get('is_handled', True))
         m.save(update_fields=['is_handled'])
         return Response(ContactMessageAdminSerializer(m).data)
+
+
+class AdminAuditExportView(AdminAuditLogView):
+    """GET /api/v1/core/admin/audit/export/ — CSV of the filtered audit trail (P1-H3)."""
+
+    def list(self, request, *args, **kwargs):
+        import csv
+        import json
+
+        from django.http import HttpResponse
+
+        from apps.core.exports import as_download, export_filename, fmt_dt
+
+        resp = HttpResponse(content_type='text/csv; charset=utf-8')
+        resp.write('﻿')
+        w = csv.writer(resp)
+        w.writerow(['Fecha', 'Actor', 'Acción', 'Objeto', 'ID', 'Contexto', 'Cambios'])
+        for a in self.get_queryset()[:10000]:
+            w.writerow([fmt_dt(a.created_at), a.actor_label or (a.actor.email if a.actor else ''), a.action,
+                        a.object_type, a.object_id, a.context, json.dumps(a.changes, ensure_ascii=False)[:2000]])
+        return as_download(resp, export_filename('auditoria'))
