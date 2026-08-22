@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import StudentCard from '@/components/portal/StudentCard';
+import { cafeteriaApi } from '@/services/api';
+import type { CafeteriaCard } from '@/types';
+import { Printer } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Coffee, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -39,6 +43,31 @@ export default function AdminStudentDetail() {
         <StudentDetailBody student={data} />
       )}
     </>
+  );
+}
+
+/** Staff view of the digital credencial (BACKLOG P1-A9): preview + print. */
+function CredencialCard({ studentId }: { studentId: number }) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-student-card', studentId],
+    queryFn: async () => (await cafeteriaApi.getStudentCard(studentId)).data as CafeteriaCard[],
+  });
+  const card = data?.[0];
+  return (
+    <Card title="Credencial de cafetería" action={card ? (
+      <button type="button" className="btn-outline print:hidden" onClick={() => window.print()}>
+        <Printer size={16} aria-hidden="true" /> Imprimir
+      </button>
+    ) : undefined}>
+      {isLoading ? <LoadingSpinner /> : isError || !card ? <ErrorState onRetry={() => refetch()} /> : (
+        <div className="print-only-card">
+          <StudentCard card={card} />
+          {!card.linked && (
+            <p className="mt-3 text-xs text-coral-600">Sin vínculo con Loyverse: el código mostrado es la matrícula. Vincule al alumno desde Cafetería para que el POS lo reconozca.</p>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -93,6 +122,7 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
 
       <div className="mt-6 space-y-6">
         <StudentGuardians studentId={student.id} />
+        <CredencialCard studentId={student.id} />
       </div>
     </>
   );

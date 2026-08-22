@@ -54,10 +54,10 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-A5 | Credentials delivery templates (WhatsApp + email) for new and reset passwords. | DONE 2026-08-22 (backend delivery_templates + lib/credentialTemplates; one-tap WhatsApp/mailto in inbox and reset dialog) |
 | P1-A6 | Welcome/invite resend; "never logged in" roster filter. | DONE 2026-08-22 (roster filters ?acceso=never/nopass + Último acceso column; "resend" = log a password request, per AE5 there is no self-activation) |
 | P1-A7 | Student status lifecycle (activo, baja temporal, egresado) and effects on login, cafetería, comunicados. | DONE 2026-08-22 (StudentProfile.status + apply_status(): mirrors is_active and toggles the student login; migration 0006 backfills) |
-| P1-A8 | Roster table: column chooser, sort, nivel/grado/grupo filters, bulk actions, density toggle, sticky header, mobile cards. | Refine |
-| P1-A9 | Staff credencial view: preview, print, reissue payment code. | Missing |
+| P1-A8 | Roster table: column chooser, sort, nivel/grado/grupo filters, bulk actions, density toggle, sticky header, mobile cards. | Partial (estado/acceso filters + status/último acceso columns done; rest folded into P1-B6) |
+| P1-A9 | Staff credencial view: preview, print, reissue payment code. | DONE 2026-08-22 (student file shows the card + Imprimir; reissue = relink Loyverse from Cafetería) |
 | P1-A10 | Parent-side student card with the same read-only data and "Solicitar corrección". | Refine |
-| P1-A11 | Flip StudentProfile/ParentProfile to read-only in Django admin after A1/A3. | Missing |
+| P1-A11 | Flip StudentProfile/ParentProfile to read-only in Django admin after A1/A3. | DONE 2026-08-22 (ReadOnlyMirror mixin) |
 
 ### P1-B. Responsiveness and mobile-first
 

@@ -51,10 +51,24 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     )
     filter_horizontal = ('groups', 'user_permissions')
 
+class ReadOnlyMirror:
+    """People are edited in the portal only (docs/ADMIN-VS-PORTAL.md rule 1);
+    the Django admin is a support/forensics mirror."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(StudentProfile)
-class StudentProfileAdmin(ModelAdmin):
-    list_display = ('user', 'student_id', 'grade', 'group', 'is_active', 'loyverse_id')
-    list_filter = ('grade', 'group', 'is_active')
+class StudentProfileAdmin(ReadOnlyMirror, ModelAdmin):
+    list_display = ('user', 'student_id', 'grade', 'group', 'status', 'is_active', 'loyverse_id')
+    list_filter = ('grade', 'group', 'status', 'is_active')
     search_fields = ('user__email', 'user__first_name', 'user__last_name',
                      'student_id', 'loyverse_id')
     raw_id_fields = ('user', 'parents')
@@ -62,7 +76,7 @@ class StudentProfileAdmin(ModelAdmin):
     inlines = [LoyverseProfileInline]
 
 @admin.register(ParentProfile)
-class ParentProfileAdmin(ModelAdmin):
+class ParentProfileAdmin(ReadOnlyMirror, ModelAdmin):
     list_display = ('user', 'phone', 'relationship')
     search_fields = ('user__email', 'user__first_name', 'user__last_name', 'phone')
     list_select_related = ('user',)

@@ -407,8 +407,12 @@ class MyCardsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        students = (_family_students_qs(request.user)
-                    .select_related('user', 'loyverse_profile'))
+        students = _family_students_qs(request.user)
+        # Staff credencial view (BACKLOG P1-A9): an admin asks for one student.
+        student_id = request.query_params.get('student')
+        if student_id and request.user.role == User.Role.ADMIN:
+            students = StudentProfile.objects.filter(pk=student_id)
+        students = students.select_related('user', 'loyverse_profile')
         cards = []
         for s in students:
             balance, _ = CafeteriaBalance.objects.get_or_create(student=s)

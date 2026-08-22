@@ -290,6 +290,9 @@ export const cafeteriaApi = {
     }),
 
   // Digital student card(s): identity + code (QR/barcode) + balance + Loyverse stats.
+  /** Admin: one student's card (staff credencial view). */
+  getStudentCard: (studentId: number) =>
+    api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/', { params: { student: studentId } }),
   getCards: () => api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/'),
 
   // Read-only recent purchases pulled live from Loyverse (does not touch the ledger).
