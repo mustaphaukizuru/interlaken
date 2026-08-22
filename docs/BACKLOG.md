@@ -151,18 +151,18 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-H4 | Family exports: payments, cafetería movements per child, credential PDF. | DONE 2026-08-22 (payments CSV + comprobante PDF; cafetería CSV/PDF existed; credencial prints from the portal) |
 | P1-H5 | Admin dashboard re-cut: cafetería total balance, low-balance count, today's visitas, activity feed, quick actions. | DONE 2026-08-22 (8 KPIs incl. saldo total, saldos bajos, recargas por aplicar, visitas hoy, por atender; actividad reciente from AuditLog) |
 | P1-H6 | Parent dashboard: per-child tiles, low-balance warning with quick top-up, announcements preview. | DONE 2026-08-22 (per-child balance tiles with +$100/+$200 deep links when >1 child; alert and announcements existed) |
-| P1-H7 | Staff analytics: date range picker and export. | Refine |
-| P1-H8 | Chart palette with nivel colors, empty/loading states, es-MX currency. | Refine |
+| P1-H7 | Staff analytics: date range picker and export. | DONE (7/30/90-day range + CSV already shipped) |
+| P1-H8 | Chart palette with nivel colors, empty/loading states, es-MX currency. | DONE 2026-08-22 (chartTheme; nivel tokens; skeleton/empty states) |
 
 ### P1-I. Cross-cutting UI/UX
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-I1 | Design tokens aligned to brand (green/coral, no teal) and nivel colors; tokens file. | Partial |
+| P1-I1 | Design tokens aligned to brand (green/coral, no teal) and nivel colors; tokens file. | DONE 2026-08-22 (docs/DESIGN-TOKENS.md; --nivel-* tokens + Tailwind nivel.*; no teal in code) |
 | P1-I2 | Consistent field component with inline validation; draft autosave on long forms. | Refine |
 | P1-I3 | Uniform EmptyState/ErrorState/Skeleton; optimistic updates. | Refine |
-| P1-I4 | Accessibility: focus rings, aria on icon buttons, contrast of nivel colors, reduced motion. | Refine |
-| P1-I5 | Dark-mode safety (no breakage under system dark). | Missing |
+| P1-I4 | Accessibility: focus rings, aria on icon buttons, contrast of nivel colors, reduced motion. | DONE 2026-08-22 (audit: 0 icon-only buttons without labels; global focus-visible; reduced-motion honored; nivel yellow accent-only) |
+| P1-I5 | Dark-mode safety (no breakage under system dark). | DONE 2026-08-22 (html color-scheme: light) |
 | P1-I6 | Consistency pass: PageHeader/Card rhythm, button hierarchy, date/currency formatting. | Refine |
 | P1-I7 | Full UI/UX audit document organized by category (e.g. admin edit tables on mobile). | Missing |
 
