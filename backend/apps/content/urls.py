@@ -1,5 +1,13 @@
 from django.urls import path
 
+from .forms import (
+    FormDetailView,
+    FormListCreateView,
+    FormSubmissionDetailView,
+    FormSubmissionsView,
+    PublicFormSubmitView,
+    PublicFormView,
+)
 from .media import MediaDetailView, MediaListCreateView, MediaServeView
 from .pages import (
     PageDetailView,
@@ -40,6 +48,12 @@ urlpatterns = [
     path('admin/pages/<int:pk>/publish/', PagePublishView.as_view(), name='admin-page-publish'),
     path('admin/pages/<int:pk>/versions/', PageVersionsView.as_view(), name='admin-page-versions'),
     path('admin/pages/<int:pk>/preview-token/', PagePreviewTokenView.as_view(), name='admin-page-preview-token'),
+    path('forms/<slug:slug>/', PublicFormView.as_view(), name='cms-form'),
+    path('forms/<slug:slug>/submit/', PublicFormSubmitView.as_view(), name='cms-form-submit'),
+    path('admin/forms/', FormListCreateView.as_view(), name='admin-forms'),
+    path('admin/forms/<int:pk>/', FormDetailView.as_view(), name='admin-form-detail'),
+    path('admin/forms/<int:pk>/submissions/', FormSubmissionsView.as_view(), name='admin-form-submissions'),
+    path('admin/form-submissions/<int:pk>/', FormSubmissionDetailView.as_view(), name='admin-form-submission-detail'),
     path('admin/media/', MediaListCreateView.as_view(), name='admin-media'),
     path('admin/media/<int:pk>/', MediaDetailView.as_view(), name='admin-media-detail'),
     path('admin/testimonials/', AdminTestimonialsView.as_view(), name='admin-testimonials'),

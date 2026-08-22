@@ -12,3 +12,11 @@ export function formatMXN(v: string | number | null | undefined): string {
 export function formatPrice(v: string | number | null): string {
   return v === null ? 'SIN COSTO' : formatMXN(v);
 }
+
+/** "22 ago 2026, 14:05" in es-MX; empty string for null. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}

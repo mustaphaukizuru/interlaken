@@ -41,6 +41,7 @@ def portal_badges(user) -> dict:
     from apps.admissions.models import PreRegistration, Registration
     from apps.bookings.models import Booking
     from apps.cafeteria.models import TopUpRequest
+    from apps.content.forms import FormSubmission
 
     out.update({
         'admisiones': PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
@@ -49,5 +50,6 @@ def portal_badges(user) -> dict:
         'cafeteria': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
         'contrasenas': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
         'mensajes': unhandled_contact_messages(None),
+        'formularios': FormSubmission.objects.filter(is_handled=False).count(),
     })
     return out

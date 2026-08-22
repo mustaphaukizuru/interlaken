@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Testimonials } from '@/components/public/Testimonials';
 import { HistoryTimeline } from '@/components/public/HistoryTimeline';
 import { PricingSections } from '@/pages/public/CostosPage';
+import { CmsForm } from './CmsForm';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { LEVELS } from '@/lib/levels';
 import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
@@ -203,7 +204,7 @@ function OpenSchoolBlock() {
   );
 }
 
-/** Form block: until the forms builder (P3-6) ships, it links to the matching built-in form. */
+/** Form block: a CMS-built form by slug, or a link to one of the built-in (code) forms. */
 const BUILTIN_FORMS: Record<string, { label: string; to: string }> = {
   'pre-registro': { label: 'Ir al pre-registro', to: '/pre-registro' },
   'contacto': { label: 'Escribirnos', to: '/contacto' },
@@ -212,8 +213,9 @@ const BUILTIN_FORMS: Record<string, { label: string; to: string }> = {
 };
 function FormBlock({ slug }: { slug: string }) {
   const f = BUILTIN_FORMS[slug];
-  if (!f) return null;
-  return <Section bg="cream" containerSize="md"><div className="text-center"><Link to={f.to} className="btn-pink">{f.label} <ArrowRight size={16} /></Link></div></Section>;
+  if (f) return <Section bg="cream" containerSize="md"><div className="text-center"><Link to={f.to} className="btn-pink">{f.label} <ArrowRight size={16} /></Link></div></Section>;
+  if (!slug) return null;
+  return <Section bg="cream" containerSize="md"><div className="card"><CmsForm slug={slug} /></div></Section>;
 }
 
 /** Route element: renders a published CMS page by slug, or the draft when ?preview=<token>. */

@@ -5,7 +5,7 @@ import {
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 /** Keys returned by GET /core/badges/ (BACKLOG P1-E3). */
-export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones' | 'mensajes';
+export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios';
 
 export interface NavEntry {
   icon: LucideIcon;
@@ -78,6 +78,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       heading: 'Contenido del sitio',
       items: [
         { icon: FileText,      label: 'Páginas',     to: '/admin/contenido' },
+        { icon: ClipboardList, label: 'Formularios', to: '/admin/formularios', badgeKey: 'formularios' },
         { icon: Image,         label: 'Biblioteca de medios', to: '/admin/contenido/medios' },
         { icon: CalendarClock, label: 'Calendario',  to: '/admin/calendario' },
         { icon: Megaphone,     label: 'Testimonios', to: '/admin/testimonios' },

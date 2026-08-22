@@ -291,5 +291,6 @@ class Testimonial(models.Model):
 
 
 # CMS media library lives in content/media.py (model + views); re-exported for migrations/admin.
+from .forms import FormDefinition, FormSubmission  # noqa: E402,F401
 from .media import MediaAsset  # noqa: E402,F401
 from .pages import Page, PageVersion  # noqa: E402,F401

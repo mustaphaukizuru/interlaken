@@ -785,6 +785,45 @@ export interface SchoolEvent {
   description: string;
   is_published: boolean;
 }
+export type FormFieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'date' | 'number';
+export interface FormField {
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  help?: string;
+  show_if?: { field: string; equals: string } | null;
+}
+export interface FormDefinitionPublic {
+  slug: string;
+  title: string;
+  description: string;
+  fields: FormField[];
+  consent_text: string;
+  success_message: string;
+  submit_label: string;
+}
+export interface FormDefinitionAdmin extends FormDefinitionPublic {
+  id: number;
+  notify_to: string;
+  is_published: boolean;
+  submissions_count: number;
+  pending_count: number;
+  updated_at: string;
+}
+export interface FormSubmission {
+  id: number;
+  form: number;
+  form_title: string;
+  data: Record<string, string | boolean>;
+  page: string;
+  is_handled: boolean;
+  reply_to: string;
+  created_at: string;
+}
+
 export interface CmsPageAdmin {
   id: number;
   slug: string;
@@ -851,6 +890,16 @@ export const contentApi = {
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
   adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
   adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
+  /** CMS forms builder (BACKLOG P3-6). */
+  getForm: (slug: string) => api.get<FormDefinitionPublic>(`/content/forms/${encodeURIComponent(slug)}/`),
+  submitForm: (slug: string, data: Record<string, unknown>) => api.post<{ ok: boolean; message: string }>(`/content/forms/${encodeURIComponent(slug)}/submit/`, data),
+  adminListForms: () => api.get<FormDefinitionAdmin[]>('/content/admin/forms/'),
+  adminCreateForm: (data: Partial<FormDefinitionAdmin>) => api.post<FormDefinitionAdmin>('/content/admin/forms/', data),
+  adminUpdateForm: (id: number, data: Partial<FormDefinitionAdmin>) => api.patch<FormDefinitionAdmin>(`/content/admin/forms/${id}/`, data),
+  adminDeleteForm: (id: number) => api.delete(`/content/admin/forms/${id}/`),
+  adminFormSubmissions: (id: number, params?: { handled?: '0' | '1' }) => api.get<FormSubmission[]>(`/content/admin/forms/${id}/submissions/`, { params }),
+  adminFormSubmissionsCsvUrl: (id: number) => `/api/v1/content/admin/forms/${id}/submissions/?export=csv`,
+  adminHandleSubmission: (id: number, is_handled: boolean) => api.patch<FormSubmission>(`/content/admin/form-submissions/${id}/`, { is_handled }),
   /** CMS media library (BACKLOG P3-1). */
   adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),
   adminUploadMedia: (file: File, meta?: { alt?: string; caption?: string; tags?: string }) => {
