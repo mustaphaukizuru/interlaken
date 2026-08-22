@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useMobileNav } from './PortalLayout';
 import { NotificationsMenu } from './NotificationsMenu';
 import { AccountMenu } from './AccountMenu';
+import { QuickActions } from './QuickActions';
 
 /**
  * Shell-level top chrome, rendered by PortalLayout on EVERY authenticated route.
@@ -18,8 +19,8 @@ export default function AppHeader() {
     <>
       <div className="accent-bar" />
       <header
-        className={`z-30 flex items-center gap-3 border-b border-line bg-cream/95 px-4 py-3 transition-shadow duration-200 sm:gap-4 sm:px-6 lg:px-8 ${
-          scrolled ? 'shadow-[0_10px_24px_-18px_rgba(16,12,40,0.55)]' : ''
+        className={`z-30 flex items-center gap-3 border-b border-line bg-cream/95 px-4 transition-[box-shadow,padding] duration-200 sm:gap-4 sm:px-6 lg:px-8 ${
+          scrolled ? 'py-2 shadow-[0_10px_24px_-18px_rgba(16,12,40,0.55)]' : 'py-3'
         }`}
       >
         {/* Mobile hamburger — the single source of drawer access on every page */}
@@ -55,6 +56,7 @@ export default function AppHeader() {
           </button>
         )}
 
+        {user?.role === 'admin' && <QuickActions />}
         <NotificationsMenu />
         <AccountMenu />
       </header>

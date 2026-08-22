@@ -30,7 +30,7 @@ const STATUS: Record<string, { label: string; variant: 'warning' | 'success' | '
 export default function AdminPasswordRequests() {
   const qc = useQueryClient();
   const [status, setStatus] = useState<'open' | 'resolved' | 'rejected' | ''>('open');
-  const [logOpen, setLogOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
   const [toReject, setToReject] = useState<PasswordRequest | null>(null);
   const [toResolve, setToResolve] = useState<PasswordRequest | null>(null);
   const [resolved, setResolved] = useState<PasswordRequestResolved | null>(null);

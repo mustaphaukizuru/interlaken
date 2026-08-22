@@ -39,7 +39,8 @@ export default function AdminAnnouncements() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
-  const [open, setOpen] = useState(false);
+  // ?nuevo=1 deep link from the header quick actions (P1-E8).
+  const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
   const [report, setReport] = useState<Announcement | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);

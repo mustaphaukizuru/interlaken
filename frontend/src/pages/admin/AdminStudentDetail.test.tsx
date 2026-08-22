@@ -73,7 +73,7 @@ describe('AdminStudentDetail', () => {
     expect(screen.queryByText('Datos del alumno')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Reintentar/i }));
-    expect(await screen.findByText('Luis López')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Luis López' })).toBeInTheDocument();
   });
 
   it('renders identity, guardians and the cafetería shortcut (no tuition UI)', async () => {
@@ -81,7 +81,7 @@ describe('AdminStudentDetail', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Luis López')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Luis López' })).toBeInTheDocument();
     expect(screen.getByText(/Matrícula A-007 · 3° A/)).toBeInTheDocument();
     expect(screen.getByText('Datos del alumno')).toBeInTheDocument();
     expect(screen.getByText('luis@interlaken.test')).toBeInTheDocument();

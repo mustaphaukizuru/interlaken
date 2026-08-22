@@ -30,7 +30,7 @@ export default function AdminStudents() {
   const estado = get('estado');
   const acceso = get('acceso');
   const [importOpen, setImportOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
   const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 

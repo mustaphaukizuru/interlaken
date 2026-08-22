@@ -112,11 +112,11 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-E3 | Live badges (pending admisiones, unread comunicados, pending visitas). | DONE 2026-08-22 (/core/badges/: admisiones, visitas, cafetería top-ups, contraseñas, notificaciones; sidebar + tab bar) |
 | P1-E4 | ChildSwitcher in sidebar top for parents. | Refine |
 | P1-E5 | Sidebar user card opens AccountMenu. | DONE 2026-08-22 |
-| P1-E6 | Header breadcrumbs replacing back-links. | Missing |
+| P1-E6 | Header breadcrumbs replacing back-links. | DONE 2026-08-22 (Breadcrumbs in PageHeader, derived from navConfig; sm+) |
 | P1-E7 | Command palette for parents or clean hide on mobile. | Partial |
-| P1-E8 | Admin "+ Nuevo" quick actions. | Missing |
-| P1-E9 | Header avatar + name; notifications grouped with deep links (see B2). | Refine |
-| P1-E10 | Sticky compact header on scroll. | Refine |
+| P1-E8 | Admin "+ Nuevo" quick actions. | DONE 2026-08-22 (alumno, comunicado, recarga, solicitud de contraseña, emergencia; ?nuevo=1 deep links) |
+| P1-E9 | Header avatar + name; notifications grouped with deep links (see B2). | DONE (AccountMenu already shows avatar + name; notifications done in B2) |
+| P1-E10 | Sticky compact header on scroll. | DONE 2026-08-22 |
 
 ### P1-F. Profile and settings
 
