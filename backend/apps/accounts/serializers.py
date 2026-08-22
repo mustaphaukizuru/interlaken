@@ -37,13 +37,28 @@ class UserSerializer(serializers.ModelSerializer):
         return NotificationPreferenceSerializer(prefs).data
 
 
+MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes')
+
+
 class StudentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    age = serializers.ReadOnlyField()
 
     class Meta:
         model = StudentProfile
         fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id',
-                  'enrollment_date', 'is_active', 'status']
+                  'enrollment_date', 'is_active', 'status',
+                  'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
+                  'blood_type', 'allergies', 'medical_notes']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Medical data only for admins and the student's own family (LFPDPPP);
+        # rosters/lists pass include_medical=False and never carry it.
+        if not self.context.get('include_medical'):
+            for f in MEDICAL_FIELDS:
+                data.pop(f, None)
+        return data
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):

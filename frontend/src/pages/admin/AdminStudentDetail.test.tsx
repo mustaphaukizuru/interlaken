@@ -85,7 +85,10 @@ describe('AdminStudentDetail', () => {
     expect(screen.getByText(/Matrícula A-007 · 3° A/)).toBeInTheDocument();
     expect(screen.getByText('Datos del alumno')).toBeInTheDocument();
     expect(screen.getByText('luis@interlaken.test')).toBeInTheDocument();
+    // Guardians live on their own tab now (P1-A2).
+    await userEvent.click(screen.getByRole('tab', { name: /Tutores/i }));
     expect(screen.getByTestId('student-guardians')).toHaveTextContent('7');
+    await userEvent.click(screen.getByRole('tab', { name: /Datos/i }));
 
     // Tuition billing is gone — no ledger, KPIs or discounts may resurface.
     expect(screen.queryByText(/colegiatura/i)).not.toBeInTheDocument();

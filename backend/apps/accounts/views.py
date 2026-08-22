@@ -400,9 +400,16 @@ class StudentListView(generics.ListAPIView):
 
 
 class StudentDetailView(generics.RetrieveAPIView):
-    """GET /api/v1/accounts/students/<pk>/"""
+    """GET /api/v1/accounts/students/<pk>/ — full file (medical data gated to admin/own family)."""
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        # The queryset is already family-scoped, so anyone who can retrieve the
+        # object is its admin or its family: medical data may be shown.
+        ctx['include_medical'] = True
+        return ctx
 
     def get_queryset(self):
         user = self.request.user

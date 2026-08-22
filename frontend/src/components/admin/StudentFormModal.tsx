@@ -46,6 +46,14 @@ function initial(student?: StudentProfile | null): StudentWrite {
     enrollment_date: student?.enrollment_date ?? '',
     is_active: student?.is_active ?? true,
     status: student?.status ?? 'active',
+    birth_date: student?.birth_date ?? '',
+    curp: student?.curp ?? '',
+    emergency_name: student?.emergency_name ?? '',
+    emergency_phone: student?.emergency_phone ?? '',
+    emergency_rel: student?.emergency_rel ?? '',
+    blood_type: student?.blood_type ?? '',
+    allergies: student?.allergies ?? '',
+    medical_notes: student?.medical_notes ?? '',
   };
 }
 
@@ -58,7 +66,7 @@ export function StudentFormModal({ open, onClose, student, onSaved }: Props) {
   const qc = useQueryClient();
   const editing = !!student;
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Editar alumno' : 'Nuevo alumno'} maxWidth={560}>
+    <Modal open={open} onClose={onClose} title={editing ? 'Editar alumno' : 'Nuevo alumno'} maxWidth={640}>
       {/* Keyed so each open starts from the current student (no effect-driven reset). */}
       <StudentForm key={`${open}-${student?.id ?? 'new'}`} student={student} onClose={onClose} onSaved={onSaved} qc={qc} />
     </Modal>
@@ -80,7 +88,7 @@ function StudentForm({ student, onClose, onSaved, qc }: {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload: StudentWrite = { ...form, enrollment_date: form.enrollment_date || null };
+      const payload: StudentWrite = { ...form, enrollment_date: form.enrollment_date || null, birth_date: form.birth_date || null };
       const { data } = editing
         ? await portalApi.updateStudent(student!.id, payload)
         : await portalApi.createStudent(payload);
@@ -143,6 +151,33 @@ function StudentForm({ student, onClose, onSaved, qc }: {
           inputMode="email"
           autoComplete="off"
         />
+        <fieldset className="space-y-4 rounded-xl border border-line p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Datos personales</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="Fecha de nacimiento" type="date" value={form.birth_date ?? ''} onChange={(e) => set('birth_date', e.target.value)} error={errors.birth_date} />
+            <Input label="CURP" value={form.curp ?? ''} onChange={(e) => set('curp', e.target.value.toUpperCase())} error={errors.curp} maxLength={18} autoComplete="off" />
+          </div>
+        </fieldset>
+        <fieldset className="space-y-4 rounded-xl border border-line p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Contacto de emergencia</legend>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Input label="Nombre" value={form.emergency_name ?? ''} onChange={(e) => set('emergency_name', e.target.value)} />
+            <Input label="Teléfono" inputMode="tel" value={form.emergency_phone ?? ''} onChange={(e) => set('emergency_phone', e.target.value)} />
+            <Input label="Parentesco" value={form.emergency_rel ?? ''} onChange={(e) => set('emergency_rel', e.target.value)} />
+          </div>
+        </fieldset>
+        <fieldset className="space-y-4 rounded-xl border border-coral/30 bg-coral-50/40 p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-coral-600">Datos médicos (confidencial)</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="Tipo de sangre" value={form.blood_type ?? ''} onChange={(e) => set('blood_type', e.target.value.toUpperCase())} maxLength={10} placeholder="O+" />
+            <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} hint="Visible en cafetería para evitar incidentes." />
+          </div>
+          <div>
+            <label className="label" htmlFor="sf-med">Notas médicas</label>
+            <textarea id="sf-med" className="input-field min-h-[80px]" value={form.medical_notes ?? ''} onChange={(e) => set('medical_notes', e.target.value)} />
+            <p className="mt-1.5 text-xs text-subtle">Cifrado en reposo; solo administración y la familia del alumno lo ven.</p>
+          </div>
+        </fieldset>
         <div>
           <label className="label" htmlFor="sf-status">Estado</label>
           <select id="sf-status" className="input-field min-h-[44px]" value={form.status ?? 'active'} onChange={(e) => set('status', e.target.value as StudentStatus)}>

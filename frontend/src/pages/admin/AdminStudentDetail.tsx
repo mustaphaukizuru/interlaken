@@ -71,8 +71,25 @@ function CredencialCard({ studentId }: { studentId: number }) {
   );
 }
 
+type Tab = 'datos' | 'tutores' | 'cafeteria';
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'datos', label: 'Datos' },
+  { key: 'tutores', label: 'Tutores' },
+  { key: 'cafeteria', label: 'Cafetería y credencial' },
+];
+
+function Field({ label, value }: { label: string; value?: string | number | null }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-ink break-words">{value === null || value === undefined || value === '' ? '—' : value}</dd>
+    </div>
+  );
+}
+
 function StudentDetailBody({ student }: { student: StudentProfile }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>('datos');
   return (
     <>
       <StudentFormModal open={editOpen} onClose={() => setEditOpen(false)} student={student} />
@@ -91,6 +108,16 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
         )}
       />
 
+      <div role="tablist" aria-label="Secciones del expediente" className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-cream-2 p-1">
+        {TABS.map((t) => (
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+            className={`min-h-[40px] whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'datos' && (<>
       <Card title="Datos del alumno">
         <dl className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <div>
@@ -120,10 +147,39 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
         </dl>
       </Card>
 
-      <div className="mt-6 space-y-6">
-        <StudentGuardians studentId={student.id} />
-        <CredencialCard studentId={student.id} />
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card title="Datos personales">
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <Field label="Fecha de nacimiento" value={student.birth_date} />
+            <Field label="Edad" value={student.age != null ? `${student.age} años` : null} />
+            <Field label="CURP" value={student.curp} />
+          </dl>
+        </Card>
+        <Card title="Contacto de emergencia">
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <Field label="Nombre" value={student.emergency_name} />
+            <Field label="Teléfono" value={student.emergency_phone} />
+            <Field label="Parentesco" value={student.emergency_rel} />
+          </dl>
+        </Card>
+        <Card title="Datos médicos (confidencial)" className="lg:col-span-2 border-coral/30">
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <Field label="Tipo de sangre" value={student.blood_type} />
+            <Field label="Alergias" value={student.allergies} />
+            <Field label="Notas médicas" value={student.medical_notes} />
+          </dl>
+        </Card>
       </div>
+      </>)}
+
+      {tab === 'tutores' && <StudentGuardians studentId={student.id} />}
+
+      {tab === 'cafeteria' && (
+        <div className="space-y-6">
+          <CredencialCard studentId={student.id} />
+          <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline"><Coffee size={16} aria-hidden="true" /> Abrir saldo y movimientos</Link>
+        </div>
+      )}
     </>
   );
 }

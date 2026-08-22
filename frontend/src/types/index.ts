@@ -26,6 +26,15 @@ export interface StudentProfile {
   enrollment_date?: string | null;
   is_active?: boolean;
   status?: 'active' | 'on_leave' | 'graduated' | 'withdrawn';
+  birth_date?: string | null;
+  age?: number | null;
+  curp?: string;
+  emergency_name?: string;
+  emergency_phone?: string;
+  emergency_rel?: string;
+  blood_type?: string;
+  allergies?: string;
+  medical_notes?: string;
 }
 
 export interface CafeteriaBalance {

@@ -51,6 +51,14 @@ export interface StudentWrite {
   enrollment_date?: string | null;
   is_active?: boolean;
   status?: StudentStatus;
+  birth_date?: string | null;
+  curp?: string;
+  emergency_name?: string;
+  emergency_phone?: string;
+  emergency_rel?: string;
+  blood_type?: string;
+  allergies?: string;
+  medical_notes?: string;
 }
 
 export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';

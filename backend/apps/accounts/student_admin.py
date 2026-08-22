@@ -24,7 +24,10 @@ from .import_students import STUDENT_EMAIL_DOMAIN
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer
 
-EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id', 'status')
+EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id', 'status',
+                    'birth_date', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
+                    'blood_type', 'allergies', 'medical_notes')
+SENSITIVE = ('blood_type', 'allergies', 'medical_notes')
 EDITABLE_USER = ('first_name', 'last_name', 'email')
 
 
@@ -38,6 +41,17 @@ class StudentWriteSerializer(serializers.Serializer):
     enrollment_date = serializers.DateField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False)
     status = serializers.ChoiceField(choices=StudentProfile.Status.choices, required=False)
+    birth_date = serializers.DateField(required=False, allow_null=True)
+    curp = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    emergency_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    emergency_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    emergency_rel = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    blood_type = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    allergies = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+    medical_notes = serializers.CharField(max_length=4000, required=False, allow_blank=True)
+
+    def validate_curp(self, value):
+        return (value or '').strip().upper()
     loyverse_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     def __init__(self, *args, partial=False, **kwargs):
@@ -77,7 +91,11 @@ def _snapshot(profile: StudentProfile) -> dict:
     u = profile.user
     snap = {k: getattr(u, k) for k in EDITABLE_USER}
     snap.update({k: getattr(profile, k) for k in EDITABLE_PROFILE})
-    snap['enrollment_date'] = snap['enrollment_date'].isoformat() if snap['enrollment_date'] else None
+    for k in ('enrollment_date', 'birth_date'):
+        snap[k] = snap[k].isoformat() if snap[k] else None
+    # Never persist medical values in the audit payload (only that they changed).
+    for k in SENSITIVE:
+        snap[k] = '[set]' if snap[k] else ''
     return snap
 
 
@@ -110,7 +128,8 @@ class AdminStudentCreateView(APIView):
             # StudentProfile is auto-audited by core.audit signals; add the actor context.
             record('create', profile, {'via': 'portal', 'snapshot': _snapshot(profile)},
                    actor=request.user, context='portal: alta de alumno')
-        return Response(StudentProfileSerializer(profile).data, status=status.HTTP_201_CREATED)
+        return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data,
+                        status=status.HTTP_201_CREATED)
 
 
 class AdminStudentUpdateView(APIView):
@@ -126,7 +145,7 @@ class AdminStudentUpdateView(APIView):
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
         if not d:
-            return Response(StudentProfileSerializer(profile).data)
+            return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)
 
         before = _snapshot(profile)
         with transaction.atomic():
@@ -156,4 +175,4 @@ class AdminStudentUpdateView(APIView):
             if changes:
                 record('update', profile, {'via': 'portal', **changes},
                        actor=request.user, context='portal: edición de alumno')
-        return Response(StudentProfileSerializer(profile).data)
+        return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)

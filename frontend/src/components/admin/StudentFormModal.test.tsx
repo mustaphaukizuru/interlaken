@@ -27,7 +27,7 @@ describe('StudentFormModal', () => {
     createStudent.mockResolvedValue({ data: { id: 9, user: { email: 'a1@alumnos.interlaken.edu.mx' } } } as never);
     const onClose = vi.fn();
     renderWithProviders(<StudentFormModal open onClose={onClose} />);
-    await userEvent.type(screen.getByLabelText(/nombre/i), 'Ana');
+    await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Ana');
     await userEvent.type(screen.getByLabelText(/apellidos/i), 'Pérez');
     await userEvent.type(screen.getByLabelText(/matrícula/i), 'a1');
     await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');

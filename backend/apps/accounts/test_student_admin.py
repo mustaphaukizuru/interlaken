@@ -69,3 +69,20 @@ class TestUpdate:
         admin_client.patch(reverse('admin-student-update', args=[p.pk]), {'grade': '1° Primaria'}, format='json')
         assert not AuditLog.objects.filter(action='update', object_type='accounts.studentprofile',
                                            context='portal: edición de alumno').exists()
+
+
+class TestExtendedFile:
+    """P1-A2: extended data editable; medical fields gated to admin/own family and redacted in audit."""
+
+    def test_medical_hidden_in_roster_shown_in_detail(self, admin_client):
+        p = StudentProfileFactory()
+        admin_client.patch(reverse('admin-student-update', args=[p.pk]), {
+            'birth_date': '2018-03-04', 'curp': 'abcd180304hdfxxx01', 'allergies': 'Nuez',
+            'emergency_name': 'Tía', 'emergency_phone': '5511111111',
+        }, format='json')
+        roster = admin_client.get(reverse('students')).data['results'][0]
+        assert 'allergies' not in roster and roster['curp'] == 'ABCD180304HDFXXX01'
+        detail = admin_client.get(reverse('student-detail', args=[p.pk])).data
+        assert detail['allergies'] == 'Nuez' and detail['age'] is not None
+        log = AuditLog.objects.filter(context='portal: edición de alumno').latest('id')
+        assert log.changes['allergies'] == {'from': '', 'to': '[set]'}

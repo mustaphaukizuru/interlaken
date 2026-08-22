@@ -5,6 +5,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 
+from apps.core.fields import EncryptedTextField
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -94,6 +96,18 @@ class StudentProfile(models.Model):
     enrollment_date = models.DateField(null=True, blank=True)
     is_active     = models.BooleanField(default=True)
 
+    # Extended file (BACKLOG P1-A2). Medical fields are sensitive personal data:
+    # encrypted at rest (same as admissions.Registration) and only serialized for
+    # admins and the student's own family (see StudentProfileSerializer).
+    birth_date      = models.DateField(null=True, blank=True, verbose_name='Fecha de nacimiento')
+    curp            = models.CharField(max_length=20, blank=True, verbose_name='CURP')
+    emergency_name  = models.CharField(max_length=200, blank=True)
+    emergency_phone = models.CharField(max_length=20, blank=True)
+    emergency_rel   = models.CharField(max_length=50, blank=True)
+    blood_type      = EncryptedTextField(blank=True, default='')
+    allergies       = EncryptedTextField(blank=True, default='')
+    medical_notes   = EncryptedTextField(blank=True, default='')
+
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Activo'
         ON_LEAVE = 'on_leave', 'Baja temporal'
@@ -130,6 +144,14 @@ class StudentProfile(models.Model):
 
     def __str__(self):
         return f'{self.user.full_name} — {self.grade} {self.group}'
+
+    @property
+    def age(self):
+        if not self.birth_date:
+            return None
+        today = timezone.localdate()
+        return today.year - self.birth_date.year - (
+            (today.month, today.day) < (self.birth_date.month, self.birth_date.day))
 
 
 class ParentProfile(models.Model):

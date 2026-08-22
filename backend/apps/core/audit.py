@@ -190,7 +190,9 @@ def connect_default_tracking():
     register_audit(CafeteriaTransaction, ['amount', 'transaction_type', 'balance_after'],
                    'cafeteria.wallet')
     # Student personal + medical fields.
-    register_audit(StudentProfile, ['grade', 'group', 'loyverse_id', 'is_active'],
+    register_audit(StudentProfile, ['grade', 'group', 'loyverse_id', 'is_active', 'status',
+                                    'birth_date', 'curp', 'emergency_phone',
+                                    'blood_type', 'allergies', 'medical_notes'],
                    'student.personal')
     register_audit(Registration, ['blood_type', 'allergies', 'medical_notes'],
                    'student.medical',
