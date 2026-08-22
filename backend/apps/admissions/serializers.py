@@ -33,7 +33,7 @@ class PreRegistrationSerializer(serializers.ModelSerializer):
             'id', 'child_first_name', 'child_last_name', 'child_dob',
             'level', 'grade_applying', 'cycle',
             'parent_name', 'parent_email', 'parent_phone', 'relationship',
-            'referral_source', 'message', 'created_at',
+            'referral_source', 'message', 'wants_visit', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -54,6 +54,16 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
     phone            = serializers.CharField(max_length=20)
     how_did_you_hear = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     message          = serializers.CharField(required=False, allow_blank=True, default='')
+    wants_visit      = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        # Age rule (BACKLOG P1-G1): strict on the public form.
+        from .eligibility import eligibility_error
+
+        err = eligibility_error(attrs.get('child_dob'), attrs.get('grade_applying', ''))
+        if err:
+            raise serializers.ValidationError({'grade_applying': err})
+        return attrs
 
     _LEVEL_KEYWORDS = (
         ('preescolar', PreRegistration.Level.PRESCHOOL),
@@ -85,6 +95,7 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
             parent_phone=validated['phone'],
             referral_source=validated.get('how_did_you_hear', ''),
             message=validated.get('message', ''),
+            wants_visit=validated.get('wants_visit', False),
         )
 
     def to_representation(self, instance):

@@ -10,10 +10,20 @@ from apps.accounts.factories import AdminFactory
 from apps.admissions.models import PreRegistration
 
 
+def _dob_for(grade: str) -> str:
+    """A birth date that satisfies the 31-Dec age rule for ``grade`` (P1-G1)."""
+    from django.utils import timezone
+
+    from apps.admissions.eligibility import required_age
+    year = timezone.localdate().year
+    return f'{year - (required_age(grade) or 13)}-05-01'
+
+
 def _payload(**over):
+    grade = over.get('grade_applying', 'Secundaria 2°')
     data = {
         'child_name': 'Ana María Pérez',
-        'child_dob': '2010-05-01',
+        'child_dob': _dob_for(grade),
         'grade_applying': 'Secundaria 2°',
         'parent_name': 'Roberto Pérez',
         'email': 'roberto@test.mx',

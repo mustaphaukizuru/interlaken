@@ -217,6 +217,7 @@ export interface PreRegistrationData {
   phone: string;
   how_did_you_hear?: string;
   message?: string;
+  wants_visit?: boolean;
 }
 
 export interface OpenSchoolEvent {

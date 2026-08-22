@@ -133,8 +133,8 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-G1 | Pre-registro age eligibility on 31 Dec (Maternal 2, 1°Pre 3, 2°Pre 4, 3°Pre 5, 1°Prim 6) with warning/block and admin override reason. | Missing |
-| P1-G2 | Pre-registro: "¿Desea agendar una visita?" linked to booking. | Missing |
+| P1-G1 | Pre-registro age eligibility on 31 Dec (Maternal 2, 1°Pre 3, 2°Pre 4, 3°Pre 5, 1°Prim 6) with warning/block and admin override reason. | DONE 2026-08-22 (strict on public form: live hint + server 400; Maternal added; admins log exceptions in the console) |
+| P1-G2 | Pre-registro: "¿Desea agendar una visita?" linked to booking. | DONE 2026-08-22 (wants_visit field; success screen links to /agendar-visita; admin email shows it) |
 | P1-G3 | Agendar visita form enhancement. | Refine |
 | P1-G4 | Separate document upload form with per-document status. | Missing |
 | P1-G5 | Inscripción review; uploads move to G4. | Refine |

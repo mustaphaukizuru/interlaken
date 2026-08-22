@@ -124,7 +124,8 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
             (
                 f'Nivel: {obj.level}\nGrado: {obj.grade_applying}\n'
                 f'Padre/Tutor: {obj.parent_name}\nEmail: {obj.parent_email}\n'
-                f'Teléfono: {obj.parent_phone}'
+                f'Teléfono: {obj.parent_phone}\n'
+                f'Desea visita: {"Sí" if obj.wants_visit else "No"}'
             ),
             [recipient],
         )

@@ -40,6 +40,8 @@ class PreRegistration(models.Model):
     # How did they find us?
     referral_source = models.CharField(max_length=100, blank=True, verbose_name='¿Cómo nos conoció?')
     message         = models.TextField(blank=True, verbose_name='Comentarios adicionales')
+    # BACKLOG P1-G2: the family asked for a school visit from the pre-registro form.
+    wants_visit     = models.BooleanField(default=False, verbose_name='Desea agendar visita')
 
     # Status
     status     = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
