@@ -5,6 +5,7 @@ import {
 import { Seo } from '@/components/seo/Seo';
 import { ADMISSION_DOCS } from '@/lib/admisionesDocs';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 
 /** Admisiones → Documentación: lista completa con enlaces a trámites oficiales. */
 export default function DocumentacionPage() {
@@ -18,7 +19,7 @@ export default function DocumentacionPage() {
       />
 
       <section className="relative overflow-hidden bg-dark text-white">
-        <img src="/assets/primaria-gate.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <img src="/assets/primaria-gate.webp" srcSet={assetSrcSet("/assets/primaria-gate.webp", { full: true })} sizes="100vw" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
         <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
           <span className="section-label-pink inline-flex">Admisiones</span>

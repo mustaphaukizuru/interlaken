@@ -14,6 +14,8 @@
  * width/height on the <img> avoid layout shift.
  */
 
+import { assetSrcSet } from '@/lib/images'
+
 type Variant = 'horizontal' | 'stacked' | 'icon' | 'seal'
 type Theme = 'light' | 'dark'
 

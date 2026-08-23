@@ -20,6 +20,8 @@ urlpatterns = [
     path('loyverse/webhook/',            views.LoyverseWebhookView.as_view(),     name='cafeteria-loyverse-webhook'),
     path('loyverse/webhook/<str:token>/', views.LoyverseWebhookView.as_view(),    name='cafeteria-loyverse-webhook-token'),
     # Parent family statement (CSV of children's cafeteria transactions).
+    path('statement/',                   views.MyStatementPdfView.as_view(),      name='cafeteria-statement'),
+    path('admin/bulk-topup/',            views.AdminBulkTopUpView.as_view(),      name='admin-bulk-topup'),
     path('export/',                      views.ParentExportView.as_view(),        name='cafeteria-export'),
     # On-demand Loyverse poll (parents/staff) — does not wait for cron.
     path('refresh/',                     views.RefreshFromLoyverseView.as_view(), name='cafeteria-refresh'),

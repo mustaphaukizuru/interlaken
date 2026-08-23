@@ -17,6 +17,10 @@
   link.rel = 'preload';
   link.as = 'image';
   link.href = '/assets/court-wide.webp';
+  // Same candidates as the hero <img> srcSet (lib/images.ts) so the browser
+  // preloads the size it will actually render instead of two files.
+  link.setAttribute('imagesrcset', '/assets/court-wide-480.webp 480w, /assets/court-wide-960.webp 960w, /assets/court-wide.webp 1600w');
+  link.setAttribute('imagesizes', '100vw');
   link.fetchPriority = 'high';
   document.head.appendChild(link);
 })();

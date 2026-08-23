@@ -412,6 +412,23 @@ class StudentListView(generics.ListAPIView):
             elif acceso == 'nopass':
                 # Django stores unusable passwords with a leading '!'.
                 qs = qs.filter(user__password__startswith='!')
+            # P1-A8: ?nivel=preescolar|primaria|secundaria (grade text), ?grado=, ?grupo=, ?ordering=
+            nivel = self.request.query_params.get('nivel')
+            if nivel in ('maternal', 'preescolar', 'primaria', 'secundaria'):
+                qs = qs.filter(grade__icontains=nivel)
+            grado = self.request.query_params.get('grado')
+            if grado:
+                qs = qs.filter(grade=grado[:20])
+            grupo = self.request.query_params.get('grupo')
+            if grupo:
+                qs = qs.filter(group__iexact=grupo[:5])
+            ordering = self.request.query_params.get('ordering', '')
+            allowed = {'name': ('user__last_name', 'user__first_name'), 'student_id': ('student_id',), 'grade': ('grade', 'group'),
+                       'status': ('status',), 'last_login': ('user__last_login',)}
+            key, desc = ordering.lstrip('-'), ordering.startswith('-')
+            if key in allowed:
+                fields = allowed[key] + ('id',)
+                order = tuple(f'-{f}' if desc else f for f in fields)
             return qs.order_by(*order)
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent

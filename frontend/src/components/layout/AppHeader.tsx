@@ -41,17 +41,17 @@ export default function AppHeader() {
 
         <div className="flex-1" />
 
-        {/* Global search — opens the ⌘K command palette. Admin-only: other roles
-            have no global-search surface, so we don't show a dead box. */}
-        {user?.role === 'admin' && (
+        {/* ⌘K palette: admins search alumnos/reservas, families and staff jump to
+            sections (P1-E7). Desktop only: on phones the tab bar is the navigation. */}
+        {user && (
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
-            aria-label="Buscar alumnos o reservas"
+            aria-label={user.role === 'admin' ? 'Buscar alumnos o reservas' : 'Ir a una sección'}
             className="hidden w-[230px] items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-[9px] text-left shadow-card transition-colors hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:flex"
           >
             <Search size={15} className="text-subtle" aria-hidden="true" />
-            <span className="flex-1 text-[13px] text-subtle">Buscar…</span>
+            <span className="flex-1 text-[13px] text-subtle">{user.role === 'admin' ? 'Buscar…' : 'Ir a…'}</span>
             <kbd className="rounded border border-line px-1.5 py-0.5 text-[10px] font-semibold text-subtle">Ctrl K</kbd>
           </button>
         )}

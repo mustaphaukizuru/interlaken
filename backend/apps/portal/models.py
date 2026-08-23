@@ -28,6 +28,10 @@ class Announcement(models.Model):
     show_on_site = models.BooleanField('Publicar en el sitio', default=False)
     site_until = models.DateField('Mostrar en el sitio hasta', null=True, blank=True)
     site_link = models.CharField('Enlace del aviso', max_length=300, blank=True)
+    # BACKLOG P4-4: scheduling, acknowledgement, attachments from the media library.
+    publish_at = models.DateTimeField('Publicar el', null=True, blank=True, help_text='Vacío = al guardar. Mientras no llegue la hora, el comunicado es un borrador programado.')
+    requires_ack = models.BooleanField('Requiere enterado', default=False)
+    attachments = models.JSONField(default=list, blank=True)   # [{id: MediaAsset pk, name}]
     # Set when the audience has been fan-out notified (create or first activate).
     # Prevents re-notify on deactivate→reactivate (GO-LIVE-AUDIT #16 follow-up).
     fanout_at  = models.DateTimeField(null=True, blank=True)
@@ -131,6 +135,7 @@ class AnnouncementRead(models.Model):
                        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                        related_name='announcement_reads')
     read_at      = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)   # P4-4 'Enterado'
 
     class Meta:
         constraints = [models.UniqueConstraint(

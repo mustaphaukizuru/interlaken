@@ -210,9 +210,17 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Lighthouse CI (budgets in lighthouserc.json)
+      - name: Lighthouse CI desktop (budgets in lighthouserc.json)
         working-directory: frontend
         run: npx --yes @lhci/cli@0.14.x autorun
+
+      # Mobile gate (BACKLOG P1-B12): simulated slow 4G on a 390px phone. The
+      # thresholds are the measured baseline of this client-rendered SPA
+      # (perf >= 0.60, LCP <= 9.5 s, TBT <= 600 ms, CLS <= 0.1); they exist to
+      # catch regressions, raise them when SSR/prerendering lands.
+      - name: Lighthouse CI mobile (lighthouserc.mobile.json)
+        working-directory: frontend
+        run: npx --yes @lhci/cli@0.14.x autorun --config=lighthouserc.mobile.json
       - name: Upload Lighthouse reports
         if: always()
         uses: actions/upload-artifact@v7

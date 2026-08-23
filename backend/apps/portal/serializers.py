@@ -8,7 +8,17 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Announcement
-        fields = ['id', 'title', 'body', 'audience', 'created_at', 'comment_count']
+        fields = ['id', 'title', 'body', 'audience', 'created_at', 'comment_count', 'requires_ack', 'attachments', 'acknowledged']
+
+    requires_ack = serializers.BooleanField(read_only=True)
+    attachments = serializers.JSONField(read_only=True)
+    acknowledged = serializers.SerializerMethodField()
+
+    def get_acknowledged(self, obj):
+        user = self.context.get('request').user if self.context.get('request') else None
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        return obj.reads.filter(user=user, acknowledged_at__isnull=False).exists()
 
     def get_comment_count(self, obj):
         # Prefer the annotation set by the list/detail queryset (avoids N+1);
@@ -36,11 +46,32 @@ class AnnouncementAdminSerializer(serializers.ModelSerializer):
     """Admin write/read shape for the Comunicados console (incl. inactive + stats)."""
     created_by_name = serializers.SerializerMethodField()
     read_count = serializers.SerializerMethodField()
+    ack_count = serializers.SerializerMethodField()
+
+    def get_ack_count(self, obj):
+        annotated = getattr(obj, 'ack_count_ann', None)
+        if annotated is not None:
+            return annotated
+        return obj.reads.filter(acknowledged_at__isnull=False).count()
+
+    def validate_attachments(self, value):
+        from apps.content.media import MediaAsset
+        if not isinstance(value, list) or len(value) > 10:
+            raise serializers.ValidationError('Máximo 10 adjuntos.')
+        ids = [a.get('id') for a in value if isinstance(a, dict)]
+        found = {m.pk: m for m in MediaAsset.objects.filter(pk__in=[i for i in ids if isinstance(i, int)])}
+        out = []
+        for a in value:
+            m = found.get(a.get('id')) if isinstance(a, dict) else None
+            if m is None:
+                raise serializers.ValidationError('Adjunto no encontrado en la biblioteca de medios.')
+            out.append({'id': m.pk, 'name': (a.get('name') or m.filename)[:120], 'url': m.public_url('original')})
+        return out
 
     class Meta:
         model = Announcement
         fields = ['id', 'title', 'body', 'audience', 'is_active', 'push_enabled',
-                  'show_on_site', 'site_until', 'site_link',
+                  'show_on_site', 'site_until', 'site_link', 'publish_at', 'requires_ack', 'attachments', 'ack_count',
                   'created_at', 'created_by_name', 'read_count']
         read_only_fields = ['id', 'created_at', 'created_by_name', 'read_count']
 

@@ -242,6 +242,17 @@ export default function CafeteriaPage() {
     }
   };
 
+  const downloadStatement = async () => {
+    if (!selectedStudent) return;
+    try {
+      const month = format(new Date(), 'yyyy-MM');
+      const { data } = await cafeteriaApi.statementPdf(selectedStudent, month);
+      downloadBlob(data, `estado-cuenta-cafeteria-${month}.pdf`);
+    } catch {
+      toast.error('No se pudo generar el estado de cuenta.');
+    }
+  };
+
   const exportMovements = async () => {
     setExporting(true);
     try {
@@ -317,6 +328,11 @@ export default function CafeteriaPage() {
               className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40"
             >
               <Download className="w-3 h-3" /> Descargar movimientos
+            </Button>
+          )}
+          {selectedStudent && (
+            <Button variant="secondary" size="sm" onClick={downloadStatement} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
+              <Download className="w-3 h-3" /> Estado de cuenta (PDF)
             </Button>
           )}
           <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} disabled={balancesLoading} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">

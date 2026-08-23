@@ -105,6 +105,22 @@ export default defineConfig(({ command }) => ({
             },
           },
           {
+            // Offline essentials (BACKLOG P4-9): the credencial (QR / card data)
+            // and the last comunicados stay available for 7 days without
+            // network, so a parent can still pay at the cafetería counter and
+            // re-read a circular in the car line. Listed BEFORE the generic
+            // /api/ rule so it wins.
+            urlPattern: ({ url }) =>
+              /^\/api\/v1\/(cafeteria\/cards|portal\/announcements|content\/settings)\/?$/.test(url.pathname),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'offline-essentials',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
             // Other API GETs — network-first with a short-lived fallback cache
             // so the portal shows recent data during brief offline windows.
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

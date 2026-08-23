@@ -92,6 +92,8 @@ class StudentProfile(models.Model):
     grade         = models.CharField(max_length=20)                     # e.g. "3° Primaria"
     group         = models.CharField(max_length=5, blank=True)          # e.g. "A"
     loyverse_id   = models.CharField(max_length=100, blank=True)        # Loyverse customer ID
+    registration  = models.OneToOneField('admissions.Registration', null=True, blank=True, on_delete=models.SET_NULL,
+                                         related_name='student_profile')  # origin when converted (P4-1)
     parents       = models.ManyToManyField(User, related_name='children', blank=True,
                                            limit_choices_to={'role': User.Role.PARENT})
     enrollment_date = models.DateField(null=True, blank=True)

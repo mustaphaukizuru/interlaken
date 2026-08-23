@@ -64,6 +64,9 @@ class SiteSettings(models.Model):
     school_year = models.CharField('Ciclo escolar', max_length=9, blank=True, help_text='AAAA-AAAA')
     last_rollover_at = models.DateTimeField(null=True, blank=True)
 
+    # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
+    tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')
+
     # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
     menu = models.JSONField('Menú del sitio', default=list, blank=True)
 

@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
+import { BulkTopUpDialog } from '@/components/admin/BulkTopUpDialog';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
@@ -110,6 +111,7 @@ function SchoolExportButtons() {
 
   return (
     <div className="flex items-center gap-2">
+      <BulkTopUpDialog />
       <Button size="sm" variant="secondary" loading={busy === 'csv'} onClick={() => doExport('csv')}>
         <Download className="w-3.5 h-3.5" /> CSV
       </Button>

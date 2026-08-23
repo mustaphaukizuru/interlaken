@@ -214,6 +214,7 @@
      mobile these tables are replaced by card stacks, so internal scroll is
      desktop-only by design. */
   .admin-table-wrap { @apply w-full overflow-auto rounded-xl2 border border-line; max-height: 68vh; }
+  .admin-table--dense tbody td { @apply py-1.5 text-[13px]; }
   .admin-table { @apply w-full border-collapse text-sm; }
   .admin-table thead th {
     @apply sticky top-0 z-10 whitespace-nowrap bg-cream-2 px-3 py-2.5 text-left font-head text-[11px] font-bold uppercase tracking-wider text-muted;

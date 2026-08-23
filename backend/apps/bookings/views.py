@@ -3,6 +3,7 @@ bookings/views.py — Public slot picker + booking, admin availability & managem
 """
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
@@ -288,6 +289,112 @@ class AdminBookingActionView(APIView):
         elif action == 'cancel':
             calendar.sync_booking_cancelled(booking)
         return Response(BookingSerializer(booking).data)
+
+
+class AdminBookingRescheduleView(APIView):
+    """POST /bookings/admin/bookings/<pk>/reschedule/ {"slot": id} — move a visit to another slot (P4-2).
+    Checks capacity, keeps the old slot as rescheduled_from, re-syncs the calendar and emails the family."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        booking = Booking.objects.select_related('slot').filter(pk=pk).first()
+        if booking is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        slot = AvailabilitySlot.objects.filter(pk=request.data.get('slot'), is_active=True).first()
+        if slot is None:
+            return Response({'slot': ['Horario no válido.']}, status=status.HTTP_400_BAD_REQUEST)
+        if slot.pk == booking.slot_id:
+            return Response({'slot': ['Es el mismo horario.']}, status=status.HTTP_400_BAD_REQUEST)
+        booked = Booking.objects.filter(slot=slot).exclude(status=Booking.Status.CANCELLED).exclude(pk=booking.pk).count()
+        if booked + booking.num_attendees > slot.capacity:
+            return Response({'slot': ['Ese horario ya no tiene cupo suficiente.']}, status=status.HTTP_400_BAD_REQUEST)
+        old = booking.slot
+        booking.rescheduled_from = old
+        booking.slot = slot
+        if booking.status in (Booking.Status.NO_SHOW, Booking.Status.CANCELLED):
+            booking.status = Booking.Status.CONFIRMED
+        booking.save(update_fields=['slot', 'rescheduled_from', 'status', 'updated_at'])
+        try:
+            calendar.sync_booking_cancelled(booking)
+            calendar.sync_booking_created(booking)
+        except Exception:  # noqa: BLE001 - calendar is best effort
+            pass
+        from apps.portal.services import send_email
+        send_email(
+            'Su visita al Colegio Interlaken cambió de horario',
+            f'Hola {booking.parent_name}:\n\nSu visita quedó reprogramada para el {slot.date:%d/%m/%Y} a las {slot.start_time:%H:%M}'
+            f' (antes {old.date:%d/%m/%Y} {old.start_time:%H:%M}).\n\nSi no le es posible, responda a este correo o escríbanos por WhatsApp.',
+            [booking.parent_email], reply_to=settings.ADMISSIONS_EMAIL)
+        from apps.core.audit import record
+        record('update', booking, {'slot': {'from': old.pk, 'to': slot.pk}}, actor=request.user, context='bookings: reprogramación')
+        return Response(BookingSerializer(booking).data)
+
+
+class AdminBookingOutcomeView(APIView):
+    """POST /bookings/admin/bookings/<pk>/outcome/ {"outcome", "note"?, "prereg_status"?} — post-visit result (P4-2).
+    Marks the visit attended, stores the outcome and optionally moves the linked
+    pre-registro (matched by parent email) to contacted/enrolled/rejected."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from apps.admissions.models import PreRegistration
+        booking = Booking.objects.filter(pk=pk).first()
+        if booking is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        outcome = str(request.data.get('outcome') or '')
+        if outcome not in Booking.Outcome.values or outcome == '':
+            return Response({'outcome': ['Resultado no válido.']}, status=status.HTTP_400_BAD_REQUEST)
+        booking.outcome = outcome
+        booking.outcome_note = str(request.data.get('note') or '')[:500]
+        if booking.status in (Booking.Status.CONFIRMED, Booking.Status.PENDING):
+            booking.status = Booking.Status.ATTENDED
+        booking.save(update_fields=['outcome', 'outcome_note', 'status', 'updated_at'])
+        linked = None
+        prereg = PreRegistration.objects.filter(parent_email__iexact=booking.parent_email).order_by('-created_at').first()
+        target = {'enrolling': PreRegistration.Status.ENROLLED, 'declined': PreRegistration.Status.REJECTED,
+                  'interested': PreRegistration.Status.CONTACTED, 'not_now': PreRegistration.Status.CONTACTED}.get(outcome)
+        if prereg is not None and request.data.get('update_prereg', True) and target and prereg.status != PreRegistration.Status.ENROLLED:
+            prereg.status = target
+            prereg.save(update_fields=['status', 'updated_at'])
+            linked = {'id': prereg.pk, 'status': prereg.status}
+        from apps.core.audit import record
+        record('update', booking, {'outcome': outcome, 'prereg': linked}, actor=request.user, context='bookings: resultado de visita')
+        data = BookingSerializer(booking).data
+        data['pre_registration'] = linked
+        return Response(data)
+
+
+class AdminWeekView(APIView):
+    """GET /bookings/admin/week/?start=YYYY-MM-DD — 7 days of slots with their bookings (P4-2 calendar)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        start_s = request.query_params.get('start')
+        try:
+            start = datetime.strptime(start_s, '%Y-%m-%d').date() if start_s else timezone.localdate()
+        except ValueError:
+            return Response({'start': ['Fecha no válida.']}, status=status.HTTP_400_BAD_REQUEST)
+        start = start - timedelta(days=start.weekday())  # Monday
+        end = start + timedelta(days=6)
+        slots = (AvailabilitySlot.objects.filter(date__range=(start, end)).order_by('date', 'start_time')
+                 .prefetch_related('bookings'))
+        days = []
+        for i in range(7):
+            d = start + timedelta(days=i)
+            day_slots = []
+            for sl in slots:
+                if sl.date != d:
+                    continue
+                bk = [b for b in sl.bookings.all() if b.status != Booking.Status.CANCELLED]
+                day_slots.append({
+                    'id': sl.pk, 'title': sl.title, 'visit_type': sl.visit_type, 'start_time': sl.start_time.strftime('%H:%M'),
+                    'end_time': sl.end_time.strftime('%H:%M'), 'capacity': sl.capacity, 'is_active': sl.is_active,
+                    'booked': sum(b.num_attendees for b in bk),
+                    'bookings': [{'id': b.pk, 'parent_name': b.parent_name, 'child_name': b.child_name, 'status': b.status,
+                                  'outcome': b.outcome, 'num_attendees': b.num_attendees, 'parent_phone': b.parent_phone} for b in bk],
+                })
+            days.append({'date': d.isoformat(), 'slots': day_slots})
+        return Response({'start': start.isoformat(), 'end': end.isoformat(), 'days': days})
 
 
 class AdminSlotListView(generics.ListAPIView):

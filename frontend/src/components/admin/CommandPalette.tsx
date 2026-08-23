@@ -5,11 +5,12 @@ import {
   CalendarCheck, Download, GraduationCap, Megaphone, Search, Settings, X,
 } from 'lucide-react';
 import { bookingsApi, portalApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import type { Booking, StudentProfile } from '@/types';
 
 interface Item {
   key: string;
-  group: 'Acciones' | 'Alumnos' | 'Reservas';
+  group: 'Acciones' | 'Alumnos' | 'Reservas' | 'Ir a';
   icon: typeof Search;
   title: string;
   detail: string;
@@ -41,6 +42,29 @@ const ACTIONS: Item[] = [
     title: 'Ir a Ajustes', detail: '/admin/ajustes', to: '/admin/ajustes',
   },
 ];
+
+/** Family portal actions (BACKLOG P1-E7): navigation only, no global search. */
+const FAMILY_ACTIONS: Item[] = [
+  { key: 'f-recargar', group: 'Acciones', icon: Download, title: 'Recargar cafetería', detail: 'Abre la recarga con tarjeta', to: '/portal/cafeteria?recarga=200' },
+  { key: 'f-cafeteria', group: 'Ir a', icon: CalendarCheck, title: 'Cafetería', detail: 'Saldo y movimientos', to: '/portal/cafeteria' },
+  { key: 'f-credencial', group: 'Ir a', icon: CalendarCheck, title: 'Credencial digital', detail: 'Código para pagar en caja', to: '/portal/credencial' },
+  { key: 'f-pagos', group: 'Ir a', icon: Download, title: 'Pagos', detail: 'Historial y comprobantes', to: '/portal/pagos' },
+  { key: 'f-comunicados', group: 'Ir a', icon: Megaphone, title: 'Comunicados', detail: 'Avisos del colegio', to: '/portal/comunicados' },
+  { key: 'f-notificaciones', group: 'Ir a', icon: Megaphone, title: 'Notificaciones', detail: 'Centro de avisos', to: '/portal/notificaciones' },
+  { key: 'f-perfil', group: 'Ir a', icon: Settings, title: 'Mi perfil', detail: 'Datos, avisos, seguridad', to: '/portal/perfil' },
+  { key: 'f-calendario', group: 'Ir a', icon: CalendarCheck, title: 'Calendario escolar', detail: 'Fechas del ciclo', to: '/calendario' },
+];
+const STAFF_ACTIONS: Item[] = [
+  { key: 's-analitica', group: 'Ir a', icon: Settings, title: 'Analítica', detail: '/staff', to: '/staff' },
+  { key: 's-paginas', group: 'Ir a', icon: Megaphone, title: 'Páginas del sitio', detail: 'Editor de contenido', to: '/staff/contenido' },
+  { key: 's-medios', group: 'Ir a', icon: Download, title: 'Biblioteca de medios', detail: 'Imágenes del sitio', to: '/staff/contenido/medios' },
+  { key: 's-perfil', group: 'Ir a', icon: Settings, title: 'Mi perfil', detail: 'Seguridad y avisos', to: '/portal/perfil' },
+];
+export function actionsForRole(role: string | undefined): Item[] {
+  if (role === 'admin') return ACTIONS;
+  if (role === 'staff') return STAFF_ACTIONS;
+  return FAMILY_ACTIONS;
+}
 
 const normalize = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -101,7 +125,11 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const q = useDebounced(query.trim());
-  const enabled = q.length >= 2;
+  const role = useAuthStore((st) => st.user?.role);
+  const isAdmin = role === 'admin';
+  const roleActions = actionsForRole(role);
+  // Global search (students, bookings) is admin-only; families/staff get navigation actions.
+  const enabled = isAdmin && q.length >= 2;
 
   // Move focus into the box shortly after the palette appears.
   useEffect(() => {
@@ -170,8 +198,8 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
     // (accent-insensitively) while typing.
     const nq = normalize(q);
     const actions = nq
-      ? ACTIONS.filter((a) => normalize(`${a.title} ${a.detail}`).includes(nq))
-      : ACTIONS;
+      ? roleActions.filter((a) => normalize(`${a.title} ${a.detail}`).includes(nq))
+      : roleActions;
     if (!enabled) return actions;
     return [
       ...actions,
@@ -192,7 +220,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
         to: '/admin/visitas',
       })),
     ];
-  }, [enabled, q, students.data, bookings.data]);
+  }, [enabled, q, students.data, bookings.data, roleActions]);
 
   const searching = enabled && (students.isFetching || bookings.isFetching);
 
@@ -249,7 +277,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Buscar alumnos o reservas…"
+            placeholder={isAdmin ? "Buscar alumnos o reservas…" : "¿A dónde quiere ir?"}
             aria-label="Buscar alumnos o reservas"
             role="combobox"
             aria-expanded={items.length > 0}

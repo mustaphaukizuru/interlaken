@@ -74,6 +74,8 @@ export interface DeliveryReport {
   recipients: number;
   pending_dispatch: number;
   read: number;
+  acknowledged?: number;
+  requires_ack?: boolean;
   email: Record<string, number>;
   push: Record<string, number>;
   failed: { id: number; user: string; email: string; attempts: number; error: string }[];
@@ -255,7 +257,16 @@ export const authApi = {
 const sessionHeaders = (token?: string) =>
   token ? { headers: { 'X-Session-Token': token } } : {};
 
+export interface PipelineCard { id: number; child_name: string; level: string; grade_applying: string; parent_name: string; parent_email: string; parent_phone: string; status: string; submitted_at: string | null; updated_at: string; docs_verified: number; docs_required: number; missing: string[]; student: number | null }
+export interface ConvertResult { student: number; student_id?: string; already: boolean; credentials: { email: string; password: string | null; name: string }[] }
+
 export const admissionsApi = {
+  /** Admissions pipeline (BACKLOG P4-1). */
+  pipeline: () => api.get<{ columns: { status: string; label: string; cards: PipelineCard[] }[]; templates: { missing_docs: string } }>('/admissions/admin/pipeline/'),
+  requestDocs: (id: number) => api.post<{ sent_to: string; missing: string[]; text: string }>(`/admissions/admin/register/${id}/request-docs/`, {}),
+  convert: (id: number, data: { student_id?: string; grade?: string; group?: string }) => api.post<ConvertResult>(`/admissions/admin/register/${id}/convert/`, data),
+  getTemplates: () => api.get<{ missing_docs: string; default_missing_docs: string; placeholders: string[] }>('/admissions/admin/templates/'),
+  updateTemplates: (data: { missing_docs: string }) => api.patch<{ missing_docs: string }>('/admissions/admin/templates/', data),
   preRegister: (data: unknown) =>
     api.post('/admissions/pre-register/', data),
 
@@ -339,6 +350,8 @@ export const admissionsAdminApi = {
 };
 
 // ── CAFETERIA ─────────────────────────────────────────────
+export interface BulkTopUpPreview { count: number; total: string; students: { id: number; name: string; grade: string; group: string }[] }
+
 export const cafeteriaApi = {
   getMyBalance: () =>
     api.get('/cafeteria/balance/'),
@@ -416,6 +429,10 @@ export const cafeteriaApi = {
   /** Parent family CSV of children's cafeteria transactions. */
   exportMyTransactions: () =>
     api.get('/cafeteria/export/', { responseType: 'blob' }),
+  /** Monthly statement PDF (BACKLOG P4-3). */
+  statementPdf: (student: number, month: string) => api.get('/cafeteria/statement/', { params: { student, month }, responseType: 'blob' }),
+  /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
+  bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean }) => api.post('/cafeteria/admin/bulk-topup/', data),
 
   // Admin
   getAllBalances: (params?: { page?: number }) =>
@@ -592,7 +609,14 @@ export const contactApi = {
 };
 
 // ── BOOKINGS ──────────────────────────────────────────────
+export interface WeekBooking { id: number; parent_name: string; child_name: string; status: string; outcome: string; num_attendees: number; parent_phone: string }
+export interface WeekSlot { id: number; date: string; title: string; visit_type: string; start_time: string; end_time: string; capacity: number; is_active: boolean; booked: number; bookings: WeekBooking[] }
+
 export const bookingsApi = {
+  /** Weekly calendar, reschedule and outcome (BACKLOG P4-2). */
+  adminWeek: (start: string) => api.get<{ start: string; end: string; days: { date: string; slots: WeekSlot[] }[] }>('/bookings/admin/week/', { params: { start } }),
+  adminReschedule: (id: number, slot: number) => api.post(`/bookings/admin/bookings/${id}/reschedule/`, { slot }),
+  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
   // Public
   getAvailability: (params?: { type?: string; from?: string; to?: string }) =>
     api.get('/bookings/availability/', { params }),
@@ -651,9 +675,11 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string }) =>
+  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string; nivel?: string; grado?: string; grupo?: string; ordering?: string }) =>
     api.get('/accounts/students/', { params }),
 
+  /** Bulk roster edit (BACKLOG P1-A8). */
+  bulkStudents: (data: { ids: number[]; action: 'status' | 'group' | 'grade'; value: string }) => api.post<{ updated: number }>('/accounts/admin/students/bulk/', data),
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
@@ -710,7 +736,10 @@ export const portalApi = {
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
     is_active?: boolean; push_enabled?: boolean; show_on_site?: boolean; site_until?: string | null; site_link?: string;
+    publish_at?: string | null; requires_ack?: boolean; attachments?: AnnouncementAttachment[];
   }) => api.post('/portal/admin/announcements/', data),
+  /** 'Enterado' on a comunicado (BACKLOG P4-4). */
+  ackAnnouncement: (id: number) => api.post<{ acknowledged: boolean; at: string }>(`/portal/announcements/${id}/ack/`, {}),
   adminUpdateAnnouncement: (id: number, data: Record<string, unknown>) =>
     api.patch(`/portal/admin/announcements/${id}/`, data),
   adminDeleteAnnouncement: (id: number) =>
@@ -853,6 +882,7 @@ export interface FormSubmission {
 
 export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
 
+export interface AnnouncementAttachment { id: number; name: string; url?: string }
 export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
 export interface ArcoRequest { id: number; requester_email: string; requester_name: string; channel: string; request_type: string; details: string; status: 'received' | 'in_review' | 'resolved' | 'rejected'; resolution_note: string; statutory_deadline: string; created_at: string; resolved_at: string | null; is_overdue: boolean; days_left: number }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
@@ -933,7 +963,7 @@ export const contentApi = {
   adminUpdatePage: (id: number, data: Partial<CmsPageAdmin>) => api.patch<CmsPageAdmin>(`/content/admin/pages/${id}/`, data),
   adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
   adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
-  adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
+  adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string; blocks: { id: string; type: string; props: Record<string, unknown> }[] }[]>(`/content/admin/pages/${id}/versions/`),
   adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
   adminPageChecks: (id: number) => api.get<{ ok: boolean; issues: PageIssue[] }>(`/content/admin/pages/${id}/checks/`),
   adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),

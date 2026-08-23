@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpenCheck, Globe2, HeartHandshake, Laptop, Leaf, Trophy } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { Reveal } from '@/components/ui/Reveal';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 
 const PILLARS = [
   {
@@ -45,7 +46,7 @@ export default function ModeloEducativoPage() {
       />
 
       <section className="relative overflow-hidden bg-dark text-white">
-        <img src="/assets/campus-mural.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <img src="/assets/campus-mural.webp" srcSet={assetSrcSet("/assets/campus-mural.webp", { full: true })} sizes="100vw" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
         <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/40" />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <span className="section-label-green inline-flex">El Colegio</span>

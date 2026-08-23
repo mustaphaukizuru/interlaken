@@ -2,6 +2,7 @@ import { CalendarDays } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { PricingSections } from '@/components/public/PricingSections';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 
 /**
  * Admisiones → Costos, ciclo 2026-2027. Todas las cifras vienen del paquete
@@ -18,7 +19,7 @@ export default function CostosPage() {
 
       {/* HERO con ciclo automático */}
       <section className="relative overflow-hidden bg-dark text-white">
-        <img src="/assets/facade.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <img src="/assets/facade.webp" srcSet={assetSrcSet("/assets/facade.webp", { full: true })} sizes="100vw" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
         <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
           <span className="section-label-pink inline-flex">Admisiones</span>

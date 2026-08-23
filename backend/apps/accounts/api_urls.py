@@ -19,7 +19,7 @@ from .security import (
     TotpSetupView,
 )
 from .staff_users import StaffDetailView, StaffListCreateView, StaffResetPasswordView
-from .student_admin import AdminStudentCreateView, AdminStudentUpdateView
+from .student_admin import AdminStudentBulkView, AdminStudentCreateView, AdminStudentUpdateView
 
 urlpatterns = [
     path('admin/import-students/', ImportStudentsView.as_view(), name='import-students'),
@@ -32,6 +32,7 @@ urlpatterns = [
     path('admin/guardians/merge/', GuardianMergeView.as_view(), name='guardian-merge'),
     path('admin/school-year/preview/', SchoolYearPreviewView.as_view(), name='school-year-preview'),
     path('admin/school-year/run/', SchoolYearRunView.as_view(), name='school-year-run'),
+    path('admin/students/bulk/', AdminStudentBulkView.as_view(), name='admin-student-bulk'),
     path('admin/students/<int:pk>/', AdminStudentUpdateView.as_view(), name='admin-student-update'),
     path('admin/students/<int:pk>/guardians/', StudentGuardiansView.as_view(),
          name='student-guardians'),

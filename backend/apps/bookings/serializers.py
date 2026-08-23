@@ -98,8 +98,9 @@ class BookingSerializer(serializers.ModelSerializer):
             'parent_name', 'parent_email', 'parent_phone',
             'child_name', 'child_grade', 'num_attendees',
             'status', 'source', 'confirmation_sent', 'created_at',
+            'outcome', 'outcome_note', 'notes',
         ]
-        read_only_fields = ['id', 'status', 'source', 'confirmation_sent', 'created_at']
+        read_only_fields = ['id', 'status', 'source', 'confirmation_sent', 'created_at', 'outcome', 'outcome_note', 'notes']
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):

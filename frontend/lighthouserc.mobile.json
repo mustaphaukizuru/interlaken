@@ -1,0 +1,31 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node scripts/preview-static.mjs 4174",
+      "startServerReadyPattern": "preview-static",
+      "startServerReadyTimeout": 60000,
+      "url": ["http://localhost:4174/", "http://localhost:4174/admisiones", "http://localhost:4174/pre-registro"],
+      "numberOfRuns": 2,
+      "settings": {
+        "preset": "perf",
+        "formFactor": "mobile",
+        "screenEmulation": { "mobile": true, "width": 390, "height": 844, "deviceScaleFactor": 3, "disabled": false },
+        "throttlingMethod": "simulate",
+        "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage --headless=new",
+        "maxWaitForFcp": 30000,
+        "maxWaitForLoad": 60000,
+        "skipAudits": ["uses-http2", "is-on-https", "redirects-http"]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.6 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 9500 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 600 }],
+        "uses-responsive-images": ["warn", { "maxNumericValue": 300000 }]
+      }
+    },
+    "upload": { "target": "temporary-public-storage" }
+  }
+}
