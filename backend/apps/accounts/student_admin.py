@@ -176,3 +176,46 @@ class AdminStudentUpdateView(APIView):
                 record('update', profile, {'via': 'portal', **changes},
                        actor=request.user, context='portal: edición de alumno')
         return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)
+
+
+class AdminStudentBulkView(APIView):
+    """POST /accounts/admin/students/bulk/ {"ids": [...], "action": "status"|"group"|"grade", "value": "..."} (BACKLOG P1-A8).
+
+    Applies one change to many roster rows in a transaction; each row is audited
+    like a single edit so the trail stays per-student."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from django.db import transaction
+
+        ids = request.data.get('ids')
+        action = request.data.get('action')
+        value = str(request.data.get('value') or '').strip()
+        if not isinstance(ids, list) or not ids or len(ids) > 500:
+            return Response({'ids': ['Seleccione entre 1 y 500 alumnos.']}, status=status.HTTP_400_BAD_REQUEST)
+        if action == 'status' and value not in StudentProfile.Status.values:
+            return Response({'value': ['Estado no válido.']}, status=status.HTTP_400_BAD_REQUEST)
+        if action == 'group' and len(value) > 5:
+            return Response({'value': ['Grupo de hasta 5 caracteres.']}, status=status.HTTP_400_BAD_REQUEST)
+        if action == 'grade' and not (1 <= len(value) <= 20):
+            return Response({'value': ['Grado no válido.']}, status=status.HTTP_400_BAD_REQUEST)
+        if action not in ('status', 'group', 'grade'):
+            return Response({'action': ['Use status, group o grade.']}, status=status.HTTP_400_BAD_REQUEST)
+        updated = 0
+        with transaction.atomic():
+            for profile in StudentProfile.objects.select_for_update().filter(pk__in=ids).select_related('user'):
+                before = {'status': profile.status, 'group': profile.group, 'grade': profile.grade}
+                if action == 'status':
+                    if profile.status == value:
+                        continue
+                    fields = profile.apply_status(value)
+                else:
+                    if getattr(profile, action) == value:
+                        continue
+                    setattr(profile, action, value)
+                    fields = [action]
+                profile.save(update_fields=fields)
+                record('update', profile, {'via': 'portal-bulk', action: {'from': before[action], 'to': value}},
+                       actor=request.user, context='portal: edición masiva de alumnos')
+                updated += 1
+        return Response({'updated': updated})

@@ -651,9 +651,11 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string }) =>
+  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string; nivel?: string; grado?: string; grupo?: string; ordering?: string }) =>
     api.get('/accounts/students/', { params }),
 
+  /** Bulk roster edit (BACKLOG P1-A8). */
+  bulkStudents: (data: { ids: number[]; action: 'status' | 'group' | 'grade'; value: string }) => api.post<{ updated: number }>('/accounts/admin/students/bulk/', data),
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
