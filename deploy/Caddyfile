@@ -22,6 +22,12 @@ www.{$PORTAL_DOMAIN} {
 {$PORTAL_DOMAIN} {
 	encode zstd gzip
 
+	# Staging sets CADDY_EXTRA_HEADERS ("X-Robots-Tag: noindex, nofollow") so
+	# search engines never index the UAT copy. Empty in production.
+	header {
+		{$CADDY_EXTRA_HEADERS:}
+	}
+
 	# The Loyverse receipts webhook authenticates with a shared secret carried
 	# in the URL PATH (Loyverse's dashboard webhooks cannot send headers). The
 	# access log records the URI, so logging this route would write a live

@@ -230,7 +230,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P5-1 | Staging environment + seed/demo data + UAT script per release. | Missing |
+| P5-1 | Staging environment + seed/demo data + UAT script per release. | DONE 2026-08-22 (`deploy/docker-compose.staging.yml` overlay: own domain/DB/secret, `[STAGING]` email prefix, WhatsApp off, sandbox gateways, noindex header; `manage.py seed_demo --force [--reset]` with 6 families, 9 students, cafetería history, pre-registros, visits, comunicados, testimonials, events + CMS pages, guarded against production; `docs/UAT.md` step-by-step script per role) |
 | P5-2 | Sentry activation, uptime check, backup restore drill documented. | Partial |
 | P5-3 | Visual regression and Lighthouse budgets in CI. | Missing |
 | P5-4 | Data retention policy and auto-purge job (pre-registros, submissions, documents, logs). | Missing |

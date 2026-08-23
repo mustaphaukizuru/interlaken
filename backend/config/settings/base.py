@@ -12,6 +12,8 @@ environ.Env.read_env(BASE_DIR.parent / '.env')
 
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
+# Staging prefixes every outbound subject (deploy/docker-compose.staging.yml).
+EMAIL_SUBJECT_PREFIX = env('EMAIL_SUBJECT_PREFIX', default='')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost'])
 
 # ── APPLICATIONS ──────────────────────────────────────────

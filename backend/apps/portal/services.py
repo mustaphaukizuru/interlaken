@@ -65,7 +65,7 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
     reply = reply_to or getattr(settings, 'CONTACT_EMAIL', '') or ''
     try:
         msg = EmailMultiAlternatives(
-            subject=subject,
+            subject=f'{getattr(settings, "EMAIL_SUBJECT_PREFIX", "")}{subject}',
             body=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=recipients,
