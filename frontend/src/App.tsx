@@ -75,6 +75,7 @@ import { CmsOverride } from './cms/CmsOverride';
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminVisitsWeek = lazy(() => import('./pages/admin/AdminVisitsWeek'));
 const AdminPipeline = lazy(() => import('./pages/admin/AdminPipeline'));
 const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
 const AdminGuardianMerge = lazy(() => import('./pages/admin/AdminGuardianMerge'));
@@ -211,6 +212,7 @@ export default function App() {
               <Route path="admisiones"  element={<AdminAdmissions />} />
               <Route path="admisiones/pipeline" element={<AdminPipeline />} />
               <Route path="visitas"     element={<AdminBookings />} />
+              <Route path="visitas/semana" element={<AdminVisitsWeek />} />
               <Route path="cafeteria"   element={<AdminCafeteria />} />
               <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
               <Route path="alumnos"     element={<AdminStudents />} />

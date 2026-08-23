@@ -125,6 +125,17 @@ class Booking(models.Model):
     # Day-before reminder (send_booking_reminders cron) — one per booking.
     reminder_sent     = models.BooleanField(default=False)
     notes             = models.TextField(blank=True, verbose_name='Notas')
+    # Post-visit outcome (BACKLOG P4-2): what admissions concluded after the visit.
+    class Outcome(models.TextChoices):
+        NONE       = '',           'Sin registrar'
+        INTERESTED = 'interested', 'Interesada, dar seguimiento'
+        ENROLLING  = 'enrolling',  'Se inscribirá'
+        NOT_NOW    = 'not_now',    'No por ahora'
+        DECLINED   = 'declined',   'No le interesó'
+
+    outcome           = models.CharField(max_length=12, choices=Outcome.choices, blank=True, default='')
+    outcome_note      = models.CharField(max_length=500, blank=True, default='')
+    rescheduled_from  = models.ForeignKey(AvailabilitySlot, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     created_at        = models.DateTimeField(default=timezone.now)
     updated_at        = models.DateTimeField(auto_now=True)
 
