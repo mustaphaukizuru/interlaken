@@ -8,6 +8,7 @@ import { SCHOOL_YEARS } from '@/lib/siteMeta';
 import { HistoryTimeline } from '@/components/public/HistoryTimeline';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 
 const VALUES: { icon: LucideIcon; title: string; desc: string; color: string }[] = [
   { icon: Award,   title: 'Excelencia académica', desc: 'Formación rigurosa con enfoque humanista y pensamiento crítico.', color: 'var(--purple)' },
@@ -100,9 +101,9 @@ export default function AboutPage() {
           <Reveal direction="left" className="relative">
             <Accent tone="green" variant="ring" size={64} opacity={0.4} className="hidden sm:block" style={{ top: -24, right: 20 }} />
             <div className="relative grid grid-cols-2 gap-3.5">
-              <img src="/assets/facade.webp" alt="Fachada del Colegio Interlaken" width={520} height={240} loading="lazy" className="row-span-2 h-60 w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-              <img src="/assets/classroom.webp" alt="Aula del colegio" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-              <img src="/assets/campus-mural.webp" alt="Mural del campus" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/facade.webp" srcSet={assetSrcSet("/assets/facade.webp")} sizes={CARD_SIZES} alt="Fachada del Colegio Interlaken" width={520} height={240} loading="lazy" className="row-span-2 h-60 w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/classroom.webp" srcSet={assetSrcSet("/assets/classroom.webp")} sizes={CARD_SIZES} alt="Aula del colegio" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/campus-mural.webp" srcSet={assetSrcSet("/assets/campus-mural.webp")} sizes={CARD_SIZES} alt="Mural del campus" width={260} height={113} loading="lazy" className="h-[113px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
             <div className="absolute -bottom-5 -left-2.5 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-left-2.5">

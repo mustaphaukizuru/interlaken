@@ -28,6 +28,8 @@ export interface CmsPagePayload {
 }
 
 const mediaUrl = (id: unknown, variant = 'lg') => (typeof id === 'number' ? `/api/v1/content/media/${id}/${variant}/` : '');
+/** srcset over the library variants (320 / 960 / 1600 px) so phones download the small file (BACKLOG P2-20). */
+export const mediaSrcSet = (id: unknown) => (typeof id === 'number' ? `${mediaUrl(id, 'thumb')} 320w, ${mediaUrl(id, 'md')} 960w, ${mediaUrl(id, 'lg')} 1600w` : undefined);
 
 /** Renders a list of blocks. Unknown types render nothing (never crash the page). */
 export function BlockRenderer({ blocks, editing = false, onSelect }: { blocks: Block[]; editing?: boolean; onSelect?: (id: string) => void }) {
@@ -59,7 +61,7 @@ function BlockView({ block }: { block: Block }) {
     case 'rich_text': return <RichText html={String(p.html ?? '')} />;
     case 'image': return (
       <Section bg="white" containerSize="md">
-        <figure><img src={mediaUrl(p.image)} alt={String(p.alt ?? p.caption ?? '')} loading="lazy" className="w-full rounded-xl2" />
+        <figure><img src={mediaUrl(p.image)} srcSet={mediaSrcSet(p.image)} sizes="(min-width: 768px) 768px, 100vw" alt={String(p.alt ?? p.caption ?? '')} loading="lazy" decoding="async" className="w-full rounded-xl2" />
           {p.caption && <figcaption className="mt-2 text-center text-sm text-muted">{p.caption}</figcaption>}</figure>
       </Section>
     );
@@ -68,7 +70,7 @@ function BlockView({ block }: { block: Block }) {
         <ul className="columns-1 gap-4 sm:columns-2 lg:columns-3">
           {((p.images as unknown as { image: number; caption?: string }[]) ?? []).map((im, i) => (
             <li key={i} className="mb-4 break-inside-avoid overflow-hidden rounded-2xl bg-white shadow-card">
-              <img src={mediaUrl(im.image, 'md')} alt={im.caption ?? ''} loading="lazy" className="w-full object-cover" />
+              <img src={mediaUrl(im.image, 'md')} srcSet={mediaSrcSet(im.image)} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" alt={im.caption ?? ''} loading="lazy" decoding="async" className="w-full object-cover" />
               {im.caption && <p className="px-3 py-2 text-xs text-muted">{im.caption}</p>}
             </li>
           ))}
@@ -140,7 +142,7 @@ interface HeroProps { title: string; subtitle?: string; image?: number; cta?: { 
 function HeroBlock({ title, subtitle, image, cta }: HeroProps) {
   return (
     <section className="relative flex min-h-[60svh] items-end overflow-hidden bg-dark text-white">
-      {image && <img src={mediaUrl(image)} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+      {image && <img src={mediaUrl(image)} srcSet={mediaSrcSet(image)} sizes="100vw" alt="" fetchPriority="high" className="absolute inset-0 h-full w-full object-cover" />}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(8,5,22,0.35) 0%, rgba(8,5,22,0.92) 100%)' }} />
       <div className="relative mx-auto w-full max-w-6xl px-4 pb-12 pt-28 sm:px-6">
         <h1 className="font-head text-fluid-5xl font-black tracking-[-0.03em]">{title}</h1>

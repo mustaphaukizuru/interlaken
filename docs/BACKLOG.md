@@ -74,7 +74,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-B9 | Fluid typography, 16px minimum body, spacing scale, max content width 1200 to 1320 on large screens. | DONE 2026-08-22 (fluid scale existed; portal max width 1320) |
 | P1-B10 | Large-screen layouts: 12-col grid, 3 to 4 KPI tiles per row at xl, list + detail two-pane at 2xl. | DONE 2026-08-22 (portal container 1680px at 2xl; dashboard KPIs 4-up at xl and activity + avisos side by side at 2xl; Alumnos opens the student detail in a sticky right pane at 2xl (links still navigate below 2xl and with ctrl/cmd-click); `AdminStudentDetail` accepts `id`/`embedded`) |
 | P1-B11 | Touch affordances for hover-only actions; swipe on ChildSwitcher and galería. | Refine |
-| P1-B12 | Playwright viewport matrix (360/768/1440) screenshots; Lighthouse mobile gate in CI. | Partial (visual suite covers 390/1280 with platform baselines; extra viewports need linux baselines from CI, Lighthouse gate under P5-3) |
+| P1-B12 | Playwright viewport matrix (360/768/1440) screenshots; Lighthouse mobile gate in CI. | DONE 2026-08-23 (visual baselines 390/1280 on win32 + linux, blocking; desktop Lighthouse gate (P5-3) plus a mobile gate `lighthouserc.mobile.json` on simulated slow 4G at the measured baseline perf ≥ 0.60 / LCP ≤ 9.5 s / TBT ≤ 600 ms / CLS ≤ 0.1 to catch regressions; note: FCP ≈ 4 s on slow 4G is the client-rendered shell, improving it needs prerendering) |
 
 ### P1-C. Notifications and email
 
@@ -189,7 +189,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P2-17 | Google Maps embed and "Cómo llegar" on Contacto. | DONE (already live: maps_url + 'Cómo llegar' CTA) |
 | P2-18 | Consent banner review (must not cover WhatsApp button on mobile). | DONE (banner sits above the sticky CTA bar on phones via mb-[76px]; the launcher is desktop-only while that bar is visible) |
 | P2-19 | 404/error pages with brand and links. | DONE (NotFoundPage with Inicio/Contacto; ErrorBoundary in App) |
-| P2-20 | Images: srcset, lazy loading, WebP on hero/galería/nivel pages. | Partial (WebP + loading=lazy everywhere; srcset variants arrive with the CMS media library P3-1) |
+| P2-20 | Images: srcset, lazy loading, WebP on hero/galería/nivel pages. | DONE 2026-08-23 (480/960 px variants generated for every public/assets image, `assetSrcSet()` + sizes on all public pages, logo and hero (with matching preload `imagesrcset`); CMS blocks use the media-library variants thumb/md/lg; mobile responsive-image waste on Home 700 → 223 KiB) |
 
 ## P3. CMS (strategic build, per CMS-PLAN.md)
 

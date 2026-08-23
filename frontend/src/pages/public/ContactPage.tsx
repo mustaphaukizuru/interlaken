@@ -11,6 +11,7 @@ import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 
 const schema = z.object({
   name:    z.string().min(2, 'Nombre requerido'),
@@ -61,7 +62,7 @@ export default function ContactPage() {
     <div>
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-dark text-white">
-        <img src="/assets/facade-sign.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        <img src="/assets/facade-sign.webp" srcSet={assetSrcSet("/assets/facade-sign.webp", { full: true })} sizes="100vw" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
         <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <Blob tone="pink" opacity={0.4} size={460} shape={1} className="hidden sm:block" style={{ top: -150, left: -110 }} />
         <Blob tone="purple" opacity={0.4} size={420} shape={0} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />

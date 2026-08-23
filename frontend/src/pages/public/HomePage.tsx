@@ -17,6 +17,7 @@ import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import Logo from '@/components/ui/Logo';
+import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
@@ -232,6 +233,8 @@ export default function HomePage() {
       <section className="relative flex min-h-[min(92svh,820px)] items-end overflow-hidden bg-dark text-white sm:min-h-[min(88svh,760px)]">
         <img
           src="/assets/court-wide.webp"
+          srcSet={assetSrcSet('/assets/court-wide.webp', { full: true })}
+          sizes="100vw"
           alt="Campus Colegio Interlaken"
           {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
           decoding="async"
@@ -361,9 +364,9 @@ export default function HomePage() {
           </m.div>
           <m.div variants={fadeLeft} className="relative">
             <div className="grid grid-cols-2 gap-3.5">
-              <img src="/assets/classroom.webp" alt="" loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-              <img src="/assets/campus-mural.webp" alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-              <img src="/assets/hopscotch.webp" alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/classroom.webp" srcSet={assetSrcSet("/assets/classroom.webp")} sizes={CARD_SIZES} alt="" loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/campus-mural.webp" srcSet={assetSrcSet("/assets/campus-mural.webp")} sizes={CARD_SIZES} alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
+              <img src="/assets/hopscotch.webp" srcSet={assetSrcSet("/assets/hopscotch.webp")} sizes={CARD_SIZES} alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
             </div>
             {/* Floating mini-stat card */}
             <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-right-2">
@@ -403,7 +406,7 @@ export default function HomePage() {
             <m.div key={l.name} variants={sectionReveal}>
               <div className="card hover-lift overflow-hidden !p-0">
                 <div className="relative h-[180px]">
-                  <img src={l.img} alt={l.name} loading="lazy" decoding="async" width={400} height={180} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
+                  <img src={l.img} srcSet={assetSrcSet(l.img)} sizes={CARD_SIZES} alt={l.name} loading="lazy" decoding="async" width={400} height={180} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
                   <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, color-mix(in srgb, ${l.accent} 87%, transparent) 100%)` }} />
                   <h3 className="absolute bottom-3.5 left-[18px] font-head text-[22px] font-extrabold text-white">{l.name}</h3>
                 </div>
@@ -452,7 +455,7 @@ export default function HomePage() {
               <div className="relative mx-auto h-[150px] w-[150px] max-w-full">
                 <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${p.accent} 8%, transparent)` }} />
                 <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${p.accent} 53%, transparent)` }}>
-                  <img src={p.img} alt={p.name} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
+                  <img src={p.img} srcSet={assetSrcSet(p.img)} sizes={CARD_SIZES} alt={p.name} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
                 </div>
                 <div className="absolute bottom-0.5 right-0.5 flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]" style={{ background: p.accent }}>
                   <p.icon size={19} color="white" />
@@ -569,7 +572,7 @@ export default function HomePage() {
         </m.div>
         <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {GALLERY.map((src, i) => (
-            <img key={i} src={src} alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full rounded-[14px] border border-white/[0.08] object-cover sm:h-[150px]" onError={hideOnError} />
+            <img key={i} src={src} srcSet={assetSrcSet(src)} sizes="(min-width: 640px) 280px, 45vw" alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full rounded-[14px] border border-white/[0.08] object-cover sm:h-[150px]" onError={hideOnError} />
           ))}
         </div>
       </Section>
