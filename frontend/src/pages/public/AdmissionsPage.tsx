@@ -334,8 +334,8 @@ export default function AdmissionsPage() {
           />
           <ol className="m-0 flex list-none flex-col p-0 lg:grid lg:grid-cols-4 lg:gap-7">
             {STEPS.map(({ icon: Icon, step, key, title, desc, color, to, ctaLabel }, i) => (
-              <Reveal key={step} delay={i * 100} direction="up">
-                <li className="relative flex gap-4 lg:block lg:text-center">
+              <Reveal key={step} as="li" delay={i * 100} direction="up" className="relative flex gap-4 lg:block lg:text-center">
+                <div className="contents">
                   {/* Numbered node + vertical connector (phones/tablets) */}
                   <div className="flex flex-col items-center lg:block">
                     <div
@@ -391,7 +391,7 @@ export default function AdmissionsPage() {
                       </Link>
                     )}
                   </div>
-                </li>
+                </div>
               </Reveal>
             ))}
           </ol>

@@ -61,7 +61,7 @@ refresh the linux ones from the next CI run's artifact as well.
   baselines" --update-snapshots`, or download the `visual-diffs` artifact, eyeball
   it, and copy the `-actual.png` over the baseline) and commit the PNGs.
 - `lighthouserc.json` + `lighthouse-budget.json` run Lighthouse CI against the
-  built SPA (`vite preview`) for Inicio, Admisiones, Costos, Pre-registro and
+  built SPA served by `scripts/preview-static.mjs` (mirrors production: dist at `/static/` + SPA fallback; `vite preview` cannot, it serves dist at `/`) for Inicio, Admisiones, Costos, Pre-registro and
   Login. Failing thresholds: performance < 0.85, accessibility < 0.95, SEO < 0.9,
   CLS > 0.1, JS > 400 KB. LCP/TBT/best-practices only warn (the preview has no
   API, so data sections render their empty states). Run locally with

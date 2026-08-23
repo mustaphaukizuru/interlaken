@@ -1,10 +1,12 @@
 import { type HTMLAttributes, useEffect, useRef, useState } from 'react';
 
-interface RevealProps extends HTMLAttributes<HTMLDivElement> {
+interface RevealProps extends HTMLAttributes<HTMLElement> {
   /** Direction the element slides in from. */
   direction?: 'up' | 'down' | 'left' | 'right' | 'none';
   /** Delay before the transition starts, in ms (stagger helper). */
   delay?: number;
+  /** Element to render (li keeps <ol>/<ul> children valid for a11y). */
+  as?: 'div' | 'li' | 'section' | 'article';
   /** Distance travelled during the slide, in px. */
   distance?: number;
 }
@@ -27,9 +29,10 @@ export function Reveal({
   distance = 24,
   style,
   children,
+  as: Tag = 'div',
   ...props
 }: RevealProps) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
 
   const reduced =
@@ -62,8 +65,8 @@ export function Reveal({
   const travel = OFFSET[direction].replace('24px', `${distance}px`);
 
   return (
-    <div
-      ref={ref}
+    <Tag
+      ref={ref as never}
       style={{
         opacity: shown ? 1 : 0,
         transform: shown ? 'none' : travel,
@@ -76,7 +79,7 @@ export function Reveal({
       {...props}
     >
       {children}
-    </div>
+    </Tag>
   );
 }
 

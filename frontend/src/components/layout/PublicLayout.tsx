@@ -438,7 +438,7 @@ export function PublicLayout() {
           <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-8">
             {FOOTER_GROUPS.map((group) => (
               <div key={group.heading}>
-                <h4 className="text-white font-semibold mb-3">{group.heading}</h4>
+                <h3 className="text-white font-semibold mb-3 text-sm">{group.heading}</h3>
                 <ul className="space-y-2 text-xs">
                   {group.links.map((l) => (
                     <li key={l.label}>
@@ -449,7 +449,7 @@ export function PublicLayout() {
               </div>
             ))}
             <div>
-              <h4 className="text-white font-semibold mb-3">Contacto</h4>
+              <h3 className="text-white font-semibold mb-3 text-sm">Contacto</h3>
               <ul className="space-y-2 text-xs">
                 {settings.phone_display && (
                   <li className="flex items-start gap-2">
@@ -485,7 +485,7 @@ export function PublicLayout() {
             <span>© {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados</span>
             <div className="flex items-center gap-4">
               <Link to="/aviso-de-privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
-              <span className="text-white/45">Reconocimiento de validez oficial · SEP</span>
+              <span className="text-white/70">Reconocimiento de validez oficial · SEP</span>
             </div>
           </div>
         </div>

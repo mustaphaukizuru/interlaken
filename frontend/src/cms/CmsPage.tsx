@@ -9,7 +9,7 @@ import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Testimonials } from '@/components/public/Testimonials';
 import { HistoryTimeline } from '@/components/public/HistoryTimeline';
-import { PricingSections } from '@/pages/public/CostosPage';
+import { PricingSections } from '@/components/public/PricingSections';
 import { CmsForm } from './CmsForm';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { LEVELS } from '@/lib/levels';

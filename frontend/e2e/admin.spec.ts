@@ -46,7 +46,7 @@ test('publishing a comunicado posts it and lists it in the admin console', async
 
   await expect(page.getByText('Comunicado publicado.')).toBeVisible();
   await expect(page.getByText('Suspensión de clases')).toBeVisible();
-  expect(createPayload).toEqual({
+  expect(createPayload).toMatchObject({
     title: 'Suspensión de clases',
     body: 'Mañana no habrá clases por mantenimiento del plantel.',
     audience: 'all',

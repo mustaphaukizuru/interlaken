@@ -61,8 +61,10 @@ test('an online cafeteria top-up from the Cafetería page initiates the gateway 
   await expect(page.getByText('Test Alumno')).toBeVisible();
   await page.getByRole('button', { name: /recargar/i }).first().click(); // open top-up modal
   await page.getByPlaceholder('Ej. 200').fill('200');
-  // Default gateway is Global Payments (PaymentMethodPicker's first option).
-  await page.getByRole('button', { name: /continuar al pago/i }).click();
+  // 3-step wizard (P1-D2): monto → método (default gateway Global Payments) → confirmar.
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: /ir a pagar/i }).click();
 
   await page.waitForURL('**/pago-simulado');
   expect(stub.topupPayload).toMatchObject({
@@ -101,9 +103,11 @@ test('the dashboard quick chip deep-links into the top-up modal with the amount 
   await expect(modal).toBeVisible();
   await expect(modal.getByLabel('Monto (MXN)')).toHaveValue('200');
 
-  // Choose the OTHER gateway to prove the selection reaches the payload.
+  // Step 2: choose the OTHER gateway to prove the selection reaches the payload.
+  await modal.getByRole('button', { name: 'Continuar' }).click();
   await modal.getByRole('button', { name: /Banorte Pago en Línea/ }).click();
-  await modal.getByRole('button', { name: /continuar al pago/i }).click();
+  await modal.getByRole('button', { name: 'Continuar' }).click();
+  await modal.getByRole('button', { name: /ir a pagar/i }).click();
 
   await page.waitForURL('**/pago-simulado');
   expect(stub.topupPayload).toMatchObject({
@@ -123,7 +127,7 @@ test.describe('top-up return page (cafeteria/recarga/retorno)', () => {
   test('a confirmed payment shows the success state', async ({ page }) => {
     await openReturn(page, 'success');
     await expect(page.getByRole('heading', { name: 'Pago confirmado' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /volver a cafetería/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /ver saldo de cafetería/i })).toBeVisible();
   });
 
   test('a failed payment shows the failure state', async ({ page }) => {

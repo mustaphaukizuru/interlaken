@@ -71,7 +71,7 @@ export default {
         ink:     { DEFAULT: '#1A1130' },
         muted:   '#6E6885',
         // Darkened (was #9A93AE, 2.93:1) so caption text passes AA on white and cream.
-        subtle:  '#726B89',
+        subtle:  '#6B6482',
         // Hairline borders / dividers (mirror --border / --border-2 in index.css)
         line:    '#ECEAF3',
         'line-2': '#EEEBF5',

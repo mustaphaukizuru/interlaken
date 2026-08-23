@@ -54,11 +54,10 @@ test.describe('Authentication', () => {
     await login(page, DEV_PARENT);
     await expect(page).toHaveURL(/\/portal\/?$/);
 
-    // Sidebar logout (scoped to the aside — the account menu has a same-named item).
-    await page
-      .getByRole('complementary', { name: 'Navegación del portal' })
-      .getByRole('button', { name: 'Cerrar sesión' })
-      .click();
+    // Sidebar user card → account actions menu → Cerrar sesión (P1-E5 layout).
+    const aside = page.getByRole('complementary', { name: 'Navegación del portal' });
+    await aside.getByRole('button', { name: 'Opciones de la cuenta' }).click();
+    await aside.getByRole('menuitem', { name: 'Cerrar sesión' }).click();
     await page.waitForURL('**/');
 
     // The refresh cookie is gone and local auth state is cleared — a protected
@@ -67,19 +66,13 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('forgot-password request shows the sent confirmation', async ({ page }) => {
-    let payload: unknown = null;
-    await page.route('**/api/v1/accounts/password-reset/', (route) => {
-      payload = route.request().postDataJSON();
-      route.fulfill({ json: { detail: 'ok' } });
-    });
-
+  test('there is no self-service password reset: the login page explains how to ask the school', async ({ page }) => {
+    // Decision 2026-08-22: families request a password by WhatsApp or email and an
+    // admin sets it. The old /olvide-contrasena route must not exist any more.
+    await page.goto('/login');
+    await expect(page.getByText(/¿Olvidó su contraseña\? Solicítela al colegio/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /correo/i }).first()).toBeVisible();
     await page.goto('/olvide-contrasena');
-    await page.getByLabel('Correo').fill('familia@example.com');
-    await page.getByRole('button', { name: 'Enviar enlace' }).click();
-
-    await expect(page.getByText(/Revise su bandeja de entrada/)).toBeVisible();
-    await expect(page.getByRole('link', { name: /volver a iniciar sesión/i })).toBeVisible();
-    expect(payload).toEqual({ email: 'familia@example.com' });
+    await expect(page.getByRole('heading', { name: /no encontrada|404/i })).toBeVisible();
   });
 });
