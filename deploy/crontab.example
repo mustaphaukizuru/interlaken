@@ -62,3 +62,6 @@ CRON_TZ=America/Mexico_City
 # KEEP "db-backup" ENABLED. It is the only thing backing up the database, it
 # does not conflict with anything here, and nothing on this VPS replaces it.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Retention policy (docs/RETENTION.md): purge/anonymise operational data past its window, weekly.
+0 5 * * 0 cd $COMPOSE && docker compose exec -T app python manage.py purge_retention --apply >> /var/log/interlaken/retention.log 2>&1
