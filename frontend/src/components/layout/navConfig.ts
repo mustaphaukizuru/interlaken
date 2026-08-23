@@ -1,11 +1,11 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 /** Keys returned by GET /core/badges/ (BACKLOG P1-E3). */
-export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios';
+export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
 
 export interface NavEntry {
   icon: LucideIcon;
@@ -92,6 +92,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         { icon: UserCog,     label: 'Usuarios',  to: '/admin/usuarios' },
         { icon: Merge,       label: 'Fusionar cuentas', to: '/admin/fusionar-cuentas' },
         { icon: ShieldCheck, label: 'Auditoría', to: '/admin/auditoria' },
+        { icon: Scale,       label: 'Solicitudes ARCO', to: '/admin/arco', badgeKey: 'arco' },
         { icon: CalendarRange, label: 'Nuevo ciclo', to: '/admin/nuevo-ciclo' },
       ],
     },

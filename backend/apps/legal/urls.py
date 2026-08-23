@@ -10,6 +10,7 @@ urlpatterns = [
     path('arco/',              views.ArcoRequestView.as_view(),     name='legal-arco'),
     path('arco/export/',       views.ArcoExportView.as_view(),      name='legal-arco-export'),
     path('admin/arco/',        views.AdminArcoListView.as_view(),   name='legal-admin-arco'),
+    path('admin/arco/intake/', views.AdminArcoIntakeView.as_view(), name='legal-admin-arco-intake'),
     path('admin/arco/<int:pk>/status/', views.AdminArcoStatusView.as_view(),
          name='legal-admin-arco-status'),
 ]

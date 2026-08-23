@@ -576,6 +576,9 @@ export const legalApi = {
     api.get('/legal/admin/arco/', { params: status ? { status } : {} }),
   adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
     api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
+  /** Record a request received via privacidad@ / WhatsApp / in person (BACKLOG P5-5). */
+  adminIntakeArco: (data: { requester_email: string; requester_name?: string; request_type: string; channel: string; details?: string }) =>
+    api.post<ArcoRequest>('/legal/admin/arco/intake/', data),
 };
 
 // ── CONTACT ───────────────────────────────────────────────
@@ -849,6 +852,7 @@ export interface FormSubmission {
 export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
 
 export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
+export interface ArcoRequest { id: number; requester_email: string; requester_name: string; channel: string; request_type: string; details: string; status: 'received' | 'in_review' | 'resolved' | 'rejected'; resolution_note: string; statutory_deadline: string; created_at: string; resolved_at: string | null; is_overdue: boolean; days_left: number }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
 export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }

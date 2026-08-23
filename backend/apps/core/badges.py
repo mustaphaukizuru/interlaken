@@ -42,6 +42,7 @@ def portal_badges(user) -> dict:
     from apps.bookings.models import Booking
     from apps.cafeteria.models import TopUpRequest
     from apps.content.forms import FormSubmission
+    from apps.legal.models import ArcoRequest
 
     out.update({
         'admisiones': PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
@@ -51,5 +52,6 @@ def portal_badges(user) -> dict:
         'contrasenas': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
         'mensajes': unhandled_contact_messages(None),
         'formularios': FormSubmission.objects.filter(is_handled=False).count(),
+        'arco': ArcoRequest.objects.filter(status__in=('received', 'in_review')).count(),
     })
     return out
