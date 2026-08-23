@@ -74,6 +74,8 @@ export interface DeliveryReport {
   recipients: number;
   pending_dispatch: number;
   read: number;
+  acknowledged?: number;
+  requires_ack?: boolean;
   email: Record<string, number>;
   push: Record<string, number>;
   failed: { id: number; user: string; email: string; attempts: number; error: string }[];
@@ -734,7 +736,10 @@ export const portalApi = {
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
     is_active?: boolean; push_enabled?: boolean; show_on_site?: boolean; site_until?: string | null; site_link?: string;
+    publish_at?: string | null; requires_ack?: boolean; attachments?: AnnouncementAttachment[];
   }) => api.post('/portal/admin/announcements/', data),
+  /** 'Enterado' on a comunicado (BACKLOG P4-4). */
+  ackAnnouncement: (id: number) => api.post<{ acknowledged: boolean; at: string }>(`/portal/announcements/${id}/ack/`, {}),
   adminUpdateAnnouncement: (id: number, data: Record<string, unknown>) =>
     api.patch(`/portal/admin/announcements/${id}/`, data),
   adminDeleteAnnouncement: (id: number) =>
@@ -877,6 +882,7 @@ export interface FormSubmission {
 
 export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
 
+export interface AnnouncementAttachment { id: number; name: string; url?: string }
 export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
 export interface ArcoRequest { id: number; requester_email: string; requester_name: string; channel: string; request_type: string; details: string; status: 'received' | 'in_review' | 'resolved' | 'rejected'; resolution_note: string; statutory_deadline: string; created_at: string; resolved_at: string | null; is_overdue: boolean; days_left: number }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }

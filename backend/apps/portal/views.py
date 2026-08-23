@@ -5,6 +5,7 @@ import logging
 
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions
 from rest_framework.response import Response
@@ -203,7 +204,7 @@ class AnnouncementListView(generics.ListAPIView):
         return Announcement.objects.filter(
             is_active=True,
             audience__in=audiences_for_user(self.request.user),
-        ).annotate(
+        ).filter(Q(publish_at__isnull=True) | Q(publish_at__lte=timezone.now())).annotate(
             visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
         )
 
@@ -259,7 +260,7 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
     """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive).
     POST — compose a new audience-targeted comunicado (author = current admin)."""
     queryset = (Announcement.objects.select_related('created_by')
-                .annotate(read_count_ann=Count('reads')))
+                .annotate(read_count_ann=Count('reads'), ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [_IsAdmin]
 
@@ -268,7 +269,7 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
         # Alert the audience (in-app). Fail-soft: a fan-out hiccup must never
         # turn a saved comunicado into a 500. Drafts (is_active=False) notify
         # nobody until published (see perform_update on activate).
-        if not announcement.is_active:
+        if not announcement.is_active or (announcement.publish_at and announcement.publish_at > timezone.now()):
             return
         try:
             fanout_and_stamp(announcement)
@@ -280,7 +281,7 @@ class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
 class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """PATCH (edit / toggle active) or DELETE a comunicado (admin)."""
     queryset = (Announcement.objects.select_related('created_by')
-                .annotate(read_count_ann=Count('reads')))
+                .annotate(read_count_ann=Count('reads'), ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [_IsAdmin]
     http_method_names = ['get', 'patch', 'delete']
@@ -292,7 +293,8 @@ class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
         announcement = serializer.save()
         # First-time publish of a draft: fan out once. Re-activate after a
         # prior fan-out must not spam the audience again.
-        if announcement.is_active and not was_active and not already_fanned:
+        scheduled_later = bool(announcement.publish_at and announcement.publish_at > timezone.now())
+        if announcement.is_active and not was_active and not already_fanned and not scheduled_later:
             try:
                 fanout_and_stamp(announcement)
             except Exception:  # noqa: BLE001 — best-effort notification
@@ -340,6 +342,22 @@ class AnnouncementMarkReadView(APIView):
             ignore_conflicts=True,
         )
         return Response({'marked': len(visible)})
+
+
+class AnnouncementAckView(APIView):
+    """POST /api/v1/portal/announcements/<pk>/ack/ — 'Enterado' (P4-4). Idempotent; also marks read."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        from django.utils import timezone as tz
+        ann = Announcement.objects.filter(pk=pk, is_active=True, audience__in=audiences_for_user(request.user)).first()
+        if ann is None:
+            return Response({'detail': 'No encontrado.'}, status=404)
+        read, _ = AnnouncementRead.objects.get_or_create(announcement=ann, user=request.user)
+        if read.acknowledged_at is None:
+            read.acknowledged_at = tz.now()
+            read.save(update_fields=['acknowledged_at'])
+        return Response({'acknowledged': True, 'at': read.acknowledged_at.isoformat()})
 
 
 class NotificationMarkReadView(APIView):
@@ -451,6 +469,8 @@ class AnnouncementDeliveryView(APIView):
             'recipients': qs.count(),
             'pending_dispatch': qs.filter(delivered_at__isnull=True).count(),
             'read': qs.filter(is_read=True).count(),
+            'acknowledged': announcement.reads.filter(acknowledged_at__isnull=False).count(),
+            'requires_ack': announcement.requires_ack,
             'email': by['email'],
             'push': by['push'],
             'failed': failed,

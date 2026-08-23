@@ -39,6 +39,7 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
           <dl className="grid grid-cols-3 gap-3 text-center">
             <Stat label="Destinatarios" value={data.recipients} />
             <Stat label="Leídos en portal" value={data.read} />
+            {data.requires_ack && <Stat label="Enterados" value={data.acknowledged ?? 0} />}
             <Stat label="Por despachar" value={data.pending_dispatch} />
           </dl>
           <Channel name="Correo" counts={data.email} />

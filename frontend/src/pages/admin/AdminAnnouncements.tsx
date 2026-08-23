@@ -11,6 +11,9 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
+import { AttachmentsField } from '@/components/admin/AttachmentsField';
+import { toLocalInput } from '@/cms/editor/helpers';
+import type { AnnouncementAttachment } from '@/services/api';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -22,6 +25,7 @@ interface Announcement {
   id: number; title: string; body: string; audience: string;
   is_active: boolean; push_enabled: boolean; created_at: string;
   show_on_site?: boolean; site_until?: string | null; site_link?: string;
+  publish_at?: string | null; requires_ack?: boolean; attachments?: AnnouncementAttachment[]; ack_count?: number;
   created_by_name: string; read_count: number;
 }
 
@@ -33,7 +37,7 @@ const AUDIENCE: { value: string; label: string; variant: 'info' | 'success' | 'w
 ];
 const audienceMeta = (a: string) => AUDIENCE.find((x) => x.value === a) ?? AUDIENCE[0];
 
-const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true, show_on_site: false, site_until: null as string | null, site_link: '' };
+const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true, show_on_site: false, site_until: null as string | null, site_link: '', publish_at: null as string | null, requires_ack: false, attachments: [] as AnnouncementAttachment[] };
 const EMPTY_ALERT = { title: '', message: '', audience: 'parents', whatsapp: false };
 
 export default function AdminAnnouncements() {
@@ -137,6 +141,7 @@ export default function AdminAnnouncements() {
       title: a.title, body: a.body, audience: a.audience,
       is_active: a.is_active, push_enabled: a.push_enabled ?? true,
       show_on_site: a.show_on_site ?? false, site_until: a.site_until ?? null, site_link: a.site_link ?? '',
+      publish_at: a.publish_at ?? null, requires_ack: a.requires_ack ?? false, attachments: a.attachments ?? [],
     });
     setOpen(true);
   };
@@ -249,6 +254,14 @@ export default function AdminAnnouncements() {
               <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setForm((f) => ({ ...f, site_link: e.target.value }))} placeholder="/calendario" />
             </div>
           )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setForm((f) => ({ ...f, publish_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} hint="Vacío = se envía al publicar." />
+            <label className="flex min-h-[44px] items-center gap-2 self-end text-sm text-muted">
+              <input type="checkbox" checked={form.requires_ack} onChange={(e) => setForm((f) => ({ ...f, requires_ack: e.target.checked }))} className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
+              Pedir «Enterado» a cada familia
+            </label>
+          </div>
+          <AttachmentsField value={form.attachments} onChange={(attachments) => setForm((f) => ({ ...f, attachments }))} />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!form.title.trim() || !form.body.trim()}>
