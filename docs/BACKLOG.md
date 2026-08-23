@@ -223,7 +223,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P4-7 | Security: idle timeout, close other sessions, login history, TOTP 2FA for admin. | DONE 2026-08-22 (LoginEvent history for password + Google with ip/device/reason; Mi perfil → Seguridad shows active sessions + last 20 accesses and 'Cerrar otras sesiones' (blacklists every other refresh token); TOTP RFC 6238 in stdlib for admin/staff with setup/enable/disable, password login returns `totp_required` and the login form asks for the code; 30-min idle logout for admin/staff) |
 | P4-8 | Audit log UX: filters, diff view, export. | Refine |
 | P4-9 | PWA: offline credencial and last comunicados, iOS install screen, app badges. | Partial |
-| P4-10 | Analytics funnel (visit, pre-registro, visita, inscripción) and cafetería adoption metrics in staff dashboard. | Missing |
+| P4-10 | Analytics funnel (visit, pre-registro, visita, inscripción) and cafetería adoption metrics in staff dashboard. | DONE 2026-08-22 (analytics payload v4 adds `funnel` (pre-registros → contactados → visitas → asistieron → inscripciones → inscritos, per range) and `cafeteria.adoption` (wallet rate, usage rate, top-ups, low balance); `FunnelSection` in /staff with step conversion bars; query budget stays constant) |
 | P4-11 | Portal "Novedades" panel. | Missing |
 
 ## P5. Ops, legal, process

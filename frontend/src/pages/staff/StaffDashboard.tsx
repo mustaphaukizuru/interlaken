@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { StaffCard, StaffShell } from '@/components/staff/StaffShell';
+import { FunnelSection } from '@/components/staff/FunnelSection';
 import { downloadAnalyticsCsv } from '@/lib/analyticsCsv';
 import { portalApi } from '@/services/api';
 import type { AnalyticsPayload, AnalyticsRange } from '@/types/analytics';
@@ -117,6 +118,7 @@ export default function StaffDashboard() {
           <Suspense fallback={<KpiSkeletons />}>
             <KpiRow data={data} />
           </Suspense>
+          <FunnelSection data={data} />
           <Suspense fallback={<ChartSkeletons />}>
             <ChartsSection data={data} />
           </Suspense>

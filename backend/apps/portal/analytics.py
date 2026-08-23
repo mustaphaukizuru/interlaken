@@ -13,7 +13,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.core.cache import cache
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import permissions
@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 
-CACHE_KEY_PREFIX = 'staff-analytics-v3'  # v3: overdue-invoice KPI removed
+CACHE_KEY_PREFIX = 'staff-analytics-v4'  # v4: funnel + cafetería adoption (P4-10)
 CACHE_TTL_SECONDS = 60
 # Whitelisted trend windows for ?days= (default 30).
 ALLOWED_RANGE_DAYS = (7, 30, 90)
@@ -164,7 +164,45 @@ def build_payload(days=30):
     ]).aggregate(n=Count('id'),
                  overdue=Count('id', filter=Q(statutory_deadline__lt=today)))
 
+    # ── Funnel (P4-10): visits → pre-registros → visitas agendadas → inscripciones, last `days` ──
+    from apps.accounts.models import StudentProfile
+    from apps.bookings.models import Booking
+    from apps.cafeteria.models import CafeteriaBalance
+    funnel_pre = PreRegistration.objects.filter(created_at__gte=since).count()
+    funnel_contacted = PreRegistration.objects.filter(created_at__gte=since).exclude(status=PreRegistration.Status.PENDING).count()
+    funnel_visits = Booking.objects.filter(created_at__gte=since).exclude(status=Booking.Status.CANCELLED).count()
+    funnel_attended = Booking.objects.filter(created_at__gte=since, status=Booking.Status.ATTENDED).count()
+    funnel_reg = Registration.objects.filter(created_at__gte=since).exclude(status=Registration.Status.DRAFT).count()
+    funnel_enrolled = (Registration.objects.filter(created_at__gte=since, status=Registration.Status.COMPLETE).count()
+                       + PreRegistration.objects.filter(created_at__gte=since, status=PreRegistration.Status.ENROLLED).count())
+    funnel = [
+        {'step': 'pre_registro', 'label': 'Pre-registros', 'count': funnel_pre},
+        {'step': 'contactado', 'label': 'Contactados', 'count': funnel_contacted},
+        {'step': 'visita', 'label': 'Visitas agendadas', 'count': funnel_visits},
+        {'step': 'asistio', 'label': 'Asistieron', 'count': funnel_attended},
+        {'step': 'inscripcion', 'label': 'Inscripciones enviadas', 'count': funnel_reg},
+        {'step': 'inscrito', 'label': 'Inscritos', 'count': funnel_enrolled},
+    ]
+    # ── Cafetería adoption: active students with a wallet, used in period, online top-ups ──
+    active_students = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE).count()
+    with_wallet = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE).count()
+    used = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.PURCHASE)
+            .values('student').distinct().count())
+    topped_up = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.TOPUP)
+                 .values('student').distinct().count())
+    low = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE, balance__lte=F('low_balance_threshold')).count()
+    adoption = {
+        'active_students': active_students,
+        'with_wallet': with_wallet,
+        'used_in_period': used,
+        'topped_up_in_period': topped_up,
+        'low_balance': low,
+        'wallet_rate': round(with_wallet / active_students, 3) if active_students else None,
+        'usage_rate': round(used / with_wallet, 3) if with_wallet else None,
+    }
+
     return {
+        'funnel': funnel,
         'admissions': {
             'pre_funnel': _zero_filled(PreRegistration.Status.choices, pre_counts),
             'reg_funnel': _zero_filled(Registration.Status.choices, reg_counts),
@@ -177,7 +215,7 @@ def build_payload(days=30):
             'last_month_to_date': payments_prev_to_date,
             'series': payments_series,
         },
-        'cafeteria': {'series': series},
+        'cafeteria': {'series': series, 'adoption': adoption},
         'documents': {'in_review': docs_in_review},
         'circulars': {'active': active_circulars, 'read_rate': read_rate},
         'arco': {'open': arco_row['n'] or 0, 'overdue': arco_row['overdue'] or 0},

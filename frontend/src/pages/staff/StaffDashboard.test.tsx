@@ -20,6 +20,7 @@ function emptyPayload(): AnalyticsPayload {
     return d.toISOString().slice(0, 10);
   });
   return {
+    funnel: [],
     admissions: {
       pre_funnel: { pending: 0, contacted: 0, enrolled: 0, rejected: 0 },
       reg_funnel: {},
