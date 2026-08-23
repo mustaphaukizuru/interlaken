@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -305,6 +306,8 @@ export default function AdminSettings() {
                 />
               </div>
             </Card>
+
+            <AdmissionTemplatesCard />
 
             <Card title="Incorporaciones SEP">
               <p className="mb-3 text-sm text-subtle">

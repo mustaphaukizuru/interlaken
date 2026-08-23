@@ -214,7 +214,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 
 | ID | Task | Status |
 |----|------|--------|
-| P4-1 | Admissions pipeline (kanban statuses), document checklist with request-missing template, one-click convert to student + family accounts, email/WhatsApp templates in Ajustes. | Partial |
+| P4-1 | Admissions pipeline (kanban statuses), document checklist with request-missing template, one-click convert to student + family accounts, email/WhatsApp templates in Ajustes. | DONE 2026-08-23 (`/admin/admisiones/pipeline` kanban by status with per-card document checklist (6 required types); 'Pedir documentos' emails the family using an editable template (Ajustes → Plantillas de admisiones, placeholders validated) with their upload link; 'Convertir en alumno' creates the StudentProfile with the file's data incl. encrypted medical fields, the school login and guardian accounts (existing emails linked, new ones get a one-time password shown with WhatsApp/correo delivery), marks the registration complete, audited, idempotent) |
 | P4-2 | Visitas: weekly calendar with drag reschedule, 24h reminders, no-show, post-visit outcome linked to pre-registro. | Partial |
 | P4-3 | Cafetería: low-balance push with family threshold, weekly reminder or auto-recarga if gateway tokens allow, daily spend limit per child, monthly statement PDF, bulk top-up by group, reconciliation with Loyverse report. | Partial |
 | P4-4 | Comunicados: audience targeting, scheduling, read receipts, attachments/rich text, acknowledgement type, push on publish. | Partial |

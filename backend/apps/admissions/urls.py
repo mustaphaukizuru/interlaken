@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import views
 from .exports import PreRegistrationExportView, RegistrationExportView
+from .pipeline import ConvertView, PipelineView, RequestDocsView, TemplatesView
 
 urlpatterns = [
     path('pre-register/export/',       PreRegistrationExportView.as_view(),          name='pre-register-export'),
@@ -20,6 +21,10 @@ urlpatterns = [
     path('register/<int:pk>/documents-link/', views.DocumentsLinkView.as_view(),   name='register-docs-link'),
     path('documents/<int:pk>/verify/', views.DocumentVerifyView.as_view(),          name='document-verify'),
     path('documents/<int:pk>/download/', views.DocumentDownloadView.as_view(),      name='document-download'),
+    path('admin/pipeline/',            PipelineView.as_view(),                       name='admissions-pipeline'),
+    path('admin/templates/',           TemplatesView.as_view(),                      name='admissions-templates'),
+    path('admin/register/<int:pk>/request-docs/', RequestDocsView.as_view(),         name='register-request-docs'),
+    path('admin/register/<int:pk>/convert/', ConvertView.as_view(),                  name='register-convert'),
     path('open-school/',               views.OpenSchoolDayListView.as_view(),       name='open-school-list'),
     path('open-school/signup/',        views.OpenSchoolDaySignUpView.as_view(),     name='open-school-signup'),
 ]

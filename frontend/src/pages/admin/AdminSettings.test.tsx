@@ -8,6 +8,10 @@ vi.mock('@/services/api', () => ({
     adminGetSettings: vi.fn(),
     adminUpdateSettings: vi.fn(),
   },
+  admissionsApi: {
+    getTemplates: vi.fn().mockResolvedValue({ data: { missing_docs: 'x', default_missing_docs: 'x', placeholders: [] } }),
+    updateTemplates: vi.fn(),
+  },
 }));
 
 vi.mock('react-hot-toast', () => ({

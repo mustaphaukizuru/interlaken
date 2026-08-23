@@ -255,7 +255,16 @@ export const authApi = {
 const sessionHeaders = (token?: string) =>
   token ? { headers: { 'X-Session-Token': token } } : {};
 
+export interface PipelineCard { id: number; child_name: string; level: string; grade_applying: string; parent_name: string; parent_email: string; parent_phone: string; status: string; submitted_at: string | null; updated_at: string; docs_verified: number; docs_required: number; missing: string[]; student: number | null }
+export interface ConvertResult { student: number; student_id?: string; already: boolean; credentials: { email: string; password: string | null; name: string }[] }
+
 export const admissionsApi = {
+  /** Admissions pipeline (BACKLOG P4-1). */
+  pipeline: () => api.get<{ columns: { status: string; label: string; cards: PipelineCard[] }[]; templates: { missing_docs: string } }>('/admissions/admin/pipeline/'),
+  requestDocs: (id: number) => api.post<{ sent_to: string; missing: string[]; text: string }>(`/admissions/admin/register/${id}/request-docs/`, {}),
+  convert: (id: number, data: { student_id?: string; grade?: string; group?: string }) => api.post<ConvertResult>(`/admissions/admin/register/${id}/convert/`, data),
+  getTemplates: () => api.get<{ missing_docs: string; default_missing_docs: string; placeholders: string[] }>('/admissions/admin/templates/'),
+  updateTemplates: (data: { missing_docs: string }) => api.patch<{ missing_docs: string }>('/admissions/admin/templates/', data),
   preRegister: (data: unknown) =>
     api.post('/admissions/pre-register/', data),
 
