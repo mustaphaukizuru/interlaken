@@ -1,0 +1,35 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npx vite preview --port 4173 --strictPort",
+      "startServerReadyPattern": "4173",
+      "url": [
+        "http://localhost:4173/",
+        "http://localhost:4173/admisiones",
+        "http://localhost:4173/admisiones/costos",
+        "http://localhost:4173/pre-registro",
+        "http://localhost:4173/login"
+      ],
+      "numberOfRuns": 2,
+      "settings": {
+        "preset": "desktop",
+        "budgetPath": "./lighthouse-budget.json",
+        "skipAudits": ["uses-http2", "is-on-https", "redirects-http"]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.85 }],
+        "categories:accessibility": ["error", { "minScore": 0.95 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:seo": ["error", { "minScore": 0.9 }],
+        "resource-summary:script:size": ["error", { "maxNumericValue": 400000 }],
+        "resource-summary:total:size": ["warn", { "maxNumericValue": 1500000 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }]
+      }
+    },
+    "upload": { "target": "temporary-public-storage" }
+  }
+}

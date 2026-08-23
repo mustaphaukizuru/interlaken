@@ -52,3 +52,17 @@ artifact) instead of failing the job. To activate real visual diffs in CI,
 download that artifact from a green run and commit the `…-linux.png` files into
 `visual.spec.ts-snapshots/`. Whenever you update win32 baselines on purpose,
 refresh the linux ones from the next CI run's artifact as well.
+
+## Visual regression and Lighthouse in CI (BACKLOG P5-3)
+
+- `visual.spec.ts` is **blocking** in CI on linux. Baselines are committed per
+  platform (`*-linux.png` for CI, `*-win32.png` for local Windows runs). When a
+  change is intentional, regenerate on linux (`npm run test:e2e -- --grep "Visual
+  baselines" --update-snapshots`, or download the `visual-diffs` artifact, eyeball
+  it, and copy the `-actual.png` over the baseline) and commit the PNGs.
+- `lighthouserc.json` + `lighthouse-budget.json` run Lighthouse CI against the
+  built SPA (`vite preview`) for Inicio, Admisiones, Costos, Pre-registro and
+  Login. Failing thresholds: performance < 0.85, accessibility < 0.95, SEO < 0.9,
+  CLS > 0.1, JS > 400 KB. LCP/TBT/best-practices only warn (the preview has no
+  API, so data sections render their empty states). Run locally with
+  `npm run build && npx @lhci/cli autorun`.

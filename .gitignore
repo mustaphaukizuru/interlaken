@@ -56,3 +56,4 @@ backend/static/*
 
 # Local secrets handoff (VAPID) - paste into deploy/.env, never commit
 *.local.txt
+frontend/.lighthouseci/

@@ -232,7 +232,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 |----|------|--------|
 | P5-1 | Staging environment + seed/demo data + UAT script per release. | DONE 2026-08-22 (`deploy/docker-compose.staging.yml` overlay: own domain/DB/secret, `[STAGING]` email prefix, WhatsApp off, sandbox gateways, noindex header; `manage.py seed_demo --force [--reset]` with 6 families, 9 students, cafetería history, pre-registros, visits, comunicados, testimonials, events + CMS pages, guarded against production; `docs/UAT.md` step-by-step script per role) |
 | P5-2 | Sentry activation, uptime check, backup restore drill documented. | Partial |
-| P5-3 | Visual regression and Lighthouse budgets in CI. | Missing |
+| P5-3 | Visual regression and Lighthouse budgets in CI. | DONE 2026-08-22 (Playwright visual baselines now blocking in CI with linux snapshots committed and diff artifacts on failure; new `lighthouse` job runs Lighthouse CI on the built SPA for 5 public routes with score thresholds (perf 0.85, a11y 0.95, SEO 0.9, CLS 0.1, JS 400 KB) and a resource/timing budget file; documented in frontend/e2e/README.md) |
 | P5-4 | Data retention policy and auto-purge job (pre-registros, submissions, documents, logs). | Missing |
 | P5-5 | ARCO workflow status view with `privacidad@` intake. | Missing |
 | P5-6 | Minor data handling: medical fields role-restricted, masked in exports. | Missing |
