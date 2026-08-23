@@ -685,6 +685,9 @@ export const portalApi = {
   getAnnouncementDelivery: (id: number) => api.get<DeliveryReport>(`/portal/admin/announcements/${id}/delivery/`),
   resendAnnouncementFailed: (id: number) =>
     api.post<{ requeued: number }>(`/portal/admin/announcements/${id}/delivery/`, { action: 'resend_failed' }),
+  /** Guardian merge (BACKLOG P4-6). */
+  guardianMergePreview: (keep: string, drop: string) => api.get<MergePreview>('/accounts/admin/guardians/merge/preview/', { params: { keep, drop } }),
+  guardianMerge: (data: { keep: number; drop: number; confirm: string }) => api.post<MergeResult>('/accounts/admin/guardians/merge/', data),
   /** New school year wizard (BACKLOG P4-5). */
   schoolYearPreview: () => api.get<SchoolYearPreview>('/accounts/admin/school-year/preview/'),
   schoolYearRun: (data: { confirm: string; new_cycle: string; reset_threshold: number | null }) => api.post<SchoolYearResult>('/accounts/admin/school-year/run/', data),
@@ -838,6 +841,9 @@ export interface SiteNotice { id: number; title: string; body: string; link: str
 
 export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }
 
+export interface MergeUser { id: number; email: string; full_name: string; is_active: boolean; last_login: string | null; has_password: boolean; google: boolean; phone: string; children: { id: number; name: string; grade: string }[] }
+export interface MergePreview { keep: MergeUser; drop: MergeUser; references: Record<string, number> }
+export interface MergeResult { moved: Record<string, number>; skipped: Record<string, number>; keep: number; drop: number }
 export interface SchoolYearPreview { moves: { from: string; to: string; count: number }[]; graduates: number; active_total: number; skipped: number; current_cycle: string; suggested_cycle: string; last_rollover_at: string | null }
 export interface SchoolYearResult { promoted: number; graduated: number; thresholds_reset: number; school_year: string }
 

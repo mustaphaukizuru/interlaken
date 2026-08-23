@@ -75,6 +75,7 @@ import { CmsOverride } from './cms/CmsOverride';
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminGuardianMerge = lazy(() => import('./pages/admin/AdminGuardianMerge'));
 const AdminSchoolYear = lazy(() => import('./pages/admin/AdminSchoolYear'));
 const AdminNavigation = lazy(() => import('./pages/admin/AdminNavigation'));
 const AdminForms = lazy(() => import('./pages/admin/AdminForms'));
@@ -224,6 +225,7 @@ export default function App() {
               <Route path="formularios" element={<AdminForms />} />
               <Route path="navegacion" element={<AdminNavigation />} />
               <Route path="nuevo-ciclo" element={<AdminSchoolYear />} />
+              <Route path="fusionar-cuentas" element={<AdminGuardianMerge />} />
               <Route path="contenido/medios" element={<AdminMedia />} />
               <Route path="contenido/:id" element={<AdminPageEditor />} />
             </Route>
