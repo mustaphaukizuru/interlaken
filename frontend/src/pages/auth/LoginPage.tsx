@@ -82,12 +82,15 @@ export default function LoginPage() {
     }
   })();
 
+  const [totp, setTotp] = useState('');
+  const [needsTotp, setNeedsTotp] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setSubmitting(true);
     try {
-      const { data } = await api.post('/accounts/token/', { email, password });
+      const { data } = await api.post('/accounts/token/', { email, password, ...(totp ? { totp } : {}) });
       const access = data.access;
       // Set the in-memory token first so the /me call is authorized; the refresh
       // token was set as an httpOnly cookie by the server.
@@ -95,8 +98,14 @@ export default function LoginPage() {
       const { data: me } = await authApi.me();
       setAuth(me, access);
       navigate(ROLE_PATHS[me.role] ?? '/portal', { replace: true });
-    } catch {
-      setFormError('Credenciales incorrectas o cuenta sin contraseña. Use Google si su cuenta es institucional.');
+    } catch (err) {
+      const body = (err as { response?: { data?: { totp_required?: boolean; detail?: string } } })?.response?.data;
+      if (body?.totp_required) {
+        setNeedsTotp(true);
+        setFormError(totp ? (body.detail ?? 'Código incorrecto.') : null);
+      } else {
+        setFormError('Credenciales incorrectas o cuenta sin contraseña. Use Google si su cuenta es institucional.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -244,6 +253,14 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
+                {needsTotp && (
+                  <div>
+                    <label htmlFor="login-totp" className="label">Código de verificación (app de autenticación)</label>
+                    <input id="login-totp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]*" maxLength={7} value={totp}
+                      onChange={(e) => setTotp(e.target.value.replace(/[^0-9]/g, ''))} placeholder="123456"
+                      className="input-field min-h-[44px] text-center text-lg tracking-[0.3em]" />
+                  </div>
+                )}
                 <button
                   type="submit"
                   disabled={submitting || oauthBootstrapping}

@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore, type User } from '@/store/authStore';
 import { AvatarUpload } from '@/components/portal/AvatarUpload';
+import { SecurityPanel } from '@/components/portal/SecurityPanel';
 import { authApi } from '@/services/api';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
 
@@ -211,6 +212,7 @@ export default function ProfilePage() {
         <Card>
           <PasswordHelp email={user?.email} />
         </Card>
+        <SecurityPanel />
         <Card>
           <div className="mb-3 flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-purple" />

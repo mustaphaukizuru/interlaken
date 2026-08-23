@@ -202,11 +202,20 @@ export async function bootstrapSession(): Promise<boolean> {
 }
 
 // ── AUTH ──────────────────────────────────────────────────
+export interface SessionsInfo { active_sessions: number; totp_enabled: boolean; history: { at: string; method: string; success: boolean; reason: string; ip: string | null; device: string }[] }
+const csrfHeader = () => { const c = getCookie(CSRF_COOKIE); return c ? { 'X-CSRF-Token': c } : {}; };
+
 export const authApi = {
   googleLogin: () => {
     window.location.href = `${API_BASE}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
+  /** Security (BACKLOG P4-7). */
+  sessions: () => api.get<SessionsInfo>('/accounts/me/sessions/'),
+  closeOtherSessions: () => api.post<{ closed: number }>('/accounts/me/sessions/close-others/', {}, { headers: csrfHeader() }),
+  totpSetup: () => api.post<{ secret: string; otpauth_url: string }>('/accounts/me/totp/setup/', {}),
+  totpEnable: (code: string) => api.post('/accounts/me/totp/enable/', { code }),
+  totpDisable: (code: string) => api.post('/accounts/me/totp/disable/', { code }),
   /** Profile photo (BACKLOG P1-F2). */
   uploadAvatar: (blob: Blob) => { const fd = new FormData(); fd.append('file', blob, 'avatar.webp'); return api.post('/accounts/me/avatar/', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); },
   deleteAvatar: () => api.delete('/accounts/me/avatar/'),

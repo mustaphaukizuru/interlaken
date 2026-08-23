@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Sidebar from './Sidebar';
 import AppHeader from './AppHeader';
@@ -69,6 +70,7 @@ export function useMobileNav() {
 }
 
 export function PortalLayout({ role }: Props) {
+  useIdleLogout(role === 'admin' || role === 'staff');
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);

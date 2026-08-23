@@ -9,10 +9,12 @@ from django.conf import settings
 from django.contrib.auth import logout
 from django.db.models import Q
 from django.shortcuts import redirect
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -257,6 +259,8 @@ class GoogleTokenView(APIView):
             dirty.append('avatar')
         if dirty:
             user.save(update_fields=dirty)
+        from .security import record_login
+        record_login(request, user=user, method='google')
 
         response = Response()
         access = issue_session(user, response)
@@ -296,7 +300,29 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
     """
 
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
+        from .security import record_login, totp_enabled, verify_totp
+        email = str(request.data.get('email') or '')[:254]
+        try:
+            response = super().post(request, *args, **kwargs)
+        except (AuthenticationFailed, InvalidToken, TokenError):
+            record_login(request, email=email, success=False, reason='bad_password')
+            raise
+        if response.status_code != status.HTTP_200_OK:
+            record_login(request, email=email, success=False, reason='bad_password')
+            return response
+        user = User.objects.filter(email__iexact=email).first()
+        if user is not None and totp_enabled(user):
+            code = str(request.data.get('totp') or '')
+            if not code:
+                record_login(request, user=user, success=False, reason='totp_required')
+                return Response({'totp_required': True, 'detail': 'Ingrese el código de su app de autenticación.'},
+                                status=status.HTTP_401_UNAUTHORIZED)
+            if not verify_totp(user.totp.secret, code):
+                record_login(request, user=user, success=False, reason='bad_totp')
+                return Response({'totp_required': True, 'detail': 'Código incorrecto.'}, status=status.HTTP_401_UNAUTHORIZED)
+            user.totp.last_used_at = timezone.now()
+            user.totp.save(update_fields=['last_used_at'])
+        record_login(request, user=user, email=email)
         if response.status_code == status.HTTP_200_OK:
             refresh = response.data.get('refresh')
             access = response.data.get('access')

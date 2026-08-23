@@ -11,6 +11,13 @@ from .loyverse_link import LinkLoyverseView
 from .merge import GuardianMergePreviewView, GuardianMergeView
 from .password_requests import PasswordRequestDetailView, PasswordRequestListCreateView
 from .school_year import SchoolYearPreviewView, SchoolYearRunView
+from .security import (
+    CloseOtherSessionsView,
+    MySessionsView,
+    TotpDisableView,
+    TotpEnableView,
+    TotpSetupView,
+)
 from .staff_users import StaffDetailView, StaffListCreateView, StaffResetPasswordView
 from .student_admin import AdminStudentCreateView, AdminStudentUpdateView
 
@@ -45,6 +52,11 @@ urlpatterns = [
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),
     path('google/token/',    views.GoogleTokenView.as_view(),     name='google-token'),
     path('me/',              views.CurrentUserView.as_view(),     name='current-user'),
+    path('me/sessions/',     MySessionsView.as_view(),            name='my-sessions'),
+    path('me/sessions/close-others/', CloseOtherSessionsView.as_view(), name='close-other-sessions'),
+    path('me/totp/setup/',   TotpSetupView.as_view(),             name='totp-setup'),
+    path('me/totp/enable/',  TotpEnableView.as_view(),            name='totp-enable'),
+    path('me/totp/disable/', TotpDisableView.as_view(),           name='totp-disable'),
     path('me/avatar/',       MyAvatarView.as_view(),              name='my-avatar'),
     path('avatar/<int:user_id>/<str:token>/', AvatarServeView.as_view(), name='avatar-serve'),
     # No self-service password reset/change (school policy): see admin-set-password.

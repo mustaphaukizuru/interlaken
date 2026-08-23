@@ -244,3 +244,6 @@ class PasswordRequest(models.Model):
 
     def __str__(self):
         return f'PasswordRequest({self.requested_email or self.user_id}, {self.status})'
+
+
+from .security import LoginEvent, TotpDevice  # noqa: E402,F401
