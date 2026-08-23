@@ -65,3 +65,6 @@ CRON_TZ=America/Mexico_City
 
 # Retention policy (docs/RETENTION.md): purge/anonymise operational data past its window, weekly.
 0 5 * * 0 cd $COMPOSE && docker compose exec -T app python manage.py purge_retention --apply >> /var/log/interlaken/retention.log 2>&1
+
+# Backup restore drill (docs/OPS-RUNBOOK.md §3): prove the newest dump restores, monthly.
+0 4 1-7 * 0 cd $COMPOSE && ./restore-db.sh "$(ls -t /var/backups/interlaken/db-*.sql.gz | head -1)" >> /var/log/interlaken/restore-drill.log 2>&1
