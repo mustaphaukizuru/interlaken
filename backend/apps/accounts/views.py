@@ -432,10 +432,20 @@ class StudentDetailView(generics.RetrieveAPIView):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        # The queryset is already family-scoped, so anyone who can retrieve the
-        # object is its admin or its family: medical data may be shown.
         ctx['include_medical'] = True
         return ctx
+
+    def retrieve(self, request, *args, **kwargs):
+        # Medical fields (P5-6): admin always; guardian only with MEDICAL_DATA
+        # consent; everyone else gets them masked with the reason.
+        from .medical import mask_medical, medical_access
+        profile = self.get_object()
+        data = self.get_serializer(profile).data
+        allowed, reason = medical_access(request.user, profile)
+        if not allowed:
+            mask_medical(data)
+            data['medical_masked'] = reason
+        return Response(data)
 
     def get_queryset(self):
         user = self.request.user

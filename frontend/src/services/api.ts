@@ -106,6 +106,8 @@ export interface StudentWrite {
   blood_type?: string;
   allergies?: string;
   medical_notes?: string;
+  /** Set when medical fields were masked (P5-6): 'consent_required' | 'role'. */
+  medical_masked?: 'consent_required' | 'role';
 }
 
 export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';
