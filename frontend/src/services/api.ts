@@ -963,7 +963,7 @@ export const contentApi = {
   adminUpdatePage: (id: number, data: Partial<CmsPageAdmin>) => api.patch<CmsPageAdmin>(`/content/admin/pages/${id}/`, data),
   adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
   adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
-  adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
+  adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string; blocks: { id: string; type: string; props: Record<string, unknown> }[] }[]>(`/content/admin/pages/${id}/versions/`),
   adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
   adminPageChecks: (id: number) => api.get<{ ok: boolean; issues: PageIssue[] }>(`/content/admin/pages/${id}/checks/`),
   adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),

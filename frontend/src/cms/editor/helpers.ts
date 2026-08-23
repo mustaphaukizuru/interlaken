@@ -53,3 +53,25 @@ export function apiErrors(err: unknown): Record<string, string> {
   for (const [k, v] of Object.entries(data as Record<string, unknown>)) out[k] = Array.isArray(v) ? String(v[0]) : String(v);
   return out;
 }
+
+/** Block-level diff between two block lists (CMS versions, BACKLOG P3-4 extra). */
+export interface BlockDiffLine { kind: 'added' | 'removed' | 'changed' | 'same' | 'moved'; type: string; id: string; summary: string }
+const summarize = (b: Block): string => {
+  const p = b.props;
+  const t = (p.title ?? p.label ?? p.html ?? p.text ?? p.url ?? '') as string;
+  return String(t).replace(/<[^>]+>/g, '').slice(0, 60);
+};
+export function diffBlocks(before: Block[], after: Block[]): BlockDiffLine[] {
+  const beforeById = new Map(before.map((b, i) => [b.id, { b, i }]));
+  const afterIds = new Set(after.map((b) => b.id));
+  const lines: BlockDiffLine[] = [];
+  after.forEach((b, i) => {
+    const prev = beforeById.get(b.id);
+    if (!prev) { lines.push({ kind: 'added', type: b.type, id: b.id, summary: summarize(b) }); return; }
+    const changed = JSON.stringify(prev.b.props) !== JSON.stringify(b.props) || prev.b.type !== b.type;
+    const moved = prev.i !== i;
+    lines.push({ kind: changed ? 'changed' : moved ? 'moved' : 'same', type: b.type, id: b.id, summary: summarize(b) });
+  });
+  before.forEach((b) => { if (!afterIds.has(b.id)) lines.push({ kind: 'removed', type: b.type, id: b.id, summary: summarize(b) }); });
+  return lines;
+}

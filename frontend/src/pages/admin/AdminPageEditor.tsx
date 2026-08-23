@@ -15,9 +15,9 @@ import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { BlockRenderer } from '@/cms/CmsPage';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
-import { apiErrors, cmsBase, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
+import { apiErrors, cmsBase, diffBlocks, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
 import { useAuthStore } from '@/store/authStore';
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Send } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertical, Send } from 'lucide-react';
 import type { PageIssue } from '@/services/api';
 
 type Device = 'mobile' | 'tablet' | 'desktop';
@@ -33,6 +33,8 @@ export default function AdminPageEditor() {
   const base = cmsBase(role);
   const [rejecting, setRejecting] = useState(false);
   const [issues, setIssues] = useState<PageIssue[] | null>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
@@ -185,7 +187,17 @@ export default function AdminPageEditor() {
             {blocks.length === 0 ? <p className="text-sm text-muted">La página está vacía. Agregue el primer bloque.</p> : (
               <ol className="space-y-1">
                 {blocks.map((b, i) => (
-                  <li key={b.id} className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm ${selected === b.id ? 'bg-purple/10 text-purple' : 'hover:bg-cream-2'}`}>
+                  <li
+                    key={b.id}
+                    draggable
+                    onDragStart={(e) => { setDragging(i); e.dataTransfer.effectAllowed = 'move'; }}
+                    onDragOver={(e) => { e.preventDefault(); if (dragOver !== i) setDragOver(i); }}
+                    onDragLeave={() => setDragOver(null)}
+                    onDrop={(e) => { e.preventDefault(); if (dragging !== null && dragging !== i) update(moveBlock(blocks, dragging, i)); setDragging(null); setDragOver(null); }}
+                    onDragEnd={() => { setDragging(null); setDragOver(null); }}
+                    className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm ${selected === b.id ? 'bg-purple/10 text-purple' : 'hover:bg-cream-2'} ${dragOver === i && dragging !== i ? 'ring-2 ring-purple/50' : ''} ${dragging === i ? 'opacity-50' : ''}`}
+                  >
+                    <span className="cursor-grab text-subtle" aria-hidden="true" title="Arrastre para reordenar"><GripVertical size={14} /></span>
                     <button type="button" className="flex-1 truncate text-left font-medium" onClick={() => setSelected(b.id)} aria-current={selected === b.id ? 'true' : undefined}>
                       {i + 1}. {blockSpec(b.type)?.label ?? b.type}
                     </button>
@@ -232,7 +244,7 @@ export default function AdminPageEditor() {
       </div>
 
       <AddBlockModal open={adding} onClose={() => setAdding(false)} onPick={(type) => { const b = newBlock(type); update([...blocks, b]); setSelected(b.id); setAdding(false); }} />
-      <VersionsModal open={showVersions} pageId={pageId} onClose={() => setShowVersions(false)} onRolledBack={() => { loadedFor.current = null; qc.invalidateQueries({ queryKey: ['admin-page', pageId] }); setShowVersions(false); }} />
+      <VersionsModal open={showVersions} pageId={pageId} current={blocks} onClose={() => setShowVersions(false)} onRolledBack={() => { loadedFor.current = null; qc.invalidateQueries({ queryKey: ['admin-page', pageId] }); setShowVersions(false); }} />
       <Modal open={showSeo} onClose={() => setShowSeo(false)} title="Título, dirección y SEO" maxWidth={520}>
         <div className="space-y-3">
           <Input label="Título de la página" value={meta.title} onChange={(e) => updateMeta({ title: e.target.value })} error={errors.title} />
@@ -276,7 +288,8 @@ function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClose: () =
   );
 }
 
-function VersionsModal({ open, pageId, onClose, onRolledBack }: { open: boolean; pageId: number; onClose: () => void; onRolledBack: () => void }) {
+function VersionsModal({ open, pageId, current, onClose, onRolledBack }: { open: boolean; pageId: number; current: Block[]; onClose: () => void; onRolledBack: () => void }) {
+  const [diffOf, setDiffOf] = useState<number | null>(null);
   const { data } = useQuery({ queryKey: ['admin-page-versions', pageId], queryFn: async () => (await contentApi.adminPageVersions(pageId)).data, enabled: open });
   const rollback = useMutation({
     mutationFn: (version: number) => contentApi.adminRollbackPage(pageId, version),
@@ -288,13 +301,34 @@ function VersionsModal({ open, pageId, onClose, onRolledBack }: { open: boolean;
       {(data ?? []).length === 0 ? <p className="text-sm text-muted">Esta página aún no se ha publicado.</p> : (
         <ul className="divide-y divide-line" aria-label="Versiones">
           {(data ?? []).map((v) => (
-            <li key={v.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-              <div><span className="font-semibold text-ink">Versión {v.number}</span><p className="text-xs text-subtle">{v.author_name} · {new Date(v.created_at).toLocaleString('es-MX')}</p></div>
-              <Button size="sm" variant="secondary" loading={rollback.isPending} onClick={() => rollback.mutate(v.number)}>Restaurar</Button>
+            <li key={v.id} className="py-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div><span className="font-semibold text-ink">Versión {v.number}</span><p className="text-xs text-subtle">{v.author_name} · {new Date(v.created_at).toLocaleString('es-MX')}</p></div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setDiffOf(diffOf === v.number ? null : v.number)}>{diffOf === v.number ? 'Ocultar cambios' : 'Ver cambios'}</Button>
+                  <Button size="sm" variant="secondary" loading={rollback.isPending} onClick={() => rollback.mutate(v.number)}>Restaurar</Button>
+                </div>
+              </div>
+              {diffOf === v.number && <VersionDiff lines={diffBlocks(v.blocks ?? [], current)} number={v.number} />}
             </li>
           ))}
         </ul>
       )}
     </Modal>
+  );
+}
+
+const DIFF_LABEL: Record<string, string> = { added: '+ Nuevo', removed: '− Eliminado', changed: '± Modificado', moved: '↕ Movido', same: '' };
+function VersionDiff({ lines, number }: { lines: ReturnType<typeof diffBlocks>; number: number }) {
+  const changes = lines.filter((l) => l.kind !== 'same');
+  return (
+    <ul className="mt-2 space-y-0.5 rounded-lg bg-cream-2 p-2 text-xs" aria-label={`Cambios del borrador respecto a la versión ${number}`}>
+      {changes.length === 0 && <li className="text-muted">El borrador es idéntico a esta versión.</li>}
+      {changes.map((l) => (
+        <li key={`${l.kind}-${l.id}`} className={l.kind === 'added' ? 'text-green-700' : l.kind === 'removed' ? 'text-coral-600' : 'text-ink'}>
+          {DIFF_LABEL[l.kind]} {l.type}{l.summary ? `: ${l.summary}` : ''}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -41,3 +41,13 @@ describe('approval helpers', () => {
     expect(toLocalInput('2026-08-22T10:05:00Z')).toMatch(/^2026-08-22T\d\d:\d\d$/);
   });
 });
+
+describe('diffBlocks', () => {
+  it('classifies added, removed, changed, moved and same', async () => {
+    const { diffBlocks } = await import('./helpers');
+    const a = [{ id: '1', type: 'hero', props: { title: 'A' } }, { id: '2', type: 'rich_text', props: { html: '<p>x</p>' } }, { id: '3', type: 'stats', props: {} }];
+    const b = [{ id: '2', type: 'rich_text', props: { html: '<p>y</p>' } }, { id: '1', type: 'hero', props: { title: 'A' } }, { id: '4', type: 'faq', props: { items: [] } }];
+    const kinds = Object.fromEntries(diffBlocks(a, b).map((l) => [l.id, l.kind]));
+    expect(kinds).toEqual({ '2': 'changed', '1': 'moved', '4': 'added', '3': 'removed' });
+  });
+});
