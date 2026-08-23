@@ -1,4 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import { useAppBadge } from '@/hooks/useAppBadge';
+import { useBadges } from '@/hooks/useBadges';
+import { OfflineBanner } from '@/components/portal/OfflineBanner';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Sidebar from './Sidebar';
@@ -71,6 +74,8 @@ export function useMobileNav() {
 
 export function PortalLayout({ role }: Props) {
   useIdleLogout(role === 'admin' || role === 'staff');
+  const badges = useBadges();
+  useAppBadge(badges.notificaciones);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
@@ -110,7 +115,9 @@ export function PortalLayout({ role }: Props) {
 
   return (
     <MobileNavContext.Provider value={{ open, toggle, close, scrolled }}>
-      <div className="flex h-[100dvh] overflow-hidden bg-cream">
+      <div className="flex h-[100dvh] flex-col overflow-hidden bg-cream">
+        <OfflineBanner />
+        <div className="flex min-h-0 flex-1">
         <a href="#contenido" className="skip-link">Saltar al contenido</a>
         {/* Off-canvas backdrop (mobile only) */}
         <div
@@ -143,6 +150,7 @@ export function PortalLayout({ role }: Props) {
 
         {/* Staff analytics is a single-route surface — no bottom tab bar. */}
         {role !== 'staff' && <MobileTabBar role={role} />}
+        </div>
       </div>
     </MobileNavContext.Provider>
   );
