@@ -125,7 +125,7 @@ export function PortalLayout({ role }: Props) {
         <Sidebar role={role} open={open} onNavigate={close} />
 
         {/* Global search (Ctrl/Cmd+K) — admin workflows only */}
-        {role === 'admin' && <CommandPalette />}
+        <CommandPalette />
 
         {/* Main — sidebar + header stay fixed; only this content column scrolls */}
         <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-hidden">

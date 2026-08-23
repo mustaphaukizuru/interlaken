@@ -113,7 +113,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P1-E4 | ChildSwitcher in sidebar top for parents. | Refine |
 | P1-E5 | Sidebar user card opens AccountMenu. | DONE 2026-08-22 |
 | P1-E6 | Header breadcrumbs replacing back-links. | DONE 2026-08-22 (Breadcrumbs in PageHeader, derived from navConfig; sm+) |
-| P1-E7 | Command palette for parents or clean hide on mobile. | Partial |
+| P1-E7 | Command palette for parents or clean hide on mobile. | DONE 2026-08-23 (palette is role-aware: admins keep alumnos/reservas search; families get 'Ir a…' actions (recargar, cafetería, credencial, pagos, comunicados, notificaciones, perfil, calendario); staff get analítica/páginas/medios; header trigger for every role on desktop only, phones rely on the tab bar) |
 | P1-E8 | Admin "+ Nuevo" quick actions. | DONE 2026-08-22 (alumno, comunicado, recarga, solicitud de contraseña, emergencia; ?nuevo=1 deep links) |
 | P1-E9 | Header avatar + name; notifications grouped with deep links (see B2). | DONE (AccountMenu already shows avatar + name; notifications done in B2) |
 | P1-E10 | Sticky compact header on scroll. | DONE 2026-08-22 |

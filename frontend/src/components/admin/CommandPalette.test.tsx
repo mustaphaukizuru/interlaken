@@ -9,7 +9,8 @@ vi.mock('@/services/api', () => ({
   bookingsApi: { getAdminBookings: vi.fn() },
 }));
 
-import { CommandPalette } from './CommandPalette';
+import { CommandPalette, actionsForRole } from './CommandPalette';
+import { useAuthStore } from '@/store/authStore';
 import { bookingsApi, portalApi } from '@/services/api';
 
 const students = vi.mocked(portalApi.getStudents);
@@ -35,6 +36,7 @@ function renderPalette() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', first_name: 'Ada', last_name: 'Admin', full_name: 'Ada Admin', role: 'admin', avatar: '', whatsapp: '', last_login: null } as never, isAuthenticated: true });
   students.mockResolvedValue({
     data: {
       results: [{
@@ -114,5 +116,20 @@ describe('CommandPalette', () => {
     expect(
       screen.getByRole('option', { name: /Exportar saldos de cafetería/ }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('role-aware actions (P1-E7)', () => {
+  it('families get navigation actions and no student search', async () => {
+    expect(actionsForRole('parent').some((a) => a.to === '/portal/cafeteria')).toBe(true);
+    expect(actionsForRole('staff').some((a) => a.to === '/staff/contenido')).toBe(true);
+    expect(actionsForRole('admin').some((a) => a.to === '/admin/visitas')).toBe(true);
+    useAuthStore.setState({ user: { id: 2, email: 'p@x.mx', first_name: 'Pa', last_name: 'Dre', full_name: 'Pa Dre', role: 'parent', avatar: '', whatsapp: '', last_login: null } as never, isAuthenticated: true });
+    renderPalette();
+    window.dispatchEvent(new Event('open-command-palette'));
+    const box = await screen.findByRole('combobox');
+    await userEvent.type(box, 'cafe');
+    expect(await screen.findByRole('option', { name: /Cafetería/ })).toBeInTheDocument();
+    expect(students).not.toHaveBeenCalled();
   });
 });
