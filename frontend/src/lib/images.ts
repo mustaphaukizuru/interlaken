@@ -1,6 +1,6 @@
 /**
  * Responsive variants of the static site images (BACKLOG P2-20 / P1-B12).
- * Every public/assets/<name>.webp ships with <name>-480.webp and <name>-960.webp
+ * Every image in public/assets ships with a -480 and a -960 variant
  * (generated once with Pillow; regenerate when adding images). Phones then
  * download ~45 KB instead of ~300 KB per card.
  */
