@@ -11,13 +11,15 @@
  *   node scripts/preview-static.mjs [port]   (default 4173)
  */
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { createGzip } from 'node:zlib';
 
 const GZIP = new Set(['.html', '.js', '.mjs', '.css', '.json', '.webmanifest', '.svg', '.txt', '.xml']);
 
 const dist = join(process.cwd(), 'dist');
+let SHELLS = {};
+try { SHELLS = JSON.parse(readFileSync(join(dist, 'shells.json'), 'utf8')); } catch { /* no shells */ }
 const port = Number(process.argv[2] || process.env.PORT || 4173);
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
@@ -54,6 +56,11 @@ createServer((req, res) => {
     res.end('{"detail":"preview: no backend"}');
     return;
   }
+  // Same first-paint shell injection as backend/apps/core/spa.py.
+  const path = (req.url || '/').split('?')[0].replace(/\/$/, '') || '/';
+  let html = readFileSync(join(dist, 'index.html'), 'utf8');
+  const shell = SHELLS[path] || '';
+  html = html.replace('<!--SHELL-->', shell);
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-  createReadStream(join(dist, 'index.html')).pipe(res);
+  res.end(html);
 }).listen(port, () => console.log(`preview-static: http://localhost:${port}/ (dist at / and /static/)`));

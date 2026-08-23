@@ -12,6 +12,22 @@ export default defineConfig(({ command }) => ({
   // serves from the root, so keep base '/' during `vite dev`.
   base: command === 'build' ? '/static/' : '/',
   plugins: [
+    // First paint on slow networks (P1-B12 follow-up): Vite emits the module
+    // <script> tags before the stylesheet, so on a throttled link the CSS queues
+    // behind ~400 KB of JS and the page stays white. Move the stylesheet ahead of
+    // the scripts and mark it high priority; the shell in #root then paints as
+    // soon as the CSS lands.
+    {
+      name: 'interlaken-css-first',
+      enforce: 'post',
+      transformIndexHtml(html) {
+        const css = html.match(/\s*<link rel="stylesheet"[^>]*>/);
+        if (!css) return html;
+        const without = html.replace(css[0], '');
+        const tag = css[0].trim().replace('<link ', '<link fetchpriority="high" ');
+        return without.replace(/(\s*)<script type="module"/, `$1${tag}$1<script type="module"`);
+      },
+    },
     react(),
     VitePWA({
       registerType: 'autoUpdate',

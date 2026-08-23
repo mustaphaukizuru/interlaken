@@ -7,7 +7,8 @@ import urllib.parse
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.urls import path, re_path
-from django.views.generic import TemplateView
+
+from .spa import spa_index
 
 
 def whatsapp_redirect(request):
@@ -24,7 +25,7 @@ urlpatterns = [
     # React SPA catch-all — must be last
     re_path(
         r'^(?!api/|admin/|auth/|static/|media/).*$',
-        TemplateView.as_view(template_name='index.html'),
+        spa_index,
         name='spa-index',
     ),
 ]

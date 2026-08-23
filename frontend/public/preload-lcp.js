@@ -12,6 +12,16 @@
  * href in sync with the hero <img> in src/pages/public/HomePage.tsx.
  */
 (function () {
+  // Fonts: the stylesheet is only preloaded in index.html so it cannot block
+  // first paint; attach it here (async, every route) and let display=swap
+  // upgrade the text once Poppins/Inter arrive.
+  var pre = document.querySelector('link[rel="preload"][as="style"][href^="https://fonts.googleapis.com"]');
+  if (pre) {
+    var css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = pre.getAttribute('href');
+    document.head.appendChild(css);
+  }
   if (location.pathname !== '/') return;
   var link = document.createElement('link');
   link.rel = 'preload';
@@ -23,4 +33,5 @@
   link.setAttribute('imagesizes', '100vw');
   link.fetchPriority = 'high';
   document.head.appendChild(link);
+
 })();
