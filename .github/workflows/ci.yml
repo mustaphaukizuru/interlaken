@@ -167,26 +167,20 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      # Functional suite is BLOCKING. Visual regression (BACKLOG P5-3) needs
-      # linux baselines that match the current UI; until the refreshed
-      # `*-linux.png` files from the artifact below are committed, the visual
-      # step regenerates them and only warns. Flip it to `npm run test:e2e`
-      # (no grep, no update) once they are in the repo.
+      # Functional suite AND visual regression are BLOCKING (BACKLOG P5-3). Linux
+      # baselines are committed in frontend/e2e/visual.spec.ts-snapshots/*-linux.png.
+      # To accept an intentional UI change: download the `visual-diffs` artifact,
+      # check the -actual.png images, copy them over the baselines and commit.
       - name: Run E2E (Playwright boots both dev servers)
         working-directory: frontend
-        run: npm run test:e2e -- --grep-invert "Visual baselines"
+        run: npm run test:e2e
 
-      - name: Visual baselines (advisory until linux PNGs are committed)
-        working-directory: frontend
-        continue-on-error: true
-        run: npm run test:e2e -- --grep "Visual baselines" --update-snapshots
-
-      - name: Upload linux visual baselines (commit these to make the visual step blocking)
-        if: always()
+      - name: Upload visual diffs on failure
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: visual-baselines-linux
-          path: frontend/e2e/visual.spec.ts-snapshots/
+          name: visual-diffs
+          path: frontend/test-results/
           retention-days: 7
 
       - name: Upload Playwright report on failure
