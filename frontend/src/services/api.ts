@@ -689,6 +689,8 @@ export const portalApi = {
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  /** Portal novedades feed (BACKLOG P4-11). */
+  novedades: (since?: string) => api.get<{ since: string; unread: number; items: NovedadItem[] }>('/portal/novedades/', { params: since ? { since } : undefined }),
   /** Public avisos banner (BACKLOG P3-9). */
   getSiteNotices: () => api.get<SiteNotice[]>('/portal/avisos/'),
   getAnnouncementDelivery: (id: number) => api.get<DeliveryReport>(`/portal/admin/announcements/${id}/delivery/`),
@@ -846,6 +848,7 @@ export interface FormSubmission {
 
 export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
 
+export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
 export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }

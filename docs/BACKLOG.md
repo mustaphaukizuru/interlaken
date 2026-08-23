@@ -224,7 +224,7 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 | P4-8 | Audit log UX: filters, diff view, export. | Refine |
 | P4-9 | PWA: offline credencial and last comunicados, iOS install screen, app badges. | Partial |
 | P4-10 | Analytics funnel (visit, pre-registro, visita, inscripción) and cafetería adoption metrics in staff dashboard. | DONE 2026-08-22 (analytics payload v4 adds `funnel` (pre-registros → contactados → visitas → asistieron → inscripciones → inscritos, per range) and `cafeteria.adoption` (wallet rate, usage rate, top-ups, low balance); `FunnelSection` in /staff with step conversion bars; query budget stays constant) |
-| P4-11 | Portal "Novedades" panel. | Missing |
+| P4-11 | Portal "Novedades" panel. | DONE 2026-08-22 (`GET /portal/novedades/?since=` merges comunicados for the family's audience (unread flag), calendar events in the next 14 days, cafetería movements and payment changes of the family's students, newly published site pages; `NovedadesPanel` on the family dashboard remembers the last visit in localStorage and shows the unread count) |
 
 ## P5. Ops, legal, process
 

@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
+import { NovedadesPanel } from '@/components/portal/NovedadesPanel';
 import { useAuthStore } from '@/store/authStore';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { portalApi } from '@/services/api';
@@ -247,6 +248,9 @@ export default function ParentDashboard() {
         <InstallHint />
         <PushOptIn />
       </div>
+
+      {/* Novedades since last visit (P4-11) */}
+      <Reveal delay={20} className="mb-6"><NovedadesPanel /></Reveal>
 
       {/* 4. Avisos (unread + latest) · 5. Últimos pagos */}
       <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
