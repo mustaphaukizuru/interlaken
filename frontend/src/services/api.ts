@@ -348,6 +348,8 @@ export const admissionsAdminApi = {
 };
 
 // ── CAFETERIA ─────────────────────────────────────────────
+export interface BulkTopUpPreview { count: number; total: string; students: { id: number; name: string; grade: string; group: string }[] }
+
 export const cafeteriaApi = {
   getMyBalance: () =>
     api.get('/cafeteria/balance/'),
@@ -425,6 +427,10 @@ export const cafeteriaApi = {
   /** Parent family CSV of children's cafeteria transactions. */
   exportMyTransactions: () =>
     api.get('/cafeteria/export/', { responseType: 'blob' }),
+  /** Monthly statement PDF (BACKLOG P4-3). */
+  statementPdf: (student: number, month: string) => api.get('/cafeteria/statement/', { params: { student, month }, responseType: 'blob' }),
+  /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
+  bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean }) => api.post('/cafeteria/admin/bulk-topup/', data),
 
   // Admin
   getAllBalances: (params?: { page?: number }) =>

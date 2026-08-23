@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.cache import cache
@@ -1151,3 +1152,124 @@ class AdminExportSchoolView(APIView):
         if fmt == 'pdf':
             return exports.school_statement_pdf()
         return exports.school_statement_csv()
+
+
+class MyStatementPdfView(APIView):
+    """GET /api/v1/cafeteria/statement/?student=<id>&month=YYYY-MM — monthly statement PDF (BACKLOG P4-3).
+
+    Families get their own children; admins any student. Opening balance is
+    reconstructed from the ledger (balance_after of the last row before the month,
+    or the first row's balance_after minus its amount).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        import calendar as _cal
+        from datetime import date as _date
+
+        from django.http import HttpResponse
+
+        from apps.core.exports import as_download
+        from apps.core.pdf import simple_document_pdf
+
+        user = request.user
+        student_id = request.query_params.get('student')
+        if user.role == User.Role.ADMIN:
+            qs_students = StudentProfile.objects.all()
+        elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
+            qs_students = StudentProfile.objects.filter(pk=user.student_profile.pk)
+        else:
+            qs_students = StudentProfile.objects.filter(parents=user)
+        student = qs_students.filter(pk=student_id).select_related('user').first() if student_id else qs_students.select_related('user').first()
+        if student is None:
+            return Response({'detail': 'Alumno no encontrado.'}, status=404)
+        month = request.query_params.get('month') or timezone.localdate().strftime('%Y-%m')
+        try:
+            y, m = (int(p) for p in month.split('-'))
+            start = _date(y, m, 1)
+            end = _date(y, m, _cal.monthrange(y, m)[1])
+        except (ValueError, TypeError):
+            return Response({'month': ['Use AAAA-MM.']}, status=400)
+        rows = list(CafeteriaTransaction.objects.filter(student=student, date__date__range=(start, end)).order_by('date', 'id'))
+        prev = CafeteriaTransaction.objects.filter(student=student, date__date__lt=start).order_by('-date', '-id').first()
+        if prev is not None and prev.balance_after is not None:
+            opening = prev.balance_after
+        elif rows and rows[0].balance_after is not None:
+            sign = -1 if rows[0].transaction_type == CafeteriaTransaction.TxType.PURCHASE else 1
+            opening = rows[0].balance_after - sign * rows[0].amount
+        else:
+            opening = Decimal('0')
+        label = {'purchase': 'Consumo', 'topup': 'Recarga', 'refund': 'Devolución', 'adjustment': 'Ajuste'}
+        totals: dict[str, Decimal] = {}
+        lines = [f'Alumno: {student.user.full_name}  ·  Matrícula {student.student_id}  ·  {student.grade} {student.group}'.rstrip(),
+                 f'Periodo: {start:%d/%m/%Y} al {end:%d/%m/%Y}', '', f'Saldo inicial: ${opening:,.2f}', '',
+                 f'{"Fecha":<12}{"Movimiento":<12}{"Detalle":<34}{"Importe":>10}{"Saldo":>10}', '-' * 78]
+        running = opening
+        for t in rows:
+            kind = label.get(t.transaction_type, t.transaction_type)
+            amt = -t.amount if t.transaction_type == CafeteriaTransaction.TxType.PURCHASE else t.amount
+            running = t.balance_after if t.balance_after is not None else running + amt
+            totals[kind] = totals.get(kind, Decimal('0')) + t.amount
+            detail = (t.description or '')[:32]
+            lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{running:>10,.2f}')
+        lines += ['-' * 78, f'Saldo final: ${running:,.2f}', '']
+        for k, v in totals.items():
+            lines.append(f'Total {k.lower()}s: ${v:,.2f}')
+        lines += ['', 'Este estado de cuenta es informativo; el saldo oficial es el del punto de venta (Loyverse).',
+                  f'Colegio Interlaken · generado el {timezone.localtime():%d/%m/%Y %H:%M}']
+        pdf = simple_document_pdf('Estado de cuenta de cafetería', lines, subtitle=f'{start:%B %Y}'.capitalize())
+        resp = HttpResponse(pdf, content_type='application/pdf')
+        return as_download(resp, f'cafeteria-{student.student_id}-{month}.pdf')
+
+
+class AdminBulkTopUpView(APIView):
+    """POST /api/v1/cafeteria/admin/bulk-topup/ {"amount", "reason", "grade"?, "group"?, "student_ids"?} (BACKLOG P4-3).
+
+    Credits many wallets at once (a grade-wide scholarship, a cash day), one
+    audited ``adjust_balance`` per student so every family sees its own ledger
+    row and notification. ``{"preview": true}`` only counts.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from decimal import InvalidOperation
+
+        try:
+            amount = Decimal(str(request.data.get('amount')))
+        except (InvalidOperation, TypeError):
+            return Response({'amount': ['Monto no válido.']}, status=400)
+        if amount <= 0 or amount > Decimal('5000'):
+            return Response({'amount': ['Entre $1 y $5,000.']}, status=400)
+        reason = str(request.data.get('reason') or '').strip()[:200]
+        if not reason:
+            return Response({'reason': ['Indique el motivo.']}, status=400)
+        qs = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE).select_related('user')
+        ids = request.data.get('student_ids')
+        if isinstance(ids, list) and ids:
+            qs = qs.filter(pk__in=ids[:500])
+        else:
+            grade = str(request.data.get('grade') or '').strip()
+            group = str(request.data.get('group') or '').strip()
+            if not grade and not group:
+                return Response({'detail': 'Elija grado/grupo o una lista de alumnos.'}, status=400)
+            if grade:
+                qs = qs.filter(grade=grade)
+            if group:
+                qs = qs.filter(group__iexact=group)
+        students = list(qs.order_by('user__last_name', 'user__first_name'))
+        if not students:
+            return Response({'detail': 'Ningún alumno activo coincide.'}, status=400)
+        if request.data.get('preview'):
+            return Response({'count': len(students), 'total': str(amount * len(students)),
+                             'students': [{'id': s.pk, 'name': s.user.full_name, 'grade': s.grade, 'group': s.group} for s in students[:50]]})
+        done, failed = 0, []
+        for s in students:
+            try:
+                adjust_balance(s, amount, f'Recarga masiva: {reason}', admin=request.user)
+                done += 1
+            except ValueError as e:
+                failed.append({'id': s.pk, 'error': str(e)})
+        from apps.core.audit import record
+        record('update', request.user, {'bulk_topup': {'amount': str(amount), 'reason': reason, 'count': done, 'failed': len(failed)}},
+               actor=request.user, context='cafeteria: recarga masiva')
+        return Response({'credited': done, 'failed': failed, 'total': str(amount * done)}, status=201)
