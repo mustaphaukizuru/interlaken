@@ -75,13 +75,9 @@ class DashboardView(APIView):
                         .select_related('student__user'))
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
-            # (invoice_payment covers historical tuition rows; the app no
-            # longer bills tuition.)
             recent_payments = (
                 Payment.objects.filter(
-                    Q(user=user)
-                    | Q(invoice_payment__invoice__student__in=students)
-                    | Q(related_topup__student__in=students)
+                    Q(user=user) | Q(related_topup__student__in=students)
                 ).distinct().order_by('-created_at')[:5]
                 if students
                 else []
@@ -123,17 +119,40 @@ class DashboardView(APIView):
             }
 
         elif user.role == User.Role.ADMIN:
-            total_revenue = Payment.objects.filter(
-                status=Payment.Status.SUCCESS
-            ).aggregate(total=Sum('amount'))['total'] or 0
+            # BACKLOG P1-H5: cafetería is the only money path, so the KPIs are
+            # wallet health + the operational queues, not tuition revenue.
+            from django.db.models import F
+            from django.utils import timezone as tz
 
+            from apps.accounts.models import PasswordRequest
+            from apps.bookings.models import Booking
+            from apps.cafeteria.models import TopUpRequest
+            from apps.core.models import AuditLog, ContactMessage
+
+            now = tz.localtime()
+            month_revenue = Payment.objects.filter(
+                status=Payment.Status.SUCCESS, created_at__year=now.year, created_at__month=now.month,
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            active_balances = CafeteriaBalance.objects.filter(student__is_active=True)
             data = {
-                'total_students': StudentProfile.objects.count(),
+                'total_students': StudentProfile.objects.filter(is_active=True).count(),
                 'total_users': User.objects.count(),
                 'pending_preregistrations': PreRegistration.objects.filter(status='pending').count(),
                 'pending_registrations': Registration.objects.filter(status='submitted').count(),
                 'pending_payments': Payment.objects.filter(status=Payment.Status.PENDING).count(),
-                'total_revenue': str(total_revenue),
+                'total_revenue': str(month_revenue),
+                'cafeteria_total_balance': str(active_balances.aggregate(t=Sum('balance'))['t'] or 0),
+                'low_balance_count': active_balances.filter(balance__lte=F('low_balance_threshold')).count(),
+                'pending_topups': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
+                'visits_today': Booking.objects.filter(slot__date=now.date()).exclude(status='cancelled').count()
+                if hasattr(Booking, 'slot') else 0,
+                'open_password_requests': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
+                'unhandled_messages': ContactMessage.objects.filter(is_handled=False).count(),
+                'recent_activity': [
+                    {'id': a.id, 'when': a.created_at, 'actor': a.actor_label or (a.actor.email if a.actor else 'sistema'),
+                     'action': a.action, 'object_type': a.object_type, 'object_id': a.object_id, 'context': a.context}
+                    for a in AuditLog.objects.select_related('actor').order_by('-created_at')[:8]
+                ],
             }
 
         # Common: announcements + unread notifications
@@ -146,6 +165,33 @@ class DashboardView(APIView):
         data['unread_notifications'] = Notification.objects.filter(user=user, is_read=False).count()
 
         return Response(data)
+
+
+SITE_NOTICES_CACHE = 'portal:site-notices'
+
+
+class SiteNoticesView(APIView):
+    """GET /portal/avisos/ — public banner notices (BACKLOG P3-9): active announcements
+    flagged "publicar en el sitio", not past site_until. Cached 5 min; saving an
+    announcement clears the cache."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.core.cache import cache
+        from django.utils import timezone
+
+        data = cache.get(SITE_NOTICES_CACHE)
+        if data is None:
+            today = timezone.localdate()
+            qs = (Announcement.objects.filter(is_active=True, show_on_site=True)
+                  .filter(Q(site_until__isnull=True) | Q(site_until__gte=today))
+                  .order_by('-created_at')[:3])
+            data = [{'id': a.id, 'title': a.title, 'body': a.body[:280], 'link': a.site_link, 'until': a.site_until.isoformat() if a.site_until else None}
+                    for a in qs]
+            cache.set(SITE_NOTICES_CACHE, data, 300)
+        resp = Response(data)
+        resp['Cache-Control'] = 'public, max-age=120'
+        return resp
 
 
 class AnnouncementListView(generics.ListAPIView):
@@ -260,7 +306,15 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
+        qs = Notification.objects.filter(user=self.request.user)
+        # /portal/notificaciones filters (BACKLOG P1-B3).
+        p = self.request.query_params
+        if p.get('unread') in ('1', 'true'):
+            qs = qs.filter(is_read=False)
+        t = p.get('type')
+        if t in Notification.NotifType.values:
+            qs = qs.filter(notif_type=t)
+        return qs.order_by('-created_at')
 
 
 class AnnouncementMarkReadView(APIView):
@@ -366,3 +420,46 @@ class EmergencyBroadcastView(APIView):
         except ValueError as exc:
             return Response({'error': str(exc)}, status=400)
         return Response(result, status=201)
+
+
+class AnnouncementDeliveryView(APIView):
+    """GET  /api/v1/portal/admin/announcements/<pk>/delivery/ — per-channel delivery report.
+    POST ... /delivery/ {"action": "resend_failed"} — requeue exhausted email failures.
+
+    BACKLOG P1-C6: shows admins how many recipients got the comunicado by
+    in-app/email/push, who failed, and lets them retry after fixing SMTP.
+    """
+    permission_classes = [_IsAdmin]
+
+    def _qs(self, pk):
+        announcement = get_object_or_404(Announcement, pk=pk)
+        return announcement, Notification.objects.filter(announcement=announcement).select_related('user')
+
+    def get(self, request, pk):
+        announcement, qs = self._qs(pk)
+        by = {}
+        for field in ('email_status', 'push_status'):
+            counts = dict(qs.values_list(field).annotate(c=Count('id')).values_list(field, 'c'))
+            by[field.replace('_status', '')] = {k: counts.get(k, 0) for k in Notification.Delivery.values}
+        failed = [
+            {'id': n.id, 'user': n.user.full_name, 'email': n.user.email,
+             'attempts': n.attempts, 'error': n.last_error}
+            for n in qs.filter(email_status=Notification.Delivery.FAILED).order_by('id')[:200]
+        ]
+        return Response({
+            'announcement': announcement.id,
+            'recipients': qs.count(),
+            'pending_dispatch': qs.filter(delivered_at__isnull=True).count(),
+            'read': qs.filter(is_read=True).count(),
+            'email': by['email'],
+            'push': by['push'],
+            'failed': failed,
+        })
+
+    def post(self, request, pk):
+        _, qs = self._qs(pk)
+        if request.data.get('action') != 'resend_failed':
+            return Response({'action': ['Use "resend_failed".']}, status=400)
+        n = qs.filter(email_status=Notification.Delivery.FAILED).update(
+            delivered_at=None, attempts=0, email_status=Notification.Delivery.PENDING, last_error='')
+        return Response({'requeued': n})

@@ -4,7 +4,12 @@ export interface AdmissionsDayPoint { date: string; count: number }
 export interface PaymentsDayPoint { date: string; total: number }
 export interface CafeteriaDayPoint { date: string; topups: number; purchases: number }
 
+export interface FunnelStep { step: string; label: string; count: number }
+export interface CafeteriaAdoption { active_students: number; with_wallet: number; used_in_period: number; topped_up_in_period: number; low_balance: number; wallet_rate: number | null; usage_rate: number | null }
+
 export interface AnalyticsPayload {
+  /** Admissions funnel for the range (P4-10). */
+  funnel: FunnelStep[];
   admissions: {
     pre_funnel: { pending: number; contacted: number; enrolled: number; rejected: number };
     reg_funnel: Record<string, number>;
@@ -18,7 +23,7 @@ export interface AnalyticsPayload {
     last_month_to_date: { total: number; count: number };
     series: PaymentsDayPoint[];
   };
-  cafeteria: { series: CafeteriaDayPoint[] };
+  cafeteria: { series: CafeteriaDayPoint[]; adoption?: CafeteriaAdoption };
   documents: { in_review: number };
   circulars: { active: number; read_rate: number | null };
   arco: { open: number; overdue: number };

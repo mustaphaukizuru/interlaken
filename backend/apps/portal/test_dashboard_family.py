@@ -44,7 +44,7 @@ class TestDashboardFamilyLogin:
         assert resp.data["children"][0]["student_id"] == student.student_id
         assert "cafeteria_balances" in resp.data
         assert resp.data["needs_family_link"] is False
-        # Tuition billing removed — the dashboard must not expose invoice keys.
+        # The app does not bill tuition: the dashboard must not expose invoice keys.
         assert "pending_invoices" not in resp.data
         assert "pending_balance" not in resp.data
         # Legacy thin student-only keys must not be the only shape.

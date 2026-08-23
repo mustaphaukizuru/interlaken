@@ -23,6 +23,11 @@ class Announcement(models.Model):
     # Admin toggle 'Enviar notificación push': when off, publishing still fans
     # out in-app + email, but no web-push is sent for this comunicado.
     push_enabled = models.BooleanField(default=True)
+    # Public site banner (BACKLOG P3-9): show a short notice above the header
+    # of the marketing site, e.g. "Suspensión de clases 2 de noviembre".
+    show_on_site = models.BooleanField('Publicar en el sitio', default=False)
+    site_until = models.DateField('Mostrar en el sitio hasta', null=True, blank=True)
+    site_link = models.CharField('Enlace del aviso', max_length=300, blank=True)
     # Set when the audience has been fan-out notified (create or first activate).
     # Prevents re-notify on deactivate→reactivate (GO-LIVE-AUDIT #16 follow-up).
     fanout_at  = models.DateTimeField(null=True, blank=True)
@@ -39,6 +44,11 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from django.core.cache import cache
+        cache.delete('portal:site-notices')
 
 
 class Notification(models.Model):
@@ -68,6 +78,19 @@ class Notification(models.Model):
     # deliver in batches — a school-wide blast can't run inside a web request.
     delivered_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Per-channel delivery status (BACKLOG P1-C5). ``pending`` until dispatched;
+    # ``skipped`` = no real address / push disabled / no subscription.
+    class Delivery(models.TextChoices):
+        PENDING = 'pending', 'Pendiente'
+        SENT = 'sent', 'Enviado'
+        SKIPPED = 'skipped', 'Omitido'
+        FAILED = 'failed', 'Falló'
+
+    email_status = models.CharField(max_length=8, choices=Delivery.choices, default=Delivery.PENDING)
+    push_status = models.CharField(max_length=8, choices=Delivery.choices, default=Delivery.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.CharField(max_length=200, blank=True)
 
     class Meta:
         ordering = ['-created_at']

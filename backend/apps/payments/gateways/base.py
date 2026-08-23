@@ -75,7 +75,7 @@ class BaseGateway:
         """Return the hosted-payment redirect URL for ``payment``.
 
         ``return_url`` overrides where the hosted page sends the parent's browser
-        back (e.g. the tuition return route vs. the cafeteria one); ``None`` falls
+        back (e.g. a per-flow return route); ``None`` falls
         back to ``settings.PAYMENT_RETURN_URL``.
         """
         raise NotImplementedError

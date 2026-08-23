@@ -40,6 +40,7 @@ class AnnouncementAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Announcement
         fields = ['id', 'title', 'body', 'audience', 'is_active', 'push_enabled',
+                  'show_on_site', 'site_until', 'site_link',
                   'created_at', 'created_by_name', 'read_count']
         read_only_fields = ['id', 'created_at', 'created_by_name', 'read_count']
 
@@ -58,4 +59,4 @@ class AnnouncementAdminSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
-        fields = ['id', 'notif_type', 'title', 'message', 'is_read', 'created_at']
+        fields = ['id', 'notif_type', 'title', 'message', 'is_read', 'created_at', 'announcement']

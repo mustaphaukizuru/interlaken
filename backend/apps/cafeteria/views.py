@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
@@ -78,12 +79,6 @@ def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
             pass
         return student.parents.filter(pk=user.pk).exists()
     return False
-
-
-class IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 class MyBalanceView(APIView):
@@ -412,8 +407,12 @@ class MyCardsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        students = (_family_students_qs(request.user)
-                    .select_related('user', 'loyverse_profile'))
+        students = _family_students_qs(request.user)
+        # Staff credencial view (BACKLOG P1-A9): an admin asks for one student.
+        student_id = request.query_params.get('student')
+        if student_id and request.user.role == User.Role.ADMIN:
+            students = StudentProfile.objects.filter(pk=student_id)
+        students = students.select_related('user', 'loyverse_profile')
         cards = []
         for s in students:
             balance, _ = CafeteriaBalance.objects.get_or_create(student=s)

@@ -6,31 +6,34 @@ from .models import Payment
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    student_id = serializers.IntegerField(source='related_topup.student_id', read_only=True, default=None)
+    student_name = serializers.CharField(source='related_topup.student.user.full_name', read_only=True, default='')
+    gateway_label = serializers.CharField(source='get_gateway_display', read_only=True)
+
     class Meta:
         model = Payment
         fields = [
             'id', 'payment_type', 'amount', 'currency', 'description',
-            'status', 'gateway_tx_id', 'created_at', 'updated_at',
+            'status', 'gateway', 'gateway_label', 'gateway_tx_id', 'gateway_ref',
+            'student_id', 'student_name', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'gateway_tx_id', 'created_at', 'updated_at']
+        read_only_fields = fields
 
 
-# Bare initiate credits nothing on SUCCESS for any type today: tuition/cafeteria
-# need their linked endpoints; enrollment has no Registration fee link yet; other
-# is a free-amount orphan path. Fail closed until a real linked fee exists.
-_BLOCKED_PAYMENT_TYPES = frozenset({'tuition', 'cafeteria', 'enrollment', 'other'})
+# Bare initiate credits nothing on SUCCESS: cafeteria needs its linked top-up
+# endpoint and ``other`` is a free-amount orphan path. Fail closed until a real
+# linked fee type exists (the app only sells cafetería top-ups).
+_BLOCKED_PAYMENT_TYPES = frozenset({'cafeteria', 'other'})
 
 _TYPE_HELP = {
-    'tuition': 'Use POST /finance/invoices/<id>/pay/ para colegiatura.',
     'cafeteria': 'Use POST /cafeteria/topup/ para recargas de cafetería.',
-    'enrollment': 'El pago de inscripción aún no está disponible por esta vía.',
-    'other': 'Use colegiaturas o cafetería desde el portal familiar.',
+    'other': 'Use la recarga de cafetería desde el portal familiar.',
 }
 
 
 class PaymentInitiateSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('1.00'))
-    payment_type = serializers.ChoiceField(choices=['tuition', 'enrollment', 'cafeteria', 'other'])
+    payment_type = serializers.ChoiceField(choices=['cafeteria', 'other'])
     description = serializers.CharField(max_length=255, required=False, default='')
 
     def validate_payment_type(self, value):

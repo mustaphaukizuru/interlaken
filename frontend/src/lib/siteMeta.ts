@@ -35,7 +35,7 @@ export const LOCALE = 'es_MX';
 export const ORG = {
   legalName: 'Colegio Interlaken',
   telephone: '+52-55-5379-1188',
-  email: 'colegio@interlaken.com.mx',
+  email: 'info@interlaken.com.mx',
   streetAddress: 'Av. de los Reyes 67, Residencial el Dorado',
   addressLocality: 'Tlalnepantla de Baz',
   addressRegion: 'Estado de México',
@@ -85,10 +85,9 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       'Completa el proceso de inscripción formal en Colegio Interlaken tras tu pre-registro y contacto con el equipo de admisiones.',
   },
-  '/puertas-abiertas': {
-    title: 'Puertas Abiertas',
-    description:
-      'Asiste a un evento de Puertas Abiertas en Colegio Interlaken: conoce nuestras instalaciones, el modelo educativo y a la comunidad.',
+  '/calendario': {
+    title: 'Calendario escolar',
+    description: 'Fechas importantes del ciclo escolar en Colegio Interlaken: vacaciones, evaluaciones, eventos y juntas.',
   },
   '/agendar-visita': {
     title: 'Agendar Visita',

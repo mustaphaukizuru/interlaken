@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { AlertTriangle, Check, Copy, KeyRound } from 'lucide-react';
+import { AlertTriangle, Check, Copy, KeyRound, MessageCircle, Mail } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { portalApi } from '@/services/api';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { credentialTemplate, mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
 
 export interface ResetPasswordTarget {
   /** User id of the account whose password is being reset. */
@@ -13,6 +15,9 @@ export interface ResetPasswordTarget {
   email: string;
   /** Human label shown in the dialog, e.g. «Cuenta familiar» or the tutor's name. */
   label: string;
+  /** Family WhatsApp number (digits with country code) for one-tap delivery. */
+  whatsapp?: string;
+  firstName?: string;
 }
 
 interface Props {
@@ -138,12 +143,13 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
             )}
             {copied ? 'Copiada' : 'Copiar contraseña'}
           </Button>
+          <DeliveryActions target={target} password={temporary} />
           <div className="flex gap-3 rounded-2xl bg-coral-50 p-3 text-xs text-ink">
             <AlertTriangle className="h-4 w-4 shrink-0 text-coral-600" aria-hidden="true" />
             <p>
-              Esta contraseña <strong>no se volverá a mostrar</strong>. Anótela antes de cerrar
-              esta ventana y pida a la familia que la cambie al iniciar sesión, desde «Mi
-              perfil». Las sesiones que ya estaban abiertas se cerraron.
+              Esta contraseña <strong>no se volverá a mostrar</strong>. Envíela a la familia por
+              WhatsApp o correo antes de cerrar. Por política del colegio la familia no puede
+              cambiarla; si la olvida, la solicitará de nuevo. Las sesiones abiertas se cerraron.
             </p>
           </div>
           <Button type="button" className="w-full" onClick={onClose}>
@@ -262,6 +268,25 @@ export function ResetPasswordDialog({ target, onClose }: Props) {
         </form>
       )}
     </Modal>
+  );
+}
+
+/** One-tap WhatsApp / email delivery of the generated credential (P1-A5). */
+function DeliveryActions({ target, password }: { target: ResetPasswordTarget; password: string }) {
+  const settings = useSiteSettings();
+  const t = credentialTemplate({ firstName: target.firstName, email: target.email, password, supportEmail: settings.contact_email });
+  const wa = whatsappDeliveryHref(target.whatsapp, t);
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {wa && (
+        <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-secondary justify-center text-sm">
+          <MessageCircle className="h-4 w-4" aria-hidden="true" /> Enviar por WhatsApp
+        </a>
+      )}
+      <a href={mailtoDeliveryHref(target.email, t)} className="btn-outline justify-center text-sm">
+        <Mail className="h-4 w-4" aria-hidden="true" /> Enviar por correo
+      </a>
+    </div>
   );
 }
 

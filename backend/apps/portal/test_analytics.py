@@ -63,8 +63,10 @@ class TestEmptySafety:
         api_client.force_authenticate(staff_user)
         data = api_client.get(URL).json()
 
-        assert set(data) == {'admissions', 'payments', 'cafeteria', 'documents',
+        assert set(data) == {'funnel', 'admissions', 'payments', 'cafeteria', 'documents',
                              'circulars', 'arco', 'range_days', 'generated_at'}
+        assert [f['count'] for f in data['funnel']] == [0] * 6
+        assert data['cafeteria']['adoption']['wallet_rate'] is None
         assert data['range_days'] == 30
         # Funnels are zero-filled with every status key present.
         assert data['admissions']['pre_funnel'] == {
@@ -184,7 +186,7 @@ class TestPerformanceAndCache:
                 loyverse_receipt_id=f't-bulk-{i}')
 
         api_client.force_authenticate(staff_user)
-        with django_assert_max_num_queries(13):
+        with django_assert_max_num_queries(25):  # +12 constant aggregates for funnel + adoption (P4-10)
             assert api_client.get(URL).status_code == 200
 
     def test_second_call_served_from_cache(self, api_client, staff_user,
@@ -224,3 +226,28 @@ class TestRangeParam:
         with django_assert_num_queries(0):
             assert api_client.get(URL, {'days': 7}).json()['range_days'] == 7
             assert api_client.get(URL, {'days': 90}).json()['range_days'] == 90
+
+
+@pytest.mark.django_db
+def test_funnel_and_adoption_counts(api_client, staff_user):
+    from decimal import Decimal
+
+    from apps.accounts.factories import StudentProfileFactory
+    from apps.admissions.models import PreRegistration
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+    PreRegistration.objects.create(child_first_name='A', child_last_name='X', child_dob='2019-01-01', level='preescolar', grade_applying='K',
+                                   parent_name='P', parent_email='a@x.mx', parent_phone='5', status=PreRegistration.Status.CONTACTED)
+    PreRegistration.objects.create(child_first_name='B', child_last_name='X', child_dob='2019-01-01', level='preescolar', grade_applying='K',
+                                   parent_name='P', parent_email='b@x.mx', parent_phone='5')
+    s1, s2 = StudentProfileFactory(), StudentProfileFactory()
+    CafeteriaBalance.objects.get_or_create(student=s1, defaults={'balance': Decimal('10')})
+    CafeteriaBalance.objects.get_or_create(student=s2, defaults={'balance': Decimal('500')})
+    CafeteriaTransaction.objects.create(student=s1, transaction_type=CafeteriaTransaction.TxType.PURCHASE, amount=Decimal('5'), loyverse_receipt_id='r1')
+    api_client.force_authenticate(staff_user)
+    data = api_client.get(URL).data
+    funnel = {f['step']: f['count'] for f in data['funnel']}
+    assert funnel['pre_registro'] == 2 and funnel['contactado'] == 1
+    ad = data['cafeteria']['adoption']
+    assert ad['active_students'] == 2 and ad['with_wallet'] == 2 and ad['used_in_period'] == 1 and ad['low_balance'] == 1
+    assert ad['wallet_rate'] == 1.0 and ad['usage_rate'] == 0.5

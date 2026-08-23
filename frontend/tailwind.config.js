@@ -3,7 +3,11 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // Breakpoint system (docs/RESPONSIVE.md): xs 360 · sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536
+      screens: { xs: '360px' },
       colors: {
+        // Nivel educativo palette (school instruction 2026-08-21)
+        nivel: { preescolar: '#8ac6a4', primaria: '#f4436c', secundaria: '#f1c82f' },
         // `brand` remapped to the Interlaken purple scale so every existing
         // `brand-*` utility across the app rebrands automatically.
         brand: {
@@ -67,7 +71,7 @@ export default {
         ink:     { DEFAULT: '#1A1130' },
         muted:   '#6E6885',
         // Darkened (was #9A93AE, 2.93:1) so caption text passes AA on white and cream.
-        subtle:  '#726B89',
+        subtle:  '#6B6482',
         // Hairline borders / dividers (mirror --border / --border-2 in index.css)
         line:    '#ECEAF3',
         'line-2': '#EEEBF5',

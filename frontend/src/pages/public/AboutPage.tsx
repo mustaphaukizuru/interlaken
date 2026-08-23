@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { SCHOOL_YEARS } from '@/lib/siteMeta';
+import { HistoryTimeline } from '@/components/public/HistoryTimeline';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
 
@@ -117,6 +118,17 @@ export default function AboutPage() {
         </div>
       </Section>
 
+      {/* ── LÍNEA DE TIEMPO (BACKLOG P2-8) ── */}
+      <Section bg="white">
+        <Reveal className="mb-8 text-center sm:mb-10">
+          <span className="section-label-green inline-flex">Trayectoria</span>
+          <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">{SCHOOL_YEARS} años formando líderes</h2>
+        </Reveal>
+        <div className="mx-auto max-w-3xl">
+          <HistoryTimeline />
+        </div>
+      </Section>
+
       {/* ── VALORES row ── */}
       <Section bg="cream">
         <Reveal className="mb-10 text-center sm:mb-11">
@@ -187,7 +199,7 @@ export default function AboutPage() {
         <p className="mx-auto mt-3 max-w-xl text-fluid-base opacity-90">Agende una visita o inicie su pre-registro en línea en solo unos minutos.</p>
         <div className="mt-7 flex flex-wrap justify-center gap-3.5">
           <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Inicie su pre-registro <ArrowRight size={17} /></Link>
-          <Link to="/puertas-abiertas" className="btn-ghost btn-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Puertas Abiertas</Link>
+          <Link to="/agendar-visita" className="btn-ghost btn-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Agendar visita</Link>
         </div>
       </Section>
     </div>

@@ -40,6 +40,8 @@ class PreRegistration(models.Model):
     # How did they find us?
     referral_source = models.CharField(max_length=100, blank=True, verbose_name='¿Cómo nos conoció?')
     message         = models.TextField(blank=True, verbose_name='Comentarios adicionales')
+    # BACKLOG P1-G2: the family asked for a school visit from the pre-registro form.
+    wants_visit     = models.BooleanField(default=False, verbose_name='Desea agendar visita')
 
     # Status
     status     = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
@@ -174,6 +176,16 @@ class RegistrationDocument(models.Model):
     file_size    = models.PositiveIntegerField(default=0)  # bytes
     uploaded_at  = models.DateTimeField(default=timezone.now)
     is_verified  = models.BooleanField(default=False)
+
+    # Per-document review (BACKLOG P1-G4). ``is_verified`` mirrors approved so
+    # existing badges/filters keep working.
+    class Review(models.TextChoices):
+        PENDING = 'pending', 'Pendiente'
+        APPROVED = 'approved', 'Aprobado'
+        REJECTED = 'rejected', 'Rechazado'
+
+    status       = models.CharField(max_length=10, choices=Review.choices, default=Review.PENDING)
+    review_note  = models.CharField(max_length=300, blank=True)
 
     class Meta:
         verbose_name = 'Documento'

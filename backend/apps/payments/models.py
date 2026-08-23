@@ -1,5 +1,9 @@
 """
-payments/models.py — Global Payments / school fee transactions
+payments/models.py — online gateway transactions (cafetería top-ups).
+
+The app only sells cafetería wallet top-ups; tuition (colegiatura) and
+enrollment (inscripción) are NOT billed through the app. Rows are created by
+the top-up flow and settled by signed webhooks — never by hand in the admin.
 """
 from django.db import models
 from django.utils import timezone
@@ -16,9 +20,9 @@ class Payment(models.Model):
         REFUNDED  = 'refunded',  'Devuelto'
 
     class Type(models.TextChoices):
-        TUITION    = 'tuition',    'Colegiatura'
-        ENROLLMENT = 'enrollment', 'Inscripción'
         CAFETERIA  = 'cafeteria',  'Recarga Cafetería'
+        # Legacy bucket: pre-existing rows of retired types were folded here by
+        # migration 0004; no new flow creates it.
         OTHER      = 'other',      'Otro'
 
     class Gateway(models.TextChoices):

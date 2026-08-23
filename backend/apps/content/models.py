@@ -33,7 +33,7 @@ class SiteSettings(models.Model):
     # notice, admin accounts) all live on interlaken.com.mx; .edu.mx is the web
     # domain only (GO-LIVE-AUDIT #19, resolved 2026-08-15).
     contact_email = models.EmailField(
-        'Correo de contacto', blank=True, default='colegio@interlaken.com.mx')
+        'Correo de contacto', blank=True, default='info@interlaken.com.mx')
     address = models.CharField(
         'Dirección', max_length=200, blank=True,
         default='Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México')
@@ -42,12 +42,30 @@ class SiteSettings(models.Model):
         default='https://maps.app.goo.gl/Xd241Sht8TmrMHUe6')
     office_hours = models.CharField(
         'Horario de oficina', max_length=100, blank=True,
-        default='Lunes–Viernes 8:00–16:00 hrs')
+        default='Lunes a Viernes 7:30 - 15:00')
 
     # ── Video institucional (vacío = la sección no se muestra) ─
     video_url = models.URLField(
         'Video institucional', blank=True, default='',
         help_text='URL de YouTube o Vimeo. Vacío = la sección no se muestra en el sitio.')
+
+    # ── Hero video (BACKLOG P2-1): direct MP4/WebM URL, autoplay muted on ≥ md;
+    # phones keep the poster image (data + battery). Vacío = imagen.
+    hero_video_url = models.URLField(
+        'Video del hero (MP4/WebM)', blank=True, default='',
+        help_text='URL directa a un MP4/WebM corto (≤ 15 s, sin audio). Vacío = imagen fija.')
+
+    # ── Snippets (CMS phase 7, BACKLOG P3-8): texto oficial editado una sola vez ───
+    sep_incorporations = models.JSONField(
+        'Incorporaciones SEP', default=list, blank=True,
+        help_text='[{level, label}] tal como aparece en el documento oficial. Vacío = valores integrados.')
+
+    # ── Ciclo escolar (BACKLOG P4-5): lo avanza el asistente de nuevo ciclo ───
+    school_year = models.CharField('Ciclo escolar', max_length=9, blank=True, help_text='AAAA-AAAA')
+    last_rollover_at = models.DateTimeField(null=True, blank=True)
+
+    # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
+    menu = models.JSONField('Menú del sitio', default=list, blank=True)
 
     # ── Redes sociales (vacío = el ícono no se muestra) ───
     # Confirmado por el cliente: la única red social del colegio es Facebook.
@@ -225,3 +243,67 @@ class PricingPolicy(PricingRow):
 
     def __str__(self):
         return self.text[:60]
+
+
+class SchoolEvent(models.Model):
+    """Calendario escolar (BACKLOG P2-16): holidays, exams, ceremonies, vacations.
+
+    Admin-managed from the portal; the public /calendario page lists the
+    current cycle. Separate from bookings.OpenSchoolEvent (visits with capacity).
+    """
+
+    class Kind(models.TextChoices):
+        HOLIDAY = 'holiday', 'Suspensión de clases'
+        VACATION = 'vacation', 'Vacaciones'
+        EXAM = 'exam', 'Evaluaciones'
+        EVENT = 'event', 'Evento escolar'
+        MEETING = 'meeting', 'Junta de padres'
+        DEADLINE = 'deadline', 'Fecha límite'
+
+    title = models.CharField('Título', max_length=160)
+    kind = models.CharField('Tipo', max_length=12, choices=Kind.choices, default=Kind.EVENT)
+    start_date = models.DateField('Inicio')
+    end_date = models.DateField('Fin', null=True, blank=True, help_text='Vacío = un solo día.')
+    level = models.CharField('Nivel', max_length=12, blank=True,
+                             help_text="Vacío = todos; o 'preescolar' / 'primaria' / 'secundaria'.")
+    description = models.CharField('Descripción', max_length=300, blank=True)
+    is_published = models.BooleanField('Publicado', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['start_date', 'title']
+        verbose_name = 'Evento del calendario'
+        verbose_name_plural = 'Calendario escolar'
+
+    def __str__(self):
+        return f'{self.start_date} {self.title}'
+
+
+class Testimonial(models.Model):
+    """Family / alumni quotes shown on Home and Admisiones (BACKLOG P2-15).
+    Admin-managed; only published rows reach the site."""
+
+    quote = models.TextField('Testimonio', max_length=400)
+    author = models.CharField('Nombre', max_length=120)
+    role = models.CharField('Relación', max_length=120, blank=True,
+                            help_text='Ej. "Mamá de alumno de 3° de primaria" o "Egresado 2019".')
+    level = models.CharField('Nivel', max_length=12, blank=True)
+    is_published = models.BooleanField('Publicado', default=True)
+    order = models.PositiveSmallIntegerField('Orden', default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = 'Testimonio'
+        verbose_name_plural = 'Testimonios'
+
+    def __str__(self):
+        return f'{self.author}: {self.quote[:40]}'
+
+
+# CMS media library lives in content/media.py (model + views); re-exported for migrations/admin.
+from .forms import FormDefinition, FormSubmission  # noqa: E402,F401
+from .media import MediaAsset  # noqa: E402,F401
+from .navigation import Redirect  # noqa: E402,F401
+from .pages import Page, PageVersion  # noqa: E402,F401

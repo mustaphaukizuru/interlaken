@@ -14,7 +14,7 @@ class PaymentFactory(factory.django.DjangoModelFactory):
         model = Payment
 
     user = factory.SubFactory(ParentFactory)
-    payment_type = Payment.Type.TUITION
+    payment_type = Payment.Type.CAFETERIA
     amount = Decimal("1000.00")
     currency = "MXN"
     status = Payment.Status.PENDING

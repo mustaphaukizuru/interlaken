@@ -1,6 +1,8 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
+from .forms import FormDefinition, FormSubmission
+from .media import MediaAsset
 from .models import (
     DaycareRate,
     EnrollmentFee,
@@ -10,6 +12,58 @@ from .models import (
     SiteSettings,
     TuitionCost,
 )
+from .navigation import Redirect
+from .pages import Page, PageVersion
+
+
+class ReadOnlyAdmin(ModelAdmin):
+    """Django admin is the technical system of record: content authored in the
+    portal CMS is visible here for support and audit, never edited (BACKLOG
+    P3-14, docs/ADMIN-VS-PORTAL.md). Editing bypasses validation, cache
+    busting, versions and the approval flow."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Page)
+class PageAdmin(ReadOnlyAdmin):
+    list_display = ('slug', 'title', 'status', 'published_at', 'updated_at')
+    list_filter = ('status', 'template')
+    search_fields = ('slug', 'title')
+
+
+@admin.register(PageVersion)
+class PageVersionAdmin(ReadOnlyAdmin):
+    list_display = ('page', 'number', 'author', 'created_at')
+
+
+@admin.register(MediaAsset)
+class MediaAssetAdmin(ReadOnlyAdmin):
+    list_display = ('filename', 'alt', 'size', 'uploaded_by', 'created_at')
+    search_fields = ('filename', 'alt')
+
+
+@admin.register(FormDefinition)
+class FormDefinitionAdmin(ReadOnlyAdmin):
+    list_display = ('slug', 'title', 'is_published', 'notify_to')
+
+
+@admin.register(FormSubmission)
+class FormSubmissionAdmin(ReadOnlyAdmin):
+    list_display = ('form', 'is_handled', 'page', 'created_at')
+    list_filter = ('form', 'is_handled')
+
+
+@admin.register(Redirect)
+class RedirectAdmin(ReadOnlyAdmin):
+    list_display = ('from_path', 'to_path', 'permanent', 'hits')
 
 
 @admin.register(TuitionCost)

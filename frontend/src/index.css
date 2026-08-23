@@ -13,6 +13,7 @@
   /* Pink darkened from #ef2558 so white button labels pass WCAG AA (4.74:1). */
   --pink: #e01a4e;
   --pink-dark: #d81a49;
+  --pink-text: #b0123b;   /* pink readable as text on pink-light */
   --pink-hot: #ec1f7f;
   --pink-light: #fde8ed;
   /* Coral — warm accent (tagline + clock hands + rule) */
@@ -30,6 +31,11 @@
   --green-strong: #38801e;
   /* Amber darkened from #d97706 so warning TEXT passes AA (5.02:1 on white). */
   --amber: #b45309;
+
+  /* Nivel educativo (school instruction 2026-08-21): used on nivel pages, chips, charts */
+  --nivel-preescolar: #8ac6a4;
+  --nivel-primaria: #f4436c;
+  --nivel-secundaria: #f1c82f;
   /* Neutrals */
   --dark: #080516;
   --dark-2: #0f0a24;
@@ -64,6 +70,9 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
     scroll-behavior: smooth;
+    /* The brand is a light design: keep native controls/scrollbars light even when
+       the OS prefers dark (BACKLOG P1-I5). A real dark theme is a separate decision. */
+    color-scheme: light;
   }
   body {
     @apply bg-cream text-ink antialiased;
@@ -189,7 +198,7 @@
   /* Status badges */
   .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
   .badge-purple { @apply badge; background: var(--purple-light); color: var(--purple); }
-  .badge-pink   { @apply badge; background: var(--pink-light); color: var(--pink); }
+  .badge-pink   { @apply badge; background: var(--pink-light); color: var(--pink-text); }  /* 4.6:1 on pink-light (WCAG AA) */
   .badge-coral  { @apply badge; background: var(--coral-light); color: var(--coral-dark); }
   .badge-green  { @apply badge; background: var(--green-light); color: var(--green-dark); }
   .badge-amber  { @apply badge; background: rgba(217,119,6,0.1); color: var(--amber); }

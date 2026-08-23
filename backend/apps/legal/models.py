@@ -147,6 +147,15 @@ class ArcoRequest(models.Model):
     requester          = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
                                            on_delete=models.SET_NULL, related_name='arco_requests')
     requester_email    = models.EmailField()   # snapshot, survives account deletion
+    class Channel(models.TextChoices):
+        PORTAL   = 'portal',   'Portal'
+        EMAIL    = 'email',    'Correo (privacidad@)'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        IN_PERSON = 'in_person', 'Presencial'
+
+    channel            = models.CharField(max_length=12, choices=Channel.choices, default=Channel.PORTAL)
+    requester_name     = models.CharField(max_length=200, blank=True, default='')
+    intake_by          = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     request_type       = models.CharField(max_length=20, choices=Type.choices)
     details            = models.TextField(blank=True, default='')
     status             = models.CharField(max_length=20, choices=Status.choices,

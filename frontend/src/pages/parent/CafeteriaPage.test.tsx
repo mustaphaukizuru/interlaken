@@ -107,7 +107,7 @@ describe('CafeteriaPage states', () => {
 
     renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
 
-    expect(await screen.findByRole('dialog', { name: 'Solicitar recarga' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Recargar cafetería' })).toBeInTheDocument();
     expect(screen.getByLabelText('Monto (MXN)')).toHaveValue(200);
   });
 

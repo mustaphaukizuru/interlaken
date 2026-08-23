@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom';
 vi.mock('@/services/api', () => ({
   portalApi: {
     getStudents: vi.fn(),
+    getStudent: vi.fn(),
     exportStudents: vi.fn(),
     importStudents: vi.fn(),
     importLoyverse: vi.fn(),
@@ -105,5 +106,19 @@ describe('AdminStudents URL-synced filters', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent(/^\/admin\/alumnos$/));
     expect(screen.getByLabelText('Buscar alumnos')).toHaveValue('');
+  });
+
+  it('on 2xl screens a row click opens the detail pane instead of navigating (P1-B10)', async () => {
+    const mql = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ ...mql(q), matches: q.includes('1536') })) as typeof window.matchMedia;
+    const student = { id: 5, student_id: 'A-5', grade: '2° Primaria', group: 'A', status: 'active', user: { id: 9, first_name: 'Ana', last_name: 'López', full_name: 'Ana López', email: 'ana@x.mx' } };
+    (portalApi.getStudents as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { results: [student], count: 1 } } as never);
+    (portalApi.getStudent as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { ...student, guardians: [], allergies: '', medical_notes: '' } } as never);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+    const link = (await screen.findAllByRole('link', { name: 'Ana López' }))[0];
+    await userEvent.setup().click(link);
+    expect(await screen.findByRole('complementary', { name: 'Detalle del alumno' })).toBeInTheDocument();
+    window.matchMedia = mql;
   });
 });

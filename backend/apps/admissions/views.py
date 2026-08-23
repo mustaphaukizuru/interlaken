@@ -16,10 +16,10 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import User
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.portal.services import send_email
 
@@ -39,13 +39,6 @@ from .serializers import (
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
 logger = logging.getLogger(__name__)
-
-
-class IsAdmin(permissions.BasePermission):
-    """Authenticated admin users only (matches bookings/cafeteria convention)."""
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 def _is_staff(request):
@@ -117,7 +110,7 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
                 f'Estimado/a {obj.parent_name},\n\n'
                 f'Hemos recibido su solicitud de pre-registro para {obj.child_first_name} '
                 f'{obj.child_last_name}. En breve nos pondremos en contacto con usted.\n\n'
-                f'Colegio Interlaken\ncolegio@interlaken.com.mx'
+                f'Colegio Interlaken\n{settings.ADMISSIONS_EMAIL}'
             ),
             [obj.parent_email],
         )
@@ -125,13 +118,14 @@ class PreRegistrationListCreateView(generics.ListCreateAPIView):
     def _notify_admin(self, obj):
         # Deliver to the school's contact inbox (NOT EMAIL_HOST_USER, which is the
         # SMTP auth user and is empty by default), mirroring the contact form.
-        recipient = getattr(settings, 'CONTACT_EMAIL', '') or settings.DEFAULT_FROM_EMAIL
+        recipient = settings.ADMISSIONS_EMAIL or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
         send_email(
             f'[Interlaken] Nuevo pre-registro: {obj.child_first_name} {obj.child_last_name}',
             (
                 f'Nivel: {obj.level}\nGrado: {obj.grade_applying}\n'
                 f'Padre/Tutor: {obj.parent_name}\nEmail: {obj.parent_email}\n'
-                f'Teléfono: {obj.parent_phone}'
+                f'Teléfono: {obj.parent_phone}\n'
+                f'Desea visita: {"Sí" if obj.wants_visit else "No"}'
             ),
             [recipient],
         )
@@ -298,13 +292,66 @@ class RegistrationStatusView(generics.UpdateAPIView):
         send_email(subject, body, [reg.parent1_email])
 
 
+class DocumentListView(APIView):
+    """GET /api/v1/admissions/register/<pk>/documents/ — the applicant's own
+    documents with review status (session token) or any, for staff (P1-G4)."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+        reg = authorize_registration(request, pk)
+        docs = reg.documents.order_by('doc_type', '-uploaded_at')
+        return Response({
+            'registration': reg.id,
+            'child_name': f'{reg.child_first_name} {reg.child_last_name}'.strip(),
+            'required': [{'code': c, 'label': label} for c, label in RegistrationDocument.DocType.choices
+                         if c != RegistrationDocument.DocType.OTHER],
+            'documents': RegistrationDocumentSerializer(docs, many=True, context={'request': request}).data,
+        })
+
+
+class DocumentsLinkView(APIView):
+    """POST /api/v1/admissions/register/<pk>/documents-link/ — admin issues a
+    fresh single-use link to the standalone documents page and emails it."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        reg = get_object_or_404(Registration, pk=pk)
+        raw = issue_invite(reg)
+        url = f'{settings.FRONTEND_URL}/inscripcion/documentos?rid={reg.id}&token={raw}'
+        missing = [label for code, label in RegistrationDocument.DocType.choices
+                   if code != RegistrationDocument.DocType.OTHER
+                   and not reg.documents.filter(doc_type=code, status=RegistrationDocument.Review.APPROVED).exists()]
+        send_email(
+            'Documentos de inscripción - Colegio Interlaken',
+            f'Estimado/a {reg.parent1_name},\n\n'
+            f'Para continuar la inscripción de {reg.child_first_name} suba los siguientes documentos:\n'
+            + ''.join(f'- {m}\n' for m in missing)
+            + f'\nEnlace (válido por tiempo limitado, un solo uso):\n{url}\n\nColegio Interlaken',
+            [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL,
+        )
+        return Response({'url': url, 'missing': missing})
+
+
 class DocumentVerifyView(generics.UpdateAPIView):
-    """PATCH /api/v1/admissions/documents/<pk>/verify/ — admin marks a document
-    verified (or clears verification)."""
+    """PATCH /api/v1/admissions/documents/<pk>/verify/ — admin approves/rejects
+    (with note) or clears verification. A rejection emails the family (fail-soft)."""
     queryset = RegistrationDocument.objects.all()
     serializer_class = DocumentVerifySerializer
     permission_classes = [IsAdmin]
     http_method_names = ['patch']
+
+    def perform_update(self, serializer):
+        doc = serializer.save()
+        if doc.status == RegistrationDocument.Review.REJECTED:
+            reg = doc.registration
+            send_email(
+                'Documento por corregir - Colegio Interlaken',
+                f'Estimado/a {reg.parent1_name},\n\nEl documento "{doc.get_doc_type_display()}" de '
+                f'{reg.child_first_name} necesita corrección'
+                + (f': {doc.review_note}' if doc.review_note else '.') + '\n\n'
+                'Solicite un nuevo enlace de documentos a admisiones si el suyo caducó.\n\nColegio Interlaken',
+                [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL,
+            )
 
 
 class DocumentDownloadView(APIView):

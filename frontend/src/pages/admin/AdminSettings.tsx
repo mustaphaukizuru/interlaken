@@ -14,13 +14,14 @@ import { contentApi } from '@/services/api';
 import { socialEntries } from '@/lib/siteContact';
 import type { SiteSettings } from '@/types/content';
 
-type SettingsForm = Omit<SiteSettings, 'updated_at'>;
+type SettingsForm = Omit<SiteSettings, 'updated_at' | 'menu'>;
+type SepRow = NonNullable<SiteSettings['sep_incorporations']>[number];
 type FieldErrors = Partial<Record<keyof SettingsForm, string>>;
 
 const EMPTY: SettingsForm = {
   phone_display: '', phone_e164: '', whatsapp_number: '', contact_email: '',
-  address: '', maps_url: '', office_hours: '', video_url: '',
-  facebook_url: '', instagram_url: '', youtube_url: '',
+  address: '', maps_url: '', office_hours: '', video_url: '', hero_video_url: '',
+  facebook_url: '', instagram_url: '', youtube_url: '', sep_incorporations: [],
 };
 
 const FORM_KEYS = Object.keys(EMPTY) as (keyof SettingsForm)[];
@@ -190,6 +191,8 @@ export default function AdminSettings() {
   const [edits, setEdits] = useState<Partial<SettingsForm>>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const form: SettingsForm = { ...EMPTY, ...data, ...edits };
+  const sepRows: SepRow[] = form.sep_incorporations ?? [];
+  const setSep = (rows: SepRow[]) => setEdits((f) => ({ ...f, sep_incorporations: rows }));
   const set = (k: keyof SettingsForm, v: string) => {
     setEdits((f) => ({ ...f, [k]: v }));
     setFieldErrors((prev) => (prev[k] ? { ...prev, [k]: undefined } : prev));
@@ -268,7 +271,7 @@ export default function AdminSettings() {
                 />
                 <Input
                   label="Correo de contacto"
-                  type="email"
+                  type="email" inputMode="email" autoComplete="email"
                   className={FIELD}
                   value={form.contact_email}
                   onChange={(e) => set('contact_email', e.target.value)}
@@ -297,10 +300,32 @@ export default function AdminSettings() {
                   className={FIELD}
                   value={form.office_hours}
                   onChange={(e) => set('office_hours', e.target.value)}
-                  placeholder="Lunes–Viernes 8:00–16:00 hrs"
+                  placeholder="Lunes a Viernes 7:30 - 15:00"
                   error={fieldErrors.office_hours}
                 />
               </div>
+            </Card>
+
+            <Card title="Incorporaciones SEP">
+              <p className="mb-3 text-sm text-subtle">
+                Texto oficial de cada registro, tal como aparece en el documento de la SEP. Se muestra en Admisiones, en cada nivel y en los bloques del CMS. Vacío = valores integrados del flyer.
+              </p>
+              <ul className="space-y-2">
+                {sepRows.map((r, i) => (
+                  <li key={i} className="grid items-end gap-2 sm:grid-cols-[150px_1fr_auto]">
+                    <div>
+                      <label className="label" htmlFor={`sep-level-${i}`}>Nivel</label>
+                      <select id={`sep-level-${i}`} className="input-field" value={r.level} onChange={(e) => setSep(sepRows.map((x, j) => (j === i ? { ...x, level: e.target.value as SepRow['level'] } : x)))}>
+                        {(['Preescolar', 'Primaria', 'Secundaria'] as const).map((l) => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                    <Input label="Texto oficial" value={r.label} onChange={(e) => setSep(sepRows.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                    <Button type="button" size="sm" variant="ghost" aria-label="Quitar registro" onClick={() => setSep(sepRows.filter((_, j) => j !== i))}>Quitar</Button>
+                  </li>
+                ))}
+              </ul>
+              {fieldErrors.sep_incorporations && <p className="mt-2 text-sm text-coral-600">{fieldErrors.sep_incorporations}</p>}
+              <Button type="button" size="sm" variant="secondary" className="mt-3" disabled={sepRows.length >= 6} onClick={() => setSep([...sepRows, { level: 'Preescolar', label: '' }])}>Agregar registro</Button>
             </Card>
 
             <Card title="Video institucional">
@@ -316,6 +341,16 @@ export default function AdminSettings() {
                 placeholder="https://www.youtube.com/watch?v=…"
                 hint="Vacío = la sección no se muestra en el sitio."
                 error={fieldErrors.video_url}
+              />
+              <Input
+                label="Video de fondo del hero (MP4/WebM directo)"
+                type="url"
+                className={FIELD}
+                value={form.hero_video_url ?? ''}
+                onChange={(e) => set('hero_video_url', e.target.value)}
+                placeholder="https://…/campus.mp4"
+                hint="Se reproduce en silencio en pantallas grandes; en móvil se muestra la imagen. Vacío = imagen fija."
+                error={fieldErrors.hero_video_url}
               />
             </Card>
 

@@ -360,7 +360,7 @@ def _notify_purchase(tx):
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
-               whatsapp=use_wa)
+               whatsapp=use_wa, fanout=False)
         notified += 1
     return notified
 
@@ -410,7 +410,7 @@ def _maybe_low_balance_alert(cb, now):
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
-               whatsapp=use_wa)
+               whatsapp=use_wa, fanout=False)
         notified += 1
     return notified
 
@@ -488,7 +488,7 @@ def _maybe_budget_alert(cb, now):
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
-               whatsapp=use_wa)
+               whatsapp=use_wa, fanout=False)
         notified += 1
     return notified
 
@@ -909,7 +909,7 @@ def notify_topup_result(payment, *, success: bool) -> int:
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
-        notify(parent, Notification.NotifType.PAYMENT, title, message)
+        notify(parent, Notification.NotifType.PAYMENT, title, message, fanout=False)
         notified += 1
     return notified
 
@@ -1005,7 +1005,7 @@ def _notify_balance_change(student, title, message):
 
     notified = 0
     for parent in family_notify_recipients(student):
-        notify(parent, Notification.NotifType.CAFETERIA, title, message)
+        notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False)
         notified += 1
     return notified
 

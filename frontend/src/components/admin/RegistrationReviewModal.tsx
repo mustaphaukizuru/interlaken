@@ -16,7 +16,7 @@ const DOC_LABELS: Record<string, string> = {
   vaccination: 'Cartilla de Vacunación', other: 'Otro Documento',
 };
 
-interface Doc { id: number; doc_type: string; filename: string; is_verified: boolean; download_url: string }
+interface Doc { id: number; doc_type: string; filename: string; is_verified: boolean; status?: 'pending' | 'approved' | 'rejected'; review_note?: string; download_url: string }
 interface Reg {
   id: number; child_first_name: string; child_last_name: string; child_dob: string;
   child_curp: string; child_nationality: string; level: string; grade_applying: string; cycle: string;
@@ -64,6 +64,20 @@ export function RegistrationReviewModal({ id, open, onClose }: {
     }
   };
 
+  const reviewDoc = useMutation({
+    mutationFn: ({ docId, status, note }: { docId: number; status: 'approved' | 'rejected' | 'pending'; note?: string }) =>
+      admissionsAdminApi.reviewDocument(docId, status, note),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-registration', id] });
+      qc.invalidateQueries({ queryKey: ['admin-registrations'] });
+    },
+    onError: () => toast.error('No se pudo actualizar el documento.'),
+  });
+  const sendDocsLink = useMutation({
+    mutationFn: () => admissionsAdminApi.sendDocumentsLink(id!),
+    onSuccess: ({ data: r }) => toast.success(r.missing.length ? `Enlace enviado. Faltan: ${r.missing.join(', ')}` : 'Enlace enviado.'),
+    onError: () => toast.error('No se pudo enviar el enlace.'),
+  });
   const verifyDoc = useMutation({
     mutationFn: ({ docId, next }: { docId: number; next: boolean }) =>
       admissionsAdminApi.verifyDocument(docId, next),
@@ -175,6 +189,10 @@ export function RegistrationReviewModal({ id, open, onClose }: {
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
               Documentos ({data.documents.filter((d) => d.is_verified).length}/{data.documents.length} verificados)
+              <button type="button" onClick={() => sendDocsLink.mutate()} disabled={sendDocsLink.isPending}
+                className="ml-3 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-purple hover:bg-cream disabled:opacity-50">
+                {sendDocsLink.isPending ? 'Enviando…' : 'Solicitar documentos'}
+              </button>
             </p>
             {data.documents.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center text-sm text-subtle">
@@ -200,6 +218,21 @@ export function RegistrationReviewModal({ id, open, onClose }: {
                         <Download className="h-3.5 w-3.5" />
                         {downloadingId === d.id ? '…' : 'Ver'}
                       </button>
+                      {d.status !== 'rejected' && (
+                        <button
+                          type="button"
+                          disabled={reviewDoc.isPending}
+                          onClick={() => {
+                            const note = window.prompt('Motivo del rechazo (se envía a la familia):', d.review_note ?? '');
+                            if (note === null) return;
+                            reviewDoc.mutate({ docId: d.id, status: 'rejected', note });
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-cream px-2.5 py-1 text-xs font-semibold text-coral-dark transition hover:bg-coral-50 disabled:opacity-50"
+                        >
+                          Rechazar
+                        </button>
+                      )}
+                      {d.status === 'rejected' && <span className="text-xs text-coral-600" title={d.review_note}>Rechazado</span>}
                       <button
                         type="button"
                         disabled={verifyDoc.isPending}

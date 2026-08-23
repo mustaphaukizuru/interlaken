@@ -1,0 +1,32 @@
+# Staging overlay (BACKLOG P5-1). Same image and Caddyfile as production,
+# pointed at a staging subdomain and a separate database, with demo data.
+#
+#   cp deploy/env.example deploy/.env.staging   # PORTAL_DOMAIN=staging.interlaken.edu.mx, own DATABASE_URL, own SECRET_KEY
+#   docker compose --env-file deploy/.env.staging -f deploy/docker-compose.yml -f deploy/docker-compose.staging.yml up -d --build
+#   docker compose --env-file deploy/.env.staging -f deploy/docker-compose.yml -f deploy/docker-compose.staging.yml exec app python manage.py seed_demo --force
+#
+# Never share DATABASE_URL, Loyverse or payment credentials with production:
+# staging uses sandbox keys only (PAYMENTS_SANDBOX=1, Loyverse token empty).
+services:
+  app:
+    environment:
+      ENVIRONMENT: staging
+      # Every email subject is prefixed so a UAT run is never mistaken for a
+      # real notice (Django EMAIL_SUBJECT_PREFIX, read in settings).
+      EMAIL_SUBJECT_PREFIX: "[STAGING] "
+      # No outbound WhatsApp and sandbox payment gateways, whatever .env says.
+      WHATSAPP_TOKEN: ""
+      WHATSAPP_PHONE_ID: ""
+      GLOBAL_PAYMENTS_ENV: sandbox
+      BANORTE_ENV: sandbox
+    container_name: interlaken-staging-app
+  caddy:
+    container_name: interlaken-staging-caddy
+    # Search engines must not index staging: Caddy adds the header on every reply.
+    environment:
+      CADDY_EXTRA_HEADERS: "X-Robots-Tag: noindex, nofollow"
+volumes:
+  caddy_data:
+    name: interlaken_staging_caddy_data
+  caddy_config:
+    name: interlaken_staging_caddy_config

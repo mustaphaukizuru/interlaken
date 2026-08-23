@@ -1,0 +1,48 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node scripts/preview-static.mjs 4173",
+      "startServerReadyPattern": "preview-static",
+      "startServerReadyTimeout": 60000,
+      "url": [
+        "http://localhost:4173/",
+        "http://localhost:4173/admisiones",
+        "http://localhost:4173/admisiones/costos",
+        "http://localhost:4173/pre-registro",
+        "http://localhost:4173/login"
+      ],
+      "numberOfRuns": 2,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage --headless=new",
+        "maxWaitForFcp": 30000,
+        "maxWaitForLoad": 60000,
+        "budgetPath": "./lighthouse-budget.json",
+        "skipAudits": ["uses-http2", "is-on-https", "redirects-http"]
+      }
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": "/login$",
+          "assertions": { "categories:seo": "off", "categories:accessibility": ["error", { "minScore": 0.95 }], "categories:performance": ["error", { "minScore": 0.85 }], "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }] }
+        },
+        {
+          "matchingUrlPattern": "^(?!.*/login$)",
+          "assertions": {
+        "categories:performance": ["error", { "minScore": 0.85 }],
+        "categories:accessibility": ["error", { "minScore": 0.95 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:seo": ["error", { "minScore": 0.9 }],
+        "resource-summary:script:size": ["error", { "maxNumericValue": 400000 }],
+        "resource-summary:total:size": ["warn", { "maxNumericValue": 1500000 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }]
+          }
+        }
+      ]
+    },
+    "upload": { "target": "temporary-public-storage" }
+  }
+}

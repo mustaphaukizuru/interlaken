@@ -43,7 +43,8 @@ export function Seo({
     : bareTitle
       ? title
       : `${title} · ${SITE_NAME}`;
-  const url = canonical ?? SITE_URL;
+  const path = typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') : '';
+  const url = canonical ?? `${SITE_URL}${path === '/' ? '' : path}`;
   const blocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 
   return (

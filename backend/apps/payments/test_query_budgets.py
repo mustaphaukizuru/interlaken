@@ -39,7 +39,7 @@ class TestPaymentHistoryBudget:
                 )
             else:
                 Payment.objects.create(
-                    user=parent, payment_type=Payment.Type.TUITION,
+                    user=parent, payment_type=Payment.Type.OTHER,
                     amount=Decimal('2500.00'), status=Payment.Status.PENDING,
                 )
 

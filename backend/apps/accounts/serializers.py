@@ -6,7 +6,8 @@ from .models import NotificationPreference, ParentProfile, StudentProfile, User
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationPreference
-        fields = ['email_enabled', 'in_app_enabled', 'push_enabled', 'updated_at']
+        fields = ['email_enabled', 'in_app_enabled', 'push_enabled',
+                  'cat_cafeteria', 'cat_payment', 'cat_info', 'updated_at']
         read_only_fields = ['updated_at']
 
 
@@ -19,9 +20,16 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'full_name', 'role',
-            'avatar', 'whatsapp', 'has_usable_password', 'notif_prefs',
+            'avatar', 'whatsapp', 'has_usable_password', 'notif_prefs', 'last_login',
         ]
-        read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs']
+        read_only_fields = ['id', 'email', 'role', 'has_usable_password', 'notif_prefs', 'last_login']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from .avatar import avatar_url
+        data['avatar'] = avatar_url(instance)
+        data['has_custom_avatar'] = bool(instance.avatar_file)
+        return data
 
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
@@ -37,12 +45,28 @@ class UserSerializer(serializers.ModelSerializer):
         return NotificationPreferenceSerializer(prefs).data
 
 
+MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes')
+
+
 class StudentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    age = serializers.ReadOnlyField()
 
     class Meta:
         model = StudentProfile
-        fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id']
+        fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id',
+                  'enrollment_date', 'is_active', 'status',
+                  'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
+                  'blood_type', 'allergies', 'medical_notes']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Medical data only for admins and the student's own family (LFPDPPP);
+        # rosters/lists pass include_medical=False and never carry it.
+        if not self.context.get('include_medical'):
+            for f in MEDICAL_FIELDS:
+                data.pop(f, None)
+        return data
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):

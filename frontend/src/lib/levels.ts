@@ -11,6 +11,8 @@ export interface LevelData {
   slug: 'preescolar' | 'primaria' | 'secundaria';
   name: string;
   accent: 'green' | 'coral' | 'purple';
+  /** Official nivel color (tokens --nivel-*): Preescolar aqua, Primaria pink, Secundaria yellow. */
+  color: string;
   hero: string;
   intro: string;
   /** Sección "Modelo educativo / actividades" (viñetas). */
@@ -28,6 +30,7 @@ export const LEVELS: LevelData[] = [
     slug: 'preescolar',
     name: 'Preescolar',
     accent: 'green',
+    color: '#8ac6a4',
     hero: '/assets/hopscotch.webp',
     intro:
       'Recibimos a los pequeños desde los dos años de edad en un entorno seguro y estimulante. Nuestro modelo bilingüe (Español–Inglés) integra Educación en Valores, Cantos y Juegos y Educación Física; a partir de 1º de Preescolar se suman Computación y Yoga.',
@@ -64,6 +67,7 @@ export const LEVELS: LevelData[] = [
     slug: 'primaria',
     name: 'Primaria',
     accent: 'coral',
+    color: '#f4436c',
     hero: '/assets/court-primaria.webp',
     intro:
       'Educación de calidad basada en los Planes y Programas de la SEP y en el Modelo Educativo propio del colegio: alto nivel académico, sólida preparación y una excelente formación humana.',
@@ -96,6 +100,7 @@ export const LEVELS: LevelData[] = [
     slug: 'secundaria',
     name: 'Secundaria',
     accent: 'purple',
+    color: '#f1c82f',
     hero: '/assets/secundaria.webp',
     intro:
       'Formamos adolescentes competentes para la vida diaria y preparados para su siguiente nivel educativo, con un alto nivel académico y una excelente formación. El iPad se utiliza en el salón de clases.',

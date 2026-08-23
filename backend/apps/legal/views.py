@@ -12,6 +12,7 @@ from apps.accounts.models import StudentProfile, User
 
 from .models import NOTICE_CACHE_KEY, ArcoRequest, PrivacyNoticeVersion
 from .serializers import (
+    ArcoIntakeSerializer,
     ArcoRequestSerializer,
     ArcoStatusInputSerializer,
     ConsentInputSerializer,
@@ -129,4 +130,45 @@ class AdminArcoStatusView(APIView):
             arco.resolved_at = timezone.now()
         # The status change is audit-logged automatically (register_audit + middleware).
         arco.save(update_fields=['status', 'resolution_note', 'resolved_at', 'updated_at'])
+        _notify_requester(arco)
         return Response(ArcoRequestSerializer(arco).data)
+
+
+def _notify_requester(arco, *, intake=False):
+    """Email the requester: acknowledgement with the statutory deadline on intake, outcome on resolution."""
+    from django.conf import settings as dj_settings
+
+    from apps.portal.services import send_email
+    label = arco.get_request_type_display()
+    if intake:
+        subject = f'Recibimos su solicitud ARCO de {label.lower()}'
+        body = (f'Registramos su solicitud de {label.lower()} el {arco.created_at:%d/%m/%Y}. '
+                f'Le responderemos a más tardar el {arco.statutory_deadline:%d/%m/%Y} (plazo legal de 20 días hábiles).\n\n'
+                f'Si desea ampliar la solicitud, responda a este correo o escriba a {dj_settings.PRIVACY_EMAIL}.')
+    elif arco.status == ArcoRequest.Status.RESOLVED:
+        subject = f'Su solicitud ARCO de {label.lower()} fue atendida'
+        body = f'Resolución: {arco.resolution_note or "atendida"}.\n\nGracias por ayudarnos a mantener sus datos correctos.'
+    elif arco.status == ArcoRequest.Status.REJECTED:
+        subject = f'Su solicitud ARCO de {label.lower()} no procedió'
+        body = f'Motivo: {arco.resolution_note or "no especificado"}.\n\nPuede acudir al INAI si no está de acuerdo con esta respuesta.'
+    else:
+        return
+    send_email(subject, body, [arco.requester_email], reply_to=dj_settings.PRIVACY_EMAIL)
+
+
+class AdminArcoIntakeView(APIView):
+    """POST /legal/admin/arco/intake/ — record a request that arrived via privacidad@, WhatsApp or in person (P5-5)."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from apps.accounts.models import User
+        ser = ArcoIntakeSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+        arco = ArcoRequest.objects.create(
+            requester=User.objects.filter(email__iexact=d['requester_email']).first(),
+            requester_email=d['requester_email'].lower(), requester_name=d['requester_name'], request_type=d['request_type'],
+            channel=d['channel'], details=d['details'], intake_by=request.user,
+        )
+        _notify_requester(arco, intake=True)
+        return Response(ArcoRequestSerializer(arco).data, status=201)

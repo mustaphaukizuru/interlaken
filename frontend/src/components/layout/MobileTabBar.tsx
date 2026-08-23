@@ -1,20 +1,38 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { mobileNavByRole, type Role } from './navConfig';
+import { useBadges } from '@/hooks/useBadges';
 
 /**
  * Always-visible primary navigation on phones — the drawer is for the full menu,
  * this keeps the curated daily destinations one tap away. Hidden at lg+ where the
  * static sidebar is present.
  */
+/** True while the on-screen keyboard shrinks the visual viewport (BACKLOG P1-B5). */
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setOpen(vv.height < window.innerHeight * 0.75);
+    vv.addEventListener('resize', check);
+    return () => vv.removeEventListener('resize', check);
+  }, []);
+  return open;
+}
+
 export default function MobileTabBar({ role }: { role: Role }) {
   const items = mobileNavByRole[role] ?? mobileNavByRole.parent;
+  const keyboardOpen = useKeyboardOpen();
+  const badges = useBadges();
+  if (keyboardOpen) return null;
 
   return (
     <nav
       aria-label="Navegación principal"
       className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_-12px_rgba(64,26,142,0.25)] backdrop-blur-lg lg:hidden"
     >
-      {items.map(({ icon: Icon, label, to, end }) => (
+      {items.map(({ icon: Icon, label, to, end, badgeKey }) => (
         <NavLink
           key={to}
           to={to}
@@ -28,11 +46,16 @@ export default function MobileTabBar({ role }: { role: Role }) {
           {({ isActive }) => (
             <>
               <span
-                className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${
+                className={`relative flex h-7 w-12 items-center justify-center rounded-full transition-colors ${
                   isActive ? 'bg-purple/10' : ''
                 }`}
               >
                 <Icon size={19} />
+                {badgeKey && (badges[badgeKey] ?? 0) > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-coral px-1 text-[9px] font-bold text-white" aria-label={`${badges[badgeKey]} pendientes`}>
+                    {(badges[badgeKey] ?? 0) > 99 ? '99+' : badges[badgeKey]}
+                  </span>
+                )}
               </span>
               <span className="max-w-full truncate px-0.5">{label}</span>
             </>

@@ -12,12 +12,13 @@ export const SITE_DEFAULTS: SiteSettings = {
   phone_e164: '+525553791188',
   whatsapp_number: import.meta.env.VITE_WHATSAPP_NUMBER || '5215553791188',
   // Real monitored mailboxes live on .com.mx; .edu.mx is the web domain only.
-  contact_email: 'colegio@interlaken.com.mx',
+  contact_email: 'info@interlaken.com.mx',
   address: 'Av. de los Reyes 67, Residencial el Dorado, Tlalnepantla, Estado de México',
   maps_url: 'https://maps.app.goo.gl/Xd241Sht8TmrMHUe6',
-  office_hours: 'Lunes–Viernes 8:00–16:00 hrs',
+  office_hours: 'Lunes a Viernes 7:30 - 15:00',
   // Empty = la sección «Conócenos en video» no se muestra en el sitio.
   video_url: '',
+  hero_video_url: '',
   // Empty = icon hidden. Confirmado por el cliente: solo Facebook.
   facebook_url: 'https://www.facebook.com/colegiointerlaken',
   instagram_url: '',

@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
+import { ExportMenu } from '@/components/admin/ExportMenu';
 import { Badge } from '@/components/ui/Badge';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -88,9 +89,17 @@ export default function AdminAdmissions() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Admisiones</h1>
-        <p className="text-muted text-sm mt-0.5">Pre-registros e inscripciones recibidas.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Admisiones</h1>
+          <p className="text-muted text-sm mt-0.5">Pre-registros e inscripciones recibidas.</p>
+        </div>
+        <ExportMenu options={[
+          { key: 'pre', label: 'Pre-registros (CSV)', filename: 'pre-registros_{date}.csv',
+            fetch: async () => (await api.get('/admissions/pre-register/export/', { params: debouncedSearch ? { search: debouncedSearch } : {}, responseType: 'blob' })).data as Blob },
+          { key: 'reg', label: 'Inscripciones (CSV)', filename: 'inscripciones_{date}.csv',
+            fetch: async () => (await api.get('/admissions/register/export/', { responseType: 'blob' })).data as Blob },
+        ]} />
       </div>
 
       <Card title="Pre-registros">

@@ -18,7 +18,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .import_students import IsAdmin, _split_name
+from apps.core.permissions import IsAdmin
+
+from .import_students import _split_name
 from .models import ParentProfile, StudentProfile, User
 
 
@@ -158,8 +160,66 @@ class StudentGuardiansView(APIView):
 
 
 class StudentGuardianDetailView(APIView):
-    """Unlink a guardian from a student (admin only). Does not delete the user."""
+    """Edit (PATCH) or unlink (DELETE) a guardian of a student (admin only).
+
+    PATCH edits the guardian's identity/contact: first_name, last_name, email
+    (unique), whatsapp, phone, relationship. Never touches the password (AE5)
+    and refuses to edit admin/staff accounts. Audited with the field diff.
+    """
     permission_classes = [IsAdmin]
+
+    EDITABLE = ('first_name', 'last_name', 'email', 'whatsapp', 'phone', 'relationship')
+
+    def patch(self, request, pk, user_id):
+        from django.db import transaction
+
+        from apps.core.audit import record
+
+        student = get_object_or_404(StudentProfile, pk=pk)
+        parent = get_object_or_404(User, pk=user_id)
+        if not student.parents.filter(pk=parent.pk).exists():
+            return Response({'error': 'Ese tutor no está vinculado a este alumno.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        if parent.role not in (User.Role.PARENT, User.Role.STUDENT):
+            return Response({'error': 'Solo se editan cuentas de padres/tutores.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        data = {k: (request.data.get(k) or '').strip() for k in self.EDITABLE if k in request.data}
+        if not data:
+            return Response(_serialize_guardian(parent, student=student))
+        if 'email' in data:
+            email = data['email'].lower()
+            if not email or '@' not in email:
+                return Response({'email': ['Proporcione un correo válido.']}, status=status.HTTP_400_BAD_REQUEST)
+            if User.objects.filter(email__iexact=email).exclude(pk=parent.pk).exists():
+                return Response({'email': ['Ese correo ya está registrado.']}, status=status.HTTP_400_BAD_REQUEST)
+            data['email'] = email
+        if 'first_name' in data and not data['first_name']:
+            return Response({'first_name': ['Requerido.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        before = _serialize_guardian(parent, student=student)
+        with transaction.atomic():
+            user_fields = [k for k in ('first_name', 'last_name', 'email', 'whatsapp') if k in data]
+            for k in user_fields:
+                setattr(parent, k, data[k])
+            if user_fields:
+                parent.save(update_fields=user_fields)
+            if parent.role == User.Role.PARENT and ('phone' in data or 'relationship' in data):
+                profile, _ = ParentProfile.objects.get_or_create(user=parent)
+                dirty = []
+                if 'phone' in data:
+                    profile.phone = data['phone']
+                    dirty.append('phone')
+                if 'relationship' in data:
+                    profile.relationship = data['relationship'] or 'Padre/Madre'
+                    dirty.append('relationship')
+                profile.save(update_fields=dirty)
+            after = _serialize_guardian(parent, student=student)
+            changes = {k: {'from': before[k], 'to': after[k]} for k in after if before.get(k) != after[k]}
+            if changes:
+                record('update', parent, {'via': 'portal', **changes}, actor=request.user,
+                       context='portal: edición de tutor')
+        return Response(after)
 
     def delete(self, request, pk, user_id):
         student = get_object_or_404(StudentProfile, pk=pk)

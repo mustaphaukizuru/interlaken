@@ -3,35 +3,46 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
   GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
-  FileText, CircleDollarSign, DoorOpen, UserPlus, MonitorSmartphone, Receipt,
+  FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Facebook, Instagram, Youtube } from '@/components/icons/brand-icons';
+import type { MenuGroup } from '@/types/content';
 import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { socialEntries } from '@/lib/siteContact';
 import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
-import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
+import { SiteNoticeBanner } from '@/components/public/SiteNoticeBanner';
 
 /** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
 const HIDE_STICKY_CTA = [
   '/agendar-visita',
   '/pre-registro',
   '/registro',
-  '/puertas-abiertas',
+  '/inscripcion/documentos',
   '/login',
-  '/olvide-contrasena',
-  '/restablecer-contrasena',
 ];
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
  *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra. */
-const MENU: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }[] = [
+type MenuEntry = { label: string; to: string; icon: LucideIcon };
+type MenuGroupEntry = { label: string; items: MenuEntry[] };
+
+/** Icons the CMS menu editor can name (falls back to FileText). */
+const ICONS: Record<string, LucideIcon> = {
+  Users, BookOpen, Camera, Blocks, Pencil, GraduationCap, ClipboardList, FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt, Phone, Mail, MapPin,
+};
+
+/** CMS menu → renderable groups; empty/invalid CMS menu keeps the built-in one. */
+export function resolveMenu(cms: MenuGroup[] | undefined, fallback: MenuGroupEntry[]): MenuGroupEntry[] {
+  if (!cms || cms.length === 0) return fallback;
+  return cms.map((g) => ({ label: g.label, items: g.items.map((it) => ({ label: it.label, to: it.to, icon: ICONS[it.icon ?? ''] ?? FileText })) }));
+}
+
+const DEFAULT_MENU: MenuGroupEntry[] = [
   {
     label: 'El Colegio',
     items: [
@@ -54,7 +65,6 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
       { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
       { label: 'Documentación', to: '/admisiones/documentacion', icon: FileText },
       { label: 'Costos', to: '/admisiones/costos', icon: CircleDollarSign },
-      { label: 'Puertas Abiertas', to: '/puertas-abiertas', icon: DoorOpen },
       { label: 'Pre-Registro', to: '/pre-registro', icon: UserPlus },
     ],
   },
@@ -62,21 +72,13 @@ const MENU: { label: string; items: { label: string; to: string; icon: LucideIco
     label: 'Comunidad',
     items: [
       { label: 'Plataformas', to: '/comunidad/plataformas', icon: MonitorSmartphone },
+      { label: 'Calendario escolar', to: '/calendario', icon: CalendarDays },
       { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
     ],
   },
 ];
 
-/** El pie refleja los mismos 4 grupos del menú; Portal/Aviso van en la barra inferior. */
-const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
 
-// Icons per social key; URLs come from the admin-editable site settings
-// (CMS Phase 1) — entries without a configured URL are not rendered.
-const SOCIAL_ICONS = {
-  facebook: Facebook,
-  instagram: Instagram,
-  youtube: Youtube,
-} as const;
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
@@ -158,8 +160,10 @@ export function PublicLayout() {
   const [footerOpen, setFooterOpen] = useState<string | null>(null);
   const { pathname } = useLocation();
   const settings = useSiteSettings();
+  const MENU = resolveMenu(settings.menu, DEFAULT_MENU);
+  /** El pie refleja los mismos grupos del menú; Portal/Aviso van en la barra inferior. */
+  const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
   // Only socials with a real URL — never render href="#" (GO-LIVE-AUDIT #41).
-  const displaySocials = socialEntries(settings);
   const showStickyCta = !HIDE_STICKY_CTA.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
@@ -185,34 +189,19 @@ export function PublicLayout() {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      {/* Preheader — solo escritorio/tablet. Mismo contenedor que la barra de
-          navegación: las redes quedan alineadas al borde del logo y el correo
-          termina al ras del botón «Portal». */}
+      <SiteNoticeBanner />
+      {/* Preheader — solo escritorio/tablet. Petición del colegio (2026-08-21):
+          teléfono a la izquierda, correo a la derecha; sin redes sociales. */}
       <div className="hidden md:block bg-brand-800 text-white text-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-1.5 sm:px-6">
-          <div className="flex items-center gap-2">
-            {displaySocials.map(({ key, label, href }) => {
-              const Icon = SOCIAL_ICONS[key];
-              return (
-                <a
-                  key={key}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors hover:bg-white/25 hover:text-white"
-                >
-                  <Icon className="h-3 w-3" aria-hidden="true" />
-                </a>
-              );
-            })}
-          </div>
           <div className="flex items-center gap-6">
             {settings.phone_display && (
               <a href={`tel:${settings.phone_e164}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
                 <Phone className="w-3 h-3" aria-hidden="true" /> {settings.phone_display}
               </a>
             )}
+          </div>
+          <div className="flex items-center gap-6">
             {settings.contact_email && (
               <a href={`mailto:${settings.contact_email}`} className="flex items-center gap-1 hover:text-brand-200 transition-colors">
                 <Mail className="w-3 h-3" aria-hidden="true" /> {settings.contact_email}
@@ -225,10 +214,10 @@ export function PublicLayout() {
       {/* Main nav */}
       <div className="accent-bar" />
       <header className="bg-white border-b border-line sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Colegio Interlaken — Inicio">
-            <Logo variant="horizontal" size={40} theme="light" eager />
+            <Logo variant="horizontal" size={52} theme="light" eager />
           </Link>
 
           {/* Desktop nav — menú confirmado por el cliente */}
@@ -378,31 +367,12 @@ export function PublicLayout() {
           {/* Brand always visible */}
           <div className="mb-8 max-w-sm">
             <div className="mb-3">
-              <Logo variant="horizontal" size={40} theme="dark" />
+              <Logo variant="horizontal" size={52} theme="dark" />
             </div>
             <p className="text-xs leading-relaxed">
               Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
               Tlalnepantla, Estado de México.
             </p>
-            {displaySocials.length > 0 && (
-              <div className="flex items-center gap-3 mt-5">
-                {displaySocials.map(({ key, label, href }) => {
-                  const Icon = SOCIAL_ICONS[key];
-                  return (
-                    <a
-                      key={key}
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={label}
-                      className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
-                    >
-                      <Icon className="w-4 h-4" />
-                    </a>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* Mobile (&lt;md): accordion link groups — desktop: open grid */}
@@ -445,7 +415,7 @@ export function PublicLayout() {
                             title={settings.address}
                             className="hover:text-white transition-colors"
                           >
-                            Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                            {settings.address}
                           </a>
                         </li>
                       </ul>
@@ -468,7 +438,7 @@ export function PublicLayout() {
           <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-8">
             {FOOTER_GROUPS.map((group) => (
               <div key={group.heading}>
-                <h4 className="text-white font-semibold mb-3">{group.heading}</h4>
+                <h3 className="text-white font-semibold mb-3 text-sm">{group.heading}</h3>
                 <ul className="space-y-2 text-xs">
                   {group.links.map((l) => (
                     <li key={l.label}>
@@ -479,7 +449,7 @@ export function PublicLayout() {
               </div>
             ))}
             <div>
-              <h4 className="text-white font-semibold mb-3">Contacto</h4>
+              <h3 className="text-white font-semibold mb-3 text-sm">Contacto</h3>
               <ul className="space-y-2 text-xs">
                 {settings.phone_display && (
                   <li className="flex items-start gap-2">
@@ -502,36 +472,20 @@ export function PublicLayout() {
                     title={settings.address}
                     className="hover:text-white transition-colors"
                   >
-                    Av. de los Reyes 67, Tlalnepantla, Edo. Méx.
+                    {settings.address}
                   </a>
                 </li>
               </ul>
             </div>
           </div>
 
-          {/* Incorporación SEP — registros oficiales (flyer institucional). */}
-          <div className="mt-10 border-t border-white/10 pt-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-white/55">
-              Incorporación SEP
-            </p>
-            <p className="mt-1.5 max-w-4xl text-[11px] leading-relaxed text-white/45">
-              {SEP_INCORPORATIONS.map((r, i) => (
-                <span key={r.level} className="block sm:inline">
-                  {r.label}
-                  {i < SEP_INCORPORATIONS.length - 1 && (
-                    <span className="hidden sm:inline" aria-hidden="true">{' · '}</span>
-                  )}
-                </span>
-              ))}
-            </p>
-          </div>
         </div>
         <div className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
             <span>© {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados</span>
             <div className="flex items-center gap-4">
               <Link to="/aviso-de-privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
-              <span className="text-white/45">Reconocimiento de validez oficial · SEP</span>
+              <span className="text-white/70">Reconocimiento de validez oficial · SEP</span>
             </div>
           </div>
         </div>

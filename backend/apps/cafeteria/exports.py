@@ -15,26 +15,10 @@ from decimal import Decimal
 from django.http import HttpResponse
 from django.utils import timezone
 
+from apps.core.exports import as_download, export_filename, fmt_dt
 from apps.core.pdf import simple_document_pdf
 
 from .models import CafeteriaBalance, CafeteriaTransaction
-
-
-def _fmt_dt(dt) -> str:
-    if not dt:
-        return ''
-    return timezone.localtime(dt).strftime('%Y-%m-%d %H:%M')
-
-
-def _filename(prefix: str, ext: str) -> str:
-    stamp = timezone.localtime(timezone.now()).strftime('%Y%m%d')
-    return f'{prefix}_{stamp}.{ext}'
-
-
-def _download(response: HttpResponse, filename: str) -> HttpResponse:
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
-
 
 # ── per-student statement ────────────────────────────────────────────────────
 
@@ -46,7 +30,7 @@ def _student_rows(student):
     rows = []
     for tx in txns:
         rows.append([
-            _fmt_dt(tx.date),
+            fmt_dt(tx.date),
             tx.get_transaction_type_display(),
             tx.description or '',
             f'{Decimal(str(tx.amount)):.2f}',
@@ -67,11 +51,11 @@ def student_statement_csv(student) -> HttpResponse:
     writer.writerow(['Alumno', student.user.full_name])
     writer.writerow(['Matrícula', student.student_id])
     writer.writerow(['Saldo actual', f'{Decimal(str(cb.balance)):.2f}'])
-    writer.writerow(['Generado', _fmt_dt(timezone.now())])
+    writer.writerow(['Generado', fmt_dt(timezone.now())])
     writer.writerow([])
     writer.writerow(header)
     writer.writerows(rows)
-    return _download(response, _filename(f'estado_cafeteria_{student.student_id}', 'csv'))
+    return as_download(response, export_filename(f'estado_cafeteria_{student.student_id}', 'csv'))
 
 
 def student_statement_pdf(student) -> HttpResponse:
@@ -87,7 +71,7 @@ def student_statement_pdf(student) -> HttpResponse:
     lines = [
         f'Alumno: {student.user.full_name}   Matrícula: {student.student_id}',
         f'Saldo actual: ${Decimal(str(cb.balance)):.2f}',
-        f'Generado: {_fmt_dt(timezone.now())}',
+        f'Generado: {fmt_dt(timezone.now())}',
         '',
         _line(header),
         '-' * sum(widths),
@@ -96,7 +80,7 @@ def student_statement_pdf(student) -> HttpResponse:
 
     pdf = simple_document_pdf('Estado de cuenta de cafetería', lines)
     response = HttpResponse(pdf, content_type='application/pdf')
-    return _download(response, _filename(f'estado_cafeteria_{student.student_id}', 'pdf'))
+    return as_download(response, export_filename(f'estado_cafeteria_{student.student_id}', 'pdf'))
 
 
 # ── whole-school roster ──────────────────────────────────────────────────────
@@ -115,7 +99,7 @@ def _school_rows():
             f'{s.grade} {s.group}'.strip(),
             f'{Decimal(str(cb.balance)):.2f}',
             'Sí' if cb.is_low_balance else 'No',
-            _fmt_dt(cb.last_synced),
+            fmt_dt(cb.last_synced),
         ])
     return header, rows
 
@@ -126,11 +110,11 @@ def school_statement_csv() -> HttpResponse:
     response.write('﻿')
     writer = csv.writer(response)
     writer.writerow(['Saldos de cafetería — toda la escuela'])
-    writer.writerow(['Generado', _fmt_dt(timezone.now())])
+    writer.writerow(['Generado', fmt_dt(timezone.now())])
     writer.writerow([])
     writer.writerow(header)
     writer.writerows(rows)
-    return _download(response, _filename('saldos_cafeteria_escuela', 'csv'))
+    return as_download(response, export_filename('saldos_cafeteria_escuela', 'csv'))
 
 
 def school_statement_pdf() -> HttpResponse:
@@ -143,7 +127,7 @@ def school_statement_pdf() -> HttpResponse:
         return fixed + str(cells[-1]) if len(cells) > len(widths) else fixed
 
     lines = [
-        f'Generado: {_fmt_dt(timezone.now())}   Alumnos: {len(rows)}',
+        f'Generado: {fmt_dt(timezone.now())}   Alumnos: {len(rows)}',
         '',
         _line(header),
         '-' * 90,
@@ -152,7 +136,7 @@ def school_statement_pdf() -> HttpResponse:
 
     pdf = simple_document_pdf('Saldos de cafetería — toda la escuela', lines)
     response = HttpResponse(pdf, content_type='application/pdf')
-    return _download(response, _filename('saldos_cafeteria_escuela', 'pdf'))
+    return as_download(response, export_filename('saldos_cafeteria_escuela', 'pdf'))
 
 
 # ── parent family statement ──────────────────────────────────────────────────
@@ -168,12 +152,12 @@ def parent_family_statement_csv(parent) -> HttpResponse:
     writer = csv.writer(response)
     writer.writerow(['Movimientos de cafetería — familia'])
     writer.writerow(['Padre/Tutor', parent.full_name or parent.email])
-    writer.writerow(['Generado', _fmt_dt(timezone.now())])
+    writer.writerow(['Generado', fmt_dt(timezone.now())])
     writer.writerow([])
 
     if not students:
         writer.writerow(['(Sin alumnos vinculados)'])
-        return _download(response, _filename('movimientos_cafeteria', 'csv'))
+        return as_download(response, export_filename('movimientos_cafeteria', 'csv'))
 
     header = ['Alumno', 'Matrícula', 'Fecha', 'Tipo', 'Descripción', 'Monto', 'Saldo']
     writer.writerow(header)
@@ -193,11 +177,11 @@ def parent_family_statement_csv(parent) -> HttpResponse:
             writer.writerow([
                 student.user.full_name,
                 student.student_id,
-                _fmt_dt(tx.date),
+                fmt_dt(tx.date),
                 tx.get_transaction_type_display(),
                 tx.description or '',
                 f'{Decimal(str(tx.amount)):.2f}',
                 f'{Decimal(str(tx.balance_after)):.2f}' if tx.balance_after is not None else '',
             ])
 
-    return _download(response, _filename('movimientos_cafeteria', 'csv'))
+    return as_download(response, export_filename('movimientos_cafeteria', 'csv'))

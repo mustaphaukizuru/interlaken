@@ -9,6 +9,109 @@
  */
 import axios from 'axios';
 
+export interface StaffUser {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  role: 'admin' | 'staff';
+  is_active: boolean;
+  is_superuser: boolean;
+  last_login: string | null;
+  date_joined: string;
+  has_password: boolean;
+}
+
+export interface PasswordRequest {
+  id: number;
+  user: number | null;
+  user_name: string;
+  user_email: string;
+  requested_email: string;
+  requester_name: string;
+  channel: string;
+  note: string;
+  status: 'open' | 'resolved' | 'rejected';
+  created_by_name: string;
+  created_at: string;
+  resolved_by_name: string;
+  resolved_at: string | null;
+  delivered_via: string;
+}
+
+export interface PasswordRequestResolved extends PasswordRequest {
+  temporary_password: string;
+  templates: { whatsapp_text: string; email_subject: string; email_body: string };
+  whatsapp_number: string;
+}
+
+export interface PaymentSummary {
+  month_total: string;
+  month_count: number;
+  pending_count: number;
+  last_success: import('@/types').Payment | null;
+  per_child: { student_id: number; name: string; total: string; count: number }[];
+}
+
+export interface AdminPaymentsSummary {
+  days: number;
+  since: string;
+  by_status: Record<string, { count: number; total: string }>;
+  series: { date: string; total: string; count: number }[];
+  stuck_pending: number;
+}
+
+export interface DocumentsListing {
+  registration: number;
+  child_name: string;
+  required: { code: string; label: string }[];
+  documents: { id: number; doc_type: string; filename: string; file_size: number; uploaded_at: string; is_verified: boolean; status: 'pending' | 'approved' | 'rejected'; review_note: string; download_url: string }[];
+}
+
+export interface DeliveryReport {
+  announcement: number;
+  recipients: number;
+  pending_dispatch: number;
+  read: number;
+  email: Record<string, number>;
+  push: Record<string, number>;
+  failed: { id: number; user: string; email: string; attempts: number; error: string }[];
+}
+
+export interface GuardianWrite {
+  first_name: string;
+  last_name: string;
+  email: string;
+  whatsapp: string;
+  phone: string;
+  relationship: string;
+}
+
+export interface StudentWrite {
+  first_name: string;
+  last_name: string;
+  email?: string;
+  student_id: string;
+  grade: string;
+  group?: string;
+  enrollment_date?: string | null;
+  is_active?: boolean;
+  status?: StudentStatus;
+  birth_date?: string | null;
+  curp?: string;
+  emergency_name?: string;
+  emergency_phone?: string;
+  emergency_rel?: string;
+  blood_type?: string;
+  allergies?: string;
+  medical_notes?: string;
+  /** Set when medical fields were masked (P5-6): 'consent_required' | 'role'. */
+  medical_masked?: 'consent_required' | 'role';
+}
+
+export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';
+
 import { useAuthStore } from '@/store/authStore';
 
 // Relative by default so the SPA is same-origin with the API (prod: served by
@@ -101,24 +204,30 @@ export async function bootstrapSession(): Promise<boolean> {
 }
 
 // ── AUTH ──────────────────────────────────────────────────
+export interface SessionsInfo { active_sessions: number; totp_enabled: boolean; history: { at: string; method: string; success: boolean; reason: string; ip: string | null; device: string }[] }
+const csrfHeader = () => { const c = getCookie(CSRF_COOKIE); return c ? { 'X-CSRF-Token': c } : {}; };
+
 export const authApi = {
   googleLogin: () => {
     window.location.href = `${API_BASE}/auth/google/`;
   },
   me: () => api.get('/accounts/me/'),
+  /** Security (BACKLOG P4-7). */
+  sessions: () => api.get<SessionsInfo>('/accounts/me/sessions/'),
+  closeOtherSessions: () => api.post<{ closed: number }>('/accounts/me/sessions/close-others/', {}, { headers: csrfHeader() }),
+  totpSetup: () => api.post<{ secret: string; otpauth_url: string }>('/accounts/me/totp/setup/', {}),
+  totpEnable: (code: string) => api.post('/accounts/me/totp/enable/', { code }),
+  totpDisable: (code: string) => api.post('/accounts/me/totp/disable/', { code }),
+  /** Profile photo (BACKLOG P1-F2). */
+  uploadAvatar: (blob: Blob) => { const fd = new FormData(); fd.append('file', blob, 'avatar.webp'); return api.post('/accounts/me/avatar/', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); },
+  deleteAvatar: () => api.delete('/accounts/me/avatar/'),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
-  requestPasswordReset: (email: string) =>
-    api.post('/accounts/password-reset/', { email }),
-  confirmPasswordReset: (data: { uid: string; token: string; password: string }) =>
-    api.post('/accounts/password-reset/confirm/', data),
-  setPassword: (password: string) =>
-    api.post('/accounts/set-password/', { password }),
   getNotifPrefs: () =>
     api.get<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>(
       '/accounts/notification-preferences/',
     ),
-  updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>) =>
+  updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>
     api.patch('/accounts/notification-preferences/', data),
   logout: async () => {
     const csrf = getCookie(CSRF_COOKIE);
@@ -166,6 +275,10 @@ export const admissionsApi = {
   submitRegistration: (id: number, sessionToken?: string, acceptPrivacy = true) =>
     api.post(`/admissions/register/${id}/submit/`, { accept_privacy: acceptPrivacy }, sessionHeaders(sessionToken)),
 
+  /** Applicant's documents with review status (BACKLOG P1-G4). */
+  listDocuments: (registrationId: number, sessionToken?: string) =>
+    api.get(`/admissions/register/${registrationId}/documents/list/`, sessionHeaders(sessionToken)),
+
   uploadDocument: (registrationId: number, file: File, docType: string, sessionToken?: string) => {
     const form = new FormData();
     form.append('file', file);
@@ -212,6 +325,12 @@ export const admissionsAdminApi = {
   /** Mark an uploaded document verified (or clear it). */
   verifyDocument: (docId: number, isVerified: boolean) =>
     api.patch(`/admissions/documents/${docId}/verify/`, { is_verified: isVerified }),
+  /** Approve / reject with a note (P1-G4). */
+  reviewDocument: (docId: number, status: 'approved' | 'rejected' | 'pending', note = '') =>
+    api.patch(`/admissions/documents/${docId}/verify/`, { status, review_note: note }),
+  /** Issue and email a fresh single-use documents link. */
+  sendDocumentsLink: (registrationId: number) =>
+    api.post<{ url: string; missing: string[] }>(`/admissions/register/${registrationId}/documents-link/`, {}),
 
   /** Download an uploaded document as a blob (prod serves no /media/, so this
    *  authenticated endpoint carries the JWT and streams the file). */
@@ -250,6 +369,9 @@ export const cafeteriaApi = {
     }),
 
   // Digital student card(s): identity + code (QR/barcode) + balance + Loyverse stats.
+  /** Admin: one student's card (staff credencial view). */
+  getStudentCard: (studentId: number) =>
+    api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/', { params: { student: studentId } }),
   getCards: () => api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/'),
 
   // Read-only recent purchases pulled live from Loyverse (does not touch the ledger).
@@ -384,15 +506,41 @@ export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
-  getMyPayments: (params?: { page?: number }) =>
+  getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string }) =>
     api.get('/payments/history/', { params }),
+  exportMyPayments: (params?: { status?: string; student?: string; from?: string; to?: string }) =>
+    api.get('/payments/history/export/', { params, responseType: 'blob' }),
+  getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
+  getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
+  /** Admin ledger (BACKLOG P1-D9). */
+  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; from?: string; to?: string }) =>
+    api.get('/payments/admin/', { params }),
+  adminSummary: (days = 30) => api.get<AdminPaymentsSummary>('/payments/admin/summary/', { params: { days } }),
 };
 
-// (financeApi removed: the app does not bill tuition — cafetería top-ups are
-// the only money path. /api/v1/finance/* no longer exists on the backend.)
+// Cafetería top-ups are the only money path; there is no tuition/finance API.
 
 // ── CORE (audit trail) ────────────────────────────────────
+export interface ContactMessage {
+  id: number;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  is_handled: boolean;
+  created_at: string;
+}
+
 export const coreApi = {
+  exportAuditLog: (params?: { actor?: string; action?: string; from?: string; to?: string }) =>
+    api.get('/core/admin/audit/export/', { params, responseType: 'blob' }),
+  /** Website inbox (BACKLOG P1-G7). */
+  getContactMessages: (params?: { page?: number; q?: string; handled?: string }) =>
+    api.get('/core/admin/contact-messages/', { params }),
+  setContactHandled: (id: number, is_handled: boolean) =>
+    api.patch<ContactMessage>(`/core/admin/contact-messages/${id}/`, { is_handled }),
+  /** Live sidebar counters (BACKLOG P1-E3). */
+  getBadges: () => api.get<Record<string, number>>('/core/badges/'),
   /** Read-only admin audit log (append-only), paginated + filterable. */
   getAuditLog: (params?: {
     page?: number;
@@ -430,12 +578,17 @@ export const legalApi = {
     api.get('/legal/admin/arco/', { params: status ? { status } : {} }),
   adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
     api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
+  /** Record a request received via privacidad@ / WhatsApp / in person (BACKLOG P5-5). */
+  adminIntakeArco: (data: { requester_email: string; requester_name?: string; request_type: string; channel: string; details?: string }) =>
+    api.post<ArcoRequest>('/legal/admin/arco/intake/', data),
 };
 
 // ── CONTACT ───────────────────────────────────────────────
 export const contactApi = {
   send: (data: { name: string; email: string; subject: string; message: string }) =>
     api.post('/contact/', data),
+  /** CFDI request (BACKLOG P1-G6). */
+  requestInvoice: (data: Record<string, string>) => api.post('/facturacion/', data),
 };
 
 // ── BOOKINGS ──────────────────────────────────────────────
@@ -498,12 +651,17 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number; search?: string }) =>
+  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string }) =>
     api.get('/accounts/students/', { params }),
 
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
+
+  /** Portal student editor (admin). Blank email = synthetic school login. */
+  createStudent: (data: StudentWrite) => api.post('/accounts/admin/students/', data),
+  updateStudent: (studentId: number, data: Partial<StudentWrite>) =>
+    api.patch(`/accounts/admin/students/${studentId}/`, data),
 
   /** CSV roster export (grade/group/guardians count), honors ?search=. */
   exportStudents: (search?: string) =>
@@ -529,15 +687,29 @@ export const portalApi = {
     api.post(`/portal/announcements/${id}/comments/`, { body }),
 
   // Personal notifications (header bell menu).
-  getNotifications: () => api.get('/portal/notifications/'),
+  getNotifications: (params?: { page?: number; type?: string; unread?: string }) =>
+    api.get('/portal/notifications/', { params }),
   markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),
   markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 
   // Admin comunicados (announcements) CRUD.
   adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  /** Portal novedades feed (BACKLOG P4-11). */
+  novedades: (since?: string) => api.get<{ since: string; unread: number; items: NovedadItem[] }>('/portal/novedades/', { params: since ? { since } : undefined }),
+  /** Public avisos banner (BACKLOG P3-9). */
+  getSiteNotices: () => api.get<SiteNotice[]>('/portal/avisos/'),
+  getAnnouncementDelivery: (id: number) => api.get<DeliveryReport>(`/portal/admin/announcements/${id}/delivery/`),
+  resendAnnouncementFailed: (id: number) =>
+    api.post<{ requeued: number }>(`/portal/admin/announcements/${id}/delivery/`, { action: 'resend_failed' }),
+  /** Guardian merge (BACKLOG P4-6). */
+  guardianMergePreview: (keep: string, drop: string) => api.get<MergePreview>('/accounts/admin/guardians/merge/preview/', { params: { keep, drop } }),
+  guardianMerge: (data: { keep: number; drop: number; confirm: string }) => api.post<MergeResult>('/accounts/admin/guardians/merge/', data),
+  /** New school year wizard (BACKLOG P4-5). */
+  schoolYearPreview: () => api.get<SchoolYearPreview>('/accounts/admin/school-year/preview/'),
+  schoolYearRun: (data: { confirm: string; new_cycle: string; reset_threshold: number | null }) => api.post<SchoolYearResult>('/accounts/admin/school-year/run/', data),
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
-    is_active?: boolean; push_enabled?: boolean;
+    is_active?: boolean; push_enabled?: boolean; show_on_site?: boolean; site_until?: string | null; site_link?: string;
   }) => api.post('/portal/admin/announcements/', data),
   adminUpdateAnnouncement: (id: number, data: Record<string, unknown>) =>
     api.patch(`/portal/admin/announcements/${id}/`, data),
@@ -600,6 +772,24 @@ export const portalApi = {
   ) => api.post(`/accounts/admin/students/${studentId}/guardians/`, data),
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
+  /** Staff user management (BACKLOG P1-H1). */
+  listStaff: () => api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/'),
+  inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role'] }) =>
+    api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
+  updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name'>>) =>
+    api.patch<StaffUser>(`/accounts/admin/staff/${id}/`, data),
+  resetStaffPassword: (id: number) =>
+    api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
+  /** Password request inbox (admin). */
+  getPasswordRequests: (status?: string) =>
+    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: status ? { status } : undefined }),
+  createPasswordRequest: (data: { requested_email: string; requester_name?: string; channel: string; note?: string }) =>
+    api.post<PasswordRequest>('/accounts/admin/password-requests/', data),
+  updatePasswordRequest: (id: number, data: { action: 'resolve' | 'reject'; delivered_via?: string; note?: string }) =>
+    api.patch<PasswordRequest | PasswordRequestResolved>(`/accounts/admin/password-requests/${id}/`, data),
+  /** Edit a linked guardian's identity/contact (admin). */
+  updateGuardian: (studentId: number, userId: number, data: Partial<GuardianWrite>) =>
+    api.patch(`/accounts/admin/students/${studentId}/guardians/${userId}/`, data),
 
   // Admin-managed password reset (school policy: only an admin resets a family
   // password — imported accounts have no usable one and their synthetic
@@ -611,10 +801,176 @@ export const portalApi = {
 };
 
 // ── CONTENT (CMS) ─────────────────────────────────────────
+export interface SchoolEvent {
+  id: number;
+  title: string;
+  kind: 'holiday' | 'vacation' | 'exam' | 'event' | 'meeting' | 'deadline';
+  kind_label: string;
+  start_date: string;
+  end_date: string | null;
+  level: string;
+  description: string;
+  is_published: boolean;
+}
+export type FormFieldType = 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'date' | 'number';
+export interface FormField {
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  help?: string;
+  show_if?: { field: string; equals: string } | null;
+}
+export interface FormDefinitionPublic {
+  slug: string;
+  title: string;
+  description: string;
+  fields: FormField[];
+  consent_text: string;
+  success_message: string;
+  submit_label: string;
+}
+export interface FormDefinitionAdmin extends FormDefinitionPublic {
+  id: number;
+  notify_to: string;
+  is_published: boolean;
+  submissions_count: number;
+  pending_count: number;
+  updated_at: string;
+}
+export interface FormSubmission {
+  id: number;
+  form: number;
+  form_title: string;
+  data: Record<string, string | boolean>;
+  page: string;
+  is_handled: boolean;
+  reply_to: string;
+  created_at: string;
+}
+
+export interface SiteRedirect { id: number; from_path: string; to_path: string; permanent: boolean; hits: number; created_at: string }
+
+export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
+export interface ArcoRequest { id: number; requester_email: string; requester_name: string; channel: string; request_type: string; details: string; status: 'received' | 'in_review' | 'resolved' | 'rejected'; resolution_note: string; statutory_deadline: string; created_at: string; resolved_at: string | null; is_overdue: boolean; days_left: number }
+export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
+
+export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }
+
+export interface MergeUser { id: number; email: string; full_name: string; is_active: boolean; last_login: string | null; has_password: boolean; google: boolean; phone: string; children: { id: number; name: string; grade: string }[] }
+export interface MergePreview { keep: MergeUser; drop: MergeUser; references: Record<string, number> }
+export interface MergeResult { moved: Record<string, number>; skipped: Record<string, number>; keep: number; drop: number }
+export interface SchoolYearPreview { moves: { from: string; to: string; count: number }[]; graduates: number; active_total: number; skipped: number; current_cycle: string; suggested_cycle: string; last_rollover_at: string | null }
+export interface SchoolYearResult { promoted: number; graduated: number; thresholds_reset: number; school_year: string }
+
+export interface CmsPageAdmin {
+  id: number;
+  slug: string;
+  title: string;
+  template: 'home' | 'level' | 'simple' | 'landing';
+  status: 'draft' | 'published';
+  draft_blocks: { id: string; type: string; props: Record<string, unknown> }[];
+  seo: { title?: string; description?: string; og_image?: string; noindex?: boolean };
+  published_version_number: number | null;
+  has_unpublished_changes: boolean;
+  published_at: string | null;
+  review_requested_at?: string | null;
+  review_requested_by_name?: string;
+  review_note?: string;
+  publish_at?: string | null;
+  unpublish_at?: string | null;
+  updated_at: string;
+}
+
+export interface MediaAsset {
+  id: number;
+  filename: string;
+  content_type: string;
+  size: number;
+  width: number;
+  height: number;
+  alt: string;
+  caption: string;
+  focal_x: number;
+  focal_y: number;
+  tags: string;
+  urls: Record<string, string>;
+  created_at: string;
+}
+
+export interface Testimonial {
+  id: number;
+  quote: string;
+  author: string;
+  role: string;
+  level: string;
+  is_published: boolean;
+  order: number;
+  created_at: string;
+}
+export type TestimonialWrite = Omit<Testimonial, 'id' | 'created_at'>;
+
+export type SchoolEventWrite = Omit<SchoolEvent, 'id' | 'kind_label' | 'end_date'> & { end_date?: string | null };
+
 export const contentApi = {
   // Public site settings — phone/social/contact data (server-cached 5 min).
   getSettings: () =>
     api.get('/content/settings/'),
+  /** School calendar (BACKLOG P2-16). */
+  getCalendar: (params?: { from?: string; to?: string; level?: string }) => api.get('/content/calendar/', { params }),
+  adminListCalendar: () => api.get('/content/admin/calendar/'),
+  adminCreateCalendar: (data: SchoolEventWrite) => api.post<SchoolEvent>('/content/admin/calendar/', data),
+  adminUpdateCalendar: (id: number, data: Partial<SchoolEventWrite>) => api.patch<SchoolEvent>(`/content/admin/calendar/${id}/`, data),
+  adminDeleteCalendar: (id: number) => api.delete(`/content/admin/calendar/${id}/`),
+  /** CMS pages (BACKLOG P3-3). */
+  getPage: (slug: string) => api.get(`/content/pages/${encodeURIComponent(slug)}/`),
+  getPagePreviewBySlug: (_slug: string, token: string) => api.get('/content/pages/preview/', { params: { token } }),
+  adminListPages: () => api.get('/content/admin/pages/'),
+  adminGetPage: (id: number) => api.get<CmsPageAdmin>(`/content/admin/pages/${id}/`),
+  adminCreatePage: (data: Partial<CmsPageAdmin>) => api.post<CmsPageAdmin>('/content/admin/pages/', data),
+  adminUpdatePage: (id: number, data: Partial<CmsPageAdmin>) => api.patch<CmsPageAdmin>(`/content/admin/pages/${id}/`, data),
+  adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
+  adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
+  adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string }[]>(`/content/admin/pages/${id}/versions/`),
+  adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
+  adminPageChecks: (id: number) => api.get<{ ok: boolean; issues: PageIssue[] }>(`/content/admin/pages/${id}/checks/`),
+  adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),
+  adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
+  /** Navigation, redirects (BACKLOG P3-7). */
+  getRedirects: () => api.get<Record<string, { to: string; permanent: boolean }>>('/content/redirects/'),
+  hitRedirect: (from: string) => api.post('/content/redirects/hit/', { from }),
+  adminListRedirects: () => api.get<SiteRedirect[]>('/content/admin/redirects/'),
+  adminCreateRedirect: (data: Partial<SiteRedirect>) => api.post<SiteRedirect>('/content/admin/redirects/', data),
+  adminDeleteRedirect: (id: number) => api.delete(`/content/admin/redirects/${id}/`),
+  /** CMS forms builder (BACKLOG P3-6). */
+  getForm: (slug: string) => api.get<FormDefinitionPublic>(`/content/forms/${encodeURIComponent(slug)}/`),
+  submitForm: (slug: string, data: Record<string, unknown>) => api.post<{ ok: boolean; message: string }>(`/content/forms/${encodeURIComponent(slug)}/submit/`, data),
+  adminListForms: () => api.get<FormDefinitionAdmin[]>('/content/admin/forms/'),
+  adminCreateForm: (data: Partial<FormDefinitionAdmin>) => api.post<FormDefinitionAdmin>('/content/admin/forms/', data),
+  adminUpdateForm: (id: number, data: Partial<FormDefinitionAdmin>) => api.patch<FormDefinitionAdmin>(`/content/admin/forms/${id}/`, data),
+  adminDeleteForm: (id: number) => api.delete(`/content/admin/forms/${id}/`),
+  adminFormSubmissions: (id: number, params?: { handled?: '0' | '1' }) => api.get<FormSubmission[]>(`/content/admin/forms/${id}/submissions/`, { params }),
+  adminFormSubmissionsCsvUrl: (id: number) => `/api/v1/content/admin/forms/${id}/submissions/?export=csv`,
+  adminHandleSubmission: (id: number, is_handled: boolean) => api.patch<FormSubmission>(`/content/admin/form-submissions/${id}/`, { is_handled }),
+  /** CMS media library (BACKLOG P3-1). */
+  adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),
+  adminUploadMedia: (file: File, meta?: { alt?: string; caption?: string; tags?: string }) => {
+    const form = new FormData();
+    form.append('file', file);
+    Object.entries(meta ?? {}).forEach(([k, v]) => { if (v) form.append(k, v); });
+    return api.post<MediaAsset>('/content/admin/media/', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  adminUpdateMedia: (id: number, data: Partial<Pick<MediaAsset, 'alt' | 'caption' | 'tags' | 'focal_x' | 'focal_y'>>) =>
+    api.patch<MediaAsset>(`/content/admin/media/${id}/`, data),
+  adminDeleteMedia: (id: number) => api.delete(`/content/admin/media/${id}/`),
+  /** Testimonials (BACKLOG P2-15). */
+  getTestimonials: () => api.get('/content/testimonials/'),
+  adminListTestimonials: () => api.get('/content/admin/testimonials/'),
+  adminCreateTestimonial: (data: TestimonialWrite) => api.post<Testimonial>('/content/admin/testimonials/', data),
+  adminUpdateTestimonial: (id: number, data: Partial<TestimonialWrite>) => api.patch<Testimonial>(`/content/admin/testimonials/${id}/`, data),
+  adminDeleteTestimonial: (id: number) => api.delete(`/content/admin/testimonials/${id}/`),
 
   // Costos por sección (editables por el colegio en el admin).
   getCosts: () =>

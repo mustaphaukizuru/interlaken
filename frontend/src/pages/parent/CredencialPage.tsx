@@ -11,9 +11,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import StudentCard from '@/components/portal/StudentCard';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaCard, LoyverseHistoryReceipt } from '@/types';
+import { formatMXN } from '@/lib/format';
 
-const money = (v: string | number) =>
-  Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+const money = formatMXN;
 const fmtDate = (d: string | null, withTime = false) =>
   d ? format(new Date(d), withTime ? "d MMM yyyy · HH:mm" : 'd MMM yyyy', { locale: es }) : '—';
 

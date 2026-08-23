@@ -1,8 +1,8 @@
 """
 PaymentInitiateView is fail-closed for unlinked money types.
 
-Checkout orphan hardening for live paths lives on cafeteria top-up and
-invoice-pay; bare initiate must not create chargeable orphan rows.
+Checkout orphan hardening for the live path lives on cafeteria top-up; bare
+initiate must not create chargeable orphan rows.
 """
 from io import StringIO
 
@@ -16,7 +16,7 @@ from apps.payments.models import Payment
 pytestmark = pytest.mark.django_db
 
 
-@pytest.mark.parametrize("payment_type", ["tuition", "cafeteria", "enrollment", "other"])
+@pytest.mark.parametrize("payment_type", ["cafeteria", "other"])
 def test_initiate_rejects_all_unlinked_types(api_client, payment_type):
     api_client.force_authenticate(user=ParentFactory())
     resp = api_client.post(

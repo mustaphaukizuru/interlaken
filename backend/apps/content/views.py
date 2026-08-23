@@ -5,7 +5,8 @@ Read-only public content: no auth, no audit logging, 5-minute LocMem cache
 invalidated on every SiteSettings save (see models.SiteSettings.save).
 """
 from django.core.cache import cache
-from rest_framework import permissions
+from django.db import models
+from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -101,3 +102,102 @@ class PublicPricingView(APIView):
             }
             cache.set(PRICING_CACHE_KEY, data, CACHE_TTL_SECONDS)
         return Response(data)
+
+
+class PublicCalendarView(APIView):
+    """GET /api/v1/content/calendar/?from=&to=&level= — published events (cached 5 min)."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.utils import timezone
+        from django.utils.dateparse import parse_date
+
+        from .models import SchoolEvent
+        from .serializers import SchoolEventSerializer
+
+        today = timezone.localdate()
+        start = parse_date(request.query_params.get('from') or '') or today.replace(day=1)
+        end = parse_date(request.query_params.get('to') or '') or (start.replace(year=start.year + 1))
+        qs = SchoolEvent.objects.filter(is_published=True, start_date__lte=end).filter(
+            models.Q(end_date__gte=start) | models.Q(end_date__isnull=True, start_date__gte=start))
+        level = request.query_params.get('level')
+        if level:
+            qs = qs.filter(models.Q(level='') | models.Q(level=level))
+        return Response(SchoolEventSerializer(qs, many=True).data)
+
+
+class AdminCalendarView(generics.ListCreateAPIView):
+    """GET/POST /api/v1/content/admin/calendar/ (admin)."""
+    permission_classes = [_IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import SchoolEventSerializer
+        return SchoolEventSerializer
+
+    def get_queryset(self):
+        from .models import SchoolEvent
+        return SchoolEvent.objects.all()
+
+
+class AdminCalendarDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH/DELETE /api/v1/content/admin/calendar/<pk>/ (admin)."""
+    permission_classes = [_IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import SchoolEventSerializer
+        return SchoolEventSerializer
+
+    def get_queryset(self):
+        from .models import SchoolEvent
+        return SchoolEvent.objects.all()
+
+
+class PublicTestimonialsView(APIView):
+    """GET /api/v1/content/testimonials/ — published quotes (cached 5 min)."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .models import Testimonial
+        from .serializers import TestimonialSerializer
+
+        data = cache.get('content:testimonials')
+        if data is None:
+            data = TestimonialSerializer(Testimonial.objects.filter(is_published=True), many=True).data
+            cache.set('content:testimonials', data, 300)
+        return Response(data)
+
+
+class AdminTestimonialsView(generics.ListCreateAPIView):
+    permission_classes = [_IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import TestimonialSerializer
+        return TestimonialSerializer
+
+    def get_queryset(self):
+        from .models import Testimonial
+        return Testimonial.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save()
+        cache.delete('content:testimonials')
+
+
+class AdminTestimonialDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [_IsAdmin]
+
+    def get_serializer_class(self):
+        from .serializers import TestimonialSerializer
+        return TestimonialSerializer
+
+    def get_queryset(self):
+        from .models import Testimonial
+        return Testimonial.objects.all()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        cache.delete('content:testimonials')
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        cache.delete('content:testimonials')

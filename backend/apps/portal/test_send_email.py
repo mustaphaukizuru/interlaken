@@ -11,7 +11,7 @@ pytestmark = pytest.mark.django_db
 class TestSendEmailLogging:
     def test_logs_and_returns_false_on_smtp_error(self, caplog):
         with patch(
-            'apps.portal.services.send_mail',
+            'django.core.mail.EmailMultiAlternatives.send',
             side_effect=OSError('smtp down'),
         ):
             with caplog.at_level('ERROR'):
@@ -24,7 +24,7 @@ class TestSendEmailLogging:
         assert send_email('Asunto', 'Cuerpo', ['']) is False
 
     def test_success_returns_true(self):
-        with patch('apps.portal.services.send_mail', return_value=1) as mocked:
+        with patch('django.core.mail.EmailMultiAlternatives.send', return_value=1) as mocked:
             assert send_email('Asunto', 'Cuerpo', ['a@test.mx']) is True
             mocked.assert_called_once()
             assert mocked.call_args.kwargs['fail_silently'] is False

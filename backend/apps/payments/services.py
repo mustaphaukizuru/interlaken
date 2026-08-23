@@ -46,7 +46,7 @@ def fail_checkout_if_still_open(pk, *, reason: str, stage: str) -> bool:
     The expire/supersede sweeps snapshot open PENDING payments without a lock,
     then write FAILED. A SUCCESS webhook can commit between that snapshot and
     the write; a blind ``mark_failed`` would then overwrite SUCCESS while the
-    cafeteria ledger keeps the credit (or the invoice stays paid) — books that
+    cafeteria ledger keeps the credit — books that
     disagree until the gateway happens to replay. This guard re-reads the row
     under ``select_for_update`` and re-checks the open-checkout condition
     (PENDING and no gateway tx id) before failing it, so a payment finalized —
@@ -64,40 +64,6 @@ def fail_checkout_if_still_open(pk, *, reason: str, stage: str) -> bool:
         payment.mark_failed(reason, stage=stage)
         _cascade_fail_linked_topup(payment)
         return True
-
-
-def reuse_or_clear_invoice_checkout(invoice) -> Payment | None:
-    """Return a fresh open tuition checkout for ``invoice``, or clear stale ones.
-
-    Caller must hold a row lock on ``invoice`` (``select_for_update``). When a
-    fresh PENDING payment linked via ``InvoicePayment`` exists, it is returned
-    for reuse. Stale open checkouts are marked failed and ``None`` is returned
-    so the caller can create a replacement.
-    """
-    link = (
-        invoice.invoice_payments
-        .select_related('payment')
-        .filter(payment__status=Payment.Status.PENDING)
-        .filter(Q(payment__gateway_tx_id__isnull=True) | Q(payment__gateway_tx_id=''))
-        .order_by('-payment__created_at')
-        .first()
-    )
-    if link is None:
-        return None
-
-    payment = link.payment
-    if payment.created_at >= _fresh_cutoff():
-        return payment
-
-    if fail_checkout_if_still_open(
-        payment.pk,
-        reason='checkout superseded — stale open session', stage='supersede',
-    ):
-        logger.info(
-            'Superseded stale tuition checkout payment=%s invoice=%s',
-            payment.id, invoice.id,
-        )
-    return None
 
 
 def reuse_or_clear_cafeteria_checkout(
@@ -183,7 +149,7 @@ def expire_stale_checkouts(*, older_than_minutes: int | None = None) -> int:
 def payments_visible_to(user):
     """Payments the family portal actor may list/poll.
 
-    Includes the caller's own rows plus tuition/cafeteria payments for linked
+    Includes the caller's own rows plus cafeteria top-up payments for linked
     children (and a school-email student's own profile when the self-guardian
     M2M row is missing). Admins see everything.
     """
@@ -206,11 +172,8 @@ def payments_visible_to(user):
         if own_pk is not None and own_pk not in student_ids:
             student_ids.append(own_pk)
 
-    q = Q(user=user)
-    q |= Q(invoice_payment__invoice__student_id__in=student_ids)
-    q |= Q(related_topup__student_id__in=student_ids)
+    q = Q(user=user) | Q(related_topup__student_id__in=student_ids)
 
-    # invoice_payment is a reverse OneToOne and related_topup a forward FK, so
-    # no join multiplies rows anymore; DISTINCT kept so the money-path query
-    # result shape is provably unchanged (it is now a no-op, not a crutch).
+    # related_topup is a forward FK, so the join never multiplies rows;
+    # DISTINCT kept so the money-path query result shape stays provably stable.
     return Payment.objects.filter(q).distinct()

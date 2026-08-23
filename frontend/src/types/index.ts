@@ -1,4 +1,5 @@
 export interface User {
+  last_login?: string | null;
   id: number;
   email: string;
   first_name: string;
@@ -22,6 +23,18 @@ export interface StudentProfile {
   grade: string;
   group: string;
   loyverse_id: string;
+  enrollment_date?: string | null;
+  is_active?: boolean;
+  status?: 'active' | 'on_leave' | 'graduated' | 'withdrawn';
+  birth_date?: string | null;
+  age?: number | null;
+  curp?: string;
+  emergency_name?: string;
+  emergency_phone?: string;
+  emergency_rel?: string;
+  blood_type?: string;
+  allergies?: string;
+  medical_notes?: string;
 }
 
 export interface CafeteriaBalance {
@@ -170,17 +183,22 @@ export interface CafeteriaStudentDetail {
 
 export interface Payment {
   id: number;
-  payment_type: 'tuition' | 'enrollment' | 'cafeteria' | 'other';
+  // Only cafetería top-ups are sold through the app; 'other' is a legacy bucket.
+  payment_type: 'cafeteria' | 'other';
   amount: string;
   currency: string;
   description: string;
   status: 'pending' | 'processing' | 'success' | 'failed' | 'refunded';
+  gateway?: string;
+  gateway_label?: string;
   gateway_tx_id: string;
+  gateway_ref?: string;
+  student_id?: number | null;
+  student_name?: string;
   created_at: string;
   updated_at: string;
 }
 
-// (Finance/tuition types removed: the app does not bill tuition.)
 
 export interface Announcement {
   id: number;
@@ -199,6 +217,7 @@ export interface PreRegistrationData {
   phone: string;
   how_did_you_hear?: string;
   message?: string;
+  wants_visit?: boolean;
 }
 
 export interface OpenSchoolEvent {
@@ -262,6 +281,13 @@ export interface DashboardData {
   pending_registrations?: number;
   pending_payments?: number;
   total_revenue?: string;
+  cafeteria_total_balance?: string;
+  low_balance_count?: number;
+  pending_topups?: number;
+  visits_today?: number;
+  open_password_requests?: number;
+  unhandled_messages?: number;
+  recent_activity?: { id: number; when: string; actor: string; action: string; object_type: string; object_id: string; context: string }[];
   announcements?: Announcement[];
   unread_notifications?: number;
 }

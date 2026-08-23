@@ -7,11 +7,14 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.contrib.auth import logout
+from django.db.models import Q
 from django.shortcuts import redirect
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -256,6 +259,8 @@ class GoogleTokenView(APIView):
             dirty.append('avatar')
         if dirty:
             user.save(update_fields=dirty)
+        from .security import record_login
+        record_login(request, user=user, method='google')
 
         response = Response()
         access = issue_session(user, response)
@@ -295,7 +300,29 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
     """
 
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
+        from .security import record_login, totp_enabled, verify_totp
+        email = str(request.data.get('email') or '')[:254]
+        try:
+            response = super().post(request, *args, **kwargs)
+        except (AuthenticationFailed, InvalidToken, TokenError):
+            record_login(request, email=email, success=False, reason='bad_password')
+            raise
+        if response.status_code != status.HTTP_200_OK:
+            record_login(request, email=email, success=False, reason='bad_password')
+            return response
+        user = User.objects.filter(email__iexact=email).first()
+        if user is not None and totp_enabled(user):
+            code = str(request.data.get('totp') or '')
+            if not code:
+                record_login(request, user=user, success=False, reason='totp_required')
+                return Response({'totp_required': True, 'detail': 'Ingrese el código de su app de autenticación.'},
+                                status=status.HTTP_401_UNAUTHORIZED)
+            if not verify_totp(user.totp.secret, code):
+                record_login(request, user=user, success=False, reason='bad_totp')
+                return Response({'totp_required': True, 'detail': 'Código incorrecto.'}, status=status.HTTP_401_UNAUTHORIZED)
+            user.totp.last_used_at = timezone.now()
+            user.totp.save(update_fields=['last_used_at'])
+        record_login(request, user=user, email=email)
         if response.status_code == status.HTTP_200_OK:
             refresh = response.data.get('refresh')
             access = response.data.get('access')
@@ -373,18 +400,52 @@ class StudentListView(generics.ListAPIView):
         # (StudentProfile has no Meta.ordering).
         order = ('user__last_name', 'user__first_name', 'id')
         if user.role == User.Role.ADMIN:
-            return StudentProfile.objects.select_related('user').order_by(*order)
+            qs = StudentProfile.objects.select_related('user')
+            # Roster filters (BACKLOG P1-A6/A7): ?estado=active|on_leave|graduated|withdrawn
+            # and ?acceso=never (family login never used) | nopass (no password yet).
+            estado = self.request.query_params.get('estado')
+            if estado in StudentProfile.Status.values:
+                qs = qs.filter(status=estado)
+            acceso = self.request.query_params.get('acceso')
+            if acceso == 'never':
+                qs = qs.filter(user__last_login__isnull=True)
+            elif acceso == 'nopass':
+                # Django stores unusable passwords with a leading '!'.
+                qs = qs.filter(user__password__startswith='!')
+            return qs.order_by(*order)
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
             return (StudentProfile.objects.filter(parents=user)
                     .select_related('user').order_by(*order))
+        elif user.role == User.Role.STUDENT:
+            # A school-email student sees its own file (and any sibling it is a
+            # self-guardian of) — same rule as StudentDetailView and the dashboard.
+            return (StudentProfile.objects.filter(Q(user=user) | Q(parents=user))
+                    .distinct().select_related('user').order_by(*order))
         return StudentProfile.objects.none()
 
 
 class StudentDetailView(generics.RetrieveAPIView):
-    """GET /api/v1/accounts/students/<pk>/"""
+    """GET /api/v1/accounts/students/<pk>/ — full file (medical data gated to admin/own family)."""
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['include_medical'] = True
+        return ctx
+
+    def retrieve(self, request, *args, **kwargs):
+        # Medical fields (P5-6): admin always; guardian only with MEDICAL_DATA
+        # consent; everyone else gets them masked with the reason.
+        from .medical import mask_medical, medical_access
+        profile = self.get_object()
+        data = self.get_serializer(profile).data
+        allowed, reason = medical_access(request.user, profile)
+        if not allowed:
+            mask_medical(data)
+            data['medical_masked'] = reason
+        return Response(data)
 
     def get_queryset(self):
         user = self.request.user

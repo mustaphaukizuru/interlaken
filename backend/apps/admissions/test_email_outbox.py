@@ -2,6 +2,7 @@
 import pytest
 from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.factories import AdminFactory
 from apps.admissions.models import PreRegistration, Registration
@@ -10,13 +11,13 @@ pytestmark = pytest.mark.django_db
 
 
 def test_pre_register_emails_parent_and_school(api_client, settings):
-    settings.CONTACT_EMAIL = "colegio@interlaken.edu.mx"
+    settings.ADMISSIONS_EMAIL = "info@interlaken.com.mx"
     settings.RATELIMIT_ENABLE = False
     mail.outbox.clear()
 
     resp = api_client.post(reverse("pre-register"), {
         "child_name": "Ana Pérez",
-        "child_dob": "2015-05-01",
+        "child_dob": f"{timezone.localdate().year - 8}-05-01",  # 8 on 31 Dec → Primaria 3°
         "grade_applying": "Primaria 3°",
         "parent_name": "Roberto Pérez",
         "email": "roberto@test.mx",
@@ -30,7 +31,7 @@ def test_pre_register_emails_parent_and_school(api_client, settings):
     parent_mail = next(m for m in mail.outbox if "Pre-registro recibido" in m.subject)
     assert parent_mail.to == ["roberto@test.mx"]
     school_mail = next(m for m in mail.outbox if "Nuevo pre-registro" in m.subject)
-    assert school_mail.to == ["colegio@interlaken.edu.mx"]
+    assert school_mail.to == ["info@interlaken.com.mx"]
 
 
 def test_invite_and_approval_email_parent(api_client, settings):
@@ -39,7 +40,7 @@ def test_invite_and_approval_email_parent(api_client, settings):
 
     api_client.post(reverse("pre-register"), {
         "child_name": "Luis Ruiz",
-        "child_dob": "2014-01-01",
+        "child_dob": f"{timezone.localdate().year - 9}-01-01",  # 9 on 31 Dec → Primaria 4°
         "grade_applying": "Primaria 4°",
         "parent_name": "María Ruiz",
         "email": "maria@test.mx",

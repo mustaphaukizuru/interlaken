@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CheckCircle, ArrowRight, ArrowLeft, UploadCloud, FileText, MailCheck, AlertTriangle } from 'lucide-react';
+import { useDraft } from '@/hooks/useDraft';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -65,7 +66,10 @@ export default function RegisterPage() {
   const isInvited = !!(inviteRid && inviteToken);
 
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<Form>(EMPTY);
+  // Autosave the (text-only) wizard state (BACKLOG P1-I2); invite flows seed from the server instead.
+  const draft = useDraft<Form>('inscripcion');
+  const [form, setForm] = useState<Form>(() => ({ ...EMPTY, ...(draft.load() ?? {}) }));
+  useEffect(() => { draft.save(form); }, [form, draft]);
   const [regId, setRegId] = useState<number | null>(null);
   const [session, setSession] = useState<string>('');
   const [files, setFiles] = useState<Record<string, File>>({});
@@ -226,6 +230,7 @@ export default function RegisterPage() {
       }
 
       await admissionsApi.submitRegistration(regId, session, true);
+      draft.clear();
       setSuccess(true);
     } catch {
       toast.error('No se pudo enviar la inscripción. Intente de nuevo.');
@@ -376,8 +381,8 @@ export default function RegisterPage() {
               <SectionHead title="Tutor principal" subtitle="Padre, madre o tutor" />
               <Input id="parent1_name" label="Nombre completo del tutor" error={fieldErrors.parent1_name} className="text-base min-h-[44px]" value={form.parent1_name} onChange={(e) => set('parent1_name', e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input id="parent1_email" label="Correo electrónico" type="email" error={fieldErrors.parent1_email} className="text-base min-h-[44px]" value={form.parent1_email} onChange={(e) => set('parent1_email', e.target.value)} />
-                <Input id="parent1_phone" label="Teléfono / WhatsApp" type="tel" error={fieldErrors.parent1_phone} className="text-base min-h-[44px]" value={form.parent1_phone} onChange={(e) => set('parent1_phone', e.target.value)} />
+                <Input id="parent1_email" label="Correo electrónico" type="email" inputMode="email" autoComplete="email" error={fieldErrors.parent1_email} className="text-base min-h-[44px]" value={form.parent1_email} onChange={(e) => set('parent1_email', e.target.value)} />
+                <Input id="parent1_phone" label="Teléfono / WhatsApp" type="tel" inputMode="tel" autoComplete="tel" error={fieldErrors.parent1_phone} className="text-base min-h-[44px]" value={form.parent1_phone} onChange={(e) => set('parent1_phone', e.target.value)} />
               </div>
 
               <div className="flex justify-end">
@@ -397,15 +402,15 @@ export default function RegisterPage() {
               <SectionHead title="Segundo tutor (opcional)" />
               <Input label="Nombre completo" className="text-base min-h-[44px]" value={form.parent2_name} onChange={(e) => set('parent2_name', e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Correo electrónico" type="email" className="text-base min-h-[44px]" value={form.parent2_email} onChange={(e) => set('parent2_email', e.target.value)} />
-                <Input label="Teléfono" type="tel" className="text-base min-h-[44px]" value={form.parent2_phone} onChange={(e) => set('parent2_phone', e.target.value)} />
+                <Input label="Correo electrónico" type="email" inputMode="email" autoComplete="email" className="text-base min-h-[44px]" value={form.parent2_email} onChange={(e) => set('parent2_email', e.target.value)} />
+                <Input label="Teléfono" type="tel" inputMode="tel" autoComplete="tel" className="text-base min-h-[44px]" value={form.parent2_phone} onChange={(e) => set('parent2_phone', e.target.value)} />
               </div>
 
               <hr className="border-line" />
               <SectionHead title="Contacto de emergencia (opcional)" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Nombre" className="text-base min-h-[44px]" value={form.emergency_name} onChange={(e) => set('emergency_name', e.target.value)} />
-                <Input label="Teléfono" type="tel" className="text-base min-h-[44px]" value={form.emergency_phone} onChange={(e) => set('emergency_phone', e.target.value)} />
+                <Input label="Teléfono" type="tel" inputMode="tel" autoComplete="tel" className="text-base min-h-[44px]" value={form.emergency_phone} onChange={(e) => set('emergency_phone', e.target.value)} />
               </div>
               <Input label="Parentesco" className="text-base min-h-[44px]" value={form.emergency_rel} onChange={(e) => set('emergency_rel', e.target.value)} />
 

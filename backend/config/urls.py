@@ -9,7 +9,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAdminUser
 
-from apps.core.views import ContactCreateView, HealthView
+from apps.content.navigation import sitemap_view
+from apps.core.views import ContactCreateView, FacturacionRequestView, HealthView
 
 # Staff-gated API docs: session auth so a Django-admin login is enough to
 # browse Swagger — the schema is never exposed anonymously.
@@ -42,15 +43,16 @@ urlpatterns = [
     path('api/v1/cafeteria/',   include('apps.cafeteria.urls')),
     path('api/v1/payments/',    include('apps.payments.urls')),
     path('api/v1/portal/',      include('apps.portal.urls')),
-    # apps.finance is intentionally NOT mounted: the school does not bill
-    # tuition through the app (models stay for the dormant historical tables).
+    # No finance/tuition API: the cafetería wallet is the only money path.
     path('api/v1/bookings/',    include('apps.bookings.urls')),
     path('api/v1/whatsapp/',    include('apps.whatsapp.urls')),
     path('api/v1/legal/',       include('apps.legal.urls')),
     path('api/v1/content/',     include('apps.content.urls')),
     path('api/v1/contact/',     ContactCreateView.as_view(), name='contact-create'),
+    path('api/v1/facturacion/', FacturacionRequestView.as_view(), name='facturacion-request'),
     path('api/v1/health/',      HealthView.as_view(),        name='health'),
 
+    path('sitemap.xml', sitemap_view, name='sitemap'),
     # React SPA catch-all (serves index.html for all unmatched routes)
     path('', include('apps.core.urls')),
 ]

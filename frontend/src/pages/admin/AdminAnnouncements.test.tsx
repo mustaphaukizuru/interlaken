@@ -78,13 +78,14 @@ describe('AdminAnnouncements', () => {
 
     await user.click(publish);
     await waitFor(() => {
-      expect(create).toHaveBeenCalledWith({
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({
         title: 'Suspensión',
         body: 'No hay clases mañana.',
         audience: 'all',
         is_active: true,
         push_enabled: true,
-      });
+        show_on_site: false,
+      }));
     });
     expect(toastSuccess).toHaveBeenCalledWith('Comunicado publicado.');
   });

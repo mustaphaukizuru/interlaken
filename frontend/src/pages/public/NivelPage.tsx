@@ -3,6 +3,8 @@ import { ArrowRight, CalendarCheck, CheckCircle2, Users } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { Reveal } from '@/components/ui/Reveal';
 import { LEVELS, getLevel } from '@/lib/levels';
+import { useSep } from '@/hooks/useSep';
+import { ShieldCheck } from 'lucide-react';
 
 const ACCENT = {
   green: { label: 'section-label-green', text: 'text-green-dark', ring: 'border-green/30', soft: 'bg-green/5' },
@@ -13,6 +15,7 @@ const ACCENT = {
 /** Un template para los tres niveles (contenido en src/lib/levels.ts). */
 export default function NivelPage() {
   const { nivel } = useParams();
+  const sepRows = useSep();
   const level = getLevel(nivel);
   if (!level) return <Navigate to="/niveles/preescolar" replace />;
   const accent = ACCENT[level.accent];
@@ -34,7 +37,7 @@ export default function NivelPage() {
           onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
         />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <span className={`${accent.label} inline-flex`}>Niveles Educativos</span>
+          <span className={`${accent.label} inline-flex`} style={{ borderLeft: `4px solid ${level.color}`, paddingLeft: 10 }}>Niveles Educativos</span>
           <h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]">
             {level.name}
           </h1>
@@ -98,6 +101,22 @@ export default function NivelPage() {
                 ))}
               </ul>
             </Reveal>
+
+            {/* Incorporación SEP de este nivel (moved here from the footer, school instruction 2026-08-21) */}
+            {(() => {
+              const sep = sepRows.find((r) => r.level === level.name);
+              return sep ? (
+                <Reveal>
+                  <div className="rounded-xl2 border border-line bg-cream-2 p-5" style={{ borderLeft: `4px solid ${level.color}` }}>
+                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[1.2px] text-subtle">
+                      <ShieldCheck size={14} aria-hidden="true" /> Incorporación oficial SEP
+                    </p>
+                    <p className="mt-1.5 text-sm font-medium text-ink">{sep.label}</p>
+                    <p className="mt-1 text-xs text-muted">Estudios con reconocimiento de validez oficial.</p>
+                  </div>
+                </Reveal>
+              ) : null;
+            })()}
           </div>
 
           {/* Sidebar de acciones (paralela al menú del sitio anterior) */}
@@ -110,7 +129,7 @@ export default function NivelPage() {
                 { to: '/admisiones', label: 'Proceso de inscripción' },
                 { to: '/admisiones/documentacion', label: 'Documentación' },
                 { to: '/admisiones/costos', label: 'Costos y colegiaturas' },
-                { to: '/puertas-abiertas', label: 'Puertas Abiertas' },
+                { to: '/agendar-visita', label: 'Agendar visita' },
                 { to: '/contacto', label: 'Contacto por nivel' },
               ].map((l) => (
                 <li key={l.label}>

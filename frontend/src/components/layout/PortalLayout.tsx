@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Sidebar from './Sidebar';
 import AppHeader from './AppHeader';
@@ -69,6 +70,7 @@ export function useMobileNav() {
 }
 
 export function PortalLayout({ role }: Props) {
+  useIdleLogout(role === 'admin' || role === 'staff');
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((v) => !v), []);
@@ -133,7 +135,7 @@ export function PortalLayout({ role }: Props) {
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
             className="flex-1 overflow-y-auto overflow-x-hidden"
           >
-            <div className="mx-auto w-full max-w-[1400px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
+            <div className="mx-auto w-full max-w-[1320px] 2xl:max-w-[1680px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
               <RouteTransition><Outlet /></RouteTransition>
             </div>
           </div>

@@ -47,6 +47,14 @@ class CafeteriaBalanceAdmin(ModelAdmin):
     # (which writes a BalanceAdjustment audit row) — never hand-edited here.
     readonly_fields = ('balance', 'last_synced', 'last_low_balance_alert_at')
 
+    # Operated from the staff portal (/admin/cafeteria); the Django admin is a
+    # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(CafeteriaTransaction)
 class CafeteriaTransactionAdmin(ModelAdmin):
@@ -61,6 +69,14 @@ class CafeteriaTransactionAdmin(ModelAdmin):
     # Ledger rows come from the Loyverse sync / top-up services; the money and
     # provenance fields are immutable in the UI.
     readonly_fields = ('amount', 'balance_after', 'loyverse_receipt_id', 'items', 'date')
+
+    # Operated from the staff portal (/admin/cafeteria); the Django admin is a
+    # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TopUpRequest)
@@ -83,6 +99,14 @@ class TopUpRequestAdmin(ModelAdmin):
         'pos_loaded_at', 'pos_loaded_by',
         'pos_unload_needed_at', 'pos_unloaded_at', 'pos_unloaded_by',
     )
+
+    # Operated from the staff portal (/admin/cafeteria); the Django admin is a
+    # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(BalanceAdjustment)

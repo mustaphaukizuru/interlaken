@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { AlertTriangle, CheckCircle, Clock, CalendarDays } from 'lucide-react';
@@ -13,6 +13,8 @@ import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { PreRegistrationData } from '@/types';
+import { eligibilityHint } from '@/lib/eligibility';
+import { useDraft } from '@/hooks/useDraft';
 
 const schema = z.object({
   child_name:       z.string().min(2, 'Nombre requerido'),
@@ -23,11 +25,13 @@ const schema = z.object({
   phone:            z.string().min(10, 'Teléfono inválido'),
   how_did_you_hear: z.string().optional(),
   message:          z.string().optional(),
+  wants_visit:      z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
 const GRADES = [
+  'Maternal',
   'Preescolar 1°', 'Preescolar 2°', 'Preescolar 3°',
   'Primaria 1°', 'Primaria 2°', 'Primaria 3°', 'Primaria 4°', 'Primaria 5°', 'Primaria 6°',
   'Secundaria 1°', 'Secundaria 2°', 'Secundaria 3°',
@@ -38,21 +42,32 @@ const selectClass =
   'input-field text-base min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1';
 
 export default function PreRegisterPage() {
+  const draft = useDraft<FormData>('pre-registro');
   const [success, setSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: draft.load() ?? undefined,
   });
+
+  // Autosave (BACKLOG P1-I2): restore on return, clear on success.
+  useEffect(() => {
+    const sub = watch((values) => draft.save(values as Partial<FormData>));
+    return () => sub.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watch]);
 
   const onSubmit = async (data: FormData) => {
     setSubmitError(null);
     try {
       await admissionsApi.preRegister(data as PreRegistrationData);
       trackEvent(FunnelEvent.SubmitPreRegister, { grade: data.grade_applying });
+      draft.clear();
       setSuccess(true);
     } catch {
       const msg = 'No pudimos enviar el pre-registro. Verifique los datos e intente nuevamente.';
@@ -60,6 +75,11 @@ export default function PreRegisterPage() {
       toast.error(msg);
     }
   };
+
+  const dobValue = watch('child_dob');
+  const gradeValue = watch('grade_applying');
+  const wantsVisit = watch('wants_visit');
+  const ageHint = eligibilityHint(dobValue ?? '', gradeValue ?? '');
 
   if (success) {
     return (
@@ -73,6 +93,12 @@ export default function PreRegisterPage() {
             Hemos recibido su solicitud. En los próximos 2 días hábiles, un asesor se pondrá en
             contacto con usted para coordinar los siguientes pasos.
           </p>
+          {wantsVisit && (
+            <div className="mb-6 rounded-xl border border-green/30 bg-green/5 p-4 text-sm text-ink">
+              Nos indicó que desea conocer el colegio.{' '}
+              <Link to="/agendar-visita" className="font-semibold text-green-dark underline">Elija fecha y hora de su visita</Link>.
+            </div>
+          )}
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               to="/admisiones"
@@ -165,6 +191,9 @@ export default function PreRegisterPage() {
               {errors.grade_applying && (
                 <p className="mt-1.5 text-xs text-red-600">{errors.grade_applying.message}</p>
               )}
+              {!errors.grade_applying && ageHint && (
+                <p className="mt-1.5 text-xs text-coral-600" role="status">{ageHint} Elija el grado que corresponde a su edad o contacte a admisiones.</p>
+              )}
             </div>
           </div>
 
@@ -186,7 +215,7 @@ export default function PreRegisterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Correo electrónico"
-              type="email"
+              type="email" inputMode="email" autoComplete="email"
               placeholder="correo@ejemplo.com"
               error={errors.email?.message}
               className="text-base min-h-[44px]"
@@ -194,7 +223,7 @@ export default function PreRegisterPage() {
             />
             <Input
               label="Teléfono / WhatsApp"
-              type="tel"
+              type="tel" inputMode="tel" autoComplete="tel"
               placeholder="55 1234 5678"
               error={errors.phone?.message}
               className="text-base min-h-[44px]"
@@ -223,6 +252,14 @@ export default function PreRegisterPage() {
               {...register('message')}
             />
           </div>
+
+          <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm text-ink">
+            <input type="checkbox" className="mt-0.5 h-5 w-5" {...register('wants_visit')} />
+            <span>
+              <span className="block font-semibold">Deseo agendar una visita para conocer el colegio</span>
+              <span className="block text-xs text-muted">Al enviar, le mostraremos el calendario para elegir fecha y hora.</span>
+            </span>
+          </label>
 
           <PrivacyNote />
 

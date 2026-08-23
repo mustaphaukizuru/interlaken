@@ -268,8 +268,8 @@ export default function BookVisitPage() {
                     </div>
 
                     <Input label="Nombre completo" error={errors.parent_name?.message} className={inputClass} {...register('parent_name')} />
-                    <Input label="Correo electrónico" type="email" error={errors.parent_email?.message} className={inputClass} {...register('parent_email')} />
-                    <Input label="Teléfono / WhatsApp" type="tel" error={errors.parent_phone?.message} className={inputClass} {...register('parent_phone')} />
+                    <Input label="Correo electrónico" type="email" inputMode="email" autoComplete="email" error={errors.parent_email?.message} className={inputClass} {...register('parent_email')} />
+                    <Input label="Teléfono / WhatsApp" type="tel" inputMode="tel" autoComplete="tel" error={errors.parent_phone?.message} className={inputClass} {...register('parent_phone')} />
                     <Input label="Nombre del alumno (opcional)" className={inputClass} {...register('child_name')} />
                     <Input label="Grado de interés (opcional)" className={inputClass} {...register('child_grade')} />
 

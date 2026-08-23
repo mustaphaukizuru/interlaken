@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, ArrowUpRight, CreditCard, GraduationCap, HeartHandshake,
-  Info, LockKeyhole, Mail, MonitorSmartphone, Tablet,
+  Coffee, Info, LockKeyhole, Mail, Tablet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
@@ -84,7 +84,7 @@ export default function PlataformasPage() {
     <div>
       <Seo
         title="Plataformas"
-        description="Accesos digitales de la comunidad Interlaken: Portal de Familias, ServoEscolar (pagos y boletas), Educar es Padre, Google Classroom, Gmail y registro de iPad."
+        description="Accesos digitales de la comunidad Interlaken: Cafetería, ServoEscolar (pagos y boletas), Educar es Padre, Google Classroom, Gmail y registro de iPad."
       />
 
       <section className="relative overflow-hidden bg-dark text-white">
@@ -117,16 +117,15 @@ export default function PlataformasPage() {
             <div className="relative">
               <p className="flex items-center gap-2.5 font-head text-xl font-bold text-ink sm:text-2xl">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-green/15 text-green-dark">
-                  <MonitorSmartphone size={22} aria-hidden="true" />
+                  <Coffee size={22} aria-hidden="true" />
                 </span>
-                Portal de Familias Interlaken
+                Cafetería
               </p>
               <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
-                Saldo y recargas de cafetería, avisos y comunicados, y agenda
-                de visitas — todo con su cuenta del colegio.
+                Checar saldo y recargas de cafetería.
               </p>
               <Link to="/login" className="btn-pink mt-5">
-                <LockKeyhole size={15} aria-hidden="true" /> Entrar al Portal
+                <LockKeyhole size={15} aria-hidden="true" /> Entrar a Cafetería
                 <ArrowRight size={15} aria-hidden="true" />
               </Link>
             </div>

@@ -9,21 +9,12 @@ import csv
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework import permissions
 from rest_framework.views import APIView
 
-from .models import StudentProfile, User
+from apps.core.exports import export_filename, fmt_dt
+from apps.core.permissions import IsAdmin
 
-
-def _fmt_dt(dt) -> str:
-    if not dt:
-        return ''
-    return timezone.localtime(dt).strftime('%Y-%m-%d %H:%M')
-
-
-def _filename(prefix: str) -> str:
-    stamp = timezone.localtime(timezone.now()).strftime('%Y%m%d')
-    return f'{prefix}_{stamp}.csv'
+from .models import StudentProfile
 
 
 def students_roster_csv(students) -> HttpResponse:
@@ -34,7 +25,7 @@ def students_roster_csv(students) -> HttpResponse:
     response.write('﻿')  # BOM so Excel opens UTF-8 accents correctly
     writer = csv.writer(response)
     writer.writerow(['Directorio de alumnos'])
-    writer.writerow(['Generado', _fmt_dt(timezone.now())])
+    writer.writerow(['Generado', fmt_dt(timezone.now())])
     writer.writerow([])
     writer.writerow(header)
     for s in students:
@@ -47,14 +38,8 @@ def students_roster_csv(students) -> HttpResponse:
             s.guardians_count,
             'Sí' if s.is_active else 'No',
         ])
-    response['Content-Disposition'] = f'attachment; filename="{_filename("alumnos")}"'
+    response['Content-Disposition'] = f'attachment; filename="{export_filename("alumnos")}"'
     return response
-
-
-class IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 class AdminExportStudentsView(APIView):

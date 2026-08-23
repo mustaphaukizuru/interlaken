@@ -1,6 +1,6 @@
 """
 Financial history must survive a student delete (Tier0 #5). The wallet ledger,
-balances, adjustments, top-ups and tuition invoices are on_delete=PROTECT, so
+balances, adjustments and top-ups are on_delete=PROTECT, so
 deleting a StudentProfile that has any of them raises ProtectedError instead of
 silently cascading the records away.
 """

@@ -69,7 +69,7 @@ class TestExpireStalePayments:
         parent = ParentFactory()
         payment = Payment.objects.create(
             user=parent,
-            payment_type=Payment.Type.TUITION,
+            payment_type=Payment.Type.OTHER,
             amount=Decimal("100.00"),
             status=Payment.Status.PENDING,
         )

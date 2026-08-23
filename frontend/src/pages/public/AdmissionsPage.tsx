@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Award, FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, ShieldCheck, Plus } from 'lucide-react';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
-import { SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
+import { useSep } from '@/hooks/useSep';
+import { Testimonials } from '@/components/public/Testimonials';
 import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Section } from '@/components/ui/Section';
@@ -250,6 +251,7 @@ function FaqExplorer() {
 }
 
 export default function AdmissionsPage() {
+  const sepRows = useSep();
   // WhatsApp number is admin-editable; CTA hidden (fallback to /contacto)
   // when it's empty, per site convention.
   const { whatsapp_number } = useSiteSettings();
@@ -282,6 +284,11 @@ export default function AdmissionsPage() {
         </div>
       </section>
 
+      {/* ── TESTIMONIOS (BACKLOG P2-15) ── */}
+      <Section bg="white">
+        <Testimonials title="Familias que ya son Interlaken" />
+      </Section>
+
       {/* ── INCORPORACIÓN SEP — señales de confianza (flyer institucional) ── */}
       <Section bg="white" spacing="sm">
         <Reveal>
@@ -299,7 +306,7 @@ export default function AdmissionsPage() {
                 </div>
               </div>
               <ul className="grid gap-2.5 text-xs leading-relaxed text-ink/80 sm:grid-cols-3 lg:max-w-[660px]">
-                {SEP_INCORPORATIONS.map((r) => (
+                {sepRows.map((r) => (
                   <li key={r.level} className="flex items-start gap-2">
                     <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-dark" aria-hidden="true" />
                     <span>{r.label}</span>
@@ -327,8 +334,8 @@ export default function AdmissionsPage() {
           />
           <ol className="m-0 flex list-none flex-col p-0 lg:grid lg:grid-cols-4 lg:gap-7">
             {STEPS.map(({ icon: Icon, step, key, title, desc, color, to, ctaLabel }, i) => (
-              <Reveal key={step} delay={i * 100} direction="up">
-                <li className="relative flex gap-4 lg:block lg:text-center">
+              <Reveal key={step} as="li" delay={i * 100} direction="up" className="relative flex gap-4 lg:block lg:text-center">
+                <div className="contents">
                   {/* Numbered node + vertical connector (phones/tablets) */}
                   <div className="flex flex-col items-center lg:block">
                     <div
@@ -384,7 +391,7 @@ export default function AdmissionsPage() {
                       </Link>
                     )}
                   </div>
-                </li>
+                </div>
               </Reveal>
             ))}
           </ol>
@@ -486,10 +493,10 @@ export default function AdmissionsPage() {
                     Inicie su pre-registro <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                   <Link
-                    to="/puertas-abiertas"
+                    to="/agendar-visita"
                     className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border-2 border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                   >
-                    Ver Puertas Abiertas
+                    Agendar una visita
                   </Link>
                 </div>
               </div>

@@ -9,6 +9,7 @@ nothing.
 """
 import logging
 
+from django.conf import settings
 from django.db import transaction as db_transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -16,6 +17,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
@@ -35,10 +37,11 @@ CLOSED_STATUSES = (Payment.Status.FAILED, Payment.Status.REFUNDED)
 class PaymentInitiateView(APIView):
     """POST /api/v1/payments/initiate/ — fail-closed for unlinked money types.
 
-    All current ``payment_type`` values are rejected: tuition/cafeteria must use
-    invoice-pay / cafeteria top-up; enrollment has no Registration fee link yet;
-    ``other`` would leave a SUCCESS webhook with nothing to credit. Keep the
-    endpoint for a future linked fee type.
+    Every ``payment_type`` is rejected: cafeteria must go through the top-up
+    flow (``POST /cafeteria/topup/``) so a SUCCESS webhook has a ledger to
+    credit, and ``other`` would leave an orphan. The cafetería wallet is the
+    only money path the app implements; the endpoint stays for a future
+    linked fee type.
     """
     permission_classes = [permissions.IsAuthenticated]
     # Per-user (DRF throttles run after JWT auth): each initiate creates a
@@ -115,11 +118,6 @@ class _WebhookProcessMixin:
             fail_online_topup,
             reverse_online_topup,
         )
-        from apps.finance.services import (
-            complete_invoice_payment,
-            fail_invoice_payment,
-            reverse_invoice_payment,
-        )
 
         notify_arg = None
         with db_transaction.atomic():
@@ -151,13 +149,11 @@ class _WebhookProcessMixin:
                     'status', 'gateway_tx_id', 'gateway_raw', 'updated_at',
                 ])
                 reverse_online_topup(payment)
-                reverse_invoice_payment(payment)
                 return status.HTTP_200_OK, {'detail': 'refunded'}, None
 
             if event.status == 'success':
                 payment.mark_success(event.transaction_id or payment.gateway_tx_id, event.raw)
                 complete_online_topup(payment)     # None for non-cafeteria payments
-                complete_invoice_payment(payment)  # None for non-tuition payments
                 notify_arg = (payment, True)
             elif event.status == 'failed':
                 payment.status = Payment.Status.FAILED
@@ -166,7 +162,6 @@ class _WebhookProcessMixin:
                 payment.gateway_raw = event.raw
                 payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
                 fail_online_topup(payment)
-                fail_invoice_payment(payment)
                 notify_arg = (payment, False)
             elif event.status == 'refunded':
                 # Refund before capture is unusual — mark refunded, reverse no-ops.
@@ -176,7 +171,6 @@ class _WebhookProcessMixin:
                 payment.gateway_raw = event.raw
                 payment.save(update_fields=['status', 'gateway_tx_id', 'gateway_raw', 'updated_at'])
                 reverse_online_topup(payment)
-                reverse_invoice_payment(payment)
             else:
                 # Non-terminal notification (PENDING/PROCESSING): record raw only.
                 payment.gateway_raw = event.raw
@@ -209,9 +203,6 @@ class _WebhookProcessMixin:
             if payment.payment_type == Payment.Type.CAFETERIA:
                 from apps.cafeteria.services import notify_topup_result
                 notify_topup_result(payment, success=success)
-            elif payment.payment_type == Payment.Type.TUITION:
-                from apps.finance.services import notify_invoice_result
-                notify_invoice_result(payment, success=success)
 
         return Response(body, status=http_status)
 
@@ -266,7 +257,7 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
 
     Lets the mock hosted-payment page finish the flow end-to-end without a live
     gateway. Reuses the EXACT webhook completion path (mark success/fail, credit
-    the cafeteria ledger / mark the invoice paid, notify the family) — only the
+    the cafeteria ledger, notify the family) — only the
     HMAC signature check is skipped — so sandbox behaviour matches production.
     Returns 404 unless DEBUG/SQLITE_LOCAL.
     """
@@ -293,9 +284,6 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
             if payment.payment_type == Payment.Type.CAFETERIA:
                 from apps.cafeteria.services import notify_topup_result
                 notify_topup_result(payment, success=success)
-            elif payment.payment_type == Payment.Type.TUITION:
-                from apps.finance.services import notify_invoice_result
-                notify_invoice_result(payment, success=success)
         return Response(body, status=http_status)
 
 
@@ -309,11 +297,191 @@ class PaymentDetailView(generics.RetrieveAPIView):
         return payments_visible_to(self.request.user)
 
 
+def _filtered_history(request):
+    """Family-scoped payments with the Pagos page filters (BACKLOG P1-D3).
+
+    ?status=  ?student=<profile id>  ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
+    """
+    from django.utils.dateparse import parse_date
+
+    from .services import payments_visible_to
+
+    qs = payments_visible_to(request.user).select_related('related_topup__student__user')
+    p = request.query_params
+    if p.get('status') in Payment.Status.values:
+        qs = qs.filter(status=p['status'])
+    if p.get('student', '').isdigit():
+        qs = qs.filter(related_topup__student_id=int(p['student']))
+    d = parse_date(p.get('from', '') or '')
+    if d:
+        qs = qs.filter(created_at__date__gte=d)
+    d = parse_date(p.get('to', '') or '')
+    if d:
+        qs = qs.filter(created_at__date__lte=d)
+    return qs.order_by('-created_at')
+
+
 class PaymentHistoryView(generics.ListAPIView):
-    """GET /api/v1/payments/history/ — family-scoped payment history."""
+    """GET /api/v1/payments/history/ — family-scoped, filterable payment history."""
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        return _filtered_history(self.request)
+
+
+class PaymentSummaryView(APIView):
+    """GET /api/v1/payments/summary/ — header tiles for the Pagos page (P1-D2):
+    month total, last successful top-up, pending count, per-child totals."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count, Sum
+        from django.utils import timezone
+
         from .services import payments_visible_to
-        return payments_visible_to(self.request.user).order_by('-created_at')
+
+        qs = payments_visible_to(request.user)
+        now = timezone.localtime()
+        month = qs.filter(status=Payment.Status.SUCCESS, created_at__year=now.year, created_at__month=now.month)
+        last = qs.filter(status=Payment.Status.SUCCESS).order_by('-created_at').first()
+        per_child = (qs.filter(status=Payment.Status.SUCCESS, related_topup__isnull=False)
+                     .values('related_topup__student_id', 'related_topup__student__user__first_name',
+                             'related_topup__student__user__last_name')
+                     .annotate(total=Sum('amount'), count=Count('id')).order_by('-total'))
+        return Response({
+            'month_total': str(month.aggregate(t=Sum('amount'))['t'] or 0),
+            'month_count': month.count(),
+            'pending_count': qs.filter(status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING]).count(),
+            'last_success': PaymentSerializer(last).data if last else None,
+            'per_child': [
+                {'student_id': r['related_topup__student_id'],
+                 'name': f"{r['related_topup__student__user__first_name']} {r['related_topup__student__user__last_name']}".strip(),
+                 'total': str(r['total']), 'count': r['count']} for r in per_child],
+        })
+
+
+class PaymentHistoryExportView(APIView):
+    """GET /api/v1/payments/history/export/ — CSV of the filtered family history (P1-D5)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        import csv
+
+        from django.http import HttpResponse
+
+        from apps.core.exports import as_download, export_filename, fmt_dt
+
+        resp = HttpResponse(content_type='text/csv; charset=utf-8')
+        resp.write('\ufeff')
+        w = csv.writer(resp)
+        w.writerow(['Fecha', 'Alumno', 'Concepto', 'Monto', 'Moneda', 'Estado', 'Pasarela', 'Referencia'])
+        for p in _filtered_history(request)[:5000]:
+            topup = p.related_topup
+            w.writerow([fmt_dt(p.created_at), topup.student.user.full_name if topup else '',
+                        p.description or p.get_payment_type_display(), p.amount, p.currency,
+                        p.get_status_display(), p.get_gateway_display(), p.gateway_tx_id or p.gateway_ref])
+        return as_download(resp, export_filename('pagos'))
+
+
+class AdminPaymentsView(generics.ListAPIView):
+    """GET /api/v1/payments/admin/ — every gateway payment, filterable (BACKLOG P1-D9).
+
+    Same filters as the family history plus ?gateway= and ?q= (student name,
+    payer email, gateway reference). Refunds live in the cafetería console;
+    cash top-ups are approved there too, so this page is the ledger view.
+    """
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = _filtered_history(self.request)
+        p = self.request.query_params
+        if p.get('gateway') in Payment.Gateway.values:
+            qs = qs.filter(gateway=p['gateway'])
+        q = (p.get('q') or '').strip()
+        if q:
+            qs = qs.filter(
+                Q(related_topup__student__user__first_name__icontains=q)
+                | Q(related_topup__student__user__last_name__icontains=q)
+                | Q(related_topup__student__student_id__icontains=q)
+                | Q(user__email__icontains=q)
+                | Q(gateway_tx_id__icontains=q)
+                | Q(gateway_ref__icontains=q))
+        return qs
+
+
+class AdminPaymentsSummaryView(APIView):
+    """GET /api/v1/payments/admin/summary/?days=30 — totals by status and per-day series."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.db.models import Count, Sum
+        from django.db.models.functions import TruncDate
+        from django.utils import timezone
+
+        try:
+            days = max(7, min(int(request.query_params.get('days', 30)), 365))
+        except ValueError:
+            days = 30
+        since = timezone.localdate() - timedelta(days=days - 1)
+        qs = Payment.objects.filter(created_at__date__gte=since)
+        by_status = {
+            r['status']: {'count': r['c'], 'total': str(r['t'] or 0)}
+            for r in qs.values('status').annotate(c=Count('id'), t=Sum('amount'))
+        }
+        series = [
+            {'date': r['d'].isoformat(), 'total': str(r['t'] or 0), 'count': r['c']}
+            for r in (qs.filter(status=Payment.Status.SUCCESS).annotate(d=TruncDate('created_at'))
+                      .values('d').annotate(t=Sum('amount'), c=Count('id')).order_by('d'))
+        ]
+        return Response({'days': days, 'since': since.isoformat(), 'by_status': by_status, 'series': series,
+                         'stuck_pending': Payment.objects.filter(
+                             status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING],
+                             created_at__lt=timezone.now() - timedelta(hours=24)).count()})
+
+
+class PaymentReceiptView(APIView):
+    """GET /api/v1/payments/<pk>/receipt/ — comprobante PDF of a successful or refunded
+    payment (BACKLOG P1-D4). Family-scoped like the detail view; admins may fetch any."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        from django.http import HttpResponse
+        from django.shortcuts import get_object_or_404
+
+        from apps.core.exports import as_download, fmt_dt
+        from apps.core.pdf import simple_document_pdf
+
+        from .services import payments_visible_to
+
+        p = get_object_or_404(payments_visible_to(request.user).select_related(
+            'user', 'related_topup__student__user'), pk=pk)
+        if p.status not in (Payment.Status.SUCCESS, Payment.Status.REFUNDED):
+            return Response({'detail': 'Solo los pagos completados tienen comprobante.'}, status=409)
+        topup = p.related_topup
+        student = topup.student.user.full_name if topup else ''
+        lines = [
+            f'Folio: {p.id}',
+            f'Fecha: {fmt_dt(p.created_at)}',
+            f'Estado: {p.get_status_display()}',
+            '',
+            f'Concepto: {p.description or p.get_payment_type_display()}',
+            f'Alumno: {student or "-"}',
+            f'Pagó: {p.user.full_name if p.user else "-"} ({p.user.email if p.user else "-"})',
+            '',
+            f'Monto: ${p.amount} {p.currency}',
+            f'Pasarela: {p.get_gateway_display()}',
+            f'Referencia: {p.gateway_tx_id or p.gateway_ref or "-"}',
+            '',
+            'Este comprobante acredita una recarga de saldo de cafetería. No es un CFDI;',
+            f'para facturación escriba a {getattr(settings, "BILLING_EMAIL", "")}.',
+        ]
+        pdf = simple_document_pdf('Comprobante de pago - Colegio Interlaken', lines,
+                                  subtitle='Portal de Familias')
+        resp = HttpResponse(pdf, content_type='application/pdf')
+        return as_download(resp, f'comprobante_{p.id}.pdf')

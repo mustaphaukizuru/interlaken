@@ -49,7 +49,10 @@ test.describe('Public routes render', () => {
 // would trigger. Cross-portal homes (/staff, /alumno) use a single goto.
 
 async function clickNavAndSettle(page: Page, name: string, urlRe: RegExp) {
-  await portalNav(page).getByRole('link', { name, exact: true }).click();
+  // Queue links carry a badge in their accessible name ("Admisiones, 3 pendientes"),
+  // so match the label exactly with an optional ", N pendientes" suffix.
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await portalNav(page).getByRole('link', { name: new RegExp(`^${esc}(, \\d+ pendientes)?$`) }).click();
   await expect(page).toHaveURL(urlRe);
   await expectMainSettled(page);
 }

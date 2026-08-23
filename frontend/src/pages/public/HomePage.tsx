@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   ArrowRight, Award, TrendingUp, Star, Check, Users, GraduationCap,
-  CalendarDays, Sparkles, Languages, Trophy, Palette, FlaskConical,
-  MapPin, Heart, Mail, Send,
+  CalendarDays, Languages, Trophy, Palette, FlaskConical,
+  Heart, Mail, Send,
 } from 'lucide-react';
 import type { Variants } from 'framer-motion';
-import { admissionsApi, contactApi } from '@/services/api';
+import { contactApi } from '@/services/api';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { m, SiteMotionProvider } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import type { OpenSchoolEvent } from '@/types';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
@@ -25,10 +25,11 @@ const STATS = [
   { value: '95%', label: 'Aprovechamiento', color: 'var(--green-mid)', icon: TrendingUp },
 ];
 
+// Official nivel colors (school instruction 2026-08-21); cards link to each nivel page.
 const LEVELS = [
-  { name: 'Preescolar', img: '/assets/court-primaria.webp', accent: 'var(--green)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
-  { name: 'Primaria', img: '/assets/facade.webp', accent: 'var(--purple)', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
-  { name: 'Secundaria', img: '/assets/secundaria.webp', accent: 'var(--pink)', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
+  { name: 'Preescolar', slug: 'preescolar', img: '/assets/court-primaria.webp', accent: 'var(--nivel-preescolar)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
+  { name: 'Primaria', slug: 'primaria', img: '/assets/facade.webp', accent: 'var(--nivel-primaria)', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
+  { name: 'Secundaria', slug: 'secundaria', img: '/assets/secundaria.webp', accent: 'var(--nivel-secundaria)', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
 ];
 
 const PROGRAMS = [
@@ -141,22 +142,6 @@ function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   (e.target as HTMLImageElement).style.display = 'none';
 }
 
-/**
- * "2026-09-12" → "12 de septiembre, 2026" — same rendering date-fns produced
- * here before, via the built-in Intl API instead. This page is the heaviest
- * public route, and one event date was its only date-fns usage; dropping the
- * import keeps format/parseISO + the `es` locale (~10 kB gz) off the home
- * route (perf budget). Parsed manually because `new Date('yyyy-MM-dd')` is
- * UTC-midnight and can shift a day in Mexico; parseISO treated it as local.
- */
-function formatEventDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!m) return iso;
-  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  const month = new Intl.DateTimeFormat('es-MX', { month: 'long' }).format(date);
-  return `${date.getDate()} de ${month}, ${date.getFullYear()}`;
-}
-
 function NewsletterCTA() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -210,7 +195,7 @@ function NewsletterCTA() {
               className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_180px]"
             />
             <input
-              type="email"
+              type="email" inputMode="email" autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -234,16 +219,9 @@ function NewsletterCTA() {
 
 export default function HomePage() {
   const settings = useSiteSettings();
-  const { data: events } = useQuery<OpenSchoolEvent[]>({
-    queryKey: ['open-school-events'],
-    queryFn: async () => {
-      const { data } = await admissionsApi.getOpenSchoolEvents();
-      return data;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  const nextEvent = events?.find((e) => e.is_active) ?? events?.[0];
   const hasVideo = settings.video_url.trim() !== '';
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const heroVideo = !reducedMotion && (settings.hero_video_url ?? '').trim() ? settings.hero_video_url : '';
 
   return (
     // Motion provider lives HERE (not in the shared layout) so the framer
@@ -262,6 +240,20 @@ export default function HomePage() {
           className="absolute inset-0 h-full w-full object-cover object-center"
           onError={hideOnError}
         />
+        {heroVideo && (
+          // BACKLOG P2-1: silent looping video on ≥ md; the poster image stays as LCP/fallback.
+          <video
+            className="absolute inset-0 hidden h-full w-full object-cover object-center md:block"
+            src={heroVideo}
+            poster="/assets/court-wide.webp"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{
@@ -417,7 +409,7 @@ export default function HomePage() {
                 </div>
                 <div className="px-5 py-[18px]">
                   <p className="text-sm leading-relaxed text-muted">{l.desc}</p>
-                  <Link to="/admisiones" className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold focus-visible:ring-2 focus-visible:ring-offset-2 rounded" style={{ color: l.accent }}>Ver admisiones <ArrowRight size={14} /></Link>
+                  <Link to={`/niveles/${l.slug}`} className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2 rounded">Conocer {l.name} <ArrowRight size={14} style={{ color: l.accent }} /></Link>
                 </div>
               </div>
             </m.div>
@@ -542,45 +534,6 @@ export default function HomePage() {
         </m.div>
       </Section>
 
-      {/* ── EVENT BANNER (Próxima Puertas Abiertas) ── */}
-      <Section bg="cream">
-        <m.div variants={sectionReveal} initial="hidden" whileInView="show" viewport={VIEWPORT}>
-          <div className="grid grid-cols-1 overflow-hidden rounded-xl3 shadow-[0_24px_48px_-20px_rgba(16,12,40,0.35)] lg:grid-cols-2">
-            <div className="relative min-h-[220px] lg:min-h-[240px]">
-              <img src="/assets/facade-sign.webp" alt="Puertas Abiertas Colegio Interlaken" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full max-w-full object-cover" onError={hideOnError} />
-            </div>
-            <div className="flex flex-col justify-center px-6 py-10 text-white sm:px-10 sm:py-11" style={{ background: 'linear-gradient(135deg, var(--green) 0%, var(--purple) 100%)' }}>
-              <span className="inline-flex items-center gap-[7px] self-start rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[1px]">
-                <Sparkles size={13} /> Próximo Evento
-              </span>
-              <h2 className="mt-4 font-head font-extrabold text-fluid-3xl leading-tight tracking-[-0.02em]">
-                {nextEvent?.title ?? 'Puertas Abiertas Interlaken'}
-              </h2>
-              {nextEvent ? (
-                <div className="mt-[18px] flex flex-wrap gap-[18px]">
-                  <span className="inline-flex items-center gap-2 text-[15px] font-semibold">
-                    <CalendarDays size={17} />
-                    {formatEventDate(nextEvent.date)}
-                  </span>
-                  {nextEvent.location && (
-                    <span className="inline-flex items-center gap-2 text-[15px] font-semibold">
-                      <MapPin size={17} /> {nextEvent.location}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <p className="mt-4 max-w-[440px] text-[15px] leading-relaxed opacity-90">
-                  Ven a conocer nuestras instalaciones, nuestro modelo educativo y a la comunidad Interlaken. Consulta las próximas fechas.
-                </p>
-              )}
-              <Link to="/puertas-abiertas" className="btn btn-lg mt-6 self-start bg-white text-purple focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">
-                Reserve su lugar <ArrowRight size={17} />
-              </Link>
-            </div>
-          </div>
-        </m.div>
-      </Section>
-
       {/* ── VIDEO INSTITUCIONAL — only when the school configured a URL ── */}
       {hasVideo && (
         <Section bg="white">
@@ -596,6 +549,11 @@ export default function HomePage() {
           </m.div>
         </Section>
       )}
+
+      {/* ── TESTIMONIOS (BACKLOG P2-15) ── */}
+      <Section bg="cream">
+        <Testimonials />
+      </Section>
 
       {/* ── GALLERY ── */}
       <Section bg="dark">
@@ -630,7 +588,7 @@ export default function HomePage() {
         <p className="mx-auto mt-3 max-w-[560px] text-[17px] opacity-90">Agende una visita o inicie su pre-registro en línea en solo unos minutos.</p>
         <div className="mt-7 flex flex-wrap justify-center gap-3.5">
           <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Inicie su pre-registro <ArrowRight size={17} /></Link>
-          <Link to="/puertas-abiertas" className="btn-ghost btn-lg focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Puertas Abiertas</Link>
+          <Link to="/agendar-visita" className="btn-ghost btn-lg focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Agendar visita</Link>
         </div>
       </Section>
     </div>

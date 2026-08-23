@@ -18,12 +18,17 @@ export interface User {
   full_name: string;
   role: 'admin' | 'parent' | 'student' | 'staff';
   avatar: string;
+  has_custom_avatar?: boolean;
   whatsapp: string;
   has_usable_password?: boolean;
+  last_login?: string | null;
   notif_prefs?: {
     email_enabled: boolean;
     in_app_enabled: boolean;
     push_enabled: boolean;
+    cat_cafeteria?: boolean;
+    cat_payment?: boolean;
+    cat_info?: boolean;
   };
 }
 

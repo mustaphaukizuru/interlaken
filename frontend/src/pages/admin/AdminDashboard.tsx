@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Users, ClipboardList, FileCheck2, CreditCard, Receipt, RefreshCw, UserPlus, ArrowRight, Bell } from 'lucide-react';
+import { Users, ClipboardList, CreditCard, RefreshCw, UserPlus, ArrowRight, Bell, Coffee, AlertTriangle, CalendarClock, Inbox, KeyRound, Activity } from 'lucide-react';
+import { formatMXN } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -33,16 +34,19 @@ export default function AdminDashboard() {
         {isError ? (
           <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
         ) : (
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 sm:gap-[18px]">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:gap-[18px]">
             {isLoading ? (
-              [0, 1, 2, 3, 4].map(i => <div key={i} className="skeleton h-[148px]" />)
+              [0, 1, 2, 3, 4, 5, 6, 7].map(i => <div key={i} className="skeleton h-[148px]" />)
             ) : (
               [
-                <StatCard key="a" title="Total Alumnos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
-                <StatCard key="b" title="Pre-registros Pendientes" value={data?.pending_preregistrations ?? 0} icon={ClipboardList} color="pink" />,
-                <StatCard key="c" title="Inscripciones Pendientes" value={data?.pending_registrations ?? 0} icon={FileCheck2} color="coral" />,
-                <StatCard key="d" title="Ingresos del Mes" value={`$${parseFloat(data?.total_revenue ?? '0').toLocaleString('es-MX')}`} suffix="MXN" icon={CreditCard} color="green" />,
-                <StatCard key="e" title="Pagos Pendientes" value={data?.pending_payments ?? 0} icon={Receipt} color="amber" />,
+                <StatCard key="a" title="Alumnos activos" value={data?.total_students ?? 0} icon={Users} color="purple" />,
+                <StatCard key="b" title="Saldo total cafetería" value={formatMXN(data?.cafeteria_total_balance ?? 0)} icon={Coffee} color="green" />,
+                <StatCard key="c" title="Saldos bajos" value={data?.low_balance_count ?? 0} icon={AlertTriangle} color="amber" subtitle="alumnos bajo su umbral" />,
+                <StatCard key="d" title="Recargas por aplicar" value={data?.pending_topups ?? 0} icon={Coffee} color="coral" subtitle="pagos en caja" />,
+                <StatCard key="e" title="Cobrado este mes" value={formatMXN(data?.total_revenue ?? 0)} icon={CreditCard} color="green" subtitle="recargas en línea" />,
+                <StatCard key="f" title="Admisiones en cola" value={(data?.pending_preregistrations ?? 0) + (data?.pending_registrations ?? 0)} icon={ClipboardList} color="pink" subtitle={`${data?.pending_preregistrations ?? 0} pre-registros · ${data?.pending_registrations ?? 0} inscripciones`} />,
+                <StatCard key="g" title="Visitas hoy" value={data?.visits_today ?? 0} icon={CalendarClock} color="purple" />,
+                <StatCard key="h" title="Por atender" value={(data?.unhandled_messages ?? 0) + (data?.open_password_requests ?? 0)} icon={Inbox} color="amber" subtitle={`${data?.unhandled_messages ?? 0} mensajes · ${data?.open_password_requests ?? 0} contraseñas`} />,
               ].map((card, i) => (
                 <Reveal key={i} delay={i * 70}>{card}</Reveal>
               ))
@@ -56,6 +60,7 @@ export default function AdminDashboard() {
           <Link to="/admin/admisiones" className="btn-pink"><UserPlus size={16} /> Nueva Admisión</Link>
           <Link to="/admin/alumnos" className="btn-outline"><Users size={16} /> Ver Alumnos</Link>
           <Link to="/admin/comunicados" className="btn-outline"><Bell size={16} /> Comunicados</Link>
+          <Link to="/admin/contrasenas" className="btn-outline"><KeyRound size={16} /> Contraseñas</Link>
         </div>
 
         {/* Analytics — reuses the staff chart suite (real data-viz on the landing) */}
@@ -71,6 +76,26 @@ export default function AdminDashboard() {
               <ChartsSection data={analytics} />
             </Suspense>
           </div>
+        )}
+
+        {/* Large screens (P1-B10): activity and avisos side by side at 2xl */}
+        <div className="grid gap-6 2xl:grid-cols-2">
+        {/* Recent activity (audit trail) */}
+        {!isError && data?.recent_activity && data.recent_activity.length > 0 && (
+          <Reveal delay={40} className="card mb-6 2xl:mb-0">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 font-head text-[15px] font-bold text-ink"><Activity size={16} className="text-purple" aria-hidden="true" /> Actividad reciente</h2>
+              <Link to="/admin/auditoria" className="flex items-center gap-1 text-[12.5px] font-semibold text-purple">Auditoría <ArrowRight size={13} /></Link>
+            </div>
+            <ul className="divide-y divide-cream text-sm">
+              {data.recent_activity.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2">
+                  <span className="min-w-0 truncate text-ink"><span className="font-semibold">{a.actor}</span> · {a.action} · {a.object_type.split('.').pop()} #{a.object_id}{a.context ? <span className="text-subtle"> · {a.context}</span> : null}</span>
+                  <span className="text-xs text-subtle">{new Date(a.when).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
         )}
 
         {/* Recent announcements — admin-table stacks to cards on small screens */}
@@ -122,6 +147,7 @@ export default function AdminDashboard() {
           )}
         </Reveal>
         )}
+        </div>
     </>
   );
 }

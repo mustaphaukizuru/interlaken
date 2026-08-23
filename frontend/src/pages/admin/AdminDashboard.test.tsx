@@ -31,6 +31,12 @@ const DASHBOARD = {
   pending_registrations: 2,
   pending_payments: 7,
   total_revenue: '15000.00',
+  cafeteria_total_balance: '3200.50',
+  low_balance_count: 3,
+  pending_topups: 1,
+  visits_today: 5,
+  unhandled_messages: 2,
+  open_password_requests: 0,
   announcements: [] as Array<{
     id: number;
     title: string;
@@ -50,18 +56,19 @@ describe('AdminDashboard', () => {
 
     renderWithProviders(<AdminDashboard />, { route: '/admin' });
 
-    expect(await screen.findByText('Total Alumnos')).toBeInTheDocument();
-    expect(screen.getByText('Pre-registros Pendientes')).toBeInTheDocument();
-    expect(screen.getByText('Inscripciones Pendientes')).toBeInTheDocument();
-    expect(screen.getByText('Ingresos del Mes')).toBeInTheDocument();
-    expect(screen.getByText('Pagos Pendientes')).toBeInTheDocument();
+    // KPIs re-cut for the cafetería-only money path (BACKLOG P1-H5)
+    expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
+    expect(screen.getByText('Saldo total cafetería')).toBeInTheDocument();
+    expect(screen.getByText('Admisiones en cola')).toBeInTheDocument();
+    expect(screen.getByText('Cobrado este mes')).toBeInTheDocument();
+    expect(screen.getByText('Visitas hoy')).toBeInTheDocument();
+    expect(screen.getByText('4 pre-registros · 2 inscripciones')).toBeInTheDocument();
 
     await waitFor(
       () => {
         expect(screen.getByText('120')).toBeInTheDocument();
-        expect(screen.getByText('4')).toBeInTheDocument();
-        expect(screen.getByText('2')).toBeInTheDocument();
-        expect(screen.getByText('7')).toBeInTheDocument();
+        expect(screen.getByText('6')).toBeInTheDocument();
+        expect(screen.getByText('5')).toBeInTheDocument();
       },
       { timeout: 2000 },
     );
@@ -87,6 +94,6 @@ describe('AdminDashboard', () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
     await userEvent.click(screen.getByRole('button', { name: /Reintentar/i }));
 
-    expect(await screen.findByText('Total Alumnos')).toBeInTheDocument();
+    expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
   });
 });

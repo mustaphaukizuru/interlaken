@@ -33,7 +33,7 @@ class PreRegistrationSerializer(serializers.ModelSerializer):
             'id', 'child_first_name', 'child_last_name', 'child_dob',
             'level', 'grade_applying', 'cycle',
             'parent_name', 'parent_email', 'parent_phone', 'relationship',
-            'referral_source', 'message', 'created_at',
+            'referral_source', 'message', 'wants_visit', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -54,6 +54,16 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
     phone            = serializers.CharField(max_length=20)
     how_did_you_hear = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     message          = serializers.CharField(required=False, allow_blank=True, default='')
+    wants_visit      = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        # Age rule (BACKLOG P1-G1): strict on the public form.
+        from .eligibility import eligibility_error
+
+        err = eligibility_error(attrs.get('child_dob'), attrs.get('grade_applying', ''))
+        if err:
+            raise serializers.ValidationError({'grade_applying': err})
+        return attrs
 
     _LEVEL_KEYWORDS = (
         ('preescolar', PreRegistration.Level.PRESCHOOL),
@@ -85,6 +95,7 @@ class PublicPreRegistrationSerializer(serializers.Serializer):
             parent_phone=validated['phone'],
             referral_source=validated.get('how_did_you_hear', ''),
             message=validated.get('message', ''),
+            wants_visit=validated.get('wants_visit', False),
         )
 
     def to_representation(self, instance):
@@ -123,7 +134,7 @@ class RegistrationDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegistrationDocument
         fields = ['id', 'doc_type', 'filename', 'file_size', 'uploaded_at',
-                  'is_verified', 'download_url']
+                  'is_verified', 'status', 'review_note', 'download_url']
         read_only_fields = ['id', 'uploaded_at', 'is_verified', 'download_url']
 
     def get_download_url(self, obj):
@@ -131,10 +142,29 @@ class RegistrationDocumentSerializer(serializers.ModelSerializer):
 
 
 class DocumentVerifySerializer(serializers.ModelSerializer):
-    """Admin write: mark an uploaded document as verified (or un-verify)."""
+    """Admin write: approve / reject (with note) or un-verify a document.
+
+    Accepts the legacy ``is_verified`` boolean or the richer ``status`` +
+    ``review_note``; both stay coherent.
+    """
     class Meta:
         model = RegistrationDocument
-        fields = ['id', 'is_verified']
+        fields = ['id', 'is_verified', 'status', 'review_note']
+        extra_kwargs = {'is_verified': {'required': False}, 'status': {'required': False},
+                        'review_note': {'required': False}}
+
+    def update(self, instance, validated):
+        status_ = validated.get('status')
+        if status_ is None and 'is_verified' in validated:
+            status_ = (RegistrationDocument.Review.APPROVED if validated['is_verified']
+                       else RegistrationDocument.Review.PENDING)
+        if status_ is not None:
+            instance.status = status_
+            instance.is_verified = status_ == RegistrationDocument.Review.APPROVED
+        if 'review_note' in validated:
+            instance.review_note = validated['review_note'][:300]
+        instance.save(update_fields=['status', 'is_verified', 'review_note'])
+        return instance
 
 
 class RegistrationAdminListSerializer(serializers.ModelSerializer):

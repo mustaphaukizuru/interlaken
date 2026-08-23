@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Users, UserPlus, Unlink, Link2, KeyRound } from 'lucide-react';
+import { Users, UserPlus, Unlink, Link2, KeyRound, Pencil } from 'lucide-react';
+import { GuardianEditModal, type GuardianEditTarget } from '@/components/admin/GuardianEditModal';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,6 +20,8 @@ interface Guardian {
   id: number;
   email: string;
   full_name: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string;
   whatsapp?: string;
   relationship?: string;
@@ -49,6 +52,7 @@ export function StudentGuardians({ studentId }: Props) {
   const [relationship, setRelationship] = useState('Padre/Madre');
   const [open, setOpen] = useState(false);
   const [toUnlink, setToUnlink] = useState<Guardian | null>(null);
+  const [toEdit, setToEdit] = useState<GuardianEditTarget | null>(null);
   // School policy: families never reset their own password (their school email
   // receives no mail), so every account listed here gets an admin reset action.
   const [toReset, setToReset] = useState<ResetPasswordTarget | null>(null);
@@ -185,9 +189,9 @@ export function StudentGuardians({ studentId }: Props) {
         >
           <Input
             label="Correo del tutor"
-            type="email"
+            type="email" inputMode="email" autoComplete="email"
             required
-            autoComplete="email"
+            
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             hint="Si no existe, se crea la cuenta (sin contraseña usable)."
@@ -247,12 +251,24 @@ export function StudentGuardians({ studentId }: Props) {
                   type="button"
                   variant="ghost"
                   size="sm"
+                  aria-label={`Editar a ${g.full_name || g.email}`}
+                  onClick={() => setToEdit(g)}
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                  Editar
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   aria-label={`Restablecer la contraseña de ${g.full_name || g.email}`}
                   onClick={() =>
                     setToReset({
                       id: g.id,
                       email: g.email,
                       label: g.is_self ? 'Cuenta familiar' : g.full_name || g.email,
+                      whatsapp: g.whatsapp || g.phone,
+                      firstName: g.first_name,
                     })
                   }
                 >
@@ -275,6 +291,8 @@ export function StudentGuardians({ studentId }: Props) {
           ))}
         </ul>
       )}
+
+      <GuardianEditModal studentId={studentId} guardian={toEdit} onClose={() => setToEdit(null)} />
 
       <ConfirmDialog
         open={!!toUnlink}

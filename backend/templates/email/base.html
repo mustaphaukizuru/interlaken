@@ -1,0 +1,43 @@
+{% autoescape on %}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#F6F4F0;font-family:Inter,Segoe UI,Arial,sans-serif;color:#1B1536;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F6F4F0;padding:24px 12px;">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #ECEAF3;">
+      <tr>
+        <td style="height:6px;background:linear-gradient(90deg,#47A028 0%,#401A8E 50%,#E01A4E 100%);font-size:0;line-height:0;">&nbsp;</td>
+      </tr>
+      <tr>
+        <td style="padding:24px 28px 8px 28px;">
+          <div style="font-family:Poppins,Inter,Arial,sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.3px;color:#401A8E;">Colegio Interlaken</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 28px 24px 28px;font-size:15px;line-height:1.6;">
+          <h1 style="margin:0 0 12px 0;font-family:Poppins,Inter,Arial,sans-serif;font-size:20px;line-height:1.3;color:#1B1536;">{{ subject }}</h1>
+          {% for paragraph in paragraphs %}<p style="margin:0 0 12px 0;white-space:pre-line;">{{ paragraph }}</p>{% endfor %}
+          {% if cta_url %}
+          <p style="margin:20px 0 8px 0;">
+            <a href="{{ cta_url }}" style="display:inline-block;background:#E01A4E;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:999px;">{{ cta_label|default:"Abrir el portal" }}</a>
+          </p>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:16px 28px 24px 28px;border-top:1px solid #ECEAF3;font-size:12px;line-height:1.6;color:#6F6A85;">
+          Colegio Interlaken · Tlalnepantla, Estado de México<br>
+          {% if contact_email %}Dudas: <a href="mailto:{{ contact_email }}" style="color:#401A8E;">{{ contact_email }}</a>{% endif %}
+          {% if portal_url %} · <a href="{{ portal_url }}" style="color:#401A8E;">Portal de Familias</a>{% endif %}<br>
+          Este mensaje se envía desde una cuenta no monitoreada.
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>{% endautoescape %}

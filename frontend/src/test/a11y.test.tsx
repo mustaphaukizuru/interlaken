@@ -1,7 +1,6 @@
 import { type ReactElement, type ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 
 // One shared api mock serves every page in this file. Query methods resolve
@@ -103,11 +102,9 @@ import { renderWithProviders } from '@/test/renderWithProviders';
  */
 describe('accessibility smoke (axe)', () => {
   it('LoginPage has no detectable a11y violations', async () => {
-    const { container } = render(
-      <MemoryRouter initialEntries={['/login']}>
-        <LoginPage />
-      </MemoryRouter>,
-    );
+    // LoginPage now reads site settings (WhatsApp/email for password help), so
+    // it needs the QueryClient the shared helper provides.
+    const { container } = renderWithProviders(<LoginPage />, { route: '/login' });
     const results = await axe(container);
     // Assert on `violations` directly so no custom-matcher type augmentation is
     // needed; a failure prints the offending nodes.

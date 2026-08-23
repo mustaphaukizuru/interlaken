@@ -2,11 +2,14 @@ from django.urls import path
 
 from . import views
 from .analytics import StaffAnalyticsView
+from .novedades import NovedadesView
 from .push import PushSubscribeView, PushUnsubscribeView
 
 urlpatterns = [
     path('dashboard/',                   views.DashboardView.as_view(),             name='dashboard'),
     path('analytics/',                   StaffAnalyticsView.as_view(),               name='staff-analytics'),
+    path('novedades/',                   NovedadesView.as_view(),                    name='novedades'),
+    path('avisos/',                      views.SiteNoticesView.as_view(),            name='site-notices'),
     path('announcements/',               views.AnnouncementListView.as_view(),       name='announcements'),
     path('announcements/mark-read/',     views.AnnouncementMarkReadView.as_view(),   name='announcements-mark-read'),
     path('announcements/<int:pk>/',      views.AnnouncementDetailView.as_view(),     name='announcement-detail'),
@@ -14,6 +17,7 @@ urlpatterns = [
     path('admin/announcements/',         views.AnnouncementAdminListCreateView.as_view(), name='admin-announcements'),
     path('admin/announcements/recipient-count/', views.AnnouncementRecipientCountView.as_view(), name='admin-announcement-recipient-count'),
     path('admin/announcements/<int:pk>/', views.AnnouncementAdminDetailView.as_view(),   name='admin-announcement-detail'),
+    path('admin/announcements/<int:pk>/delivery/', views.AnnouncementDeliveryView.as_view(), name='admin-announcement-delivery'),
     path('admin/broadcast/',             views.EmergencyBroadcastView.as_view(),         name='admin-broadcast'),
     path('notifications/',               views.NotificationListView.as_view(),       name='notifications'),
     path('notifications/mark-all-read/', views.NotificationMarkAllReadView.as_view(), name='notifications-mark-all-read'),

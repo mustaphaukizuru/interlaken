@@ -167,20 +167,21 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      # Functional suite is BLOCKING. Visual specs run separately below: baselines
-      # are per-platform and only win32 is committed, so on linux the visual step
-      # GENERATES baselines (uploaded as an artifact — commit them to enable strict
-      # CI visual diffs, see frontend/e2e/README.md) without failing the job.
+      # Functional suite is BLOCKING. Visual regression (BACKLOG P5-3) needs
+      # linux baselines that match the current UI; until the refreshed
+      # `*-linux.png` files from the artifact below are committed, the visual
+      # step regenerates them and only warns. Flip it to `npm run test:e2e`
+      # (no grep, no update) once they are in the repo.
       - name: Run E2E (Playwright boots both dev servers)
         working-directory: frontend
         run: npm run test:e2e -- --grep-invert "Visual baselines"
 
-      - name: Generate visual baselines (advisory until linux baselines are committed)
+      - name: Visual baselines (advisory until linux PNGs are committed)
         working-directory: frontend
         continue-on-error: true
         run: npm run test:e2e -- --grep "Visual baselines" --update-snapshots
 
-      - name: Upload visual baselines (linux — commit these to enable CI visual diffs)
+      - name: Upload linux visual baselines (commit these to make the visual step blocking)
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -194,6 +195,36 @@ jobs:
         with:
           name: playwright-report
           path: frontend/playwright-report/
+          retention-days: 7
+
+  lighthouse:
+    # Performance / a11y / SEO budgets on the built SPA (BACKLOG P5-3). The
+    # preview has no API behind it, so pages render their empty/fallback
+    # states; budgets target the shell, fonts, scripts and layout stability,
+    # which is what a deploy can regress. Thresholds: frontend/lighthouserc.json.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Lighthouse CI (budgets in lighthouserc.json)
+        working-directory: frontend
+        run: npx --yes @lhci/cli@0.14.x autorun
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-reports
+          path: frontend/.lighthouseci/
           retention-days: 7
 
   docker:

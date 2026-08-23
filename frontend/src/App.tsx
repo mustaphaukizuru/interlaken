@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'react-hot-toast';
+import { ToastHost } from '@/components/ui/ToastHost';
 
 import { bootstrapSession } from './services/api';
 import { useAuthStore } from './store/authStore';
@@ -30,7 +30,6 @@ const DocumentacionPage = lazy(() => import('./pages/public/DocumentacionPage'))
 const CostosPage      = lazy(() => import('./pages/public/CostosPage'));
 const PreRegisterPage = lazy(() => import('./pages/public/PreRegisterPage'));
 const RegisterPage    = lazy(() => import('./pages/public/RegisterPage'));
-const OpenSchoolPage  = lazy(() => import('./pages/public/OpenSchoolPage'));
 const BookVisitPage   = lazy(() => import('./pages/public/BookVisitPage'));
 const ContactPage     = lazy(() => import('./pages/public/ContactPage'));
 const AvisoPrivacidadPage = lazy(() => import('./pages/public/AvisoPrivacidadPage'));
@@ -43,8 +42,6 @@ const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
-const ResetPasswordPage  = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
 
 // Parent portal
@@ -56,6 +53,7 @@ const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
 const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
 const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
 const InscripcionesPage = lazy(() => import('./pages/parent/InscripcionesPage'));
+const NotificationsPage = lazy(() => import('./pages/parent/NotificationsPage'));
 const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
 const PrivacyPage = lazy(() => import('./pages/parent/PrivacyPage'));
 
@@ -73,6 +71,25 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
+import { CmsOverride } from './cms/CmsOverride';
+const CmsPage = lazy(() => import('./cms/CmsPage'));
+const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
+const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
+const AdminGuardianMerge = lazy(() => import('./pages/admin/AdminGuardianMerge'));
+const AdminSchoolYear = lazy(() => import('./pages/admin/AdminSchoolYear'));
+const AdminNavigation = lazy(() => import('./pages/admin/AdminNavigation'));
+const AdminForms = lazy(() => import('./pages/admin/AdminForms'));
+const AdminPages = lazy(() => import('./pages/admin/AdminPages'));
+const AdminPageEditor = lazy(() => import('./pages/admin/AdminPageEditor'));
+const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
+const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
+const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
+const DocumentsUploadPage = lazy(() => import('./pages/public/DocumentsUploadPage'));
+const AdminStaffUsers = lazy(() => import('./pages/admin/AdminStaffUsers'));
+const AdminContactInbox = lazy(() => import('./pages/admin/AdminContactInbox'));
+const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
+const AdminPasswordRequests = lazy(() => import('./pages/admin/AdminPasswordRequests'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,49 +122,42 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            // Errors linger longer and are announced immediately by screen readers.
-            error: {
-              duration: 6000,
-              ariaProps: { role: 'alert', 'aria-live': 'assertive' },
-            },
-          }}
-        />
+        <ToastHost />
         <AnalyticsListener />
         <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* ── PUBLIC SITE ─────────────────────────────── */}
             <Route element={<PublicLayout />}>
-              <Route path="/"              element={<HomePage />} />
-              <Route path="/nosotros"      element={<AboutPage />} />
-              <Route path="/admisiones"    element={<AdmissionsPage />} />
-              <Route path="/admisiones/documentacion" element={<DocumentacionPage />} />
-              <Route path="/admisiones/costos" element={<CostosPage />} />
+              <Route path="/" element={<CmsOverride slug="inicio"><HomePage /></CmsOverride>} />
+              <Route path="/nosotros" element={<CmsOverride slug="nosotros"><AboutPage /></CmsOverride>} />
+              <Route path="/admisiones" element={<CmsOverride slug="admisiones"><AdmissionsPage /></CmsOverride>} />
+              <Route path="/admisiones/documentacion" element={<CmsOverride slug="documentacion"><DocumentacionPage /></CmsOverride>} />
+              <Route path="/admisiones/costos" element={<CmsOverride slug="costos"><CostosPage /></CmsOverride>} />
               <Route path="/pre-registro"  element={<PreRegisterPage />} />
               <Route path="/inscripcion"   element={<RegisterPage />} />
-              <Route path="/puertas-abiertas" element={<OpenSchoolPage />} />
+              <Route path="/inscripcion/documentos" element={<DocumentsUploadPage />} />
+              {/* Puertas Abiertas is admin-only now (bookings console); public URL redirects. */}
+              <Route path="/puertas-abiertas" element={<Navigate to="/agendar-visita" replace />} />
               <Route path="/agendar-visita" element={<BookVisitPage />} />
-              <Route path="/contacto"      element={<ContactPage />} />
+              <Route path="/contacto" element={<CmsOverride slug="contacto"><ContactPage /></CmsOverride>} />
               <Route path="/aviso-de-privacidad" element={<AvisoPrivacidadPage />} />
               {/* IA confirmada por el cliente (menú 2026-07) */}
-              <Route path="/modelo-educativo" element={<ModeloEducativoPage />} />
-              <Route path="/galeria"          element={<GaleriaPage />} />
+              <Route path="/modelo-educativo" element={<CmsOverride slug="modelo-educativo"><ModeloEducativoPage /></CmsOverride>} />
+              <Route path="/galeria" element={<CmsOverride slug="galeria"><GaleriaPage /></CmsOverride>} />
               <Route path="/niveles/:nivel"   element={<NivelPage />} />
-              <Route path="/comunidad/plataformas" element={<PlataformasPage />} />
+              <Route path="/comunidad/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
+              <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="p/:slug" element={<CmsPage />} />
+              <Route path="*" element={<CmsOrNotFound />} />
             </Route>
 
             {/* ── AUTH ────────────────────────────────────── */}
             {/* Google OAuth returns to /login?login=ok — /auth/* is reserved for
                 the backend (Vite proxy + SPA catch-all both send it to Django). */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/olvide-contrasena" element={<ForgotPasswordPage />} />
-            <Route path="/restablecer-contrasena" element={<ResetPasswordPage />} />
             {/* Mock hosted-payment page — DEV only. It's a neutral bank-styled
                 page with an attacker-controllable amount/return_url, so mounting
                 it in production would be an open-redirect + phishing surface; in
@@ -171,6 +181,7 @@ export default function App() {
               <Route path="comunicados" element={<ComunicadosPage />} />
               <Route path="comunicados/:id" element={<ComunicadoDetailPage />} />
               <Route path="perfil"    element={<ProfilePage />} />
+              <Route path="notificaciones" element={<NotificationsPage />} />
               <Route path="privacidad" element={<PrivacyPage />} />
             </Route>
 
@@ -184,6 +195,9 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<StaffDashboard />} />
+              <Route path="contenido" element={<AdminPages />} />
+              <Route path="contenido/medios" element={<AdminMedia />} />
+              <Route path="contenido/:id" element={<AdminPageEditor />} />
             </Route>
 
             {/* ── ADMIN PORTAL ────────────────────────────── */}
@@ -202,6 +216,20 @@ export default function App() {
               <Route path="comunicados" element={<AdminAnnouncements />} />
               <Route path="ajustes"     element={<AdminSettings />} />
               <Route path="auditoria"   element={<AdminAudit />} />
+              <Route path="contrasenas" element={<AdminPasswordRequests />} />
+              <Route path="pagos"       element={<AdminPayments />} />
+              <Route path="mensajes"    element={<AdminContactInbox />} />
+              <Route path="usuarios"    element={<AdminStaffUsers />} />
+              <Route path="calendario"  element={<AdminCalendar />} />
+              <Route path="testimonios" element={<AdminTestimonials />} />
+              <Route path="contenido" element={<AdminPages />} />
+              <Route path="formularios" element={<AdminForms />} />
+              <Route path="navegacion" element={<AdminNavigation />} />
+              <Route path="nuevo-ciclo" element={<AdminSchoolYear />} />
+              <Route path="fusionar-cuentas" element={<AdminGuardianMerge />} />
+              <Route path="arco" element={<AdminArco />} />
+              <Route path="contenido/medios" element={<AdminMedia />} />
+              <Route path="contenido/:id" element={<AdminPageEditor />} />
             </Route>
 
           </Routes>

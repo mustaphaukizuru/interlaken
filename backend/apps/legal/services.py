@@ -73,7 +73,6 @@ def export_household_data(user) -> dict:
     """
     from apps.bookings.models import Booking
     from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
-    from apps.finance.models import Invoice
     from apps.payments.models import Payment
 
     from .models import ArcoRequest
@@ -122,10 +121,6 @@ def export_household_data(user) -> dict:
                 {'type': t.transaction_type, 'amount': str(t.amount),
                  'date': _iso(t.date), 'description': t.description}
                 for t in CafeteriaTransaction.objects.filter(student=child)
-            ],
-            'invoices': [
-                {'period': i.period, 'amount': str(i.amount), 'status': i.status}
-                for i in Invoice.objects.filter(student=child)
             ],
         })
 

@@ -14,6 +14,14 @@ class AnnouncementAdmin(ModelAdmin):
     list_select_related = ('created_by',)
     readonly_fields = ('created_at', 'updated_at')
 
+    # Comunicados are authored and dispatched (email/WhatsApp/push) from the
+    # portal (/admin/comunicados); creating one here would skip delivery.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(AnnouncementComment)
 class AnnouncementCommentAdmin(ModelAdmin):

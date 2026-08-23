@@ -8,11 +8,14 @@ vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock('@/hooks/useSiteSettings', () => ({
+  useSiteSettings: () => ({ whatsapp_number: '5215553791188', contact_email: 'info@interlaken.com.mx' }),
+}));
+
 vi.mock('@/services/api', () => ({
   authApi: {
     updateMe: vi.fn(),
     updateNotifPrefs: vi.fn(),
-    setPassword: vi.fn(),
     me: vi.fn(),
   },
 }));

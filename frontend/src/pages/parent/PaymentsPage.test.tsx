@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({
-  paymentsApi: { getMyPayments: vi.fn() },
+  paymentsApi: { getMyPayments: vi.fn(), getSummary: vi.fn(async () => ({ data: null })), exportMyPayments: vi.fn() },
+  downloadBlob: vi.fn(),
 }));
 
 import PaymentsPage from './PaymentsPage';
@@ -54,14 +55,15 @@ describe('PaymentsPage states', () => {
     // 'success', so paid rows fell through to the 'pending' default.
     mockedPayments.mockResolvedValue({
       data: { results: [{
-        id: 1, status: 'success', payment_type: 'tuition',
+        id: 1, status: 'success', payment_type: 'cafeteria',
         amount: '1500.00', currency: 'MXN', created_at: '2026-07-10T12:00:00Z',
       }] },
     } as never);
 
     renderPage();
 
-    expect(await screen.findByText('Completado')).toBeInTheDocument();
-    expect(screen.queryByText('Pendiente')).toBeNull();
+    // The status filter <select> also lists every label; assert on the badge only.
+    expect(await screen.findByText('Completado', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByText('Pendiente', { selector: 'span' })).toBeNull();
   });
 });
