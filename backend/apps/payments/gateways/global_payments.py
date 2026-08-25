@@ -33,7 +33,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 
-from .base import BaseGateway, CheckoutSession, LiveCheckoutNotConfigured
+from .base import BaseGateway, CheckoutSession, LiveCheckoutNotConfigured, resolve_checkout_base
 
 logger = logging.getLogger(__name__)
 
@@ -47,21 +47,8 @@ _DEFAULT_API_VERSION = '2021-03-22'
 
 def _checkout_base() -> str:
     """Resolve the HPP base URL, honouring PAYMENTS_LIVE sandbox forcing."""
-    configured = (getattr(settings, 'GLOBAL_PAYMENTS_HPP_URL', '') or '').strip()
-    live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
-    local_mock = f'{settings.FRONTEND_URL.rstrip("/")}/pago/simulado'
-    if live:
-        if not configured or 'simulado' in configured.lower():
-            raise LiveCheckoutNotConfigured(
-                'PAYMENTS_LIVE=true requiere GLOBAL_PAYMENTS_HPP_URL '
-                '(HPP real del comercio). No se usará /pago/simulado.')
-        return configured
-    # Sandbox mode: never hit a live merchant URL.
-    if not configured:
-        return local_mock
-    if 'sandbox' in configured.lower() or 'simulado' in configured.lower():
-        return configured
-    return _DEFAULT_HPP_URL
+    return resolve_checkout_base(
+        'GLOBAL_PAYMENTS_HPP_URL', _DEFAULT_HPP_URL, 'HPP real del comercio')
 
 
 def _credentials_ready() -> bool:

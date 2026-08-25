@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.payments.models import Payment
 
@@ -256,19 +257,13 @@ class AnnouncementCommentListCreateView(generics.ListCreateAPIView):
         serializer.save(announcement=self._announcement(), author=self.request.user)
 
 
-class _IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        u = request.user
-        return bool(u and u.is_authenticated and getattr(u, 'role', '') == User.Role.ADMIN)
-
-
 class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
     """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive).
     POST — compose a new audience-targeted comunicado (author = current admin)."""
     queryset = (Announcement.objects.select_related('created_by')
                 .annotate(read_count_ann=Count('reads'), ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
     serializer_class = AnnouncementAdminSerializer
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def perform_create(self, serializer):
         announcement = serializer.save(created_by=self.request.user)
@@ -289,7 +284,7 @@ class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = (Announcement.objects.select_related('created_by')
                 .annotate(read_count_ann=Count('reads'), ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
     serializer_class = AnnouncementAdminSerializer
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
     http_method_names = ['get', 'patch', 'delete']
 
     def perform_update(self, serializer):
@@ -404,7 +399,7 @@ class AnnouncementRecipientCountView(APIView):
     would notify. Reuses the exact role mapping the fan-out uses
     (``_audience_roles``) so the number matches what publish will do.
     """
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         audience = (request.query_params.get('audience')
@@ -425,7 +420,7 @@ class EmergencyBroadcastView(APIView):
     optionally WhatsApp-blasts numbers on file (capped). Remaining email/push
     is finished by the ``dispatch_notifications`` cron.
     """
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def post(self, request):
         title = request.data.get('title')
@@ -453,7 +448,7 @@ class AnnouncementDeliveryView(APIView):
     BACKLOG P1-C6: shows admins how many recipients got the comunicado by
     in-app/email/push, who failed, and lets them retry after fixing SMTP.
     """
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def _qs(self, pk):
         announcement = get_object_or_404(Announcement, pk=pk)

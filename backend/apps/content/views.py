@@ -10,23 +10,19 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsAdmin
+
 from .models import SETTINGS_CACHE_KEY, SiteSettings
 from .serializers import AdminSiteSettingsSerializer, SiteSettingsSerializer
 
 CACHE_TTL_SECONDS = 300
 
 
-class _IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        u = request.user
-        return bool(u and u.is_authenticated and getattr(u, 'role', '') == 'admin')
-
-
 class AdminSiteSettingsView(APIView):
     """GET/PATCH /api/v1/content/admin/settings/ — edit the public site settings
     (contact info, WhatsApp, socials) shown on the marketing site. A save
     invalidates the public read cache (SiteSettings.save)."""
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         return Response(AdminSiteSettingsSerializer(SiteSettings.load()).data)
@@ -138,7 +134,7 @@ class PublicCalendarView(APIView):
 
 class AdminCalendarView(generics.ListCreateAPIView):
     """GET/POST /api/v1/content/admin/calendar/ (admin)."""
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import SchoolEventSerializer
@@ -151,7 +147,7 @@ class AdminCalendarView(generics.ListCreateAPIView):
 
 class AdminCalendarDetailView(generics.RetrieveUpdateDestroyAPIView):
     """PATCH/DELETE /api/v1/content/admin/calendar/<pk>/ (admin)."""
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import SchoolEventSerializer
@@ -178,7 +174,7 @@ class PublicTestimonialsView(APIView):
 
 
 class AdminTestimonialsView(generics.ListCreateAPIView):
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import TestimonialSerializer
@@ -194,7 +190,7 @@ class AdminTestimonialsView(generics.ListCreateAPIView):
 
 
 class AdminTestimonialDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import TestimonialSerializer

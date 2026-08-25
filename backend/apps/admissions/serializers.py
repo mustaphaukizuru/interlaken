@@ -26,6 +26,12 @@ def current_school_cycle() -> str:
     return f'{year}-{year + 1}'
 
 
+def child_full_name(obj) -> str:
+    """The applicant's display name. Three serializers here (and one view) each
+    inlined this join; a change to name formatting has to land in one place."""
+    return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+
+
 class PreRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = PreRegistration
@@ -116,7 +122,7 @@ class PreRegistrationAdminSerializer(serializers.ModelSerializer):
         ]
 
     def get_child_name(self, obj):
-        return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+        return child_full_name(obj)
 
 
 class PreRegistrationStatusSerializer(serializers.ModelSerializer):
@@ -186,7 +192,7 @@ class RegistrationAdminListSerializer(serializers.ModelSerializer):
         ]
 
     def get_child_name(self, obj):
-        return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+        return child_full_name(obj)
 
     def get_doc_count(self, obj):
         # len() over the prefetched list; .count() issued a fresh COUNT per row.
@@ -219,7 +225,7 @@ class RegistrationParentStatusSerializer(serializers.ModelSerializer):
         ]
 
     def get_child_name(self, obj):
-        return f'{obj.child_first_name} {obj.child_last_name}'.strip()
+        return child_full_name(obj)
 
 
 MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes', 'estatura', 'peso')

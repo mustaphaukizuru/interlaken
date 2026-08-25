@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.permissions import IsAdmin
 
 from .models import NOTICE_CACHE_KEY, ArcoRequest, PrivacyNoticeVersion
 from .serializers import (
@@ -19,12 +20,6 @@ from .serializers import (
     PrivacyNoticeSerializer,
 )
 from .services import consent_state, export_household_data, needs_acceptance, record_consent
-
-
-class IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
 
 
 class CurrentNoticeView(APIView):
@@ -166,7 +161,6 @@ class AdminArcoIntakeView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request):
-        from apps.accounts.models import User
         ser = ArcoIntakeSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data

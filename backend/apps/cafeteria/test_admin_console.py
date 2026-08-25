@@ -489,7 +489,7 @@ class TestLowBalanceReport:
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(reverse("admin-low-balance"))
         assert resp.status_code == 200
-        ids = {row["student"]["id"] for row in resp.data}
+        ids = {row["student"]["id"] for row in resp.data["results"]}
         assert low.id in ids and ok.id not in ids
 
     def test_low_balance_is_admin_only(self, api_client):

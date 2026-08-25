@@ -49,6 +49,9 @@ def _slot_start(slot):
     return timezone.make_aware(datetime.combine(slot.date, slot.start_time))
 
 
+AVAILABILITY_HORIZON_DAYS = 120
+
+
 def _open_slots_qs(params):
     """Filter active, non-past slots by optional ?type=&from=&to=."""
     today = timezone.localdate()  # school-local day, not the UTC calendar date
@@ -65,6 +68,10 @@ def _open_slots_qs(params):
     date_to = params.get('to')
     if date_to:
         qs = qs.filter(date__lte=date_to)
+    else:
+        # Without an upper bound this public endpoint returned every slot the
+        # generator ever created. Nobody books a visit a year out.
+        qs = qs.filter(date__lte=today + timedelta(days=AVAILABILITY_HORIZON_DAYS))
 
     # One grouped aggregate for booked_count/is_full instead of 3 per slot.
     return AvailabilitySlot.annotate_booked(qs.order_by('date', 'start_time'))

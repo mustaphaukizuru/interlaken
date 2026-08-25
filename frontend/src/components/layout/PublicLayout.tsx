@@ -16,6 +16,7 @@ import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { SiteNoticeBanner } from '@/components/public/SiteNoticeBanner';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 /** Routes where the sticky "Agendar visita" bar would fight an in-page CTA. */
 const HIDE_STICKY_CTA = [
@@ -84,6 +85,10 @@ const DEFAULT_MENU: MenuGroupEntry[] = [
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
 function NavDropdown({ label, items }: { label: string; items: { label: string; to: string; icon: LucideIcon }[] }) {
   const [open, setOpen] = useState(false);
+  // Hover-to-open only where hovering exists. On a touch screen the synthetic
+  // mouseenter fires just before the click, so the tap opened and then
+  // immediately closed the panel.
+  const hoverCapable = useMediaQuery('(hover: hover) and (pointer: fine)');
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -110,8 +115,8 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
     <div
       ref={ref}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={hoverCapable ? () => setOpen(true) : undefined}
+      onMouseLeave={hoverCapable ? () => setOpen(false) : undefined}
     >
       <button
         ref={btnRef}

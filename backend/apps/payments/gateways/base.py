@@ -173,3 +173,29 @@ class BaseGateway:
             transaction_id=transaction_id,
             raw=payload,
         )
+
+
+def resolve_checkout_base(setting_name: str, default_sandbox_url: str, label: str) -> str:
+    """Resolve a gateway's checkout base URL, honouring ``PAYMENTS_LIVE``.
+
+    Both gateways had a byte-identical copy of this live/sandbox guard. It is the
+    rule that keeps sandbox traffic off a real merchant URL (and refuses to run
+    live against ``/pago/simulado``), so it lives in exactly one place.
+    """
+    from django.conf import settings
+
+    configured = (getattr(settings, setting_name, '') or '').strip()
+    live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
+    local_mock = f'{settings.FRONTEND_URL.rstrip("/")}/pago/simulado'
+    if live:
+        if not configured or 'simulado' in configured.lower():
+            raise LiveCheckoutNotConfigured(
+                f'PAYMENTS_LIVE=true requiere {setting_name} ({label}). '
+                'No se usará /pago/simulado.')
+        return configured
+    # Sandbox mode: never hit a live merchant URL.
+    if not configured:
+        return local_mock
+    if 'sandbox' in configured.lower() or 'simulado' in configured.lower():
+        return configured
+    return default_sandbox_url

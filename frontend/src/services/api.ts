@@ -802,7 +802,8 @@ export const portalApi = {
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
   /** Staff user management (BACKLOG P1-H1). */
-  listStaff: () => api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/'),
+  listStaff: (page?: number) =>
+    api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/', { params: page && page > 1 ? { page } : undefined }),
   inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role'] }) =>
     api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
   updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name'>>) =>

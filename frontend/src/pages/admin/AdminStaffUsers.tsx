@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { UserCog, Plus, KeyRound, Copy, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -11,6 +11,9 @@ import { Modal } from '@/components/ui/Modal';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Pagination } from '@/components/ui/Pagination';
+import { ADMIN_PAGE_SIZE } from '@/lib/pagination';
+import { useUrlPage } from '@/hooks/useUrlFilters';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi, type StaffUser } from '@/services/api';
 import { fieldErrorsFrom } from '@/components/admin/StudentFormModal';
@@ -26,9 +29,11 @@ export default function AdminStaffUsers() {
   const [toReset, setToReset] = useState<StaffUser | null>(null);
   const [revealed, setRevealed] = useState<{ user: StaffUser; password: string } | null>(null);
 
+  const [page, setPage] = useUrlPage();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-staff'],
-    queryFn: async () => (await portalApi.listStaff()).data,
+    queryKey: ['admin-staff', page],
+    queryFn: async () => (await portalApi.listStaff(page)).data,
+    placeholderData: keepPreviousData,
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-staff'] });
   const onErr = (e: unknown) => {
@@ -99,6 +104,7 @@ export default function AdminStaffUsers() {
             })}
           </ul>
         )}
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={data?.count ?? 0} onChange={setPage} itemLabel="cuentas" />
       </Card>
 
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onInvited={(r) => { invalidate(); setRevealed(r); }} />

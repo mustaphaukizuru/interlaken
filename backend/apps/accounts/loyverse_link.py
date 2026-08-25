@@ -14,11 +14,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.cafeteria.services import LoyverseError, get_all_customers, link_students_to_loyverse
+from apps.core.flags import truthy
 from apps.core.permissions import IsAdmin
-
-
-def _truthy(value) -> bool:
-    return str(value).lower() in ('1', 'true', 'si', 'sí', 'on')
 
 
 class LinkLoyverseView(APIView):
@@ -26,8 +23,8 @@ class LinkLoyverseView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request):
-        commit = _truthy(request.data.get('commit', '0'))
-        overwrite = _truthy(request.data.get('overwrite', '0'))
+        commit = truthy(request.data.get('commit', '0'))
+        overwrite = truthy(request.data.get('overwrite', '0'))
 
         try:
             customers = get_all_customers()

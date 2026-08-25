@@ -34,6 +34,7 @@ from .serializers import (
     RegistrationParentStatusSerializer,
     RegistrationSerializer,
     RegistrationStatusSerializer,
+    child_full_name,
     current_school_cycle,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
@@ -234,6 +235,11 @@ class RegistrationListCreateView(generics.ListCreateAPIView):
         return Response(data, status=status.HTTP_201_CREATED, headers=headers)
 
 
+# Re-applications accumulate per cycle and are never purged; a family only ever
+# needs its recent ones on the portal card.
+MY_REGISTRATIONS_LIMIT = 50
+
+
 class MyRegistrationsView(APIView):
     """GET /api/v1/admissions/my-registrations/ — parent application status.
 
@@ -250,7 +256,7 @@ class MyRegistrationsView(APIView):
         regs = (
             Registration.objects
             .filter(Q(parent1_email__iexact=email) | Q(parent2_email__iexact=email))
-            .order_by('-updated_at')
+            .order_by('-updated_at')[:MY_REGISTRATIONS_LIMIT]
         )
         return Response(RegistrationParentStatusSerializer(regs, many=True).data)
 
@@ -302,7 +308,7 @@ class DocumentListView(APIView):
         docs = reg.documents.order_by('doc_type', '-uploaded_at')
         return Response({
             'registration': reg.id,
-            'child_name': f'{reg.child_first_name} {reg.child_last_name}'.strip(),
+            'child_name': child_full_name(reg),
             'required': [{'code': c, 'label': label} for c, label in RegistrationDocument.DocType.choices
                          if c != RegistrationDocument.DocType.OTHER],
             'documents': RegistrationDocumentSerializer(docs, many=True, context={'request': request}).data,
@@ -400,6 +406,9 @@ class DocumentDownloadView(APIView):
                             filename=doc.filename or 'documento')
 
 
+# Invite tokens are the only thing standing between the public internet and a
+# family's inscription draft: cap the guess rate per IP.
+@method_decorator(ratelimit('registration-access', '10/m', key='ip', method='POST'), name='dispatch')
 class RegistrationAccessView(APIView):
     """POST /api/v1/admissions/register/<id>/access/ — exchange invite → session.
 
@@ -439,6 +448,7 @@ class RegistrationDetailView(generics.RetrieveUpdateAPIView):
         return authorize_registration(self.request, self.kwargs['pk'])
 
 
+@method_decorator(ratelimit('registration-submit', '10/m', key='ip', method='POST'), name='dispatch')
 class RegistrationSubmitView(APIView):
     """POST /api/v1/admissions/register/<id>/submit/ — Submit for review."""
     permission_classes = [permissions.AllowAny]
@@ -488,6 +498,7 @@ class RegistrationSubmitView(APIView):
         return Response({'status': 'submitted', 'message': 'Inscripción enviada exitosamente.'})
 
 
+@method_decorator(ratelimit('registration-upload', '20/m', key='ip', method='POST'), name='dispatch')
 class DocumentUploadView(APIView):
     """POST /api/v1/admissions/register/<id>/documents/ — Upload a document."""
     parser_classes = [MultiPartParser, FormParser]

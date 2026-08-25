@@ -82,6 +82,12 @@ def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
     return False
 
 
+# Bounds for the two admin-facing reads that would otherwise grow with
+# enrollment.
+ADMIN_PREVIEW_LIMIT = 200
+LOW_BALANCE_PAGE = 20  # matches DRF's global PAGE_SIZE
+
+
 class MyBalanceView(APIView):
     """
     GET /api/v1/cafeteria/balance/
@@ -105,7 +111,11 @@ class MyBalanceView(APIView):
         if user.role == User.Role.ADMIN:
             # Admin wide view: skip the per-student spend aggregates so a
             # full-roster list stays cheap (matches AdminBalancesView).
-            students = list(StudentProfile.objects.all())
+            # Bounded: this endpoint answers "my balance", and an admin has no
+            # children. Returning the whole roster made the response grow with
+            # enrollment; the paginated /cafeteria/admin/balances/ is the real
+            # admin view.
+            students = list(StudentProfile.objects.all().order_by('student_id')[:ADMIN_PREVIEW_LIMIT])
             include_spend = False
         else:
             # Everyone else - parents, staff, and any role added later - sees
@@ -1106,11 +1116,23 @@ class AdminLowBalanceView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
+        # Paged: at end of month most wallets sit under their threshold, so the
+        # unbounded serialize returned the entire roster in one payload. The
+        # admin console already sends ?page= and renders a pager.
+        # Lowest balances first, which is the outreach order anyway.
         balances = (CafeteriaBalance.objects
                     .select_related('student__user')
                     .filter(balance__lte=models.F('low_balance_threshold'))
-                    .order_by('balance'))
-        return Response(CafeteriaBalanceSerializer(balances, many=True).data)
+                    .order_by('balance', 'student_id'))
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        start = (page - 1) * LOW_BALANCE_PAGE
+        return Response({
+            'count': balances.count(),
+            'results': CafeteriaBalanceSerializer(balances[start:start + LOW_BALANCE_PAGE], many=True).data,
+        })
 
 
 class ParentExportView(APIView):

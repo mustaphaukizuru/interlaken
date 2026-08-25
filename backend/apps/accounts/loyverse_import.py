@@ -19,11 +19,8 @@ from apps.cafeteria.services import (
     import_students_from_loyverse,
     link_students_to_loyverse,
 )
+from apps.core.flags import truthy
 from apps.core.permissions import IsAdmin
-
-
-def _truthy(value) -> bool:
-    return str(value).lower() in ('1', 'true', 'si', 'sí', 'on')
 
 
 def _serialize_import(report: dict) -> dict:
@@ -38,8 +35,8 @@ class ImportLoyverseView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request):
-        commit = _truthy(request.data.get('commit', '0'))
-        seed_balances = _truthy(request.data.get('seed_balances', '1'))
+        commit = truthy(request.data.get('commit', '0'))
+        seed_balances = truthy(request.data.get('seed_balances', '1'))
 
         try:
             customers = get_all_customers()
