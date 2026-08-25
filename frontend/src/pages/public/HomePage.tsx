@@ -1,26 +1,16 @@
-import { useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import {
-  ArrowRight, Award, TrendingUp, Star, Check, Users, GraduationCap,
-  CalendarDays, Languages, Trophy, Palette, FlaskConical,
-  Heart, Mail, Send, ShieldCheck,
-} from 'lucide-react';
+import { ArrowRight, TrendingUp, Users, GraduationCap, CalendarDays } from 'lucide-react';
 import type { Variants } from 'framer-motion';
-import { contactApi } from '@/services/api';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { m, SiteMotionProvider } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { useQuery } from '@tanstack/react-query';
-import { contentApi } from '@/services/api';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { Testimonials } from '@/components/public/Testimonials';
-import { Section } from '@/components/ui/Section';
 import { Container } from '@/components/ui/Container';
-import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import Logo from '@/components/ui/Logo';
-import { assetSrcSet, CARD_SIZES } from '@/lib/images';
 import { HeroVideo } from '@/components/public/HeroVideo';
+
+const HomeBelowFold = lazy(() => import('@/components/public/HomeBelowFold'));
 
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
@@ -30,80 +20,18 @@ const STATS = [
 ];
 
 // Official nivel colors (school instruction 2026-08-21); cards link to each nivel page.
-const LEVELS = [
-  { name: 'Preescolar', slug: 'preescolar', img: '/assets/court-primaria.webp', accent: 'var(--nivel-preescolar)', desc: 'Aprendizaje lúdico y desarrollo socioemocional en un entorno seguro y estimulante.' },
-  { name: 'Primaria', slug: 'primaria', img: '/assets/facade.webp', accent: 'var(--nivel-primaria)', desc: 'Formación bilingüe sólida con énfasis en pensamiento crítico y valores.' },
-  { name: 'Secundaria', slug: 'secundaria', img: '/assets/secundaria.webp', accent: 'var(--nivel-secundaria)', desc: 'Preparación académica de excelencia orientada al liderazgo y la ciudadanía global.' },
-];
 
-const PROGRAMS = [
-  { name: 'Inglés', img: '/assets/classroom.webp', accent: 'var(--purple)', icon: Languages },
-  { name: 'Deportes', img: '/assets/court-wide.webp', accent: 'var(--green)', icon: Trophy },
-  { name: 'Arte y Música', img: '/assets/campus-mural.webp', accent: 'var(--pink)', icon: Palette },
-  { name: 'Ciencia y Robótica', img: '/assets/secundaria.webp', accent: 'var(--green)', icon: FlaskConical },
-];
 
-const PROMOS = [
-  {
-    label: 'Modelo Bilingüe',
-    title: 'Inglés desde preescolar, todos los días',
-    desc: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.',
-    to: '/modelo-educativo',
-    cta: 'Conozca el modelo',
-    grad: 'linear-gradient(135deg, var(--purple) 0%, var(--purple-mid) 100%)',
-    icon: Languages,
-  },
-  {
-    label: 'Comunidad y Valores',
-    title: 'Formamos personas íntegras y felices',
-    desc: 'Educación en valores, acompañamiento socioemocional y una comunidad cálida donde cada familia pertenece.',
-    to: '/nosotros',
-    cta: 'Nuestra comunidad',
-    grad: 'linear-gradient(135deg, var(--pink) 0%, var(--pink-hot) 100%)',
-    icon: Heart,
-  },
-];
 
 /**
  * Institutional strengths — defensible, verifiable school credentials that
  * replace prior placeholder testimonials (fabricated social proof is banned).
  */
-const STRENGTHS = [
-  {
-    icon: Award,
-    color: 'var(--purple)',
-    title: 'Incorporación oficial SEP',
-    body: 'Planes de estudio con reconocimiento y validez oficial ante la Secretaría de Educación Pública.',
-  },
-  {
-    icon: Languages,
-    color: 'var(--green)',
-    title: 'Certificaciones internacionales',
-    body: 'Programa bilingüe intensivo con exámenes de certificación de inglés reconocidos internacionalmente.',
-  },
-  {
-    icon: Heart,
-    color: 'var(--pink)',
-    title: `${SCHOOL_YEARS} años de trayectoria`,
-    body: `${SCHOOL_YEARS} años formando familias en Tlalnepantla, con más de 2,500 egresados en nuestra comunidad.`,
-  },
-];
 
 // Curated, explicit list — not a generated range. Building filenames from an
 // index silently pointed at whatever happened to be numbered 1-8, which mixed
 // brand logos in among the photographs and broke the moment a file was renamed
 // or de-duplicated. Static paths are also the only kind an asset audit can check.
-const GALLERY = [
-  '/assets/interlaken-image (1).webp',
-  '/assets/interlaken-image (2).webp',
-  '/assets/interlaken-image (4).webp',
-  '/assets/facade.webp',
-  '/assets/classroom.webp',
-  '/assets/hopscotch.webp',
-  '/assets/court-wide.webp',
-  '/assets/campus-mural.webp',
-];
-
 /* ── Motion (framer `m` — engine lazy-loaded via PublicLayout's provider) ──
  * Section reveals: fade + small rise, played once as each section approaches
  * the viewport (the negative bottom margin mirrors the sitewide Reveal feel).
@@ -116,23 +44,17 @@ const sectionReveal: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 };
-const fadeRight: Variants = {
-  hidden: { opacity: 0, x: -24 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: 'easeOut' } },
-};
-const fadeLeft: Variants = {
-  hidden: { opacity: 0, x: 24 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: 'easeOut' } },
-};
+/** Parent wrapper: carries whileInView and staggers its variant children. */
+
+/* Hero entrance: ONE orchestrated run on first mount — headline, subline and
+ * CTAs rise in (~540ms total). Opacity/transform only: no layout shift, and
+ * the hero IMAGE is deliberately not animated so the LCP paint is untouched. */
 /** Parent wrapper: carries whileInView and staggers its variant children. */
 const staggerGroup: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08 } },
 };
 
-/* Hero entrance: ONE orchestrated run on first mount — headline, subline and
- * CTAs rise in (~540ms total). Opacity/transform only: no layout shift, and
- * the hero IMAGE is deliberately not animated so the LCP paint is untouched. */
 const heroGroup: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08 } },
@@ -142,118 +64,9 @@ const heroItem: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.38, ease: 'easeOut' } },
 };
 
-function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
-  (e.target as HTMLImageElement).style.display = 'none';
-}
-
-function NewsletterCTA() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [sending, setSending] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (sending) return;
-    setSending(true);
-    try {
-      await contactApi.send({
-        name: name.trim(),
-        email: email.trim(),
-        subject: 'Solicitud de informes',
-        message: `${name.trim()} solicita informes desde la página de inicio.`,
-      });
-      setDone(true);
-      toast.success('¡Gracias! Te contactaremos muy pronto.');
-    } catch {
-      toast.error('No fue posible enviar tu solicitud. Intenta de nuevo.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="relative overflow-hidden rounded-xl3 bg-gradient-to-br from-purple to-brand-500 text-white px-6 py-10 text-center sm:px-10 sm:py-12 lg:py-14">
-      <div className="pointer-events-none absolute -top-16 -right-10 hidden h-56 w-56 rounded-full bg-white/[0.06] sm:block" />
-      <div className="relative mx-auto max-w-[620px]">
-        <div className="mx-auto mb-4 inline-flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-white/[0.14]">
-          <Mail size={24} />
-        </div>
-        <h2 className="font-head font-extrabold text-fluid-3xl tracking-tight">Solicite informes</h2>
-        <p className="mt-2.5 text-base leading-relaxed opacity-90">
-          Déjenos sus datos y un asesor le compartirá costos, fechas y todo lo que necesita saber sobre Interlaken.
-        </p>
-        {done ? (
-          <div role="status" className="mt-6 inline-flex items-center gap-2 rounded-full bg-green-400/20 px-5 py-3 font-semibold">
-            <Check size={18} color="var(--green-mid)" strokeWidth={3} /> ¡Solicitud recibida! Le contactaremos pronto.
-          </div>
-        ) : (
-          <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 text-left sm:mt-6 sm:flex-row sm:items-end">
-            {/* Visible labels, not placeholders: the placeholder vanishes on the
-                first keystroke, leaving the field unidentified on review and for
-                voice control. */}
-            <label className="min-w-0 flex-1 sm:flex-[1_1_180px]">
-              <span className="mb-1.5 block text-sm font-medium text-white/90">Nombre completo</span>
-              <input
-                type="text"
-                required
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
-              />
-            </label>
-            <label className="min-w-0 flex-1 sm:flex-[1_1_220px]">
-              <span className="mb-1.5 block text-sm font-medium text-white/90">Correo electrónico</span>
-              <input
-                type="email" inputMode="email" autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn btn-lg shrink-0 justify-center bg-pink text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple disabled:opacity-70"
-              disabled={sending}
-            >
-              {sending ? 'Enviando…' : <>Solicitar <Send size={16} /></>}
-            </button>
-          </form>
-        )}
-        {!done && (
-          // LFPDPPP notice at the point of collection. PrivacyNote's muted grey
-          // is unreadable on this purple band, so the same copy is restated here
-          // in the band's own palette.
-          <p className="mx-auto mt-4 flex max-w-[520px] items-start justify-center gap-2 text-xs leading-relaxed text-white/80">
-            <ShieldCheck size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
-            <span>
-              Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el{' '}
-              <Link to="/aviso-de-privacidad" className="font-semibold text-white underline underline-offset-2">
-                Aviso de Privacidad
-              </Link>.
-            </span>
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function HomePage() {
   const settings = useSiteSettings();
-  const hasVideo = settings.video_url.trim() !== '';
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-  // Skip the whole testimonials band when the school has not published quotes
-  // yet (it used to render as an empty cream stripe).
-  const { data: testimonials } = useQuery({
-    queryKey: ['testimonials'],
-    queryFn: async () => (await contentApi.getTestimonials()).data as unknown[],
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
-  const hasTestimonials = (testimonials ?? []).length > 0;
 
   return (
     // Motion provider lives HERE (not in the shared layout) so the framer
@@ -349,264 +162,11 @@ export default function HomePage() {
         </Container>
       </section>
 
-      {/* ── ABOUT ── */}
-      <Section bg="white">
-        <m.div
-          className="grid items-center gap-10 lg:grid-cols-2 lg:gap-11"
-          variants={staggerGroup}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-        >
-          <m.div variants={fadeRight}>
-            <span className="section-label-purple inline-flex">Nuestra Comunidad</span>
-            <h2 className="font-head font-extrabold text-fluid-4xl leading-tight tracking-[-0.03em] text-ink">
-              {SCHOOL_YEARS} años formando familias en Tlalnepantla
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-muted">
-              En Colegio Interlaken combinamos rigor académico, educación bilingüe y un ambiente cálido y seguro. Nuestros egresados destacan por su liderazgo, sus valores y su compromiso con la comunidad.
-            </p>
-            <Link to="/nosotros" className="btn-outline mt-6 focus-visible:ring-2 focus-visible:ring-purple focus-visible:ring-offset-2">Conózcanos <ArrowRight size={16} /></Link>
-          </m.div>
-          <m.div variants={fadeLeft} className="relative">
-            <div className="grid grid-cols-2 gap-3.5">
-              <img src="/assets/classroom.webp" srcSet={assetSrcSet("/assets/classroom.webp")} sizes={CARD_SIZES} alt="" loading="lazy" decoding="async" width={400} height={400} className="row-span-2 h-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-              <img src="/assets/campus-mural.webp" srcSet={assetSrcSet("/assets/campus-mural.webp")} sizes={CARD_SIZES} alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-              <img src="/assets/hopscotch.webp" srcSet={assetSrcSet("/assets/hopscotch.webp")} sizes={CARD_SIZES} alt="" loading="lazy" decoding="async" width={400} height={186} className="h-[93px] w-full max-w-full rounded-2xl object-cover" onError={hideOnError} />
-            </div>
-            {/* Floating mini-stat card */}
-            <div className="absolute -bottom-4 right-0 flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-purple sm:-right-2">
-              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-purple/10"><Star size={20} color="var(--purple)" /></div>
-              <div>
-                <div className="font-head text-xl font-extrabold leading-none text-ink">+2,500</div>
-                <div className="text-[11.5px] text-muted">Egresados</div>
-              </div>
-            </div>
-          </m.div>
-        </m.div>
-      </Section>
-
-      {/* ── LEVELS — 3 scroll beats: eyebrow → staggered cards → CTA ── */}
-      <Section bg="cream">
-        <m.div
-          variants={sectionReveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mb-10 text-center"
-        >
-          <span className="section-label-green inline-flex">Niveles Educativos</span>
-          <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Un camino de excelencia</h2>
-          <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
-            De preescolar a secundaria, un mismo campus y un mismo compromiso con cada etapa.
-          </p>
-        </m.div>
-        <m.div
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          variants={staggerGroup}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-        >
-          {LEVELS.map((l) => (
-            <m.div key={l.name} variants={sectionReveal}>
-              <div className="card hover-lift overflow-hidden !p-0">
-                <div className="relative h-[180px]">
-                  <img src={l.img} srcSet={assetSrcSet(l.img)} sizes={CARD_SIZES} alt={l.name} loading="lazy" decoding="async" width={400} height={180} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
-                  <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, color-mix(in srgb, ${l.accent} 87%, transparent) 100%)` }} />
-                  <h3 className="absolute bottom-3.5 left-[18px] font-head text-[22px] font-extrabold text-white">{l.name}</h3>
-                </div>
-                <div className="px-5 py-[18px]">
-                  <p className="text-sm leading-relaxed text-muted">{l.desc}</p>
-                  <Link to={`/niveles/${l.slug}`} className="mt-3.5 inline-flex items-center gap-[5px] text-[13.5px] font-bold text-ink focus-visible:ring-2 focus-visible:ring-offset-2 rounded">Conocer {l.name} <ArrowRight size={14} style={{ color: l.accent }} /></Link>
-                </div>
-              </div>
-            </m.div>
-          ))}
-        </m.div>
-        <m.div
-          variants={sectionReveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mt-8 text-center"
-        >
-          <Link to="/modelo-educativo" className="btn-outline inline-flex focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2">
-            Conozca el modelo educativo <ArrowRight size={16} />
-          </Link>
-        </m.div>
-      </Section>
-
-      {/* ── PROGRAMAS — eyebrow → stagger → closing line ── */}
-      <Section bg="white">
-        <m.div
-          variants={sectionReveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mb-11 text-center"
-        >
-          <span className="section-label-pink inline-flex">Nuestros Programas</span>
-          <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Más allá del aula</h2>
-        </m.div>
-        <m.div
-          className="grid grid-cols-2 gap-7 sm:grid-cols-2 lg:grid-cols-4"
-          variants={staggerGroup}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-        >
-          {PROGRAMS.map((p) => (
-            <m.div key={p.name} variants={sectionReveal} className="text-center">
-              <div className="relative mx-auto aspect-square w-full max-w-[150px]">
-                <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${p.accent} 8%, transparent)` }} />
-                <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${p.accent} 53%, transparent)` }}>
-                  <img src={p.img} srcSet={assetSrcSet(p.img)} sizes={CARD_SIZES} alt={p.name} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
-                </div>
-                <div className="absolute bottom-0.5 right-0.5 flex h-10 w-10 items-center justify-center rounded-full shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]" style={{ background: p.accent }}>
-                  <p.icon size={19} color="white" />
-                </div>
-              </div>
-              <h3 className="mt-[18px] font-head text-[17px] font-bold text-ink">{p.name}</h3>
-            </m.div>
-          ))}
-        </m.div>
-        <m.div
-          variants={sectionReveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mt-10 text-center"
-        >
-          <p className="text-[15px] text-muted">
-            Programas que complementan la formación académica todos los días.
-          </p>
-        </m.div>
-      </Section>
-
-      {/* ── PROMO PAIR ── */}
-      <Section bg="cream">
-        <m.div
-          className="grid grid-cols-1 gap-6 lg:grid-cols-2"
-          variants={staggerGroup}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-        >
-          {PROMOS.map((p, i) => (
-            <m.div key={p.label} variants={i === 0 ? fadeRight : fadeLeft}>
-              <div className="hover-lift relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-xl3 px-8 py-10 text-white shadow-[0_24px_48px_-20px_rgba(16,12,40,0.4)] sm:px-9" style={{ background: p.grad }}>
-                <div className="pointer-events-none absolute -top-12 -right-12 h-[200px] w-[200px] rounded-full bg-white/[0.08]" />
-                <p.icon size={40} color="rgba(255,255,255,0.9)" className="relative" />
-                <div className="relative mt-5">
-                  <span className="text-xs font-bold uppercase tracking-[1.5px] opacity-85">{p.label}</span>
-                  <h3 className="mt-2 font-head text-[26px] font-extrabold leading-tight tracking-[-0.02em]">{p.title}</h3>
-                  <p className="mt-3 max-w-[420px] text-[14.5px] leading-relaxed opacity-90">{p.desc}</p>
-                  <Link to={p.to} className="mt-5 inline-flex items-center gap-1.5 border-b-2 border-white/50 pb-0.5 text-sm font-bold text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 rounded-sm">{p.cta} <ArrowRight size={15} /></Link>
-                </div>
-              </div>
-            </m.div>
-          ))}
-        </m.div>
-      </Section>
-
-      {/* ── RESPALDO / POR QUÉ INTERLAKEN ── */}
-      <Section bg="white">
-        <m.div
-          variants={sectionReveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mb-11 text-center"
-        >
-          <span className="section-label-purple inline-flex">Por qué Interlaken</span>
-          <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Respaldo que da certeza a su familia</h2>
-        </m.div>
-        <m.div
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          variants={staggerGroup}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-        >
-          {STRENGTHS.map((s) => (
-            <m.div key={s.title} variants={sectionReveal} className="h-full">
-              <div className="card hover-lift flex h-full flex-col gap-[18px]">
-                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px]" style={{ background: `color-mix(in srgb, ${s.color} 12%, transparent)` }}>
-                  <s.icon size={26} color={s.color} />
-                </div>
-                <h3 className="font-head text-[19px] font-bold text-ink">{s.title}</h3>
-                <p className="flex-1 text-[15px] leading-relaxed text-muted">{s.body}</p>
-              </div>
-            </m.div>
-          ))}
-        </m.div>
-      </Section>
-
-      {/* ── VIDEO INSTITUCIONAL — only when the school configured a URL ── */}
-      {hasVideo && (
-        <Section bg="white">
-          <m.div variants={sectionReveal} initial="hidden" whileInView="show" viewport={VIEWPORT}>
-            <div className="mb-8 text-center">
-              <span className="section-label-purple inline-flex">Conócenos</span>
-              <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Conócenos en video</h2>
-              <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
-                Un recorrido por nuestra comunidad, nuestras instalaciones y nuestro modelo educativo.
-              </p>
-            </div>
-            <VideoEmbed url={settings.video_url} />
-          </m.div>
-        </Section>
-      )}
-
-      {/* ── TESTIMONIOS (BACKLOG P2-15) — the band disappears with no quotes ── */}
-      {hasTestimonials && (
-        <Section bg="cream">
-          <Testimonials />
-        </Section>
-      )}
-
-      {/* ── GALLERY ── */}
-      <Section bg="dark">
-        <m.div
-          variants={sectionReveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mb-9 text-center"
-        >
-          <span className="section-label-pink inline-flex">Galería</span>
-          <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-white">Vida en Interlaken</h2>
-        </m.div>
-        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-          {GALLERY.map((src, i) => (
-            <Link key={i} to="/galeria" aria-label="Ver la galería completa" className="group block overflow-hidden rounded-[14px] border border-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
-              <img src={src} srcSet={assetSrcSet(src)} sizes="(min-width: 640px) 280px, 45vw" alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none sm:h-[150px]" onError={hideOnError} />
-            </Link>
-          ))}
-        </div>
-        <div className="mt-7 text-center">
-          <Link to="/galeria" className="btn-ghost min-h-[44px]">Ver la galería completa <ArrowRight size={16} /></Link>
-        </div>
-      </Section>
-
-      {/* ── NEWSLETTER / LEAD CAPTURE ── */}
-      <Section bg="white">
-        <m.div variants={sectionReveal} initial="hidden" whileInView="show" viewport={VIEWPORT}>
-          <NewsletterCTA />
-        </m.div>
-      </Section>
-
-      {/* ── CTA ── */}
-      <Section bg="gradient" spacing="sm" className="text-center">
-        <Star size={28} className="mx-auto mb-3" />
-        <h2 className="font-head font-black text-fluid-4xl tracking-[-0.03em]">Comience el futuro de su hijo hoy</h2>
-        <p className="mx-auto mt-3 max-w-[560px] text-[17px] opacity-90">Agende una visita o inicie su pre-registro en línea en solo unos minutos.</p>
-        <div className="mt-7 flex flex-wrap justify-center gap-3.5">
-          <Link to="/pre-registro" className="btn btn-lg bg-white text-purple focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Inicie su pre-registro <ArrowRight size={17} /></Link>
-          <Link to="/agendar-visita" className="btn-ghost btn-lg focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple">Agendar visita</Link>
-        </div>
-      </Section>
+      {/* Below the fold: lazily mounted so the first paint ships the hero and
+          the programs, not the gallery and the lead form. */}
+      <Suspense fallback={<div className="min-h-[60vh]" />}>
+        <HomeBelowFold />
+      </Suspense>
     </div>
     </SiteMotionProvider>
   );

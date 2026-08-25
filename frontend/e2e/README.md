@@ -46,12 +46,17 @@ npx playwright test visual.spec.ts --update-snapshots
 
 then review the diff of the regenerated PNGs and commit them.
 
-**Linux (CI) baselines:** CI runs with `--update-snapshots=missing`, so missing
-platform baselines are generated (and uploaded as the `visual-baselines-linux`
-artifact) instead of failing the job. To activate real visual diffs in CI,
-download that artifact from a green run and commit the `…-linux.png` files into
-`visual.spec.ts-snapshots/`. Whenever you update win32 baselines on purpose,
-refresh the linux ones from the next CI run's artifact as well.
+**Linux (CI) baselines:** these are the ones CI diffs against, and they are
+**blocking** — a Windows-only refresh leaves CI red. Whenever you update win32
+baselines on purpose, refresh the linux ones too:
+
+1. push and let the E2E job fail on the intentional change;
+2. download the **`visual-baselines-linux`** artifact from that run — the job
+   regenerates the complete linux set after failing, precisely so an accepted
+   redesign does not cost one CI round per viewport (a visual failure stops at
+   the first mismatching viewport, so the `visual-diffs` artifact only ever
+   shows part of it);
+3. review the PNGs, copy them into `visual.spec.ts-snapshots/`, and commit.
 
 ## Visual regression and Lighthouse in CI (BACKLOG P5-3)
 
