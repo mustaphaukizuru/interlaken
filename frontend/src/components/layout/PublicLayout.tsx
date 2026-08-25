@@ -321,10 +321,12 @@ export function PublicLayout() {
       {/* Page content — bottom pad clears sticky CTA + WA on phones */}
       <main
         id="contenido"
+        // Phones always reserve room at the bottom: either the sticky CTA bar or
+        // (on the funnel pages that hide it) the WhatsApp float sits there.
         className={`flex-1 ${
           showStickyCta
             ? 'pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0'
-            : ''
+            : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0'
         }`}
       >
         <RouteTransition><Outlet /></RouteTransition>

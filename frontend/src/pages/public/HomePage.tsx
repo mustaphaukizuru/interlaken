@@ -18,6 +18,7 @@ import { Container } from '@/components/ui/Container';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import Logo from '@/components/ui/Logo';
 import { assetSrcSet, CARD_SIZES } from '@/lib/images';
+import { HeroVideo } from '@/components/public/HeroVideo';
 
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
@@ -222,7 +223,6 @@ export default function HomePage() {
   const settings = useSiteSettings();
   const hasVideo = settings.video_url.trim() !== '';
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-  const heroVideo = !reducedMotion && (settings.hero_video_url ?? '').trim() ? settings.hero_video_url : '';
 
   return (
     // Motion provider lives HERE (not in the shared layout) so the framer
@@ -230,40 +230,13 @@ export default function HomePage() {
     <SiteMotionProvider>
     <div>
       {/* ── HERO: brand + one headline + one line + CTAs over full-bleed campus ── */}
-      <section className="relative flex min-h-[min(92svh,820px)] items-end overflow-hidden bg-dark text-white sm:min-h-[min(88svh,760px)]">
-        <img
-          src="/assets/court-wide.webp"
-          srcSet={assetSrcSet('/assets/court-wide.webp', { full: true })}
-          sizes="100vw"
-          alt="Campus Colegio Interlaken"
-          {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
-          decoding="async"
-          width={1600}
-          height={900}
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          onError={hideOnError}
-        />
-        {heroVideo && (
-          // BACKLOG P2-1: silent looping video on ≥ md; the poster image stays as LCP/fallback.
-          <video
-            className="absolute inset-0 hidden h-full w-full object-cover object-center md:block"
-            src={heroVideo}
-            poster="/assets/court-wide.webp"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-          />
-        )}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(180deg, rgba(8,5,22,0.35) 0%, rgba(8,5,22,0.55) 42%, rgba(8,5,22,0.92) 100%)',
-          }}
-        />
+      <HeroVideo
+        className="min-h-[min(92svh,820px)] sm:min-h-[min(88svh,760px)]"
+        src={settings.hero_video_url ?? ''}
+        poster="/assets/court-wide.webp"
+        posterAlt="Campus Colegio Interlaken"
+        reducedMotion={reducedMotion}
+      >
         <div
           className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
           style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.4), transparent 68%)' }}
@@ -316,7 +289,7 @@ export default function HomePage() {
             </m.div>
           </m.div>
         </Container>
-      </section>
+      </HeroVideo>
 
       {/* ── STAT BANNER ── */}
       <section className="bg-dark-2 py-10 text-white">
@@ -452,7 +425,7 @@ export default function HomePage() {
         >
           {PROGRAMS.map((p) => (
             <m.div key={p.name} variants={sectionReveal} className="text-center">
-              <div className="relative mx-auto h-[150px] w-[150px] max-w-full">
+              <div className="relative mx-auto aspect-square w-full max-w-[150px]">
                 <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${p.accent} 8%, transparent)` }} />
                 <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${p.accent} 53%, transparent)` }}>
                   <img src={p.img} srcSet={assetSrcSet(p.img)} sizes={CARD_SIZES} alt={p.name} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
