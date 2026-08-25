@@ -24,6 +24,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import AdminStudentDetail from './AdminStudentDetail';
 import { Badge } from '@/components/ui/Badge';
 import type { StudentProfile } from '@/types';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function AdminStudents() {
   // URL-synced filters (shareable, survive refresh); search writes are
@@ -95,29 +96,31 @@ export default function AdminStudents() {
   return (
     <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
     <div className="space-y-6 min-w-0">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Alumnos</h1>
-          <p className="text-muted text-sm mt-0.5">Directorio de alumnos activos.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
-            <Plus size={16} aria-hidden="true" /> Nuevo alumno
-          </button>
-          <button type="button" className="btn-outline" onClick={() => setImportLoyverseOpen(true)}>
-            <Download size={16} aria-hidden="true" /> Importar desde Loyverse
-          </button>
-          <button type="button" className="btn-outline" onClick={() => setLinkOpen(true)}>
-            <Link2 size={16} aria-hidden="true" /> Vincular Loyverse
-          </button>
-          <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
-            <FileUp size={16} aria-hidden="true" /> Importar CSV
-          </button>
-          <Button variant="secondary" loading={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
-            <FileDown size={16} aria-hidden="true" /> Exportar CSV
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Alumnos"
+        subtitle="Directorio de alumnos activos."
+        actions={(
+          <>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
+              <Plus size={16} aria-hidden="true" /> Nuevo alumno
+            </button>
+            <button type="button" className="btn-outline" onClick={() => setImportLoyverseOpen(true)}>
+              <Download size={16} aria-hidden="true" /> Importar desde Loyverse
+            </button>
+            <button type="button" className="btn-outline" onClick={() => setLinkOpen(true)}>
+              <Link2 size={16} aria-hidden="true" /> Vincular Loyverse
+            </button>
+            <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
+              <FileUp size={16} aria-hidden="true" /> Importar CSV
+            </button>
+            <Button variant="secondary" loading={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
+              <FileDown size={16} aria-hidden="true" /> Exportar CSV
+            </Button>
+          </div>
+          </>
+        )}
+      />
       <StudentFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => refetch()} />
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
       <ImportLoyverseModal
@@ -128,6 +131,7 @@ export default function AdminStudents() {
       <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
 
       <Card title={`${count} alumnos registrados`}>
+        <p role="status" aria-live="polite" className="sr-only">{count} alumnos encontrados</p>
         <div className="relative mb-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
           <input

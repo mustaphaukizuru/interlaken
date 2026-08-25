@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   ArrowRight, Award, TrendingUp, Star, Check, Users, GraduationCap,
   CalendarDays, Languages, Trophy, Palette, FlaskConical,
-  Heart, Mail, Send,
+  Heart, Mail, Send, ShieldCheck,
 } from 'lucide-react';
 import type { Variants } from 'framer-motion';
 import { contactApi } from '@/services/api';
@@ -188,25 +188,31 @@ function NewsletterCTA() {
             <Check size={18} color="var(--green-mid)" strokeWidth={3} /> ¡Solicitud recibida! Le contactaremos pronto.
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 sm:mt-6 sm:flex-row">
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre completo"
-              aria-label="Nombre completo"
-              className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_180px]"
-            />
-            <input
-              type="email" inputMode="email" autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Correo electrónico"
-              aria-label="Correo electrónico"
-              className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_220px]"
-            />
+          <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 text-left sm:mt-6 sm:flex-row sm:items-end">
+            {/* Visible labels, not placeholders: the placeholder vanishes on the
+                first keystroke, leaving the field unidentified on review and for
+                voice control. */}
+            <label className="min-w-0 flex-1 sm:flex-[1_1_180px]">
+              <span className="mb-1.5 block text-sm font-medium text-white/90">Nombre completo</span>
+              <input
+                type="text"
+                required
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+              />
+            </label>
+            <label className="min-w-0 flex-1 sm:flex-[1_1_220px]">
+              <span className="mb-1.5 block text-sm font-medium text-white/90">Correo electrónico</span>
+              <input
+                type="email" inputMode="email" autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+              />
+            </label>
             <button
               type="submit"
               className="btn btn-lg shrink-0 justify-center bg-pink text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple disabled:opacity-70"
@@ -215,6 +221,20 @@ function NewsletterCTA() {
               {sending ? 'Enviando…' : <>Solicitar <Send size={16} /></>}
             </button>
           </form>
+        )}
+        {!done && (
+          // LFPDPPP notice at the point of collection. PrivacyNote's muted grey
+          // is unreadable on this purple band, so the same copy is restated here
+          // in the band's own palette.
+          <p className="mx-auto mt-4 flex max-w-[520px] items-start justify-center gap-2 text-xs leading-relaxed text-white/80">
+            <ShieldCheck size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span>
+              Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el{' '}
+              <Link to="/aviso-de-privacidad" className="font-semibold text-white underline underline-offset-2">
+                Aviso de Privacidad
+              </Link>.
+            </span>
+          </p>
         )}
       </div>
     </div>

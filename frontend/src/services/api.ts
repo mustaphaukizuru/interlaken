@@ -591,8 +591,8 @@ export const legalApi = {
   /** Acceso: download everything held on the requesting household. */
   exportMyData: () => api.get('/legal/arco/export/'),
   // Staff console
-  adminListArco: (status?: string) =>
-    api.get('/legal/admin/arco/', { params: status ? { status } : {} }),
+  adminListArco: (status?: string, page?: number) =>
+    api.get('/legal/admin/arco/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
   adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
     api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
   /** Record a request received via privacidad@ / WhatsApp / in person (BACKLOG P5-5). */
@@ -810,8 +810,8 @@ export const portalApi = {
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
   /** Password request inbox (admin). */
-  getPasswordRequests: (status?: string) =>
-    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: status ? { status } : undefined }),
+  getPasswordRequests: (status?: string, page?: number) =>
+    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
   createPasswordRequest: (data: { requested_email: string; requester_name?: string; channel: string; note?: string }) =>
     api.post<PasswordRequest>('/accounts/admin/password-requests/', data),
   updatePasswordRequest: (id: number, data: { action: 'resolve' | 'reject'; delivered_via?: string; note?: string }) =>

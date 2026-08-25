@@ -112,6 +112,11 @@ class AdminArcoListView(generics.ListAPIView):
     def get_queryset(self):
         qs = ArcoRequest.objects.all()
         status_filter = self.request.query_params.get('status')
+        # 'open' is the console's default queue (received + in review). It used
+        # to be filtered client-side, which silently dropped every open request
+        # that fell past the first page.
+        if status_filter == 'open':
+            return qs.filter(status__in=[ArcoRequest.Status.RECEIVED, ArcoRequest.Status.IN_REVIEW])
         return qs.filter(status=status_filter) if status_filter else qs
 
 

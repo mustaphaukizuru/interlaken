@@ -24,7 +24,7 @@ from apps.core.permissions import IsAdmin
 from .admin_password import _audit_set_password, generate_temporary_password, revoke_refresh_tokens
 from .models import PasswordRequest, User
 
-PAGE = 50
+PAGE = 20  # matches DRF's global PAGE_SIZE so the admin pager lines up
 
 
 def delivery_templates(user: User, password: str) -> dict:
@@ -82,10 +82,17 @@ class PasswordRequestListCreateView(APIView):
         st = request.query_params.get('status')
         if st in PasswordRequest.Status.values:
             qs = qs.filter(status=st)
+        # Paged: the inbox only ever showed the newest PAGE rows, so older
+        # requests became unreachable once the queue grew.
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        start = (page - 1) * PAGE
         return Response({
             'count': qs.count(),
             'open_count': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
-            'results': PasswordRequestSerializer(qs[:PAGE], many=True).data,
+            'results': PasswordRequestSerializer(qs[start:start + PAGE], many=True).data,
         })
 
     def post(self, request):

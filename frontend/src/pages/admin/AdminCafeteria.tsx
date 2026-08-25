@@ -21,6 +21,7 @@ import { cafeteriaApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
 
@@ -46,15 +47,11 @@ export default function AdminCafeteria() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería — Admin</h1>
-          <p className="mt-1 text-sm text-muted">
-            Saldos, depósitos, carga/quita en POS, ajustes, devoluciones y reconciliación.
-          </p>
-        </div>
-        <SchoolExportButtons />
-      </div>
+      <PageHeader
+        title="Cafetería"
+        subtitle="Saldos, depósitos, carga/quita en POS, ajustes, devoluciones y reconciliación."
+        actions={<SchoolExportButtons />}
+      />
 
       <div className="flex flex-wrap gap-1 border-b border-line">
         {TABS.map(({ key, label, icon: Icon }) => (

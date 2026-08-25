@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { KeyRound, Plus, Check, Copy, MessageCircle, Mail, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -14,6 +14,9 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { portalApi, type PasswordRequest, type PasswordRequestResolved } from '@/services/api';
 import { mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
+import { useUrlPage } from '@/hooks/useUrlFilters';
+import { ADMIN_PAGE_SIZE } from '@/lib/pagination';
+import { Pagination } from '@/components/ui/Pagination';
 
 const CHANNEL: Record<string, string> = { whatsapp: 'WhatsApp', email: 'Correo', phone: 'Teléfono', in_person: 'Presencial' };
 const STATUS: Record<string, { label: string; variant: 'warning' | 'success' | 'neutral' }> = {
@@ -35,9 +38,11 @@ export default function AdminPasswordRequests() {
   const [toResolve, setToResolve] = useState<PasswordRequest | null>(null);
   const [resolved, setResolved] = useState<PasswordRequestResolved | null>(null);
 
+  const [page, setPage] = useUrlPage();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['password-requests', status],
-    queryFn: async () => (await portalApi.getPasswordRequests(status || undefined)).data,
+    queryKey: ['password-requests', status, page],
+    queryFn: async () => (await portalApi.getPasswordRequests(status || undefined, page)).data,
+    placeholderData: keepPreviousData,
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: ['password-requests'] });
 
@@ -120,6 +125,7 @@ export default function AdminPasswordRequests() {
               ))}
             </ul>
           )}
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={data?.count ?? 0} onChange={setPage} itemLabel="solicitudes" />
       </Card>
 
       <LogRequestModal open={logOpen} onClose={() => setLogOpen(false)} onSaved={invalidate} />

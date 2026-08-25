@@ -16,6 +16,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { bookingsApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { Booking } from '@/types';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const statusMeta: Record<string, { label: string; variant: any }> = {
   pending:   { label: 'Pendiente', variant: 'warning' },
@@ -449,12 +450,10 @@ export default function AdminBookings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Visitas</h1>
-        <p className="text-muted text-sm mt-0.5">
-          Publique fechas para visitas individuales (/agendar-visita) y Puertas Abiertas (/puertas-abiertas).
-        </p>
-      </div>
+      <PageHeader
+        title="Visitas"
+        subtitle="Publique fechas para visitas individuales (/agendar-visita) y Puertas Abiertas (/puertas-abiertas)."
+      />
 
       <Card
         title="Publicar disponibilidad"
