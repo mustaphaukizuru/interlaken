@@ -7,6 +7,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
+import { assetSrcSet } from '@/lib/images';
 
 /**
  * Comunidad → Plataformas: directorio de accesos digitales de la comunidad
@@ -90,7 +91,12 @@ export default function PlataformasPage() {
       <section className="relative overflow-hidden bg-dark text-white">
         <img
           src="/assets/campus-mural.webp"
+          srcSet={assetSrcSet('/assets/campus-mural.webp', { full: true })}
+          sizes="100vw"
           alt=""
+          width={1600}
+          height={900}
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover opacity-30"
           loading="eager"
         />

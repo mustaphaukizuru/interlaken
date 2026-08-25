@@ -189,7 +189,8 @@ class RegistrationAdminListSerializer(serializers.ModelSerializer):
         return f'{obj.child_first_name} {obj.child_last_name}'.strip()
 
     def get_doc_count(self, obj):
-        return obj.documents.count()
+        # len() over the prefetched list; .count() issued a fresh COUNT per row.
+        return len(obj.documents.all())
 
     def get_doc_verified(self, obj):
         return sum(1 for d in obj.documents.all() if d.is_verified)

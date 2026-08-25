@@ -190,9 +190,9 @@ export default function ParentDashboard() {
               <p className={`mt-1 font-head text-2xl font-extrabold ${b.low ? 'text-amber' : 'text-ink'}`}>${parseFloat(b.balance).toFixed(2)}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {[100, 200].map((amt) => (
-                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}`} className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-purple hover:border-purple/40">+${amt}</Link>
+                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}`} className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-purple transition-colors hover:border-purple/40 active:scale-[0.98]">+${amt}</Link>
                 ))}
-                <Link to="/portal/cafeteria" className="rounded-full px-3 py-1 text-xs font-semibold text-muted hover:text-ink">Ver más →</Link>
+                <Link to="/portal/cafeteria" className="inline-flex min-h-[44px] items-center rounded-full px-3 text-sm font-semibold text-muted hover:text-ink">Ver más →</Link>
               </div>
             </li>
           ))}

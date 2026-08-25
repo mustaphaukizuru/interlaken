@@ -50,8 +50,8 @@ export default function AdminPipeline() {
       <PageHeader title="Pipeline de inscripciones" subtitle="De solicitud enviada a alumno inscrito. Pida los documentos que faltan con un clic y convierta el expediente aprobado en alumno con sus cuentas de familia."
         actions={<Link to="/admin/admisiones" className="btn-outline">Lista clásica</Link>} />
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
-        <div className="-mx-4 overflow-x-auto px-4 pb-4">
-          <div className="grid min-w-[1100px] grid-cols-5 gap-3" role="list" aria-label="Columnas del pipeline">
+        <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
+          <div className="grid grid-cols-1 gap-3 md:min-w-[1100px] md:grid-cols-5" role="list" aria-label="Columnas del pipeline">
             {data.columns.map((col) => (
               <section key={col.status} role="listitem" aria-label={col.label} className="rounded-xl2 bg-cream-2 p-2">
                 <h2 className="mb-2 flex items-center justify-between px-1 text-xs font-bold uppercase tracking-wide text-subtle"><span className="inline-flex items-center gap-1"><KanbanSquare size={12} aria-hidden="true" /> {col.label}</span><span>{col.cards.length}</span></h2>

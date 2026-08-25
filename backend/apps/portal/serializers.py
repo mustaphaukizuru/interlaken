@@ -15,7 +15,13 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     acknowledged = serializers.SerializerMethodField()
 
     def get_acknowledged(self, obj):
-        user = self.context.get('request').user if self.context.get('request') else None
+        # Prefer the queryset annotation (see AnnouncementListView); the per-row
+        # EXISTS below is only for callers that don't annotate.
+        annotated = getattr(obj, 'acknowledged_ann', None)
+        if annotated is not None:
+            return bool(annotated)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
         if not user or not getattr(user, 'is_authenticated', False):
             return False
         return obj.reads.filter(user=user, acknowledged_at__isnull=False).exists()

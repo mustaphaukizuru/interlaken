@@ -168,6 +168,32 @@ export function PublicLayout() {
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 
+  const menuRef = useRef<HTMLDivElement>(null);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+
+  // Focus management for the mobile menu: move focus in on open, keep Tab inside
+  // it, and hand focus back to the burger on close (body scroll is locked below).
+  useEffect(() => {
+    if (!open) return;
+    const panel = menuRef.current;
+    const first = panel?.querySelector<HTMLElement>('a, button');
+    first?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !panel) return;
+      const items = Array.from(panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'))
+        .filter((el) => el.offsetParent !== null);
+      if (!items.length) return;
+      const [head, tail] = [items[0], items[items.length - 1]];
+      if (e.shiftKey && document.activeElement === head) { e.preventDefault(); tail.focus(); }
+      else if (!e.shiftKey && document.activeElement === tail) { e.preventDefault(); head.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      burgerRef.current?.focus();
+    };
+  }, [open]);
+
   // Lock body scroll while the mobile menu is open (prevents background scroll).
   useEffect(() => {
     if (!open) return;
@@ -247,20 +273,41 @@ export function PublicLayout() {
             </Link>
           </div>
 
-          {/* Mobile burger */}
-          <button
-            onClick={() => setOpen(!open)}
-            aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
-            aria-expanded={open}
-            className="lg:hidden p-3 rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-          >
-            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          {/* Mobile: tap-to-call + burger (the phone strip above is desktop-only) */}
+          <div className="flex items-center gap-1 lg:hidden">
+            {settings.phone_e164 && (
+              <a
+                href={`tel:${settings.phone_e164}`}
+                aria-label={`Llamar al colegio, ${settings.phone_display}`}
+                onClick={() => trackEvent(ConversionEvent.PhoneCta, { context: 'header_movil' })}
+                className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              >
+                <Phone className="h-5 w-5" aria-hidden="true" />
+              </a>
+            )}
+            <button
+              ref={burgerRef}
+              onClick={() => setOpen(!open)}
+              aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={open}
+              aria-controls="mobile-menu"
+              className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            >
+              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu — CTAs near top, then Contacto, then acordeón por grupo */}
         {open && (
-          <div className="lg:hidden bg-white border-t border-line px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+          <div
+            ref={menuRef}
+            id="mobile-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú de navegación"
+            className="lg:hidden bg-white border-t border-line px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto"
+          >
             <div className="flex flex-col gap-2 pb-2">
               <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-pink justify-center min-h-[44px]">
                 Agendar Visita

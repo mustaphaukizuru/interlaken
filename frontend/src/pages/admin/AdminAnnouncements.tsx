@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Megaphone, Plus, Pencil, Trash2, Eye, Siren, Send } from 'lucide-react';
 import { DeliveryReportModal } from '@/components/admin/DeliveryReportModal';
 import { format } from 'date-fns';
@@ -18,6 +18,9 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Pagination } from '@/components/ui/Pagination';
+import { useUrlPage } from '@/hooks/useUrlFilters';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { portalApi } from '@/services/api';
 
@@ -52,10 +55,14 @@ export default function AdminAnnouncements() {
   const [alertForm, setAlertForm] = useState(EMPTY_ALERT);
   const [alertConfirm, setAlertConfirm] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-announcements'],
-    queryFn: async () => (await portalApi.adminListAnnouncements()).data.results as Announcement[],
+  const [page, setPage] = useUrlPage();
+  const { data: paged, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-announcements', page],
+    queryFn: async () => toPaged<Announcement>((await portalApi.adminListAnnouncements({ page })).data),
+    placeholderData: keepPreviousData,
   });
+  const data = paged?.results;
+  const count = paged?.count ?? 0;
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-announcements'] });
 
@@ -214,6 +221,7 @@ export default function AdminAnnouncements() {
             })}
           </ul>
         )}
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="comunicados" />
       </Card>
 
       {/* Composer */}

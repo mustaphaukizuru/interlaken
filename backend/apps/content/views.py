@@ -104,6 +104,9 @@ class PublicPricingView(APIView):
         return Response(data)
 
 
+CALENDAR_CACHE_KEY = 'content:calendar:{key}'
+
+
 class PublicCalendarView(APIView):
     """GET /api/v1/content/calendar/?from=&to=&level= — published events (cached 5 min)."""
     permission_classes = [permissions.AllowAny]
@@ -123,7 +126,14 @@ class PublicCalendarView(APIView):
         level = request.query_params.get('level')
         if level:
             qs = qs.filter(models.Q(level='') | models.Q(level=level))
-        return Response(SchoolEventSerializer(qs, many=True).data)
+        key = CALENDAR_CACHE_KEY.format(key=f'{start}:{end}:{level or "all"}')
+        data = cache.get(key)
+        if data is None:
+            data = SchoolEventSerializer(qs, many=True).data
+            cache.set(key, data, CACHE_TTL_SECONDS)
+        resp = Response(data)
+        resp['Cache-Control'] = 'public, max-age=300'
+        return resp
 
 
 class AdminCalendarView(generics.ListCreateAPIView):

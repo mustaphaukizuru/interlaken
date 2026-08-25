@@ -280,7 +280,7 @@ class FormSubmissionsView(APIView):
         form = FormDefinition.objects.filter(pk=pk).first()
         if form is None:
             raise Http404
-        qs = form.submissions.all()
+        qs = form.submissions.select_related('form')  # form.title + reply_to touch the FK per row
         handled = request.query_params.get('handled')
         if handled in ('0', '1'):
             qs = qs.filter(is_handled=(handled == '1'))

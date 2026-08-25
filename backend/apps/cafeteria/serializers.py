@@ -98,7 +98,9 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
 
 
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):
-    student_id = serializers.IntegerField(source='student.id', read_only=True)
+    # source='student_id' reads the column already on the row; 'student.id'
+    # fetched the whole related object once per row (N+1 on every ledger page).
+    student_id = serializers.IntegerField(source='student_id', read_only=True)
 
     class Meta:
         model = CafeteriaTransaction

@@ -3,7 +3,7 @@ Portal views: role-aware dashboard, announcements, notifications.
 """
 import logging
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -161,8 +161,12 @@ class DashboardView(APIView):
             is_active=True, audience__in=audiences_for_user(user)
         ).annotate(
             visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
+            # Annotated here too, so passing the request (needed for the correct
+            # 'acknowledged' value) does not cost one EXISTS per announcement.
+            acknowledged_ann=Exists(AnnouncementRead.objects.filter(
+                announcement=OuterRef('pk'), user=user, acknowledged_at__isnull=False)),
         )[:5]
-        data['announcements'] = AnnouncementSerializer(announcements, many=True).data
+        data['announcements'] = AnnouncementSerializer(announcements, many=True, context={'request': request}).data
         data['unread_notifications'] = Notification.objects.filter(user=user, is_read=False).count()
 
         return Response(data)
@@ -206,6 +210,8 @@ class AnnouncementListView(generics.ListAPIView):
             audience__in=audiences_for_user(self.request.user),
         ).filter(Q(publish_at__isnull=True) | Q(publish_at__lte=timezone.now())).annotate(
             visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
+            acknowledged_ann=Exists(AnnouncementRead.objects.filter(
+                announcement=OuterRef('pk'), user=self.request.user, acknowledged_at__isnull=False)),
         )
 
 

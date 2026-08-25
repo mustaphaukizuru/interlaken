@@ -719,7 +719,7 @@ export const portalApi = {
   markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 
   // Admin comunicados (announcements) CRUD.
-  adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  adminListAnnouncements: (params?: { page?: number }) => api.get('/portal/admin/announcements/', { params }),
   /** Portal novedades feed (BACKLOG P4-11). */
   novedades: (since?: string) => api.get<{ since: string; unread: number; items: NovedadItem[] }>('/portal/novedades/', { params: since ? { since } : undefined }),
   /** Public avisos banner (BACKLOG P3-9). */

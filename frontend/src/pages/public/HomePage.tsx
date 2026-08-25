@@ -11,6 +11,8 @@ import { contactApi } from '@/services/api';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { m, SiteMotionProvider } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useQuery } from '@tanstack/react-query';
+import { contentApi } from '@/services/api';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
@@ -46,7 +48,7 @@ const PROMOS = [
     label: 'Modelo Bilingüe',
     title: 'Inglés desde preescolar, todos los días',
     desc: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.',
-    to: '/nosotros',
+    to: '/modelo-educativo',
     cta: 'Conozca el modelo',
     grad: 'linear-gradient(135deg, var(--purple) 0%, var(--purple-mid) 100%)',
     icon: Languages,
@@ -223,6 +225,15 @@ export default function HomePage() {
   const settings = useSiteSettings();
   const hasVideo = settings.video_url.trim() !== '';
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  // Skip the whole testimonials band when the school has not published quotes
+  // yet (it used to render as an empty cream stripe).
+  const { data: testimonials } = useQuery({
+    queryKey: ['testimonials'],
+    queryFn: async () => (await contentApi.getTestimonials()).data as unknown[],
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const hasTestimonials = (testimonials ?? []).length > 0;
 
   return (
     // Motion provider lives HERE (not in the shared layout) so the framer
@@ -526,10 +537,12 @@ export default function HomePage() {
         </Section>
       )}
 
-      {/* ── TESTIMONIOS (BACKLOG P2-15) ── */}
-      <Section bg="cream">
-        <Testimonials />
-      </Section>
+      {/* ── TESTIMONIOS (BACKLOG P2-15) — the band disappears with no quotes ── */}
+      {hasTestimonials && (
+        <Section bg="cream">
+          <Testimonials />
+        </Section>
+      )}
 
       {/* ── GALLERY ── */}
       <Section bg="dark">
@@ -545,8 +558,13 @@ export default function HomePage() {
         </m.div>
         <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {GALLERY.map((src, i) => (
-            <img key={i} src={src} srcSet={assetSrcSet(src)} sizes="(min-width: 640px) 280px, 45vw" alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full rounded-[14px] border border-white/[0.08] object-cover sm:h-[150px]" onError={hideOnError} />
+            <Link key={i} to="/galeria" aria-label="Ver la galería completa" className="group block overflow-hidden rounded-[14px] border border-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+              <img src={src} srcSet={assetSrcSet(src)} sizes="(min-width: 640px) 280px, 45vw" alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none sm:h-[150px]" onError={hideOnError} />
+            </Link>
           ))}
+        </div>
+        <div className="mt-7 text-center">
+          <Link to="/galeria" className="btn-ghost min-h-[44px]">Ver la galería completa <ArrowRight size={16} /></Link>
         </div>
       </Section>
 

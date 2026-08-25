@@ -414,9 +414,14 @@ class MyCardsView(APIView):
         if student_id and request.user.role == User.Role.ADMIN:
             students = StudentProfile.objects.filter(pk=student_id)
         students = students.select_related('user', 'loyverse_profile')
+        # One INSERT for whatever is missing, then one fetch: the previous
+        # get_or_create ran per child (a write on a read path).
+        CafeteriaBalance.objects.bulk_create(
+            [CafeteriaBalance(student=s) for s in students], ignore_conflicts=True)
+        balances = {b.student_id: b for b in CafeteriaBalance.objects.filter(student__in=students)}
         cards = []
         for s in students:
-            balance, _ = CafeteriaBalance.objects.get_or_create(student=s)
+            balance = balances.get(s.pk) or CafeteriaBalance(student=s)
             loyverse = getattr(s, 'loyverse_profile', None)
             code = ((loyverse.customer_code if loyverse else '')
                     or s.student_id or '')

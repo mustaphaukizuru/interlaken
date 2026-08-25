@@ -213,8 +213,8 @@ export default function GaleriaPage() {
                   onError={(e) => (((e.target as HTMLImageElement).closest('button') as HTMLButtonElement).style.display = 'none')}
                 />
                 {/* Hover affordance: gradient wash + "Ampliar" pill */}
-                <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/0 to-ink/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex translate-y-1.5 items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-bold text-ink opacity-0 shadow-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
+                <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/0 to-ink/0 opacity-100 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100" />
+                <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-bold text-ink opacity-100 shadow-sm transition-all duration-300 lg:translate-y-1.5 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 motion-reduce:transition-none">
                   <Maximize2 className="h-3 w-3 text-green-dark" /> Ampliar
                 </span>
                 {photo.caption && (

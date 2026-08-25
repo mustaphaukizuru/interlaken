@@ -5,6 +5,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { LEVELS, getLevel } from '@/lib/levels';
 import { useSep } from '@/hooks/useSep';
 import { ShieldCheck } from 'lucide-react';
+import { assetSrcSet } from '@/lib/images';
 
 const ACCENT = {
   green: { label: 'section-label-green', text: 'text-green-dark', ring: 'border-green/30', soft: 'bg-green/5' },
@@ -32,7 +33,12 @@ export default function NivelPage() {
       <section className="relative overflow-hidden bg-dark text-white">
         <img
           src={level.hero}
+          srcSet={assetSrcSet(level.hero, { full: true })}
+          sizes="100vw"
           alt=""
+          width={1600}
+          height={900}
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover opacity-35"
           onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
         />

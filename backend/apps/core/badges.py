@@ -29,9 +29,28 @@ def unhandled_contact_messages(request):
     return ContactMessage.objects.filter(is_handled=False).count()
 
 
+BADGE_CACHE_KEY = 'core:badges:{pk}'
+BADGE_CACHE_TTL = 30
+
+
 def portal_badges(user) -> dict:
     """Live counts for the portal sidebar (BACKLOG P1-E3). Admins get work
-    queues; families get their unread notifications. Cheap COUNT queries only."""
+    queues; families get their unread notifications. Cheap COUNT queries only.
+
+    Cached 30 s per user: the SPA polls this on every navigation and the admin
+    branch is eight COUNTs (audit 2026-08)."""
+    from django.core.cache import cache
+
+    key = BADGE_CACHE_KEY.format(pk=getattr(user, 'pk', 0))
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    out = _compute_badges(user)
+    cache.set(key, out, BADGE_CACHE_TTL)
+    return out
+
+
+def _compute_badges(user) -> dict:
     from apps.accounts.models import PasswordRequest, User
     from apps.portal.models import Notification
 
