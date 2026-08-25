@@ -272,7 +272,9 @@ export default function HomePage() {
           className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
           style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.4), transparent 68%)' }}
         />
-        <Container className="relative w-full !pb-12 !pt-28 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
+        {/* pb on phones clears the fixed "Agendar visita" bar, which otherwise
+            sits on top of the secondary hero CTA at the fold. */}
+        <Container className="relative w-full !pb-28 !pt-28 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
           <m.div
             className="max-w-[640px]"
             variants={heroGroup}
