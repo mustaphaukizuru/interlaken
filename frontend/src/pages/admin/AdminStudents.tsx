@@ -1,7 +1,7 @@
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, FileUp, Link2, Download, FileDown, Plus, ArrowUp, ArrowDown, ArrowUpDown, Columns3, Rows3 } from 'lucide-react';
+import { Users, Search, FileUp, Link2, Download, FileDown, Plus, ArrowUp, ArrowDown, ArrowUpDown, Columns3, Rows3, MoreHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
@@ -93,6 +93,19 @@ export default function AdminStudents() {
     setSelectedId(id);
   };
 
+  const SECONDARY = [
+    { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download },
+    { key: 'link', label: 'Vincular Loyverse', icon: Link2 },
+    { key: 'csv-in', label: 'Importar CSV', icon: FileUp },
+    { key: 'csv-out', label: 'Exportar CSV', icon: FileDown },
+  ] as const;
+  const runSecondary = (key: (typeof SECONDARY)[number]['key']) => {
+    if (key === 'loyverse') setImportLoyverseOpen(true);
+    else if (key === 'link') setLinkOpen(true);
+    else if (key === 'csv-in') setImportOpen(true);
+    else exportCsv.mutate();
+  };
+
   return (
     <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
     <div className="space-y-6 min-w-0">
@@ -101,22 +114,58 @@ export default function AdminStudents() {
         subtitle="Directorio de alumnos activos."
         actions={(
           <>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
               <Plus size={16} aria-hidden="true" /> Nuevo alumno
             </button>
-            <button type="button" className="btn-outline" onClick={() => setImportLoyverseOpen(true)}>
-              <Download size={16} aria-hidden="true" /> Importar desde Loyverse
-            </button>
-            <button type="button" className="btn-outline" onClick={() => setLinkOpen(true)}>
-              <Link2 size={16} aria-hidden="true" /> Vincular Loyverse
-            </button>
-            <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
-              <FileUp size={16} aria-hidden="true" /> Importar CSV
-            </button>
-            <Button variant="secondary" loading={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
-              <FileDown size={16} aria-hidden="true" /> Exportar CSV
-            </Button>
+            {/* Five stacked full-width buttons filled the entire first screen at
+                390px before a single alumno was visible. The primary action
+                stays; the rest collapse into one menu on phones. */}
+            <div className="hidden flex-wrap gap-2 sm:flex">
+              {SECONDARY.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="btn-outline"
+                  disabled={key === 'csv-out' && exportCsv.isPending}
+                  onClick={() => runSecondary(key)}
+                >
+                  <Icon size={16} aria-hidden="true" /> {key === 'csv-out' && exportCsv.isPending ? 'Exportando…' : label}
+                </button>
+              ))}
+            </div>
+            <div className="sm:hidden">
+              <Dropdown
+                width={260}
+                trigger={({ open, toggle }) => (
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    aria-haspopup="true"
+                    aria-expanded={open}
+                    onClick={toggle}
+                  >
+                    <MoreHorizontal size={16} aria-hidden="true" /> Más acciones
+                  </button>
+                )}
+              >
+                {({ close }) => (
+                  <div className="py-1">
+                    {SECONDARY.map(({ key, label, icon: Icon }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className="flex min-h-[44px] w-full items-center gap-2 px-4 text-left text-sm text-ink hover:bg-cream disabled:opacity-60"
+                        disabled={key === 'csv-out' && exportCsv.isPending}
+                        onClick={() => { close(); runSecondary(key); }}
+                      >
+                        <Icon size={16} aria-hidden="true" /> {key === 'csv-out' && exportCsv.isPending ? 'Exportando…' : label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Dropdown>
+            </div>
           </div>
           </>
         )}
@@ -143,7 +192,7 @@ export default function AdminStudents() {
           />
         </div>
         <p className="mb-3 text-xs text-subtle">Busca en todo el directorio de alumnos.</p>
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <div>
             <label className="label" htmlFor="f-nivel">Nivel</label>
             <select id="f-nivel" className="input-field min-h-[44px]" value={nivel} onChange={(e) => set({ nivel: e.target.value || null, grado: null, page: null })}>

@@ -69,7 +69,7 @@ export default function AdminPayments() {
         actions={<Button variant="secondary" loading={exportCsv.isPending} onClick={() => exportCsv.mutate()}><FileDown size={16} aria-hidden="true" /> Exportar CSV</Button>}
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard title="Cobrado (30 días)" value={s ? formatMXN(s.by_status.success?.total ?? 0) : '…'} icon={CreditCard} color="green" />
         <StatCard title="Pagos completados" value={s?.by_status.success?.count ?? 0} icon={CreditCard} color="purple" />
         <StatCard title="Fallidos / reembolsados" value={(s?.by_status.failed?.count ?? 0) + (s?.by_status.refunded?.count ?? 0)} icon={AlertTriangle} color="coral" />

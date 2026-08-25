@@ -64,22 +64,36 @@ interface StatCardProps {
 export function StatCard({ title, value, suffix, icon: Icon, color, trend, subtitle }: StatCardProps) {
   const t = theme[color];
   return (
-    <div className="hover-lift" style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 18, padding: '22px', boxShadow: 'var(--shadow-card)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={22} color={t.color} />
+    // Sizing is responsive, not fixed: at 390px these tiles sit two-per-row, so
+    // padding, the icon chip and the figure all step down instead of forcing a
+    // one-per-screen scroll through the KPIs.
+    <div className="hover-lift relative overflow-hidden rounded-[18px] border border-line bg-white p-4 shadow-card sm:p-[22px]">
+      <div className="mb-3 flex items-center justify-between sm:mb-[18px]">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-[12px] sm:h-11 sm:w-11"
+          style={{ background: t.bg }}
+        >
+          <Icon size={20} color={t.color} className="sm:h-[22px] sm:w-[22px]" />
         </div>
         {trend && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: trend.up ? 'rgba(71,160,24,0.1)' : 'rgba(239,37,88,0.1)', color: trend.up ? 'var(--green-dark)' : 'var(--pink)' }}>
+          <span
+            className="flex items-center gap-1 rounded-full px-2.5 py-[3px] text-[11.5px] font-bold"
+            style={{
+              background: trend.up ? 'rgba(71,160,24,0.1)' : 'rgba(239,37,88,0.1)',
+              color: trend.up ? 'var(--green-dark)' : 'var(--pink)',
+            }}
+          >
             {trend.up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}{trend.value}
           </span>
         )}
       </div>
-      <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-muted)' }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 1 }}>{subtitle}</div>}
-      <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 'clamp(24px, 8vw, 36px)', letterSpacing: -1, color: 'var(--text-main)', lineHeight: 1.1 }}><StatValue value={value} /></span>
-        {suffix && <span style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-light)' }}>{suffix}</span>}
+      <div className="text-[13px] font-medium text-muted">{title}</div>
+      {subtitle && <div className="mt-px text-[12px] text-light">{subtitle}</div>}
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="font-head text-[clamp(21px,5.5vw,36px)] font-extrabold leading-[1.1] tracking-[-1px] text-ink">
+          <StatValue value={value} />
+        </span>
+        {suffix && <span className="text-[17px] font-semibold text-light">{suffix}</span>}
       </div>
     </div>
   );

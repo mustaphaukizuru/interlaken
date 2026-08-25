@@ -34,7 +34,7 @@ export default function AdminDashboard() {
         {isError ? (
           <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
         ) : (
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:gap-[18px]">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-[18px] lg:grid-cols-3 xl:grid-cols-4">
             {isLoading ? (
               [0, 1, 2, 3, 4, 5, 6, 7].map(i => <div key={i} className="skeleton h-[148px]" />)
             ) : (
