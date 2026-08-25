@@ -40,6 +40,9 @@ class StaffUserSerializer(serializers.ModelSerializer):
         return u.has_usable_password()
 
 
+STAFF_PAGE = 20  # matches DRF's global PAGE_SIZE
+
+
 def _guard_target(request, target):
     if target.is_superuser:
         return 'Las cuentas superusuario se administran desde el panel técnico.'
@@ -53,7 +56,17 @@ class StaffListCreateView(APIView):
 
     def get(self, request):
         qs = User.objects.filter(role__in=STAFF_ROLES).order_by('-is_active', 'role', 'last_name', 'first_name')
-        return Response({'results': StaffUserSerializer(qs, many=True).data, 'count': qs.count()})
+        # The envelope always looked paginated but never sliced, so the payload
+        # grew with every staff account ever created (deactivated ones included).
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        start = (page - 1) * STAFF_PAGE
+        return Response({
+            'results': StaffUserSerializer(qs[start:start + STAFF_PAGE], many=True).data,
+            'count': qs.count(),
+        })
 
     def post(self, request):
         email = (request.data.get('email') or '').strip().lower()

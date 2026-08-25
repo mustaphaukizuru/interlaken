@@ -103,6 +103,8 @@ class Notification(models.Model):
         indexes = [
             models.Index(fields=['user', 'is_read']),
             models.Index(fields=['delivered_at', 'created_at']),
+            # NotificationListView always filters by user and orders -created_at.
+            models.Index(fields=['user', '-created_at']),
         ]
 
     def __str__(self):

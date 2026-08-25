@@ -591,8 +591,8 @@ export const legalApi = {
   /** Acceso: download everything held on the requesting household. */
   exportMyData: () => api.get('/legal/arco/export/'),
   // Staff console
-  adminListArco: (status?: string) =>
-    api.get('/legal/admin/arco/', { params: status ? { status } : {} }),
+  adminListArco: (status?: string, page?: number) =>
+    api.get('/legal/admin/arco/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
   adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
     api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
   /** Record a request received via privacidad@ / WhatsApp / in person (BACKLOG P5-5). */
@@ -719,7 +719,7 @@ export const portalApi = {
   markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 
   // Admin comunicados (announcements) CRUD.
-  adminListAnnouncements: () => api.get('/portal/admin/announcements/'),
+  adminListAnnouncements: (params?: { page?: number }) => api.get('/portal/admin/announcements/', { params }),
   /** Portal novedades feed (BACKLOG P4-11). */
   novedades: (since?: string) => api.get<{ since: string; unread: number; items: NovedadItem[] }>('/portal/novedades/', { params: since ? { since } : undefined }),
   /** Public avisos banner (BACKLOG P3-9). */
@@ -802,7 +802,8 @@ export const portalApi = {
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
   /** Staff user management (BACKLOG P1-H1). */
-  listStaff: () => api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/'),
+  listStaff: (page?: number) =>
+    api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/', { params: page && page > 1 ? { page } : undefined }),
   inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role'] }) =>
     api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
   updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name'>>) =>
@@ -810,8 +811,8 @@ export const portalApi = {
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
   /** Password request inbox (admin). */
-  getPasswordRequests: (status?: string) =>
-    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: status ? { status } : undefined }),
+  getPasswordRequests: (status?: string, page?: number) =>
+    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
   createPasswordRequest: (data: { requested_email: string; requester_name?: string; channel: string; note?: string }) =>
     api.post<PasswordRequest>('/accounts/admin/password-requests/', data),
   updatePasswordRequest: (id: number, data: { action: 'resolve' | 'reject'; delivered_via?: string; note?: string }) =>

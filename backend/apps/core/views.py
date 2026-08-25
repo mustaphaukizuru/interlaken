@@ -12,6 +12,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 
 from .models import AuditLog
@@ -89,15 +90,6 @@ class HealthView(APIView):
         )
 
 
-class IsAdminRole(permissions.BasePermission):
-    """Admin-role gate (mirrors finance/cafeteria IsAdmin: 401 anon, 403 others)."""
-
-    def has_permission(self, request, view):
-        from apps.accounts.models import User
-        user = request.user
-        return bool(user and user.is_authenticated and user.role == User.Role.ADMIN)
-
-
 class AdminAuditLogView(generics.ListAPIView):
     """GET /api/v1/core/admin/audit/ — read-only, paginated audit trail (admin).
 
@@ -107,7 +99,7 @@ class AdminAuditLogView(generics.ListAPIView):
     ``from`` / ``to`` (ISO dates, inclusive). Newest first.
     """
     serializer_class = AuditLogSerializer
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
         qs = AuditLog.objects.select_related('actor')
@@ -212,7 +204,7 @@ class FacturacionRequestView(APIView):
 class ContactInboxView(generics.ListAPIView):
     """GET /api/v1/core/admin/contact-messages/?handled=0 — website inbox (BACKLOG P1-G7)."""
     serializer_class = None
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import ContactMessageAdminSerializer
@@ -235,7 +227,7 @@ class ContactInboxView(generics.ListAPIView):
 
 class ContactMessageHandleView(APIView):
     """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool}"""
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
         from django.shortcuts import get_object_or_404

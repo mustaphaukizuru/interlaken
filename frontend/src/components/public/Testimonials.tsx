@@ -5,13 +5,21 @@ import { contentApi, type Testimonial } from '@/services/api';
 
 /** Published family/alumni quotes (BACKLOG P2-15). Renders nothing when the school has none. */
 export function Testimonials({ limit = 3, title = 'Lo que dicen las familias' }: { limit?: number; title?: string }) {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['testimonials'],
     queryFn: async () => (await contentApi.getTestimonials()).data as Testimonial[],
     staleTime: 5 * 60_000,
     retry: false,
   });
   const items = (data ?? []).slice(0, limit);
+  // Loading: reserve the space so the page below does not jump when quotes land.
+  if (isLoading) {
+    return (
+      <div aria-hidden="true" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => <div key={i} className="skeleton h-[168px] rounded-xl2" />)}
+      </div>
+    );
+  }
   if (items.length === 0) return null;
   return (
     <div>

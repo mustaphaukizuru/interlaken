@@ -10,23 +10,19 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsAdmin
+
 from .models import SETTINGS_CACHE_KEY, SiteSettings
 from .serializers import AdminSiteSettingsSerializer, SiteSettingsSerializer
 
 CACHE_TTL_SECONDS = 300
 
 
-class _IsAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        u = request.user
-        return bool(u and u.is_authenticated and getattr(u, 'role', '') == 'admin')
-
-
 class AdminSiteSettingsView(APIView):
     """GET/PATCH /api/v1/content/admin/settings/ — edit the public site settings
     (contact info, WhatsApp, socials) shown on the marketing site. A save
     invalidates the public read cache (SiteSettings.save)."""
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         return Response(AdminSiteSettingsSerializer(SiteSettings.load()).data)
@@ -104,6 +100,9 @@ class PublicPricingView(APIView):
         return Response(data)
 
 
+CALENDAR_CACHE_KEY = 'content:calendar:{key}'
+
+
 class PublicCalendarView(APIView):
     """GET /api/v1/content/calendar/?from=&to=&level= — published events (cached 5 min)."""
     permission_classes = [permissions.AllowAny]
@@ -123,12 +122,19 @@ class PublicCalendarView(APIView):
         level = request.query_params.get('level')
         if level:
             qs = qs.filter(models.Q(level='') | models.Q(level=level))
-        return Response(SchoolEventSerializer(qs, many=True).data)
+        key = CALENDAR_CACHE_KEY.format(key=f'{start}:{end}:{level or "all"}')
+        data = cache.get(key)
+        if data is None:
+            data = SchoolEventSerializer(qs, many=True).data
+            cache.set(key, data, CACHE_TTL_SECONDS)
+        resp = Response(data)
+        resp['Cache-Control'] = 'public, max-age=300'
+        return resp
 
 
 class AdminCalendarView(generics.ListCreateAPIView):
     """GET/POST /api/v1/content/admin/calendar/ (admin)."""
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import SchoolEventSerializer
@@ -141,7 +147,7 @@ class AdminCalendarView(generics.ListCreateAPIView):
 
 class AdminCalendarDetailView(generics.RetrieveUpdateDestroyAPIView):
     """PATCH/DELETE /api/v1/content/admin/calendar/<pk>/ (admin)."""
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import SchoolEventSerializer
@@ -168,7 +174,7 @@ class PublicTestimonialsView(APIView):
 
 
 class AdminTestimonialsView(generics.ListCreateAPIView):
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import TestimonialSerializer
@@ -184,7 +190,7 @@ class AdminTestimonialsView(generics.ListCreateAPIView):
 
 
 class AdminTestimonialDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [_IsAdmin]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         from .serializers import TestimonialSerializer

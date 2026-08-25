@@ -87,7 +87,7 @@ export default function CredencialPage() {
                     key={c.student.id}
                     type="button"
                     onClick={() => setSelectedId(c.student.id)}
-                    className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
+                    className={`inline-flex min-h-[44px] items-center rounded-full border px-4 text-sm font-semibold transition ${
                       on ? 'border-purple bg-purple text-white' : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
                     }`}
                   >

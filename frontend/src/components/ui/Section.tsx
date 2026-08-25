@@ -13,10 +13,12 @@ interface SectionProps extends HTMLAttributes<HTMLElement> {
   containerSize?: 'md' | 'lg' | 'xl';
 }
 
+// Vertical rhythm scales with the viewport: a phone gets air without the 72px
+// desktop gap that pushed content below the fold (audit 2026-08).
 const PAD: Record<NonNullable<SectionProps['spacing']>, string> = {
-  sm: '48px 0',
-  md: '72px 0',
-  lg: '96px 0',
+  sm: 'py-8 sm:py-10 lg:py-12',
+  md: 'py-12 sm:py-16 lg:py-[72px]',
+  lg: 'py-16 sm:py-20 lg:py-24',
 };
 
 const BG: Record<BgVariant, React.CSSProperties> = {
@@ -36,12 +38,13 @@ export function Section({
   spacing = 'md',
   container = true,
   containerSize = 'lg',
+  className = '',
   style,
   children,
   ...props
 }: SectionProps) {
   return (
-    <section style={{ padding: PAD[spacing], ...BG[bg], ...style }} {...props}>
+    <section className={`${PAD[spacing]} ${className}`.trim()} style={{ ...BG[bg], ...style }} {...props}>
       {container ? <Container size={containerSize}>{children}</Container> : children}
     </section>
   );

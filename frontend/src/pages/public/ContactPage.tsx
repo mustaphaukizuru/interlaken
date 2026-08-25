@@ -66,7 +66,7 @@ export default function ContactPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <Blob tone="pink" opacity={0.4} size={460} shape={1} className="hidden sm:block" style={{ top: -150, left: -110 }} />
         <Blob tone="purple" opacity={0.4} size={420} shape={0} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
-        <div className="relative mx-auto w-full max-w-[1120px] px-6 py-14 sm:py-16">
+        <div className="relative mx-auto w-full max-w-[1120px] py-14 sm:py-16">
           <span className="section-label-pink inline-flex">Estamos para ayudarle</span>
           <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
             Contacto
@@ -205,7 +205,7 @@ export default function ContactPage() {
 
       {/* ── DIRECTORIO POR NIVEL ── */}
       <Section bg="cream">
-        <div className="mx-auto w-full max-w-[1120px] px-6">
+        <div className="mx-auto w-full max-w-[1120px]">
           <span className="section-label-green inline-flex">Directorio</span>
           <h2 className="mt-2 font-head text-fluid-xl font-bold text-ink">
             Atención por nivel educativo
@@ -246,7 +246,7 @@ export default function ContactPage() {
 
       {/* ── MAPA ── */}
       <section className="bg-white pb-14 pt-4">
-        <div className="mx-auto w-full max-w-[1120px] px-6">
+        <div className="mx-auto w-full max-w-[1120px]">
           <h2 className="font-head text-fluid-xl font-bold text-ink">Cómo llegar</h2>
           <p className="mt-1 text-sm text-muted">
             {settings.address}

@@ -1,10 +1,12 @@
 """
 bookings/views.py — Public slot picker + booking, admin availability & management.
 """
+import logging
 from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -47,6 +49,9 @@ def _slot_start(slot):
     return timezone.make_aware(datetime.combine(slot.date, slot.start_time))
 
 
+AVAILABILITY_HORIZON_DAYS = 120
+
+
 def _open_slots_qs(params):
     """Filter active, non-past slots by optional ?type=&from=&to=."""
     today = timezone.localdate()  # school-local day, not the UTC calendar date
@@ -63,6 +68,10 @@ def _open_slots_qs(params):
     date_to = params.get('to')
     if date_to:
         qs = qs.filter(date__lte=date_to)
+    else:
+        # Without an upper bound this public endpoint returned every slot the
+        # generator ever created. Nobody books a visit a year out.
+        qs = qs.filter(date__lte=today + timedelta(days=AVAILABILITY_HORIZON_DAYS))
 
     # One grouped aggregate for booked_count/is_full instead of 3 per slot.
     return AvailabilitySlot.annotate_booked(qs.order_by('date', 'start_time'))
@@ -305,20 +314,26 @@ class AdminBookingRescheduleView(APIView):
             return Response({'slot': ['Horario no válido.']}, status=status.HTTP_400_BAD_REQUEST)
         if slot.pk == booking.slot_id:
             return Response({'slot': ['Es el mismo horario.']}, status=status.HTTP_400_BAD_REQUEST)
-        booked = Booking.objects.filter(slot=slot).exclude(status=Booking.Status.CANCELLED).exclude(pk=booking.pk).count()
-        if booked + booking.num_attendees > slot.capacity:
-            return Response({'slot': ['Ese horario ya no tiene cupo suficiente.']}, status=status.HTTP_400_BAD_REQUEST)
-        old = booking.slot
-        booking.rescheduled_from = old
-        booking.slot = slot
-        if booking.status in (Booking.Status.NO_SHOW, Booking.Status.CANCELLED):
-            booking.status = Booking.Status.CONFIRMED
-        booking.save(update_fields=['slot', 'rescheduled_from', 'status', 'updated_at'])
+        # Lock the target slot while we count and move, so two admins
+        # rescheduling into the last seat cannot both succeed (create_booking
+        # already does this; this path did not).
+        with transaction.atomic():
+            slot = AvailabilitySlot.objects.select_for_update().get(pk=slot.pk)
+            booked = (Booking.objects.filter(slot=slot).exclude(status=Booking.Status.CANCELLED)
+                      .exclude(pk=booking.pk).count())
+            if booked + booking.num_attendees > slot.capacity:
+                return Response({'slot': ['Ese horario ya no tiene cupo suficiente.']}, status=status.HTTP_400_BAD_REQUEST)
+            old = booking.slot
+            booking.rescheduled_from = old
+            booking.slot = slot
+            if booking.status in (Booking.Status.NO_SHOW, Booking.Status.CANCELLED):
+                booking.status = Booking.Status.CONFIRMED
+            booking.save(update_fields=['slot', 'rescheduled_from', 'status', 'updated_at'])
         try:
             calendar.sync_booking_cancelled(booking)
             calendar.sync_booking_created(booking)
-        except Exception:  # noqa: BLE001 - calendar is best effort
-            pass
+        except Exception:  # noqa: BLE001 - calendar is best effort, but never silent
+            logging.getLogger(__name__).exception('Calendar resync failed for booking %s', booking.pk)
         from apps.portal.services import send_email
         send_email(
             'Su visita al Colegio Interlaken cambió de horario',

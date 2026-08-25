@@ -124,4 +124,5 @@ export const ConversionEvent = {
   AdmissionsStepCta: 'admissions_step_cta',
   EstimatorUsed: 'estimator_used',
   WhatsappCta: 'whatsapp_cta',
+  PhoneCta: 'phone_cta',
 } as const;

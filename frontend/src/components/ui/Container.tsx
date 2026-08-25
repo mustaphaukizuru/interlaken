@@ -15,10 +15,13 @@ const MAX: Record<NonNullable<ContainerProps['size']>, number> = {
  * Centered max-width wrapper with consistent horizontal padding.
  * Replaces the repeated `margin: 0 auto; padding: 0 24px; max-width` inline blocks.
  */
-export function Container({ size = 'lg', style, children, ...props }: ContainerProps) {
+export function Container({ size = 'lg', className = '', style, children, ...props }: ContainerProps) {
   return (
     <div
-      style={{ width: '100%', maxWidth: MAX[size], margin: '0 auto', padding: '0 24px', ...style }}
+      // Gutter as classes (not inline) so pages can override it and phones get
+      // 20px instead of a fixed 24px; nested containers no longer double up.
+      className={`mx-auto w-full px-5 sm:px-6 lg:px-8 ${className}`.trim()}
+      style={{ maxWidth: MAX[size], ...style }}
       {...props}
     >
       {children}

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { ShieldCheck, Plus, Clock, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -10,10 +10,11 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Pagination } from '@/components/ui/Pagination';
 import { legalApi, type ArcoRequest } from '@/services/api';
-import { toPaged } from '@/lib/pagination';
+import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { apiErrors } from '@/cms/editor/helpers';
-import { useUrlFilters } from '@/hooks/useUrlFilters';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 
 const TYPE: Record<string, string> = { access: 'Acceso', rectification: 'Rectificación', cancellation: 'Cancelación', opposition: 'Oposición' };
 const STATUS: Record<string, { label: string; tone: 'info' | 'warning' | 'success' | 'error' }> = {
@@ -34,8 +35,13 @@ export default function AdminArco() {
   const qc = useQueryClient();
   const { get, set } = useUrlFilters();
   const status = get('status') || 'open';
-  const { data, isLoading } = useQuery({ queryKey: ['admin-arco', status], queryFn: async () => toPaged<ArcoRequest>((await legalApi.adminListArco(status === 'open' || status === 'all' ? undefined : status)).data) });
-  const rows = (data?.results ?? []).filter((r) => status !== 'open' || r.status === 'received' || r.status === 'in_review');
+  const [page, setPage] = useUrlPage();
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-arco', status, page],
+    queryFn: async () => toPaged<ArcoRequest>((await legalApi.adminListArco(status === 'all' ? undefined : status, page)).data),
+    placeholderData: keepPreviousData,
+  });
+  const rows = data?.results ?? [];
   const [intake, setIntake] = useState(false);
   const [resolving, setResolving] = useState<{ r: ArcoRequest; status: 'resolved' | 'rejected' | 'in_review' } | null>(null);
   const [note, setNote] = useState('');
@@ -82,6 +88,7 @@ export default function AdminArco() {
             ))}
           </ul>
         )}
+        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={data?.count ?? 0} onChange={setPage} itemLabel="solicitudes" />
       </Card>
       <IntakeModal open={intake} onClose={() => setIntake(false)} onSaved={() => { setIntake(false); invalidate(); }} />
       <Modal open={!!resolving} onClose={() => setResolving(null)} title={resolving?.status === 'resolved' ? 'Resolver solicitud' : resolving?.status === 'rejected' ? 'Rechazar solicitud' : 'Marcar en revisión'} maxWidth={480}>

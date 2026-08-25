@@ -34,15 +34,15 @@ export function SiteNoticeBanner() {
   const isExternal = n.link.startsWith('http');
   return (
     <div role="status" aria-live="polite" className="bg-amber text-ink">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 text-sm sm:px-6">
+      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-1.5 text-sm sm:gap-3 sm:px-6">
         <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <p className="min-w-0 flex-1 truncate">
+        <p className="line-clamp-2 min-w-0 flex-1 sm:line-clamp-1">
           <strong className="font-semibold">{n.title}.</strong> {n.body}
-          {n.link && (isExternal
-            ? <a href={n.link} className="ml-2 font-semibold underline" target="_blank" rel="noopener noreferrer">Ver más</a>
-            : <Link to={n.link} className="ml-2 font-semibold underline">Ver más</Link>)}
         </p>
-        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="rounded p-1 hover:bg-black/10"><X className="h-4 w-4" aria-hidden="true" /></button>
+        {n.link && (isExternal
+          ? <a href={n.link} className="shrink-0 whitespace-nowrap font-semibold underline underline-offset-2" target="_blank" rel="noopener noreferrer">Ver más</a>
+          : <Link to={n.link} className="shrink-0 whitespace-nowrap font-semibold underline underline-offset-2">Ver más</Link>)}
+        <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
     </div>
   );

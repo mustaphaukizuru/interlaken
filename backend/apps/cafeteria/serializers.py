@@ -98,7 +98,10 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
 
 
 class CafeteriaTransactionSerializer(serializers.ModelSerializer):
-    student_id = serializers.IntegerField(source='student.id', read_only=True)
+    # No source= here: DRF reads ``obj.student_id``, the FK column already on
+    # the row. ``source='student.id'`` fetched the whole related object once per
+    # row (N+1 on every ledger page).
+    student_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = CafeteriaTransaction

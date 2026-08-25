@@ -21,6 +21,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
   // Focus management for the full-screen view (same pattern as Modal): move
   // focus to the close button on open, restore it to the opener on close.
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
   // Escape closes the full-screen scan view; body scroll is locked while open.
@@ -30,7 +31,21 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
     closeBtnRef.current?.focus();
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setFull(false); return; }
+      // Trap Tab inside the overlay: it declares aria-modal, but focus could
+      // still walk into the portal behind it, where a screen-reader user has no
+      // way of knowing the card is covering the page.
+      if (e.key !== 'Tab' || !overlayRef.current) return;
+      const focusable = overlayRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = prevOverflow;
@@ -99,6 +114,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
       {/* Full-screen scan view */}
       {full && card.code && (
         <div
+          ref={overlayRef}
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white p-[max(1.5rem,env(safe-area-inset-bottom))]"
           role="dialog"
           aria-modal="true"

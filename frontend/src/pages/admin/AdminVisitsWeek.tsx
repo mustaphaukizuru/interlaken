@@ -72,8 +72,8 @@ export default function AdminVisitsWeek() {
         <span className="inline-flex items-center gap-1 text-sm font-semibold text-ink"><CalendarDays size={16} className="text-purple" aria-hidden="true" /> {weekLabel}</span>
       </div>
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
-        <div className="-mx-4 overflow-x-auto px-4 pb-4">
-          <div className="grid min-w-[980px] grid-cols-7 gap-2" role="list" aria-label="Días de la semana">
+        <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
+          <div className="grid grid-cols-1 gap-2 md:min-w-[980px] md:grid-cols-7" role="list" aria-label="Días de la semana">
             {data.days.map((d, i) => {
               const isToday = d.date === new Date().toISOString().slice(0, 10);
               return (
@@ -94,10 +94,10 @@ export default function AdminVisitsWeek() {
                               </div>
                               {b.outcome && <p className="text-[11px] text-green-700">Resultado: {OUTCOMES.find(([k]) => k === b.outcome)?.[1] ?? b.outcome}</p>}
                               <div className="mt-1 flex flex-wrap gap-1">
-                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-subtle hover:bg-white hover:text-ink" onClick={() => { setMoving(b); setTargetSlot(null); }}><MoveRight size={11} className="mr-0.5 inline" aria-hidden="true" />Reprogramar</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-subtle hover:bg-white hover:text-ink" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-coral-600 hover:bg-white" onClick={() => action.mutate({ id: b.id, act: 'no_show' })}>No asistió</button>}
-                                {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="rounded px-1.5 py-0.5 text-[11px] text-subtle hover:bg-white hover:text-ink" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
+                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setMoving(b); setTargetSlot(null); }}><MoveRight size={11} className="mr-0.5 inline" aria-hidden="true" />Reprogramar</button>}
+                                {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
+                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" onClick={() => action.mutate({ id: b.id, act: 'no_show' })}>No asistió</button>}
+                                {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
                               </div>
                             </li>
                           ))}

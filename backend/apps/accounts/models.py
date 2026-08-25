@@ -143,6 +143,8 @@ class StudentProfile(models.Model):
         indexes = [
             models.Index(fields=['loyverse_id']),
             models.Index(fields=['is_active', 'loyverse_id']),
+            # Roster filters and bulk top-up select by grade/group (audit 2026-08).
+            models.Index(fields=['grade', 'group']),
         ]
 
     def __str__(self):

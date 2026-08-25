@@ -4,13 +4,15 @@ import toast from 'react-hot-toast';
 import {
   ArrowRight, Award, TrendingUp, Star, Check, Users, GraduationCap,
   CalendarDays, Languages, Trophy, Palette, FlaskConical,
-  Heart, Mail, Send,
+  Heart, Mail, Send, ShieldCheck,
 } from 'lucide-react';
 import type { Variants } from 'framer-motion';
 import { contactApi } from '@/services/api';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { m, SiteMotionProvider } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useQuery } from '@tanstack/react-query';
+import { contentApi } from '@/services/api';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
@@ -18,6 +20,7 @@ import { Container } from '@/components/ui/Container';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import Logo from '@/components/ui/Logo';
 import { assetSrcSet, CARD_SIZES } from '@/lib/images';
+import { HeroVideo } from '@/components/public/HeroVideo';
 
 const STATS = [
   { value: '1,200+', label: 'Alumnos', color: 'var(--pink)', icon: Users },
@@ -45,7 +48,7 @@ const PROMOS = [
     label: 'Modelo Bilingüe',
     title: 'Inglés desde preescolar, todos los días',
     desc: 'Un programa intensivo con certificaciones internacionales que prepara a nuestros alumnos para un mundo global.',
-    to: '/nosotros',
+    to: '/modelo-educativo',
     cta: 'Conozca el modelo',
     grad: 'linear-gradient(135deg, var(--purple) 0%, var(--purple-mid) 100%)',
     icon: Languages,
@@ -185,25 +188,31 @@ function NewsletterCTA() {
             <Check size={18} color="var(--green-mid)" strokeWidth={3} /> ¡Solicitud recibida! Le contactaremos pronto.
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 sm:mt-6 sm:flex-row">
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre completo"
-              aria-label="Nombre completo"
-              className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_180px]"
-            />
-            <input
-              type="email" inputMode="email" autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Correo electrónico"
-              aria-label="Correo electrónico"
-              className="min-w-0 flex-1 rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple sm:flex-[1_1_220px]"
-            />
+          <form onSubmit={onSubmit} className="mt-6 flex flex-col flex-wrap justify-center gap-3 text-left sm:mt-6 sm:flex-row sm:items-end">
+            {/* Visible labels, not placeholders: the placeholder vanishes on the
+                first keystroke, leaving the field unidentified on review and for
+                voice control. */}
+            <label className="min-w-0 flex-1 sm:flex-[1_1_180px]">
+              <span className="mb-1.5 block text-sm font-medium text-white/90">Nombre completo</span>
+              <input
+                type="text"
+                required
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+              />
+            </label>
+            <label className="min-w-0 flex-1 sm:flex-[1_1_220px]">
+              <span className="mb-1.5 block text-sm font-medium text-white/90">Correo electrónico</span>
+              <input
+                type="email" inputMode="email" autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-full border-none px-5 py-3.5 text-[15px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-pink focus-visible:ring-offset-2 focus-visible:ring-offset-purple"
+              />
+            </label>
             <button
               type="submit"
               className="btn btn-lg shrink-0 justify-center bg-pink text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple disabled:opacity-70"
@@ -212,6 +221,20 @@ function NewsletterCTA() {
               {sending ? 'Enviando…' : <>Solicitar <Send size={16} /></>}
             </button>
           </form>
+        )}
+        {!done && (
+          // LFPDPPP notice at the point of collection. PrivacyNote's muted grey
+          // is unreadable on this purple band, so the same copy is restated here
+          // in the band's own palette.
+          <p className="mx-auto mt-4 flex max-w-[520px] items-start justify-center gap-2 text-xs leading-relaxed text-white/80">
+            <ShieldCheck size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span>
+              Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el{' '}
+              <Link to="/aviso-de-privacidad" className="font-semibold text-white underline underline-offset-2">
+                Aviso de Privacidad
+              </Link>.
+            </span>
+          </p>
         )}
       </div>
     </div>
@@ -222,7 +245,15 @@ export default function HomePage() {
   const settings = useSiteSettings();
   const hasVideo = settings.video_url.trim() !== '';
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-  const heroVideo = !reducedMotion && (settings.hero_video_url ?? '').trim() ? settings.hero_video_url : '';
+  // Skip the whole testimonials band when the school has not published quotes
+  // yet (it used to render as an empty cream stripe).
+  const { data: testimonials } = useQuery({
+    queryKey: ['testimonials'],
+    queryFn: async () => (await contentApi.getTestimonials()).data as unknown[],
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const hasTestimonials = (testimonials ?? []).length > 0;
 
   return (
     // Motion provider lives HERE (not in the shared layout) so the framer
@@ -230,45 +261,20 @@ export default function HomePage() {
     <SiteMotionProvider>
     <div>
       {/* ── HERO: brand + one headline + one line + CTAs over full-bleed campus ── */}
-      <section className="relative flex min-h-[min(92svh,820px)] items-end overflow-hidden bg-dark text-white sm:min-h-[min(88svh,760px)]">
-        <img
-          src="/assets/court-wide.webp"
-          srcSet={assetSrcSet('/assets/court-wide.webp', { full: true })}
-          sizes="100vw"
-          alt="Campus Colegio Interlaken"
-          {...{ fetchpriority: 'high' }} // React 18 lacks the camelCase prop; lowercase via spread avoids the TS/DOM warning
-          decoding="async"
-          width={1600}
-          height={900}
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          onError={hideOnError}
-        />
-        {heroVideo && (
-          // BACKLOG P2-1: silent looping video on ≥ md; the poster image stays as LCP/fallback.
-          <video
-            className="absolute inset-0 hidden h-full w-full object-cover object-center md:block"
-            src={heroVideo}
-            poster="/assets/court-wide.webp"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-          />
-        )}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(180deg, rgba(8,5,22,0.35) 0%, rgba(8,5,22,0.55) 42%, rgba(8,5,22,0.92) 100%)',
-          }}
-        />
+      <HeroVideo
+        className="min-h-[min(92svh,820px)] sm:min-h-[min(88svh,760px)]"
+        src={settings.hero_video_url ?? ''}
+        poster="/assets/court-wide.webp"
+        posterAlt="Campus Colegio Interlaken"
+        reducedMotion={reducedMotion}
+      >
         <div
           className="pointer-events-none absolute -top-32 -left-24 hidden h-[420px] w-[420px] rounded-full sm:block"
           style={{ background: 'radial-gradient(circle, rgba(64,26,142,0.4), transparent 68%)' }}
         />
-        <Container className="relative w-full !pb-12 !pt-28 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
+        {/* pb on phones clears the fixed "Agendar visita" bar, which otherwise
+            sits on top of the secondary hero CTA at the fold. */}
+        <Container className="relative w-full !pb-28 !pt-28 sm:!pb-16 sm:!pt-32 lg:!pb-[72px]">
           <m.div
             className="max-w-[640px]"
             variants={heroGroup}
@@ -316,7 +322,7 @@ export default function HomePage() {
             </m.div>
           </m.div>
         </Container>
-      </section>
+      </HeroVideo>
 
       {/* ── STAT BANNER ── */}
       <section className="bg-dark-2 py-10 text-white">
@@ -452,7 +458,7 @@ export default function HomePage() {
         >
           {PROGRAMS.map((p) => (
             <m.div key={p.name} variants={sectionReveal} className="text-center">
-              <div className="relative mx-auto h-[150px] w-[150px] max-w-full">
+              <div className="relative mx-auto aspect-square w-full max-w-[150px]">
                 <div className="absolute inset-0 rounded-full" style={{ background: `color-mix(in srgb, ${p.accent} 8%, transparent)` }} />
                 <div className="absolute inset-2.5 overflow-hidden rounded-full" style={{ border: `3px solid ${p.accent}`, boxShadow: `0 16px 30px -14px color-mix(in srgb, ${p.accent} 53%, transparent)` }}>
                   <img src={p.img} srcSet={assetSrcSet(p.img)} sizes={CARD_SIZES} alt={p.name} loading="lazy" decoding="async" width={150} height={150} className="h-full w-full max-w-full object-cover" onError={hideOnError} />
@@ -553,10 +559,12 @@ export default function HomePage() {
         </Section>
       )}
 
-      {/* ── TESTIMONIOS (BACKLOG P2-15) ── */}
-      <Section bg="cream">
-        <Testimonials />
-      </Section>
+      {/* ── TESTIMONIOS (BACKLOG P2-15) — the band disappears with no quotes ── */}
+      {hasTestimonials && (
+        <Section bg="cream">
+          <Testimonials />
+        </Section>
+      )}
 
       {/* ── GALLERY ── */}
       <Section bg="dark">
@@ -572,8 +580,13 @@ export default function HomePage() {
         </m.div>
         <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {GALLERY.map((src, i) => (
-            <img key={i} src={src} srcSet={assetSrcSet(src)} sizes="(min-width: 640px) 280px, 45vw" alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full rounded-[14px] border border-white/[0.08] object-cover sm:h-[150px]" onError={hideOnError} />
+            <Link key={i} to="/galeria" aria-label="Ver la galería completa" className="group block overflow-hidden rounded-[14px] border border-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+              <img src={src} srcSet={assetSrcSet(src)} sizes="(min-width: 640px) 280px, 45vw" alt="" loading="lazy" width={280} height={150} className="h-[120px] w-full max-w-full object-cover transition-transform duration-500 group-hover:scale-[1.04] motion-reduce:transition-none sm:h-[150px]" onError={hideOnError} />
+            </Link>
           ))}
+        </div>
+        <div className="mt-7 text-center">
+          <Link to="/galeria" className="btn-ghost min-h-[44px]">Ver la galería completa <ArrowRight size={16} /></Link>
         </div>
       </Section>
 

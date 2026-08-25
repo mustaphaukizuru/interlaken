@@ -27,7 +27,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 
-from .base import BaseGateway, CheckoutSession, LiveCheckoutNotConfigured
+from .base import BaseGateway, CheckoutSession, LiveCheckoutNotConfigured, resolve_checkout_base
 
 logger = logging.getLogger(__name__)
 
@@ -38,21 +38,8 @@ _DEFAULT_CHECKOUT_URL = 'https://gateway.sandbox.banorte.com/pagos/checkout'
 
 def _checkout_base() -> str:
     """Resolve the Banorte checkout base URL, honouring PAYMENTS_LIVE."""
-    configured = (getattr(settings, 'BANORTE_CHECKOUT_URL', '') or '').strip()
-    live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
-    local_mock = f'{settings.FRONTEND_URL.rstrip("/")}/pago/simulado'
-    if live:
-        if not configured or 'simulado' in configured.lower():
-            raise LiveCheckoutNotConfigured(
-                'PAYMENTS_LIVE=true requiere BANORTE_CHECKOUT_URL '
-                '(checkout real del comercio). No se usará /pago/simulado.')
-        return configured
-    # Sandbox mode: never hit a live merchant URL.
-    if not configured:
-        return local_mock
-    if 'sandbox' in configured.lower() or 'simulado' in configured.lower():
-        return configured
-    return _DEFAULT_CHECKOUT_URL
+    return resolve_checkout_base(
+        'BANORTE_CHECKOUT_URL', _DEFAULT_CHECKOUT_URL, 'checkout real del comercio')
 
 
 def _merchant_ready() -> bool:

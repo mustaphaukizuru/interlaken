@@ -42,6 +42,7 @@ export function RegistrationReviewModal({ id, open, onClose }: {
   });
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [rejecting, setRejecting] = useState<{ id: number; label: string; note: string } | null>(null);
 
   // Prod serves no /media/, so we fetch the file with auth (JWT via the api
   // client) and save the returned blob rather than linking to a URL.
@@ -201,18 +202,18 @@ export function RegistrationReviewModal({ id, open, onClose }: {
             ) : (
               <ul className="space-y-2">
                 {data.documents.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2.5">
                     <span className="flex min-w-0 items-center gap-2 text-sm text-ink">
                       <FileText className="h-4 w-4 shrink-0 text-subtle" />
                       <span className="truncate">{DOC_LABELS[d.doc_type] ?? d.doc_type}</span>
                       <span className="truncate text-xs text-subtle">· {d.filename}</span>
                     </span>
-                    <div className="flex shrink-0 items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
                         disabled={downloadingId === d.id}
                         onClick={() => handleDownload(d)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-cream px-2.5 py-1 text-xs font-semibold text-muted transition hover:bg-line disabled:opacity-50"
+                        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-cream px-3 text-xs font-semibold text-muted transition hover:bg-line disabled:opacity-50"
                         aria-label={`Descargar ${d.filename}`}
                       >
                         <Download className="h-3.5 w-3.5" />
@@ -222,12 +223,8 @@ export function RegistrationReviewModal({ id, open, onClose }: {
                         <button
                           type="button"
                           disabled={reviewDoc.isPending}
-                          onClick={() => {
-                            const note = window.prompt('Motivo del rechazo (se envía a la familia):', d.review_note ?? '');
-                            if (note === null) return;
-                            reviewDoc.mutate({ docId: d.id, status: 'rejected', note });
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-cream px-2.5 py-1 text-xs font-semibold text-coral-dark transition hover:bg-coral-50 disabled:opacity-50"
+                          onClick={() => setRejecting({ id: d.id, label: DOC_LABELS[d.doc_type] ?? d.doc_type, note: d.review_note ?? '' })}
+                          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-cream px-3 text-xs font-semibold text-coral-dark transition hover:bg-coral-50 disabled:opacity-50"
                         >
                           Rechazar
                         </button>
@@ -237,7 +234,7 @@ export function RegistrationReviewModal({ id, open, onClose }: {
                         type="button"
                         disabled={verifyDoc.isPending}
                         onClick={() => verifyDoc.mutate({ docId: d.id, next: !d.is_verified })}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                        className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition disabled:opacity-50 ${
                           d.is_verified ? 'bg-green-50 text-green-700' : 'bg-cream text-muted hover:bg-line'
                         }`}
                       >
@@ -250,6 +247,38 @@ export function RegistrationReviewModal({ id, open, onClose }: {
               </ul>
             )}
           </div>
+
+          <Modal open={!!rejecting} onClose={() => setRejecting(null)} title={`Rechazar: ${rejecting?.label ?? ''}`} maxWidth={460}>
+            <div className="space-y-3">
+              <p className="text-sm text-muted">La familia recibe este motivo por correo y puede volver a subir el documento.</p>
+              <div>
+                <label className="label" htmlFor="reject-doc-note">Motivo del rechazo</label>
+                <textarea
+                  id="reject-doc-note"
+                  className="input-field"
+                  rows={3}
+                  value={rejecting?.note ?? ''}
+                  onChange={(e) => setRejecting((r) => (r ? { ...r, note: e.target.value } : r))}
+                  placeholder="La foto está borrosa; envíe el acta completa."
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setRejecting(null)}>Cancelar</Button>
+                <Button
+                  variant="danger"
+                  loading={reviewDoc.isPending}
+                  disabled={!rejecting?.note.trim()}
+                  onClick={() => {
+                    if (!rejecting) return;
+                    reviewDoc.mutate({ docId: rejecting.id, status: 'rejected', note: rejecting.note.trim() });
+                    setRejecting(null);
+                  }}
+                >
+                  Rechazar y avisar
+                </Button>
+              </div>
+            </div>
+          </Modal>
 
           {/* Review decision — keyed so switching to a different registration
               reseeds the controls, while refetches of the same one (e.g. after

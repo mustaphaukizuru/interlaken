@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
 import toast from 'react-hot-toast';
@@ -192,6 +192,16 @@ export default function AdminSettings() {
   const [edits, setEdits] = useState<Partial<SettingsForm>>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const form: SettingsForm = { ...EMPTY, ...data, ...edits };
+  const dirty = Object.keys(edits).length > 0;
+
+  // Leaving the page (tab close, reload) with pending edits would discard them
+  // silently; the browser asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
   const sepRows: SepRow[] = form.sep_incorporations ?? [];
   const setSep = (rows: SepRow[]) => setEdits((f) => ({ ...f, sep_incorporations: rows }));
   const set = (k: keyof SettingsForm, v: string) => {
@@ -234,6 +244,16 @@ export default function AdminSettings() {
         }
       />
 
+      {dirty && (
+        // Sticky save: on a phone the header button scrolls out of view within
+        // one swipe, and the accumulated edits are only in memory.
+        <div className="sticky top-16 z-20 mb-4 flex items-center justify-between gap-3 rounded-xl border border-purple/30 bg-purple/5 px-4 py-2.5 text-sm">
+          <span className="text-ink">Cambios sin guardar</span>
+          <Button size="sm" onClick={() => save.mutate()} loading={save.isPending}>
+            <Save className="h-4 w-4" /> Guardar
+          </Button>
+        </div>
+      )}
       {isError ? (
         <Card><ErrorState onRetry={() => refetch()} /></Card>
       ) : isLoading ? (
