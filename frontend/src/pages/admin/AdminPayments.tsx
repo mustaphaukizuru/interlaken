@@ -7,18 +7,15 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
-import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { Pagination } from '@/components/ui/Pagination';
 import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
-import { ADMIN_PAGE_SIZE, toPaged } from '@/lib/pagination';
+import { toPaged } from '@/lib/pagination';
 import { formatMXN } from '@/lib/format';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import { paymentsApi, downloadBlob } from '@/services/api';
 import type { Payment } from '@/types';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
-import { SortableTh, parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
   success: { label: 'Completado', variant: 'success' },
@@ -31,6 +28,27 @@ const GATEWAYS: Record<string, string> = { global_payments: 'Global Payments', b
 
 /** /admin/pagos — gateway ledger: every online top-up, filters, totals, CSV (BACKLOG P1-D9).
  *  Refunds and cash approvals stay in the Cafetería console (money moves in one place). */
+const COLUMNS: Column<Payment>[] = [
+  {
+    header: 'Fecha', sortKey: 'date', className: 'whitespace-nowrap text-muted',
+    cell: (p) => new Date(p.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
+  },
+  {
+    header: 'Alumno', className: 'font-medium text-ink',
+    cell: (p) => p.student_id
+      ? <Link to={`/admin/cafeteria/${p.student_id}`} className="hover:text-purple hover:underline">{p.student_name}</Link>
+      : '—',
+  },
+  { header: 'Pagó', className: 'text-xs text-subtle', cell: (p) => p.description || '—' },
+  { header: 'Monto', sortKey: 'amount', align: 'right', className: 'font-semibold text-ink', cell: (p) => formatMXN(p.amount) },
+  { header: 'Pasarela', sortKey: 'gateway', className: 'text-muted', cell: (p) => p.gateway_label ?? GATEWAYS[p.gateway ?? ''] ?? p.gateway },
+  { header: 'Referencia', className: 'font-mono text-xs text-subtle', cell: (p) => p.gateway_tx_id || p.gateway_ref || '—' },
+  {
+    header: 'Estado', sortKey: 'status',
+    cell: (p) => <Badge variant={STATUS[p.status]?.variant ?? 'neutral'}>{STATUS[p.status]?.label ?? p.status}</Badge>,
+  },
+];
+
 export default function AdminPayments() {
   const { input: q, setInput: setQ, search: debouncedQ } = useUrlSyncedSearch('q');
   const [page, setPage] = useUrlPage();
@@ -124,43 +142,21 @@ export default function AdminPayments() {
         />
         <ActiveFilterChips chips={chips} onClearAll={() => { setQ(''); set({ estado: null, pasarela: null, desde: null, hasta: null, page: null }); }} />
 
-        {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading ? <TableSkeleton /> : !rows.length ? (
-          <EmptyState icon={CreditCard} title="Sin pagos" description="No hay pagos con esos filtros." />
-        ) : (
-          <>
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <SortableTh columnKey="date" sort={sort} onSort={onSort}>Fecha</SortableTh>
-                    <th>Alumno</th>
-                    <th>Pagó</th>
-                    <SortableTh columnKey="amount" sort={sort} onSort={onSort} align="right" className="num">Monto</SortableTh>
-                    <SortableTh columnKey="gateway" sort={sort} onSort={onSort}>Pasarela</SortableTh>
-                    <th>Referencia</th>
-                    <SortableTh columnKey="status" sort={sort} onSort={onSort}>Estado</SortableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((p) => (
-                    <tr key={p.id}>
-                      <td data-label="Fecha" className="whitespace-nowrap text-muted">{new Date(p.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                      <td data-label="Alumno" className="font-medium text-ink">
-                        {p.student_id ? <Link to={`/admin/cafeteria/${p.student_id}`} className="hover:text-purple hover:underline">{p.student_name}</Link> : '—'}
-                      </td>
-                      <td data-label="Pagó" className="text-xs text-subtle">{p.description || '—'}</td>
-                      <td data-label="Monto" className="num font-semibold text-ink">{formatMXN(p.amount)}</td>
-                      <td data-label="Pasarela" className="text-muted">{p.gateway_label ?? GATEWAYS[p.gateway ?? ''] ?? p.gateway}</td>
-                      <td data-label="Referencia" className="font-mono text-xs text-subtle">{p.gateway_tx_id || p.gateway_ref || '—'}</td>
-                      <td data-label="Estado"><Badge variant={STATUS[p.status]?.variant ?? 'neutral'}>{STATUS[p.status]?.label ?? p.status}</Badge></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="pagos" />
-          </>
-        )}
+        <DataTable<Payment>
+          columns={COLUMNS}
+          rows={rows}
+          rowKey={(p) => p.id}
+          sort={sort}
+          onSort={onSort}
+          page={page}
+          count={count}
+          onPage={setPage}
+          itemLabel="pagos"
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          empty={{ icon: CreditCard, title: 'Sin pagos', description: 'No hay pagos con esos filtros.' }}
+        />
       </Card>
     </>
   );
