@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/broadcast/',             views.EmergencyBroadcastView.as_view(),         name='admin-broadcast'),
     path('notifications/',               views.NotificationListView.as_view(),       name='notifications'),
     path('notifications/mark-all-read/', views.NotificationMarkAllReadView.as_view(), name='notifications-mark-all-read'),
+    path('notifications/<int:pk>/',      views.NotificationDetailView.as_view(),     name='notification-detail'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(),   name='notification-read'),
     path('push/subscribe/',              PushSubscribeView.as_view(),                name='push-subscribe'),
     path('push/unsubscribe/',            PushUnsubscribeView.as_view(),              name='push-unsubscribe'),

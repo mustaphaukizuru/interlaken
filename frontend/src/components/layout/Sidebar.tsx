@@ -6,6 +6,7 @@ import Logo from '@/components/ui/Logo';
 import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp } from 'lucide-react';
 import { navGroupsByRole, type Role } from './navConfig';
 import { useBadges } from '@/hooks/useBadges';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface SidebarProps {
   role: Role;
@@ -30,7 +31,6 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   const { user } = useAuthStore();
   const badges = useBadges();
   const groups = navGroupsByRole[role] ?? navGroupsByRole.parent;
-  const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
   const asideRef = useRef<HTMLElement>(null);
   const touchX = useRef<number | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
@@ -168,9 +168,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           aria-label="Opciones de la cuenta"
           className={`flex w-full items-center gap-2.5 rounded-[14px] border border-line bg-cream-2 px-3 py-2.5 text-left hover:border-purple/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${rail ? 'lg:justify-center lg:px-0' : ''}`}
         >
-          <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-pink to-purple font-head text-[13px] font-bold text-white">
-            {initials}
-          </div>
+          <Avatar user={user} size={38} rounded="rounded-[10px]" />
           <div className={`min-w-0 flex-1 ${rail ? 'lg:hidden' : ''}`}>
             <div className="truncate text-[13px] font-semibold text-ink">{user?.first_name} {user?.last_name}</div>
             <div className="truncate text-[11px] text-subtle">{user?.email}</div>

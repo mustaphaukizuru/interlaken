@@ -17,6 +17,8 @@ import { formatMXN } from '@/lib/format';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import { paymentsApi, downloadBlob } from '@/services/api';
 import type { Payment } from '@/types';
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
+import { SortableTh, parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 
 const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
   success: { label: 'Completado', variant: 'success' },
@@ -37,7 +39,11 @@ export default function AdminPayments() {
   const gateway = get('pasarela');
   const from = get('desde');
   const to = get('hasta');
-  const params = { page, q: debouncedQ || undefined, status: status || undefined, gateway: gateway || undefined, from: from || undefined, to: to || undefined };
+  const sort = parseSort(get('orden'));
+  const params = {
+    page, q: debouncedQ || undefined, status: status || undefined, gateway: gateway || undefined,
+    from: from || undefined, to: to || undefined, ordering: serializeSort(sort) || undefined,
+  };
 
   const summary = useQuery({ queryKey: ['admin-payments-summary'], queryFn: async () => (await paymentsApi.adminSummary(30)).data });
   const { data, isLoading, isError, refetch } = useQuery({
@@ -54,6 +60,9 @@ export default function AdminPayments() {
   const rows = data?.results ?? [];
   const count = data?.count ?? 0;
   const s = summary.data;
+  // Sorting lives in the URL like every other filter, so a sorted view is
+  // shareable and survives a reload.
+  const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
   const chips = [
     ...(debouncedQ ? [{ key: 'q', label: `Búsqueda: “${debouncedQ}”`, onClear: () => setQ('') }] : []),
     ...(status ? [{ key: 'estado', label: `Estado: ${STATUS[status]?.label ?? status}`, onClear: () => set({ estado: null, page: null }) }] : []),
@@ -93,7 +102,7 @@ export default function AdminPayments() {
       )}
 
       <Card title={`${count} pagos`}>
-        <div className="mb-3 grid gap-3 lg:grid-cols-5">
+        <div className="mb-3 grid gap-3 lg:grid-cols-4">
           <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
             <input className="input-field pl-9" placeholder="Alumno, matrícula, correo o referencia…" aria-label="Buscar pagos" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -106,11 +115,13 @@ export default function AdminPayments() {
             <option value="">Todas las pasarelas</option>
             {Object.entries(GATEWAYS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <div className="flex gap-2">
-            <input type="date" className="input-field" aria-label="Desde" value={from} onChange={(e) => set({ desde: e.target.value || null, page: null })} />
-            <input type="date" className="input-field" aria-label="Hasta" value={to} onChange={(e) => set({ hasta: e.target.value || null, page: null })} />
-          </div>
         </div>
+        <DateRangeFilter
+          idPrefix="pagos"
+          className="mb-3"
+          value={{ from, to }}
+          onChange={(r) => set({ desde: r.from || null, hasta: r.to || null, page: null })}
+        />
         <ActiveFilterChips chips={chips} onClearAll={() => { setQ(''); set({ estado: null, pasarela: null, desde: null, hasta: null, page: null }); }} />
 
         {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading ? <TableSkeleton /> : !rows.length ? (
@@ -120,7 +131,15 @@ export default function AdminPayments() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Fecha</th><th>Alumno</th><th>Pagó</th><th className="num">Monto</th><th>Pasarela</th><th>Referencia</th><th>Estado</th></tr>
+                  <tr>
+                    <SortableTh columnKey="date" sort={sort} onSort={onSort}>Fecha</SortableTh>
+                    <th>Alumno</th>
+                    <th>Pagó</th>
+                    <SortableTh columnKey="amount" sort={sort} onSort={onSort} align="right" className="num">Monto</SortableTh>
+                    <SortableTh columnKey="gateway" sort={sort} onSort={onSort}>Pasarela</SortableTh>
+                    <th>Referencia</th>
+                    <SortableTh columnKey="status" sort={sort} onSort={onSort}>Estado</SortableTh>
+                  </tr>
                 </thead>
                 <tbody>
                   {rows.map((p) => (

@@ -12,6 +12,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 
@@ -90,6 +91,15 @@ class HealthView(APIView):
         )
 
 
+# Columns the auditoría table can sort by (public key → ORM field).
+AUDIT_ORDERING = {
+    'date': 'created_at',
+    'action': 'action',
+    'actor': 'actor__email',
+    'object': 'object_type',
+}
+
+
 class AdminAuditLogView(generics.ListAPIView):
     """GET /api/v1/core/admin/audit/ — read-only, paginated audit trail (admin).
 
@@ -128,7 +138,7 @@ class AdminAuditLogView(generics.ListAPIView):
         if date_to:
             qs = qs.filter(created_at__date__lte=date_to)
 
-        return qs.order_by('-created_at')
+        return apply_ordering(qs, self.request, AUDIT_ORDERING, '-created_at')
 
 
 class PortalBadgesView(APIView):

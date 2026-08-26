@@ -36,11 +36,8 @@ export function NotificationsMenu() {
 
   const openNotif = (n: Notif, close: () => void) => {
     if (!n.is_read) markRead.mutate(n.id);
-    const dest = notifDestination(n);
-    if (dest) {
-      navigate(dest);
-      close();
-    }
+    navigate(notifDestination(n));
+    close();
   };
 
   // Scroll lock + Escape for the sheet.

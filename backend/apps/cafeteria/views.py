@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
@@ -140,6 +141,15 @@ class MyBalanceView(APIView):
             balances, many=True, context=context).data)
 
 
+# Columns the movimientos tables can sort by (public key → ORM field).
+TRANSACTION_ORDERING = {
+    'date': 'date',
+    'amount': 'amount',
+    'type': 'transaction_type',
+    'balance': 'balance_after',
+}
+
+
 class MyTransactionsView(generics.ListAPIView):
     """GET /api/v1/cafeteria/transactions/?student=&type=&from=&to=
 
@@ -183,7 +193,7 @@ class MyTransactionsView(generics.ListAPIView):
         if date_to:
             qs = qs.filter(date__date__lte=date_to)
 
-        return qs
+        return apply_ordering(qs, self.request, TRANSACTION_ORDERING, '-date')
 
 
 class MySpendingTrendView(APIView):

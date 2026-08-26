@@ -15,6 +15,8 @@ import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { AuditLogEntry } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
+import { SortableTh, parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 
 const ACTION_LABEL: Record<string, string> = {
   create: 'Creación',
@@ -60,9 +62,13 @@ export default function AdminAudit() {
   const from = get('desde');
   const to = get('hasta');
   const [page, setPage] = useUrlPage();
+  const sort = parseSort(get('orden'));
+  // Sorting is a filter like any other: it belongs in the URL so a sorted view
+  // can be shared and survives a reload.
+  const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-audit', debouncedActor, action, from, to, page],
+    queryKey: ['admin-audit', debouncedActor, action, from, to, page, sort.key, sort.dir],
     queryFn: async () =>
       toPaged<AuditLogEntry>(
         (await coreApi.getAuditLog({
@@ -71,6 +77,7 @@ export default function AdminAudit() {
           action: action || undefined,
           from: from || undefined,
           to: to || undefined,
+          ordering: serializeSort(sort) || undefined,
         })).data,
       ),
     placeholderData: keepPreviousData,
@@ -132,21 +139,13 @@ export default function AdminAudit() {
             <option value="delete">Eliminación</option>
             <option value="permission">Permisos</option>
           </select>
-          <input
-            type="date"
-            className="input-field w-auto"
-            aria-label="Desde"
-            value={from}
-            onChange={(e) => set({ desde: e.target.value || null, page: null })}
-          />
-          <input
-            type="date"
-            className="input-field w-auto"
-            aria-label="Hasta"
-            value={to}
-            onChange={(e) => set({ hasta: e.target.value || null, page: null })}
-          />
         </div>
+        <DateRangeFilter
+          idPrefix="auditoria"
+          className="mb-4"
+          value={{ from, to }}
+          onChange={(r) => set({ desde: r.from || null, hasta: r.to || null, page: null })}
+        />
 
         <ActiveFilterChips
           chips={chips}
@@ -173,10 +172,10 @@ export default function AdminAudit() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Actor</th>
-                  <th>Acción</th>
-                  <th>Objeto</th>
+                  <SortableTh columnKey="date" sort={sort} onSort={onSort}>Fecha</SortableTh>
+                  <SortableTh columnKey="actor" sort={sort} onSort={onSort}>Actor</SortableTh>
+                  <SortableTh columnKey="action" sort={sort} onSort={onSort}>Acción</SortableTh>
+                  <SortableTh columnKey="object" sort={sort} onSort={onSort}>Objeto</SortableTh>
                   <th>Detalle</th>
                 </tr>
               </thead>

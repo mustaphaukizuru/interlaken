@@ -97,3 +97,23 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'notif_type', 'title', 'message', 'is_read', 'created_at', 'announcement']
+
+
+class NotificationDetailSerializer(serializers.ModelSerializer):
+    """One notification, opened on its own page.
+
+    The list view truncates the message to two lines and drops everything about
+    delivery, so an 'info' notification with a long body had nowhere to be read
+    in full. This adds the announcement's title (so the link says what it points
+    at instead of 'ver comunicado') and the delivery stamp.
+    """
+    announcement_title = serializers.SerializerMethodField()
+    type_label = serializers.CharField(source='get_notif_type_display', read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'notif_type', 'type_label', 'title', 'message', 'is_read',
+                  'created_at', 'delivered_at', 'announcement', 'announcement_title']
+
+    def get_announcement_title(self, obj):
+        return obj.announcement.title if obj.announcement_id and obj.announcement else ''

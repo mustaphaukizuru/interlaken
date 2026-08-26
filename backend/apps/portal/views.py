@@ -23,6 +23,7 @@ from .serializers import (
     AnnouncementAdminSerializer,
     AnnouncementCommentSerializer,
     AnnouncementSerializer,
+    NotificationDetailSerializer,
     NotificationSerializer,
 )
 from .services import _audience_roles, emergency_broadcast, fanout_and_stamp
@@ -359,6 +360,19 @@ class AnnouncementAckView(APIView):
             read.acknowledged_at = tz.now()
             read.save(update_fields=['acknowledged_at'])
         return Response({'acknowledged': True, 'at': read.acknowledged_at.isoformat()})
+
+
+class NotificationDetailView(generics.RetrieveAPIView):
+    """GET /api/v1/portal/notifications/<pk>/ — one notification, in full.
+
+    Scoped to the caller's own rows: a wrong pk is a 404, never someone else's
+    notification.
+    """
+    serializer_class = NotificationDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).select_related('announcement')
 
 
 class NotificationMarkReadView(APIView):
