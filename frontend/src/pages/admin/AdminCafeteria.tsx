@@ -53,12 +53,21 @@ export default function AdminCafeteria() {
         actions={<SchoolExportButtons />}
       />
 
-      <div className="flex flex-wrap gap-1 border-b border-line">
+      {/* One scrolling row on phones (the five tabs used to wrap into two rows,
+          pushing content down and hiding which tab was active); -mx cancels the
+          page gutter so the strip bleeds to the edge like a native tab bar. */}
+      <div
+        role="tablist"
+        aria-label="Secciones de cafetería"
+        className="scrollbar-none -mx-4 flex snap-x gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+      >
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={tab === key}
             onClick={() => setTab(key)}
-            className={`inline-flex min-h-[44px] items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`inline-flex min-h-[44px] shrink-0 snap-start items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === key
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-muted hover:text-ink'

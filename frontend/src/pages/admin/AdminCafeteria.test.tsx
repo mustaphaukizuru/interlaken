@@ -72,7 +72,8 @@ const unloadRow = {
 
 async function openPosTab(user: ReturnType<typeof userEvent.setup>) {
   renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria' });
-  await user.click(await screen.findByRole('button', { name: /POS Loyverse/i }));
+  // The strip is a real tablist now (role=tab, aria-selected).
+  await user.click(await screen.findByRole('tab', { name: /POS Loyverse/i }));
 }
 
 describe('AdminCafeteria POS Loyverse queues', () => {
