@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 vi.mock('@/services/api', () => ({
   admissionsApi: { getOpenSchoolEvents: vi.fn(async () => ({ data: [] })) },
   contactApi: { send: vi.fn() },
+  contentApi: { getTestimonials: vi.fn(async () => ({ data: [] })) },
 }));
 
 // Site settings reach components through useSiteSettings (react-query over
@@ -38,14 +39,18 @@ describe('HomePage — video institucional (admin-editable, ships hidden)', () =
     mockUseSiteSettings.mockReturnValue({ ...SITE_DEFAULTS });
   });
 
-  it('renders no video section while video_url is empty (production default)', () => {
+  it('renders no video section while video_url is empty (production default)', async () => {
     renderHome();
     expect(screen.getByText('Formando líderes')).toBeInTheDocument();
+    // Wait for the lazy below-the-fold chunk before asserting an absence. The
+    // generous timeout is for loaded CI machines: this waits on a dynamic
+    // import resolving, not on a network round trip.
+    await screen.findByText('Vida en Interlaken', {}, { timeout: 8000 });
     expect(screen.queryByText('Conócenos en video')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Reproducir el video institucional' }),
     ).not.toBeInTheDocument();
-  });
+  }, 20_000);
 
   it('renders a click-to-load placeholder and only injects the iframe on click', async () => {
     mockUseSiteSettings.mockReturnValue({
@@ -54,7 +59,7 @@ describe('HomePage — video institucional (admin-editable, ships hidden)', () =
     });
     renderHome();
 
-    expect(screen.getByText('Conócenos en video')).toBeInTheDocument();
+    expect(await screen.findByText('Conócenos en video', {}, { timeout: 8000 })).toBeInTheDocument();
     const play = screen.getByRole('button', { name: 'Reproducir el video institucional' });
     // No third-party iframe until the user opts in.
     expect(
@@ -71,19 +76,19 @@ describe('HomePage — video institucional (admin-editable, ships hidden)', () =
     expect(
       screen.queryByRole('button', { name: 'Reproducir el video institucional' }),
     ).not.toBeInTheDocument();
-  });
+  }, 20_000);
 
-  it('falls back to a plain external link for unrecognized URLs', () => {
+  it('falls back to a plain external link for unrecognized URLs', async () => {
     mockUseSiteSettings.mockReturnValue({
       ...SITE_DEFAULTS,
       video_url: 'https://example.com/video-institucional.mp4',
     });
     renderHome();
 
-    const link = screen.getByRole('link', { name: /Ver video institucional/ });
+    const link = await screen.findByRole('link', { name: /Ver video institucional/ }, { timeout: 8000 });
     expect(link).toHaveAttribute('href', 'https://example.com/video-institucional.mp4');
     expect(
       screen.queryByRole('button', { name: 'Reproducir el video institucional' }),
     ).not.toBeInTheDocument();
-  });
+  }, 20_000);
 });

@@ -169,8 +169,8 @@ jobs:
 
       # Functional suite AND visual regression are BLOCKING (BACKLOG P5-3). Linux
       # baselines are committed in frontend/e2e/visual.spec.ts-snapshots/*-linux.png.
-      # To accept an intentional UI change: download the `visual-diffs` artifact,
-      # check the -actual.png images, copy them over the baselines and commit.
+      # To accept an intentional UI change: download the `visual-baselines-linux`
+      # artifact produced by the step below and commit it over the snapshots dir.
       - name: Run E2E (Playwright boots both dev servers)
         working-directory: frontend
         run: npm run test:e2e
@@ -181,6 +181,25 @@ jobs:
         with:
           name: visual-diffs
           path: frontend/test-results/
+          retention-days: 7
+
+      # A visual failure stops at the FIRST mismatching viewport, so the diffs
+      # above only ever show part of an intentional redesign — accepting one used
+      # to take a CI round per viewport. This regenerates the whole linux set in
+      # one go so the change can be adopted from a single artifact. Never gates
+      # the job: it only runs after it has already failed.
+      - name: Regenerate linux visual baselines (for review)
+        if: failure()
+        working-directory: frontend
+        continue-on-error: true
+        run: npx playwright test visual.spec.ts --update-snapshots
+
+      - name: Upload regenerated visual baselines
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines-linux
+          path: frontend/e2e/visual.spec.ts-snapshots/
           retention-days: 7
 
       - name: Upload Playwright report on failure
