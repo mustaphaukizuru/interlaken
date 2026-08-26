@@ -10,6 +10,8 @@ Origins map to real integrations only:
   sentry    — browser SDK ingest (no-op unless VITE_SENTRY_DSN is set)
   avatars   — Google account photos (User.avatar from OAuth)
   maps      — embedded Google Maps iframe on /contacto
+  video     — click-to-load institutional video (SiteSettings.video_url):
+              youtube-nocookie/Vimeo player frames + the YouTube poster image
 
 Toggles (env): CSP_ENABLED (default on), CSP_REPORT_ONLY (default off —
 flip on for a shakedown period in production if desired).
@@ -23,6 +25,11 @@ _ANALYTICS = ('https://www.googletagmanager.com '
 _SENTRY = 'https://*.ingest.sentry.io https://*.ingest.us.sentry.io'
 _AVATARS = 'https://lh3.googleusercontent.com'
 _MAPS_EMBED = 'https://www.google.com https://maps.google.com'
+# The video is admin-editable (SiteSettings.video_url) and rendered click-to-load
+# by ui/VideoEmbed; without these the iframe and its poster were blocked outright,
+# so the feature could not work in production no matter what URL was pasted in.
+_VIDEO_FRAMES = 'https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com'
+_VIDEO_POSTERS = 'https://img.youtube.com https://i.ytimg.com'
 
 # Public SPA + API. NOTE: style-src keeps 'unsafe-inline' because React
 # components set style attributes (token-driven inline styles); script-src
@@ -33,9 +40,9 @@ PUBLIC_CSP = '; '.join([
     f"script-src 'self' {_ANALYTICS}",
     f"style-src 'self' 'unsafe-inline' {_FONT_STYLES}",
     f"font-src 'self' {_FONT_FILES}",
-    f"img-src 'self' data: blob: {_AVATARS}",
+    f"img-src 'self' data: blob: {_AVATARS} {_VIDEO_POSTERS}",
     f"connect-src 'self' {_ANALYTICS} {_SENTRY}",
-    f"frame-src {_MAPS_EMBED}",
+    f"frame-src {_MAPS_EMBED} {_VIDEO_FRAMES}",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",

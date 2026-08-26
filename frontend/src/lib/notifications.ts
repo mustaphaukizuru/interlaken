@@ -17,12 +17,19 @@ export const NOTIF_META: Record<Notif['notif_type'], { icon: LucideIcon; cls: st
   cafeteria: { icon: Coffee,        cls: 'bg-green/10 text-green-dark', label: 'Cafetería' },
 };
 
-/** Where a notification takes you when tapped; null = just mark read in place. */
-export function notifDestination(n: Notif): string | null {
+/**
+ * Where a notification takes you when tapped.
+ *
+ * Prefer the page that holds its subject; everything else opens the
+ * notification's own detail page. Nothing is a dead tap any more: an
+ * info/warning aviso used to return null, so the row clamped its message to two
+ * lines and then did nothing when you pressed it.
+ */
+export function notifDestination(n: Notif): string {
   if (n.announcement) return `/portal/comunicados/${n.announcement}`;
   if (n.notif_type === 'payment') return '/portal/pagos';
   if (n.notif_type === 'cafeteria') return '/portal/cafeteria';
-  return null;
+  return `/portal/notificaciones/${n.id}`;
 }
 
 export type NotifGroup = 'Hoy' | 'Esta semana' | 'Anteriores';

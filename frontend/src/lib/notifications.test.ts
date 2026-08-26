@@ -26,6 +26,11 @@ describe('notifDestination', () => {
   it('deep-links comunicados first, then by type', () => {
     expect(notifDestination(base({ announcement: 9, notif_type: 'payment' }))).toBe('/portal/comunicados/9');
     expect(notifDestination(base({ notif_type: 'cafeteria' }))).toBe('/portal/cafeteria');
-    expect(notifDestination(base({ notif_type: 'info' }))).toBeNull();
+  });
+
+  it('falls back to the notification page so no tap is a dead end', () => {
+    // An aviso used to return null: the row clamped its message to two lines
+    // and then did nothing at all when pressed.
+    expect(notifDestination(base({ id: 42, notif_type: 'info' }))).toBe('/portal/notificaciones/42');
   });
 });

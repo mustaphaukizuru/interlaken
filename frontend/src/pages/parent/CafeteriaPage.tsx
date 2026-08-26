@@ -22,6 +22,7 @@ import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TOPUP_MIN = 50;
@@ -791,20 +792,6 @@ export default function CafeteriaPage() {
             <option value="topup">Recargas</option>
             <option value="refund">Devoluciones</option>
           </select>
-          <input
-            type="date"
-            className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
-            value={filterFrom}
-            onChange={(e) => setFilterFrom(e.target.value)}
-            aria-label="Desde"
-          />
-          <input
-            type="date"
-            className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
-            value={filterTo}
-            onChange={(e) => setFilterTo(e.target.value)}
-            aria-label="Hasta"
-          />
           {filtersActive && (
             <Button
               variant="ghost"
@@ -816,6 +803,15 @@ export default function CafeteriaPage() {
             </Button>
           )}
         </div>
+
+        {/* Presets first: "este mes" is what a parent actually wants to see, and
+            on a phone it used to cost two native date pickers. */}
+        <DateRangeFilter
+          idPrefix="mov"
+          className="mb-4"
+          value={{ from: filterFrom, to: filterTo }}
+          onChange={(r) => { setFilterFrom(r.from); setFilterTo(r.to); }}
+        />
 
         {txError ? (
           <ErrorState onRetry={() => refetchTx()} />

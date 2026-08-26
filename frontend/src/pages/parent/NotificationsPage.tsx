@@ -44,8 +44,7 @@ export default function NotificationsPage() {
 
   const open = (n: Notif) => {
     if (!n.is_read) markRead.mutate(n.id);
-    const dest = notifDestination(n);
-    if (dest) navigate(dest);
+    navigate(notifDestination(n));
   };
 
   const items = data?.results ?? [];

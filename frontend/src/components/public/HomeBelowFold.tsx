@@ -266,6 +266,44 @@ export default function HomeBelowFold() {
         </m.div>
       </Section>
 
+      {/* ── VIDEO INSTITUCIONAL ──
+          Sits directly under the About block, where a visitor who has just read
+          "who are you" is asking to see the place. It used to sit near the
+          footer, below the gallery, which almost nobody reaches. Click-to-load:
+          no YouTube frame is created (and no third-party script runs) until the
+          visitor presses play. */}
+      {hasVideo && (
+        <Section bg="dark">
+          <m.div
+            className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12"
+            variants={staggerGroup}
+            initial="hidden"
+            whileInView="show"
+            viewport={VIEWPORT}
+          >
+            <m.div variants={fadeRight} className="order-2 lg:order-1">
+              <VideoEmbed url={settings.video_url} />
+            </m.div>
+            <m.div variants={fadeLeft} className="order-1 text-center lg:order-2 lg:text-left">
+              <span className="section-label-pink inline-flex">Conócenos</span>
+              <h2 className="font-head text-fluid-4xl font-extrabold tracking-[-0.03em] text-white">
+                Interlaken en video
+              </h2>
+              <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-white/75 lg:mx-0">
+                Nuestro video institucional. Y si quiere conocer el colegio en persona,
+                agende una visita: le mostramos instalaciones, salones y patios.
+              </p>
+              <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
+                <Link to="/agendar-visita" className="btn-pink min-h-[44px]">
+                  Agendar una visita <ArrowRight size={16} aria-hidden="true" />
+                </Link>
+                <Link to="/galeria" className="btn-ghost min-h-[44px]">Ver la galería</Link>
+              </div>
+            </m.div>
+          </m.div>
+        </Section>
+      )}
+
       {/* ── LEVELS — 3 scroll beats: eyebrow → staggered cards → CTA ── */}
       <Section bg="cream">
         <m.div
@@ -422,22 +460,6 @@ export default function HomeBelowFold() {
           ))}
         </m.div>
       </Section>
-      {/* ── VIDEO INSTITUCIONAL — only when the school configured a URL ── */}
-      {hasVideo && (
-        <Section bg="white">
-          <m.div variants={sectionReveal} initial="hidden" whileInView="show" viewport={VIEWPORT}>
-            <div className="mb-8 text-center">
-              <span className="section-label-purple inline-flex">Conócenos</span>
-              <h2 className="font-head font-extrabold text-fluid-4xl tracking-[-0.03em] text-ink">Conócenos en video</h2>
-              <p className="mx-auto mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
-                Un recorrido por nuestra comunidad, nuestras instalaciones y nuestro modelo educativo.
-              </p>
-            </div>
-            <VideoEmbed url={settings.video_url} />
-          </m.div>
-        </Section>
-      )}
-
       {/* ── TESTIMONIOS (BACKLOG P2-15) — the band disappears with no quotes ── */}
       {hasTestimonials && (
         <Section bg="cream">

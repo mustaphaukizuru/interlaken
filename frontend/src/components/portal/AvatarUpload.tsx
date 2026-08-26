@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { authApi } from '@/services/api';
 import { useAuthStore, type User } from '@/store/authStore';
+import { Avatar } from '@/components/ui/Avatar';
 
 const OUT = 512;
 
@@ -25,13 +26,6 @@ export function cropToSquare(img: HTMLImageElement, zoom: number, offset: { x: n
   const k = OUT / box;
   ctx.drawImage(img, x * k, y * k, drawW * k, drawH * k);
   return canvas;
-}
-
-/** Avatar with initials fallback. */
-export function Avatar({ user, size = 64, className = '' }: { user: Pick<User, 'first_name' | 'last_name' | 'avatar'> | null; size?: number; className?: string }) {
-  const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
-  if (user?.avatar) return <img src={user.avatar} alt="" width={size} height={size} className={`rounded-full object-cover ${className}`} style={{ width: size, height: size }} />;
-  return <div className={`flex items-center justify-center rounded-full bg-gradient-to-br from-pink to-purple font-head font-bold text-white ${className}`} style={{ width: size, height: size, fontSize: size / 2.6 }} aria-hidden="true">{initials}</div>;
 }
 
 /** Profile photo picker with square crop (drag + zoom), BACKLOG P1-F2. */
@@ -82,12 +76,23 @@ export function AvatarUpload() {
   const hasCustom = (user as (User & { has_custom_avatar?: boolean }) | null)?.has_custom_avatar;
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-4">
       <Avatar user={user} size={72} />
-      <div className="flex flex-wrap gap-2">
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" aria-label="Elegir foto" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
-        <Button type="button" size="sm" variant="secondary" onClick={() => inputRef.current?.click()}><Camera size={14} aria-hidden="true" /> {user?.avatar ? 'Cambiar foto' : 'Subir foto'}</Button>
-        {hasCustom && <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate()} loading={remove.isPending}><Trash2 size={14} aria-hidden="true" /> Quitar</Button>}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap gap-2">
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" aria-label="Elegir foto" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
+          <Button type="button" size="sm" variant="secondary" onClick={() => inputRef.current?.click()}><Camera size={14} aria-hidden="true" /> {user?.avatar ? 'Cambiar foto' : 'Subir foto'}</Button>
+          {hasCustom && <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate()} loading={remove.isPending}><Trash2 size={14} aria-hidden="true" /> Quitar</Button>}
+        </div>
+        {/* Say where the picture came from: without this, a family that never
+            opened the picker sees a photo appear and has no idea why. */}
+        <p className="mt-2 text-xs text-muted">
+          {hasCustom
+            ? 'Foto subida por usted. Al quitarla se vuelve a mostrar la de su cuenta de Google.'
+            : user?.avatar
+              ? 'Se muestra la foto de su cuenta de Google escolar. Suba una para reemplazarla.'
+              : 'Sin foto: se muestran sus iniciales. JPG, PNG o WebP, hasta 5 MB.'}
+        </p>
       </div>
       <Modal open={!!src} onClose={() => { setSrc(null); setImg(null); }} title="Ajustar foto" maxWidth={360}>
         <p className="mb-2 text-xs text-muted">Arrastre para encuadrar y use el control para acercar.</p>

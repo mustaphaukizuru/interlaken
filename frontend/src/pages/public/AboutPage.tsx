@@ -9,6 +9,7 @@ import { HistoryTimeline } from '@/components/public/HistoryTimeline';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
 import { assetSrcSet, CARD_SIZES } from '@/lib/images';
+import { PhotoHero } from '@/components/public/PhotoHero';
 
 const VALUES: { icon: LucideIcon; title: string; desc: string; color: string }[] = [
   { icon: Award,   title: 'Excelencia académica', desc: 'Formación rigurosa con enfoque humanista y pensamiento crítico.', color: 'var(--purple)' },
@@ -46,20 +47,14 @@ export default function AboutPage() {
   return (
     <div>
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden bg-dark text-white">
-        <Blob tone="purple" opacity={0.5} size={520} shape={0} className="hidden sm:block" style={{ top: -180, left: -140 }} />
-        <Blob tone="green" opacity={0.18} size={420} shape={2} className="hidden sm:block" style={{ bottom: -160, right: -120 }} />
-        <div className="relative mx-auto max-w-[1120px] px-6 py-14 sm:py-16 lg:py-[72px]">
-          <span className="section-label-pink inline-flex">Nuestra Historia</span>
-          <h1 className="mt-3 font-head font-black text-fluid-4xl leading-[1.08] tracking-[-0.04em]">
-            {SCHOOL_YEARS} años formando<br />líderes en Tlalnepantla
-          </h1>
-          <p className="mt-4 max-w-xl text-fluid-base leading-relaxed text-white/60 sm:mt-[18px]">
-            Colegio Interlaken es una institución educativa privada con más de cuatro décadas
-            de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta secundaria.
-          </p>
-        </div>
-      </section>
+      <PhotoHero
+        label="Nuestra Historia"
+        labelClass="section-label-pink"
+        image="/assets/facade-sign.webp"
+        focus="center 40%"
+        title={<>{SCHOOL_YEARS} años formando<br />líderes en Tlalnepantla</>}
+        subtitle="Colegio Interlaken es una institución educativa privada con más de cuatro décadas de trayectoria, ofreciendo educación bilingüe de calidad desde preescolar hasta secundaria."
+      />
 
       {/* ── MISIÓN / VISIÓN split ── */}
       <Section bg="white">

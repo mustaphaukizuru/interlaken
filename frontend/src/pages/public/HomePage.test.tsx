@@ -34,19 +34,21 @@ function renderHome() {
   );
 }
 
-describe('HomePage — video institucional (admin-editable, ships hidden)', () => {
+describe('HomePage — video institucional (admin-editable, seeded)', () => {
   beforeEach(() => {
-    mockUseSiteSettings.mockReturnValue({ ...SITE_DEFAULTS });
+    // The video ships seeded (content migration 0024); tests that need it
+    // absent clear it explicitly, the way an admin would in Ajustes.
+    mockUseSiteSettings.mockReturnValue({ ...SITE_DEFAULTS, video_url: '' });
   });
 
-  it('renders no video section while video_url is empty (production default)', async () => {
+  it('renders no video section when the admin clears video_url', async () => {
     renderHome();
     expect(screen.getByText('Formando líderes')).toBeInTheDocument();
     // Wait for the lazy below-the-fold chunk before asserting an absence. The
     // generous timeout is for loaded CI machines: this waits on a dynamic
     // import resolving, not on a network round trip.
     await screen.findByText('Vida en Interlaken', {}, { timeout: 8000 });
-    expect(screen.queryByText('Conócenos en video')).not.toBeInTheDocument();
+    expect(screen.queryByText('Interlaken en video')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Reproducir el video institucional' }),
     ).not.toBeInTheDocument();
@@ -59,7 +61,7 @@ describe('HomePage — video institucional (admin-editable, ships hidden)', () =
     });
     renderHome();
 
-    expect(await screen.findByText('Conócenos en video', {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByText('Interlaken en video', {}, { timeout: 8000 })).toBeInTheDocument();
     const play = screen.getByRole('button', { name: 'Reproducir el video institucional' });
     // No third-party iframe until the user opts in.
     expect(

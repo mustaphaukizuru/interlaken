@@ -17,6 +17,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
@@ -297,6 +298,15 @@ class PaymentDetailView(generics.RetrieveAPIView):
         return payments_visible_to(self.request.user)
 
 
+# Columns the pagos tables can sort by (public key → ORM field).
+PAYMENT_ORDERING = {
+    'date': 'created_at',
+    'amount': 'amount',
+    'status': 'status',
+    'gateway': 'gateway',
+}
+
+
 def _filtered_history(request):
     """Family-scoped payments with the Pagos page filters (BACKLOG P1-D3).
 
@@ -318,7 +328,7 @@ def _filtered_history(request):
     d = parse_date(p.get('to', '') or '')
     if d:
         qs = qs.filter(created_at__date__lte=d)
-    return qs.order_by('-created_at')
+    return apply_ordering(qs, request, PAYMENT_ORDERING, '-created_at')
 
 
 class PaymentHistoryView(generics.ListAPIView):

@@ -19,6 +19,16 @@ class TestSecurityHeaders:
         # The public policy must never allow eval.
         assert "'unsafe-eval'" not in csp
 
+    def test_public_csp_allows_the_institutional_video_it_ships(self, api_client):
+        """The video is a shipped, admin-editable feature; a policy that blocks its
+        frame makes it unusable in production while looking fine in dev."""
+        csp = api_client.get(reverse('health')).headers.get('Content-Security-Policy', '')
+        frame_src = next(d for d in csp.split('; ') if d.startswith('frame-src'))
+        img_src = next(d for d in csp.split('; ') if d.startswith('img-src'))
+        assert 'https://www.youtube-nocookie.com' in frame_src
+        assert 'https://player.vimeo.com' in frame_src
+        assert 'https://img.youtube.com' in img_src
+
     def test_admin_csp_allows_alpine_but_stays_scoped(self, client):
         resp = client.get('/admin/login/')
         csp = resp.headers.get('Content-Security-Policy', '')

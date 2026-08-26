@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { Avatar } from './AvatarUpload';
+import { Avatar } from '@/components/ui/Avatar';
 
 describe('Avatar', () => {
   it('renders the photo when present, initials otherwise', () => {

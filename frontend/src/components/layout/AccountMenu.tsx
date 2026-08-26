@@ -3,6 +3,7 @@ import { LogOut, Settings, LayoutDashboard, ChevronDown, User as UserIcon } from
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
+import { Avatar } from '@/components/ui/Avatar';
 
 const HOME: Record<string, string> = {
   admin: '/admin', staff: '/staff', student: '/portal', parent: '/portal',
@@ -15,8 +16,6 @@ const ROLE_LABEL: Record<string, string> = {
 export function AccountMenu() {
   const { user } = useAuthStore();
   const role = user?.role ?? 'parent';
-  const initials =
-    `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
   const home = HOME[role] ?? '/portal';
 
   return (
@@ -37,13 +36,7 @@ export function AccountMenu() {
             </div>
             <div className="text-[11px] text-subtle">{ROLE_LABEL[role] ?? role}</div>
           </div>
-          {user?.avatar ? (
-            <img src={user.avatar} alt="" className="h-9 w-9 rounded-[10px] object-cover" />
-          ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-pink to-purple font-head text-[13px] font-bold text-white">
-              {initials}
-            </div>
-          )}
+          <Avatar user={user} size={36} rounded="rounded-[10px]" />
           <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       )}
@@ -51,9 +44,7 @@ export function AccountMenu() {
       {({ close }) => (
         <>
           <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink to-purple font-head text-sm font-bold text-white">
-              {initials}
-            </div>
+            <Avatar user={user} size={44} rounded="rounded-xl" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">
                 {user?.first_name} {user?.last_name}

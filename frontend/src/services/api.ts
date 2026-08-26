@@ -530,7 +530,7 @@ export const paymentsApi = {
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
   getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
   /** Admin ledger (BACKLOG P1-D9). */
-  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; from?: string; to?: string }) =>
+  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/admin/', { params }),
   adminSummary: (days = 30) => api.get<AdminPaymentsSummary>('/payments/admin/summary/', { params: { days } }),
 };
@@ -561,6 +561,7 @@ export const coreApi = {
   /** Read-only admin audit log (append-only), paginated + filterable. */
   getAuditLog: (params?: {
     page?: number;
+    ordering?: string;
     actor?: string;
     action?: string;
     context?: string;
@@ -671,6 +672,19 @@ export const bookingsApi = {
 };
 
 // ── PORTAL ────────────────────────────────────────────────
+export interface NotificationDetail {
+  id: number;
+  notif_type: 'info' | 'warning' | 'payment' | 'cafeteria';
+  type_label: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  delivered_at: string | null;
+  announcement: number | null;
+  announcement_title: string;
+}
+
 export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
@@ -715,6 +729,7 @@ export const portalApi = {
   // Personal notifications (header bell menu).
   getNotifications: (params?: { page?: number; type?: string; unread?: string }) =>
     api.get('/portal/notifications/', { params }),
+  getNotification: (id: number) => api.get<NotificationDetail>(`/portal/notifications/${id}/`),
   markNotificationRead: (id: number) => api.post(`/portal/notifications/${id}/read/`),
   markAllNotificationsRead: () => api.post('/portal/notifications/mark-all-read/'),
 
