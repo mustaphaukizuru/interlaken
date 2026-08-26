@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { contentApi, type SchoolEvent } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
+import { PhotoHero } from '@/components/public/PhotoHero';
 
 const KIND_COLOR: Record<string, string> = {
   holiday: 'bg-coral/10 text-coral-dark', vacation: 'bg-amber/10 text-amber', exam: 'bg-purple/10 text-purple',
@@ -46,13 +47,13 @@ export default function CalendarioPage() {
   return (
     <div>
       <Seo title="Calendario escolar" description={`Fechas importantes del ciclo ${CURRENT_CYCLE} en Colegio Interlaken: vacaciones, evaluaciones, eventos y juntas.`} />
-      <section className="relative overflow-hidden bg-dark text-white">
-        <div className="relative mx-auto max-w-[1120px] px-4 py-14 sm:px-6 sm:py-16">
-          <span className="section-label-green inline-flex">Comunidad</span>
-          <h1 className="mt-3 font-head text-fluid-4xl font-black tracking-[-0.03em]">Calendario escolar {CURRENT_CYCLE}</h1>
-          <p className="mt-3 max-w-2xl text-[15.5px] leading-relaxed text-white/75">Suspensiones, vacaciones, evaluaciones, eventos y juntas del ciclo en curso.</p>
-        </div>
-      </section>
+      <PhotoHero
+        label="Comunidad"
+        labelClass="section-label-green"
+        image="/assets/classroom.webp"
+        title={<>Calendario escolar {CURRENT_CYCLE}</>}
+        subtitle="Suspensiones, vacaciones, evaluaciones, eventos y juntas del ciclo en curso."
+      />
       <Section bg="white" containerSize="md">
         <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Nivel">
           {LEVELS.map(([v, label]) => (

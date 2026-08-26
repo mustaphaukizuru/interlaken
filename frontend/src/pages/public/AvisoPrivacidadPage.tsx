@@ -11,6 +11,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PhotoHero } from '@/components/public/PhotoHero';
 
 interface PrivacyNotice {
   version: string;
@@ -87,12 +88,13 @@ export default function AvisoPrivacidadPage() {
 
   return (
     <div>
-      <section className="relative overflow-hidden bg-dark text-white">
-        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-          <span className="section-label-pink inline-flex">Legal</span>
-          <h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]">
-            {data?.title ?? 'Aviso de Privacidad'}
-          </h1>
+      <PhotoHero
+        label="Legal"
+        labelClass="section-label-pink"
+        image="/assets/facade.webp"
+        opacity={0.25}
+        title={data?.title ?? 'Aviso de Privacidad'}
+      >
           {data?.effective_date && (
             <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/60">
               <ShieldCheck size={16} aria-hidden="true" />
@@ -107,8 +109,7 @@ export default function AvisoPrivacidadPage() {
               {data.version && ` · Versión ${data.version}`}
             </p>
           )}
-        </div>
-      </section>
+      </PhotoHero>
 
       <Section bg="white" container={false}>
         {/* Ancho de contenido igual al del pie de página y la barra de navegación (max-w-6xl). */}
