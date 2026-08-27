@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
@@ -80,11 +80,11 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       heading: 'Contenido del sitio',
       items: [
         { icon: FileText,      label: 'Páginas',     to: '/admin/contenido' },
-        { icon: ClipboardList, label: 'Formularios', to: '/admin/formularios', badgeKey: 'formularios' },
+        { icon: FormInput,     label: 'Formularios', to: '/admin/formularios', badgeKey: 'formularios' },
         { icon: Compass,       label: 'Navegación', to: '/admin/navegacion' },
         { icon: Image,         label: 'Biblioteca de medios', to: '/admin/contenido/medios' },
-        { icon: CalendarClock, label: 'Calendario',  to: '/admin/calendario' },
-        { icon: Megaphone,     label: 'Testimonios', to: '/admin/testimonios' },
+        { icon: CalendarDays,  label: 'Calendario',  to: '/admin/calendario' },
+        { icon: MessageSquareQuote, label: 'Testimonios', to: '/admin/testimonios' },
       ],
     },
     {
@@ -130,14 +130,16 @@ export const navByRole: Record<Role, NavEntry[]> = Object.fromEntries(
  * Curated 5-item mobile tab bar — must include daily-use destinations that
  * `.slice(0, 5)` on `navByRole` used to drop (parent Comunicados, admin Cafetería).
  */
-export const mobileNavByRole: Record<Role, NavEntry[]> = {
-  parent: [
+const FAMILY_MOBILE: NavEntry[] = [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
     { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
     { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
-  ],
+];
+
+export const mobileNavByRole: Record<Role, NavEntry[]> = {
+  parent: FAMILY_MOBILE,
   admin: [
     { icon: BarChart3,     label: 'Inicio',      to: '/admin', end: true },
     { icon: Users,         label: 'Alumnos',     to: '/admin/alumnos' },
@@ -146,11 +148,6 @@ export const mobileNavByRole: Record<Role, NavEntry[]> = {
     { icon: ClipboardList, label: 'Admisiones',  to: '/admin/admisiones', badgeKey: 'admisiones' },
   ],
   staff: navByRole.staff,
-  student: [
-    { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
-    { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
-    { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
-    { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
-    { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
-  ],
+  // Same shell, same destinations as parents (see navGroupsByRole.student).
+  student: FAMILY_MOBILE,
 };

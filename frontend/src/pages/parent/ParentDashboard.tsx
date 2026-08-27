@@ -107,7 +107,7 @@ export default function ParentDashboard() {
         subtitle={`${todayCapitalized}${selectedChild ? ` · ${selectedChild.name}` : ''}`}
         actions={
           <div className="flex items-center gap-2.5">
-            {updatedLabel && <span className="text-[11.5px] text-subtle">{updatedLabel}</span>}
+            {updatedLabel && <span className="text-[12px] text-subtle">{updatedLabel}</span>}
             <button
               type="button"
               aria-label="Actualizar"
@@ -174,7 +174,7 @@ export default function ParentDashboard() {
           </div>
           <Link
             to="/portal/cafeteria"
-            className="whitespace-nowrap rounded text-[12.5px] font-bold text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
+            className="whitespace-nowrap rounded text-[13px] font-bold text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
           >
             Recargar →
           </Link>
@@ -202,7 +202,7 @@ export default function ParentDashboard() {
       {/* 2. Child switcher */}
       {children.length > 1 && (
         <div className="mb-5">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-subtle">Alumno</p>
+          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wider text-subtle">Alumno</p>
           <ChildSwitcher students={children} />
         </div>
       )}
@@ -325,12 +325,12 @@ function CafeteriaSaldoCard({ total, low, studentsCount }: {
     <div className="card flex h-full flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[12.5px] font-medium text-muted">Saldo Cafetería</p>
+          <p className="text-[13px] font-medium text-muted">Saldo Cafetería</p>
           <p className={`mt-1 font-head text-[clamp(26px,8vw,36px)] font-extrabold leading-[1.1] tracking-[-1px] ${low ? 'text-amber' : 'text-ink'}`}>
             ${total.toFixed(2)}
           </p>
           {studentsCount > 1 && (
-            <p className="mt-0.5 text-[11.5px] text-subtle">Suma de {studentsCount} alumnos</p>
+            <p className="mt-0.5 text-[12px] text-subtle">Suma de {studentsCount} alumnos</p>
           )}
         </div>
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${low ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-dark'}`}>
@@ -338,7 +338,7 @@ function CafeteriaSaldoCard({ total, low, studentsCount }: {
         </span>
       </div>
       <div className="mt-auto">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-subtle">Recarga rápida</p>
+        <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wider text-subtle">Recarga rápida</p>
         <div className="flex flex-wrap items-center gap-2">
           {QUICK_TOPUP_AMOUNTS.map((amt) => (
             <Link
@@ -352,7 +352,7 @@ function CafeteriaSaldoCard({ total, low, studentsCount }: {
           ))}
           <Link
             to="/portal/cafeteria"
-            className="rounded px-1 text-[12.5px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            className="rounded px-1 text-[13px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             Otro monto →
           </Link>
@@ -386,8 +386,8 @@ function AnnouncementsCard({ announcements, unread, className }: {
               className={`block px-5 py-[13px] transition hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/30 ${i === 0 ? '' : 'border-t border-cream'}`}
             >
               <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
-              <div className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{a.body}</div>
-              <div className="mt-1 text-[11.5px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
+              <div className="mt-0.5 line-clamp-2 text-[13px] text-muted">{a.body}</div>
+              <div className="mt-1 text-[12px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
             </Link>
           ))}
         </div>

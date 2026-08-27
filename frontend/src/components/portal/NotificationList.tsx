@@ -26,7 +26,7 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
     <div>
       {groupNotifs(visible).map((g) => (
         <section key={g.label} aria-label={g.label}>
-          <h3 className="sticky top-0 z-[1] bg-white/95 px-4 py-1.5 text-[10.5px] font-bold uppercase tracking-[1.4px] text-subtle backdrop-blur">
+          <h3 className="sticky top-0 z-[1] bg-white/95 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[1.4px] text-subtle backdrop-blur">
             {g.label}
           </h3>
           <ul>
@@ -47,11 +47,11 @@ export function NotificationList({ items, onOpen, limit, emptyText = 'Sin notifi
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
-                        <span className="truncate text-[13.5px] font-semibold text-ink">{n.title}</span>
+                        <span className="truncate text-[14px] font-semibold text-ink">{n.title}</span>
                         {!n.is_read && <span className="h-2 w-2 shrink-0 rounded-full bg-coral" aria-label="Sin leer" />}
                       </span>
-                      <span className="mt-0.5 line-clamp-2 block text-xs text-muted">{n.message}</span>
-                      <span className="mt-1 block text-[11px] text-subtle">
+                      <span className="mt-0.5 line-clamp-2 block text-[13px] text-muted">{n.message}</span>
+                      <span className="mt-1 block text-[12px] text-subtle">
                         {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: es })}
                       </span>
                     </span>

@@ -34,7 +34,7 @@ export function AccountMenu() {
             <div className="text-[13px] font-semibold text-ink">
               {user?.first_name} {user?.last_name}
             </div>
-            <div className="text-[11px] text-subtle">{ROLE_LABEL[role] ?? role}</div>
+            <div className="text-[12px] text-subtle">{ROLE_LABEL[role] ?? role}</div>
           </div>
           <Avatar user={user} size={36} rounded="rounded-[10px]" />
           <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />

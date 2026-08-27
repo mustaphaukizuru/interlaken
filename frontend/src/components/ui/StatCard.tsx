@@ -87,7 +87,7 @@ export function StatCard({ title, value, suffix, icon: Icon, color, trend, subti
           </span>
         )}
       </div>
-      <div className="text-[13px] font-medium text-muted">{title}</div>
+      <div className="text-[14px] font-medium text-muted">{title}</div>
       {subtitle && <div className="mt-px text-[12px] text-light">{subtitle}</div>}
       <div className="mt-1 flex items-baseline gap-1">
         <span className="font-head text-[clamp(21px,5.5vw,36px)] font-extrabold leading-[1.1] tracking-[-1px] text-ink">

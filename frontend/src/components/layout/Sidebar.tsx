@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp } from 'lucide-react';
+import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown } from 'lucide-react';
 import { navGroupsByRole, type Role } from './navConfig';
 import { useBadges } from '@/hooks/useBadges';
 import { Avatar } from '@/components/ui/Avatar';
@@ -15,6 +15,10 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
+const FOLD_KEY = 'sidebar.folded';
+function readFolded(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]') as string[]); } catch { return new Set(); }
+}
 const COLLAPSE_KEY = 'portal.sidebar.collapsed';
 const ROLE_LABEL: Record<string, string> = { admin: 'Administración', staff: 'Personal', student: 'Familia', parent: 'Familia' };
 
@@ -35,6 +39,18 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
   const touchX = useRef<number | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  // Folded group headings, persisted per browser. The admin menu is 23 entries
+  // in five groups; an office that lives in Cafetería should not scroll past
+  // Contenido del sitio every time.
+  const [folded, setFolded] = useState<Set<string>>(readFolded);
+  const toggleGroup = (heading: string) =>
+    setFolded((prev) => {
+      const next = new Set(prev);
+      if (next.has(heading)) next.delete(heading); else next.add(heading);
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
+      return next;
+    });
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -104,15 +120,28 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
 
       {/* Navigation */}
       <nav aria-label="Menú del portal" className="scrollbar-none relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-        {groups.map((group) => (
+        {groups.map((group) => {
+          // The group holding the current page is always open: folding it would
+          // hide the highlighted "you are here" entry.
+          const holdsCurrent = group.items.some((i) => (i.end ? pathname === i.to : pathname.startsWith(i.to)));
+          const isFolded = !rail && folded.has(group.heading) && !holdsCurrent;
+          const panelId = `nav-group-${group.heading.replace(/\W+/g, '-').toLowerCase()}`;
+          return (
           <div key={group.heading}>
             {!rail && (
-              <div className="px-3.5 pb-1 pt-1 font-head text-[9.5px] font-bold uppercase tracking-[1.8px] text-subtle">
+              <button
+                type="button"
+                aria-expanded={!isFolded}
+                aria-controls={panelId}
+                onClick={() => toggleGroup(group.heading)}
+                className="flex w-full items-center justify-between rounded-lg px-3.5 pb-1 pt-1 text-left font-head text-[11px] font-bold uppercase tracking-[1.6px] text-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+              >
                 {group.heading}
-              </div>
+                <ChevronDown size={13} aria-hidden="true" className={`transition-transform ${isFolded ? '-rotate-90' : ''}`} />
+              </button>
             )}
             {rail && <div className="mx-auto mb-1 h-px w-8 bg-line" aria-hidden="true" />}
-            <div className="flex flex-col gap-0.5">
+            <div id={panelId} className={`${isFolded ? 'hidden' : 'flex'} flex-col gap-0.5`}>
               {group.items.map(({ icon: Icon, label, to, end, badgeKey }) => {
                 const count = badgeKey ? badges[badgeKey] ?? 0 : 0;
                 return (
@@ -124,7 +153,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                     title={rail ? label : undefined}
                     aria-label={count ? `${label}, ${count} pendientes` : label}
                     className={({ isActive }) =>
-                      `relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13.5px] font-medium no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+                      `relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                         rail ? 'lg:justify-center lg:px-0' : ''
                       } ${
                         isActive
@@ -145,7 +174,8 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User card → account actions (P1-E5) */}
@@ -171,7 +201,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           <Avatar user={user} size={38} rounded="rounded-[10px]" />
           <div className={`min-w-0 flex-1 ${rail ? 'lg:hidden' : ''}`}>
             <div className="truncate text-[13px] font-semibold text-ink">{user?.first_name} {user?.last_name}</div>
-            <div className="truncate text-[11px] text-subtle">{user?.email}</div>
+            <div className="truncate text-[12px] text-subtle">{user?.email}</div>
           </div>
           <ChevronUp size={15} className={`text-subtle transition-transform ${menuOpen ? 'rotate-180' : ''} ${rail ? 'lg:hidden' : ''}`} />
         </button>

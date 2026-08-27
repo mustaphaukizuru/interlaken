@@ -5,18 +5,15 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { Badge } from '@/components/ui/Badge';
-import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { Pagination } from '@/components/ui/Pagination';
 import { ActiveFilterChips, type FilterChip } from '@/components/admin/ActiveFilterChips';
 import { coreApi } from '@/services/api';
-import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
+import { toPaged } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { AuditLogEntry } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
-import { SortableTh, parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 
 const ACTION_LABEL: Record<string, string> = {
   create: 'Creación',
@@ -55,6 +52,36 @@ function changesSummary(entry: AuditLogEntry): string {
  * /admin/auditoria — read-only viewer over the append-only AuditLog
  * (money movements, wallet, datos de alumnos, roles). Filters are URL-synced.
  */
+const COLUMNS: Column<AuditLogEntry>[] = [
+  {
+    header: 'Fecha', sortKey: 'date', className: 'whitespace-nowrap text-muted',
+    cell: (e) => format(new Date(e.created_at), 'd MMM yyyy, HH:mm', { locale: es }),
+  },
+  {
+    header: 'Actor', sortKey: 'actor', className: 'text-muted max-w-[180px] truncate',
+    cell: (e) => <span title={e.actor_label}>{e.actor_label || 'system'}</span>,
+  },
+  {
+    header: 'Acción', sortKey: 'action',
+    cell: (e) => (
+      <div className="flex flex-wrap items-center gap-1">
+        <Badge variant={ACTION_VARIANT[e.action] ?? 'neutral'}>
+          {e.action_display || ACTION_LABEL[e.action] || e.action}
+        </Badge>
+        {e.context && <span className="text-xs text-subtle">{e.context}</span>}
+      </div>
+    ),
+  },
+  {
+    header: 'Objeto', sortKey: 'object', className: 'text-muted whitespace-nowrap text-xs font-mono',
+    cell: (e) => `${e.object_type}#${e.object_id}`,
+  },
+  {
+    header: 'Detalle', className: 'text-muted max-w-md truncate',
+    cell: (e) => <span title={changesSummary(e)}>{changesSummary(e)}</span>,
+  },
+];
+
 export default function AdminAudit() {
   const { get, set } = useUrlFilters();
   const { input: actor, setInput: setActor, search: debouncedActor } = useUrlSyncedSearch('actor');
@@ -155,63 +182,27 @@ export default function AdminAudit() {
           }}
         />
 
-        {isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : isLoading ? (
-          <TableSkeleton />
-        ) : !rows?.length ? (
-          <EmptyState
-            icon={ShieldCheck}
-            title={anyFilter ? 'Sin resultados' : 'Sin registros de auditoría'}
-            description={anyFilter
+        <DataTable<AuditLogEntry>
+          columns={COLUMNS}
+          rows={rows}
+          rowKey={(e) => e.id}
+          sort={sort}
+          onSort={onSort}
+          page={page}
+          count={count}
+          onPage={setPage}
+          itemLabel="registros"
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          empty={{
+            icon: ShieldCheck,
+            title: anyFilter ? 'Sin resultados' : 'Sin registros de auditoría',
+            description: anyFilter
               ? 'Ningún registro coincide con los filtros.'
-              : 'Las acciones sensibles quedarán registradas aquí.'}
-          />
-        ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <SortableTh columnKey="date" sort={sort} onSort={onSort}>Fecha</SortableTh>
-                  <SortableTh columnKey="actor" sort={sort} onSort={onSort}>Actor</SortableTh>
-                  <SortableTh columnKey="action" sort={sort} onSort={onSort}>Acción</SortableTh>
-                  <SortableTh columnKey="object" sort={sort} onSort={onSort}>Objeto</SortableTh>
-                  <th>Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((entry) => (
-                  <tr key={entry.id}>
-                    <td data-label="Fecha" className="whitespace-nowrap text-muted">
-                      {format(new Date(entry.created_at), 'd MMM yyyy, HH:mm', { locale: es })}
-                    </td>
-                    <td data-label="Actor" className="text-muted max-w-[180px] truncate" title={entry.actor_label}>
-                      {entry.actor_label || 'system'}
-                    </td>
-                    <td data-label="Acción">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <Badge variant={ACTION_VARIANT[entry.action] ?? 'neutral'}>
-                          {entry.action_display || ACTION_LABEL[entry.action] || entry.action}
-                        </Badge>
-                        {entry.context && (
-                          <span className="text-xs text-subtle">{entry.context}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td data-label="Objeto" className="text-muted whitespace-nowrap text-xs font-mono">
-                      {entry.object_type}#{entry.object_id}
-                    </td>
-                    <td data-label="Detalle" className="text-muted max-w-md truncate" title={changesSummary(entry)}>
-                      {changesSummary(entry)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="registros" />
+              : 'Las acciones sensibles aparecerán aquí conforme ocurran.',
+          }}
+        />
       </Card>
     </div>
   );
