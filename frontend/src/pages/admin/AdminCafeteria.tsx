@@ -23,6 +23,7 @@ import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { SyncHealthPanel } from '@/components/admin/SyncHealthPanel';
 
 type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
 
@@ -219,6 +220,7 @@ function RosterTab() {
           <RefreshCw className="w-3.5 h-3.5" /> Sincronizar todos
         </Button>
       </div>
+      <SyncHealthPanel />
       {lastSync && (
         <div className="-mt-1 mb-3 text-xs text-subtle">
           <p>

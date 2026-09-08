@@ -1310,6 +1310,60 @@ def reconcile_balances(*, limit: int = 50, offset: int = 0):
     }
 
 
+def loyverse_reachable() -> tuple[bool, str]:
+    """Cheapest possible liveness probe: one customer, one page.
+
+    Separated from the heavier reads so the health panel can answer "is the
+    token still valid and the API up?" without pulling the roster.
+    """
+    try:
+        _get('/customers', params={'limit': 1})
+        return True, ''
+    except LoyverseError as e:
+        return False, str(e)[:200]
+
+
+def sync_health() -> dict:
+    """Everything needed to answer "is the cafeteria sync actually working?".
+
+    This used to be answerable only by SSH-ing to the box and reading
+    /var/log/interlaken/loyverse.log, which puts the one diagnosis the office
+    needs behind root access to a server. Each field maps to a distinct failure:
+
+    * ``last_purchases_cursor`` old/None → the poll is not running (cron not
+      installed, or it has never completed a run).
+    * ``loyverse_ok`` false → token expired or the API is unreachable; nothing
+      can sync regardless of everything else.
+    * ``linked_students`` well below ``active_students`` → receipts will keep
+      landing in ``unmatched`` because the roster is not linked.
+    * ``last_transaction_at`` old while the cursor is fresh → the poll runs and
+      sees receipts but records nothing, i.e. the POS is charging the wallet by
+      a route ``_points_spent`` does not recognise.
+    """
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import CafeteriaTransaction, LoyverseSyncState
+
+    state = LoyverseSyncState.load()
+    active = StudentProfile.objects.filter(is_active=True)
+    week_ago = timezone.now() - timedelta(days=7)
+    last_tx = CafeteriaTransaction.objects.order_by('-date').first()
+    ok, error = loyverse_reachable()
+
+    return {
+        'loyverse_ok': ok,
+        'loyverse_error': error,
+        'last_purchases_cursor': state.last_purchases_cursor,
+        'last_full_fetch_at': state.last_full_fetch_at,
+        'active_students': active.count(),
+        'linked_students': active.exclude(loyverse_id='').count(),
+        'last_transaction_at': last_tx.date if last_tx else None,
+        'transactions_last_7d': CafeteriaTransaction.objects.filter(date__gte=week_ago).count(),
+        'purchases_last_7d': CafeteriaTransaction.objects.filter(
+            date__gte=week_ago,
+            transaction_type=CafeteriaTransaction.TxType.PURCHASE).count(),
+    }
+
+
 # ── Roster ↔ Loyverse linking ────────────────────────────────────────────────
 #
 # A student's purchases/balance only sync once StudentProfile.loyverse_id holds
