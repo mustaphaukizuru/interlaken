@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
@@ -147,6 +148,7 @@ function RosterTab() {
 
   const [lastSync, setLastSync] = useState<{
     receipts: number; purchases_created: number; balances_ok: number; balances_failed: number;
+    unmatched: number; skipped: number;
   } | null>(null);
 
   const syncAll = useMutation({
@@ -156,11 +158,18 @@ function RosterTab() {
       const receipts = data?.receipts ?? 0;
       const ok = data?.balances_ok ?? 0;
       const failed = data?.balances_failed ?? 0;
-      setLastSync({ receipts, purchases_created: created, balances_ok: ok, balances_failed: failed });
+      const unmatched = data?.unmatched ?? 0;
+      const skipped = data?.skipped ?? 0;
+      setLastSync({ receipts, purchases_created: created, balances_ok: ok, balances_failed: failed, unmatched, skipped });
+      // Say why a run moved nothing. "0 compras nuevas" on its own looks
+      // identical whether the POS charged the wallet some other way, nobody is
+      // linked, or there genuinely were no sales.
       toast.success(
-        `Sincronización: ${ok} saldo(s) ok`
-        + (failed ? `, ${failed} fallido(s)` : '')
-        + `, ${receipts} recibo(s), ${created} compra(s) nueva(s).`,
+        `Sincronización: ${receipts} recibo(s), ${created} compra(s) nueva(s)`
+        + (skipped ? `, ${skipped} sin movimiento de monedero` : '')
+        + (unmatched ? `, ${unmatched} sin alumno vinculado` : '')
+        + (failed ? `, ${failed} saldo(s) fallido(s)` : '')
+        + '.',
       );
       queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-balances'] });
     },
@@ -169,8 +178,19 @@ function RosterTab() {
 
   const syncOne = useMutation({
     mutationFn: (studentId: number) => cafeteriaApi.syncBalance(studentId),
-    onSuccess: () => {
-      toast.success('Saldo sincronizado.');
+    onSuccess: ({ data }) => {
+      // Don't claim "saldo sincronizado" when the seed-once rule made this a
+      // no-op — say what the wallet is actually worth and whether it agrees
+      // with Loyverse, which is the question being asked.
+      const local = `$${parseFloat(data.balance).toFixed(2)}`;
+      if (data.in_sync === true) toast.success(`Saldo ${local}, coincide con Loyverse.`);
+      else if (data.in_sync === false) {
+        toast(
+          `Saldo local ${local}, Loyverse $${parseFloat(data.loyverse_balance ?? '0').toFixed(2)} `
+          + `(diferencia $${parseFloat(data.drift ?? '0').toFixed(2)}). Use Reconciliación para corregir.`,
+          { icon: '⚠️', duration: 8000 },
+        );
+      } else toast.success(`Saldo ${local}. No se pudo consultar Loyverse.`);
       queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-balances'] });
     },
     onError: () => toast.error('Error al sincronizar.'),
@@ -200,11 +220,29 @@ function RosterTab() {
         </Button>
       </div>
       {lastSync && (
-        <p className="-mt-1 mb-3 text-xs text-subtle">
-          Última sincronización — saldos ok: {lastSync.balances_ok}
-          {lastSync.balances_failed > 0 ? `, fallidos: ${lastSync.balances_failed}` : ''}
-          , recibos: {lastSync.receipts}, compras nuevas: {lastSync.purchases_created}.
-        </p>
+        <div className="-mt-1 mb-3 text-xs text-subtle">
+          <p>
+            Última sincronización — recibos: {lastSync.receipts}, compras nuevas:{' '}
+            {lastSync.purchases_created}, saldos sembrados: {lastSync.balances_ok}
+            {lastSync.balances_failed > 0 ? `, fallidos: ${lastSync.balances_failed}` : ''}.
+          </p>
+          {(lastSync.skipped > 0 || lastSync.unmatched > 0) && (
+            <p className="mt-0.5 text-muted">
+              {lastSync.skipped > 0 && (
+                <>
+                  {lastSync.skipped} recibo(s) sin movimiento de monedero (venta en efectivo o
+                  tarjeta: el saldo no cambia).{' '}
+                </>
+              )}
+              {lastSync.unmatched > 0 && (
+                <>
+                  {lastSync.unmatched} recibo(s) de un cliente que no es un alumno vinculado —
+                  revise “Vincular Loyverse” en Alumnos.
+                </>
+              )}
+            </p>
+          )}
+        </div>
       )}
       <p className="-mt-2 mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
@@ -675,6 +713,24 @@ function ReconcileTab() {
   });
   const data = reconcile.data;
 
+  // Seeing a $25 gap and having to re-type the arithmetic into the manual
+  // adjustment form is how a reconciliation becomes a second discrepancy.
+  const [toFix, setToFix] = useState<ReconcileRow | null>(null);
+  const fix = useMutation({
+    mutationFn: (studentId: number) => cafeteriaApi.reconcileFix(studentId),
+    onSuccess: ({ data: res }) => {
+      toast.success(res.adjusted
+        ? `Saldo reconciliado: $${parseFloat(res.balance).toFixed(2)}.`
+        : 'Ya estaban sincronizados.');
+      setToFix(null);
+      reconcile.mutate(data?.offset ?? 0);
+    },
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { error?: string } } })?.response?.data;
+      toast.error(d?.error ?? 'No se pudo reconciliar.');
+    },
+  });
+
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -738,6 +794,7 @@ function ReconcileTab() {
                     <th className="num">Loyverse</th>
                     <th className="num">Diferencia</th>
                     <th>Estado</th>
+                    <th className="text-right">Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -765,6 +822,13 @@ function ReconcileTab() {
                           <Badge variant="warning">Diferencia</Badge>
                         )}
                       </td>
+                      <td data-label="Acción" className="text-right">
+                        {!r.error && !r.in_sync && (
+                          <Button size="sm" variant="secondary" onClick={() => setToFix(r)}>
+                            <RefreshCw className="h-3.5 w-3.5" /> Corregir
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -773,6 +837,20 @@ function ReconcileTab() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={!!toFix}
+        onClose={() => setToFix(null)}
+        onConfirm={() => toFix && fix.mutate(toFix.student_id)}
+        loading={fix.isPending}
+        title="Reconciliar con Loyverse"
+        confirmLabel="Aplicar ajuste"
+        message={toFix
+          ? `Se ajustará el saldo de ${toFix.student_name} de $${parseFloat(toFix.local_balance).toFixed(2)} `
+            + `a $${parseFloat(toFix.loyverse_balance ?? '0').toFixed(2)} (el valor de Loyverse). `
+            + 'Queda registrado en Auditoría y no se notifica a la familia.'
+          : ''}
+      />
     </Card>
   );
 }

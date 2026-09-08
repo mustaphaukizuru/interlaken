@@ -40,8 +40,11 @@ from .serializers import (
     build_spend_map,
 )
 from .services import (
+    LoyverseError,
     add_points_to_customer,
     adjust_balance,
+    get_balance_from_customer,
+    get_customer_by_id,
     reconcile_balances,
     record_receipts,
     refund_transaction,
@@ -788,18 +791,55 @@ class RefreshFromLoyverseView(APIView):
 
 
 class AdminSyncBalanceView(APIView):
-    """POST /api/v1/cafeteria/admin/sync/<pk>/"""
+    """POST /api/v1/cafeteria/admin/sync/<pk>/
+
+    Two different things, both of which the admin means by "sincronizar":
+
+    1. Seed the opening balance if this student has never been seeded. After
+       that the local ledger owns the balance (spec R1) and this step is a
+       deliberate no-op — ``seeded`` says which happened, so the UI can stop
+       claiming "saldo sincronizado" when nothing was touched.
+    2. Poll Loyverse receipts, then report the live comparison. Without the
+       comparison the button answers "did something run?" instead of the
+       question actually being asked, "is this wallet right?".
+    """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
         student = get_object_or_404(StudentProfile, pk=pk)
         try:
+            before = CafeteriaBalance.objects.filter(student=student).first()
+            was_seeded = before is not None and before.last_synced is not None
+
             new_balance = sync_student_balance(student)
             # Also pull any new POS purchases so the admin detail stays fresh.
             purchases = sync_purchases()
+
+            # Re-read: sync_purchases may have debited this student's wallet.
+            cb = CafeteriaBalance.objects.filter(student=student).first()
+            local = cb.balance if cb else new_balance
+
+            # Read-only comparison against Loyverse. Never writes — correcting
+            # drift is an explicit, audited action (AdminReconcileFixView).
+            loyverse_balance = drift = None
+            try:
+                loyverse_balance = get_balance_from_customer(
+                    get_customer_by_id(student.loyverse_id)) if student.loyverse_id else None
+            except LoyverseError as exc:
+                logger.warning('Sync drift check failed for %s: %s', student, exc)
+            if loyverse_balance is not None:
+                drift = local - loyverse_balance
+
             return Response({
-                'balance': str(new_balance),
+                'balance': str(local),
+                'seeded': not was_seeded,
+                'loyverse_balance': None if loyverse_balance is None else str(loyverse_balance),
+                'drift': None if drift is None else str(drift),
+                'in_sync': None if drift is None else drift == 0,
                 'purchases_created': purchases.get('created', 0),
+                'receipts': purchases.get('receipts', 0),
+                'unmatched': purchases.get('unmatched', 0),
+                'skipped': purchases.get('skipped', 0),
             })
         except Exception as e:
             return Response({'error': str(e)}, status=502)
@@ -824,12 +864,64 @@ class AdminSyncAllView(APIView):
                 'receipts': purchases.get('receipts', 0),
                 'purchases_created': purchases.get('created', 0),
                 'notified': purchases.get('notified', 0),
+                # The two numbers that explain a "0 compras nuevas" run. They
+                # were computed and then dropped here, so every failure mode
+                # (nobody linked / the POS charges the wallet some other way /
+                # genuinely nothing new) looked identical to the admin.
+                'unmatched': purchases.get('unmatched', 0),
+                'skipped': purchases.get('skipped', 0),
             })
         except Exception as e:
             return Response({'error': str(e)}, status=502)
 
 
 # ── Admin console (Phase D) ──────────────────────────────────────────────────
+
+
+class AdminReconcileFixView(APIView):
+    """POST /api/v1/cafeteria/admin/reconcile/<pk>/fix/
+
+    Bring one student's local balance to Loyverse's points with an audited
+    ADJUSTMENT. Reconciliación could only ever *show* drift, so closing a $25
+    gap meant an admin re-typing the arithmetic into the manual-adjustment form
+    — which is how a reconciliation turns into a second discrepancy.
+
+    The delta is recomputed here from a live Loyverse read; the client never
+    sends an amount. ``notify=False, mirror=False`` is the documented reconcile
+    mode (see adjust_balance): the local ledger is being set TO Loyverse, so
+    pushing the points back is circular, and a correction is not news a family
+    needs pushed to them.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        student = get_object_or_404(StudentProfile, pk=pk)
+        if not student.loyverse_id:
+            return Response({'error': 'El alumno no está vinculado a Loyverse.'}, status=400)
+
+        try:
+            remote = get_balance_from_customer(get_customer_by_id(student.loyverse_id))
+        except LoyverseError as exc:
+            return Response({'error': f'No se pudo leer el saldo en Loyverse: {exc}'}, status=502)
+
+        cb, _ = CafeteriaBalance.objects.get_or_create(student=student)
+        local = cb.balance or Decimal('0')
+        delta = remote - local
+        if delta == 0:
+            return Response({'detail': 'Ya estaban sincronizados.', 'adjusted': False,
+                             'balance': str(local)})
+
+        try:
+            adjust_balance(
+                student, delta,
+                reason=f'Reconciliación con Loyverse (local ${local:.2f} → ${remote:.2f})',
+                admin=request.user, notify=False, mirror=False)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=400)
+
+        cb.refresh_from_db()
+        return Response({'detail': 'Saldo reconciliado con Loyverse.', 'adjusted': True,
+                         'delta': str(delta), 'balance': str(cb.balance)})
 
 
 class AdminTopUpLogView(generics.ListAPIView):
