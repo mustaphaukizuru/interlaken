@@ -442,7 +442,23 @@ export const cafeteriaApi = {
     api.post(`/cafeteria/admin/topup/${topupId}/apply/`),
 
   syncBalance: (studentId: number) =>
-    api.post(`/cafeteria/admin/sync/${studentId}/`),
+    api.post<{
+      balance: string;
+      /** false = the balance was already locally owned, so nothing was re-seeded. */
+      seeded: boolean;
+      loyverse_balance: string | null;
+      drift: string | null;
+      in_sync: boolean | null;
+      purchases_created?: number;
+      receipts?: number;
+      unmatched?: number;
+      skipped?: number;
+    }>(`/cafeteria/admin/sync/${studentId}/`),
+
+  /** Bring one student's local balance to Loyverse's points (audited adjustment). */
+  reconcileFix: (studentId: number) =>
+    api.post<{ detail: string; adjusted: boolean; delta?: string; balance: string }>(
+      `/cafeteria/admin/reconcile/${studentId}/fix/`),
 
   syncAll: () =>
     api.post<{
@@ -452,6 +468,10 @@ export const cafeteriaApi = {
       receipts?: number;
       purchases_created?: number;
       notified?: number;
+      /** Receipts whose customer is not a linked student. */
+      unmatched?: number;
+      /** Receipts that moved no wallet money (cash/card sales). */
+      skipped?: number;
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
