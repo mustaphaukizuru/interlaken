@@ -46,6 +46,25 @@ class TestHelpers:
         assert _is_loyverse_student(STAFF) is False
         assert _is_loyverse_student(TEST) is False
 
+    def test_accepts_the_ci_prefixed_matricula_the_school_actually_uses(self):
+        """Regression: the live roster writes matrículas as ``ci10184``, not
+        ``10184``, and the filter required ``code.isdigit()``. Every one of the
+        350 real students was therefore rejected and "Importar desde Loyverse"
+        imported nobody. The fixture above used bare digits, which is exactly
+        why the test suite never noticed."""
+        real = _cust('ci10184', 'Correa Cervantes Maximiliano',
+                     'ci10184@interlaken.com.mx', '6APRI', 160)
+        assert _is_loyverse_student(real) is True
+        assert _is_loyverse_student(_cust('CI09723', 'Uc Ku Ana', 'ci09723@interlaken.com.mx')) is True
+
+    def test_still_rejects_staff_whose_code_is_numeric(self):
+        """The 42 non-student customers carry numeric codes but name-based
+        emails; the email guard is what excludes them, so widening the code rule
+        must not let them through."""
+        assert _is_loyverse_student(_cust('177', 'Jessica Soto', 'jsoto@interlaken.com.mx')) is False
+        assert _is_loyverse_student(_cust('ci-abc', 'X', 'ci1@interlaken.com.mx')) is False
+        assert _is_loyverse_student(_cust('', 'Sin código', 'ci1@interlaken.com.mx')) is False
+
 
 @pytest.mark.django_db
 class TestImport:

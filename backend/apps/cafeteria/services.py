@@ -16,6 +16,7 @@ Notes for maintainers:
   remote write. It is intentionally **not** on the money-in critical path.
 """
 import logging
+import re
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
@@ -1462,20 +1463,28 @@ _LEVEL_ABBR = {'PRE': 'Preescolar', 'KIN': 'Kinder', 'MAT': 'Maternal',
                'PRI': 'Primaria', 'SEC': 'Secundaria', 'PREP': 'Preparatoria'}
 
 
+# The school's matrículas are written ``ci10020`` in Loyverse — the same ``ci``
+# prefix the student email carries — not bare digits. ``code.isdigit()`` therefore
+# rejected EVERY real student, so "Importar desde Loyverse" reported zero
+# candidates and imported nobody. Accept both spellings; the email guard below is
+# what actually excludes staff and junk records.
+_STUDENT_CODE_RE = re.compile(r'^(?:ci)?\d{3,10}$', re.IGNORECASE)
+
+
 def _is_loyverse_student(c) -> bool:
-    """A Loyverse customer is a student iff it has a numeric matrícula and the
-    school's student email shape ``ci<digits>@interlaken.com.mx`` — this cleanly
-    excludes staff (name-based emails, ``ZP-`` prefixes) and test/junk records."""
+    """A Loyverse customer is a student iff its matrícula is ``ci<digits>`` (or
+    bare digits) AND it carries the school's student email shape
+    ``ci<digits>@interlaken.com.mx`` — which cleanly excludes staff (name-based
+    emails, ``ZP-`` prefixes) and test/junk records."""
     code = (c.get('customer_code') or '').strip()
     email = (c.get('email') or '').strip().lower()
-    return (code.isdigit()
+    return (bool(_STUDENT_CODE_RE.match(code))
             and email.startswith('ci')
             and email.endswith('@interlaken.com.mx'))
 
 
 def _parse_grade_code(addr):
     """Decode Loyverse's grade code → (grade, group). ``6APRI`` → ("6° Primaria", "A")."""
-    import re
     m = re.match(r'^\s*(\d)\s*([A-Za-z])\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', (addr or '').upper())
     if not m:
         return '', ''
