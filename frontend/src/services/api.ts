@@ -352,6 +352,19 @@ export const admissionsAdminApi = {
 // ── CAFETERIA ─────────────────────────────────────────────
 export interface BulkTopUpPreview { count: number; total: string; students: { id: number; name: string; grade: string; group: string }[] }
 
+export interface SyncHealth {
+  loyverse_ok: boolean;
+  loyverse_error: string;
+  /** Newest receipt the poll has read; stale/null = nothing is polling. */
+  last_purchases_cursor: string | null;
+  last_full_fetch_at: string | null;
+  active_students: number;
+  linked_students: number;
+  last_transaction_at: string | null;
+  transactions_last_7d: number;
+  purchases_last_7d: number;
+}
+
 export const cafeteriaApi = {
   getMyBalance: () =>
     api.get('/cafeteria/balance/'),
@@ -454,6 +467,9 @@ export const cafeteriaApi = {
       unmatched?: number;
       skipped?: number;
     }>(`/cafeteria/admin/sync/${studentId}/`),
+
+  /** "Is the cafeteria sync working?" — see components/admin/SyncHealthPanel. */
+  syncHealth: () => api.get<SyncHealth>('/cafeteria/admin/sync-health/'),
 
   /** Bring one student's local balance to Loyverse's points (audited adjustment). */
   reconcileFix: (studentId: number) =>

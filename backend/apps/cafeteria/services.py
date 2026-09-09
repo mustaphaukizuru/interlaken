@@ -16,6 +16,7 @@ Notes for maintainers:
   remote write. It is intentionally **not** on the money-in critical path.
 """
 import logging
+import re
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
@@ -1310,6 +1311,60 @@ def reconcile_balances(*, limit: int = 50, offset: int = 0):
     }
 
 
+def loyverse_reachable() -> tuple[bool, str]:
+    """Cheapest possible liveness probe: one customer, one page.
+
+    Separated from the heavier reads so the health panel can answer "is the
+    token still valid and the API up?" without pulling the roster.
+    """
+    try:
+        _get('/customers', params={'limit': 1})
+        return True, ''
+    except LoyverseError as e:
+        return False, str(e)[:200]
+
+
+def sync_health() -> dict:
+    """Everything needed to answer "is the cafeteria sync actually working?".
+
+    This used to be answerable only by SSH-ing to the box and reading
+    /var/log/interlaken/loyverse.log, which puts the one diagnosis the office
+    needs behind root access to a server. Each field maps to a distinct failure:
+
+    * ``last_purchases_cursor`` old/None → the poll is not running (cron not
+      installed, or it has never completed a run).
+    * ``loyverse_ok`` false → token expired or the API is unreachable; nothing
+      can sync regardless of everything else.
+    * ``linked_students`` well below ``active_students`` → receipts will keep
+      landing in ``unmatched`` because the roster is not linked.
+    * ``last_transaction_at`` old while the cursor is fresh → the poll runs and
+      sees receipts but records nothing, i.e. the POS is charging the wallet by
+      a route ``_points_spent`` does not recognise.
+    """
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import CafeteriaTransaction, LoyverseSyncState
+
+    state = LoyverseSyncState.load()
+    active = StudentProfile.objects.filter(is_active=True)
+    week_ago = timezone.now() - timedelta(days=7)
+    last_tx = CafeteriaTransaction.objects.order_by('-date').first()
+    ok, error = loyverse_reachable()
+
+    return {
+        'loyverse_ok': ok,
+        'loyverse_error': error,
+        'last_purchases_cursor': state.last_purchases_cursor,
+        'last_full_fetch_at': state.last_full_fetch_at,
+        'active_students': active.count(),
+        'linked_students': active.exclude(loyverse_id='').count(),
+        'last_transaction_at': last_tx.date if last_tx else None,
+        'transactions_last_7d': CafeteriaTransaction.objects.filter(date__gte=week_ago).count(),
+        'purchases_last_7d': CafeteriaTransaction.objects.filter(
+            date__gte=week_ago,
+            transaction_type=CafeteriaTransaction.TxType.PURCHASE).count(),
+    }
+
+
 # ── Roster ↔ Loyverse linking ────────────────────────────────────────────────
 #
 # A student's purchases/balance only sync once StudentProfile.loyverse_id holds
@@ -1408,20 +1463,28 @@ _LEVEL_ABBR = {'PRE': 'Preescolar', 'KIN': 'Kinder', 'MAT': 'Maternal',
                'PRI': 'Primaria', 'SEC': 'Secundaria', 'PREP': 'Preparatoria'}
 
 
+# The school's matrículas are written ``ci10020`` in Loyverse — the same ``ci``
+# prefix the student email carries — not bare digits. ``code.isdigit()`` therefore
+# rejected EVERY real student, so "Importar desde Loyverse" reported zero
+# candidates and imported nobody. Accept both spellings; the email guard below is
+# what actually excludes staff and junk records.
+_STUDENT_CODE_RE = re.compile(r'^(?:ci)?\d{3,10}$', re.IGNORECASE)
+
+
 def _is_loyverse_student(c) -> bool:
-    """A Loyverse customer is a student iff it has a numeric matrícula and the
-    school's student email shape ``ci<digits>@interlaken.com.mx`` — this cleanly
-    excludes staff (name-based emails, ``ZP-`` prefixes) and test/junk records."""
+    """A Loyverse customer is a student iff its matrícula is ``ci<digits>`` (or
+    bare digits) AND it carries the school's student email shape
+    ``ci<digits>@interlaken.com.mx`` — which cleanly excludes staff (name-based
+    emails, ``ZP-`` prefixes) and test/junk records."""
     code = (c.get('customer_code') or '').strip()
     email = (c.get('email') or '').strip().lower()
-    return (code.isdigit()
+    return (bool(_STUDENT_CODE_RE.match(code))
             and email.startswith('ci')
             and email.endswith('@interlaken.com.mx'))
 
 
 def _parse_grade_code(addr):
     """Decode Loyverse's grade code → (grade, group). ``6APRI`` → ("6° Primaria", "A")."""
-    import re
     m = re.match(r'^\s*(\d)\s*([A-Za-z])\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', (addr or '').upper())
     if not m:
         return '', ''

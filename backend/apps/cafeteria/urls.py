@@ -34,6 +34,7 @@ urlpatterns = [
     path('admin/sync/<int:pk>/',         views.AdminSyncBalanceView.as_view(),    name='admin-sync-balance'),
     path('admin/sync-all/',              views.AdminSyncAllView.as_view(),        name='admin-sync-all'),
     path('admin/reconcile/<int:pk>/fix/', views.AdminReconcileFixView.as_view(),  name='admin-reconcile-fix'),
+    path('admin/sync-health/',           views.AdminSyncHealthView.as_view(),     name='admin-sync-health'),
 
     # Phase D — admin console
     path('admin/topups/',                views.AdminTopUpLogView.as_view(),       name='admin-topups'),

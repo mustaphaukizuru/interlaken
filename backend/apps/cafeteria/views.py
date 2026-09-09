@@ -49,6 +49,7 @@ from .services import (
     record_receipts,
     refund_transaction,
     sync_all_balances,
+    sync_health,
     sync_purchases,
     sync_student_balance,
 )
@@ -876,6 +877,32 @@ class AdminSyncAllView(APIView):
 
 
 # ── Admin console (Phase D) ──────────────────────────────────────────────────
+
+
+class AdminSyncHealthView(APIView):
+    """GET /api/v1/cafeteria/admin/sync-health/
+
+    "Is the cafeteria sync working?" — previously answerable only by SSH-ing to
+    the VPS and reading the cron log, which puts the diagnosis the office needs
+    behind root access to a server. Cached briefly so opening the page does not
+    probe Loyverse on every render.
+    """
+    permission_classes = [IsAdmin]
+    CACHE_KEY = 'cafeteria:sync-health'
+    CACHE_TTL = 60
+
+    def get(self, request):
+        data = cache.get(self.CACHE_KEY)
+        if data is None:
+            h = sync_health()
+            data = {
+                **h,
+                'last_purchases_cursor': h['last_purchases_cursor'].isoformat() if h['last_purchases_cursor'] else None,
+                'last_full_fetch_at': h['last_full_fetch_at'].isoformat() if h['last_full_fetch_at'] else None,
+                'last_transaction_at': h['last_transaction_at'].isoformat() if h['last_transaction_at'] else None,
+            }
+            cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
+        return Response(data)
 
 
 class AdminReconcileFixView(APIView):
