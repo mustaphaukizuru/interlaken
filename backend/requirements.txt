@@ -1,5 +1,5 @@
 # Core
-Django==6.1
+Django==6.1.1
 djangorestframework==3.18.0
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
@@ -8,7 +8,7 @@ django-filter==26.1
 drf-spectacular==0.30.0
 # At-rest encryption for sensitive fields (medical data — IK-LEGAL B4).
 # social-auth-core 5.x requires cryptography>=46.0.7.
-cryptography==50.0.0
+cryptography==50.0.1
 
 # Database — Postgres only (containerised Postgres in production, SQLite locally).
 # The MySQL drivers the cPanel host needed are gone; nothing imports MySQLdb.
@@ -26,18 +26,18 @@ Pillow==12.3.0
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
 django-storages==1.14.6
-boto3==1.43.77
+boto3==1.43.88
 
 # Web push notifications (VAPID) — inert until VAPID_* env keys are set.
-pywebpush==2.4.0
+pywebpush==2.5.0
 
 # HTTP & APIs
 requests==2.34.2
 
 # Google Calendar (service-account writes for confirmed bookings — Prompt 13).
 # Fail-soft: bookings never depend on these being importable/configured.
-google-api-python-client==2.199.0
-google-auth==2.56.3
+google-api-python-client==2.200.0
+google-auth==2.57.1
 
 # Payments: Global Payments + Banorte are custom HPP redirect + HMAC-signed
 # webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
@@ -55,14 +55,14 @@ django-ratelimit==4.1.0
 django-axes==8.3.1
 
 # Production
-gunicorn==26.1.0
+gunicorn==26.2.0
 whitenoise==6.12.0
 
 # Monitoring (no-op unless SENTRY_DSN is configured)
-sentry-sdk==2.68.0
+sentry-sdk==2.68.1
 
 # Admin skin (IK-ADMIN). 0.103.0 supports Django 5.x/6.x.
-django-unfold==0.104.1
+django-unfold==0.105.0
 
 # Dev
 pytest-django==4.14.0
