@@ -77,3 +77,39 @@ class AuditLog(models.Model):
 
     def delete(self, *args, **kwargs):
         raise IntegrityError('AuditLog is append-only; entries cannot be deleted.')
+
+
+class OpsStatus(models.Model):
+    """One row of operational markers written by scripts that run OUTSIDE the
+    app container (the nightly backup lives on the host; the container cannot
+    see /var/backups). Scripts report in through management commands; the
+    admin console reads it. Keys are free-form JSON so a new marker never needs
+    a migration: {"backup": {"at": iso, "ok": bool, "path": str, "size": int,
+    "target": str, "offsite": str|null}}.
+    """
+    data = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Estado operativo'
+        verbose_name_plural = 'Estado operativo'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @classmethod
+    def set(cls, key: str, value) -> None:
+        obj = cls.load()
+        obj.data = {**(obj.data or {}), key: value}
+        obj.save(update_fields=['data', 'updated_at'])
+
+    @classmethod
+    def get(cls, key: str, default=None):
+        row = cls.objects.filter(pk=1).first()
+        return (row.data or {}).get(key, default) if row else default

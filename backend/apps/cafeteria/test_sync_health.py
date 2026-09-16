@@ -102,3 +102,22 @@ class TestSyncHealth:
         api_client.get(URL)
 
         assert len(calls) == 1
+
+    def test_exposes_the_real_time_and_backup_signals(self, api_client, monkeypatch):
+        """Two more lights: last Loyverse delivery, and the nightly backup
+        marker that backup-db.sh reports in (the container cannot see the dump)."""
+        from apps.core.models import OpsStatus
+        monkeypatch.setattr('apps.cafeteria.services.loyverse_reachable', lambda: (True, ''))
+        state = LoyverseSyncState.load()
+        state.last_webhook_at = timezone.now(); state.last_webhook_type = 'receipts.update'
+        state.save(update_fields=['last_webhook_at', 'last_webhook_type'])
+        OpsStatus.set('backup', {'ok': True, 'at': timezone.now().isoformat(), 'size': 1000,
+                                 'path': '/x', 'target': 'external', 'offsite': None, 'offsite_at': None})
+        api_client.force_authenticate(AdminFactory())
+
+        data = api_client.get(URL).json()
+
+        assert data['last_webhook_at'] is not None
+        assert data['last_webhook_type'] == 'receipts.update'
+        assert data['backup']['ok'] is True and data['backup']['offsite'] is None
+

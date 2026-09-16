@@ -260,6 +260,13 @@ class LoyverseSyncState(models.Model):
     # (which would permanently skip a receipt whose webhook was lost).
     last_purchases_cursor = models.DateTimeField(
         'Cursor de compras (poll)', null=True, blank=True)
+    # Stamped by LoyverseWebhookView on every authenticated delivery. The only
+    # honest answer to "is real-time working?": server logs proved unreliable
+    # for it (Caddy only kept the 502s), and a hook Loyverse silently disabled
+    # looks identical to a quiet afternoon without this.
+    last_webhook_at = models.DateTimeField(
+        'Última entrega de webhook', null=True, blank=True)
+    last_webhook_type = models.CharField(max_length=40, blank=True, default='')
 
     class Meta:
         verbose_name = 'Estado de sincronización Loyverse'

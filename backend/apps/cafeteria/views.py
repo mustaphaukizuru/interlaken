@@ -530,6 +530,19 @@ class MyLoyverseHistoryView(APIView):
         return Response(result)
 
 
+# Secret-gated and idempotent already; the limit is belt-and-braces so a leaked
+# URL cannot hammer the ledger path. A lunch rush is ~10 receipts/min, and
+# Loyverse batches several receipts per delivery, so 120/min is generous.
+def _stamp_webhook(event: str) -> None:
+    """Record that Loyverse reached us. Cheap, and the one signal the health
+    panel can use to tell "quiet afternoon" from "hook silently disabled"."""
+    from apps.cafeteria.models import LoyverseSyncState
+    LoyverseSyncState.objects.filter(pk=1).exists() or LoyverseSyncState.load()
+    LoyverseSyncState.objects.filter(pk=1).update(
+        last_webhook_at=timezone.now(), last_webhook_type=(event or '')[:40])
+
+
+@method_decorator(ratelimit('loyverse-webhook', '120/m', key='ip', method='POST'), name='dispatch')
 @method_decorator(csrf_exempt, name='dispatch')
 class LoyverseWebhookView(APIView):
     """POST /api/v1/cafeteria/loyverse/webhook/[<token>/] — near-real-time receipt
@@ -576,6 +589,8 @@ class LoyverseWebhookView(APIView):
             return Response({'error': 'unauthorized'}, status=401)
 
         payload = request.data if isinstance(request.data, dict) else {}
+        event = payload.get('type') or ('customers.update' if 'customers' in payload else 'receipts.update')
+        _stamp_webhook(event)
 
         # customers.update — Loyverse pushes the changed customer objects
         # (total_points included) the moment a cash recarga is loaded on the
@@ -589,6 +604,8 @@ class LoyverseWebhookView(APIView):
             except Exception:  # noqa: BLE001
                 logger.exception('Loyverse customers.update processing failed')
                 return Response({'error': 'processing_error'}, status=500)
+            logger.info('Loyverse webhook %s: %d customer(s), %d credited ($%s)',
+                        event, len(customers), result['credited'], result['total'])
             return Response({'ok': True, 'event': 'customers.update',
                              'credited': result['credited'], 'total': str(result['total'])})
 
@@ -605,6 +622,8 @@ class LoyverseWebhookView(APIView):
         except Exception:  # noqa: BLE001 — never leak internals to the caller
             logger.exception('Loyverse webhook processing failed')
             return Response({'error': 'processing_error'}, status=500)
+        logger.info('Loyverse webhook %s: %d receipt(s), %d new, %d unmatched, %d skipped',
+                    event, len(receipts), result['created'], result['unmatched'], result['skipped'])
         return Response({'ok': True, **result})
 
 
@@ -931,6 +950,7 @@ class AdminSyncHealthView(APIView):
                 'last_purchases_cursor': h['last_purchases_cursor'].isoformat() if h['last_purchases_cursor'] else None,
                 'last_full_fetch_at': h['last_full_fetch_at'].isoformat() if h['last_full_fetch_at'] else None,
                 'last_transaction_at': h['last_transaction_at'].isoformat() if h['last_transaction_at'] else None,
+                'last_webhook_at': h['last_webhook_at'].isoformat() if h['last_webhook_at'] else None,
             }
             cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
         return Response(data)

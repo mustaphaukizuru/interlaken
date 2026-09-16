@@ -363,6 +363,14 @@ export interface SyncHealth {
   last_transaction_at: string | null;
   transactions_last_7d: number;
   purchases_last_7d: number;
+  /** Stamped on every authenticated Loyverse webhook delivery. */
+  last_webhook_at: string | null;
+  last_webhook_type: string;
+  /** Reported in by deploy/backup-db.sh; null until the first run after this ships. */
+  backup: {
+    at: string; ok: boolean; path: string; size: number; target: string;
+    offsite: string | null; offsite_at: string | null;
+  } | null;
 }
 
 export const cafeteriaApi = {
@@ -786,7 +794,7 @@ export const portalApi = {
   guardianMerge: (data: { keep: number; drop: number; confirm: string }) => api.post<MergeResult>('/accounts/admin/guardians/merge/', data),
   /** New school year wizard (BACKLOG P4-5). */
   schoolYearPreview: () => api.get<SchoolYearPreview>('/accounts/admin/school-year/preview/'),
-  schoolYearRun: (data: { confirm: string; new_cycle: string; reset_threshold: number | null }) => api.post<SchoolYearResult>('/accounts/admin/school-year/run/', data),
+  schoolYearRun: (data: { confirm: string; new_cycle: string; reset_threshold: number | null; promote_grades?: boolean }) => api.post<SchoolYearResult>('/accounts/admin/school-year/run/', data),
   adminCreateAnnouncement: (data: {
     title: string; body: string; audience: string;
     is_active?: boolean; push_enabled?: boolean; show_on_site?: boolean; site_until?: string | null; site_link?: string;
@@ -947,7 +955,7 @@ export interface PageIssue { level: 'error' | 'warning'; code: string; message: 
 export interface MergeUser { id: number; email: string; full_name: string; is_active: boolean; last_login: string | null; has_password: boolean; google: boolean; phone: string; children: { id: number; name: string; grade: string }[] }
 export interface MergePreview { keep: MergeUser; drop: MergeUser; references: Record<string, number> }
 export interface MergeResult { moved: Record<string, number>; skipped: Record<string, number>; keep: number; drop: number }
-export interface SchoolYearPreview { moves: { from: string; to: string; count: number }[]; graduates: number; active_total: number; skipped: number; current_cycle: string; suggested_cycle: string; last_rollover_at: string | null }
+export interface SchoolYearPreview { moves: { from: string; to: string; count: number }[]; graduates: number; active_total: number; skipped: number; current_cycle: string; suggested_cycle: string; last_rollover_at: string | null; /** Grades come from the Loyverse import; the wizard skips promotion unless asked. */ grades_from_loyverse: boolean }
 export interface SchoolYearResult { promoted: number; graduated: number; thresholds_reset: number; school_year: string }
 
 export interface CmsPageAdmin {

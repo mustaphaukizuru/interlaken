@@ -9,6 +9,9 @@
 # always matches the server (a mismatch is what silently broke the old workflow
 # for five nights).
 set -euo pipefail
+# If anything below fails, say so where the office can see it (console), not
+# only in a log nobody reads.
+trap 'rc=$?; if [[ $rc -ne 0 ]]; then docker compose exec -T app python manage.py record_backup --failed --target "${target:-?}" >/dev/null 2>&1 || true; fi' EXIT
 
 cd "$(dirname "$0")"
 
@@ -57,6 +60,15 @@ fi
 find "$DEST" -name 'db-*.sql.gz' -mtime "+$KEEP_DAYS" -delete
 
 echo "$(date -Is) backup ok: $out ($((size / 1024)) KB) from $target"
+
+# Report in to the app so the admin console can show it: the container cannot
+# see this directory, and a silent backup job looks exactly like a working one.
+docker compose exec -T app python manage.py record_backup --ok --path "$out" --size "$size" --target "$target" >/dev/null 2>&1 || true
+
+# Off-box copy into the app's object storage (Supabase S3). The container
+# cannot see this directory, so the dump is streamed in on stdin. A no-op with
+# a clear message until AWS_STORAGE_BUCKET_NAME + keys exist in .env.
+docker compose exec -T app python manage.py offsite_backup --name "$(basename "$out")" < "$out" || echo "offsite copy failed (local dump is intact)"
 
 # A backup that only exists on the machine it protects is not a backup. Set
 # BACKUP_REMOTE (e.g. user@host:/path or an rclone remote) to copy it off.

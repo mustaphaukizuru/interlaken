@@ -34,7 +34,10 @@ def test_preview_and_run(admin_client, parent_user):
     # confirmation + cycle format guards
     assert admin_client.post(reverse('school-year-run'), {'confirm': 'no', 'new_cycle': '2027-2028'}, format='json').status_code == 400
     assert admin_client.post(reverse('school-year-run'), {'confirm': 'AVANZAR', 'new_cycle': '2027-2029'}, format='json').status_code == 400
-    r = admin_client.post(reverse('school-year-run'), {'confirm': 'AVANZAR', 'new_cycle': '2027-2028', 'reset_threshold': 80}, format='json')
+    # The factory links every student to Loyverse, so this roster counts as
+    # "grades come from the import": promotion must now be asked for explicitly
+    # (see test_school_year_guard.py for the default).
+    r = admin_client.post(reverse('school-year-run'), {'confirm': 'AVANZAR', 'new_cycle': '2027-2028', 'reset_threshold': 80, 'promote_grades': True}, format='json')
     assert r.status_code == 200, r.data
     assert r.data['promoted'] == 1 and r.data['graduated'] == 1
     for sp in (a, b, c):
