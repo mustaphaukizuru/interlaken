@@ -45,6 +45,7 @@ from .services import (
     adjust_balance,
     get_balance_from_customer,
     get_customer_by_id,
+    mirror_pos_topups,
     reconcile_balances,
     record_receipts,
     refund_transaction,
@@ -858,8 +859,14 @@ class AdminSyncAllView(APIView):
         try:
             balances = sync_all_balances()
             purchases = sync_purchases()
+            # Cash recargas loaded on the POS tablet: the one flow with no other
+            # channel into the ledger. Without this the button could only ever
+            # debit, so "Sincronizar" left a family's wallet negative.
+            pos = mirror_pos_topups()
             return Response({
                 'detail': 'Sincronización completada.',
+                'pos_topups_credited': pos.get('credited', 0),
+                'pos_topups_total': str(pos.get('total', 0)),
                 'balances_ok': balances.get('synced', 0),
                 'balances_failed': balances.get('failed', 0),
                 'receipts': purchases.get('receipts', 0),

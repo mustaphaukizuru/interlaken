@@ -488,6 +488,9 @@ export const cafeteriaApi = {
       unmatched?: number;
       /** Receipts that moved no wallet money (cash/card sales). */
       skipped?: number;
+      /** Cash recargas loaded on the POS tablet and now credited locally. */
+      pos_topups_credited?: number;
+      pos_topups_total?: string;
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)

@@ -1311,6 +1311,106 @@ def reconcile_balances(*, limit: int = 50, offset: int = 0):
     }
 
 
+def mirror_pos_topups(customers=None, *, notify=True) -> dict:
+    """Credit recargas typed directly into the Loyverse POS into the local ledger.
+
+    The 2026-09-16 roster reconcile showed 69 wallets BELOW Loyverse by round
+    amounts ($100, $200, $500 ...), many negative. That is the one flow R1 has no
+    channel for: a cash top-up loaded on the POS tablet raises ``total_points``
+    in Loyverse, the purchase poll keeps debiting every sale, and the local
+    wallet marches negative. Every other money path (online top-up, caja
+    escolar, refund, adjustment) already writes the ledger itself.
+
+    One-directional by design: only a POSITIVE remote-minus-local delta is
+    credited, as a TOPUP the family can see. A negative delta is never touched
+    here; it is either a purchase the next poll will record, or an online top-up
+    the staff has not loaded into the POS yet (also excluded explicitly below,
+    so a simultaneous cash load cannot be misread). After crediting, local ==
+    remote, so re-runs are no-ops: idempotent without needing a receipt id.
+
+    ``customers`` lets the caller reuse an already-fetched store-wide list; the
+    cron passes none and fetches once (2 pages), never per student.
+
+    ``notify=False`` is for the deploy-day catch-up: the first run credits the
+    accumulated backlog (one wallet was $4,823 behind), and "se registró una
+    recarga de $4,823" is not a message to send a family about months of
+    history. After that first run the deltas are single recargas and the cron
+    notifies normally.
+    """
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+
+    if customers is None:
+        customers = get_all_customers()
+    points_by_id = {c.get('id'): get_balance_from_customer(c) for c in customers}
+
+    pending_pos = set(
+        TopUpRequest.objects.filter(
+            method=TopUpRequest.Method.ONLINE,
+            status=TopUpRequest.Status.COMPLETED,
+            pos_loaded_at__isnull=True,
+        ).values_list('student_id', flat=True)
+    )
+
+    students = (StudentProfile.objects.filter(is_active=True)
+                .exclude(loyverse_id='').select_related('user'))
+    credited = skipped_pending = in_sync = below = unseeded = 0
+    total = Decimal('0')
+    now = timezone.now()
+
+    for student in students:
+        remote = points_by_id.get(student.loyverse_id)
+        if remote is None:
+            continue
+        if student.id in pending_pos:
+            skipped_pending += 1
+            continue
+        with transaction.atomic():
+            cb = (CafeteriaBalance.objects.select_for_update()
+                  .filter(student=student).first())
+            if cb is None or cb.last_synced is None:
+                unseeded += 1          # sync_balances seeds these from Loyverse
+                continue
+            delta = Decimal(str(remote)) - Decimal(str(cb.balance or 0))
+            if delta == 0:
+                in_sync += 1
+                continue
+            if delta < 0:
+                below += 1             # not ours to touch, see docstring
+                continue
+            cb.balance = (cb.balance or Decimal('0')) + delta
+            cb.last_synced = now
+            fields = ['balance', 'last_synced']
+            if not cb.is_low_balance and cb.last_low_balance_alert_at is not None:
+                cb.last_low_balance_alert_at = None
+                fields.append('last_low_balance_alert_at')
+            cb.save(update_fields=fields)
+            CafeteriaTransaction.objects.create(
+                student=student,
+                transaction_type=CafeteriaTransaction.TxType.TOPUP,
+                amount=delta,
+                description='Recarga en caja de cafetería (POS Loyverse)',
+                loyverse_receipt_id=f'pos-topup-{student.id}-{int(now.timestamp())}',
+                balance_after=cb.balance,
+                date=now,
+            )
+        credited += 1
+        total += delta
+        if not notify:
+            continue
+        _notify_balance_change(
+            student, 'Recarga registrada',
+            f'Se registró una recarga de ${delta:.2f} en la cafetería. '
+            f'Saldo actual: ${cb.balance:.2f}.')
+
+    logger.info(
+        f'mirror_pos_topups: {credited} credited (${total}), {in_sync} in sync, '
+        f'{below} below Loyverse (left to the purchase poll), '
+        f'{skipped_pending} pending POS load, {unseeded} unseeded.')
+    return {'credited': credited, 'total': total, 'in_sync': in_sync, 'below': below,
+            'skipped_pending': skipped_pending, 'unseeded': unseeded}
+
+
 def loyverse_reachable() -> tuple[bool, str]:
     """Cheapest possible liveness probe: one customer, one page.
 
@@ -1392,7 +1492,8 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
 
     by_code, by_email, dup_codes = {}, {}, set()
     for c in customers:
-        code = (c.get('customer_code') or '').strip()
+        # Same normalisation as the import: Loyverse says ci09938, the app 09938.
+        code = _matricula(c.get('customer_code'))
         if code:
             if code in by_code:
                 dup_codes.add(code)
@@ -1414,7 +1515,7 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
     report['students'] = students.count()
 
     for s in students:
-        code = (s.student_id or '').strip()
+        code = _matricula(s.student_id)
         email = (s.user.email or '').strip().lower()
 
         cust, matched_by = by_code.get(code), 'código'
@@ -1483,13 +1584,39 @@ def _is_loyverse_student(c) -> bool:
             and email.endswith('@interlaken.com.mx'))
 
 
+_GRADE_CODE_RE = re.compile(r'^\s*(\d)\s*([A-Za-z])?\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', re.IGNORECASE)
+
+
 def _parse_grade_code(addr):
-    """Decode Loyverse's grade code → (grade, group). ``6APRI`` → ("6° Primaria", "A")."""
-    m = re.match(r'^\s*(\d)\s*([A-Za-z])\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', (addr or '').upper())
+    """Decode Loyverse's grade code → (grade, group).
+
+    ``6APRI`` → ("6° Primaria", "A"). The live roster writes it WITHOUT a group
+    letter — ``1PRI`` — and the old pattern made the letter mandatory, so every
+    student decoded to ('', '') and was imported with grade "N/D".
+    """
+    m = _GRADE_CODE_RE.match(addr or '')
     if not m:
         return '', ''
     num, group, lvl = m.groups()
-    return f'{num}° {_LEVEL_ABBR.get(lvl, lvl.title())}', group
+    return f'{num}° {_LEVEL_ABBR.get(lvl.upper(), lvl.title())}', (group or '').upper()
+
+
+# Loyverse's ``name`` field carries the grade code as a suffix on the given
+# name — "Calles Lopez Sebastian-1PRI" — so it has to come off before the
+# apellidos/nombre split, or the student is created as "Sebastian-1PRI".
+_NAME_GRADE_SUFFIX_RE = re.compile(r'\s*-\s*\d\s*[A-Za-z]?\s*(?:PREP|PRE|KIN|MAT|PRI|SEC)\s*$', re.IGNORECASE)
+
+
+def _strip_grade_suffix(name):
+    return _NAME_GRADE_SUFFIX_RE.sub('', name or '').strip()
+
+
+def _matricula(code):
+    """Loyverse writes the matrícula as ``ci09938``; the app stores ``09938``
+    (and that is what every existing StudentProfile.student_id holds). Without
+    this the import matched none of the 333 linked students and would have
+    created 350 duplicates beside them."""
+    return re.sub(r'^ci', '', (code or '').strip(), flags=re.IGNORECASE)
 
 
 def _split_loyverse_name(name):
@@ -1497,7 +1624,7 @@ def _split_loyverse_name(name):
     the two apellidos first, then the nombres — so the first two words are the
     last name and the rest are the first name (a heuristic; admin can correct
     the rare single-apellido case)."""
-    parts = (name or '').split()
+    parts = _strip_grade_suffix(name).split()
     if not parts:
         return 'Alumno', ''
     if len(parts) == 1:
@@ -1538,11 +1665,16 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
             continue
         report['candidates'] += 1
 
-        code = (c.get('customer_code') or '').strip()
+        code = _matricula(c.get('customer_code'))
         email = (c.get('email') or '').strip().lower()
         uuid = c.get('id') or ''
         first, last = _split_loyverse_name(c.get('name'))
         grade, group = _parse_grade_code(c.get('address'))
+        if not grade:
+            # Fall back to the suffix on the name ("…-1PRI") when address is blank.
+            m = _NAME_GRADE_SUFFIX_RE.search(c.get('name') or '')
+            if m:
+                grade, group = _parse_grade_code(m.group(0).lstrip(' -'))
         points = _to_decimal(c.get('total_points'))
 
         try:

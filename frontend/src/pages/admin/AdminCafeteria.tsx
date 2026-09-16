@@ -165,8 +165,10 @@ function RosterTab() {
       // Say why a run moved nothing. "0 compras nuevas" on its own looks
       // identical whether the POS charged the wallet some other way, nobody is
       // linked, or there genuinely were no sales.
+      const posTopups = data?.pos_topups_credited ?? 0;
       toast.success(
         `Sincronización: ${receipts} recibo(s), ${created} compra(s) nueva(s)`
+        + (posTopups ? `, ${posTopups} recarga(s) en caja por $${parseFloat(data?.pos_topups_total ?? '0').toFixed(2)}` : '')
         + (skipped ? `, ${skipped} sin movimiento de monedero` : '')
         + (unmatched ? `, ${unmatched} sin alumno vinculado` : '')
         + (failed ? `, ${failed} saldo(s) fallido(s)` : '')
