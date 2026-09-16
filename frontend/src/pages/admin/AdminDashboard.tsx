@@ -11,6 +11,7 @@ import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
 import type { AnalyticsPayload } from '@/types/analytics';
+import { DataTable } from '@/components/ui/DataTable';
 
 // Recharts loads only when this dashboard renders (keeps it off the main bundle).
 const ChartsSection = lazy(() => import('@/components/staff/ChartsSection'));
@@ -120,30 +121,17 @@ export default function AdminDashboard() {
               <p className="text-[13px] text-subtle">Sin actividad reciente</p>
             </div>
           ) : (
-            <div className="admin-table-wrap border-0 !rounded-none">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Concepto</th>
-                    <th>Audiencia</th>
-                    <th>Estatus</th>
-                    <th>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data?.announcements ?? []).slice(0, 10).map((a) => (
-                    <tr key={a.id}>
-                      <td data-label="Concepto" className="font-semibold text-ink">{a.title}</td>
-                      <td data-label="Audiencia" className="capitalize text-muted">{a.audience}</td>
-                      <td data-label="Estatus"><span className="badge-green">Publicado</span></td>
-                      <td data-label="Fecha" className="text-subtle">
-                        {new Date(a.created_at).toLocaleDateString('es-MX')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              wrapClassName="border-0 !rounded-none"
+              rows={(data?.announcements ?? []).slice(0, 10)}
+              rowKey={(a) => a.id}
+              columns={[
+                { header: 'Concepto', className: 'font-semibold text-ink', cell: (a) => a.title },
+                { header: 'Audiencia', className: 'capitalize text-muted', cell: (a) => a.audience },
+                { header: 'Estatus', cell: () => <span className="badge-green">Publicado</span> },
+                { header: 'Fecha', className: 'text-subtle', cell: (a) => new Date(a.created_at).toLocaleDateString('es-MX') },
+              ]}
+            />
           )}
         </Reveal>
         )}

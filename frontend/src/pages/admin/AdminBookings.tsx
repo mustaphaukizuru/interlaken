@@ -17,6 +17,7 @@ import { bookingsApi, downloadBlob } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import type { Booking } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { DataTable } from '@/components/ui/DataTable';
 
 const statusMeta: Record<string, { label: string; variant: any }> = {
   pending:   { label: 'Pendiente', variant: 'warning' },
@@ -579,65 +580,58 @@ export default function AdminBookings() {
             </ul>
 
             {/* Desktop: dense table */}
-            <div className="admin-table-wrap hidden md:block">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Tipo</th>
-                    <th>Tutor</th>
-                    <th>Contacto</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.map((b) => {
-                    const meta = statusMeta[b.status] ?? statusMeta.pending;
-                    return (
-                      <tr key={b.id}>
-                        <td className="whitespace-nowrap">
-                          <div className="font-medium text-ink">
-                            {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
-                          </div>
-                          <div className="text-subtle text-xs">
-                            {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
-                          </div>
-                        </td>
-                        <td data-label="Tipo">
-                          <Badge variant="neutral">
-                            {VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}
-                          </Badge>
-                        </td>
-                        <td className="text-muted">
-                          {b.parent_name}
-                          {b.child_name && (
-                            <div className="text-subtle text-xs">Alumno: {b.child_name}</div>
-                          )}
-                        </td>
-                        <td>
-                          <div className="text-muted">{b.parent_email}</div>
-                          <div className="text-subtle text-xs">{b.parent_phone}</div>
-                        </td>
-                        <td>
-                          <Badge variant={meta.variant}>{meta.label}</Badge>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-1">
-                            <BookingActions
-                              booking={b}
-                              onAction={action.mutate}
-                              onCancelRequest={setCancelFor}
-                              pendingAct={action.isPending && action.variables?.id === b.id ? action.variables?.act : undefined}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              wrapClassName="hidden md:block"
+              rows={bookings}
+              rowKey={(b) => b.id}
+              columns={[
+                {
+                  header: 'Fecha', className: 'whitespace-nowrap',
+                  cell: (b) => (
+                    <>
+                      <div className="font-medium text-ink">{format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}</div>
+                      <div className="text-subtle text-xs">{b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}</div>
+                    </>
+                  ),
+                },
+                { header: 'Tipo', cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
+                {
+                  header: 'Tutor', className: 'text-muted',
+                  cell: (b) => (
+                    <>
+                      {b.parent_name}
+                      {b.child_name && <div className="text-subtle text-xs">Alumno: {b.child_name}</div>}
+                    </>
+                  ),
+                },
+                {
+                  header: 'Contacto',
+                  cell: (b) => (
+                    <>
+                      <div className="text-muted">{b.parent_email}</div>
+                      <div className="text-subtle text-xs">{b.parent_phone}</div>
+                    </>
+                  ),
+                },
+                {
+                  header: 'Estado',
+                  cell: (b) => { const meta = statusMeta[b.status] ?? statusMeta.pending; return <Badge variant={meta.variant}>{meta.label}</Badge>; },
+                },
+                {
+                  header: 'Acciones',
+                  cell: (b) => (
+                    <div className="flex items-center gap-1">
+                      <BookingActions
+                        booking={b}
+                        onAction={action.mutate}
+                        onCancelRequest={setCancelFor}
+                        pendingAct={action.isPending && action.variables?.id === b.id ? action.variables?.act : undefined}
+                      />
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </>
         )}
 

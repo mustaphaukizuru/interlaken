@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaStudentDetail, CafeteriaTransaction } from '@/types';
+import { DataTable } from '@/components/ui/DataTable';
 
 const txIcon = (type: string) => {
   if (type === 'topup')      return <ArrowUpCircle className="w-4 h-4 text-brand-500" />;
@@ -200,46 +201,25 @@ export default function AdminCafeteriaStudent() {
         {!transactions.length ? (
           <EmptyState icon={ArrowDownCircle} title="Sin movimientos" />
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Descripción</th>
-                  <th className="num">Monto</th>
-                  <th className="num">Saldo</th>
-                  <th className="num">Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((t) => (
-                  <tr key={t.id}>
-                    <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmtDate(t.date)}</td>
-                    <td data-label="Tipo">
-                      <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span>
-                    </td>
-                    <td data-label="Descripción" className="text-muted max-w-xs truncate" title={t.description}>{t.description || '—'}</td>
-                    <td data-label="Monto" className="num font-medium text-ink">${parseFloat(t.amount).toFixed(2)}</td>
-                    <td data-label="Saldo" className="num text-muted">
-                      {t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—'}
-                    </td>
-                    <td className="num">
-                      {refundable(t) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { setRefundTx(t); setRefundReason(''); }}
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" /> Devolver
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={transactions}
+            rowKey={(t) => t.id}
+            columns={[
+              { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
+              { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
+              { header: 'Descripción', className: 'text-muted max-w-xs truncate', cell: (t) => <span title={t.description}>{t.description || '—'}</span> },
+              { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => `$${parseFloat(t.amount).toFixed(2)}` },
+              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
+              {
+                header: 'Acción', align: 'right',
+                cell: (t) => refundable(t) && (
+                  <Button size="sm" variant="ghost" onClick={() => { setRefundTx(t); setRefundReason(''); }}>
+                    <RotateCcw className="w-3.5 h-3.5" /> Devolver
+                  </Button>
+                ),
+              },
+            ]}
+          />
         )}
       </Card>
 
@@ -249,38 +229,25 @@ export default function AdminCafeteriaStudent() {
         {!adjustments.length ? (
           <EmptyState icon={SlidersHorizontal} title="Sin ajustes registrados" />
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th className="num">Monto</th>
-                  <th>Motivo</th>
-                  <th>Admin</th>
-                  <th className="num">Saldo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {adjustments.map((a) => (
-                  <tr key={a.id}>
-                    <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmtDate(a.created_at)}</td>
-                    <td data-label="Tipo">
-                      <Badge variant={a.kind === 'refund' ? 'info' : 'neutral'}>{a.kind_display}</Badge>
-                    </td>
-                    <td data-label="Monto" className={`num font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
-                      {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
-                    </td>
-                    <td data-label="Motivo" className="text-muted max-w-xs truncate" title={a.reason}>{a.reason}</td>
-                    <td data-label="Admin" className="text-muted">{a.admin_name || '—'}</td>
-                    <td data-label="Saldo" className="num text-muted">
-                      {a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={adjustments}
+            rowKey={(a) => a.id}
+            columns={[
+              { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (a) => fmtDate(a.created_at) },
+              { header: 'Tipo', cell: (a) => <Badge variant={a.kind === 'refund' ? 'info' : 'neutral'}>{a.kind_display}</Badge> },
+              {
+                header: 'Monto', align: 'right',
+                cell: (a) => (
+                  <span className={`font-medium ${parseFloat(a.amount) < 0 ? 'text-coral-600' : 'text-green-700'}`}>
+                    {parseFloat(a.amount) < 0 ? '−' : '+'}${Math.abs(parseFloat(a.amount)).toFixed(2)}
+                  </span>
+                ),
+              },
+              { header: 'Motivo', className: 'text-muted max-w-xs truncate', cell: (a) => <span title={a.reason}>{a.reason}</span> },
+              { header: 'Admin', className: 'text-muted', cell: (a) => a.admin_name || '—' },
+              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (a) => (a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—') },
+            ]}
+          />
         )}
       </Card>
 

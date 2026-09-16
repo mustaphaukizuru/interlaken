@@ -39,6 +39,9 @@ interface Props<Row> {
   empty?: { icon: LucideIcon; title: string; description?: string; action?: ReactNode };
   /** Row-level className, e.g. to dim cancelled rows. */
   rowClassName?: (row: Row) => string;
+  /** Extra classes on the scroll wrapper: `hidden md:block` for a desktop-only
+   *  table that sits next to a phone card list, or `border-0` inside a card. */
+  wrapClassName?: string;
 }
 
 /**
@@ -56,7 +59,7 @@ interface Props<Row> {
  */
 export function DataTable<Row>({
   columns, rows, rowKey, sort, onSort, page, count = 0, onPage, pageSize = ADMIN_PAGE_SIZE, itemLabel = 'resultados',
-  isLoading, isError, onRetry, empty, rowClassName,
+  isLoading, isError, onRetry, empty, rowClassName, wrapClassName = '',
 }: Props<Row>) {
   if (isError) return <ErrorState onRetry={onRetry} />;
   if (isLoading) return <TableSkeleton />;
@@ -66,7 +69,7 @@ export function DataTable<Row>({
   const sortable = sort && onSort;
   return (
     <>
-      <div className="admin-table-wrap">
+      <div className={`admin-table-wrap ${wrapClassName}`.trim()}>
         <table className="admin-table">
           <thead>
             <tr>
