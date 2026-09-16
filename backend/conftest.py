@@ -38,10 +38,15 @@ def _test_settings(settings):
       re-enable it with override_settings.
     * The manifest static-files storage raises on any missing asset; use the
       plain storage so views that render templates don't blow up in CI.
+    * A developer's ``.env`` carries the REAL Loyverse token. Blank it so an
+      unmocked call raises LoyverseError here exactly as it does in CI, instead
+      of silently succeeding against the school's live POS account (which is
+      how a suite went green locally and red in CI on 2026-09-16).
     """
     from django.core.cache import cache
 
     cache.clear()
+    settings.LOYVERSE_API_TOKEN = ""
     settings.RATELIMIT_ENABLE = False
     settings.AXES_ENABLED = False
     settings.STORAGES = {
