@@ -83,7 +83,7 @@ export default function AdminDashboard() {
         <div className="grid gap-6 2xl:grid-cols-2">
         {/* Recent activity (audit trail) */}
         {!isError && data?.recent_activity && data.recent_activity.length > 0 && (
-          <Reveal delay={40} className="card mb-6 2xl:mb-0">
+          <Reveal delay={40} className="card min-w-0 mb-6 2xl:mb-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-head text-[15px] font-bold text-ink"><Activity size={16} className="text-purple" aria-hidden="true" /> Actividad reciente</h2>
               <Link to="/admin/auditoria" className="flex items-center gap-1 text-[12.5px] font-semibold text-purple">Auditoría <ArrowRight size={13} /></Link>
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
 
         {/* Recent announcements — admin-table stacks to cards on small screens */}
         {!isError && (
-        <Reveal delay={60} className="card !p-0 overflow-hidden">
+        <Reveal delay={60} className="card min-w-0 !p-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4 sm:px-[22px]">
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
             <Link

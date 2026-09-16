@@ -207,7 +207,7 @@ export default function AdminCafeteriaStudent() {
             columns={[
               { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
               { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
-              { header: 'Descripción', className: 'text-muted max-w-xs truncate', cell: (t) => <span title={t.description}>{t.description || '—'}</span> },
+              { header: 'Descripción', className: 'text-muted', cell: (t) => <span className="block min-w-0 max-w-xs truncate" title={t.description}>{t.description || '—'}</span> },
               { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => `$${parseFloat(t.amount).toFixed(2)}` },
               { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
               {
@@ -243,7 +243,7 @@ export default function AdminCafeteriaStudent() {
                   </span>
                 ),
               },
-              { header: 'Motivo', className: 'text-muted max-w-xs truncate', cell: (a) => <span title={a.reason}>{a.reason}</span> },
+              { header: 'Motivo', className: 'text-muted', cell: (a) => <span className="block min-w-0 max-w-xs truncate" title={a.reason}>{a.reason}</span> },
               { header: 'Admin', className: 'text-muted', cell: (a) => a.admin_name || '—' },
               { header: 'Saldo', align: 'right', className: 'text-muted', cell: (a) => (a.balance_after !== null ? `$${parseFloat(a.balance_after).toFixed(2)}` : '—') },
             ]}
