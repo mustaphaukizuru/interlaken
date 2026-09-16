@@ -12,6 +12,7 @@ const base: SyncHealth = {
   last_transaction_at: new Date().toISOString(),
   transactions_last_7d: 12,
   purchases_last_7d: 12,
+  last_poll_at: new Date().toISOString(),
   last_webhook_at: new Date().toISOString(),
   last_webhook_type: 'receipts.update',
   backup: {
@@ -36,10 +37,16 @@ describe('buildChecks — the four questions the sync panel answers', () => {
     expect(c.detail).toContain('401');
   });
 
-  it('flags a stale poll cursor — the cron-not-running case', () => {
-    expect(check({ last_purchases_cursor: hoursAgo(48) }, 'poll').tone).toBe('bad');
-    expect(check({ last_purchases_cursor: null }, 'poll').tone).toBe('bad');
-    expect(check({ last_purchases_cursor: hoursAgo(1) }, 'poll').tone).toBe('ok');
+  it('measures the poll on when it last RAN, so a weekend with no receipts is not an outage', () => {
+    // Cursor two days old (nothing sold), poll ran minutes ago: healthy.
+    expect(check({ last_purchases_cursor: hoursAgo(48), last_poll_at: hoursAgo(0.1) }, 'poll').tone).toBe('ok');
+    // Poll has not run for hours: the cron stopped.
+    expect(check({ last_poll_at: hoursAgo(3) }, 'poll').tone).toBe('bad');
+    expect(check({ last_poll_at: null, last_purchases_cursor: null }, 'poll').tone).toBe('bad');
+  });
+
+  it('falls back to the cursor against a server that has not shipped last_poll_at yet', () => {
+    expect(check({ last_poll_at: null, last_purchases_cursor: hoursAgo(0.2) }, 'poll').tone).toBe('ok');
   });
 
   it('escalates unlinked students by how much of the roster is affected', () => {
@@ -50,12 +57,12 @@ describe('buildChecks — the four questions the sync panel answers', () => {
 
   it('distinguishes "nothing polled" from "polled but recorded nothing"', () => {
     // Poll stale too → the ledger silence is merely expected, not the cause.
-    expect(check({ purchases_last_7d: 0, last_purchases_cursor: hoursAgo(48) }, 'ledger').tone)
+    expect(check({ purchases_last_7d: 0, last_poll_at: hoursAgo(3) }, 'ledger').tone)
       .toBe('warn');
 
     // Poll fresh but no purchases recorded → the POS is charging the wallet by
     // a route the receipt parser does not recognise. This is the real bug.
-    const c = check({ purchases_last_7d: 0, last_purchases_cursor: hoursAgo(1) }, 'ledger');
+    const c = check({ purchases_last_7d: 0, last_poll_at: hoursAgo(0.1) }, 'ledger');
     expect(c.tone).toBe('bad');
     expect(c.detail).toContain('no reconoce');
   });

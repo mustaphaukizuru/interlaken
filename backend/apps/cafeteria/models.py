@@ -267,6 +267,11 @@ class LoyverseSyncState(models.Model):
     last_webhook_at = models.DateTimeField(
         'Última entrega de webhook', null=True, blank=True)
     last_webhook_type = models.CharField(max_length=40, blank=True, default='')
+    # When sync_purchases last RAN (not the newest receipt it saw). The cursor
+    # legitimately stands still over a weekend or a holiday; this does not. It
+    # is the signal for "the cron stopped", which used to be inferred from the
+    # log file's mtime by a crontab line that piped to a `mail` the VPS lacks.
+    last_poll_at = models.DateTimeField('Último sondeo', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Estado de sincronización Loyverse'
