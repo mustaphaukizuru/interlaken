@@ -116,7 +116,9 @@ class TestOffsiteBackup:
 
         class FakeStorage:
             def save(self, name, content):
-                saved['name'] = name; saved['size'] = len(content.read()); return name
+                saved['name'] = name
+                saved['size'] = len(content.read())
+                return name
             def listdir(self, prefix):
                 return [], ['db-2026-09-01-0230.sql.gz', 'db-2026-09-16-0230.sql.gz']
             def delete(self, name):

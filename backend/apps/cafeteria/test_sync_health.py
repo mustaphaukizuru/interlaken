@@ -109,7 +109,8 @@ class TestSyncHealth:
         from apps.core.models import OpsStatus
         monkeypatch.setattr('apps.cafeteria.services.loyverse_reachable', lambda: (True, ''))
         state = LoyverseSyncState.load()
-        state.last_webhook_at = timezone.now(); state.last_webhook_type = 'receipts.update'
+        state.last_webhook_at = timezone.now()
+        state.last_webhook_type = 'receipts.update'
         state.save(update_fields=['last_webhook_at', 'last_webhook_type'])
         OpsStatus.set('backup', {'ok': True, 'at': timezone.now().isoformat(), 'size': 1000,
                                  'path': '/x', 'target': 'external', 'offsite': None, 'offsite_at': None})

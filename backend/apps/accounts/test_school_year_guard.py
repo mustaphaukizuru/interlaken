@@ -41,7 +41,8 @@ class TestRunGuard:
         r = self._run(admin_client)
         assert r.status_code == 200, r.data
         assert r.data['promoted'] == 0 and r.data['graduated'] == 1 and r.data['promote_grades'] is False
-        a.refresh_from_db(); b.refresh_from_db()
+        a.refresh_from_db()
+        b.refresh_from_db()
         assert a.grade == '1° Primaria'                       # untouched: Loyverse owns it
         assert b.status == StudentProfile.Status.GRADUATED    # still graduated
 
