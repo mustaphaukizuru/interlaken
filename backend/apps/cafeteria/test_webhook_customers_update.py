@@ -87,3 +87,36 @@ class TestCustomersUpdateWebhook:
         resp = api_client.post(reverse('cafeteria-loyverse-webhook-token', args=['nope']),
                                {'type': 'customers.update', 'customers': []}, format='json')
         assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+class TestDeliveryIsVisible:
+    """Server logs proved useless for "did Loyverse reach us?" (Caddy kept only
+    the 502s). Every authenticated delivery now stamps the sync state, and the
+    health panel reads it."""
+
+    def test_stamps_the_last_delivery(self, api_client, settings):
+        from apps.cafeteria.models import LoyverseSyncState
+        settings.LOYVERSE_WEBHOOK_SECRET = SECRET
+        assert LoyverseSyncState.load().last_webhook_at is None
+
+        api_client.post(hook_url(), {'type': 'customers.update', 'customers': []}, format='json')
+
+        st = LoyverseSyncState.load()
+        assert st.last_webhook_at is not None
+        assert st.last_webhook_type == 'customers.update'
+
+    def test_an_unauthorised_hit_does_not_count_as_a_delivery(self, api_client, settings):
+        from apps.cafeteria.models import LoyverseSyncState
+        settings.LOYVERSE_WEBHOOK_SECRET = SECRET
+        api_client.post(reverse('cafeteria-loyverse-webhook-token', args=['nope']),
+                        {'type': 'customers.update', 'customers': []}, format='json')
+        assert LoyverseSyncState.load().last_webhook_at is None
+
+    def test_logs_one_line_per_delivery(self, api_client, settings, caplog):
+        import logging
+        settings.LOYVERSE_WEBHOOK_SECRET = SECRET
+        with caplog.at_level(logging.INFO, logger='apps.cafeteria.views'):
+            api_client.post(hook_url(), {'type': 'receipts.update', 'receipts': []}, format='json')
+        assert any('Loyverse webhook receipts.update' in r.getMessage() for r in caplog.records)
+

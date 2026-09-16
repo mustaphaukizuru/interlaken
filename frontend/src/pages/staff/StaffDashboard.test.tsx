@@ -88,8 +88,11 @@ describe('StaffDashboard states (IK-ADMIN item 8)', () => {
   // Explicit timeout: the findBy waits below allow 20s each for the lazy recharts
   // chunk in jsdom; under full-suite load WITH a concurrent backend pytest run the
   // transform alone has been observed at 28s, so give it generous headroom.
-  it('renders empty-safe content with zero data (KPIs + empty-state guidance)', { timeout: 45000 }, async () => {
-    mockedAnalytics.mockResolvedValueOnce({ data: emptyPayload() } as never);
+  it('renders empty-safe content with zero data (KPIs + empty-state guidance)', { timeout: 90000 }, async () => {
+    // Not `Once`: under a loaded parallel run react-query can retry past the
+    // single mocked response and hit an unmocked call, which is why this test
+    // used to fail only in the full suite and pass alone.
+    mockedAnalytics.mockResolvedValue({ data: emptyPayload() } as never);
 
     renderDashboard();
     // First find waits out the lazy recharts chunk transform in jsdom.

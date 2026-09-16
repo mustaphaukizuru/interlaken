@@ -48,6 +48,16 @@ def suggested_cycle() -> str:
     return f'{y}-{y + 1}'
 
 
+def grades_from_loyverse(active_qs=None) -> bool:
+    """True when (nearly) every active student is linked to a Loyverse customer."""
+    qs = active_qs if active_qs is not None else StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE)
+    total = qs.count()
+    if total == 0:
+        return False
+    linked = qs.exclude(loyverse_id='').count()
+    return linked / total >= 0.9
+
+
 def build_preview() -> dict:
     from apps.content.models import SiteSettings
     active = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE)
@@ -62,6 +72,11 @@ def build_preview() -> dict:
     skipped = StudentProfile.objects.exclude(status=StudentProfile.Status.ACTIVE).count()
     settings_obj = SiteSettings.load()
     return {
+        # When the roster is linked to Loyverse, grades come from the import
+        # (Alumnos → Importar desde Loyverse) and are already current. The
+        # wizard's own promotion would then move everyone up a SECOND time, so
+        # the run defaults to leaving grades alone in that case.
+        'grades_from_loyverse': grades_from_loyverse(active),
         'moves': sorted(moves.values(), key=lambda m: GRADE_SEQUENCE.index(m['from']) if m['from'] in GRADE_SEQUENCE else 99),
         'graduates': graduates,
         'active_total': active.count(),
@@ -107,15 +122,21 @@ class SchoolYearRunView(APIView):
         else:
             reset_threshold = None
 
+        synced = grades_from_loyverse()
+        raw = request.data.get('promote_grades')
+        promote = (not synced) if raw in (None, '') else bool(raw) and raw not in ('false', 'False', '0', 0)
         promoted = graduated = 0
         with transaction.atomic():
             for sp in StudentProfile.objects.select_for_update().filter(status=StudentProfile.Status.ACTIVE).select_related('user'):
                 nxt = next_grade(sp.grade)
                 if nxt is None:
+                    # Graduation is always applied: it is the status change the
+                    # cycle rollover exists for, and Loyverse deletes graduates
+                    # rather than marking them.
                     fields = sp.apply_status(StudentProfile.Status.GRADUATED)
                     sp.save(update_fields=fields)
                     graduated += 1
-                elif nxt != sp.grade:
+                elif promote and nxt != sp.grade:
                     sp.grade = nxt
                     sp.save(update_fields=['grade'])
                     promoted += 1
@@ -127,6 +148,8 @@ class SchoolYearRunView(APIView):
             settings_obj.last_rollover_at = timezone.now()
             settings_obj.save()
             record('update', settings_obj,
-                   {'school_year': {'from': previous, 'to': new_cycle}, 'promoted': promoted, 'graduated': graduated, 'thresholds_reset': thresholds},
+                   {'school_year': {'from': previous, 'to': new_cycle}, 'promoted': promoted, 'graduated': graduated,
+                    'thresholds_reset': thresholds, 'promote_grades': promote, 'grades_from_loyverse': synced},
                    actor=request.user, context='school-year.rollover')
-        return Response({'promoted': promoted, 'graduated': graduated, 'thresholds_reset': thresholds, 'school_year': new_cycle})
+        return Response({'promoted': promoted, 'graduated': graduated, 'thresholds_reset': thresholds,
+                         'school_year': new_cycle, 'promote_grades': promote})

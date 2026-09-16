@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, PlugZap, Timer } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, PlugZap, Timer, Zap, DatabaseBackup } from 'lucide-react';
 import { cafeteriaApi, type SyncHealth } from '@/services/api';
 
 type Tone = 'ok' | 'warn' | 'bad';
@@ -14,6 +14,10 @@ const TONE: Record<Tone, string> = {
 
 /** How stale the poll cursor may get before it means "nothing is polling". */
 const STALE_HOURS = 6;
+/** A school day without a single Loyverse delivery means the hook is dead. */
+const WEBHOOK_STALE_HOURS = 30;
+/** Nightly at 02:30; anything older than a day and a bit is a missed night. */
+const BACKUP_STALE_HOURS = 30;
 
 function ago(iso: string | null): string {
   if (!iso) return 'nunca';
@@ -44,6 +48,10 @@ export function buildChecks(h: SyncHealth): Check[] {
   const cursorHours = hoursSince(h.last_purchases_cursor);
   const pollStale = cursorHours === null || cursorHours > STALE_HOURS;
   const unlinked = h.active_students - h.linked_students;
+  const hookHours = hoursSince(h.last_webhook_at);
+  const hookStale = hookHours === null || hookHours > WEBHOOK_STALE_HOURS;
+  const backupHours = hoursSince(h.backup?.ok ? h.backup.at : null);
+  const backupStale = backupHours === null || backupHours > BACKUP_STALE_HOURS;
 
   return [
     {
@@ -64,6 +72,17 @@ export function buildChecks(h: SyncHealth): Check[] {
         ? `Último recibo leído: ${ago(h.last_purchases_cursor)}. Si no corre cada 5 minutos, `
           + 'los saldos solo se mueven cuando alguien presiona Sincronizar.'
         : `Último recibo leído ${ago(h.last_purchases_cursor)}.`,
+    },
+    {
+      key: 'webhook',
+      icon: Zap,
+      // A dead hook is a warning, not a failure: the 5-minute poll still runs.
+      tone: hookStale ? 'warn' : 'ok',
+      label: hookStale ? 'Sin entregas en tiempo real' : 'Tiempo real activo',
+      detail: hookStale
+        ? `Última entrega de Loyverse: ${ago(h.last_webhook_at)}. Las ventas siguen llegando cada 5 minutos por el sondeo; `
+          + 'revise que el webhook en Loyverse apunte a interlaken.edu.mx.'
+        : `Loyverse avisó ${ago(h.last_webhook_at)} (${h.last_webhook_type || 'evento'}). Compras y recargas llegan en segundos.`,
     },
     {
       key: 'linked',
@@ -89,6 +108,20 @@ export function buildChecks(h: SyncHealth): Check[] {
           ? 'Esperado si el sondeo no corre: primero resuelva el sondeo.'
           : 'El sondeo corre pero no registra nada: probablemente el POS cobra el monedero '
             + 'de una forma que el lector de recibos no reconoce.',
+    },
+    {
+      key: 'backup',
+      icon: DatabaseBackup,
+      tone: backupStale ? 'bad' : h.backup?.offsite ? 'ok' : 'warn',
+      label: backupStale
+        ? (h.backup && !h.backup.ok ? 'El respaldo de anoche falló' : 'Sin respaldo reciente')
+        : h.backup?.offsite ? 'Respaldo nocturno al día' : 'Respaldo nocturno al día, sin copia externa',
+      detail: backupStale
+        ? `Último respaldo correcto: ${ago(h.backup?.ok ? h.backup.at : null)}. Mientras tanto no existe una copia reciente de los datos.`
+        : `${Math.round((h.backup?.size ?? 0) / 1024)} KB, ${ago(h.backup?.at ?? null)}`
+          + (h.backup?.offsite
+            ? `; copia externa ${ago(h.backup.offsite_at)}.`
+            : '. Solo existe en el propio servidor: configure el almacenamiento externo para tener una copia fuera.'),
     },
   ];
 }

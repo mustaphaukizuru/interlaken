@@ -1450,11 +1450,19 @@ def sync_health() -> dict:
     last_tx = CafeteriaTransaction.objects.order_by('-date').first()
     ok, error = loyverse_reachable()
 
+    from apps.core.models import OpsStatus
+
     return {
         'loyverse_ok': ok,
         'loyverse_error': error,
         'last_purchases_cursor': state.last_purchases_cursor,
         'last_full_fetch_at': state.last_full_fetch_at,
+        # Real-time: stamped on every authenticated Loyverse delivery.
+        'last_webhook_at': state.last_webhook_at,
+        'last_webhook_type': state.last_webhook_type,
+        # Nightly backup marker, reported in by deploy/backup-db.sh via
+        # `manage.py record_backup` (the container cannot see /var/backups).
+        'backup': OpsStatus.get('backup'),
         'active_students': active.count(),
         'linked_students': active.exclude(loyverse_id='').count(),
         'last_transaction_at': last_tx.date if last_tx else None,

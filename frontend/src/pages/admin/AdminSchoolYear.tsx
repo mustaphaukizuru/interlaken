@@ -21,10 +21,15 @@ export default function AdminSchoolYear() {
   const [cycle, setCycle] = useState('');
   const [resetThreshold, setResetThreshold] = useState('');
   const [confirm, setConfirm] = useState('');
+  // null = follow the server default (no promotion when Loyverse owns grades).
+  const [promoteGrades, setPromoteGrades] = useState<boolean | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [result, setResult] = useState<SchoolYearResult | null>(null);
   const run = useMutation({
-    mutationFn: () => portalApi.schoolYearRun({ confirm, new_cycle: cycle, reset_threshold: resetThreshold === '' ? null : Number(resetThreshold) }),
+    mutationFn: () => portalApi.schoolYearRun({
+      confirm, new_cycle: cycle, reset_threshold: resetThreshold === '' ? null : Number(resetThreshold),
+      ...(promoteGrades === null ? {} : { promote_grades: promoteGrades }),
+    }),
     onSuccess: ({ data: res }) => { setResult(res); setStep('done'); qc.invalidateQueries({ queryKey: ['admin-students'] }); qc.invalidateQueries({ queryKey: ['school-year-preview'] }); toast.success('Nuevo ciclo aplicado.'); },
     onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.confirm || f.new_cycle || f.reset_threshold || f.detail || 'No se pudo aplicar.'); },
   });
@@ -68,6 +73,24 @@ export default function AdminSchoolYear() {
             {step === 'preview' ? (
               <div className="space-y-3">
                 <Input label="Nuevo ciclo" value={newCycle} onChange={(e) => setCycle(e.target.value)} placeholder="2027-2028" hint="Formato AAAA-AAAA." error={errors.new_cycle} />
+                {data.grades_from_loyverse && (
+                  <div className="rounded-xl border border-amber/30 bg-amber/5 px-3 py-2.5 text-sm text-ink">
+                    <label htmlFor="promote-grades" className="flex items-center gap-2 font-semibold">
+                      <input
+                        id="promote-grades"
+                        type="checkbox"
+                        aria-describedby="promote-grades-help"
+                        checked={promoteGrades ?? false}
+                        onChange={(e) => setPromoteGrades(e.target.checked)}
+                      />
+                      Promover grados aquí también
+                    </label>
+                    <p id="promote-grades-help" className="mt-1 text-xs text-muted">
+                      Desactivado: los grados ya vienen de Loyverse (Alumnos → Importar). Promoverlos aquí los subiría una segunda vez.
+                      Este paso sí marca como egresados a 3° de Secundaria.
+                    </p>
+                  </div>
+                )}
                 <Input label="Reiniciar umbral de saldo bajo (opcional)" type="number" inputMode="decimal" value={resetThreshold} onChange={(e) => setResetThreshold(e.target.value)} placeholder="50" hint="Vacío = conservar el umbral de cada familia." error={errors.reset_threshold} />
                 <Button onClick={() => { setCycle(newCycle); setStep('confirm'); }} disabled={data.active_total === 0}><CalendarRange size={16} aria-hidden="true" /> Continuar</Button>
               </div>

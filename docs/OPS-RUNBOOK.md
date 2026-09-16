@@ -77,12 +77,35 @@ desde **Admin → Alumnos**, todos con vista previa antes de aplicar.
    egresados y bajas. Muestra grado y **saldo restante**; seleccione y use
    *Dar de baja*. La baja no toca el saldo: si queda dinero, decida la
    devolución aparte (Cafetería → Ajustes / Devoluciones).
-3. **Etiqueta del ciclo: `Nuevo ciclo`.** Cambia el ciclo que muestra el sitio
-   y, opcionalmente, el umbral de saldo bajo. **No use su promoción de grados
-   si ya corrió la importación**: los grados vienen de Loyverse y el asistente
-   los subiría una segunda vez. (Pendiente: que el asistente omita la
-   promoción cuando los grados están sincronizados con Loyverse.)
+3. **Etiqueta del ciclo: `Nuevo ciclo`.** Cambia el ciclo que muestra el sitio,
+   marca como egresados a 3° de Secundaria y, opcionalmente, reinicia el umbral
+   de saldo bajo. Cuando el alumnado está vinculado a Loyverse el asistente
+   **no promueve grados** (ya vienen de la importación); la casilla *Promover
+   grados aquí también* existe solo para una escuela sin Loyverse.
 
 Los saldos no requieren acción en el cambio de ciclo: cada 5 minutos el cron
 registra compras y recargas hechas en el POS, y **Cafetería → Reconciliación**
 muestra cualquier diferencia con el botón *Corregir* para cerrarla.
+
+### 3b. Respaldo nocturno: cómo saber que ocurrió
+
+`deploy/backup-db.sh` corre a las 02:30 y **avisa a la app** de su resultado
+(`manage.py record_backup`): la luz *Respaldo nocturno* en Administración →
+Cafetería → Estado de la sincronización lo muestra. A las 07:45,
+`manage.py check_backup_fresh` revisa que el último respaldo correcto tenga
+menos de 26 h; si no, **envía un correo a cada administrador activo** por el
+mismo canal de los comunicados (el servidor no tiene `mail`) y pone la luz en
+rojo.
+
+**Copia fuera del servidor.** Un respaldo que solo existe en la máquina que
+protege no es un respaldo. El script sube cada volcado al almacenamiento de
+objetos de la app (Supabase Storage, compatible con S3) en cuanto existan en
+`deploy/.env`:
+
+    AWS_STORAGE_BUCKET_NAME=<bucket privado>
+    AWS_S3_ENDPOINT_URL=https://<proyecto>.supabase.co/storage/v1/s3
+    AWS_ACCESS_KEY_ID=...   AWS_SECRET_ACCESS_KEY=...   (Supabase → Storage → S3 Connection)
+
+Hasta entonces la luz dice "sin copia externa". Los volcados quedan en
+`backups/` dentro del bucket; se conservan los 30 más recientes.
+

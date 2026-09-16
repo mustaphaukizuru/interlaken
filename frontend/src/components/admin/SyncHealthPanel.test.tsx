@@ -12,6 +12,13 @@ const base: SyncHealth = {
   last_transaction_at: new Date().toISOString(),
   transactions_last_7d: 12,
   purchases_last_7d: 12,
+  last_webhook_at: new Date().toISOString(),
+  last_webhook_type: 'receipts.update',
+  backup: {
+    at: new Date().toISOString(), ok: true, path: '/var/backups/interlaken/db-x.sql.gz',
+    size: 257_355, target: 'external (supabase)', offsite: 'bucket/backups/db-x.sql.gz',
+    offsite_at: new Date().toISOString(),
+  },
 };
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 36e5).toISOString();
@@ -53,3 +60,21 @@ describe('buildChecks — the four questions the sync panel answers', () => {
     expect(c.detail).toContain('no reconoce');
   });
 });
+
+describe('buildChecks — real-time and backup lights', () => {
+  it('warns (not fails) when Loyverse has not delivered in a school day: the poll still runs', () => {
+    expect(check({ last_webhook_at: hoursAgo(1) }, 'webhook').tone).toBe('ok');
+    expect(check({ last_webhook_at: hoursAgo(40) }, 'webhook').tone).toBe('warn');
+    expect(check({ last_webhook_at: null }, 'webhook').tone).toBe('warn');
+  });
+
+  it('backup: green with an off-site copy, amber without one, red when stale or failed', () => {
+    expect(check({}, 'backup').tone).toBe('ok');
+    expect(check({ backup: { ...base.backup!, offsite: null, offsite_at: null } }, 'backup').tone).toBe('warn');
+    expect(check({ backup: { ...base.backup!, at: hoursAgo(50) } }, 'backup').tone).toBe('bad');
+    expect(check({ backup: { ...base.backup!, ok: false } }, 'backup').tone).toBe('bad');
+    expect(check({ backup: null }, 'backup').tone).toBe('bad');
+    expect(check({ backup: { ...base.backup!, ok: false } }, 'backup').label).toMatch(/falló/);
+  });
+});
+
