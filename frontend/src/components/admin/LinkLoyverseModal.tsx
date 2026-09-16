@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Link2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Link2, AlertTriangle, CheckCircle2, UserMinus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { portalApi } from '@/services/api';
+
+/** An active student with no Loyverse customer: in practice, a leaver. */
+export interface UnmatchedStudent {
+  id: number; matricula: string; name: string; grade: string; status: string; balance: string;
+}
 
 interface Report {
   customers: number; students: number;
   linked: number; already_linked: number; skipped_conflict: number;
-  unmatched_students: { matricula: string; name: string }[];
+  unmatched_students: UnmatchedStudent[];
   unmatched_customer_count: number; duplicate_codes: string[];
 }
 
@@ -66,6 +72,42 @@ function LinkLoyverseBody({ onClose, onLinked }: {
     setAttempt((a) => a + 1);
   };
 
+  // Leavers. The school deletes a student's Loyverse customer when they go
+  // and nothing else tells the app, so 36 graduates were still "activo" a
+  // full cycle later. Selected rows go through the existing bulk status
+  // endpoint (audited per row); the balance column is there so leftover money
+  // is a visible decision, never a silent write-off.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmBaja, setConfirmBaja] = useState(false);
+  const [bajaBusy, setBajaBusy] = useState(false);
+  const unmatched = report?.unmatched_students ?? [];
+  const allSelected = unmatched.length > 0 && unmatched.every((u) => selected.has(u.id));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(unmatched.map((u) => u.id)));
+  const toggleOne = (id: number) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const selectedBalance = unmatched
+    .filter((u) => selected.has(u.id))
+    .reduce((sum, u) => sum + parseFloat(u.balance || '0'), 0);
+
+  async function darDeBaja() {
+    setBajaBusy(true);
+    try {
+      const { data } = await portalApi.bulkStudents({ ids: [...selected], action: 'status', value: 'withdrawn' });
+      toast.success(`${data.updated} alumno(s) dados de baja.`);
+      setConfirmBaja(false);
+      setSelected(new Set());
+      onLinked?.();
+      retry();
+    } catch {
+      toast.error('No se pudo aplicar la baja.');
+    } finally {
+      setBajaBusy(false);
+    }
+  }
+
   async function commit() {
     setPhase('committing');
     try {
@@ -117,26 +159,64 @@ function LinkLoyverseBody({ onClose, onLinked }: {
             <Stat label="Conflictos (otro id)" value={report.skipped_conflict} tone={report.skipped_conflict ? 'warn' : 'muted'} />
           </div>
 
-          {report.unmatched_students.length > 0 && (
+          {unmatched.length > 0 && (
             <div className="rounded-xl border border-line">
-              <p className="border-b border-line px-3 py-2 text-xs font-semibold text-subtle">
-                Alumnos sin cliente en Loyverse (revise su matrícula)
-              </p>
-              <ul className="max-h-40 divide-y divide-line overflow-y-auto text-sm">
-                {report.unmatched_students.slice(0, 25).map((u) => (
-                  <li key={u.matricula} className="flex justify-between gap-3 px-3 py-1.5">
-                    <span className="text-ink">{u.name}</span>
-                    <span className="text-subtle">{u.matricula || '—'}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-subtle">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="Seleccionar todos los alumnos sin cliente en Loyverse"
+                  />
+                  Sin cliente en Loyverse ({unmatched.length}): egresados o bajas no registradas
+                </label>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={selected.size === 0}
+                  onClick={() => setConfirmBaja(true)}
+                >
+                  <UserMinus size={14} aria-hidden="true" /> Dar de baja ({selected.size})
+                </Button>
+              </div>
+              <ul className="max-h-64 divide-y divide-line overflow-y-auto text-sm">
+                {unmatched.map((u) => (
+                  <li key={u.id} className="flex items-center gap-3 px-3 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(u.id)}
+                      onChange={() => toggleOne(u.id)}
+                      aria-label={`Seleccionar a ${u.name}`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-ink">{u.name}</span>
+                      <span className="block text-xs text-subtle">{u.matricula || '—'} · {u.grade || 'sin grado'}</span>
+                    </span>
+                    <span className={`whitespace-nowrap text-xs ${parseFloat(u.balance) > 0 ? 'font-semibold text-amber' : 'text-subtle'}`}>
+                      ${parseFloat(u.balance || '0').toFixed(2)}
+                    </span>
                   </li>
                 ))}
-                {report.unmatched_students.length > 25 && (
-                  <li className="px-3 py-1.5 text-xs text-subtle">
-                    … y {report.unmatched_students.length - 25} más
-                  </li>
-                )}
               </ul>
             </div>
           )}
+
+          <ConfirmDialog
+            open={confirmBaja}
+            onClose={() => setConfirmBaja(false)}
+            onConfirm={darDeBaja}
+            loading={bajaBusy}
+            title="Dar de baja definitiva"
+            confirmLabel={`Dar de baja a ${selected.size}`}
+            message={
+              `Se marcarán ${selected.size} alumno(s) como baja definitiva: dejan de contar como activos, `
+              + 'su cuenta de alumno ya no puede iniciar sesión y quedan en Auditoría. '
+              + (selectedBalance > 0
+                ? `Entre ellos queda un saldo de $${selectedBalance.toFixed(2)} en cafetería; la baja no lo toca — decida su devolución por separado.`
+                : 'Ninguno de los seleccionados tiene saldo pendiente en cafetería.')
+            }
+          />
 
           {report.duplicate_codes.length > 0 && (
             <p className="flex items-start gap-1.5 text-xs text-amber">
