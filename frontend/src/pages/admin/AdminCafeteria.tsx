@@ -26,6 +26,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { SyncHealthPanel } from '@/components/admin/SyncHealthPanel';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
+import { DataTable } from '@/components/ui/DataTable';
 
 type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
 
@@ -315,62 +316,52 @@ function RosterTab() {
           </ul>
 
           {/* Desktop: dense table */}
-          <div className="admin-table-wrap hidden md:block">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Alumno</th>
-                  <th>Matrícula</th>
-                  <th className="num">Saldo</th>
-                  <th>Estado</th>
-                  <th>Últ. sinc.</th>
-                  <th className="num">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b) => {
+          <DataTable
+            wrapClassName="hidden md:block"
+            rows={filtered}
+            rowKey={(b) => b.id}
+            columns={[
+              {
+                header: 'Alumno', className: 'font-medium text-ink',
+                cell: (b) => <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>,
+              },
+              { header: 'Matrícula', className: 'text-muted', cell: (b) => b.student.student_id },
+              { header: 'Saldo', align: 'right', className: 'font-semibold text-ink', cell: (b) => `$${parseFloat(b.balance).toFixed(2)}` },
+              {
+                header: 'Estado',
+                cell: (b) => {
                   const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
-                  return (
-                    <tr key={b.id}>
-                      <td className="font-medium text-ink">
-                        <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
-                          {b.student.user.full_name}
-                        </Link>
-                      </td>
-                      <td className="text-muted">{b.student.student_id}</td>
-                      <td className="num font-semibold text-ink">${parseFloat(b.balance).toFixed(2)}</td>
-                      <td>
-                        <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>
-                      </td>
-                      <td className="text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
-                      <td>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
-                            title="Sincronizar saldo"
-                            onClick={() => syncOne.mutate(b.student.id)}
-                            loading={syncOne.isPending && syncOne.variables === b.student.id}
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </Button>
-                          <Link
-                            to={`/admin/cafeteria/${b.student.id}`}
-                            className="inline-flex items-center rounded-lg p-1.5 text-muted hover:bg-cream"
-                            title="Ver detalle"
-                            aria-label={`Ver detalle de ${b.student.user.full_name}`}
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  return <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>;
+                },
+              },
+              { header: 'Últ. sinc.', className: 'text-muted whitespace-nowrap', cell: (b) => fmtDate(b.last_synced) },
+              {
+                header: 'Acciones', align: 'right',
+                cell: (b) => (
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Sincronizar saldo de ${b.student.user.full_name}`}
+                      title="Sincronizar saldo"
+                      onClick={() => syncOne.mutate(b.student.id)}
+                      loading={syncOne.isPending && syncOne.variables === b.student.id}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </Button>
+                    <Link
+                      to={`/admin/cafeteria/${b.student.id}`}
+                      className="inline-flex items-center rounded-lg p-1.5 text-muted hover:bg-cream"
+                      title="Ver detalle"
+                      aria-label={`Ver detalle de ${b.student.user.full_name}`}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                ),
+              },
+            ]}
+          />
         </>
       )}
 
@@ -435,53 +426,31 @@ function DepositsTab() {
       ) : !data?.length ? (
         <EmptyState icon={ScrollText} title="Sin depósitos registrados" />
       ) : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Alumno</th>
-                <th className="num">Monto</th>
-                <th>Método</th>
-                <th>Pasarela</th>
-                <th>Estado</th>
-                <th>POS</th>
-                <th>Referencia</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d) => (
-                <tr key={d.id}>
-                  <td data-label="Fecha" className="whitespace-nowrap text-muted">{fmtDate(d.created_at)}</td>
-                  <td data-label="Alumno" className="font-medium text-ink">
-                    <span className="block">
-                      <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
-                        {d.student_name}
-                      </Link>
-                      <span className="block text-xs text-subtle">{d.student_code}</span>
-                    </span>
-                  </td>
-                  <td data-label="Monto" className="num font-semibold text-ink">${parseFloat(d.amount).toFixed(2)}</td>
-                  <td data-label="Método" className="text-muted">{d.method_display}</td>
-                  <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
-                  <td data-label="Estado"><Badge variant={statusVariant(d.status)}>{d.status_display}</Badge></td>
-                  <td data-label="POS">
-                    {d.needs_pos_unload ? (
-                      <Badge variant="error">Quitar del POS</Badge>
-                    ) : d.needs_pos_load ? (
-                      <Badge variant="warning">Pendiente POS</Badge>
-                    ) : d.pos_loaded_at ? (
-                      <Badge variant="success">En POS</Badge>
-                    ) : (
-                      <span className="text-subtle">—</span>
-                    )}
-                  </td>
-                  <td data-label="Referencia" className="text-subtle text-xs font-mono">{d.gateway_tx_id || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          rows={data}
+          rowKey={(d) => d.id}
+          columns={[
+            { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.created_at) },
+            { header: 'Alumno', className: 'font-medium text-ink', cell: (d) => (
+                <span className="block">
+                  <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">{d.student_name}</Link>
+                  <span className="block text-xs text-subtle">{d.student_code}</span>
+                </span>
+              ) },
+            { header: 'Monto', align: 'right', className: 'font-semibold text-ink', cell: (d) => `$${parseFloat(d.amount).toFixed(2)}` },
+            { header: 'Método', className: 'text-muted', cell: (d) => d.method_display },
+            { header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
+            { header: 'Estado', cell: (d) => <Badge variant={statusVariant(d.status)}>{d.status_display}</Badge> },
+            {
+              header: 'POS',
+              cell: (d) => d.needs_pos_unload ? <Badge variant="error">Quitar del POS</Badge>
+                : d.needs_pos_load ? <Badge variant="warning">Pendiente POS</Badge>
+                : d.pos_loaded_at ? <Badge variant="success">En POS</Badge>
+                : <span className="text-subtle">—</span>,
+            },
+            { header: 'Referencia', className: 'text-subtle text-xs font-mono', cell: (d) => d.gateway_tx_id || '—' },
+          ]}
+        />
       )}
 
       <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="depósitos" />
@@ -546,54 +515,31 @@ function PosLoadQueue() {
           description="Todas las recargas en línea ya fueron marcadas como cargadas."
         />
       ) : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Acreditada</th>
-                <th>Alumno</th>
-                <th className="num">Monto</th>
-                <th>Pasarela</th>
-                <th>Referencia</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d) => (
-                <tr key={d.id}>
-                  <td data-label="Acreditada" className="whitespace-nowrap text-muted">
-                    {fmtDate(d.processed_at || d.created_at)}
-                  </td>
-                  <td data-label="Alumno" className="font-medium text-ink">
-                    <span className="block">
-                      <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
-                        {d.student_name}
-                      </Link>
-                      <span className="block text-xs text-subtle">{d.student_code}</span>
-                    </span>
-                  </td>
-                  <td data-label="Monto" className="num font-semibold text-ink">
-                    ${parseFloat(d.amount).toFixed(2)}
-                  </td>
-                  <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
-                  <td data-label="Referencia" className="text-subtle text-xs font-mono">
-                    {d.gateway_tx_id || '—'}
-                  </td>
-                  <td data-label="Acción" className="text-right">
-                    <Button
-                      size="sm"
-                      loading={mark.isPending && mark.variables === d.id}
-                      onClick={() => mark.mutate(d.id)}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Cargado en Loyverse
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          rows={data}
+          rowKey={(d) => d.id}
+          columns={[
+            { header: 'Acreditada', className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.processed_at || d.created_at) },
+            { header: 'Alumno', className: 'font-medium text-ink', cell: (d) => (
+                <span className="block">
+                  <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">{d.student_name}</Link>
+                  <span className="block text-xs text-subtle">{d.student_code}</span>
+                </span>
+              ) },
+            { header: 'Monto', align: 'right', className: 'font-semibold text-ink', cell: (d) => `$${parseFloat(d.amount).toFixed(2)}` },
+            { header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
+            { header: 'Referencia', className: 'text-subtle text-xs font-mono', cell: (d) => d.gateway_tx_id || '—' },
+            {
+              header: 'Acción', align: 'right',
+              cell: (d) => (
+                <Button size="sm" loading={mark.isPending && mark.variables === d.id} onClick={() => mark.mutate(d.id)}>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Cargado en Loyverse
+                </Button>
+              ),
+            },
+          ]}
+        />
       )}
 
       <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="recargas" />
@@ -649,55 +595,31 @@ function PosUnloadQueue() {
           description="No hay recargas reembolsadas esperando descarga en Loyverse."
         />
       ) : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Reembolso</th>
-                <th>Alumno</th>
-                <th className="num">Monto</th>
-                <th>Pasarela</th>
-                <th>Referencia</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d) => (
-                <tr key={d.id}>
-                  <td data-label="Reembolso" className="whitespace-nowrap text-muted">
-                    {fmtDate(d.pos_unload_needed_at)}
-                  </td>
-                  <td data-label="Alumno" className="font-medium text-ink">
-                    <span className="block">
-                      <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">
-                        {d.student_name}
-                      </Link>
-                      <span className="block text-xs text-subtle">{d.student_code}</span>
-                    </span>
-                  </td>
-                  <td data-label="Monto" className="num font-semibold text-ink">
-                    ${parseFloat(d.amount).toFixed(2)}
-                  </td>
-                  <td data-label="Pasarela" className="text-muted">{d.gateway || '—'}</td>
-                  <td data-label="Referencia" className="text-subtle text-xs font-mono">
-                    {d.gateway_tx_id || '—'}
-                  </td>
-                  <td data-label="Acción" className="text-right">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      loading={mark.isPending && mark.variables === d.id}
-                      onClick={() => mark.mutate(d.id)}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Quitado de Loyverse
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          rows={data}
+          rowKey={(d) => d.id}
+          columns={[
+            { header: 'Reembolso', className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.pos_unload_needed_at) },
+            { header: 'Alumno', className: 'font-medium text-ink', cell: (d) => (
+                <span className="block">
+                  <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">{d.student_name}</Link>
+                  <span className="block text-xs text-subtle">{d.student_code}</span>
+                </span>
+              ) },
+            { header: 'Monto', align: 'right', className: 'font-semibold text-ink', cell: (d) => `$${parseFloat(d.amount).toFixed(2)}` },
+            { header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
+            { header: 'Referencia', className: 'text-subtle text-xs font-mono', cell: (d) => d.gateway_tx_id || '—' },
+            {
+              header: 'Acción', align: 'right',
+              cell: (d) => (
+                <Button size="sm" variant="secondary" loading={mark.isPending && mark.variables === d.id} onClick={() => mark.mutate(d.id)}>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Quitado de Loyverse
+                </Button>
+              ),
+            },
+          ]}
+        />
       )}
 
       <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="recargas" />
@@ -793,55 +715,38 @@ function ReconcileTab() {
           {!data.results.length ? (
             <EmptyState icon={CheckCircle2} title="Sin diferencias" />
           ) : (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Alumno</th>
-                    <th className="num">Saldo local</th>
-                    <th className="num">Loyverse</th>
-                    <th className="num">Diferencia</th>
-                    <th>Estado</th>
-                    <th className="text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.results.map((r) => (
-                    <tr key={r.student_id}>
-                      <td data-label="Alumno" className="font-medium text-ink">
-                        <span className="block">
-                          <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>
-                          <span className="block text-xs text-subtle">{r.student_code}</span>
-                        </span>
-                      </td>
-                      <td data-label="Saldo local" className="num text-ink">${parseFloat(r.local_balance).toFixed(2)}</td>
-                      <td data-label="Loyverse" className="num text-muted">
-                        {r.loyverse_balance !== null ? `$${parseFloat(r.loyverse_balance).toFixed(2)}` : '—'}
-                      </td>
-                      <td data-label="Diferencia" className="num font-medium text-ink">
-                        {r.drift !== null ? `$${parseFloat(r.drift).toFixed(2)}` : '—'}
-                      </td>
-                      <td data-label="Estado">
-                        {r.error ? (
-                          <Badge variant="error">Error</Badge>
-                        ) : r.in_sync ? (
-                          <Badge variant="success">En orden</Badge>
-                        ) : (
-                          <Badge variant="warning">Diferencia</Badge>
-                        )}
-                      </td>
-                      <td data-label="Acción" className="text-right">
-                        {!r.error && !r.in_sync && (
-                          <Button size="sm" variant="secondary" onClick={() => setToFix(r)}>
-                            <RefreshCw className="h-3.5 w-3.5" /> Corregir
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={data.results}
+              rowKey={(r) => r.student_id}
+              columns={[
+                {
+                  header: 'Alumno', className: 'font-medium text-ink',
+                  cell: (r) => (
+                    <span className="block">
+                      <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>
+                      <span className="block text-xs text-subtle">{r.student_code}</span>
+                    </span>
+                  ),
+                },
+                { header: 'Saldo local', align: 'right', className: 'text-ink', cell: (r) => `$${parseFloat(r.local_balance).toFixed(2)}` },
+                { header: 'Loyverse', align: 'right', className: 'text-muted', cell: (r) => (r.loyverse_balance !== null ? `$${parseFloat(r.loyverse_balance).toFixed(2)}` : '—') },
+                { header: 'Diferencia', align: 'right', className: 'font-medium text-ink', cell: (r) => (r.drift !== null ? `$${parseFloat(r.drift).toFixed(2)}` : '—') },
+                {
+                  header: 'Estado',
+                  cell: (r) => r.error ? <Badge variant="error">Error</Badge>
+                    : r.in_sync ? <Badge variant="success">En orden</Badge>
+                    : <Badge variant="warning">Diferencia</Badge>,
+                },
+                {
+                  header: 'Acción', align: 'right',
+                  cell: (r) => !r.error && !r.in_sync && (
+                    <Button size="sm" variant="secondary" onClick={() => setToFix(r)}>
+                      <RefreshCw className="h-3.5 w-3.5" /> Corregir
+                    </Button>
+                  ),
+                },
+              ]}
+            />
           )}
         </>
       )}
@@ -887,34 +792,20 @@ function LowBalanceTab() {
       ) : (
         <>
           <p className="text-sm text-muted mb-3">{count} alumno(s) por debajo del umbral.</p>
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Alumno</th>
-                  <th>Matrícula</th>
-                  <th className="num">Saldo</th>
-                  <th className="num">Umbral</th>
-                  <th>Últ. sinc.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((b) => (
-                  <tr key={b.id}>
-                    <td data-label="Alumno" className="font-medium text-ink">
-                      <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">
-                        {b.student.user.full_name}
-                      </Link>
-                    </td>
-                    <td data-label="Matrícula" className="text-muted">{b.student.student_id}</td>
-                    <td data-label="Saldo" className="num font-semibold text-amber">${parseFloat(b.balance).toFixed(2)}</td>
-                    <td data-label="Umbral" className="num text-muted">${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}</td>
-                    <td data-label="Últ. sinc." className="text-muted whitespace-nowrap">{fmtDate(b.last_synced)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={data}
+            rowKey={(b) => b.id}
+            columns={[
+              {
+                header: 'Alumno', className: 'font-medium text-ink',
+                cell: (b) => <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>,
+              },
+              { header: 'Matrícula', className: 'text-muted', cell: (b) => b.student.student_id },
+              { header: 'Saldo', align: 'right', className: 'font-semibold text-amber', cell: (b) => `$${parseFloat(b.balance).toFixed(2)}` },
+              { header: 'Umbral', align: 'right', className: 'text-muted', cell: (b) => `$${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}` },
+              { header: 'Últ. sinc.', className: 'text-muted whitespace-nowrap', cell: (b) => fmtDate(b.last_synced) },
+            ]}
+          />
           <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="alumnos" />
         </>
       )}

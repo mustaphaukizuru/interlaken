@@ -17,6 +17,7 @@ import { api, admissionsAdminApi } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { STATUS_BADGE } from '@/lib/admissionsStatus';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { DataTable } from '@/components/ui/DataTable';
 
 interface PreReg {
   id: number;
@@ -194,50 +195,48 @@ export default function AdminAdmissions() {
             </ul>
 
             {/* Desktop: dense table */}
-            <div className="admin-table-wrap hidden md:block">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Alumno</th>
-                    <th>Grado</th>
-                    <th>Tutor</th>
-                    <th>Contacto</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preRegs.map((p) => {
+            <DataTable
+              wrapClassName="hidden md:block"
+              rows={preRegs}
+              rowKey={(p) => p.id}
+              columns={[
+                { header: 'Alumno', className: 'font-medium text-ink', cell: (p) => p.child_name },
+                { header: 'Grado', className: 'text-muted', cell: (p) => p.grade_applying },
+                { header: 'Tutor', className: 'text-muted', cell: (p) => p.parent_name },
+                {
+                  header: 'Contacto',
+                  cell: (p) => (
+                    <>
+                      <div className="text-muted">{p.parent_email}</div>
+                      <div className="text-subtle text-xs">{p.parent_phone}</div>
+                    </>
+                  ),
+                },
+                {
+                  header: 'Fecha', className: 'text-subtle whitespace-nowrap',
+                  cell: (p) => format(new Date(p.created_at), 'd MMM yyyy', { locale: es }),
+                },
+                {
+                  header: 'Estado',
+                  cell: (p) => {
                     const meta = statusMeta[p.status] ?? statusMeta.pending;
                     return (
-                      <tr key={p.id}>
-                        <td className="font-medium text-ink">{p.child_name}</td>
-                        <td className="text-muted">{p.grade_applying}</td>
-                        <td className="text-muted">{p.parent_name}</td>
-                        <td>
-                          <div className="text-muted">{p.parent_email}</div>
-                          <div className="text-subtle text-xs">{p.parent_phone}</div>
-                        </td>
-                        <td className="text-subtle whitespace-nowrap">
-                          {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
-                        </td>
-                        <td>
-                          <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending && updateStatus.variables?.id === p.id} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
-                        </td>
-                        <td>
-                          <button type="button" disabled={invitingId === p.id}
-                            onClick={() => invite.mutate({ id: p.id, name: p.child_name })}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-purple/10 px-2.5 py-1 text-xs font-semibold text-purple hover:bg-purple/15 disabled:opacity-50 whitespace-nowrap">
-                            <Send className="h-3.5 w-3.5" /> {invitingId === p.id ? 'Generando…' : 'Invitar'}
-                          </button>
-                        </td>
-                      </tr>
+                      <StatusSelect value={p.status} variant={meta.variant} disabled={updateStatus.isPending && updateStatus.variables?.id === p.id} onChange={(status) => updateStatus.mutate({ id: p.id, status })} />
                     );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  },
+                },
+                {
+                  header: 'Acciones',
+                  cell: (p) => (
+                    <button type="button" disabled={invitingId === p.id}
+                      onClick={() => invite.mutate({ id: p.id, name: p.child_name })}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple/10 px-2.5 py-1 text-xs font-semibold text-purple hover:bg-purple/15 disabled:opacity-50 whitespace-nowrap">
+                      <Send className="h-3.5 w-3.5" /> {invitingId === p.id ? 'Generando…' : 'Invitar'}
+                    </button>
+                  ),
+                },
+              ]}
+            />
           </>
         )}
 
@@ -343,47 +342,42 @@ function RegistrationsSection() {
           </ul>
 
           {/* Desktop: dense table */}
-          <div className="admin-table-wrap hidden md:block">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Alumno</th>
-                  <th>Grado</th>
-                  <th>Tutor</th>
-                  <th>Docs</th>
-                  <th>Estado</th>
-                  <th>Enviada</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const meta = STATUS_BADGE[r.status] ?? STATUS_BADGE.draft;
-                  return (
-                    <tr key={r.id}>
-                      <td className="font-medium text-ink">{r.child_name}</td>
-                      <td className="text-muted">{r.grade_applying}</td>
-                      <td>
-                        <div className="text-muted">{r.parent1_name}</div>
-                        <div className="text-subtle text-xs">{r.parent1_email}</div>
-                      </td>
-                      <td className="text-muted whitespace-nowrap">{r.doc_verified}/{r.doc_count}</td>
-                      <td><Badge variant={meta.variant}>{meta.label}</Badge></td>
-                      <td className="text-subtle whitespace-nowrap">
-                        {r.submitted_at ? format(new Date(r.submitted_at), 'd MMM yyyy', { locale: es }) : '—'}
-                      </td>
-                      <td>
-                        <button type="button" onClick={() => setReviewId(r.id)}
-                          className="rounded-lg bg-cream px-2.5 py-1 text-xs font-semibold text-ink hover:bg-line">
-                          Revisar
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            wrapClassName="hidden md:block"
+            rows={rows}
+            rowKey={(r) => r.id}
+            columns={[
+              { header: 'Alumno', className: 'font-medium text-ink', cell: (r) => r.child_name },
+              { header: 'Grado', className: 'text-muted', cell: (r) => r.grade_applying },
+              {
+                header: 'Tutor',
+                cell: (r) => (
+                  <>
+                    <div className="text-muted">{r.parent1_name}</div>
+                    <div className="text-subtle text-xs">{r.parent1_email}</div>
+                  </>
+                ),
+              },
+              { header: 'Docs', className: 'text-muted whitespace-nowrap', cell: (r) => `${r.doc_verified}/${r.doc_count}` },
+              {
+                header: 'Estado',
+                cell: (r) => { const meta = STATUS_BADGE[r.status] ?? STATUS_BADGE.draft; return <Badge variant={meta.variant}>{meta.label}</Badge>; },
+              },
+              {
+                header: 'Enviada', className: 'text-subtle whitespace-nowrap',
+                cell: (r) => (r.submitted_at ? format(new Date(r.submitted_at), 'd MMM yyyy', { locale: es }) : '—'),
+              },
+              {
+                header: 'Acción',
+                cell: (r) => (
+                  <button type="button" onClick={() => setReviewId(r.id)}
+                    className="rounded-lg bg-cream px-2.5 py-1 text-xs font-semibold text-ink hover:bg-line">
+                    Revisar
+                  </button>
+                ),
+              },
+            ]}
+          />
         </>
       )}
 

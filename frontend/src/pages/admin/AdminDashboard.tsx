@@ -11,6 +11,7 @@ import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
 import type { AnalyticsPayload } from '@/types/analytics';
+import { DataTable } from '@/components/ui/DataTable';
 
 // Recharts loads only when this dashboard renders (keeps it off the main bundle).
 const ChartsSection = lazy(() => import('@/components/staff/ChartsSection'));
@@ -82,7 +83,7 @@ export default function AdminDashboard() {
         <div className="grid gap-6 2xl:grid-cols-2">
         {/* Recent activity (audit trail) */}
         {!isError && data?.recent_activity && data.recent_activity.length > 0 && (
-          <Reveal delay={40} className="card mb-6 2xl:mb-0">
+          <Reveal delay={40} className="card min-w-0 mb-6 2xl:mb-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-head text-[15px] font-bold text-ink"><Activity size={16} className="text-purple" aria-hidden="true" /> Actividad reciente</h2>
               <Link to="/admin/auditoria" className="flex items-center gap-1 text-[12.5px] font-semibold text-purple">Auditoría <ArrowRight size={13} /></Link>
@@ -100,7 +101,7 @@ export default function AdminDashboard() {
 
         {/* Recent announcements — admin-table stacks to cards on small screens */}
         {!isError && (
-        <Reveal delay={60} className="card !p-0 overflow-hidden">
+        <Reveal delay={60} className="card min-w-0 !p-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-cream px-5 py-4 sm:px-[22px]">
             <h2 className="font-head text-[15px] font-bold text-ink">Avisos Recientes</h2>
             <Link
@@ -120,30 +121,17 @@ export default function AdminDashboard() {
               <p className="text-[13px] text-subtle">Sin actividad reciente</p>
             </div>
           ) : (
-            <div className="admin-table-wrap border-0 !rounded-none">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Concepto</th>
-                    <th>Audiencia</th>
-                    <th>Estatus</th>
-                    <th>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data?.announcements ?? []).slice(0, 10).map((a) => (
-                    <tr key={a.id}>
-                      <td data-label="Concepto" className="font-semibold text-ink">{a.title}</td>
-                      <td data-label="Audiencia" className="capitalize text-muted">{a.audience}</td>
-                      <td data-label="Estatus"><span className="badge-green">Publicado</span></td>
-                      <td data-label="Fecha" className="text-subtle">
-                        {new Date(a.created_at).toLocaleDateString('es-MX')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              wrapClassName="border-0 !rounded-none"
+              rows={(data?.announcements ?? []).slice(0, 10)}
+              rowKey={(a) => a.id}
+              columns={[
+                { header: 'Concepto', className: 'font-semibold text-ink', cell: (a) => a.title },
+                { header: 'Audiencia', className: 'capitalize text-muted', cell: (a) => a.audience },
+                { header: 'Estatus', cell: () => <span className="badge-green">Publicado</span> },
+                { header: 'Fecha', className: 'text-subtle', cell: (a) => new Date(a.created_at).toLocaleDateString('es-MX') },
+              ]}
+            />
           )}
         </Reveal>
         )}
