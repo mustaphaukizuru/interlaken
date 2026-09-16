@@ -363,6 +363,8 @@ export interface SyncHealth {
   last_transaction_at: string | null;
   transactions_last_7d: number;
   purchases_last_7d: number;
+  /** When the purchase poll last RAN (the cursor stands still over a weekend; this does not). */
+  last_poll_at: string | null;
   /** Stamped on every authenticated Loyverse webhook delivery. */
   last_webhook_at: string | null;
   last_webhook_type: string;

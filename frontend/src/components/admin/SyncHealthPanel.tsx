@@ -12,8 +12,10 @@ const TONE: Record<Tone, string> = {
   bad: 'border-coral/30 bg-coral/5 text-coral-dark',
 };
 
-/** How stale the poll cursor may get before it means "nothing is polling". */
-const STALE_HOURS = 6;
+/** How long the poll may go without RUNNING before it means "the cron stopped".
+ *  Measured on last_poll_at, not the receipt cursor: the cursor legitimately
+ *  stands still over a weekend or a holiday and would show red for no reason. */
+const STALE_HOURS = 1;
 /** A school day without a single Loyverse delivery means the hook is dead. */
 const WEBHOOK_STALE_HOURS = 30;
 /** Nightly at 02:30; anything older than a day and a bit is a missed night. */
@@ -45,7 +47,10 @@ interface Check {
  * the signature of receipts arriving that nobody recognises as wallet spend.
  */
 export function buildChecks(h: SyncHealth): Check[] {
-  const cursorHours = hoursSince(h.last_purchases_cursor);
+  // Older builds have no last_poll_at yet; fall back to the cursor so the light
+  // never reads "never" against a server that simply has not deployed it.
+  const pollAt = h.last_poll_at ?? h.last_purchases_cursor;
+  const cursorHours = hoursSince(pollAt);
   const pollStale = cursorHours === null || cursorHours > STALE_HOURS;
   const unlinked = h.active_students - h.linked_students;
   const hookHours = hoursSince(h.last_webhook_at);
@@ -69,9 +74,9 @@ export function buildChecks(h: SyncHealth): Check[] {
       tone: pollStale ? 'bad' : 'ok',
       label: pollStale ? 'El sondeo no está corriendo' : 'Sondeo al día',
       detail: pollStale
-        ? `Último recibo leído: ${ago(h.last_purchases_cursor)}. Si no corre cada 5 minutos, `
+        ? `Última corrida del sondeo: ${ago(pollAt)}. Si no corre cada 5 minutos, `
           + 'los saldos solo se mueven cuando alguien presiona Sincronizar.'
-        : `Último recibo leído ${ago(h.last_purchases_cursor)}.`,
+        : `Corrió ${ago(pollAt)}; último recibo leído ${ago(h.last_purchases_cursor)}.`,
     },
     {
       key: 'webhook',

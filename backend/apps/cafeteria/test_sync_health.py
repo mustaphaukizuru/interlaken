@@ -122,3 +122,19 @@ class TestSyncHealth:
         assert data['last_webhook_type'] == 'receipts.update'
         assert data['backup']['ok'] is True and data['backup']['offsite'] is None
 
+    def test_the_poll_stamps_when_it_ran_even_with_nothing_to_do(self, api_client, monkeypatch):
+        """last_poll_at is the "cron alive" signal: it must move on every run,
+        including the early exit when no student is linked yet."""
+        from unittest.mock import patch
+
+        from apps.cafeteria.services import sync_purchases
+        monkeypatch.setattr('apps.cafeteria.services.loyverse_reachable', lambda: (True, ''))
+        assert LoyverseSyncState.load().last_poll_at is None
+
+        with patch('apps.cafeteria.services.get_receipts', return_value=[]):
+            sync_purchases()                       # no linked students → early return
+
+        assert LoyverseSyncState.load().last_poll_at is not None
+        api_client.force_authenticate(AdminFactory())
+        assert api_client.get(URL).json()['last_poll_at'] is not None
+

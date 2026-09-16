@@ -584,6 +584,15 @@ def _newest_receipt_dt(receipts):
     return newest
 
 
+def _stamp_poll() -> None:
+    """Record that the purchase poll ran. The cursor records the newest receipt
+    it SAW, which legitimately stands still over a weekend; this does not, and
+    is what "the cron stopped" is measured against (check_sync_fresh, panel)."""
+    from apps.cafeteria.models import LoyverseSyncState
+    LoyverseSyncState.load()
+    LoyverseSyncState.objects.filter(pk=1).update(last_poll_at=timezone.now())
+
+
 def sync_purchases():
     """Poll Loyverse receipts → transactions + balance debit + parent alerts.
 
@@ -595,6 +604,7 @@ def sync_purchases():
     from apps.cafeteria.models import LoyverseSyncState
 
     students = _students_by_loyverse_id()
+    _stamp_poll()
     if not students:
         logger.info('sync_purchases: no students with a Loyverse id — nothing to do.')
         return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0,
@@ -1457,6 +1467,8 @@ def sync_health() -> dict:
         'loyverse_error': error,
         'last_purchases_cursor': state.last_purchases_cursor,
         'last_full_fetch_at': state.last_full_fetch_at,
+        # When the poll last RAN: the honest "is the cron alive" signal.
+        'last_poll_at': state.last_poll_at,
         # Real-time: stamped on every authenticated Loyverse delivery.
         'last_webhook_at': state.last_webhook_at,
         'last_webhook_type': state.last_webhook_type,

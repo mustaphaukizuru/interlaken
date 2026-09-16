@@ -39,8 +39,9 @@ CRON_TZ=America/Mexico_City
 # ── Alert if the cafeteria sync stops running ───────────────────────────────
 # Without this a broken sync is invisible for days: the site looks fine and
 # balances just quietly stop moving. If the log has not been touched in 30
-# minutes, something is wrong. Replace `mail` with whatever you actually read.
-*/30 * * * * find /var/log/interlaken/loyverse.log -mmin +30 2>/dev/null | grep -q . && echo "Interlaken: cafeteria sync has not run in 30+ minutes on $(hostname)" | mail -s "Interlaken cron stalled" mustaphaukizuru@gmail.com
+# minutes, something is wrong. The check runs inside the app (the VPS has no
+# `mail`): it emails every active admin once per outage and lights the panel.
+*/30 * * * * cd $COMPOSE && docker compose exec -T app python manage.py check_sync_fresh >> /var/log/interlaken/loyverse.log 2>&1
 
 # ── Log rotation so the files above cannot fill the disk ────────────────────
 # Nightly database backup at 02:30 (see backup-db.sh). The database now runs on

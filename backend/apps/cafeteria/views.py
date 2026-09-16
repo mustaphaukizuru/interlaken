@@ -951,6 +951,7 @@ class AdminSyncHealthView(APIView):
                 'last_full_fetch_at': h['last_full_fetch_at'].isoformat() if h['last_full_fetch_at'] else None,
                 'last_transaction_at': h['last_transaction_at'].isoformat() if h['last_transaction_at'] else None,
                 'last_webhook_at': h['last_webhook_at'].isoformat() if h['last_webhook_at'] else None,
+                'last_poll_at': h['last_poll_at'].isoformat() if h['last_poll_at'] else None,
             }
             cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
         return Response(data)
