@@ -862,11 +862,19 @@ class AdminSyncAllView(APIView):
             # Cash recargas loaded on the POS tablet: the one flow with no other
             # channel into the ledger. Without this the button could only ever
             # debit, so "Sincronizar" left a family's wallet negative.
-            pos = mirror_pos_topups()
+            # An unreachable Loyverse here must not turn the purchases that just
+            # synced into a 502: report it and keep the rest of the result.
+            pos_error = ''
+            try:
+                pos = mirror_pos_topups()
+            except LoyverseError as exc:
+                pos, pos_error = {}, str(exc)[:200]
+                logger.warning('mirror_pos_topups skipped: %s', exc)
             return Response({
                 'detail': 'Sincronización completada.',
                 'pos_topups_credited': pos.get('credited', 0),
                 'pos_topups_total': str(pos.get('total', 0)),
+                'pos_topups_error': pos_error,
                 'balances_ok': balances.get('synced', 0),
                 'balances_failed': balances.get('failed', 0),
                 'receipts': purchases.get('receipts', 0),

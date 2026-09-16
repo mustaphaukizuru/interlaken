@@ -57,7 +57,8 @@ class TestSyncAllDiagnostics:
 
         receipts = [cash_receipt('r1', 'cust-1', 50), cash_receipt('r2', 'cust-1', 30)]
         api_client.force_authenticate(AdminFactory())
-        with patch('apps.cafeteria.services.get_receipts', return_value=receipts):
+        with patch('apps.cafeteria.services.get_receipts', return_value=receipts), \
+             patch('apps.cafeteria.services.get_all_customers', return_value=[]):
             resp = api_client.post(reverse('admin-sync-all'))
 
         assert resp.status_code == 200
@@ -72,7 +73,8 @@ class TestSyncAllDiagnostics:
         receipts = [points_receipt('r1', 'someone-else', 50)]
 
         api_client.force_authenticate(AdminFactory())
-        with patch('apps.cafeteria.services.get_receipts', return_value=receipts):
+        with patch('apps.cafeteria.services.get_receipts', return_value=receipts), \
+             patch('apps.cafeteria.services.get_all_customers', return_value=[]):
             data = api_client.post(reverse('admin-sync-all')).json()
 
         assert data['unmatched'] == 1
@@ -85,7 +87,7 @@ class TestSyncAllDiagnostics:
 
         api_client.force_authenticate(AdminFactory())
         with patch('apps.cafeteria.services.get_receipts',
-                   return_value=[points_receipt('r1', 'cust-1', 35)]):
+                   return_value=[points_receipt('r1', 'cust-1', 35)]),              patch('apps.cafeteria.services.get_all_customers', return_value=[]):
             data = api_client.post(reverse('admin-sync-all')).json()
 
         assert data['purchases_created'] == 1

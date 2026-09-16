@@ -349,9 +349,10 @@ class TestAdminPermissions:
         resp = api_client.get(reverse("admin-balances"))
         assert resp.status_code == 200
 
+    @patch("apps.cafeteria.views.mirror_pos_topups", return_value={"credited": 0, "total": 0})
     @patch("apps.cafeteria.views.sync_purchases")
     @patch("apps.cafeteria.views.sync_all_balances")
-    def test_admin_sync_all_also_polls_purchases(self, mock_balances, mock_purchases, api_client):
+    def test_admin_sync_all_also_polls_purchases(self, mock_balances, mock_purchases, _mirror, api_client):
         mock_balances.return_value = {"synced": 3, "failed": 0}
         mock_purchases.return_value = {
             "students": 3, "receipts": 2, "created": 1, "notified": 2,
