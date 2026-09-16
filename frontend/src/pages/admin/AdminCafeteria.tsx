@@ -24,6 +24,8 @@ import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFil
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SyncHealthPanel } from '@/components/admin/SyncHealthPanel';
+import { LIVE } from '@/lib/live';
+import { LiveBadge } from '@/components/ui/LiveBadge';
 
 type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
 
@@ -138,8 +140,9 @@ function RosterTab() {
   const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
   const [page, setPage] = useUrlPage();
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, refetch, dataUpdatedAt, isFetching } = useQuery({
     queryKey: ['admin-cafeteria-balances', page],
+    ...LIVE,
     queryFn: async () => toPaged<CafeteriaBalance>((await cafeteriaApi.getAllBalances({ page })).data),
     placeholderData: keepPreviousData,
   });
@@ -218,6 +221,7 @@ function RosterTab() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <LiveBadge updatedAt={dataUpdatedAt} isFetching={isFetching} onRefresh={() => refetch()} className="min-h-[44px]" />
         <Button variant="secondary" size="sm" loading={syncAll.isPending} onClick={() => syncAll.mutate()}>
           <RefreshCw className="w-3.5 h-3.5" /> Sincronizar todos
         </Button>

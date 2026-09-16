@@ -8,6 +8,7 @@ import { usePrefersDark, useReducedMotion } from '@/hooks/useMediaQuery';
 import { useChartEntrance } from '@/hooks/useChartEntrance';
 import { SectionEmpty } from '@/components/ui/SectionCard';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LIVE } from '@/lib/live';
 
 interface TrendPoint { date: string; amount: number; }
 interface TrendResp { days: number; total: number; average: number; series: TrendPoint[]; }
@@ -42,7 +43,7 @@ export default function CafeteriaTrendCard() {
     },
     select: (arr) =>
       arr.map((b) => ({ id: b.student.id, name: b.student.user.full_name })),
-    staleTime: 1000 * 60 * 5,
+    ...LIVE,
   });
 
   const { data, isLoading, isError, refetch } = useQuery({
