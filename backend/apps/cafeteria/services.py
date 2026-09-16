@@ -1522,8 +1522,17 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
         if cust is None and email:
             cust, matched_by = by_email.get(email), 'correo'
         if cust is None:
-            report['unmatched_students'].append(
-                {'matricula': s.student_id, 'name': s.user.full_name})
+            # An active student with no Loyverse customer is, in practice, a
+            # leaver: the school deletes the customer when a student goes and
+            # nothing else tells the app. Carry what the admin needs to act on
+            # it (id for the bulk-status endpoint, leftover balance so money is
+            # never silently written off with the baja).
+            cb = getattr(s, 'cafeteria_balance', None)
+            report['unmatched_students'].append({
+                'id': s.id, 'matricula': s.student_id, 'name': s.user.full_name,
+                'grade': s.grade, 'status': s.status,
+                'balance': str(cb.balance if cb is not None else Decimal('0')),
+            })
             continue
 
         uuid = cust.get('id')

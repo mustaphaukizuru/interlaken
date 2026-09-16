@@ -60,3 +60,29 @@ Activación, una sola vez:
 | Semanal dom 05:00 | `purge_retention --apply` |
 | Mensual 1er dom 04:00 | `restore-db.sh` (simulacro) |
 | Anual (julio) | `/admin/nuevo-ciclo`; revisar docs/RETENTION.md con Dirección |
+
+## 6. Cambio de ciclo escolar: altas, bajas y grados
+
+Loyverse (el POS de la cafetería) es la fuente de verdad del alumnado: ahí la
+escuela da de alta a cada alumno nuevo, actualiza su grado y **borra el cliente
+cuando el alumno se va**. La app se alinea con Loyverse en tres pasos, todos
+desde **Admin → Alumnos**, todos con vista previa antes de aplicar.
+
+1. **Altas y grados: `Importar desde Loyverse`.** Crea a los alumnos nuevos
+   (con su saldo inicial tomado de Loyverse) y actualiza nombre y grado de los
+   existentes. Ejecútelo al inicio del ciclo y cada vez que haya inscripciones.
+   Es idempotente: repetirlo no duplica a nadie.
+2. **Bajas: `Vincular Loyverse` → "Sin cliente en Loyverse".** Esa lista son
+   los alumnos activos cuyo cliente ya no existe en Loyverse: en la práctica,
+   egresados y bajas. Muestra grado y **saldo restante**; seleccione y use
+   *Dar de baja*. La baja no toca el saldo: si queda dinero, decida la
+   devolución aparte (Cafetería → Ajustes / Devoluciones).
+3. **Etiqueta del ciclo: `Nuevo ciclo`.** Cambia el ciclo que muestra el sitio
+   y, opcionalmente, el umbral de saldo bajo. **No use su promoción de grados
+   si ya corrió la importación**: los grados vienen de Loyverse y el asistente
+   los subiría una segunda vez. (Pendiente: que el asistente omita la
+   promoción cuando los grados están sincronizados con Loyverse.)
+
+Los saldos no requieren acción en el cambio de ciclo: cada 5 minutos el cron
+registra compras y recargas hechas en el POS, y **Cafetería → Reconciliación**
+muestra cualquier diferencia con el botón *Corregir* para cerrarla.

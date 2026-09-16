@@ -116,3 +116,25 @@ class TestLinkLoyverseEndpoint:
         resp = api_client.post(URL, {'commit': '1'}, format='json')
         assert resp.status_code == 502
         assert 'Loyverse' in resp.json()['error']
+
+
+@pytest.mark.django_db
+def test_unmatched_students_carry_what_a_baja_needs():
+    """An active student with no Loyverse customer is a leaver in practice. The
+    console must be able to act on the row (id → bulk status endpoint) and must
+    see the leftover balance, so money is never written off silently."""
+    from decimal import Decimal
+
+    from apps.cafeteria.models import CafeteriaBalance
+
+    gone = StudentProfileFactory(student_id='09238', grade='3° Secundaria')
+    CafeteriaBalance.objects.create(student=gone, balance=Decimal('16'))
+
+    report = link_students_to_loyverse([], commit=False)
+
+    row = next(u for u in report['unmatched_students'] if u['matricula'] == '09238')
+    assert row['id'] == gone.id
+    assert row['grade'] == '3° Secundaria'
+    assert row['status'] == 'active'
+    assert row['balance'] == '16.00'
+
