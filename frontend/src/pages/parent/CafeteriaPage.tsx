@@ -23,6 +23,8 @@ import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
+import { LIVE } from '@/lib/live';
+import { LiveBadge } from '@/components/ui/LiveBadge';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TOPUP_MIN = 50;
@@ -92,8 +94,9 @@ export default function CafeteriaPage() {
   const page = pageSel && pageSel.key === filterKey ? pageSel.page : 1;
   const setPage = (p: number) => setPageSel({ key: filterKey, page: p });
 
-  const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances } = useQuery<CafeteriaBalance[]>({
+  const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances, dataUpdatedAt: balancesUpdatedAt, isFetching: balancesFetching } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
+    ...LIVE,
     queryFn: async () => {
       const { data } = await cafeteriaApi.getMyBalance();
       return Array.isArray(data) ? data : [data];
@@ -104,6 +107,7 @@ export default function CafeteriaPage() {
     results: CafeteriaTransaction[]; count: number;
   }>({
     queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, page],
+    ...LIVE,
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTransactions({
         student: filterStudent === 'all' ? undefined : filterStudent,
@@ -336,9 +340,12 @@ export default function CafeteriaPage() {
               <Download className="w-3 h-3" /> Estado de cuenta (PDF)
             </Button>
           )}
-          <Button variant="secondary" size="sm" loading={refreshing} onClick={refresh} disabled={balancesLoading} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
-            <RefreshCw className="w-3 h-3" /> Actualizar
-          </Button>
+          <LiveBadge
+            updatedAt={balancesUpdatedAt}
+            isFetching={balancesFetching || refreshing}
+            onRefresh={refresh}
+            className="min-h-[44px] px-1"
+          />
         </div>
       </div>
 

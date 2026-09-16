@@ -576,6 +576,22 @@ class LoyverseWebhookView(APIView):
             return Response({'error': 'unauthorized'}, status=401)
 
         payload = request.data if isinstance(request.data, dict) else {}
+
+        # customers.update — Loyverse pushes the changed customer objects
+        # (total_points included) the moment a cash recarga is loaded on the
+        # POS. Feeding them to the mirror makes that credit land in seconds
+        # instead of on the next 5-minute tick. Same one-way rule as the cron:
+        # credits only, ledgers that already agree are no-ops.
+        customers = payload.get('customers')
+        if isinstance(customers, list) and (payload.get('type') == 'customers.update' or customers):
+            try:
+                result = mirror_pos_topups(customers=customers)
+            except Exception:  # noqa: BLE001
+                logger.exception('Loyverse customers.update processing failed')
+                return Response({'error': 'processing_error'}, status=500)
+            return Response({'ok': True, 'event': 'customers.update',
+                             'credited': result['credited'], 'total': str(result['total'])})
+
         receipts = payload.get('receipts')
         if receipts is None:
             # Some integrations post a single receipt object at the top level.

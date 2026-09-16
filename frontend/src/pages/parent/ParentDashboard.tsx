@@ -22,6 +22,7 @@ import { InstallHint } from '@/components/portal/InstallHint';
 import type { DashboardData } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { LIVE } from '@/lib/live';
 
 // Recharts (heavy) stays out of the dashboard's main chunk — loaded only when a
 // cafeteria-using family renders the trend.
@@ -72,7 +73,7 @@ export default function ParentDashboard() {
   const { data, isLoading, isError, isFetching, dataUpdatedAt, refetch } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data,
-    staleTime: 1000 * 60 * 2,
+    ...LIVE,
   });
 
   useAnnouncementsRead(data?.announcements);
