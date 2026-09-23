@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
+from apps.cafeteria.services import low_balance_queryset
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.payments.models import Payment
@@ -124,7 +125,6 @@ class DashboardView(APIView):
         elif user.role == User.Role.ADMIN:
             # BACKLOG P1-H5: cafetería is the only money path, so the KPIs are
             # wallet health + the operational queues, not tuition revenue.
-            from django.db.models import F
             from django.utils import timezone as tz
 
             from apps.accounts.models import PasswordRequest
@@ -145,7 +145,13 @@ class DashboardView(APIView):
                 'pending_payments': Payment.objects.filter(status=Payment.Status.PENDING).count(),
                 'total_revenue': str(month_revenue),
                 'cafeteria_total_balance': str(active_balances.aggregate(t=Sum('balance'))['t'] or 0),
-                'low_balance_count': active_balances.filter(balance__lte=F('low_balance_threshold')).count(),
+                # Wallets in use and under their threshold (not every $0 wallet
+                # of a child who never buys): see cafeteria.low_balance_queryset.
+                'low_balance_count': low_balance_queryset().count(),
+                # Still "active" in the app but their Loyverse customer is gone:
+                # leavers the office has not withdrawn yet (Vincular Loyverse).
+                'stale_links': StudentProfile.objects.filter(
+                    is_active=True, loyverse_missing_since__isnull=False).count(),
                 'pending_topups': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
                 'visits_today': Booking.objects.filter(slot__date=now.date()).exclude(status='cancelled').count()
                 if hasattr(Booking, 'slot') else 0,

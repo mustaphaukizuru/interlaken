@@ -30,7 +30,7 @@ class TestSecurityHeaders:
         assert 'https://img.youtube.com' in img_src
 
     def test_admin_csp_allows_alpine_but_stays_scoped(self, client):
-        resp = client.get('/admin/login/')
+        resp = client.get('/django-admin/login/')
         csp = resp.headers.get('Content-Security-Policy', '')
         assert "'unsafe-eval'" in csp          # Alpine.js (unfold)
         assert "frame-ancestors 'none'" in csp
@@ -70,3 +70,15 @@ class TestSecurityHeaders:
         assert 'Content-Security-Policy' not in resp.headers
         # Permissions-Policy is independent of the CSP toggle.
         assert 'Permissions-Policy' in resp.headers
+
+    def test_react_admin_console_gets_the_public_policy(self, client):
+        # The React admin console owns /admin/*; it must get the public policy
+        # (Google profile pictures allowed), never the Django-admin one. With
+        # both mounted on 'admin/' a refresh on /admin/cafeteria used to bounce
+        # to the Django login and, when it rendered, block the avatar.
+        for path in ('/admin', '/admin/cafeteria', '/admin/alumnos/'):
+            resp = client.get(path)
+            csp = resp.headers.get('Content-Security-Policy', '')
+            assert resp.status_code == 200, path
+            assert 'lh3.googleusercontent.com' in csp, path
+            assert 'unsafe-eval' not in csp, path

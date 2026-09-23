@@ -45,11 +45,12 @@ class Command(BaseCommand):
                            last_low_balance_alert_at__isnull=False)
                    .update(last_low_balance_alert_at=None))
 
-        # Only rows at/below their own threshold — the same SQL filter
-        # AdminLowBalanceView uses — instead of scanning every balance.
-        balances = (CafeteriaBalance.objects
-                    .select_related('student__user')
-                    .filter(balance__lte=F('low_balance_threshold')))
+        # Only wallets at/below their threshold AND in use (a movement in the
+        # last 30 days), the same rule as the dashboard and the Saldo bajo tab:
+        # a child who never buys at the cafetería must not get a weekly nag
+        # about an empty wallet, and a leaver's family must not get one at all.
+        from apps.cafeteria.services import low_balance_queryset
+        balances = low_balance_queryset().select_related('student__user')
         for cb in balances:
             recently_alerted = (
                 cb.last_low_balance_alert_at is not None

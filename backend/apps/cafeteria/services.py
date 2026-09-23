@@ -1704,6 +1704,31 @@ def reverse_phantom_topup(topup_tx, *, reason: str, admin=None):
     return adj
 
 
+# A wallet counts as "low" only while it is in use. 148 of 386 wallets sit at
+# $0 because those children never buy at the cafetería; counting them made the
+# dashboard say "235 saldos bajos" when 25 families actually needed a nudge,
+# and the weekly alert would have nagged 144 families about a wallet they do
+# not use. Leavers (customer gone from Loyverse) are excluded too.
+LOW_BALANCE_ACTIVITY_DAYS = 30
+
+
+def low_balance_queryset():
+    """Active students' wallets at/below their threshold WITH a ledger movement
+    in the last ``LOW_BALANCE_ACTIVITY_DAYS`` days. Shared by the dashboard
+    counter, the Saldo bajo tab and the weekly alert so all three agree."""
+    from django.db.models import Exists, F, OuterRef
+
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+
+    since = timezone.now() - timedelta(days=LOW_BALANCE_ACTIVITY_DAYS)
+    recent = CafeteriaTransaction.objects.filter(student=OuterRef('student'), date__gte=since)
+    return (CafeteriaBalance.objects
+            .filter(student__is_active=True,
+                    student__loyverse_missing_since__isnull=True,
+                    balance__lte=F('low_balance_threshold'))
+            .annotate(_in_use=Exists(recent)).filter(_in_use=True))
+
+
 def loyverse_reachable() -> tuple[bool, str]:
     """Cheapest possible liveness probe: one customer, one page.
 
