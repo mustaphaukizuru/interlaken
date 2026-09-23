@@ -154,7 +154,10 @@ export function buildChecks(h: SyncHealth): Check[] {
       label: rosterIssues.length === 0 ? 'Plantel alineado con Loyverse' : rosterLabel.join(', '),
       detail: rosterIssues.length === 0
         ? 'Ningún alumno sin cliente en Loyverse ni cliente de alumno sin vincular.'
-          + (parked > 0 ? ` ${parked} recibo(s) sin alumno (tarjetas de personal o de prueba).` : '')
+          + (audit?.profiles_total
+            ? ` ${audit.profiles_total} tarjeta(s) sincronizadas, ${audit.profiles_staff ?? 0} de personal.`
+            : '')
+          + (parked > 0 ? ` ${parked} recibo(s) de tarjetas sin alumno.` : '')
         : 'Los enlaces obsoletos son alumnos cuyo cliente ya no existe en Loyverse (bajas): '
           + 'Alumnos → Vincular Loyverse → Dar de baja. Los alumnos nuevos se vinculan solos cada '
           + 'madrugada y sus recibos pendientes se aplican en ese momento.',

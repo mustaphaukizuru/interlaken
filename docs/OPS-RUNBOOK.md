@@ -149,3 +149,13 @@ revertirlas con rastro:
 Cada reverso queda como Ajuste en el historial del alumno, con motivo, y solo
 se aplica si el alumno todavía carga esa diferencia contra el saldo vivo de
 Loyverse.
+
+**Todas las tarjetas de Loyverse, no solo alumnos.** Cafetería → pestaña
+Clientes Loyverse lista cada tarjeta que existe en la tienda: alumnos (con
+enlace a su consola), personal (nombres `ZP-…`, correos de la escuela como
+`direccion@` o `colegio@`), registros de prueba y cualquier otra. Cada fila
+muestra el saldo vivo en Loyverse, visitas, última visita y si Loyverse ya la
+eliminó. Las compras al monedero de una tarjeta sin alumno se guardan y se ven
+con el botón de compras de esa fila. Se refresca en cada pasada del espejo
+(5 minutos) y con cada aviso de Loyverse; nada de lo que existe en Loyverse
+queda invisible en la app.

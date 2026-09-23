@@ -32,6 +32,7 @@ from .serializers import (
     CafeteriaBalanceSerializer,
     CafeteriaTransactionSerializer,
     LowBalanceThresholdSerializer,
+    LoyverseCustomerSerializer,
     LoyverseProfileSerializer,
     RefundInputSerializer,
     SpendLimitsSerializer,
@@ -604,6 +605,13 @@ class LoyverseWebhookView(APIView):
             except Exception:  # noqa: BLE001
                 logger.exception('Loyverse customers.update processing failed')
                 return Response({'error': 'processing_error'}, status=500)
+            # Keep the customer snapshots (staff cards included) current in
+            # real time too. Partial list: never marks anyone missing.
+            try:
+                from apps.cafeteria.loyverse_profile import refresh_all_profiles
+                refresh_all_profiles(customers, mark_missing=False)
+            except Exception:  # noqa: BLE001 — reference data, never blocks the credit
+                logger.exception('Loyverse profile refresh from webhook failed')
             logger.info('Loyverse webhook %s: %d customer(s), %d credited ($%s)',
                         event, len(customers), result['credited'], result['total'])
             return Response({'ok': True, 'event': 'customers.update',
@@ -1316,6 +1324,88 @@ class AdminLowBalanceView(APIView):
         return Response({
             'count': balances.count(),
             'results': CafeteriaBalanceSerializer(balances[start:start + LOW_BALANCE_PAGE], many=True).data,
+        })
+
+
+CUSTOMERS_PAGE = 50
+
+
+class AdminLoyverseCustomersView(APIView):
+    """GET /api/v1/cafeteria/admin/customers/?kind=&q=&page=
+
+    The whole Loyverse store, one row per customer card: pupils (linked to
+    their student), staff meal cards, the school's own cards and test records.
+    Until 2026-09-23 anything that was not a pupil was invisible to the app;
+    now every card is synced on each full pass and listed here with its live
+    points, visits and whether Loyverse still has it. ``kind`` filters
+    (``student|staff|test|other``, or ``nonstudent`` for everything but
+    pupils); ``q`` matches name, code or email.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Count, Q
+
+        from apps.cafeteria.models import LoyverseProfile, UnmatchedReceipt
+
+        qs = LoyverseProfile.objects.select_related('student__user')
+        kind = (request.query_params.get('kind') or '').strip()
+        if kind == 'nonstudent':
+            qs = qs.exclude(kind=LoyverseProfile.Kind.STUDENT)
+        elif kind in LoyverseProfile.Kind.values:
+            qs = qs.filter(kind=kind)
+        q = (request.query_params.get('q') or '').strip()
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(customer_code__icontains=q)
+                           | Q(email__icontains=q))
+        qs = qs.order_by('kind', '-last_visit', 'name')
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        start = (page - 1) * CUSTOMERS_PAGE
+        rows = list(qs[start:start + CUSTOMERS_PAGE])
+        counts = dict(
+            UnmatchedReceipt.objects.filter(customer_id__in=[r.loyverse_id for r in rows])
+            .values_list('customer_id').annotate(n=Count('id')).values_list('customer_id', 'n'))
+        summary = {k: 0 for k in LoyverseProfile.Kind.values}
+        summary.update(dict(LoyverseProfile.objects.values_list('kind')
+                            .annotate(n=Count('id')).values_list('kind', 'n')))
+        summary['missing'] = LoyverseProfile.objects.filter(missing_since__isnull=False).count()
+        return Response({
+            'count': qs.count(),
+            'summary': summary,
+            'results': LoyverseCustomerSerializer(
+                rows, many=True, context={'receipt_counts': counts}).data,
+        })
+
+
+class AdminLoyverseCustomerReceiptsView(APIView):
+    """GET /api/v1/cafeteria/admin/customers/<loyverse_id>/receipts/
+
+    Wallet receipts of a card that has no student (staff meals): the parked
+    ``UnmatchedReceipt`` rows, newest first, with a line-item summary. For a
+    pupil's card the ledger lives on the student console instead.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request, loyverse_id):
+        from apps.cafeteria.loyverse_profile import receipt_lines
+        from apps.cafeteria.models import LoyverseProfile, UnmatchedReceipt
+
+        profile = get_object_or_404(LoyverseProfile, loyverse_id=loyverse_id)
+        rows = (UnmatchedReceipt.objects.filter(customer_id=loyverse_id)
+                .order_by('-receipt_date', '-id')[:200])
+        return Response({
+            'customer': LoyverseCustomerSerializer(profile).data,
+            'results': [{
+                'receipt_number': r.receipt_number,
+                'receipt_date': r.receipt_date,
+                'points': str(r.points),
+                'items': receipt_lines(r.payload or {}),
+                'receipt_type': (r.payload or {}).get('receipt_type') or 'SALE',
+                'resolved': r.resolved_at is not None,
+            } for r in rows],
         })
 
 

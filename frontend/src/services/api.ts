@@ -381,8 +381,58 @@ export interface SyncHealth {
   unmatched_receipts: number;
 }
 
+export type LoyverseCustomerKind = 'student' | 'staff' | 'test' | 'other';
+
+export interface LoyverseCustomer {
+  loyverse_id: string;
+  kind: LoyverseCustomerKind;
+  kind_display: string;
+  customer_code: string;
+  name: string;
+  email: string;
+  phone_number: string;
+  address_code: string;
+  note: string;
+  first_visit: string | null;
+  last_visit: string | null;
+  total_visits: number;
+  total_spent: string;
+  total_points: string;
+  loyverse_created_at: string | null;
+  loyverse_updated_at: string | null;
+  synced_at: string;
+  /** Set when a full sync no longer found this card in Loyverse. */
+  missing_since: string | null;
+  student: { id: number; name: string; grade: string; group: string; student_id: string } | null;
+  /** Parked wallet receipts for a card with no student. */
+  receipts: number;
+}
+
+export interface LoyverseCustomerPage {
+  count: number;
+  summary: Record<LoyverseCustomerKind | 'missing', number>;
+  results: LoyverseCustomer[];
+}
+
+export interface LoyverseCustomerReceipts {
+  customer: LoyverseCustomer;
+  results: {
+    receipt_number: string;
+    receipt_date: string | null;
+    points: string;
+    items: string;
+    receipt_type: string;
+    resolved: boolean;
+  }[];
+}
+
 export interface WalletAudit {
   at: string;
+  profiles_total?: number;
+  profiles_staff?: number;
+  profiles_test?: number;
+  profiles_other?: number;
+  profiles_missing?: number;
   compared: number;
   in_sync: number;
   credited: number;
@@ -568,6 +618,13 @@ export const cafeteriaApi = {
 
   getLowBalance: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/low-balance/', { params }),
+
+  /** The whole Loyverse store, one row per customer card (pupils, staff, tests). */
+  getLoyverseCustomers: (params?: { page?: number; kind?: string; q?: string }) =>
+    api.get<LoyverseCustomerPage>('/cafeteria/admin/customers/', { params }),
+  /** Wallet receipts of a card that has no student (staff meals). */
+  getLoyverseCustomerReceipts: (loyverseId: string) =>
+    api.get<LoyverseCustomerReceipts>(`/cafeteria/admin/customers/${encodeURIComponent(loyverseId)}/receipts/`),
 
   exportStudent: (studentId: number, fmt: 'csv' | 'pdf') =>
     api.get(`/cafeteria/admin/export/student/${studentId}/`, {
