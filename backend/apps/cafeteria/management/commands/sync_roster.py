@@ -22,14 +22,7 @@ different id) is skipped and listed, exactly as the manual flow does.
 from django.core.management.base import BaseCommand
 
 from apps.accounts.models import StudentProfile
-from apps.cafeteria.services import (
-    LoyverseError,
-    get_all_customers,
-    import_students_from_loyverse,
-    link_students_to_loyverse,
-    mirror_pos_topups,
-    replay_unmatched_receipts,
-)
+from apps.cafeteria import services
 
 
 class Command(BaseCommand):
@@ -42,14 +35,14 @@ class Command(BaseCommand):
     def handle(self, *args, **o):
         commit = not o['dry_run']
         try:
-            customers = get_all_customers()
-        except LoyverseError as e:
+            customers = services.get_all_customers()
+        except services.LoyverseError as e:
             self.stderr.write(self.style.ERROR(f'Loyverse unreachable: {e}'))
             return
 
-        link = link_students_to_loyverse(customers, commit=commit)
-        imp = import_students_from_loyverse(customers, commit=commit, seed_balances=True)
-        replay = replay_unmatched_receipts() if commit else {'replayed': 0, 'absorbed': 0,
+        link = services.link_students_to_loyverse(customers, commit=commit)
+        imp = services.import_students_from_loyverse(customers, commit=commit, seed_balances=True)
+        replay = services.replay_unmatched_receipts() if commit else {'replayed': 0, 'absorbed': 0,
                                                              'created': 0, 'pending': None}
         # A full-roster mirror pass flags stale links and refreshes the audit
         # numbers the console shows, using the customer list already fetched.
@@ -57,7 +50,7 @@ class Command(BaseCommand):
         if commit:
             # The mirror needs the full list to audit; passing ``customers``
             # would mark it partial, so let it fetch (one call, two pages).
-            audit = mirror_pos_topups().get('audit', {})
+            audit = services.mirror_pos_topups().get('audit', {})
 
         stale = StudentProfile.objects.filter(is_active=True,
                                               loyverse_missing_since__isnull=False)

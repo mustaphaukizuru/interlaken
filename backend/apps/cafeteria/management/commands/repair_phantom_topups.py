@@ -24,14 +24,8 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 
+from apps.cafeteria import services
 from apps.cafeteria.models import CafeteriaBalance
-from apps.cafeteria.services import (
-    LoyverseError,
-    find_phantom_topups,
-    get_all_customers,
-    get_balance_from_customer,
-    reverse_phantom_topup,
-)
 
 REASON = ('Recarga registrada por error: Loyverse informó el saldo previo a una compra '
           'de {amount} ya descontada (recibo {receipt}).')
@@ -47,18 +41,24 @@ class Command(BaseCommand):
     def handle(self, *args, **o):
         commit = o['commit']
         try:
-            points = {c.get('id'): get_balance_from_customer(c) for c in get_all_customers()}
-        except LoyverseError as e:
+            points = {c.get('id'): services.get_balance_from_customer(c)
+                      for c in services.get_all_customers()}
+        except services.LoyverseError as e:
             self.stderr.write(self.style.ERROR(f'Loyverse unreachable, nothing checked: {e}'))
             return
 
-        pairs = find_phantom_topups()
+        pairs = services.find_phantom_topups()
         if not pairs:
             self.stdout.write(self.style.SUCCESS('No phantom POS credits found.'))
             return
 
-        # Walk per student so several phantoms on one wallet are judged against
-        # the drift that remains after the earlier ones are reversed.
+        # Walk per student, NEWEST phantom first. A phantom gets absorbed only
+        # by a cash recarga that comes AFTER it (the mirror credits less than
+        # the family paid), so when a wallet carries an old absorbed phantom
+        # and a fresh live one, the drift belongs to the fresh one. Oldest-
+        # first would spend the drift on the absorbed row and leave the real
+        # one standing (student 10135 on 2026-09-23: 6 reversed, 15 left).
+        pairs.sort(key=lambda p: (p[0].student_id, -p[0].id))
         local = {}
         reversed_n = absorbed = no_remote = 0
         reversed_total = Decimal('0')
@@ -84,7 +84,7 @@ class Command(BaseCommand):
                 continue
             action = 'REVERTIDA' if commit else 'se revertiría'
             if commit:
-                adj = reverse_phantom_topup(
+                adj = services.reverse_phantom_topup(
                     topup, reason=REASON.format(amount=f'${amount:.2f}',
                                                 receipt=purchase.loyverse_receipt_id))
                 if adj is None:

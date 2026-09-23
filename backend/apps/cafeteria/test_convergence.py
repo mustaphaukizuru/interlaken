@@ -365,6 +365,28 @@ class TestPhantomRepair:
         assert BalanceAdjustment.objects.filter(student=drifting).count() == 1
         assert not BalanceAdjustment.objects.filter(student=absorbed).exists()
 
+    def test_an_old_absorbed_phantom_does_not_steal_the_drift_from_a_live_one(self):
+        """Student 10135, 2026-09-23: phantom 6 on the 17th (absorbed by a cash
+        recarga on the 22nd), phantom 15 minutes after that recarga (live).
+        Drift is 15. The 15 must be reversed, the 6 left alone."""
+        s = StudentProfileFactory(loyverse_id='m')
+        seeded(s, 102)
+        old = pos_topup(s, 6, ago=timedelta(days=5))
+        purchase(s, 6, ago=timedelta(days=5, seconds=3))
+        pos_topup(s, 94, ago=timedelta(minutes=30))        # real recarga, absorbed the 6
+        purchase(s, 15, ago=timedelta(minutes=20))
+        live = pos_topup(s, 15, ago=timedelta(minutes=20) - timedelta(seconds=2))
+
+        with patch('apps.cafeteria.services.get_all_customers', return_value=[customer('m', 87)]):
+            out = StringIO()
+            call_command('repair_phantom_topups', '--commit', stdout=out)
+
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('87'), out.getvalue()
+        reversed_ids = set(BalanceAdjustment.objects.filter(student=s)
+                           .values_list('source_transaction_id', flat=True))
+        assert reversed_ids == {live.id}
+        assert old.id not in reversed_ids
+
 
 # ── The daily alarm and the console ──────────────────────────────────────────
 
