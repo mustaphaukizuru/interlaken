@@ -92,6 +92,11 @@ class StudentProfile(models.Model):
     grade         = models.CharField(max_length=20)                     # e.g. "3° Primaria"
     group         = models.CharField(max_length=5, blank=True)          # e.g. "A"
     loyverse_id   = models.CharField(max_length=100, blank=True)        # Loyverse customer ID
+    # Set by the roster audit when ``loyverse_id`` no longer exists in Loyverse
+    # (the school deletes the customer when a student leaves, and nothing else
+    # tells the app). Cleared the moment the customer is seen again. A linked
+    # student whose customer is gone would otherwise fail every sync silently.
+    loyverse_missing_since = models.DateTimeField(null=True, blank=True)
     registration  = models.OneToOneField('admissions.Registration', null=True, blank=True, on_delete=models.SET_NULL,
                                          related_name='student_profile')  # origin when converted (P4-1)
     parents       = models.ManyToManyField(User, related_name='children', blank=True,

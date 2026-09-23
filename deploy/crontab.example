@@ -36,6 +36,19 @@ CRON_TZ=America/Mexico_City
 # enabled (the default) it is a harmless no-op.
 0 18 * * 1-5 cd $COMPOSE && flock -n /tmp/interlaken-digest.lock docker compose exec -T app python manage.py send_spending_digest >> /var/log/interlaken/daily.log 2>&1
 
+# ── Nightly convergence, 05:40 and 06:05 local ──────────────────────────────
+# 05:40: re-read the last 7 days of receipts. The 5-minute poll only looks a
+# few minutes behind its cursor, so a receipt that reached Loyverse late (a
+# tablet syncing after a day offline) or an edited one could otherwise hide
+# behind it forever. Idempotent: everything already recorded is a no-op.
+40 5 * * * cd $COMPOSE && flock -n /tmp/interlaken-loyverse.lock docker compose exec -T app python manage.py sync_purchases --since-days 7 >> /var/log/interlaken/loyverse.log 2>&1
+# 06:05: link/import pupils the cashier enrolled at the POS, replay their
+# parked receipts, flag links whose customer is gone. Never deletes anything.
+5 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-loyverse.lock docker compose exec -T app python manage.py sync_roster >> /var/log/interlaken/loyverse.log 2>&1
+# 07:35: email admins if any wallet, link or receipt is out of step, before
+# the cafetería opens so nothing in flight is mistaken for drift.
+35 7 * * * cd $COMPOSE && docker compose exec -T app python manage.py check_wallet_drift >> /var/log/interlaken/loyverse.log 2>&1
+
 # ── Alert if the cafeteria sync stops running ───────────────────────────────
 # Without this a broken sync is invisible for days: the site looks fine and
 # balances just quietly stop moving. If the log has not been touched in 30

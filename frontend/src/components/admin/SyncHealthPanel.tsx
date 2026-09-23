@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, PlugZap, Timer, Zap, DatabaseBackup } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, PlugZap, Scale, Timer, Users, Zap, DatabaseBackup } from 'lucide-react';
 import { cafeteriaApi, type SyncHealth } from '@/services/api';
 
 type Tone = 'ok' | 'warn' | 'bad';
@@ -57,6 +57,19 @@ export function buildChecks(h: SyncHealth): Check[] {
   const hookStale = hookHours === null || hookHours > WEBHOOK_STALE_HOURS;
   const backupHours = hoursSince(h.backup?.ok ? h.backup.at : null);
   const backupStale = backupHours === null || backupHours > BACKUP_STALE_HOURS;
+  const audit = h.wallet_audit;
+  const drifting = audit?.drifting ?? 0;
+  const driftTotal = Math.abs(parseFloat(audit?.drift_total ?? '0'));
+  const stale = h.stale_links ?? 0;
+  const newKids = audit?.unlinked_students ?? 0;
+  const parked = h.unmatched_receipts ?? 0;
+  // Stale links and unlinked pupils need a person; parked receipts on their
+  // own are usually staff or test cards and only get mentioned.
+  const rosterIssues: string[] = [];
+  if (stale > 0) rosterIssues.push(`${stale} enlace(s) obsoleto(s)`);
+  if (newKids > 0) rosterIssues.push(`${newKids} alumno(s) nuevo(s) en Loyverse sin vincular`);
+  const rosterLabel = rosterIssues.length > 0 && parked > 0
+    ? [...rosterIssues, `${parked} recibo(s) sin alumno`] : rosterIssues;
 
   return [
     {
@@ -113,6 +126,38 @@ export function buildChecks(h: SyncHealth): Check[] {
           ? 'Esperado si el sondeo no corre: primero resuelva el sondeo.'
           : 'El sondeo corre pero no registra nada: probablemente el POS cobra el monedero '
             + 'de una forma que el lector de recibos no reconoce.',
+    },
+    {
+      key: 'drift',
+      icon: Scale,
+      // No audit yet is a warning (the cron has not compared the roster); drift
+      // is a warning too: the nightly re-read usually explains it, and a person
+      // only needs to act if it survives the night.
+      tone: !audit ? 'warn' : drifting === 0 ? 'ok' : 'warn',
+      label: !audit
+        ? 'Sin conciliación reciente'
+        : drifting === 0
+          ? 'Saldos conciliados con Loyverse'
+          : `${drifting} alumno(s) con saldo por encima de Loyverse`,
+      detail: !audit
+        ? 'El sondeo aún no ha comparado el plantel completo con Loyverse.'
+        : drifting === 0
+          ? `${audit.compared} alumno(s) comparados ${ago(audit.at)}`
+            + (audit.deferred > 0 ? `; ${audit.deferred} en espera por movimientos recientes.` : '.')
+          : `Diferencia total $${driftTotal.toFixed(2)} (${ago(audit.at)}). Si persiste después del `
+            + 'repaso nocturno, revise la pestaña Reconciliación.',
+    },
+    {
+      key: 'roster',
+      icon: Users,
+      tone: rosterIssues.length === 0 ? 'ok' : 'warn',
+      label: rosterIssues.length === 0 ? 'Plantel alineado con Loyverse' : rosterLabel.join(', '),
+      detail: rosterIssues.length === 0
+        ? 'Ningún alumno sin cliente en Loyverse ni cliente de alumno sin vincular.'
+          + (parked > 0 ? ` ${parked} recibo(s) sin alumno (tarjetas de personal o de prueba).` : '')
+        : 'Los enlaces obsoletos son alumnos cuyo cliente ya no existe en Loyverse (bajas): '
+          + 'Alumnos → Vincular Loyverse → Dar de baja. Los alumnos nuevos se vinculan solos cada '
+          + 'madrugada y sus recibos pendientes se aplican en ese momento.',
     },
     {
       key: 'backup',

@@ -20,6 +20,13 @@ const base: SyncHealth = {
     size: 257_355, target: 'external (supabase)', offsite: 'bucket/backups/db-x.sql.gz',
     offsite_at: new Date().toISOString(),
   },
+  wallet_audit: {
+    at: new Date().toISOString(), compared: 10, in_sync: 10, credited: 0, drifting: 0,
+    drift_total: '0', deferred: 0, unseeded: 0, stale_links: 0, unlinked_customers: 3,
+    unlinked_students: 0, unmatched_receipts: 0, unmatched_points: '0',
+  },
+  stale_links: 0,
+  unmatched_receipts: 0,
 };
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 36e5).toISOString();
@@ -85,3 +92,32 @@ describe('buildChecks — real-time and backup lights', () => {
   });
 });
 
+describe('buildChecks — convergence lights (2026-09-23 drift audit)', () => {
+  it('drift: green when the last full pass found nobody above Loyverse', () => {
+    const c = check({}, 'drift');
+    expect(c.tone).toBe('ok');
+    expect(c.detail).toMatch(/10 alumno\(s\) comparados/);
+  });
+
+  it('drift: amber with the peso total when wallets sit above Loyverse', () => {
+    const c = check({ wallet_audit: { ...base.wallet_audit!, drifting: 27, drift_total: '-623.00' } }, 'drift');
+    expect(c.tone).toBe('warn');
+    expect(c.label).toMatch(/27 alumno/);
+    expect(c.detail).toMatch(/\$623\.00/);
+  });
+
+  it('drift: amber, not silent, before the cron has ever compared the roster', () => {
+    expect(check({ wallet_audit: null }, 'drift').tone).toBe('warn');
+  });
+
+  it('roster: names stale links, new pupils and parked receipts, and points at Dar de baja', () => {
+    expect(check({}, 'roster').tone).toBe('ok');
+    const c = check({ stale_links: 36, unmatched_receipts: 4,
+                      wallet_audit: { ...base.wallet_audit!, unlinked_students: 2 } }, 'roster');
+    expect(c.tone).toBe('warn');
+    expect(c.label).toMatch(/36 enlace/);
+    expect(c.label).toMatch(/2 alumno\(s\) nuevo/);
+    expect(c.label).toMatch(/4 recibo/);
+    expect(c.detail).toMatch(/Dar de baja/);
+  });
+});

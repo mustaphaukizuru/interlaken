@@ -20,6 +20,10 @@ class CafeteriaBalance(models.Model):
     balance              = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     low_balance_threshold= models.DecimalField(max_digits=8, decimal_places=2, default=50)
     last_synced          = models.DateTimeField(null=True, blank=True)
+    # When the opening balance was copied from Loyverse points. Those points
+    # already net out every receipt before this instant, so a parked receipt
+    # older than it must never be replayed into the ledger (double debit).
+    seeded_at            = models.DateTimeField(null=True, blank=True)
     # When the last low-balance alert was sent, so the daily cron doesn't spam.
     # Cleared once the balance recovers above the threshold (see low_balance_alerts).
     last_low_balance_alert_at = models.DateTimeField(null=True, blank=True)
@@ -66,6 +70,11 @@ class CafeteriaTransaction(models.Model):
     items               = models.JSONField(default=list, blank=True)
     # Running balance snapshot right after this transaction was applied.
     balance_after       = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # When OUR ledger wrote the row. ``date`` is the POS clock (a receipt keeps
+    # its sale time even when the tablet syncs it hours later), so it cannot
+    # answer "did anything just land for this student?", which is exactly the
+    # question the POS top-up mirror must ask before trusting a points delta.
+    recorded_at         = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         verbose_name = 'Transacción de Cafetería'
@@ -74,6 +83,7 @@ class CafeteriaTransaction(models.Model):
         indexes = [
             models.Index(fields=['student', '-date']),
             models.Index(fields=['transaction_type', 'date']),
+            models.Index(fields=['student', '-recorded_at']),
         ]
 
     def __str__(self):
@@ -238,6 +248,37 @@ class LoyverseProfile(models.Model):
 
     def __str__(self):
         return f'{self.name or self.customer_code} — {self.total_visits} visitas'
+
+
+class UnmatchedReceipt(models.Model):
+    """A wallet receipt whose Loyverse customer is not linked to any student.
+
+    Until 2026-09-23 such receipts were counted and dropped, so a pupil who
+    bought lunch before the office linked their card lost those purchases for
+    good: the roster link came later and nothing went back for them. The raw
+    receipt is kept here instead and replayed through the normal record path
+    the moment its customer is linked (``replay_unmatched_receipts``). Staff
+    and test customers also land here; they simply never resolve, and the
+    audit reports them separately from student-looking ones.
+    """
+    receipt_number = models.CharField(max_length=100, unique=True)
+    customer_id    = models.CharField(max_length=100, db_index=True)
+    receipt_date   = models.DateTimeField(null=True, blank=True)
+    points         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payload        = models.JSONField(default=dict, blank=True)
+    seen_at        = models.DateTimeField(default=timezone.now)
+    resolved_at    = models.DateTimeField(null=True, blank=True)
+    resolved_student = models.ForeignKey(
+        StudentProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='replayed_receipts')
+
+    class Meta:
+        verbose_name = 'Recibo sin alumno'
+        verbose_name_plural = 'Recibos sin alumno'
+        ordering = ['-seen_at']
+
+    def __str__(self):
+        return f'{self.receipt_number} ({self.customer_id}) ${self.points}'
 
 
 class LoyverseSyncState(models.Model):

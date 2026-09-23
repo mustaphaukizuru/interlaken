@@ -170,6 +170,20 @@ Most is reuse. Additions:
   > 1. Treat the DB as the **source of truth** for prepaid balance. `CafeteriaBalance.balance` is credited on a confirmed top-up (Prompt 10) via a `CafeteriaTransaction(type=topup)`; **no** call to Loyverse to add points.
   > 2. Keep syncing **purchases** *out* of Loyverse (`sync_purchases`, Prompt 09) — each processed receipt **debits** the local balance. Reads from Loyverse stay authoritative for *spend*; the DB stays authoritative for *credit*.
   > 3. Add a **reconciliation** report (Prompt 11 / §5 `admin/reconcile`) to flag drift between the local ledger and Loyverse. If the store later enables a Loyverse plan/flow that supports crediting (e.g. a redemption/store-credit API), revisit crediting Loyverse directly.
+
+  > ### Convergence rules (2026-09-23 audit, after the POS-mirror went live)
+  >
+  > **What the audit found.** 27 students sat above Loyverse by $623 in total, all of it phantom "recargas en caja": Loyverse's `customers.update` webhook delivers a points snapshot taken *before* a sale, a few seconds *after* the receipt event has already debited the wallet, so for a moment Loyverse reads higher than local by exactly the purchase and the mirror credited the gap. 36 active students pointed at customers Loyverse no longer had (leavers) and failed every sync silently. Receipts for unlinked customers were counted and dropped. The 44 unlinked Loyverse customers were all staff and test cards, not pupils.
+  >
+  > **Rules the pipeline now enforces:**
+  > 1. **Settle before crediting.** A positive remote-minus-local delta is credited only when the student's ledger has had no row for `POS_MIRROR_SETTLE_SECONDS` (180) and the delta does not equal a purchase recorded in the last `POS_MIRROR_ECHO_MINUTES` (15). Otherwise it is *deferred* to the next pass. A genuine cash recarga inside the window waits one tick; it is never lost.
+  > 2. **Every compared student is stamped.** `last_synced` is written on every full pass, so "386 of 386 synced today" is a real statement.
+  > 3. **Stale links are flagged, never deleted.** `StudentProfile.loyverse_missing_since` is set when the customer is gone from a full list and cleared when it reappears. The office withdraws them through Vincular Loyverse → Dar de baja.
+  > 4. **Unmatched wallet receipts are parked** (`UnmatchedReceipt`) and replayed through the normal record path when their customer gets linked, but only receipts newer than the student's `seeded_at`; older ones are already netted into the opening balance and are marked absorbed. Replays are silent.
+  > 5. **Nightly window.** `sync_purchases --since-days 7` re-reads a week of receipts at 05:40; the unique receipt id makes it a no-op for everything already recorded.
+  > 6. **Roster self-heals daily** (`sync_roster`, 06:05): exact-match link, import of `ci<digits>@` customers, replay, audit.
+  > 7. **A person is told.** `check_wallet_drift` (07:35) emails admins when anyone drifts, any link is stale, a pupil is unlinked, or receipts are parked; the console's sync panel shows the same numbers from `OpsStatus['wallet_audit']`.
+  > 8. **History is repaired with a paper trail.** `repair_phantom_topups --commit` reverses an echo credit with an `ADJUSTMENT` row and a `BalanceAdjustment` pointing at it, and only when the student still carries that drift against the live Loyverse balance.
   >
   > **Consequence for the roadmap.** Prompt 08 (this foundation) proceeds. **Prompt 10 (top-ups) must NOT wire `add_points_to_customer` into the payment-success path** — credit the local ledger instead. `add_points_to_customer()` is retained (refactored, atomic/idempotent) only as a best-effort no-op-safe helper for the day a write path exists; it is **not** on the money-in critical path.
 - **R2 — Non-atomic top-up race** (`services.py:118-129`): `add_points_to_customer` does read-modify-write of the total; concurrent purchase + top-up can clobber. Wrap in `select_for_update`/idempotency and prefer a delta-based API if Loyverse offers one.

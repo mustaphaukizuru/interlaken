@@ -909,6 +909,9 @@ class AdminSyncAllView(APIView):
                 'detail': 'Sincronización completada.',
                 'pos_topups_credited': pos.get('credited', 0),
                 'pos_topups_total': str(pos.get('total', 0)),
+                # Held back because that wallet moved seconds ago (a stale
+                # Loyverse snapshot would otherwise be credited as a recarga).
+                'pos_topups_deferred': pos.get('deferred', 0),
                 'pos_topups_error': pos_error,
                 'balances_ok': balances.get('synced', 0),
                 'balances_failed': balances.get('failed', 0),

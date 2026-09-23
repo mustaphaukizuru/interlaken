@@ -373,6 +373,32 @@ export interface SyncHealth {
     at: string; ok: boolean; path: string; size: number; target: string;
     offsite: string | null; offsite_at: string | null;
   } | null;
+  /** Roster-wide picture from the last full POS-mirror pass (cron / Sincronizar todos). */
+  wallet_audit: WalletAudit | null;
+  /** Active students whose Loyverse customer no longer exists (leavers to withdraw). */
+  stale_links: number;
+  /** Wallet receipts parked because their customer is linked to no student. */
+  unmatched_receipts: number;
+}
+
+export interface WalletAudit {
+  at: string;
+  compared: number;
+  in_sync: number;
+  credited: number;
+  /** Students whose local balance sits ABOVE Loyverse (a purchase we have not seen). */
+  drifting: number;
+  /** Signed sum of those gaps, as a decimal string (negative = local above). */
+  drift_total: string;
+  /** Deltas held back because that wallet moved seconds ago. */
+  deferred: number;
+  unseeded: number;
+  stale_links: number;
+  unlinked_customers: number;
+  /** Unlinked customers that look like pupils (ci<digits>@ email). */
+  unlinked_students: number;
+  unmatched_receipts: number;
+  unmatched_points: string;
 }
 
 export const cafeteriaApi = {
@@ -501,6 +527,7 @@ export const cafeteriaApi = {
       /** Cash recargas loaded on the POS tablet and now credited locally. */
       pos_topups_credited?: number;
       pos_topups_total?: string;
+      pos_topups_deferred?: number;
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
