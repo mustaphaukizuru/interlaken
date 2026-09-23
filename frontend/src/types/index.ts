@@ -103,6 +103,8 @@ export interface CafeteriaTransaction {
   description: string;
   items: CafeteriaTransactionItem[];
   balance_after: string | null;
+  /** False = history only: the receipt predates the opening balance, which already included it. */
+  applied?: boolean;
   date: string;
   loyverse_receipt_id: string;
 }

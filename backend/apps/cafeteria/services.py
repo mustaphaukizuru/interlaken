@@ -294,12 +294,20 @@ def _parse_receipt(receipt: dict):
     return amount, items, summary, is_refund, date
 
 
-def _record_receipt(student, receipt: dict):
+def _record_receipt(student, receipt: dict, *, apply=None):
     """Idempotently record one receipt against ``student``.
 
     Returns the newly-created ``CafeteriaTransaction`` (with balance debited), or
     ``None`` if the receipt had no usable id or was already processed — the unique
     ``loyverse_receipt_id`` makes re-runs a no-op.
+
+    ``apply`` decides whether the row moves the balance. ``None`` (the default)
+    applies the seed rule: a receipt dated on or before the wallet's
+    ``seeded_at`` is already netted into the opening balance copied from
+    Loyverse, so it is stored as history (``applied=False``, no debit, no
+    ``balance_after``). Without this the nightly 7-day re-read would charge a
+    pupil imported mid-week twice for last Monday's lunch. ``False`` forces
+    history-only (the one-off backfill); ``True`` forces a debit.
     """
     from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
 
@@ -313,6 +321,16 @@ def _record_receipt(student, receipt: dict):
 
     with transaction.atomic():
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+        if apply is None:
+            # The seed copied the points Loyverse's SERVER held at that moment,
+            # which include every receipt ingested by then: compare on the
+            # server's created_at when present, not the tablet's sale time
+            # (a tablet syncing after a day offline ingests old-dated sales
+            # the seed could not have known about; those must still debit).
+            raw_ingested = receipt.get('created_at')
+            ingested = (parse_datetime(raw_ingested) if raw_ingested else None) or date
+            apply = not (cb.seeded_at is not None and ingested is not None
+                         and ingested <= cb.seeded_at)
         tx, created = CafeteriaTransaction.objects.get_or_create(
             loyverse_receipt_id=receipt_id,
             defaults={
@@ -322,10 +340,13 @@ def _record_receipt(student, receipt: dict):
                 'description': summary,
                 'items': items,
                 'date': date or timezone.now(),
+                'applied': apply,
             },
         )
         if not created:
             return None
+        if not apply:
+            return tx
 
         # Purchases debit the local ledger; refunds credit it (spec R1: DB is the
         # source of truth, Loyverse receipts are authoritative for spend).
@@ -576,6 +597,9 @@ def replay_unmatched_receipts(loyverse_ids=None) -> dict:
             absorbed.append(r)
 
     result = record_receipts([r.payload for r in to_replay], students, notify=False)
+    # Absorbed receipts are still the family's history: store them without
+    # touching the balance the seed already settled.
+    record_receipts([r.payload for r in absorbed], students, notify=False, apply=False)
     for r in rows:
         r.resolved_at = now
         r.resolved_student = students[r.customer_id]
@@ -586,7 +610,7 @@ def replay_unmatched_receipts(loyverse_ids=None) -> dict:
             'pending': UnmatchedReceipt.objects.filter(resolved_at__isnull=True).count()}
 
 
-def record_receipts(receipts, students=None, *, notify=True):
+def record_receipts(receipts, students=None, *, notify=True, apply=None):
     """Record a batch of Loyverse receipts against matched students.
 
     Shared by the ``sync_purchases`` cron and the real-time Loyverse webhook
@@ -630,11 +654,13 @@ def record_receipts(receipts, students=None, *, notify=True):
             skipped += 1
             continue
 
-        tx = _record_receipt(student, receipt)
+        tx = _record_receipt(student, receipt, apply=apply)
         if tx is None:
             continue
 
         created += 1
+        if not tx.applied:
+            continue            # history only: nothing moved, nothing to announce
         if per_purchase_notify:
             notified += _notify_purchase(tx)
 
@@ -1422,18 +1448,33 @@ POS_MIRROR_SETTLE_SECONDS = 180
 POS_MIRROR_ECHO_MINUTES = 15
 
 
-def _pos_delta_is_settled(student, delta, now) -> bool:
-    """Is a remote-minus-local delta safe to credit as a cash recarga?"""
+def _pos_delta_is_settled(student, delta, now, *, fresh=False) -> bool:
+    """Is a remote-minus-local delta safe to credit as a cash recarga?
+
+    The echo check always runs: a delta equal to one purchase, or to the sum
+    of the purchases, recorded in the last ``POS_MIRROR_ECHO_MINUTES`` is the
+    stale-snapshot signature, whatever the source. The settle window (no row
+    at all in the last ``POS_MIRROR_SETTLE_SECONDS``) only applies to values
+    that may be stale, i.e. a webhook payload; a value just read from the API
+    (``fresh=True``, the cron's list or the webhook's re-read) reflects the
+    sale already, so a genuine recarga typed seconds after a purchase lands
+    at once instead of waiting a tick.
+    """
+    from django.db.models import Sum
+
     from apps.cafeteria.models import CafeteriaTransaction
 
     rows = CafeteriaTransaction.objects.filter(student=student)
-    if rows.filter(recorded_at__gte=now - timedelta(seconds=POS_MIRROR_SETTLE_SECONDS)).exists():
+    if not fresh and rows.filter(
+            recorded_at__gte=now - timedelta(seconds=POS_MIRROR_SETTLE_SECONDS)).exists():
         return False
-    return not rows.filter(
-        transaction_type=CafeteriaTransaction.TxType.PURCHASE,
-        amount=delta,
-        recorded_at__gte=now - timedelta(minutes=POS_MIRROR_ECHO_MINUTES),
-    ).exists()
+    recent = rows.filter(transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                         applied=True,
+                         recorded_at__gte=now - timedelta(minutes=POS_MIRROR_ECHO_MINUTES))
+    if recent.filter(amount=delta).exists():
+        return False
+    total = recent.aggregate(s=Sum('amount'))['s'] or Decimal('0')
+    return total != delta
 
 
 def _record_wallet_audit(customers, result, now) -> dict:
@@ -1496,7 +1537,7 @@ def _record_wallet_audit(customers, result, now) -> dict:
     return audit
 
 
-def mirror_pos_topups(customers=None, *, notify=True) -> dict:
+def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     """Credit recargas typed directly into the Loyverse POS into the local ledger.
 
     The 2026-09-16 roster reconcile showed 69 wallets BELOW Loyverse by round
@@ -1536,6 +1577,10 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
     full_roster = customers is None
     if full_roster:
         customers = get_all_customers()
+    # A list we fetched ourselves is fresh by construction; a caller-supplied
+    # one (webhook payload) is presumed stale unless the caller re-read it.
+    if fresh is None:
+        fresh = full_roster
     points_by_id = {c.get('id'): get_balance_from_customer(c) for c in customers}
 
     pending_pos = set(
@@ -1577,7 +1622,7 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
                 drift_total += delta
                 stamp.append(student.id)
                 continue
-            if not _pos_delta_is_settled(student, delta, now):
+            if not _pos_delta_is_settled(student, delta, now, fresh=fresh):
                 deferred += 1
                 stamp.append(student.id)
                 continue

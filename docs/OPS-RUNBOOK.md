@@ -151,6 +151,13 @@ Cada reverso queda como Ajuste en el historial del alumno, con motivo, y solo
 se aplica si el alumno todavía carga esa diferencia contra el saldo vivo de
 Loyverse.
 
+**Historial completo sin cobrar dos veces.** Una compra anterior al alta del alumno (su saldo inicial ya la incluía) se muestra en el historial marcada "incluida en el saldo inicial" y no descuenta nada. Para completar historiales antiguos:
+
+    docker compose exec -T app python manage.py backfill_receipt_history --days 60            # reporte
+    docker compose exec -T app python manage.py backfill_receipt_history --days 60 --commit   # escribe
+
+Nunca toca saldos; omite a cualquier alumno cuyo saldo no coincida con Loyverse.
+
 **Todas las tarjetas de Loyverse, no solo alumnos.** Cafetería → pestaña
 Clientes Loyverse lista cada tarjeta que existe en la tienda: alumnos (con
 enlace a su consola), personal (nombres `ZP-…`, correos de la escuela como
