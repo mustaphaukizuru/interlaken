@@ -17,7 +17,7 @@ psycopg2-binary==2.9.13
 # Auth
 social-auth-app-django==6.0.1
 social-auth-core==5.1.0
-PyJWT==2.13.0
+PyJWT==2.14.0
 
 # Storage & Files
 # Pillow is reportlab's image dependency (PDF receipts), not a direct import.
@@ -26,7 +26,7 @@ Pillow==12.3.0
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
 django-storages==1.14.6
-boto3==1.43.92
+boto3==1.43.97
 
 # Web push notifications (VAPID) — inert until VAPID_* env keys are set.
 pywebpush==2.5.0
@@ -59,10 +59,10 @@ gunicorn==26.2.0
 whitenoise==6.12.0
 
 # Monitoring (no-op unless SENTRY_DSN is configured)
-sentry-sdk==2.69.1
+sentry-sdk==2.69.2
 
 # Admin skin (IK-ADMIN). 0.103.0 supports Django 5.x/6.x.
-django-unfold==0.105.0
+django-unfold==0.107.0
 
 # Dev
 pytest-django==4.14.0
