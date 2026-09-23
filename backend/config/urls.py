@@ -26,7 +26,12 @@ urlpatterns = [
     path('healthz', HealthView.as_view(), name='healthz'),
 
     # Admin
-    path('admin/', admin.site.urls),
+    # Django admin lives at /django-admin/ so it can never shadow the React
+    # admin console, which owns /admin/*: with both on 'admin/' a refresh on
+    # /admin/cafeteria hit Django's admin catch-all and bounced the user to
+    # /admin/login/, and those pages were served the strict admin CSP that
+    # blocks Google profile pictures.
+    path('django-admin/', admin.site.urls),
 
     # API schema + docs (staff only, via admin session)
     path('api/schema/', SpectacularAPIView.as_view(**_docs_kwargs), name='schema'),

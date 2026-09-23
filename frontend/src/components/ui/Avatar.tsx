@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { User } from '@/store/authStore';
 
 type AvatarUser = Pick<User, 'first_name' | 'last_name' | 'avatar'>;
@@ -23,7 +24,11 @@ interface AvatarProps {
  */
 export function Avatar({ user, size = 64, rounded = 'rounded-full', className = '' }: AvatarProps) {
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
-  if (user?.avatar) {
+  // A photo URL that fails to load (Google picture blocked by the content
+  // security policy, expired link, offline) must fall back to initials, not
+  // to the browser's broken-image glyph in the header of every page.
+  const [failed, setFailed] = useState<string | null>(null);
+  if (user?.avatar && failed !== user.avatar) {
     return (
       <img
         src={user.avatar}
@@ -32,6 +37,8 @@ export function Avatar({ user, size = 64, rounded = 'rounded-full', className = 
         height={size}
         loading="lazy"
         decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(user.avatar)}
         className={`${rounded} flex-shrink-0 bg-cream-2 object-cover ${className}`}
         style={{ width: size, height: size }}
       />

@@ -283,6 +283,8 @@ export interface DashboardData {
   total_revenue?: string;
   cafeteria_total_balance?: string;
   low_balance_count?: number;
+  /** Active students whose Loyverse customer is gone (leavers to withdraw). */
+  stale_links?: number;
   pending_topups?: number;
   visits_today?: number;
   open_password_requests?: number;

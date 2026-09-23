@@ -84,8 +84,10 @@ export default defineConfig(({ command }) => ({
         cleanupOutdatedCaches: true,
         // generateSW's default navigateFallback ('index.html') registers a
         // NavigationRoute AHEAD of runtimeCaching, answering EVERY navigation
-        // with the SPA shell — including /admin/ and /auth/, which broke the
-        // Django admin (SPA 404 at /admin/login/ in any SW-controlled browser).
+        // with the SPA shell — including the Django admin and /auth/, which
+        // broke them (SPA 404 at the Django login in any SW-controlled
+        // browser). The Django admin lives at /django-admin/ since 2026-09-23;
+        // /admin/* is the React console and IS the SPA shell.
         // Disable it; the 'pages' route below owns navigations and already
         // excludes the server-rendered paths + provides the offline fallback.
         navigateFallback: null,
@@ -109,7 +111,7 @@ export default defineConfig(({ command }) => ({
             // branded es-MX offline page when nothing is cached.
             urlPattern: ({ request, url }) =>
               request.mode === 'navigate' &&
-              !/^\/(api|admin|auth|static|media)\//.test(url.pathname) &&
+              !/^\/(api|django-admin|auth|static|media)\//.test(url.pathname) &&
               url.pathname !== '/healthz',
             handler: 'NetworkFirst',
             options: {

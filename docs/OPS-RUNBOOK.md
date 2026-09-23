@@ -25,6 +25,7 @@ Activación, una sola vez:
 - Monitor externo: UptimeRobot (gratis) → HTTP(s) → URL anterior, intervalo 5 min, alerta por correo a `sistemas@` y WhatsApp/SMS si lo contrata. Registre también `https://interlaken.edu.mx/` (tipo *keyword*, palabra "Interlaken") para detectar un frontend roto con backend sano.
 - Monitor interno: el cron de cafetería avisa por correo si la sincronización con Loyverse lleva 30 min sin correr (deploy/crontab.example).
 - Métricas de negocio: `/admin` muestra colas (admisiones, recargas, contraseñas, mensajes, formularios, ARCO); `/staff` la analítica.
+- El admin técnico de Django (Unfold) vive en `/django-admin/` desde el 23-09-2026. Antes compartía `/admin/` con la consola React: recargar `/admin/cafeteria` mandaba al login de Django y esas páginas recibían la política de seguridad estricta que bloquea la foto de Google del usuario.
 
 ## 3. Respaldos y simulacro de restauración
 

@@ -25,8 +25,8 @@ describe('service worker navigation routing', () => {
 
     // Django-served paths the SW must never answer with the SPA shell.
     for (const path of [
-      '/admin/login/',
-      '/admin/cafeteria/',
+      '/django-admin/login/',
+      '/django-admin/cafeteria/cafeteriabalance/',
       '/auth/google/',
       '/auth/social/complete/google-oauth2/',
       '/api/v1/accounts/me/',
@@ -43,6 +43,8 @@ describe('service worker navigation routing', () => {
       '/',
       '/login',
       '/administracion',
+      '/admin',
+      '/admin/cafeteria',
       '/portal/cafeteria/recarga/retorno',
     ]) {
       expect(excluded.test(path), `${path} should stay on the SPA route`).toBe(false);

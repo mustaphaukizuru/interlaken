@@ -486,6 +486,12 @@ class TestLowBalanceReport:
         ok = StudentProfileFactory()
         _balance(low, 20, threshold=Decimal("50"))
         _balance(ok, 200, threshold=Decimal("50"))
+        # Since 2026-09-23 a wallet is "low" only while in use: give both a
+        # recent purchase so the threshold is the only thing that differs.
+        for s in (low, ok):
+            CafeteriaTransaction.objects.create(
+                student=s, transaction_type="purchase", amount=Decimal("5"),
+                loyverse_receipt_id=f"low-{s.id}")
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(reverse("admin-low-balance"))
         assert resp.status_code == 200

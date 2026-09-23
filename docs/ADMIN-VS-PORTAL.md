@@ -2,7 +2,7 @@
 
 Two back-offices exist and they must not overlap. The rule:
 
-| | **Portal staff console** (`/admin/*`, React) | **Django admin** (`/admin/` backend, Unfold) |
+| | **Portal staff console** (`/admin/*`, React) | **Django admin** (`/django-admin/` backend, Unfold; moved off `/admin/` on 2026-09-23 so it can never shadow the console) |
 |---|---|---|
 | **Audience** | School staff (`role = admin`): secretaría, dirección, cafetería | Superusers / technical operator only |
 | **Purpose** | Day-to-day operations on people and money | System of record: auth, permissions, CMS content, legal records, raw ledgers |

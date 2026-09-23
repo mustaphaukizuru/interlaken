@@ -1311,10 +1311,12 @@ class AdminLowBalanceView(APIView):
         # Paged: at end of month most wallets sit under their threshold, so the
         # unbounded serialize returned the entire roster in one payload. The
         # admin console already sends ?page= and renders a pager.
-        # Lowest balances first, which is the outreach order anyway.
-        balances = (CafeteriaBalance.objects
+        # Lowest balances first, which is the outreach order anyway. Only
+        # wallets in use (a movement in the last 30 days) and not leavers, the
+        # same rule as the dashboard counter and the weekly alert.
+        from apps.cafeteria.services import low_balance_queryset
+        balances = (low_balance_queryset()
                     .select_related('student__user')
-                    .filter(balance__lte=models.F('low_balance_threshold'))
                     .order_by('balance', 'student_id'))
         try:
             page = max(1, int(request.query_params.get('page', 1)))
