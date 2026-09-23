@@ -27,10 +27,13 @@ class Command(BaseCommand):
                             help='Loop forever, re-polling every --interval seconds (dev/demo).')
         parser.add_argument('--interval', type=int, default=30,
                             help='Seconds between polls in --watch mode (default 30).')
+        parser.add_argument('--since-days', type=int, default=None,
+                            help='Re-read a trailing window instead of the cursor (nightly '
+                                 'catch-up for late or edited receipts; idempotent).')
 
     def handle(self, *args, **options):
         if not options['watch']:
-            self._run_once()
+            self._run_once(since_days=options['since_days'])
             return
 
         interval = max(1, options['interval'])
@@ -44,9 +47,9 @@ class Command(BaseCommand):
         except KeyboardInterrupt:
             self.stdout.write('\nStopped.')
 
-    def _run_once(self, quiet=False):
+    def _run_once(self, quiet=False, since_days=None):
         try:
-            result = sync_purchases()
+            result = sync_purchases(since_days=since_days)
         except LoyverseError as e:
             self.stderr.write(self.style.ERROR(f'sync_purchases could not reach Loyverse: {e}'))
             return

@@ -109,3 +109,43 @@ objetos de la app (Supabase Storage, compatible con S3) en cuanto existan en
 Hasta entonces la luz dice "sin copia externa". Los volcados quedan en
 `backups/` dentro del bucket; se conservan los 30 más recientes.
 
+
+## 7. Cafetería: cómo saber que los saldos coinciden con Loyverse
+
+La luz **Saldos conciliados con Loyverse** del panel de Cafetería resume la
+última pasada completa del espejo del POS (cada 5 minutos y al presionar
+Sincronizar todos): cuántos alumnos se compararon, cuántos tienen el saldo
+local por encima de Loyverse y por cuánto. La luz **Plantel alineado** dice si
+hay alumnos cuyo cliente ya no existe en Loyverse, alumnos nuevos en Loyverse
+sin vincular, o recibos del monedero sin alumno.
+
+**Qué corre solo, y cuándo (hora local):**
+
+| Hora | Comando | Qué hace |
+| --- | --- | --- |
+| cada 5 min | `sync_purchases` + `mirror_pos_topups` | compras y recargas en caja; el espejo espera 3 minutos tras cualquier movimiento antes de acreditar una diferencia |
+| 05:40 | `sync_purchases --since-days 7` | vuelve a leer una semana de recibos por si alguno llegó tarde |
+| 06:05 | `sync_roster` | vincula e importa alumnos nuevos, aplica sus recibos pendientes, marca enlaces obsoletos |
+| 07:35 | `check_wallet_drift` | correo a los administradores si algo quedó fuera de lugar |
+
+**Si la luz de saldos está en ámbar por la mañana** (antes de que abra la
+cafetería): abra la pestaña Reconciliación. Un alumno con saldo local por
+encima de Loyverse casi siempre tiene una compra en el POS que aquí no
+aparece; el repaso de las 05:40 la trae si existe. Si a mediodía sigue igual,
+use Corregir en esa fila: deja el saldo en el número de Loyverse con un ajuste
+auditado.
+
+**Enlaces obsoletos.** Son bajas: la cafetería borró el cliente y nada más se
+lo dijo a la app. Alumnos → Vincular Loyverse lista a esos alumnos con su
+saldo restante y el botón Dar de baja. Nada se borra solo.
+
+**Recargas duplicadas históricas (auditoría del 23-09-2026).** Antes de la
+regla de espera, el espejo acreditó 31 recargas fantasma. Para revisarlas y
+revertirlas con rastro:
+
+    docker compose exec -T app python manage.py repair_phantom_topups            # solo reporte
+    docker compose exec -T app python manage.py repair_phantom_topups --commit   # escribe los reversos
+
+Cada reverso queda como Ajuste en el historial del alumno, con motivo, y solo
+se aplica si el alumno todavía carga esa diferencia contra el saldo vivo de
+Loyverse.

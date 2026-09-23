@@ -512,7 +512,81 @@ def _students_by_loyverse_id(loyverse_ids=None):
     return {s.loyverse_id: s for s in qs}
 
 
-def record_receipts(receipts, students=None):
+def _keep_unmatched_receipt(receipt) -> bool:
+    """Park a wallet receipt whose Loyverse customer is linked to no student.
+
+    Only receipts that actually moved the wallet are kept (a cash sale attached
+    to an unlinked staff card is noise). Keyed by receipt number, so a webhook
+    redelivery or an overlapping poll stores it once. Returns True when parked.
+    """
+    from apps.cafeteria.models import UnmatchedReceipt
+
+    number = str(receipt.get('receipt_number') or '').strip()
+    customer_id = receipt.get('customer_id')
+    if not number or not customer_id:
+        return False
+    points = _points_spent(receipt)
+    if points == 0:
+        return False
+    raw = receipt.get('receipt_date') or receipt.get('created_at')
+    UnmatchedReceipt.objects.get_or_create(
+        receipt_number=number,
+        defaults={
+            'customer_id': customer_id,
+            'receipt_date': parse_datetime(raw) if raw else None,
+            'points': points,
+            'payload': receipt,
+        },
+    )
+    return True
+
+
+def replay_unmatched_receipts(loyverse_ids=None) -> dict:
+    """Run parked receipts through the normal record path once linked.
+
+    Called after every roster link/import. A receipt is *replayed* (debited,
+    silently: it is history, not news) only when it is newer than the
+    student's opening-balance seed; anything older is already netted into the
+    points that seed was copied from, so it is marked *absorbed* instead of
+    debited a second time. Returns ``{replayed, absorbed, created, pending}``.
+    """
+    from apps.cafeteria.models import CafeteriaBalance, UnmatchedReceipt
+
+    qs = UnmatchedReceipt.objects.filter(resolved_at__isnull=True)
+    if loyverse_ids is not None:
+        qs = qs.filter(customer_id__in=list(loyverse_ids))
+    students = _students_by_loyverse_id(set(qs.values_list('customer_id', flat=True)))
+    rows = list(qs.filter(customer_id__in=list(students)).order_by('receipt_date', 'id'))
+    if not rows:
+        return {'replayed': 0, 'absorbed': 0, 'created': 0,
+                'pending': UnmatchedReceipt.objects.filter(resolved_at__isnull=True).count()}
+
+    seeded_at = {
+        cb.student_id: cb.seeded_at
+        for cb in CafeteriaBalance.objects.filter(student__in=students.values())
+    }
+    now = timezone.now()
+    to_replay, absorbed = [], []
+    for r in rows:
+        student = students[r.customer_id]
+        seed = seeded_at.get(student.id)
+        if seed is not None and r.receipt_date is not None and r.receipt_date > seed:
+            to_replay.append(r)
+        else:
+            absorbed.append(r)
+
+    result = record_receipts([r.payload for r in to_replay], students, notify=False)
+    for r in rows:
+        r.resolved_at = now
+        r.resolved_student = students[r.customer_id]
+    UnmatchedReceipt.objects.bulk_update(rows, ['resolved_at', 'resolved_student'])
+    logger.info('replay_unmatched_receipts: %d replayed (%d new rows), %d absorbed by an opening balance',
+                len(to_replay), result['created'], len(absorbed))
+    return {'replayed': len(to_replay), 'absorbed': len(absorbed), 'created': result['created'],
+            'pending': UnmatchedReceipt.objects.filter(resolved_at__isnull=True).count()}
+
+
+def record_receipts(receipts, students=None, *, notify=True):
     """Record a batch of Loyverse receipts against matched students.
 
     Shared by the ``sync_purchases`` cron and the real-time Loyverse webhook
@@ -520,9 +594,12 @@ def record_receipts(receipts, students=None):
     ``loyverse_receipt_id`` — so a webhook delivery that overlaps the poll, or a
     webhook retry, is a no-op. Receipts with no wallet movement (pure cash/card
     sales — ``_points_spent`` == 0) are skipped entirely: no ledger row, no
-    "$0.00" notification. For every newly recorded purchase it fires the
-    per-purchase parent alert (unless digest mode is on), a low-balance alert and
-    a budget/overspend alert. Returns
+    "$0.00" notification. A wallet receipt whose customer matches no student is
+    counted as ``unmatched`` AND parked (``UnmatchedReceipt``) for replay once
+    the roster catches up, instead of being lost. For every newly recorded
+    purchase it fires the per-purchase parent alert (unless digest mode is on
+    or ``notify=False``, the replay path), a low-balance alert and a
+    budget/overspend alert. Returns
     ``{'created', 'notified', 'unmatched', 'skipped'}``.
     """
     from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
@@ -534,7 +611,7 @@ def record_receipts(receipts, students=None):
         ids = {r.get('customer_id') for r in (receipts or []) if r.get('customer_id')}
         students = _students_by_loyverse_id(ids)
     now = timezone.now()
-    per_purchase_notify = not getattr(settings, 'CAFETERIA_PURCHASE_DIGEST', False)
+    per_purchase_notify = notify and not getattr(settings, 'CAFETERIA_PURCHASE_DIGEST', False)
 
     created = notified = unmatched = skipped = 0
     for receipt in receipts or []:
@@ -542,6 +619,7 @@ def record_receipts(receipts, students=None):
         student = students.get(customer_id) if customer_id else None
         if student is None:
             unmatched += 1
+            _keep_unmatched_receipt(receipt)
             continue
 
         if _points_spent(receipt) == 0:
@@ -560,7 +638,7 @@ def record_receipts(receipts, students=None):
         if per_purchase_notify:
             notified += _notify_purchase(tx)
 
-        if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
+        if notify and tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
             cb = CafeteriaBalance.objects.get(student=student)
             notified += _maybe_low_balance_alert(cb, now)
             notified += _maybe_budget_alert(cb, now)
@@ -593,13 +671,19 @@ def _stamp_poll() -> None:
     LoyverseSyncState.objects.filter(pk=1).update(last_poll_at=timezone.now())
 
 
-def sync_purchases():
+def sync_purchases(*, since_days: int | None = None):
     """Poll Loyverse receipts → transactions + balance debit + parent alerts.
 
     Idempotent: each receipt maps to a unique ``CafeteriaTransaction`` so re-runs
     neither duplicate rows nor re-notify. Called by the ``sync_purchases`` cron
     command (spec §2.1); the near-real-time webhook shares the same record path
     (``record_receipts``). Returns a summary dict.
+
+    ``since_days`` re-reads a trailing window instead of the cursor's 5-minute
+    look-back: the nightly catch-up, so a receipt that reached Loyverse late
+    (a tablet syncing after a day offline) or an edited one can never be lost
+    behind the cursor. The unique receipt id makes the re-read a no-op for
+    everything already recorded.
     """
     from apps.cafeteria.models import LoyverseSyncState
 
@@ -619,7 +703,9 @@ def sync_purchases():
     # by the poll below. A small look-back + idempotency guard the overlap window.
     now = timezone.now()
     state = LoyverseSyncState.load()
-    if state.last_purchases_cursor:
+    if since_days:
+        since = _loyverse_ts(now - timedelta(days=int(since_days)))
+    elif state.last_purchases_cursor:
         since = _loyverse_ts(state.last_purchases_cursor - timedelta(minutes=5))
     else:
         # FIRST RUN — must NOT backfill history. The opening balance was seeded
@@ -687,8 +773,8 @@ def sync_student_balance(student_profile) -> Decimal:
         if cb.last_synced is not None:
             return cb.balance      # seeded/credited while we were fetching
         cb.balance = balance
-        cb.last_synced = timezone.now()
-        cb.save(update_fields=['balance', 'last_synced'])
+        cb.last_synced = cb.seeded_at = timezone.now()
+        cb.save(update_fields=['balance', 'last_synced', 'seeded_at'])
 
     logger.info(f'Seeded opening balance for {student_profile}: {balance}')
     return balance
@@ -1321,6 +1407,79 @@ def reconcile_balances(*, limit: int = 50, offset: int = 0):
     }
 
 
+# The POS mirror must not trust a points delta while the ledger is still moving.
+# Loyverse's ``customers.update`` fires with a PRE-SALE points snapshot a few
+# seconds after the receipt event has already debited the wallet, so for a
+# moment Loyverse reads higher than local by exactly the purchase. The
+# 2026-09-23 audit found 31 such phantom recargas ($679) across 29 students,
+# every one stamped within seconds of a same-amount purchase. A real cash
+# recarga that lands inside the window is simply credited on the next tick.
+POS_MIRROR_SETTLE_SECONDS = 180
+# Loyverse can deliver that stale snapshot later than the settle window when
+# it is slow, so a delta that exactly echoes a purchase recorded recently is
+# held back for longer. A genuine recarga of the same amount as a purchase in
+# the same quarter hour is rare and only waits, never lost.
+POS_MIRROR_ECHO_MINUTES = 15
+
+
+def _pos_delta_is_settled(student, delta, now) -> bool:
+    """Is a remote-minus-local delta safe to credit as a cash recarga?"""
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    rows = CafeteriaTransaction.objects.filter(student=student)
+    if rows.filter(recorded_at__gte=now - timedelta(seconds=POS_MIRROR_SETTLE_SECONDS)).exists():
+        return False
+    return not rows.filter(
+        transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+        amount=delta,
+        recorded_at__gte=now - timedelta(minutes=POS_MIRROR_ECHO_MINUTES),
+    ).exists()
+
+
+def _record_wallet_audit(customers, result, now) -> dict:
+    """Flag stale links, count the unlinked, and persist the roster-wide picture.
+
+    Runs only on a FULL customer list (never on a webhook's partial payload,
+    which would flag every student it did not mention). The numbers land in
+    ``OpsStatus['wallet_audit']`` so the console and the daily alert read what
+    the last mirror pass actually saw, without another Loyverse round trip.
+    """
+    from django.db.models import Sum
+
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import UnmatchedReceipt
+    from apps.core.models import OpsStatus
+
+    remote_ids = {c.get('id') for c in customers if c.get('id')}
+    linked = StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
+    stale = linked.exclude(loyverse_id__in=remote_ids)
+    stale.filter(loyverse_missing_since__isnull=True).update(loyverse_missing_since=now)
+    (linked.filter(loyverse_id__in=remote_ids, loyverse_missing_since__isnull=False)
+           .update(loyverse_missing_since=None))
+
+    linked_ids = set(linked.values_list('loyverse_id', flat=True))
+    unlinked = [c for c in customers if c.get('id') not in linked_ids]
+    pending = UnmatchedReceipt.objects.filter(resolved_at__isnull=True)
+    audit = {
+        'at': now.isoformat(),
+        'compared': (result['credited'] + result['in_sync'] + result['below']
+                     + result['deferred'] + result['skipped_pending']),
+        'in_sync': result['in_sync'],
+        'credited': result['credited'],
+        'drifting': result['below'],
+        'drift_total': str(result['drift_total']),
+        'deferred': result['deferred'],
+        'unseeded': result['unseeded'],
+        'stale_links': stale.count(),
+        'unlinked_customers': len(unlinked),
+        'unlinked_students': sum(1 for c in unlinked if _is_loyverse_student(c)),
+        'unmatched_receipts': pending.count(),
+        'unmatched_points': str(pending.aggregate(s=Sum('points'))['s'] or Decimal('0')),
+    }
+    OpsStatus.set('wallet_audit', audit)
+    return audit
+
+
 def mirror_pos_topups(customers=None, *, notify=True) -> dict:
     """Credit recargas typed directly into the Loyverse POS into the local ledger.
 
@@ -1338,6 +1497,14 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
     so a simultaneous cash load cannot be misread). After crediting, local ==
     remote, so re-runs are no-ops: idempotent without needing a receipt id.
 
+    A positive delta is credited only once the ledger has been still for
+    ``POS_MIRROR_SETTLE_SECONDS`` and does not echo a purchase just recorded
+    (see ``_pos_delta_is_settled``); otherwise it is ``deferred`` to the next
+    pass. Every student compared gets ``last_synced`` stamped, so the roster's
+    "last sync" column means what it says. When the caller did not supply the
+    customer list (the cron, Sincronizar todos) the full roster is audited too:
+    stale links flagged, unlinked customers counted, numbers persisted.
+
     ``customers`` lets the caller reuse an already-fetched store-wide list; the
     cron passes none and fetches once (2 pages), never per student.
 
@@ -1350,7 +1517,8 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
     from apps.accounts.models import StudentProfile
     from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 
-    if customers is None:
+    full_roster = customers is None
+    if full_roster:
         customers = get_all_customers()
     points_by_id = {c.get('id'): get_balance_from_customer(c) for c in customers}
 
@@ -1364,8 +1532,9 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
 
     students = (StudentProfile.objects.filter(is_active=True)
                 .exclude(loyverse_id='').select_related('user'))
-    credited = skipped_pending = in_sync = below = unseeded = 0
-    total = Decimal('0')
+    credited = skipped_pending = in_sync = below = unseeded = deferred = 0
+    total = drift_total = Decimal('0')
+    stamp: list[int] = []
     now = timezone.now()
 
     for student in students:
@@ -1374,6 +1543,7 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
             continue
         if student.id in pending_pos:
             skipped_pending += 1
+            stamp.append(student.id)
             continue
         with transaction.atomic():
             cb = (CafeteriaBalance.objects.select_for_update()
@@ -1384,9 +1554,16 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
             delta = Decimal(str(remote)) - Decimal(str(cb.balance or 0))
             if delta == 0:
                 in_sync += 1
+                stamp.append(student.id)
                 continue
             if delta < 0:
                 below += 1             # not ours to touch, see docstring
+                drift_total += delta
+                stamp.append(student.id)
+                continue
+            if not _pos_delta_is_settled(student, delta, now):
+                deferred += 1
+                stamp.append(student.id)
                 continue
             cb.balance = (cb.balance or Decimal('0')) + delta
             cb.last_synced = now
@@ -1413,12 +1590,102 @@ def mirror_pos_topups(customers=None, *, notify=True) -> dict:
             f'Se registró una recarga de ${delta:.2f} en la cafetería. '
             f'Saldo actual: ${cb.balance:.2f}.')
 
+    if stamp:
+        CafeteriaBalance.objects.filter(student_id__in=stamp).update(last_synced=now)
+
+    result = {'credited': credited, 'total': total, 'in_sync': in_sync, 'below': below,
+              'deferred': deferred, 'drift_total': drift_total,
+              'skipped_pending': skipped_pending, 'unseeded': unseeded}
+    if full_roster:
+        result['audit'] = _record_wallet_audit(customers, result, now)
+
     logger.info(
         f'mirror_pos_topups: {credited} credited (${total}), {in_sync} in sync, '
-        f'{below} below Loyverse (left to the purchase poll), '
+        f'{below} below Loyverse (${drift_total}, left to the purchase poll), '
+        f'{deferred} deferred (ledger still settling), '
         f'{skipped_pending} pending POS load, {unseeded} unseeded.')
-    return {'credited': credited, 'total': total, 'in_sync': in_sync, 'below': below,
-            'skipped_pending': skipped_pending, 'unseeded': unseeded}
+    return result
+
+
+# ── Phantom POS credits (the 2026-09-23 drift) ───────────────────────────────
+
+PHANTOM_WINDOW_SECONDS = 180
+
+
+def find_phantom_topups() -> list:
+    """Pairs ``(topup_tx, purchase_tx)`` where a POS-mirror credit merely echoed
+    a purchase: same student, same amount, stamped within the window, and not
+    already reversed. Detection uses ``date`` (the only stamp historical rows
+    carry) so it works on rows written before ``recorded_at`` existed."""
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaTransaction
+
+    reversed_ids = set(
+        BalanceAdjustment.objects.filter(source_transaction__isnull=False)
+        .values_list('source_transaction_id', flat=True))
+    window = timedelta(seconds=PHANTOM_WINDOW_SECONDS)
+    pairs = []
+    topups = (CafeteriaTransaction.objects
+              .filter(loyverse_receipt_id__startswith='pos-topup-')
+              .select_related('student__user').order_by('id'))
+    for tp in topups:
+        if tp.id in reversed_ids:
+            continue
+        purchase = (CafeteriaTransaction.objects
+                    .filter(student_id=tp.student_id,
+                            transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                            amount=tp.amount,
+                            date__gte=tp.date - window, date__lte=tp.date + window)
+                    .order_by('id').first())
+        if purchase is not None:
+            pairs.append((tp, purchase))
+    return pairs
+
+
+def reverse_phantom_topup(topup_tx, *, reason: str, admin=None):
+    """Audited debit that undoes one phantom POS credit.
+
+    Writes an ADJUSTMENT row plus a ``BalanceAdjustment`` pointing at the
+    phantom via ``source_transaction`` (which is also what makes a second run
+    skip it). Unlike ``adjust_balance`` it may not raise on a negative result:
+    the amount is by construction what Loyverse already deducted, so the
+    outcome is Loyverse's own number. Returns the ``BalanceAdjustment``, or
+    ``None`` if this phantom was already reversed.
+    """
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
+
+    ref = f'phantom-reversal-{topup_tx.id}'
+    if CafeteriaTransaction.objects.filter(loyverse_receipt_id=ref).exists():
+        return None
+    now = timezone.now()
+    with transaction.atomic():
+        cb = CafeteriaBalance.objects.select_for_update().get(student_id=topup_tx.student_id)
+        amount = Decimal(str(topup_tx.amount))
+        cb.balance = (cb.balance or Decimal('0')) - amount
+        cb.last_synced = now
+        cb.save(update_fields=['balance', 'last_synced'])
+        tx = CafeteriaTransaction.objects.create(
+            student_id=topup_tx.student_id,
+            transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT,
+            amount=amount,
+            description=f'Reverso de recarga duplicada: {reason}',
+            loyverse_receipt_id=ref,
+            balance_after=cb.balance,
+            date=now,
+        )
+        adj = BalanceAdjustment.objects.create(
+            student_id=topup_tx.student_id,
+            admin=admin,
+            kind=BalanceAdjustment.Kind.ADJUSTMENT,
+            amount=-amount,
+            reason=reason,
+            balance_after=cb.balance,
+            transaction=tx,
+            source_transaction=topup_tx,
+        )
+    _audit_wallet('cafeteria.phantom_reversal', cb, admin=admin, reason=reason,
+                  amount=str(-amount), balance_after=str(cb.balance),
+                  student=topup_tx.student.student_id, source_tx=topup_tx.id)
+    return adj
 
 
 def loyverse_reachable() -> tuple[bool, str]:
@@ -1452,7 +1719,7 @@ def sync_health() -> dict:
       a route ``_points_spent`` does not recognise.
     """
     from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import CafeteriaTransaction, LoyverseSyncState
+    from apps.cafeteria.models import CafeteriaTransaction, LoyverseSyncState, UnmatchedReceipt
 
     state = LoyverseSyncState.load()
     active = StudentProfile.objects.filter(is_active=True)
@@ -1463,6 +1730,11 @@ def sync_health() -> dict:
     from apps.core.models import OpsStatus
 
     return {
+        # Roster-wide picture from the last full mirror pass (cron / Sincronizar
+        # todos): drift, stale links, unlinked customers, parked receipts.
+        'wallet_audit': OpsStatus.get('wallet_audit'),
+        'stale_links': active.filter(loyverse_missing_since__isnull=False).count(),
+        'unmatched_receipts': UnmatchedReceipt.objects.filter(resolved_at__isnull=True).count(),
         'loyverse_ok': ok,
         'loyverse_error': error,
         'last_purchases_cursor': state.last_purchases_cursor,
@@ -1574,10 +1846,17 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
         })
         if commit:
             s.loyverse_id = uuid
-            s.save(update_fields=['loyverse_id'])
+            s.loyverse_missing_since = None
+            s.save(update_fields=['loyverse_id', 'loyverse_missing_since'])
 
     report['unmatched_customer_count'] = sum(
         1 for c in customers if c.get('id') not in matched_ids)
+    if commit and report['changes']:
+        # Receipts that arrived while these students were unlinked were parked,
+        # not lost: run them through the ledger now (or absorb them into the
+        # opening balance the seed is about to copy, see replay rules).
+        report['replay'] = replay_unmatched_receipts(
+            loyverse_ids=[ch['loyverse_id'] for ch in report['changes']])
     return report
 
 
@@ -1759,10 +2038,12 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
                     cb, _ = CafeteriaBalance.objects.get_or_create(student=profile)
                     if cb.last_synced is None:      # seed-once (never clobber a topup)
                         cb.balance = points
-                        cb.last_synced = timezone.now()
-                        cb.save(update_fields=['balance', 'last_synced'])
+                        cb.last_synced = cb.seeded_at = timezone.now()
+                        cb.save(update_fields=['balance', 'last_synced', 'seeded_at'])
                         report['balance_seeded'] += points
         except Exception as exc:                     # per-row isolation
             report['errors'].append({'matricula': code, 'error': str(exc)[:150]})
 
+    if commit and (report['created'] or report['updated']):
+        report['replay'] = replay_unmatched_receipts()
     return report
