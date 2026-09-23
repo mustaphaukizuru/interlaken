@@ -46,7 +46,11 @@ def test_request_docs_uses_editable_template(admin_client, reg, settings):
     r = admin_client.post(reverse('register-request-docs', args=[reg.pk]), {}, format='json')
     assert r.status_code == 200 and r.data['sent_to'] == 'maria@test.mx'
     body = mail.outbox[-1].body
-    assert body.startswith('Estimado María López') and '• CURP' in body and f'token={reg.access_token}' in body
+    assert body.startswith('Estimado María López') and '• CURP' in body
+    # The link must be redeemable: rid + a fresh invite, never the persistent access_token UUID.
+    assert f'/inscripcion/documentos?rid={reg.pk}&token=' in body and str(reg.access_token) not in body
+    reg.refresh_from_db()
+    assert reg.invite_token_hash and reg.invite_used_at is None
 
 
 @pytest.mark.django_db

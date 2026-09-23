@@ -288,6 +288,7 @@ class PageListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdminOrStaff]
     serializer_class = PageAdminSerializer
     queryset = Page.objects.select_related('published_version')
+    pagination_class = None  # the editor lists every page; the SPA sends no ?page=
 
 
 class PageDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -383,10 +384,12 @@ class PageReviewView(APIView):
             page.review_note = ''
             page.save(update_fields=['review_requested_at', 'review_requested_by', 'review_note'])
             from apps.accounts.models import User
-            url = f"{(settings.FRONTEND_URL or '').rstrip('/')}/{page.slug}?preview={page.preview_token()}"
+
+            from .navigation import page_path
+            url = f"{(settings.FRONTEND_URL or '').rstrip('/')}/p/{page.slug}?preview={page.preview_token()}"
             for admin in User.objects.filter(role='admin', is_active=True):
                 notify(admin, 'info', f'Página lista para aprobar: {page.title}',
-                       f'{request.user.full_name} solicita publicar /{page.slug}. Vista previa: {url}', fanout=False)
+                       f'{request.user.full_name} solicita publicar {page_path(page.slug)}. Vista previa: {url}', fanout=False)
             return Response(PageAdminSerializer(page).data)
         if action == 'reject':
             if getattr(request.user, 'role', None) != 'admin':
@@ -410,4 +413,4 @@ class PagePreviewTokenView(APIView):
         if page is None:
             raise Http404
         token = page.preview_token()
-        return Response({'token': token, 'url': f"{(settings.FRONTEND_URL or '').rstrip('/')}/{page.slug}?preview={token}"})
+        return Response({'token': token, 'url': f"{(settings.FRONTEND_URL or '').rstrip('/')}/p/{page.slug}?preview={token}"})

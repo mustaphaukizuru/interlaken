@@ -1,7 +1,7 @@
 """
 core/pdf.py — a tiny, dependency-free PDF generator.
 
-The cPanel host and CI don't ship a PDF library (no reportlab/weasyprint in
+The image and CI don't ship a PDF library (no reportlab/weasyprint in
 ``requirements.txt``), so this emits a valid multi-page PDF by hand: a fixed
 Helvetica font, one text column, automatic pagination. It's intentionally
 minimal — enough for tabular statements (cafeteria account statements, spec §5

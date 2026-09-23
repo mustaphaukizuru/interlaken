@@ -272,8 +272,13 @@ class GoogleTokenView(APIView):
 
 
 class LogoutView(APIView):
-    """POST /auth/logout/ — Blacklist the refresh cookie's token and clear cookies."""
-    permission_classes = [permissions.IsAuthenticated]
+    """POST /auth/logout/ — Blacklist the refresh cookie's token and clear cookies.
+
+    AllowAny on purpose: the SPA's access token is 15 min but the idle logout
+    fires at 30, so requiring a valid Bearer left the 7-day refresh cookie
+    un-revoked. The CSRF double-submit + the httpOnly cookie identify the session.
+    """
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         if not csrf_ok(request):

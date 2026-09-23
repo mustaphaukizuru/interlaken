@@ -63,7 +63,7 @@ def test_preview_requires_admin_or_token(admin_client, api_client):
     assert api_client.get(reverse('cms-page-preview', args=[page.pk])).status_code == 403
     api_client.force_authenticate(user=AdminFactory())
     tok = api_client.post(reverse('admin-page-preview-token', args=[page.pk]), {}, format='json').data
-    assert f'/{page.slug}?preview=' in tok['url']
+    assert f'/p/{page.slug}?preview=' in tok['url']
     api_client.force_authenticate(user=None)
     ok = api_client.get(reverse('cms-page-preview', args=[page.pk]), {'token': tok['token']})
     assert ok.status_code == 200 and ok.data['blocks'][0]['type'] == 'hero' and ok['Cache-Control'] == 'no-store'

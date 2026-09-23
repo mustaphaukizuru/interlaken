@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, main, automated-build]
+    branches: [master, main]
   pull_request:
   # Nightly full run on master (03:15 CT): catches drift between merges —
   # external API changes, dependency rot, flaky-test creep — before a PR does.

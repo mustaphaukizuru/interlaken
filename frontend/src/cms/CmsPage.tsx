@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CalendarDays, ShieldCheck } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
@@ -235,8 +235,9 @@ function FormBlock({ slug }: { slug: string }) {
 /** Route element: renders a published CMS page by slug, or the draft when ?preview=<token>. */
 export default function CmsPage({ slug: slugProp }: { slug?: string }) {
   const [params] = useSearchParams();
+  const { slug: routeSlug } = useParams<{ slug: string }>();
   const preview = params.get('preview');
-  const slug = slugProp ?? window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+  const slug = slugProp ?? routeSlug ?? window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
   const { data, isLoading, isError } = useQuery({
     queryKey: ['cms-page', slug, preview],
     queryFn: async () => (preview

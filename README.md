@@ -6,15 +6,17 @@ a parent/student portal, cafeteria wallet integration, payments, and visit booki
 
 ## Stack
 
-- **Backend:** Django 4.2 + Django REST Framework + SimpleJWT. Apps under `backend/apps/`:
-  `accounts`, `admissions`, `cafeteria`, `payments`, `portal`, `core`.
+- **Backend:** Django 6 + Django REST Framework + SimpleJWT. Apps under `backend/apps/`:
+  `accounts`, `admissions`, `bookings`, `cafeteria`, `content` (CMS), `core`, `legal`,
+  `payments` (cafetería top-ups only), `portal`, `whatsapp` (`finance` is retired; kept for its migrations).
   - User model: `accounts.User` (email login, `role ∈ admin|parent|student|staff`).
   - Parent ↔ student via `StudentProfile.parents` (M2M; reverse accessor `children`).
-- **Frontend:** React 18 + TypeScript + Vite 5, Tailwind CSS, `@tanstack/react-query`,
+- **Frontend:** React + TypeScript + Vite 8, Tailwind CSS, `@tanstack/react-query`,
   `zustand`, `react-router-dom`, `react-hook-form` + `zod`.
-- **Database:** SQLite for local dev, MySQL (via PyMySQL) in production.
-- **Deploy:** GoDaddy cPanel served by Passenger (`backend/passenger_wsgi.py`).
-  No Celery/Redis on the host — scheduled work runs via cron + Django management commands.
+- **Database:** SQLite for local dev (`SQLITE_LOCAL=1`), managed PostgreSQL in production.
+- **Deploy:** Docker (gunicorn + whitenoise) behind Caddy on a Hostinger VPS at
+  `https://interlaken.edu.mx` — see [`docs/DEPLOY_HOSTINGER_VPS.md`](docs/DEPLOY_HOSTINGER_VPS.md).
+  No Celery/Redis — scheduled work runs via cron (`deploy/crontab.example`) + Django management commands.
 
 ## Local dev quickstart
 
@@ -45,7 +47,7 @@ python manage.py createsuperuser        # create your admin login
 python manage.py runserver 0.0.0.0:8000
 ```
 
-- Django admin: http://localhost:8000/admin/
+- Django admin: http://localhost:8000/django-admin/ (the React console owns `/admin/*`)
 - API root: http://localhost:8000/api/v1/
 
 On Windows `cmd`, use `set VAR=value` instead of `export`. Helper scripts in
@@ -86,8 +88,10 @@ pre-commit run --all-files           # run against the whole tree once
 
 Specs, status and ops notes live in [`docs/`](docs/):
 
-- [`docs/STATUS_REPORT.md`](docs/STATUS_REPORT.md) — known issues, remediation order
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — feature roadmap
+- [`docs/OPS-RUNBOOK.md`](docs/OPS-RUNBOOK.md) — day-to-day operations (backups, cron, yearly cycle)
+- [`docs/BACKLOG.md`](docs/BACKLOG.md) — consolidated backlog and decision log
+- [`docs/ADMIN-VS-PORTAL.md`](docs/ADMIN-VS-PORTAL.md) — what lives in the React console vs `/django-admin/`
+- [`docs/STATUS_REPORT.md`](docs/STATUS_REPORT.md), [`docs/ROADMAP.md`](docs/ROADMAP.md) — July 2026 audit + roadmap (historical)
 - [`docs/DEPLOY_HOSTINGER_VPS.md`](docs/DEPLOY_HOSTINGER_VPS.md) — deploying and operating the VPS
 - [`docs/AUTH.md`](docs/AUTH.md) — auth/session model (httpOnly refresh + CSRF)
 - [`docs/DESIGN.md`](docs/DESIGN.md) — design system & tokens

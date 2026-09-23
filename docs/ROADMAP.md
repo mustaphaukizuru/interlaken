@@ -1,5 +1,8 @@
 # Colegio Interlaken — Product & Engineering Roadmap
 
+> **Historical (July 2026).** The live backlog and decision log is `docs/BACKLOG.md`;
+> hosting is now the Hostinger VPS (`docs/DEPLOY_HOSTINGER_VPS.md`), not cPanel.
+
 **Generated:** 2026-07-07 · Master index + professional recommendations
 This ties together all planning docs and adds everything else worth doing, prioritized.
 

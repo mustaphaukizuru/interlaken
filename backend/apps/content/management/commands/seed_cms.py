@@ -58,7 +58,7 @@ def page_definitions(img: dict[str, int]) -> list[dict]:
             'blocks': [
                 _b('hero', title='Educación bilingüe con valores',
                    subtitle='Preescolar, Primaria y Secundaria con inglés todos los días, en una comunidad que conoce a cada familia por su nombre.',
-                   image=pic('facade.webp'), cta={'label': 'Agendar visita', 'href': '/pre-registro'}),
+                   image=pic('facade.webp'), cta={'label': 'Agendar visita', 'href': '/agendar-visita'}),
                 _b('stats', items=[{'value': '95%', 'label': 'Aprovechamiento'}, {'value': '3', 'label': 'Niveles educativos'},
                                    {'value': 'SEP', 'label': 'Incorporación oficial'}, {'value': '100%', 'label': 'Inglés diario'}]),
                 _b('levels_cards'),
@@ -71,7 +71,7 @@ def page_definitions(img: dict[str, int]) -> list[dict]:
                 _b('testimonials'),
                 _b('calendar'),
                 _b('cta_band', title='Conozca el colegio', text='Agende una visita individual o una clase abierta.',
-                   cta={'label': 'Agendar visita', 'href': '/pre-registro'}),
+                   cta={'label': 'Agendar visita', 'href': '/agendar-visita'}),
             ],
         },
         {

@@ -1,16 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { waLink, WA_MESSAGES, waSectionMessage } from './whatsapp';
+import { waHref } from './siteContact';
+import { WA_MESSAGES, waSectionMessage } from './whatsapp';
 import { CURRENT_CYCLE } from './siteMeta';
 
 describe('whatsapp helpers', () => {
-  it('waLink strips number formatting and URL-encodes the message', () => {
-    expect(waLink('+52 1 55 1234-5678', 'Hola, ¿informes?')).toBe(
+  it('waHref strips number formatting and URL-encodes the message', () => {
+    expect(waHref('+52 1 55 1234-5678', 'Hola, ¿informes?')).toBe(
       'https://wa.me/5215512345678?text=Hola%2C%20%C2%BFinformes%3F',
     );
   });
 
-  it('waLink encodes accented es-MX copy safely', () => {
-    const href = waLink('5215553791188', 'Sección Maternal — más información');
+  it('waHref encodes accented es-MX copy safely', () => {
+    const href = waHref('5215553791188', 'Sección Maternal — más información');
     expect(href.startsWith('https://wa.me/5215553791188?text=')).toBe(true);
     // Decoding round-trips exactly.
     expect(decodeURIComponent(href.split('text=')[1])).toBe('Sección Maternal — más información');

@@ -1,7 +1,7 @@
 """
 low_balance_alerts — notify parents whose child's cafeteria balance is low.
 
-Scheduled by .github/workflows/scheduled-tasks.yml (daily).
+Scheduled by deploy/crontab.example (daily).
 
 Dedup: an alert is (re)sent only when the balance is low AND we haven't alerted
 within ``CAFETERIA_LOW_BALANCE_ALERT_COOLDOWN_DAYS`` (default 7). When a balance

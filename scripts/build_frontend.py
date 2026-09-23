@@ -10,9 +10,8 @@ Mirrors what the Dockerfile does, for prod-style serving without Docker:
 
 Run from anywhere:  python scripts/build_frontend.py [--collectstatic]
 
-On the cPanel server (no Node), build locally and upload the resulting
-backend/templates/index.html + backend/static/assets/, then run
-`python manage.py collectstatic` in the cPanel venv.
+Production builds happen inside the Docker image (see the root Dockerfile);
+this script is for running the built SPA from a local Django without Docker.
 """
 import argparse
 import os

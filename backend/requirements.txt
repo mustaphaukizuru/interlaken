@@ -7,20 +7,17 @@ django-environ==0.14.0
 django-filter==26.1
 drf-spectacular==0.30.0
 # At-rest encryption for sensitive fields (medical data — IK-LEGAL B4).
-# social-auth-core 5.x requires cryptography>=46.0.7.
 cryptography==50.0.1
 
-# Database — Postgres only (containerised Postgres in production, SQLite locally).
-# The MySQL drivers the cPanel host needed are gone; nothing imports MySQLdb.
+# Database — Postgres only (managed Postgres in production, SQLite locally).
 psycopg2-binary==2.9.13
 
-# Auth
-social-auth-app-django==6.0.1
-social-auth-core==5.1.0
+# Auth (Google OAuth is hand-rolled in apps/accounts/views.py; JWT via simplejwt)
 PyJWT==2.14.0
 
 # Storage & Files
-# Pillow is reportlab's image dependency (PDF receipts), not a direct import.
+# Pillow: avatar cropping (apps/accounts/avatar.py) and CMS media variants
+# (apps/content/media.py). PDFs are generated dependency-free in apps/core/pdf.py.
 Pillow==12.3.0
 # Durable object storage for uploaded media (admissions documents) — the
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert

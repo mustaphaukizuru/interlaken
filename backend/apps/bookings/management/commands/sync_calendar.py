@@ -6,7 +6,7 @@ when the booking was made, the booking still succeeded with an empty
 ``google_event_id``. This cron command sweeps those active bookings and creates
 their events now, and (for tidiness) removes events left on cancelled bookings.
 
-Scheduled by .github/workflows/scheduled-tasks.yml. If calendar
+Scheduled by deploy/crontab.example. If calendar
 is unconfigured the command is a clean no-op, so it's safe to schedule always.
 """
 from django.core.management.base import BaseCommand

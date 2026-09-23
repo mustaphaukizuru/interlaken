@@ -64,7 +64,7 @@ def _get_service():
         credentials = service_account.Credentials.from_service_account_file(
             settings.GOOGLE_CALENDAR_SA_KEY, scopes=_SCOPES,
         )
-        # cache_discovery=False avoids a noisy warning + file cache on cPanel.
+        # cache_discovery=False avoids a noisy warning + file cache in the container.
         return build('calendar', 'v3', credentials=credentials, cache_discovery=False)
     except Exception as exc:  # ImportError, auth error, malformed key…
         logger.warning('Google Calendar client unavailable: %s', exc)

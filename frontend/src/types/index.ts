@@ -222,17 +222,6 @@ export interface PreRegistrationData {
   wants_visit?: boolean;
 }
 
-export interface OpenSchoolEvent {
-  id: number;
-  date: string;
-  title: string;
-  description: string;
-  location: string;
-  max_capacity: number;
-  spots_remaining: number;
-  is_active: boolean;
-}
-
 export interface AvailabilitySlot {
   id: number;
   visit_type: 'open_class' | 'individual';

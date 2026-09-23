@@ -6,7 +6,7 @@ lifetime spend, contact fields, raw object).
     python manage.py sync_loyverse_profiles            # dry-run preview
     python manage.py sync_loyverse_profiles --commit   # persist snapshots
 
-Scheduled by .github/workflows/scheduled-tasks.yml (daily). Read-only against
+Scheduled by deploy/crontab.example (daily). Read-only against
 the wallet — it never changes balances; it only mirrors reference data.
 Matches customers to students by Loyverse id first, then by matrícula
 (customer_code == student_id) as a fallback.

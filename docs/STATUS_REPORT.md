@@ -1,5 +1,10 @@
 # Colegio Interlaken — Status Report
 
+> **Historical snapshot (July 2026).** Kept for the record of the initial audit.
+> Hosting, the admin path (`/django-admin/` today) and every blocker listed here
+> have changed since; see `docs/OPS-RUNBOOK.md` and `docs/DEPLOY_HOSTINGER_VPS.md`
+> for the current state.
+
 **Generated:** 2026-07-07 · **Branch:** `master` (clean) · **Analyst:** Claude Code
 **Stack:** Django 4.2.13 + DRF 3.15 + SimpleJWT · React 18.3 + TypeScript 5.4 + Vite 5.3
 
@@ -217,6 +222,6 @@ python manage.py runserver 0.0.0.0:8000
 # Frontend
 cd frontend && npm run dev   # http://localhost:3000
 ```
-- Admin: `http://localhost:8000/admin/` — `admin@interlaken.edu.mx` / `Interla2025Admin!`
+- Admin: `http://localhost:8000/django-admin/` — the superuser you create with `createsuperuser`
 - API endpoints live under `http://localhost:8000/api/v1/<app>/` (JSON only).
 - ⚠️ Login will not work until fixes 4.1–4.3 are applied.

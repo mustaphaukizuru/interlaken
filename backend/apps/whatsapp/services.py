@@ -87,7 +87,7 @@ def _post(payload):
         logger.info('WhatsApp send skipped (Cloud API not configured): %s',
                     payload.get('type'))
         return False
-    version = getattr(settings, 'WHATSAPP_API_VERSION', 'v19.0')
+    version = getattr(settings, 'WHATSAPP_API_VERSION', '') or 'v19.0'
     url = f'https://graph.facebook.com/{version}/{settings.WHATSAPP_PHONE_ID}/messages'
     headers = {'Authorization': f'Bearer {settings.WHATSAPP_TOKEN}'}
     try:

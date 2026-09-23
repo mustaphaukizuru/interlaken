@@ -9,14 +9,7 @@
  * editable); per existing convention, callers hide the button entirely when
  * the number is empty.
  */
-import { waHref } from './siteContact';
 import { CURRENT_CYCLE } from './siteMeta';
-
-/**
- * wa.me deep link: `https://wa.me/<digits>?text=<encoded message>`.
- * Alias of siteContact.waHref — single implementation, funnel-facing name.
- */
-export const waLink: (number: string, message: string) => string = waHref;
 
 /** Prefilled messages per conversion context (es-MX, cycle auto-computed). */
 export const WA_MESSAGES = {

@@ -365,7 +365,7 @@ class DocumentDownloadView(APIView):
     registration document to an authorized caller.
 
     Production serves no ``/media/`` path (Django serves it only under DEBUG,
-    and the deploy fronts /api,/auth,/admin,/static via Passenger — never
+    and Caddy proxies everything to gunicorn, which serves no static /media —
     /media), so this authenticated view IS the download path. That keeps
     minors' documents (birth certificates, CURP, photos) off any guessable,
     unauthenticated URL — do NOT "fix" the download gap by aliasing /media/ in

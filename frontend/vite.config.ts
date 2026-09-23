@@ -107,8 +107,8 @@ export default defineConfig(({ command }) => ({
           {
             // App navigations (mirrors the Django SPA catch-all exclusions):
             // fresh HTML when online, cached copy when the network is slow/down
-            // (3s timeout also masks Render free-tier cold starts), and the
-            // branded es-MX offline page when nothing is cached.
+            // (3s timeout also masks a slow origin), and the branded es-MX
+            // offline page when nothing is cached.
             urlPattern: ({ request, url }) =>
               request.mode === 'navigate' &&
               !/^\/(api|django-admin|auth|static|media)\//.test(url.pathname) &&
@@ -135,6 +135,18 @@ export default defineConfig(({ command }) => ({
               cacheName: 'offline-essentials',
               networkTimeoutSeconds: 4,
               expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // CMS media variants are immutable per id/variant: cache-first like
+            // any image, and listed BEFORE the generic /api/ rule so they do
+            // not churn the 80-entry JSON cache.
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/v1/content/media/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images',
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [200] },
             },
           },
@@ -235,6 +247,12 @@ export default defineConfig(({ command }) => ({
           });
         },
       },
+      // Backend-served paths (Django admin, media, sitemap, WhatsApp redirect):
+      // without these the dev server answers them with the SPA 404.
+      '/django-admin': { target: process.env.DEV_API_TARGET || 'http://localhost:8000', changeOrigin: true },
+      '/media': { target: process.env.DEV_API_TARGET || 'http://localhost:8000', changeOrigin: true },
+      '/sitemap.xml': { target: process.env.DEV_API_TARGET || 'http://localhost:8000', changeOrigin: true },
+      '/whatsapp': { target: process.env.DEV_API_TARGET || 'http://localhost:8000', changeOrigin: true },
       '/auth': {
         target: process.env.DEV_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,

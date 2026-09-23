@@ -21,10 +21,10 @@ ROUTE_PREFIXES = ('/niveles/', '/portal', '/admin', '/staff', '/login', '/p/')
 
 
 def _known_paths() -> set[str]:
-    from .navigation import STATIC_ROUTES, Redirect
+    from .navigation import STATIC_ROUTES, Redirect, page_path
     paths = {p for p, _f, _p in STATIC_ROUTES}
-    paths |= {'/pre-registro', '/inscripcion', '/inscripcion/documentos', '/puertas-abiertas', '/agendar-visita'}
-    paths |= {f'/{s}' for s in Page.objects.filter(status=Page.Status.PUBLISHED).values_list('slug', flat=True)}
+    paths |= {'/pre-registro', '/inscripcion', '/inscripcion/documentos', '/puertas-abiertas', '/agendar-visita', '/whatsapp/'}
+    paths |= {page_path(s) for s in Page.objects.filter(status=Page.Status.PUBLISHED).values_list('slug', flat=True)}
     paths |= set(Redirect.objects.values_list('from_path', flat=True))
     return paths
 

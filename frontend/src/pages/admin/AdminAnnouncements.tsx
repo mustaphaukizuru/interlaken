@@ -125,22 +125,28 @@ export default function AdminAnnouncements() {
 
   // Command-palette deep link: /admin/comunicados?nuevo=1 opens the composer
   // (same modal, same validations) and consumes the param.
+  // ?emergencia=1 (header quick action "Emergencia (broadcast)") opens the
+  // urgent-notice modal instead.
   const [searchParams, setSearchParams] = useSearchParams();
   const wantsNew = searchParams.get('nuevo');
+  const wantsAlert = searchParams.get('emergencia');
   useEffect(() => {
-    if (!wantsNew) return;
+    if (!wantsNew && !wantsAlert) return;
     // Suppressed: one-shot URL command — the param is external navigation
     // state consumed (deleted) right after, so the composer state cannot be
     // derived from it and the setState cannot cascade.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    openNew();
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (wantsAlert) setAlertOpen(true);
+    else openNew();
+    /* eslint-enable react-hooks/set-state-in-effect */
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('nuevo');
+      next.delete('emergencia');
       return next;
     }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantsNew]);
+  }, [wantsNew, wantsAlert]);
 
   const openEdit = (a: Announcement) => {
     setEditing(a);

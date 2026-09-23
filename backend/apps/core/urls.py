@@ -24,7 +24,7 @@ urlpatterns = [
     path('whatsapp/', whatsapp_redirect, name='whatsapp-redirect'),
     # React SPA catch-all — must be last
     re_path(
-        r'^(?!api/|django-admin/|auth/|static/|media/).*$',
+        r'^(?!api(?:/|$)|django-admin(?:/|$)|auth(?:/|$)|static/|media/|healthz/?$).*$',
         spa_index,
         name='spa-index',
     ),

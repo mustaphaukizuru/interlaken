@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ElementType } from 'react';
+import { waHref } from '@/lib/siteContact';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Award, FileText, ClipboardList, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, ShieldCheck, Plus } from 'lucide-react';
 import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
 import { useSep } from '@/hooks/useSep';
 import { Testimonials } from '@/components/public/Testimonials';
-import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
+import { WA_MESSAGES } from '@/lib/whatsapp';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
@@ -371,7 +372,7 @@ export default function AdmissionsPage() {
                       </Link>
                     ) : whatsapp_number ? (
                       <a
-                        href={waLink(whatsapp_number, WA_MESSAGES.admissionsInfo)}
+                        href={waHref(whatsapp_number, WA_MESSAGES.admissionsInfo)}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => {

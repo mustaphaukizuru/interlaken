@@ -53,7 +53,7 @@ def send_web_push(user, title: str, message: str, url: str = '/portal') -> int:
                 },
                 data=payload,
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
-                vapid_claims={'sub': f'mailto:{settings.VAPID_ADMIN_EMAIL}'},
+                vapid_claims={'sub': f"mailto:{settings.VAPID_ADMIN_EMAIL or settings.DEFAULT_FROM_EMAIL}"},
             )
             delivered += 1
         except WebPushException as exc:

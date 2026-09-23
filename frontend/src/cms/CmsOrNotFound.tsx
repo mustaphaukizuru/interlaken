@@ -5,6 +5,7 @@ import NotFoundPage from '@/pages/public/NotFoundPage';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { contentApi } from '@/services/api';
 import { BlockRenderer, type CmsPagePayload } from './CmsPage';
+import { CMS_SLUG_PATHS } from './slugPaths';
 import { Seo } from '@/components/seo/Seo';
 
 /**
@@ -34,6 +35,8 @@ export default function CmsOrNotFound() {
     if (target.to.startsWith('http')) { window.location.replace(target.to); return null; }
     return <Navigate to={target.to} replace />;
   }
+  const canonical = CMS_SLUG_PATHS[slug];
+  if (canonical && canonical !== key) return <Navigate to={canonical} replace />;
   if (isLoading || loadingRedirects) return <div className="flex min-h-[50vh] items-center justify-center"><LoadingSpinner /></div>;
   if (!data) return <NotFoundPage />;
   return (
