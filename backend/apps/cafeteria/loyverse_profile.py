@@ -1,16 +1,24 @@
 """
 cafeteria/loyverse_profile.py — parse + persist the full Loyverse customer
-snapshot for a student (IK-CAFE: full student information from Loyverse).
+snapshot for EVERY customer in the store (IK-CAFE: full information from
+Loyverse; 2026-09-23: staff and other cards too, not only students).
 
 Kept out of services.py so the parsing is a small, pure, unit-testable unit
 with no API calls or ORM coupling. `parse_customer_snapshot` maps a raw
-Loyverse customer dict to the LoyverseProfile column values;
-`upsert_loyverse_profile` writes them.
+Loyverse customer dict to the LoyverseProfile column values,
+`classify_customer` decides what kind of card it is, and `refresh_all_profiles`
+writes the whole store in one pass.
 """
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.utils.dateparse import parse_datetime
+
+# The school's pupils in Loyverse: code ``ci<digits>`` (bare digits tolerated)
+# and the student mailbox ``ci<digits>@interlaken.com.mx``.
+_STUDENT_CODE_RE = re.compile(r'^(?:ci)?\d{3,10}$', re.IGNORECASE)
+_TEST_RE = re.compile(r'prueba|probando|\btest\b|demo', re.IGNORECASE)
 
 
 def _dt(value):
@@ -43,6 +51,29 @@ def _int(value) -> int:
         return 0
 
 
+def classify_customer(customer: dict) -> str:
+    """What kind of card is this? ``student`` / ``staff`` / ``test`` / ``other``.
+
+    Pupils carry the ``ci<digits>`` code and mailbox. Staff cards at Interlaken
+    are named ``ZP-…`` and use a person's or office's mailbox on the school
+    domain (``direccion@``, ``colegio@``, ``jsoto@``). Anything that calls
+    itself a prueba/test is a test record. The rest is ``other`` and is still
+    stored, so nothing in the store is invisible to the console.
+    """
+    code = (customer.get('customer_code') or '').strip()
+    email = (customer.get('email') or '').strip().lower()
+    name = (customer.get('name') or '').strip()
+    if _TEST_RE.search(name) or _TEST_RE.search(email):
+        return 'test'
+    if (_STUDENT_CODE_RE.match(code) and email.startswith('ci')
+            and email.endswith('@interlaken.com.mx')):
+        return 'student'
+    if name.upper().startswith('ZP-') or (
+            email.endswith('@interlaken.com.mx') and not email.startswith('ci')):
+        return 'staff'
+    return 'other'
+
+
 def parse_customer_snapshot(customer: dict) -> dict:
     """Map a raw Loyverse customer object to LoyverseProfile field values.
 
@@ -70,10 +101,12 @@ def parse_customer_snapshot(customer: dict) -> dict:
 
 
 def upsert_loyverse_profile(student, customer: dict):
-    """Create or refresh the LoyverseProfile for ``student`` from ``customer``.
+    """Create or refresh the profile for ``customer``, bound to ``student``
+    (which may be ``None`` for a staff/test/other card).
 
-    Returns (profile, created). Idempotent: re-running just refreshes the
-    snapshot in place.
+    Keyed by the Loyverse id. If the student was previously bound to a
+    different customer (a relink), that older row is unbound first so the
+    one-to-one holds. Returns (profile, created). Idempotent.
     """
     from django.utils import timezone
 
@@ -81,17 +114,35 @@ def upsert_loyverse_profile(student, customer: dict):
 
     values = parse_customer_snapshot(customer)
     values['synced_at'] = timezone.now()
+    values['student'] = student
+    values['kind'] = (LoyverseProfile.Kind.STUDENT if student is not None
+                      else classify_customer(customer))
+    values['missing_since'] = None
+    uuid = values.pop('loyverse_id')
+    if not uuid:
+        raise ValueError('customer without id')
+    if student is not None:
+        (LoyverseProfile.objects.filter(student=student).exclude(loyverse_id=uuid)
+                                .update(student=None))
     profile, created = LoyverseProfile.objects.update_or_create(
-        student=student, defaults=values)
+        loyverse_id=uuid, defaults=values)
     return profile, created
 
 
-def refresh_all_profiles(customers):
-    """Upsert LoyverseProfile snapshots for every matched student.
+def refresh_all_profiles(customers, *, mark_missing=True):
+    """Upsert a LoyverseProfile for EVERY customer in ``customers``.
 
-    Pure over ``customers`` (no API call), so it's cheap to unit-test. Matches
-    by Loyverse id first, then matrícula (customer_code == student_id).
-    Returns ``{matched, created, updated, unmatched, errors}``.
+    Pure over ``customers`` (no API call), so it's cheap to unit-test. Students
+    are matched by Loyverse id first, then matrícula (customer_code ==
+    student_id); everyone else is stored unbound with a ``kind``. Rows whose
+    id is absent from a full list are stamped ``missing_since`` (never
+    deleted); pass ``mark_missing=False`` for a partial list such as a webhook
+    payload. Unchanged customers only get ``synced_at`` refreshed, in one
+    query, so the 5-minute cron can afford this on the whole store.
+
+    Returns ``{matched, created, updated, unmatched, errors, total, staff,
+    test, other, missing}``. ``unmatched`` keeps its historical meaning:
+    customers stored without a student.
 
     Each student is bound to at most one customer (LoyverseProfile is a
     OneToOne), so once a student matches we skip further customers claiming the
@@ -99,7 +150,11 @@ def refresh_all_profiles(customers):
     snapshot and inflate the counters. A single malformed customer is counted
     under ``errors`` and skipped, never allowed to abort the batch.
     """
+    from django.utils import timezone
+
     from apps.accounts.models import StudentProfile
+
+    from .models import LoyverseProfile
 
     by_id, by_code = {}, {}
     for s in StudentProfile.objects.select_related('user').all():
@@ -112,25 +167,62 @@ def refresh_all_profiles(customers):
         if code:
             by_code.setdefault(code, s)
 
-    report = {'matched': 0, 'created': 0, 'updated': 0, 'unmatched': 0,
-              'errors': 0}
-    seen_students = set()
+    # Fingerprint of what we already hold, to skip rows that did not change.
+    existing = {
+        p['loyverse_id']: p for p in LoyverseProfile.objects.values(
+            'loyverse_id', 'loyverse_updated_at', 'total_points', 'total_visits',
+            'student_id', 'missing_since', 'kind')
+    }
+
+    report = {'matched': 0, 'created': 0, 'updated': 0, 'unmatched': 0, 'errors': 0,
+              'total': 0, 'staff': 0, 'test': 0, 'other': 0, 'missing': 0}
+    seen_students, seen_ids, unchanged = set(), set(), []
+    now = timezone.now()
     for c in customers:
+        uuid = c.get('id')
+        if not uuid or uuid in seen_ids:
+            continue
+        seen_ids.add(uuid)
+        report['total'] += 1
         code = (c.get('customer_code') or '').strip()
-        student = by_id.get(c.get('id')) or (by_code.get(code) if code else None)
+        student = by_id.get(uuid) or (by_code.get(code) if code else None)
+        if student is not None and student.pk in seen_students:
+            student = None
+        kind = 'student' if student is not None else classify_customer(c)
+
+        prev = existing.get(uuid)
+        if (prev is not None
+                and prev['loyverse_updated_at'] == _dt(c.get('updated_at'))
+                and prev['total_points'] == _dec(c.get('total_points'))
+                and prev['total_visits'] == _int(c.get('total_visits'))
+                and prev['student_id'] == (student.pk if student else None)
+                and prev['kind'] == kind
+                and prev['missing_since'] is None):
+            unchanged.append(uuid)
+        else:
+            try:
+                _, created = upsert_loyverse_profile(student, c)
+            except Exception:  # noqa: BLE001 — fail-soft per bad customer
+                report['errors'] += 1
+                continue
+            report['created' if created else 'updated'] += 1
+
+        # Counted only once the row is known to be in place.
         if student is None:
             report['unmatched'] += 1
-            continue
-        if student.pk in seen_students:
-            continue
-        try:
-            _, created = upsert_loyverse_profile(student, c)
-        except Exception:  # noqa: BLE001 — fail-soft per bad customer
-            report['errors'] += 1
-            continue
-        seen_students.add(student.pk)
-        report['matched'] += 1
-        report['created' if created else 'updated'] += 1
+            report[kind if kind in ('staff', 'test', 'other') else 'other'] += 1
+        else:
+            report['matched'] += 1
+            seen_students.add(student.pk)
+
+    if unchanged:
+        LoyverseProfile.objects.filter(loyverse_id__in=unchanged).update(synced_at=now)
+    if mark_missing:
+        gone = LoyverseProfile.objects.exclude(loyverse_id__in=seen_ids)
+        gone.filter(missing_since__isnull=True).update(missing_since=now)
+        report['missing'] = gone.count()
+    else:
+        report['missing'] = LoyverseProfile.objects.filter(missing_since__isnull=False).count()
     return report
 
 
@@ -195,3 +287,18 @@ def refresh_profiles_if_stale(max_age_hours=20):
     report['skipped'] = False
     report['total_customers'] = len(customers)
     return report
+
+
+def receipt_lines(payload: dict) -> str:
+    """Short human summary of a receipt's line items, for the customer console."""
+    parts = []
+    for li in payload.get('line_items') or []:
+        name = li.get('item_name') or li.get('variant_name') or 'Artículo'
+        qty = li.get('quantity', 1)
+        try:
+            q = float(qty)
+            qty = int(q) if q.is_integer() else q
+        except (TypeError, ValueError):
+            pass
+        parts.append(f'{qty}× {name}' if qty not in (1, '1') else name)
+    return ', '.join(parts)[:255]

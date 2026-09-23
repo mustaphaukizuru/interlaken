@@ -125,7 +125,9 @@ class TestRefreshAll:
              {**SAMPLE, 'id': 'y', 'customer_code': None}])
         assert report['matched'] == 0
         assert report['unmatched'] == 2
-        assert LoyverseProfile.objects.count() == 0
+        # Since 2026-09-23 every card is stored; these two just carry no student.
+        assert LoyverseProfile.objects.count() == 2
+        assert not LoyverseProfile.objects.filter(student__isnull=False).exists()
 
     def test_duplicate_customer_code_binds_student_once(self):
         # Two customers claiming the same matrícula: the student (OneToOne) is
@@ -137,9 +139,12 @@ class TestRefreshAll:
         ]
         report = refresh_all_profiles(customers)
         assert report['matched'] == 1
-        assert report['created'] == 1
-        assert LoyverseProfile.objects.count() == 1
+        # Both cards are stored (nothing in the store is invisible), but only
+        # the first is bound to the student.
+        assert report['created'] == 2
+        assert LoyverseProfile.objects.count() == 2
         assert LoyverseProfile.objects.get(student=student).total_visits == 10
+        assert LoyverseProfile.objects.get(loyverse_id='second').student is None
 
     def test_one_bad_customer_does_not_abort_the_batch(self, monkeypatch):
         good = StudentProfileFactory(student_id='09824', loyverse_id='')
@@ -240,7 +245,9 @@ class TestThrottle:
         first = refresh_profiles_if_stale()
         assert first['skipped'] is False
         assert first['matched'] == 0
-        assert LoyverseProfile.objects.count() == 0  # nothing written
+        # The unmatched card is still stored (every card is, since 2026-09-23),
+        # just without a student; the throttle must not depend on that.
+        assert not LoyverseProfile.objects.filter(student__isnull=False).exists()
 
         second = refresh_profiles_if_stale()
         assert second['skipped'] is True

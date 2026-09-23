@@ -28,6 +28,38 @@ class LoyverseProfileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class LoyverseCustomerSerializer(serializers.ModelSerializer):
+    """One row of the store-wide customer directory (students, staff, tests).
+
+    ``receipts`` is the number of wallet receipts parked for a card with no
+    student (staff meals); it comes from the view's one grouped query via
+    ``context['receipt_counts']`` so listing 400 cards is not 400 queries.
+    """
+    student = serializers.SerializerMethodField()
+    receipts = serializers.SerializerMethodField()
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+
+    class Meta:
+        model = LoyverseProfile
+        fields = [
+            'loyverse_id', 'kind', 'kind_display', 'customer_code', 'name', 'email',
+            'phone_number', 'address_code', 'note', 'first_visit', 'last_visit',
+            'total_visits', 'total_spent', 'total_points', 'loyverse_created_at',
+            'loyverse_updated_at', 'synced_at', 'missing_since', 'student', 'receipts',
+        ]
+        read_only_fields = fields
+
+    def get_student(self, obj):
+        s = obj.student
+        if s is None:
+            return None
+        return {'id': s.id, 'name': s.user.full_name, 'grade': s.grade,
+                'group': s.group, 'student_id': s.student_id}
+
+    def get_receipts(self, obj):
+        return (self.context.get('receipt_counts') or {}).get(obj.loyverse_id, 0)
+
+
 def build_spend_map(students):
     """Today/week purchase totals per student in ONE grouped aggregate.
 

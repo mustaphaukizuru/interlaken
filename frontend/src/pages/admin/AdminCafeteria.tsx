@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Coffee, RefreshCw, Search, Download, ChevronRight, ScrollText,
-  Scale, AlertTriangle, CheckCircle2, Store,
+  Scale, AlertTriangle, CheckCircle2, Store, Users, Receipt,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -12,13 +12,14 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
 import { BulkTopUpDialog } from '@/components/admin/BulkTopUpDialog';
-import { cafeteriaApi, downloadBlob } from '@/services/api';
+import { cafeteriaApi, downloadBlob, type LoyverseCustomer, type LoyverseCustomerKind } from '@/services/api';
 import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
 import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
 import type { CafeteriaBalance, TopUpLogEntry, ReconcileRow } from '@/types';
@@ -28,7 +29,7 @@ import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
 import { DataTable } from '@/components/ui/DataTable';
 
-type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low';
+type Tab = 'roster' | 'deposits' | 'pos' | 'reconcile' | 'low' | 'customers';
 
 const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
   { key: 'roster',    label: 'Saldos',         icon: Coffee },
@@ -36,6 +37,7 @@ const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
   { key: 'pos',       label: 'POS Loyverse',   icon: Store },
   { key: 'reconcile', label: 'Reconciliación', icon: Scale },
   { key: 'low',       label: 'Saldo bajo',     icon: AlertTriangle },
+  { key: 'customers', label: 'Clientes Loyverse', icon: Users },
 ];
 
 const fmtDate = (d: string | null) =>
@@ -48,7 +50,7 @@ export default function AdminCafeteria() {
   const tabParam = get('tab');
   const tab: Tab = TABS.some((t) => t.key === tabParam) ? (tabParam as Tab) : 'roster';
   const setTab = (key: Tab) =>
-    set({ tab: key === 'roster' ? null : key, q: null, estado: null, page: null });
+    set({ tab: key === 'roster' ? null : key, q: null, estado: null, tipo: null, page: null });
 
   return (
     <div className="space-y-6">
@@ -88,6 +90,7 @@ export default function AdminCafeteria() {
       {tab === 'pos' && <PosLoadTab />}
       {tab === 'reconcile' && <ReconcileTab />}
       {tab === 'low' && <LowBalanceTab />}
+      {tab === 'customers' && <CustomersTab />}
     </div>
   );
 }
@@ -812,5 +815,168 @@ function LowBalanceTab() {
         </>
       )}
     </Card>
+  );
+}
+
+
+// ── Every Loyverse customer (pupils, staff cards, tests) ─────────────────────
+
+const KIND_BADGE: Record<LoyverseCustomerKind, { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' }> = {
+  student: { label: 'Alumno', variant: 'success' },
+  staff:   { label: 'Personal', variant: 'info' },
+  test:    { label: 'Prueba', variant: 'warning' },
+  other:   { label: 'Otro', variant: 'neutral' },
+};
+
+const KIND_FILTERS: { key: string; label: string }[] = [
+  { key: '', label: 'Todos' },
+  { key: 'nonstudent', label: 'Sin alumno' },
+  { key: 'student', label: 'Alumnos' },
+  { key: 'staff', label: 'Personal' },
+  { key: 'test', label: 'Prueba' },
+  { key: 'other', label: 'Otros' },
+];
+
+/**
+ * The whole Loyverse store, one row per card. Until 2026-09-23 only the cards
+ * linked to a pupil existed in the app; the 44 staff, office and test cards
+ * were invisible and read as "missing students". Every card now has a row,
+ * refreshed on each sync pass, so the office can see exactly what Loyverse
+ * holds, including cards Loyverse has since deleted.
+ */
+function CustomersTab() {
+  const { get, set } = useUrlFilters();
+  const [page, setPage] = useUrlPage();
+  const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
+  const kind = get('tipo') ?? '';
+  const [receiptsFor, setReceiptsFor] = useState<LoyverseCustomer | null>(null);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin-cafeteria-customers', page, kind, debouncedSearch],
+    queryFn: async () => (await cafeteriaApi.getLoyverseCustomers({
+      page, ...(kind ? { kind } : {}), ...(debouncedSearch ? { q: debouncedSearch } : {}),
+    })).data,
+    placeholderData: keepPreviousData,
+    ...LIVE,
+  });
+
+  const rows = data?.results ?? [];
+  const summary = data?.summary;
+  const total = summary ? summary.student + summary.staff + summary.test + summary.other : 0;
+
+  return (
+    <Card>
+      <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative max-w-md flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, código o correo..."
+            aria-label="Buscar cliente de Loyverse"
+            className="w-full rounded-xl border border-line bg-white py-2 pl-9 pr-3 text-sm text-ink placeholder:text-subtle focus:border-brand-500 focus:outline-none"
+          />
+        </div>
+        <div role="group" aria-label="Filtrar por tipo" className="flex flex-wrap gap-1">
+          {KIND_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              aria-pressed={kind === f.key}
+              onClick={() => set({ tipo: f.key || null, page: null })}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                kind === f.key ? 'bg-brand-600 text-white' : 'bg-cream text-muted hover:text-ink'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {summary && (
+        <p className="mb-3 text-sm text-muted">
+          {total} tarjeta(s) en Loyverse: {summary.student} alumno(s), {summary.staff} de personal,
+          {' '}{summary.test} de prueba, {summary.other} otra(s)
+          {summary.missing > 0 ? `; ${summary.missing} ya no existe(n) en Loyverse.` : '.'}
+        </p>
+      )}
+      {isLoading ? (
+        <TableSkeleton />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : !rows.length ? (
+        <EmptyState icon={Users} title="Sin clientes que coincidan" description="Las tarjetas se llenan en la siguiente pasada de sincronización (cada 5 minutos)." />
+      ) : (
+        <>
+          <DataTable
+            rows={rows}
+            rowKey={(c) => c.loyverse_id}
+            columns={[
+              {
+                header: 'Nombre', className: 'font-medium text-ink',
+                cell: (c) => c.student
+                  ? <Link to={`/admin/cafeteria/${c.student.id}`} className="hover:text-brand-700">{c.name || c.student.name}</Link>
+                  : (c.name || '—'),
+              },
+              { header: 'Código', className: 'font-mono text-xs text-muted', cell: (c) => c.customer_code || '—' },
+              { header: 'Tipo', cell: (c) => <Badge variant={KIND_BADGE[c.kind].variant}>{KIND_BADGE[c.kind].label}</Badge> },
+              { header: 'Correo', className: 'text-muted', cell: (c) => c.email || '—' },
+              { header: 'Saldo', align: 'right', className: 'font-semibold text-ink', cell: (c) => `$${parseFloat(c.total_points).toFixed(2)}` },
+              { header: 'Visitas', align: 'right', className: 'text-muted', cell: (c) => c.total_visits },
+              { header: 'Última visita', className: 'whitespace-nowrap text-muted', cell: (c) => fmtDate(c.last_visit) },
+              {
+                header: 'Estado',
+                cell: (c) => c.missing_since
+                  ? <Badge variant="error">Eliminado en Loyverse</Badge>
+                  : <Badge variant="success">Activo</Badge>,
+              },
+              {
+                header: 'Compras', align: 'right',
+                cell: (c) => c.student
+                  ? <Link to={`/admin/cafeteria/${c.student.id}`} className="text-xs font-semibold text-brand-700 hover:underline">Ver alumno</Link>
+                  : (
+                    <Button size="sm" variant="ghost" onClick={() => setReceiptsFor(c)} aria-label={`Ver compras de ${c.name}`}>
+                      <Receipt className="h-3.5 w-3.5" /> {c.receipts}
+                    </Button>
+                  ),
+              },
+            ]}
+          />
+          <Pagination page={page} pageSize={50} count={data?.count ?? 0} onChange={setPage} itemLabel="clientes" />
+        </>
+      )}
+      <CustomerReceiptsModal customer={receiptsFor} onClose={() => setReceiptsFor(null)} />
+    </Card>
+  );
+}
+
+function CustomerReceiptsModal({ customer, onClose }: { customer: LoyverseCustomer | null; onClose: () => void }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['admin-cafeteria-customer-receipts', customer?.loyverse_id],
+    queryFn: async () => (await cafeteriaApi.getLoyverseCustomerReceipts(customer!.loyverse_id)).data,
+    enabled: !!customer,
+  });
+  return (
+    <Modal open={!!customer} onClose={onClose} title={customer ? `Compras: ${customer.name}` : 'Compras'} maxWidth={640}>
+      {isLoading ? (
+        <TableSkeleton />
+      ) : isError ? (
+        <ErrorState />
+      ) : !data?.results.length ? (
+        <EmptyState icon={Receipt} title="Sin compras registradas" description="Solo se conservan las compras cobradas al monedero desde que la app empezó a guardarlas." />
+      ) : (
+        <DataTable
+          rows={data.results}
+          rowKey={(r) => r.receipt_number}
+          columns={[
+            { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (r) => fmtDate(r.receipt_date) },
+            { header: 'Recibo', className: 'font-mono text-xs text-subtle', cell: (r) => r.receipt_number },
+            { header: 'Artículos', className: 'text-muted', cell: (r) => r.items || '—' },
+            { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (r) => `${r.receipt_type === 'REFUND' ? '+' : '−'}$${parseFloat(r.points).toFixed(2)}` },
+          ]}
+        />
+      )}
+    </Modal>
   );
 }

@@ -12,6 +12,8 @@ vi.mock('@/services/api', () => ({
     syncBalance: vi.fn(),
     reconcile: vi.fn(),
     getLowBalance: vi.fn(),
+    getLoyverseCustomers: vi.fn(),
+    getLoyverseCustomerReceipts: vi.fn(),
     exportSchool: vi.fn(),
   },
   downloadBlob: vi.fn(),
@@ -172,5 +174,50 @@ describe('AdminCafeteria POS Loyverse queues', () => {
 
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
     expect(within(screen.getByText('Luis Pérez').closest('tr')!).getByText(/\$200\.00/)).toBeInTheDocument();
+  });
+});
+
+describe('AdminCafeteria Clientes Loyverse tab (every card, not only pupils)', () => {
+  const getCustomers = vi.mocked(cafeteriaApi.getLoyverseCustomers);
+  const getReceipts = vi.mocked(cafeteriaApi.getLoyverseCustomerReceipts);
+  const staff = {
+    loyverse_id: 's1', kind: 'staff' as const, kind_display: 'Personal', customer_code: '170',
+    name: 'ZP-Rivero Montes de Oca Nadia', email: 'nrivero@interlaken.com.mx', phone_number: '',
+    address_code: '', note: '', first_visit: null, last_visit: '2026-09-17T16:00:00Z',
+    total_visits: 177, total_spent: '9000.00', total_points: '178.00', loyverse_created_at: null,
+    loyverse_updated_at: null, synced_at: '2026-09-23T14:00:00Z', missing_since: null,
+    student: null, receipts: 2,
+  };
+  const pupil = { ...staff, loyverse_id: 'p1', kind: 'student' as const, kind_display: 'Alumno',
+    customer_code: 'ci10999', name: 'Perez Lopez Ana-1PRI', receipts: 0,
+    student: { id: 7, name: 'Ana Perez Lopez', grade: '1° Primaria', group: '', student_id: '10999' } };
+
+  beforeEach(() => {
+    getAllBalances.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    getCustomers.mockResolvedValue({ data: {
+      count: 2, summary: { student: 1, staff: 1, test: 0, other: 0, missing: 0 }, results: [pupil, staff],
+    } } as never);
+    getReceipts.mockResolvedValue({ data: { customer: staff, results: [
+      { receipt_number: 'r-9', receipt_date: '2026-09-22T17:00:00Z', points: '45.00',
+        items: 'Comida corrida, 2× Agua', receipt_type: 'SALE', resolved: false },
+    ] } } as never);
+  });
+
+  it('lists staff cards next to pupils with kind, balance and a receipts button', async () => {
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?tab=customers' });
+    expect(await screen.findByText('ZP-Rivero Montes de Oca Nadia')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Personal')).toBeInTheDocument();
+    expect(within(table).getByText('Alumno')).toBeInTheDocument();
+    expect(within(table).getAllByText('$178.00')).toHaveLength(2);
+    expect(screen.getByText(/2 tarjeta\(s\) en Loyverse/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver alumno' })).toHaveAttribute('href', '/admin/cafeteria/7');
+  });
+
+  it('opens the receipts of a staff card', async () => {
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?tab=customers' });
+    await userEvent.click(await screen.findByRole('button', { name: /Ver compras de ZP-Rivero/ }));
+    expect(await screen.findByText('Comida corrida, 2× Agua')).toBeInTheDocument();
+    expect(getReceipts).toHaveBeenCalledWith('s1');
   });
 });

@@ -43,6 +43,9 @@ urlpatterns = [
     path('admin/refund/<int:tx_pk>/',    views.AdminRefundView.as_view(),         name='admin-refund'),
     path('admin/reconcile/',             views.AdminReconcileView.as_view(),      name='admin-reconcile'),
     path('admin/low-balance/',           views.AdminLowBalanceView.as_view(),     name='admin-low-balance'),
+    path('admin/customers/',             views.AdminLoyverseCustomersView.as_view(), name='admin-customers'),
+    path('admin/customers/<str:loyverse_id>/receipts/',
+         views.AdminLoyverseCustomerReceiptsView.as_view(), name='admin-customer-receipts'),
     path('admin/export/student/<int:pk>/', views.AdminExportStudentView.as_view(), name='admin-export-student'),
     path('admin/export/school/',         views.AdminExportSchoolView.as_view(),   name='admin-export-school'),
 ]

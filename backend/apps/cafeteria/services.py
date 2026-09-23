@@ -1460,7 +1460,23 @@ def _record_wallet_audit(customers, result, now) -> dict:
     linked_ids = set(linked.values_list('loyverse_id', flat=True))
     unlinked = [c for c in customers if c.get('id') not in linked_ids]
     pending = UnmatchedReceipt.objects.filter(resolved_at__isnull=True)
+
+    # Every customer in the store gets (or refreshes) its profile row, staff
+    # and test cards included, so the console can show the whole store. A
+    # profile failure must never undo the credits this pass just wrote.
+    from apps.cafeteria.loyverse_profile import refresh_all_profiles
+    try:
+        profiles = refresh_all_profiles(customers)
+    except Exception:  # noqa: BLE001
+        logger.exception('Loyverse profile refresh failed; audit continues')
+        profiles = {}
+
     audit = {
+        'profiles_total': profiles.get('total', 0),
+        'profiles_staff': profiles.get('staff', 0),
+        'profiles_test': profiles.get('test', 0),
+        'profiles_other': profiles.get('other', 0),
+        'profiles_missing': profiles.get('missing', 0),
         'at': now.isoformat(),
         'compared': (result['credited'] + result['in_sync'] + result['below']
                      + result['deferred'] + result['skipped_pending']),

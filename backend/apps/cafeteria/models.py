@@ -208,19 +208,36 @@ class BalanceAdjustment(models.Model):
 
 
 class LoyverseProfile(models.Model):
-    """Full snapshot of a student's Loyverse customer record.
+    """Full snapshot of ONE Loyverse customer record, student or not.
 
-    Loyverse holds more about each student than we mirror onto StudentProfile —
+    Loyverse holds more about each customer than we mirror onto StudentProfile:
     the visit history (first/last visit, total visits) and lifetime spend shown
-    on the POS customer card. This model captures the *complete* customer object
-    (parsed columns for querying + the raw JSON for anything not modelled),
-    refreshed by ``sync_loyverse_profiles``. It never drives spending — the
-    prepaid wallet is CafeteriaBalance; this is read-only reference data.
+    on the POS customer card. This model captures the *complete* customer
+    object (parsed columns for querying + the raw JSON for anything not
+    modelled). Since 2026-09-23 every customer in the store has a row, not only
+    the ones linked to a student: staff meal cards, the school's own cards and
+    test records are ``kind`` staff/test/other with ``student`` empty, so the
+    console can show the whole store and nothing in Loyverse is invisible.
+    Refreshed on every full sync pass and on customers.update webhooks. It
+    never drives spending: the prepaid wallet is CafeteriaBalance; this is
+    read-only reference data.
     """
+
+    class Kind(models.TextChoices):
+        STUDENT = 'student', 'Alumno'
+        STAFF   = 'staff',   'Personal'
+        TEST    = 'test',    'Prueba'
+        OTHER   = 'other',   'Otro'
+
     student        = models.OneToOneField(
-                         StudentProfile, on_delete=models.CASCADE,
+                         StudentProfile, on_delete=models.CASCADE, null=True, blank=True,
                          related_name='loyverse_profile')
-    loyverse_id    = models.CharField('ID de Loyverse', max_length=100, db_index=True)
+    loyverse_id    = models.CharField('ID de Loyverse', max_length=100, unique=True)
+    kind           = models.CharField('Tipo', max_length=10, choices=Kind.choices,
+                                      default=Kind.OTHER, db_index=True)
+    # Set when a full customer list no longer contains this id (deleted in
+    # Loyverse); cleared when it reappears. Rows are never deleted here.
+    missing_since  = models.DateTimeField('Ausente en Loyverse desde', null=True, blank=True)
     customer_code  = models.CharField('Matrícula (Loyverse)', max_length=40, blank=True)
     name           = models.CharField('Nombre en Loyverse', max_length=200, blank=True)
     email          = models.EmailField('Correo', blank=True)
