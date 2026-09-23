@@ -5,7 +5,7 @@
  * Incident (2026-08-21): vite-plugin-pwa's generateSW default navigateFallback
  * registered a NavigationRoute bound to index.html AHEAD of runtimeCaching.
  * Every SW-controlled browser then answered EVERY navigation with the SPA
- * shell — including the server-rendered /auth/google/ and /admin/ paths — so
+ * shell — including the server-rendered /auth/google/ and /django-admin/ paths — so
  * Google login rendered the React 404 page and the Django admin was
  * unreachable. vite.config.ts sets `navigateFallback: null` to fix it; this
  * script makes sure that fix can never silently regress (a plugin upgrade or
@@ -17,7 +17,7 @@
  *   2. the worker contains a NavigationRoute / createHandlerBoundToURL
  *      (the global navigation hijack),
  *   3. the worker no longer excludes the server-rendered prefixes
- *      (/api, /admin, /auth, /static, /media) from its page route,
+ *      (/api, /django-admin, /auth, /static, /media) from its page route,
  *   4. the push companion (push-sw.js) is not imported.
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -38,15 +38,15 @@ const sw = readFileSync(swPath, 'utf8');
 if (/NavigationRoute|createHandlerBoundToURL/.test(sw)) {
   fail(
     'dist/sw.js registers a NavigationRoute (navigateFallback). This answers ' +
-      '/auth/* and /admin/* with the SPA shell and breaks Google login + the ' +
+      '/auth/* and /django-admin/* with the SPA shell and breaks Google login + the ' +
       'Django admin. Keep `workbox.navigateFallback: null` in vite.config.ts.',
   );
 }
 
 // The 'pages' route's exclusion regex survives minification verbatim.
-if (!/\^\\\/\(api\|admin\|auth\|static\|media\)\\\//.test(sw)) {
+if (!/\^\\\/\(api\|django-admin\|auth\|static\|media\)\\\//.test(sw)) {
   fail(
-    'dist/sw.js no longer excludes /api, /admin, /auth, /static and /media ' +
+    'dist/sw.js no longer excludes /api, /django-admin, /auth, /static and /media ' +
       'from the page (navigate) route — see the `pages` runtimeCaching entry ' +
       'in vite.config.ts.',
   );
