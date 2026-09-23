@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw, RefreshCw,
+  Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
   Search, X, Download, Wallet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -883,6 +883,9 @@ export default function CafeteriaPage() {
                   }`}>
                     {tx.transaction_type === 'purchase' ? '-' : '+'}${parseFloat(tx.amount).toFixed(2)}
                   </span>
+                  {tx.applied === false && (
+                    <p className="text-xs text-subtle sm:mt-0.5">Incluida en el saldo inicial</p>
+                  )}
                   {tx.balance_after != null && (
                     <p className="text-xs text-subtle sm:mt-0.5">Saldo ${parseFloat(tx.balance_after).toFixed(2)}</p>
                   )}

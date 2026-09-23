@@ -75,6 +75,11 @@ class CafeteriaTransaction(models.Model):
     # answer "did anything just land for this student?", which is exactly the
     # question the POS top-up mirror must ask before trusting a points delta.
     recorded_at         = models.DateTimeField(default=timezone.now, db_index=True)
+    # False = history only: the receipt predates the student's opening balance
+    # (which was copied from Loyverse points that already net it), so the row
+    # is shown to the family but never debited. Keeps the purchase list
+    # complete for pupils imported mid-year without double-charging them.
+    applied             = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = 'Transacción de Cafetería'

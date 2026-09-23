@@ -600,8 +600,24 @@ class LoyverseWebhookView(APIView):
         # credits only, ledgers that already agree are no-ops.
         customers = payload.get('customers')
         if isinstance(customers, list) and (payload.get('type') == 'customers.update' or customers):
+            # The payload's points can predate the sale that triggered it (the
+            # 2026-09-23 phantom recargas). Re-read each card from the API so
+            # the mirror works from a current value and can credit a genuine
+            # recarga at once; if a read fails, fall back to the payload and
+            # let the mirror treat it as stale (settle window applies).
+            from apps.cafeteria.services import LoyverseError, get_customer_by_id
+            fresh_customers, all_fresh = [], True
+            for c in customers:
+                cid = c.get('id') if isinstance(c, dict) else None
+                if not cid:
+                    continue
+                try:
+                    fresh_customers.append(get_customer_by_id(cid))
+                except LoyverseError:
+                    fresh_customers.append(c)
+                    all_fresh = False
             try:
-                result = mirror_pos_topups(customers=customers)
+                result = mirror_pos_topups(customers=fresh_customers, fresh=all_fresh)
             except Exception:  # noqa: BLE001
                 logger.exception('Loyverse customers.update processing failed')
                 return Response({'error': 'processing_error'}, status=500)

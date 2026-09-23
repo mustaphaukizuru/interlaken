@@ -139,7 +139,7 @@ class CafeteriaTransactionSerializer(serializers.ModelSerializer):
         model = CafeteriaTransaction
         fields = [
             'id', 'student_id', 'transaction_type', 'amount', 'description',
-            'items', 'balance_after', 'date', 'loyverse_receipt_id',
+            'items', 'balance_after', 'date', 'loyverse_receipt_id', 'applied',
         ]
 
 

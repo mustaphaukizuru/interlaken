@@ -209,7 +209,7 @@ export default function AdminCafeteriaStudent() {
               { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
               { header: 'Descripción', className: 'text-muted', cell: (t) => <span className="block min-w-0 max-w-xs truncate" title={t.description}>{t.description || '—'}</span> },
               { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => `$${parseFloat(t.amount).toFixed(2)}` },
-              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
+              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.applied === false ? <span className="text-xs" title="Compra anterior al alta: ya estaba incluida en el saldo inicial">incl. saldo inicial</span> : t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
               {
                 header: 'Acción', align: 'right',
                 cell: (t) => refundable(t) && (

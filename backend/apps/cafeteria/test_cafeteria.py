@@ -1180,7 +1180,11 @@ class TestLedgerSumInvariant:
         services.complete_online_topup(payment)
 
         # POS purchase -40 via the shared receipt record path.
-        services.record_receipts([_receipt("loy-sum", "R-SUM-1", 40)])
+        # A purchase AFTER the seed (the helper's default date is months before
+        # it, which since 2026-09-23 is history-only and must not debit).
+        services.record_receipts([_receipt(
+            "loy-sum", "R-SUM-1", 40,
+            date=(timezone.now() + timedelta(seconds=5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))])
 
         # Manual audited adjustment -10.
         services.adjust_balance(student, Decimal("-10"), "cobro duplicado")
