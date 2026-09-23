@@ -40,7 +40,7 @@ class TestAnnouncementComments:
         created = api_client.post(url, {'body': '¿A qué hora?'}, format='json')
         assert created.status_code == 201, created.content
         assert created.json()['author_name']            # attributed, not blank
-        rows = api_client.get(url).json()['results']
+        rows = api_client.get(url).json()
         assert [r['body'] for r in rows] == ['¿A qué hora?']
 
     def test_hidden_comments_are_not_listed(self, api_client):
@@ -50,7 +50,7 @@ class TestAnnouncementComments:
         AnnouncementComment.objects.create(announcement=ann, author=parent,
                                            body='oculto', is_hidden=True)
         api_client.force_authenticate(parent)
-        rows = api_client.get(reverse('announcement-comments', args=[ann.id])).json()['results']
+        rows = api_client.get(reverse('announcement-comments', args=[ann.id])).json()
         assert [r['body'] for r in rows] == ['visible']
 
     def test_cannot_comment_on_out_of_audience(self, api_client):

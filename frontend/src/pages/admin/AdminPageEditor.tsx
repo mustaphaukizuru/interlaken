@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, ChevronLeft, Copy, ExternalLink, Eye, History, Monitor, Plus, Smartphone, Tablet, Trash2, Upload, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { cmsPagePath } from '@/cms/slugPaths';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -122,7 +123,7 @@ export default function AdminPageEditor() {
     <div className="flex min-h-[calc(100svh-7rem)] flex-col">
       <PageHeader
         title={meta.title || page.title}
-        subtitle={`/${meta.slug}`}
+        subtitle={cmsPagePath(meta.slug)}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
             <Link to={base} className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
@@ -140,7 +141,7 @@ export default function AdminPageEditor() {
             )}
             {isAdmin && page.status === 'published' && (
               <>
-                <a href={`/${page.slug}`} target="_blank" rel="noopener noreferrer" className="btn-outline inline-flex items-center gap-1 text-sm"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
+                <a href={cmsPagePath(page.slug)} target="_blank" rel="noopener noreferrer" className="btn-outline inline-flex items-center gap-1 text-sm"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
                 <Button variant="danger" size="sm" onClick={() => setConfirmUnpublish(true)}><XCircle size={16} aria-hidden="true" /> Retirar</Button>
               </>
             )}

@@ -10,6 +10,7 @@ import MobileTabBar from './MobileTabBar';
 import { RouteTransition } from './RouteTransition';
 import { CommandPalette } from '@/components/admin/CommandPalette';
 import { SITE_NAME } from '@/lib/siteMeta';
+import { navGroupsByRole } from './navConfig';
 
 interface Props {
   role: 'parent' | 'student' | 'admin' | 'staff';
@@ -20,7 +21,7 @@ interface Props {
  * its titles from <RouteSeo> (react-helmet-async); portal routes set them here
  * directly so screen-reader users hear where a navigation landed.
  */
-const PORTAL_TITLES: Record<string, string> = {
+const EXPLICIT_TITLES: Record<string, string> = {
   '/portal': 'Inicio',
   '/portal/pagos': 'Pagos',
   '/portal/cafeteria': 'Cafetería',
@@ -38,6 +39,10 @@ const PORTAL_TITLES: Record<string, string> = {
   '/admin/ajustes': 'Ajustes',
   '/staff': 'Analítica',
 };
+// Every sidebar entry titles its own route; the explicit map wins on overlap.
+const PORTAL_TITLES: Record<string, string> = Object.values(navGroupsByRole)
+  .flatMap((groups) => groups.flatMap((g) => g.items))
+  .reduce<Record<string, string>>((acc, { to, label }) => (acc[to] ? acc : { ...acc, [to]: label }), { ...EXPLICIT_TITLES });
 
 /** Exact match first; detail routes (…/comunicados/:id) inherit their section title. */
 function portalTitleFor(pathname: string): string | undefined {

@@ -55,9 +55,9 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       items: [
         { icon: BarChart3,     label: 'Dashboard',  to: '/admin', end: true },
         { icon: Users,         label: 'Alumnos',    to: '/admin/alumnos' },
-        { icon: ClipboardList, label: 'Admisiones', to: '/admin/admisiones', badgeKey: 'admisiones' },
+        { icon: ClipboardList, label: 'Admisiones', to: '/admin/admisiones', end: true, badgeKey: 'admisiones' },
         { icon: KanbanSquare, label: 'Pipeline', to: '/admin/admisiones/pipeline' },
-        { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', badgeKey: 'visitas' },
+        { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas' },
         { icon: CalendarDays, label: 'Agenda semanal', to: '/admin/visitas/semana' },
       ],
     },
@@ -79,7 +79,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
     {
       heading: 'Contenido del sitio',
       items: [
-        { icon: FileText,      label: 'Páginas',     to: '/admin/contenido' },
+        { icon: FileText,      label: 'Páginas',     to: '/admin/contenido', end: true },
         { icon: FormInput,     label: 'Formularios', to: '/admin/formularios', badgeKey: 'formularios' },
         { icon: Compass,       label: 'Navegación', to: '/admin/navegacion' },
         { icon: Image,         label: 'Biblioteca de medios', to: '/admin/contenido/medios' },
@@ -110,7 +110,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
     {
       heading: 'Contenido del sitio',
       items: [
-        { icon: FileText, label: 'Páginas',              to: '/staff/contenido' },
+        { icon: FileText, label: 'Páginas',              to: '/staff/contenido', end: true },
         { icon: Image,    label: 'Biblioteca de medios', to: '/staff/contenido/medios' },
       ],
     },

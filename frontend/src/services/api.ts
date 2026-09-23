@@ -177,7 +177,12 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !original._retry &&
-      !url.includes('/token/refresh')
+      !url.includes('/token/refresh') &&
+      // A 401 from the login endpoint is a wrong password / TOTP challenge,
+      // not an expired session: refreshing there would reload /login and wipe
+      // the form (and make the TOTP step unreachable in a fresh browser).
+      !url.includes('/accounts/token/') &&
+      useAuthStore.getState().isAuthenticated
     ) {
       original._retry = true;
       try {
@@ -187,7 +192,9 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         useAuthStore.getState().logout();
-        if (typeof window !== 'undefined') window.location.href = '/login';
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
@@ -225,27 +232,33 @@ export const authApi = {
   deleteAvatar: () => api.delete('/accounts/me/avatar/'),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
-  getNotifPrefs: () =>
-    api.get<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean }>(
-      '/accounts/notification-preferences/',
-    ),
   updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>
     api.patch('/accounts/notification-preferences/', data),
   logout: async () => {
     const csrf = getCookie(CSRF_COOKIE);
-    const token = useAuthStore.getState().accessToken;
+    const post = (token: string | null) => axios.post(`${API_BASE}/auth/logout/`, {}, {
+      withCredentials: true,
+      headers: {
+        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     try {
-      await axios.post(`${API_BASE}/auth/logout/`, {}, {
-        withCredentials: true,
-        headers: {
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-    } catch {
-      /* best-effort — clear locally regardless */
+      await post(useAuthStore.getState().accessToken);
+    } catch (err) {
+      // The in-memory access token outlives its 15-min lifetime on an idle
+      // tab; mint a fresh one so the server actually revokes the refresh
+      // cookie instead of just clearing local state.
+      if ((err as { response?: { status?: number } })?.response?.status === 401) {
+        try { await post(await coalescedRefresh()); } catch { /* best-effort */ }
+      }
     }
     useAuthStore.getState().logout();
+    // Runtime caches keyed by URL only: a later login on the same device must
+    // never be served this account's JSON while offline/slow.
+    if (typeof caches !== 'undefined') {
+      try { await Promise.all(['api', 'offline-essentials'].map((c) => caches.delete(c))); } catch { /* ignore */ }
+    }
     window.location.href = '/';
   },
 };
@@ -277,8 +290,6 @@ export const admissionsApi = {
   exchangeAccess: (id: number, token: string) =>
     api.post(`/admissions/register/${id}/access/`, { token }),
 
-  getRegistration: (id: number, sessionToken?: string) =>
-    api.get(`/admissions/register/${id}/`, sessionHeaders(sessionToken)),
 
   updateRegistration: (id: number, data: unknown, sessionToken?: string) =>
     api.patch(`/admissions/register/${id}/`, data, sessionHeaders(sessionToken)),
@@ -309,8 +320,6 @@ export const admissionsApi = {
   getOpenSchoolEvents: () =>
     api.get('/admissions/open-school/'),
 
-  signUpOpenSchool: (data: unknown) =>
-    api.post('/admissions/open-school/signup/', data),
 };
 
 // ── ADMISSIONS (admin console) ────────────────────────────
@@ -537,8 +546,6 @@ export const cafeteriaApi = {
   getAllBalances: (params?: { page?: number }) =>
     api.get('/cafeteria/admin/balances/', { params }),
 
-  applyTopUp: (topupId: number) =>
-    api.post(`/cafeteria/admin/topup/${topupId}/apply/`),
 
   syncBalance: (studentId: number) =>
     api.post<{
@@ -765,11 +772,7 @@ export const bookingsApi = {
     num_attendees?: number;
   }) => api.post('/bookings/', data),
 
-  getBooking: (id: number) =>
-    api.get(`/bookings/${id}/`),
 
-  cancelBooking: (id: number) =>
-    api.post(`/bookings/${id}/cancel/`),
 
   // Admin
   generateSlots: (data: {
@@ -1131,7 +1134,7 @@ export const contentApi = {
   adminUpdateForm: (id: number, data: Partial<FormDefinitionAdmin>) => api.patch<FormDefinitionAdmin>(`/content/admin/forms/${id}/`, data),
   adminDeleteForm: (id: number) => api.delete(`/content/admin/forms/${id}/`),
   adminFormSubmissions: (id: number, params?: { handled?: '0' | '1' }) => api.get<FormSubmission[]>(`/content/admin/forms/${id}/submissions/`, { params }),
-  adminFormSubmissionsCsvUrl: (id: number) => `/api/v1/content/admin/forms/${id}/submissions/?export=csv`,
+  adminFormSubmissionsCsv: (id: number) => api.get<Blob>(`/content/admin/forms/${id}/submissions/`, { params: { export: 'csv' }, responseType: 'blob' }),
   adminHandleSubmission: (id: number, is_handled: boolean) => api.patch<FormSubmission>(`/content/admin/form-submissions/${id}/`, { is_handled }),
   /** CMS media library (BACKLOG P3-1). */
   adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),
@@ -1152,8 +1155,6 @@ export const contentApi = {
   adminDeleteTestimonial: (id: number) => api.delete(`/content/admin/testimonials/${id}/`),
 
   // Costos por sección (editables por el colegio en el admin).
-  getCosts: () =>
-    api.get('/content/costs/'),
 
   // Paquete completo de precios 2026-2027: inscripción/reinscripción,
   // colegiaturas, seguros, extraescolares, estancia y políticas.

@@ -17,6 +17,8 @@ frontend/dist/
 frontend/.env*.local
 # Bundle treemap from `ANALYZE=1 npm run build` (rollup-plugin-visualizer)
 frontend/stats.html
+# Vitest coverage output (`npm run test:coverage`)
+frontend/coverage/
 # Playwright E2E artifacts
 frontend/test-results/
 frontend/playwright-report/

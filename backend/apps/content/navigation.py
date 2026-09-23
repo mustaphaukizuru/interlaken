@@ -29,6 +29,21 @@ SITEMAP_CACHE_KEY = 'cms:sitemap'
 REDIRECTS_CACHE_KEY = 'cms:redirects'
 SITE = 'https://interlaken.edu.mx'
 
+# CMS slugs that CmsOverride (frontend/src/App.tsx) binds to a nested public
+# route. Every other published page is served at /<slug>. Keep in sync with
+# frontend/src/cms/slugPaths.ts.
+SLUG_PATHS = {
+    'inicio': '/',
+    'documentacion': '/admisiones/documentacion',
+    'costos': '/admisiones/costos',
+    'plataformas': '/comunidad/plataformas',
+}
+
+
+def page_path(slug: str) -> str:
+    """Public URL path of a CMS page."""
+    return SLUG_PATHS.get(slug, f'/{slug}')
+
 # Routes that live in code (App.tsx). Slugs of published CMS pages are added.
 STATIC_ROUTES = [
     ('/', 'weekly', '1.0'), ('/nosotros', 'monthly', '0.8'), ('/modelo-educativo', 'monthly', '0.7'),
@@ -97,8 +112,9 @@ class RedirectSerializer(serializers.ModelSerializer):
 
     def validate_from_path(self, v):
         v = v.strip().rstrip('/') or '/'
-        if not PATH_RE.match(v) or v.startswith('/api/') or v.startswith('/admin'):
-            raise serializers.ValidationError('Ruta no válida (debe empezar con / y no puede ser /api o /admin).')
+        reserved = ('/api', '/admin', '/django-admin', '/auth', '/static', '/media', '/portal', '/staff')
+        if not PATH_RE.match(v) or v == '/healthz' or any(v == r or v.startswith(f'{r}/') for r in reserved):
+            raise serializers.ValidationError('Ruta no válida (debe empezar con / y no puede ser una ruta reservada como /api, /admin o /portal).')
         return v
 
     def validate_to_path(self, v):
@@ -158,7 +174,7 @@ def build_sitemap() -> str:
     for page in Page.objects.filter(status=Page.Status.PUBLISHED):
         if (page.seo or {}).get('noindex') or (page.unpublish_at and page.unpublish_at <= timezone.now()):
             continue
-        path = f'/{page.slug}' if page.slug != 'inicio' else '/'
+        path = page_path(page.slug)
         if any(r[0] == path for r in rows) or path in redirected:
             continue
         rows.append((path, 'weekly', '0.6', page.published_at))

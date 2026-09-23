@@ -244,6 +244,7 @@ class AnnouncementCommentListCreateView(generics.ListCreateAPIView):
     (moderated) comments are never listed. The author is the current user.
     """
     serializer_class = AnnouncementCommentSerializer
+    pagination_class = None  # a thread is read whole; the SPA sends no ?page=
     permission_classes = [permissions.IsAuthenticated]
 
     def _announcement(self):

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ClipboardList, GraduationCap, Search, Send, Copy, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -285,6 +286,21 @@ interface RegRow {
 function RegistrationsSection() {
   const [page, setPage] = useState(1);
   const [reviewId, setReviewId] = useState<number | null>(null);
+  // ?inscripcion=<id> deep link (pipeline card → review modal); consumed once.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wantsReview = searchParams.get('inscripcion');
+  useEffect(() => {
+    if (!wantsReview) return;
+    const id = Number(wantsReview);
+    // Suppressed: one-shot URL command consumed (deleted) right after.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (Number.isInteger(id) && id > 0) setReviewId(id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('inscripcion');
+      return next;
+    }, { replace: true });
+  }, [wantsReview, setSearchParams]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-registrations', page],

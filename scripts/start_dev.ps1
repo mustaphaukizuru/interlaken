@@ -23,7 +23,7 @@ Start-Process powershell -ArgumentList @(
 )
 
 Write-Host ""
-Write-Host "  Backend  : http://localhost:8000/admin/   (admin@interlaken.edu.mx / Interla2025Admin!)" -ForegroundColor Green
+Write-Host "  Backend  : http://localhost:8000/django-admin/   (use the superuser you created with createsuperuser)" -ForegroundColor Green
 Write-Host "  API      : http://localhost:8000/api/v1/" -ForegroundColor Green
 Write-Host "  Frontend : http://localhost:3000/" -ForegroundColor Green
 Write-Host ""

@@ -12,7 +12,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { contentApi, type FormDefinitionAdmin, type FormField, type FormFieldType, type FormSubmission } from '@/services/api';
+import { contentApi, type FormDefinitionAdmin, type FormField, type FormFieldType, type FormSubmission, downloadBlob } from '@/services/api';
 import { apiErrors, slugify } from '@/cms/editor/helpers';
 import { formatDateTime } from '@/lib/format';
 
@@ -156,11 +156,20 @@ function SubmissionsModal({ form, onClose }: { form: FormDefinitionAdmin; onClos
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-form-submissions', form.id] }); qc.invalidateQueries({ queryKey: ['admin-forms'] }); qc.invalidateQueries({ queryKey: ['badges'] }); },
   });
   const rows: FormSubmission[] = data ?? [];
+  // Authenticated download (a plain <a href> would carry no Bearer token → 401).
+  const exportCsv = async () => {
+    try {
+      const { data: blob } = await contentApi.adminFormSubmissionsCsv(form.id);
+      downloadBlob(blob, `envios-${form.slug || form.id}.csv`);
+    } catch {
+      toast.error('No se pudo exportar el CSV.');
+    }
+  };
   return (
     <Modal open onClose={onClose} title={`Envíos: ${form.title}`} maxWidth={720}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} /> Solo pendientes</label>
-        <a href={contentApi.adminFormSubmissionsCsvUrl(form.id)} className="btn-outline inline-flex items-center gap-1 text-sm"><Download size={14} aria-hidden="true" /> CSV</a>
+        <button type="button" onClick={() => { void exportCsv(); }} className="btn-outline inline-flex items-center gap-1 text-sm"><Download size={14} aria-hidden="true" /> CSV</button>
       </div>
       {isLoading ? <ListSkeleton /> : rows.length === 0 ? <p className="py-6 text-center text-sm text-muted">Sin envíos{onlyPending ? ' pendientes' : ''}.</p> : (
         <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto" aria-label="Envíos">

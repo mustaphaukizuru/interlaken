@@ -130,6 +130,18 @@ export default function CafeteriaPage() {
   // not re-trigger) and out-of-range amounts are ignored. No payment logic
   // lives here — this only pre-selects what the existing modal already does.
   const [searchParams, setSearchParams] = useSearchParams();
+  // ?hijo=<id> (profile page per-child button) selects that child once.
+  useEffect(() => {
+    const raw = searchParams.get('hijo');
+    if (raw == null || !balances) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('hijo');
+      return next;
+    }, { replace: true });
+    const id = Number(raw);
+    if (balances.some((b) => b.student.id === id)) setChildId(id);
+  }, [searchParams, setSearchParams, balances, setChildId]);
   useEffect(() => {
     const raw = searchParams.get('recarga');
     if (raw == null || !balances) return;

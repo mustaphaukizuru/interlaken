@@ -59,10 +59,12 @@ def cap(im, max_dim):
 
 
 def save_pair(im, name):
-    """Write <name>.webp + <name>.png into OUT."""
-    im.save(f"{OUT}/{name}.png")
+    """Write <name>.webp into OUT (+ <name>.png only for logo-horizontal, the
+    one raster consumer: the JSON-LD logo in index.html / siteMeta.ts)."""
+    if name == "logo-horizontal":
+        im.save(f"{OUT}/{name}.png")
     im.save(f"{OUT}/{name}.webp", **WEBP)
-    print(f"  {name}.png / .webp  {im.size}")
+    print(f"  {name}.webp  {im.size}")
 
 
 # --- load sources ------------------------------------------------------------

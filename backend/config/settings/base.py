@@ -33,7 +33,6 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
-    'social_django',
     'drf_spectacular',
     'axes',
 ]
@@ -76,7 +75,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'social_django.middleware.SocialAuthExceptionMiddleware',
     # Turns axes lockout signals into a 429 response (brute-force protection).
     'axes.middleware.AxesMiddleware',
     # Exposes the request so audit records can attribute the acting user (IK-SEC A3).
@@ -98,8 +96,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'social_django.context_processors.backends',
-                'social_django.context_processors.login_redirect',
             ],
         },
     },
@@ -140,7 +136,6 @@ AUTHENTICATION_BACKENDS = [
     # Axes must come first: it raises on locked-out credentials before any
     # real backend sees them (brute-force protection, IK-SEC C2/C6).
     'axes.backends.AxesStandaloneBackend',
-    'social_core.backends.google.GoogleOAuth2',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -168,16 +163,6 @@ CSP_ENABLED = env.bool('CSP_ENABLED', default=True)
 CSP_REPORT_ONLY = env.bool('CSP_REPORT_ONLY', default=False)
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-# Default '' so the app boots without Google OAuth configured (email/password
-# login still works); social-auth's Google backend simply stays inactive until set.
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('GOOGLE_CLIENT_ID', default='')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile',
-]
-SOCIAL_AUTH_GOOGLE_OAUTH2_EXTRA_DATA = ['first_name', 'last_name', 'picture']
-
 # Google OAuth (read by apps/accounts/views.py). Redirect URI MUST end with '/'
 # to match the Django route /auth/google/callback/ and Google Cloud Console.
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
@@ -189,7 +174,7 @@ GOOGLE_REDIRECT_URI = env('GOOGLE_REDIRECT_URI', default='http://localhost:8000/
 GOOGLE_AUTO_CREATE_DOMAINS = env.list('GOOGLE_AUTO_CREATE_DOMAINS', default=[])
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 
-LOGIN_URL = '/auth/login/'
+LOGIN_URL = '/login'
 LOGIN_REDIRECT_URL = '/portal/'
 LOGOUT_REDIRECT_URL = '/'
 
@@ -387,7 +372,7 @@ DEFAULT_PAYMENT_GATEWAY = env('DEFAULT_PAYMENT_GATEWAY', default='global_payment
 PAYMENTS_LIVE = env.bool('PAYMENTS_LIVE', default=False)
 
 # Public origin of this Django API (webhook status_url in HPP session payloads).
-# On cPanel the SPA and API share interlaken.edu.mx — set explicitly in prod.
+# SPA and API share the same origin behind Caddy; compose derives it from PORTAL_DOMAIN.
 BACKEND_URL = env('BACKEND_URL', default='')
 
 # Global Payments (Hosted Payment Page).
@@ -507,16 +492,16 @@ if SENTRY_DSN:
         release=(env('SENTRY_RELEASE', default='')
                  or env('GIT_SHA', default='')
                  or None),
-        traces_sample_rate=env.float('SENTRY_TRACES_SAMPLE_RATE', default=0.0),
+        # env.float('') raises at import: a blank line in .env must mean 0.
+        traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='') or 0.0),
         send_default_pii=False,
         before_send=_scrub_sensitive,
     )
 
 # ── CACHE ─────────────────────────────────────────────────
 # Per-process in-memory cache. Today it backs the 60s micro-cache on the
-# staff analytics endpoint (apps/portal/analytics.py); on cPanel/Passenger
-# each process keeps its own copy, which is acceptable for short-TTL
-# read-only aggregates.
+# staff analytics endpoint (apps/portal/analytics.py); each gunicorn worker
+# keeps its own copy, which is acceptable for short-TTL read-only aggregates.
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -648,7 +633,7 @@ UNFOLD = {
     'ENVIRONMENT_TITLE_PREFIX': 'apps.core.environment.environment_title_prefix',
     'SIDEBAR': {
         'show_search': True,
-        # Plumbing models (JWT token blacklist, sessions, social-auth rows) are
+        # Plumbing models (JWT token blacklist, sessions, axes) are
         # deliberately NOT listed below, which hides them from the default view.
         'show_all_applications': False,
         'navigation': [

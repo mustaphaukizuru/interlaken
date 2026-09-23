@@ -136,6 +136,7 @@ class AdminCalendarView(generics.ListCreateAPIView):
     """GET/POST /api/v1/content/admin/calendar/ (admin)."""
     permission_classes = [IsAdmin]
 
+    pagination_class = None  # small admin table; the SPA sends no ?page=
     def get_serializer_class(self):
         from .serializers import SchoolEventSerializer
         return SchoolEventSerializer
@@ -176,6 +177,7 @@ class PublicTestimonialsView(APIView):
 class AdminTestimonialsView(generics.ListCreateAPIView):
     permission_classes = [IsAdmin]
 
+    pagination_class = None  # small admin table; the SPA sends no ?page=
     def get_serializer_class(self):
         from .serializers import TestimonialSerializer
         return TestimonialSerializer

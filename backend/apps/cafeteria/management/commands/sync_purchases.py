@@ -1,7 +1,7 @@
 """
 sync_purchases — poll Loyverse receipts → cafeteria transactions + parent alerts.
 
-Scheduled by .github/workflows/loyverse-sync.yml; the Loyverse webhook
+Scheduled by deploy/crontab.example; the Loyverse webhook
 (LoyverseWebhookView) delivers the same receipts in real time, so this poll is
 the safety net rather than the primary path. Idempotent: each receipt maps to a
 unique ``CafeteriaTransaction`` so re-running never duplicates a purchase or

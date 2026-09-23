@@ -105,38 +105,3 @@ export const ROUTE_META: Record<string, RouteMeta> = {
       'Aviso de Privacidad de Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO.',
   },
 };
-
-/**
- * JSON-LD for the school as an EducationalOrganization + LocalBusiness.
- * Rendered once on the home page so the Rich Results test sees a stable graph.
- */
-export function organizationJsonLd(): Record<string, unknown> {
-  return {
-    '@context': 'https://schema.org',
-    '@type': ['School', 'EducationalOrganization', 'LocalBusiness'],
-    '@id': `${SITE_URL}/#organization`,
-    name: SITE_NAME,
-    legalName: ORG.legalName,
-    url: SITE_URL,
-    logo: `${SITE_URL}/assets/logo-horizontal.png`,
-    image: OG_IMAGE,
-    description: DEFAULT_DESCRIPTION,
-    telephone: ORG.telephone,
-    email: ORG.email,
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: ORG.streetAddress,
-      addressLocality: ORG.addressLocality,
-      addressRegion: ORG.addressRegion,
-      postalCode: ORG.postalCode,
-      addressCountry: ORG.addressCountry,
-    },
-    geo: {
-      '@type': 'GeoCoordinates',
-      latitude: ORG.latitude,
-      longitude: ORG.longitude,
-    },
-    sameAs: ORG.sameAs,
-    areaServed: 'Tlalnepantla de Baz, Estado de México',
-  };
-}

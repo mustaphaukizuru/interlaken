@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowUpRight, ExternalLink, type LucideIcon,
          CreditCard, FileSearch, Gavel, UserPlus } from 'lucide-react';
 import { fmtInt, fmtMXN, fmtPct, getChartTheme } from '@/lib/chartTheme';
 import { usePrefersDark } from '@/hooks/useMediaQuery';
+import { useAuthStore } from '@/store/authStore';
 import type { AnalyticsPayload } from '@/types/analytics';
 
 /**
@@ -11,10 +12,11 @@ import type { AnalyticsPayload } from '@/types/analytics';
  * each card deep-linking to the console/admin view that acts on it.
  */
 
-// Django admin lives on the API origin (same origin in production, where the
-// SPA is served by Django; on the Vite dev server this resolves to the SPA).
+// Django admin is mounted at /django-admin/ on the API origin (same origin in
+// production; the React console owns /admin/*). The Vite dev server proxies
+// that prefix to the backend too.
 const djangoAdmin = (path: string) =>
-  `${import.meta.env.VITE_API_BASE_URL || ''}${path}`;
+  `${import.meta.env.VITE_API_BASE_URL || ''}/django-admin${path}`;
 
 function Delta({ pct, label }: { pct: number | null; label: string }) {
   if (pct === null) {
@@ -80,6 +82,9 @@ function pctChange(current: number, previous: number): number | null {
 export default function KpiRow({ data }: { data: AnalyticsPayload }) {
   const dark = usePrefersDark();
   const theme = getChartTheme(dark);
+  // Staff see this row on /staff but cannot open /admin/* (ProtectedRoute
+  // bounces them back) nor the Django admin, so their cards are plain tiles.
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
 
   const admissionsSeries = data.admissions.series;
   // Momentum: second half of the selected window vs the first half.
@@ -123,7 +128,7 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
       value: fmtInt(data.documents.in_review),
       deltaPct: null,
       deltaLabel: 'cola de revisión de expedientes',
-      href: djangoAdmin('/admin/admissions/registrationdocument/?is_verified__exact=0'),
+      href: djangoAdmin('/admissions/registrationdocument/?is_verified__exact=0'),
     },
     {
       key: 'arco',
@@ -134,7 +139,7 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
       deltaLabel: data.arco.overdue > 0
         ? `${fmtInt(data.arco.overdue)} fuera de plazo legal`
         : 'todas dentro de plazo',
-      href: djangoAdmin('/admin/legal/arcorequest/?status__in=received,in_review'),
+      href: djangoAdmin('/legal/arcorequest/?status__in=received,in_review'),
     },
   ];
 
@@ -148,7 +153,7 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
               <span className="flex-1 text-xs font-medium text-muted dark:text-white/60">
                 {title}
               </span>
-              <ExternalLink size={13} className="text-subtle opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/45" aria-hidden="true" />
+              {isAdmin && <ExternalLink size={13} className="text-subtle opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/45" aria-hidden="true" />}
             </div>
             <div className="mt-2 font-head text-2xl font-bold tabular-nums text-ink dark:text-white">
               {value}
@@ -160,6 +165,9 @@ export default function KpiRow({ data }: { data: AnalyticsPayload }) {
           </>
         );
         const cls = 'group block min-w-0 rounded-xl2 border border-line bg-white p-4 shadow-card transition-colors hover:border-purple/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/50 dark:border-white/10 dark:bg-dark-card dark:shadow-none dark:hover:border-white/25';
+        if (!isAdmin) {
+          return <div key={key} className={cls}>{body}</div>;
+        }
         return to ? (
           <Link key={key} to={to} className={cls} aria-label={`${title} — abrir vista`}>{body}</Link>
         ) : (

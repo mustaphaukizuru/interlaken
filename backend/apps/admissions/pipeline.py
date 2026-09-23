@@ -81,9 +81,18 @@ def _template() -> str:
     return SiteSettings.load().tpl_missing_docs or DEFAULT_MISSING_DOCS_TEMPLATE
 
 
-def render_missing_docs(reg: Registration, template: str | None = None) -> tuple[str, list[str]]:
+def documents_upload_url(reg: Registration, raw_token: str) -> str:
+    """Link the family can redeem on /inscripcion/documentos (needs rid + a fresh
+    single-use invite token; the persistent access_token UUID is NOT redeemable)."""
+    return f"{(settings.FRONTEND_URL or '').rstrip('/')}/inscripcion/documentos?rid={reg.id}&token={raw_token}"
+
+
+def render_missing_docs(reg: Registration, template: str | None = None, upload_url: str | None = None) -> tuple[str, list[str]]:
+    """Render the missing-documents message. ``upload_url`` is injected by the
+    sender (RequestDocsView issues the invite); the template preview shown in
+    the pipeline uses a placeholder so previewing never rotates a family's link."""
     c = checklist(reg)
-    upload_url = f"{(settings.FRONTEND_URL or '').rstrip('/')}/inscripcion/documentos?token={reg.access_token}"
+    upload_url = upload_url or f"{(settings.FRONTEND_URL or '').rstrip('/')}/inscripcion/documentos?rid={reg.id}&token=…"
     text = (template or _template()).format(
         parent_name=reg.parent1_name, child_name=f'{reg.child_first_name} {reg.child_last_name}',
         missing_list='\n'.join(f'• {m}' for m in c['missing']) or '• (nada pendiente)', upload_url=upload_url)
@@ -96,9 +105,10 @@ class RequestDocsView(APIView):
     def post(self, request, pk):
         from apps.portal.services import send_email
         reg = get_object_or_404(Registration, pk=pk)
-        text, missing = render_missing_docs(reg)
-        if not missing:
+        if not checklist(reg)['missing']:
             return Response({'detail': 'No falta ningún documento.'}, status=status.HTTP_400_BAD_REQUEST)
+        from .tokens import issue_invite
+        text, missing = render_missing_docs(reg, upload_url=documents_upload_url(reg, issue_invite(reg)))
         send_email('Documentos pendientes para la inscripción', text, [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL)
         record('update', reg, {'requested_docs': missing}, actor=request.user, context='admissions: solicitud de documentos')
         return Response({'sent_to': reg.parent1_email, 'missing': missing, 'text': text})

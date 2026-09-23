@@ -52,14 +52,6 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
   });
 }
 
-/** Remove the current push subscription, if any. */
-export async function unsubscribeFromPush(): Promise<boolean> {
-  if (!('serviceWorker' in navigator)) return false;
-  const registration = await navigator.serviceWorker.ready;
-  const sub = await registration.pushManager.getSubscription();
-  return sub ? sub.unsubscribe() : false;
-}
-
 /**
  * Full opt-in: browser subscription + persist on the backend so
  * portal notifications (cafetería, pagos, avisos) reach this device.

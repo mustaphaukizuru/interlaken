@@ -37,7 +37,10 @@ export default function ComunicadoDetailPage() {
 
   const comments = useQuery<Comment[]>({
     queryKey: ['announcement-comments', annId],
-    queryFn: async () => (await portalApi.getAnnouncementComments(annId)).data.results,
+    queryFn: async () => {
+      const d = (await portalApi.getAnnouncementComments(annId)).data as Comment[] | { results: Comment[] };
+      return Array.isArray(d) ? d : d.results;
+    },
     enabled,
   });
 

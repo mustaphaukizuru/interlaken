@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { waHref } from '@/lib/siteContact';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Calculator, Info } from 'lucide-react';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { waLink, waSectionMessage } from '@/lib/whatsapp';
+import { waSectionMessage } from '@/lib/whatsapp';
 import { formatPrice } from '@/lib/format';
 import { contentApi } from '@/services/api';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
@@ -214,7 +215,7 @@ export function CostEstimator() {
       <div className="flex flex-col gap-3 border-t border-ink/10 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
         {whatsapp_number && (
           <a
-            href={waLink(whatsapp_number, waSectionMessage(section))}
+            href={waHref(whatsapp_number, waSectionMessage(section))}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() =>

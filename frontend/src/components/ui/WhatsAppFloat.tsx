@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarCheck, KeyRound, X } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { waLink } from '@/lib/whatsapp';
+import { waHref } from '@/lib/siteContact';
 import { PASSWORD_REQUEST_MESSAGE } from '@/components/portal/PasswordHelp';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
@@ -35,14 +35,14 @@ export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: 
     <div className={wrap}>
       {open && (
         <div role="menu" aria-label="Contacto rápido" className="flex flex-col items-end gap-2">
-          <a role="menuitem" href={waLink(whatsapp_number, FLOAT_TEXT)} target="_blank" rel="noopener noreferrer" className={item}
+          <a role="menuitem" href={waHref(whatsapp_number, FLOAT_TEXT)} target="_blank" rel="noopener noreferrer" className={item}
             onClick={() => { trackEvent(ConversionEvent.WhatsappCta, { context: 'burbuja_flotante' }); setOpen(false); }}>
             <WhatsAppIcon className="h-4 w-4 text-green-600" /> WhatsApp
           </a>
           <Link role="menuitem" to="/agendar-visita" className={item} onClick={() => setOpen(false)}>
             <CalendarCheck className="h-4 w-4 text-purple" aria-hidden="true" /> Agendar visita
           </Link>
-          <a role="menuitem" href={waLink(whatsapp_number, PASSWORD_REQUEST_MESSAGE)} target="_blank" rel="noopener noreferrer" className={item} onClick={() => setOpen(false)}>
+          <a role="menuitem" href={waHref(whatsapp_number, PASSWORD_REQUEST_MESSAGE)} target="_blank" rel="noopener noreferrer" className={item} onClick={() => setOpen(false)}>
             <KeyRound className="h-4 w-4 text-coral" aria-hidden="true" /> Recuperar contraseña
           </a>
         </div>

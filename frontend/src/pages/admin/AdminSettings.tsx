@@ -212,7 +212,13 @@ export default function AdminSettings() {
   const save = useMutation({
     mutationFn: () => {
       setFieldErrors({});
-      return contentApi.adminUpdateSettings({ ...form });
+      // Fields owned by other screens (menu → /admin/navegacion, school_year →
+      // /admin/nuevo-ciclo) are never sent: PATCHing the fetched snapshot
+      // silently reverted whatever was saved there in the meantime.
+      const payload = Object.fromEntries(
+        Object.entries(form).filter(([k]) => !['menu', 'school_year', 'updated_at'].includes(k)),
+      ) as Partial<SettingsForm>;
+      return contentApi.adminUpdateSettings(payload);
     },
     onSuccess: () => toast.success('Ajustes guardados. El sitio público se actualizará.'),
     onError: (err: unknown) => {

@@ -1,4 +1,5 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
+import { waHref } from '@/lib/siteContact';
 import { useEffect, useRef, useState } from 'react';
 import {
   Menu, X, Phone, Mail, MapPin, ChevronDown,
@@ -11,7 +12,7 @@ import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { waLink, WA_MESSAGES } from '@/lib/whatsapp';
+import { WA_MESSAGES } from '@/lib/whatsapp';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
@@ -22,8 +23,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 const HIDE_STICKY_CTA = [
   '/agendar-visita',
   '/pre-registro',
-  '/registro',
-  '/inscripcion/documentos',
+  '/inscripcion',
   '/login',
 ];
 
@@ -394,7 +394,7 @@ export function PublicLayout() {
           </Link>
           {settings.whatsapp_number && (
             <a
-              href={waLink(settings.whatsapp_number, WA_MESSAGES.visit)}
+              href={waHref(settings.whatsapp_number, WA_MESSAGES.visit)}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Escribir por WhatsApp"

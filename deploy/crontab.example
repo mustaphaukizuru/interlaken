@@ -27,7 +27,7 @@ CRON_TZ=America/Mexico_City
 # ── Daily tasks, 06:15 local ────────────────────────────────────────────────
 # ';' not '&&' on purpose: these are independent, and one failure must not
 # cancel the reminders that follow it.
-15 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-daily.lock bash -c 'docker compose exec -T app python manage.py expire_stale_payments; docker compose exec -T app python manage.py low_balance_alerts; docker compose exec -T app python manage.py send_booking_reminders; docker compose exec -T app python manage.py dispatch_notifications' >> /var/log/interlaken/daily.log 2>&1
+15 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-daily.lock bash -c 'docker compose exec -T app python manage.py expire_stale_payments; docker compose exec -T app python manage.py low_balance_alerts; docker compose exec -T app python manage.py sync_calendar; docker compose exec -T app python manage.py send_booking_reminders; docker compose exec -T app python manage.py dispatch_notifications' >> /var/log/interlaken/daily.log 2>&1
 
 # ── Spending digest, 18:00 local ────────────────────────────────────────────
 # Deliberately separate from the 06:15 block: the digest summarises the day's
@@ -56,9 +56,9 @@ CRON_TZ=America/Mexico_City
 # `mail`): it emails every active admin once per outage and lights the panel.
 */30 * * * * cd $COMPOSE && docker compose exec -T app python manage.py check_sync_fresh >> /var/log/interlaken/loyverse.log 2>&1
 
-# ── Log rotation so the files above cannot fill the disk ────────────────────
-# Nightly database backup at 02:30 (see backup-db.sh). The database now runs on
-# this box, so nothing off-site backs it up: if this stops, there is no copy.
+# ── Nightly database backup, 02:30 (see backup-db.sh) ──────────────────────
+# Dumps whichever database DB_HOST names (the managed Postgres today). If this
+# stops, the only other copy is the off-site one backup-db.sh uploads itself.
 30 2 * * * cd $COMPOSE && flock -n /tmp/interlaken-backup.lock ./backup-db.sh >> /var/log/interlaken/backup.log 2>&1
 
 # Shout if last night's backup did not land. Silence from a backup job looks
@@ -70,20 +70,13 @@ CRON_TZ=America/Mexico_City
 # The off-box copy (Supabase S3) is done by backup-db.sh itself right after the
 # dump; it is a no-op until AWS_STORAGE_BUCKET_NAME + keys are set in .env.
 
+# ── Log rotation so the files above cannot fill the disk ────────────────────
 0 3 * * 0 find /var/log/interlaken -name '*.log' -size +50M -exec truncate -s 0 {} \;
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GitHub Actions: disable "Loyverse cafeteria sync" and "scheduled-tasks" once
-# the above is running, or both fire against the same database. The work is
-# idempotent so nothing is double charged, but the Actions runs also execute
-# `migrate`, which can collide with a container restart.
-#
-# KEEP "db-backup" ENABLED. It is the only thing backing up the database, it
-# does not conflict with anything here, and nothing on this VPS replaces it.
-# ─────────────────────────────────────────────────────────────────────────────
 
 # Retention policy (docs/RETENTION.md): purge/anonymise operational data past its window, weekly.
 0 5 * * 0 cd $COMPOSE && docker compose exec -T app python manage.py purge_retention --apply >> /var/log/interlaken/retention.log 2>&1
 
-# Backup restore drill (docs/OPS-RUNBOOK.md §3): prove the newest dump restores, monthly.
-0 4 1-7 * 0 cd $COMPOSE && ./restore-db.sh "$(ls -t /var/backups/interlaken/db-*.sql.gz | head -1)" >> /var/log/interlaken/restore-drill.log 2>&1
+# Backup restore drill (docs/OPS-RUNBOOK.md §3): prove the newest dump restores,
+# on the first Sunday of the month. (cron ORs day-of-month with day-of-week, so
+# "1-7 * 0" would fire on every Sunday AND on days 1-7; the date test is the gate.)
+0 4 1-7 * * [ "$(date +\%u)" = 7 ] && cd $COMPOSE && ./restore-db.sh "$(ls -t /var/backups/interlaken/db-*.sql.gz | head -1)" >> /var/log/interlaken/restore-drill.log 2>&1

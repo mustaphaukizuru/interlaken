@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
@@ -17,7 +17,15 @@ const ROLE_PATHS: Record<string, string> = {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
+  // ProtectedRoute sends the page the user tried to open (push/email deep
+  // links); return there after login. ProtectedRoute re-checks the role.
+  const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+  const fromPath = from?.pathname && from.pathname.startsWith('/') && from.pathname !== '/login'
+    ? `${from.pathname}${from.search ?? ''}`
+    : null;
+  const homeFor = (role: string) => fromPath ?? ROLE_PATHS[role] ?? '/portal';
   const { setAuth, setUser, isAuthenticated, user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,7 +55,7 @@ export default function LoginPage() {
         const { data } = await authApi.me();
         if (cancelled) return;
         setUser(data);
-        navigate(ROLE_PATHS[data.role] ?? '/portal', { replace: true });
+        navigate(homeFor(data.role), { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
@@ -62,14 +70,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(ROLE_PATHS[user.role] ?? '/portal', { replace: true });
+      navigate(homeFor(user.role), { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, navigate, fromPath]);
 
   const oauthError = params.get('error');
   const oauthMessage = (() => {
     switch (oauthError) {
       case 'no_code': return 'No se recibió autorización de Google.';
+      case 'state_mismatch': return 'La sesión de Google caducó o no coincide. Intente de nuevo.';
       case 'no_email': return 'No fue posible obtener su correo de Google.';
       case 'token_exchange_failed': return 'Error al comunicarse con Google. Intente de nuevo.';
       case 'userinfo_failed': return 'No fue posible obtener su perfil de Google. Intente de nuevo.';
@@ -97,7 +107,7 @@ export default function LoginPage() {
       useAuthStore.getState().setAccess(access);
       const { data: me } = await authApi.me();
       setAuth(me, access);
-      navigate(ROLE_PATHS[me.role] ?? '/portal', { replace: true });
+      navigate(homeFor(me.role), { replace: true });
     } catch (err) {
       const body = (err as { response?: { data?: { totp_required?: boolean; detail?: string } } })?.response?.data;
       if (body?.totp_required) {
