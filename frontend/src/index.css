@@ -224,6 +224,38 @@
   .admin-table tbody tr:hover { @apply bg-cream; }
   .admin-table .num { @apply text-right tabular-nums; }
 
+  /* DataTable v2 (Data Ops round): selection, pinned first column, resizable
+     widths, static header, clickable rows. All ≥ md; the card mode below
+     resets the layout so none of these apply on phones. */
+  .admin-table--static thead th { position: static; }
+  .admin-table__select { width: 44px; }
+  .admin-table thead th.admin-table__select,
+  .admin-table tbody td.admin-table__select { @apply px-3 text-center; }
+  .admin-table tbody tr.admin-table__row--selected { @apply bg-brand-50; }
+  .admin-table tbody tr.admin-table__row--selected:hover { @apply bg-brand-100; }
+  .admin-table--clickable tbody tr { @apply cursor-pointer; }
+  .admin-table--clickable tbody tr:focus-visible { @apply outline-none ring-2 ring-inset ring-purple/40; }
+  .admin-table__resizer {
+    position: absolute; top: 0; right: 0; height: 100%; width: 8px;
+    cursor: col-resize; user-select: none; touch-action: none;
+  }
+  .admin-table__resizer:hover, .admin-table__resizer--active { @apply bg-purple/30; }
+  @media (min-width: 768px) {
+    .admin-table--pin-first thead th.admin-table__select,
+    .admin-table--pin-first tbody td.admin-table__select { position: sticky; left: 0; z-index: 5; @apply bg-white; }
+    .admin-table--pin-first thead th.admin-table__pin,
+    .admin-table--pin-first tbody td.admin-table__pin {
+      position: sticky; left: var(--pin-left, 0px); z-index: 5; @apply bg-white;
+      box-shadow: inset -1px 0 0 theme('colors.line');
+    }
+    .admin-table--pin-first thead th.admin-table__select,
+    .admin-table--pin-first thead th.admin-table__pin { z-index: 15; @apply bg-cream-2; }
+    .admin-table--pin-first tbody tr:hover td.admin-table__select,
+    .admin-table--pin-first tbody tr:hover td.admin-table__pin { @apply bg-cream; }
+    .admin-table--pin-first tbody tr.admin-table__row--selected td.admin-table__select,
+    .admin-table--pin-first tbody tr.admin-table__row--selected td.admin-table__pin { @apply bg-brand-50; }
+  }
+
   /* Mobile (<768px): dense tables that ship no bespoke card list collapse into
      stacked cards. Scoped with :not(.hidden) so tables that already pair a
      `md:hidden <ul>` with a `hidden md:block` desktop table are left alone —
@@ -251,5 +283,7 @@
     .admin-table-wrap:not(.hidden) tbody td:not([data-label]) { @apply justify-end; }
     .admin-table-wrap:not(.hidden) tbody td:not([data-label])::before { content: none; }
     .admin-table-wrap:not(.hidden) .num { @apply text-right; }
+    .admin-table-wrap:not(.hidden) tbody td.admin-table__select { width: auto; }
+    .admin-table-wrap:not(.hidden) tbody tr.admin-table__row--selected { @apply border-brand-300 bg-brand-50; }
   }
 }
