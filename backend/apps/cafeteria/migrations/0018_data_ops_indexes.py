@@ -8,7 +8,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('accounts', '0013_studentprofile_loyverse_missing_since'),
-        ('cafeteria', '0016_cafeteriatransaction_applied'),
+        # Stacked on Phase 0 (fix/loyverse-roster-sync) so cafeteria keeps a single leaf.
+        ('cafeteria', '0017_loyversesyncstate_last_roster_sync_at'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

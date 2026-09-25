@@ -55,6 +55,14 @@ class TestSearch:
     def test_legacy_search_alias_still_works(self, admin_client, roster):
         assert _names(admin_client.get(URL, {"search": "Zuñiga"})) == ["Ana"]
 
+    def test_loyverse_spelling_finds_the_stored_digits(self, admin_client, roster):
+        # Decision C3.1 (Phase 0): ci09932 and 09932 are one matrícula; the
+        # mixin's normalize_search_term hook carries search_key over to ``q``.
+        assert _names(admin_client.get(URL, {"q": "ci09932"})) == ["Beto"]
+        assert _names(admin_client.get(URL, {"q": "CI09932 primaria"})) == ["Beto"]
+        # A name that merely starts with "ci" is not a Loyverse code.
+        assert _names(admin_client.get(URL, {"q": "carla"})) == ["Carla"]
+
     def test_terms_are_anded(self, admin_client, roster):
         assert _names(admin_client.get(URL, {"q": "primaria 09932"})) == ["Beto"]
         assert _names(admin_client.get(URL, {"q": "ana alvarado"})) == []
