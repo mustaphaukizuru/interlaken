@@ -63,6 +63,8 @@ class Payment(models.Model):
             models.Index(fields=['status', 'completed_at']),
             models.Index(fields=['user', '-created_at']),
             models.Index(fields=['payment_type', 'status']),
+            # Admin pagos list and summary by date range (Data Ops Phase 1).
+            models.Index(fields=['created_at'], name='pay_payment_created'),
         ]
 
     def __str__(self):
