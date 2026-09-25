@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.cafeteria.services import LoyverseError, get_all_customers, link_students_to_loyverse
+from apps.core.exceptions import error_body
 from apps.core.flags import truthy
 from apps.core.permissions import IsAdmin
 
@@ -31,7 +32,7 @@ class LinkLoyverseView(APIView):
         except LoyverseError as e:
             # Expired/absent token or a Loyverse outage — surface it, don't 500.
             return Response(
-                {'error': f'No se pudo conectar con Loyverse: {e}'},
+                error_body(f'No se pudo conectar con Loyverse: {e}'),
                 status=status.HTTP_502_BAD_GATEWAY)
 
         report = link_students_to_loyverse(customers, overwrite=overwrite, commit=commit)

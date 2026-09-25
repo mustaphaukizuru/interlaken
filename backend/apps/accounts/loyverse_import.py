@@ -19,6 +19,7 @@ from apps.cafeteria.services import (
     import_students_from_loyverse,
     link_students_to_loyverse,
 )
+from apps.core.exceptions import error_body
 from apps.core.flags import truthy
 from apps.core.permissions import IsAdmin
 
@@ -42,7 +43,7 @@ class ImportLoyverseView(APIView):
             customers = get_all_customers()
         except LoyverseError as e:
             return Response(
-                {'error': f'No se pudo conectar con Loyverse: {e}'},
+                error_body(f'No se pudo conectar con Loyverse: {e}'),
                 status=status.HTTP_502_BAD_GATEWAY)
 
         import_report = import_students_from_loyverse(

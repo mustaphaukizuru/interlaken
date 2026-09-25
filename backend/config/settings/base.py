@@ -202,17 +202,21 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    # Data Ops C1: NO implicit backends. The implicit OrderingFilter used to run
+    # after apps.core.ordering.apply_ordering, accept any serializer field and
+    # drop the -pk tiebreak; SearchFilter gave every list a different param.
+    # Lists opt in through apps.core.listing.AdminListMixin (q, whitelisted
+    # ordering, FilterSet) instead.
+    'DEFAULT_FILTER_BACKENDS': [],
+    'DEFAULT_PAGINATION_CLASS': 'apps.core.listing.ListPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Keeps DRF's {detail} / field-dict shapes, converts Django ValidationError
+    # to a 400 and folds any stray {'error': ...} body into {'detail'}.
+    'EXCEPTION_HANDLER': 'apps.core.exceptions.handler',
     # Scoped throttles for money-initiation endpoints (per-user; anonymous
     # abuse-prone public forms are covered by django-ratelimit decorators).
     # Views opt in with apps.core.throttling.SharedScopedRateThrottle, which
@@ -224,9 +228,12 @@ REST_FRAMEWORK = {
         # handful per minute; the ceiling blunts scripted mass-rewriting of
         # every family credential from one compromised admin session.
         'admin-set-password': '20/min',
-        # Admin bulk/roster operations (sync-roster today, the bulk contract
-        # later): each run fetches the whole Loyverse store and rewrites up to
-        # ~400 rows, so a scripted loop from one session is capped.
+        # Data Ops round: every export, import and bulk action (and the
+        # sync-roster pass) runs inside one request (no workers), so the
+        # ceilings bound how much synchronous work one admin session can queue
+        # on the 3 gunicorn workers.
+        'admin-export': '30/min',
+        'admin-import': '10/min',
         'admin-bulk': '30/min',
     },
 }

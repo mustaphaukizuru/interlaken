@@ -7,6 +7,8 @@ operational analytics dashboard is the staff app view (/staff).
 from django.urls import reverse
 from django.utils import formats, timezone
 
+from .listing import day_end_exclusive, day_start
+
 
 def dashboard_callback(request, context):
     # Imports at call time so settings can reference this module dotted-path
@@ -23,8 +25,11 @@ def dashboard_callback(request, context):
     regs_in_review = Registration.objects.filter(
         status__in=[Registration.Status.SUBMITTED, Registration.Status.REVIEWING]).count()
     docs_in_review = RegistrationDocument.objects.filter(is_verified=False).count()
+    # Aware bounds instead of ``completed_at__date=`` so the (status, completed_at)
+    # index answers the count (Data Ops C1).
     payments_today = Payment.objects.filter(
-        status=Payment.Status.SUCCESS, completed_at__date=today).count()
+        status=Payment.Status.SUCCESS,
+        completed_at__gte=day_start(today), completed_at__lt=day_end_exclusive(today)).count()
     arco_open = ArcoRequest.objects.filter(
         status__in=[ArcoRequest.Status.RECEIVED, ArcoRequest.Status.IN_REVIEW]).count()
 
