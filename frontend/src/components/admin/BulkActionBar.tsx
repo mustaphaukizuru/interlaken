@@ -19,6 +19,8 @@ interface Props {
   onClear: () => void;
   /** Plural noun: "filas", "reservas", "alumnos". */
   itemLabel?: string;
+  /** Grammatical gender of `itemLabel` for the participle (seleccionadas / seleccionados). */
+  gender?: 'f' | 'm';
   busy?: boolean;
   /** How many actions render as buttons before the overflow menu (desktop). */
   inline?: number;
@@ -35,12 +37,13 @@ const ACTION_BTN =
  */
 export function BulkActionBar({
   count, allMatching = false, allMatchingCount = 0, onSelectAllMatching, actions = [], onAction, onExport, exportMenu, onClear,
-  itemLabel = 'filas', busy = false, inline = 3,
+  itemLabel = 'filas', gender = 'f', busy = false, inline = 3,
 }: Props) {
   if (count <= 0) return null;
   const primary = actions.slice(0, inline);
   const overflow = actions.slice(inline);
   const canSelectAll = !!onSelectAllMatching && !allMatching && allMatchingCount > count;
+  const participle = `seleccionad${gender === 'm' ? 'o' : 'a'}${count === 1 ? '' : 's'}`;
 
   return (
     <div
@@ -51,7 +54,7 @@ export function BulkActionBar({
       <p className="text-sm text-brand-700" aria-live="polite">
         <strong className="font-semibold text-ink">{count.toLocaleString('es-MX')}</strong>{' '}
         {allMatching ? `${itemLabel} que coinciden con los filtros` : count === 1 ? itemLabel.replace(/s$/, '') : itemLabel}{' '}
-        {count === 1 ? 'seleccionada' : 'seleccionadas'}
+        {participle}
         {canSelectAll && (
           <>
             {' · '}

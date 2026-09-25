@@ -159,6 +159,7 @@ export default function AdminPayments() {
               onSelectAllMatching={selection.onSelectAllMatching}
               onClear={selection.onClear}
               itemLabel="pagos"
+              gender="m"
               exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="pagos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
             />
           )}

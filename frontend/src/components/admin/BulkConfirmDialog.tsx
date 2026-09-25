@@ -12,6 +12,8 @@ interface Props {
   action: BulkActionDef | null;
   /** Plural noun for the plan: "reservas", "alumnos", "pagos". */
   entityLabel: string;
+  /** Grammatical gender of `entityLabel` for the participles (procesadas / procesados). */
+  gender?: 'f' | 'm';
   ids: RowKey[];
   /** With `allMatching`, the server resolves the ids from `filters`. */
   allMatching?: boolean;
@@ -38,8 +40,8 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, ids, allMatching = false, filters, execute, onDone }: Props) {
-  const title = action ? `${action.label}: ${allMatching ? 'todas las que coinciden' : `${ids.length} ${entityLabel}`}` : '';
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, execute, onDone }: Props) {
+  const title = action ? `${action.label}: ${allMatching ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${ids.length} ${entityLabel}`}` : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
       {action && (
@@ -49,6 +51,7 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, ids, all
           key={action.name}
           action={action}
           entityLabel={entityLabel}
+          gender={gender}
           ids={ids}
           allMatching={allMatching}
           filters={filters}
@@ -61,7 +64,9 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, ids, all
   );
 }
 
-function BulkConfirmBody({ action, entityLabel, ids, allMatching, filters, execute, onDone, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, execute, onDone, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+  // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
+  const p = (stem: string) => `${stem}${gender === 'm' ? 'o' : 'a'}s`;
   const [phase, setPhase] = useState<Phase>('planning');
   const [plan, setPlan] = useState<BulkResult | null>(null);
   const [result, setResult] = useState<BulkResult | null>(null);
@@ -170,7 +175,7 @@ function BulkConfirmBody({ action, entityLabel, ids, allMatching, filters, execu
               {plan.failed.length > 0 && (
                 <p className="text-xs text-coral-700">{plan.failed.length} no se pueden procesar (ver detalle al terminar).</p>
               )}
-              {snapshot.allMatching && <p className="text-xs">Se aplicará a todas las {entityLabel} que coinciden con los filtros actuales.</p>}
+              {snapshot.allMatching && <p className="text-xs">Se aplicará a tod{gender === 'm' ? 'os los' : 'as las'} {entityLabel} que coinciden con los filtros actuales.</p>}
             </div>
           </div>
 
@@ -224,9 +229,9 @@ function BulkConfirmBody({ action, entityLabel, ids, allMatching, filters, execu
             </span>
             <div className="text-sm text-muted" role="status">
               <p>
-                <strong className="text-ink">{result.ok.toLocaleString('es-MX')}</strong> {entityLabel} procesadas
-                {result.skipped.length > 0 && <>, {result.skipped.length} omitidas</>}
-                {result.failed.length > 0 && <>, <strong className="text-coral-700">{result.failed.length} fallidas</strong></>}.
+                <strong className="text-ink">{result.ok.toLocaleString('es-MX')}</strong> {entityLabel} {p('procesad')}
+                {result.skipped.length > 0 && <>, {result.skipped.length} {p('omitid')}</>}
+                {result.failed.length > 0 && <>, <strong className="text-coral-700">{result.failed.length} {p('fallid')}</strong></>}.
               </p>
             </div>
           </div>

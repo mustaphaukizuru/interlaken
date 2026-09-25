@@ -68,7 +68,7 @@ describe('AdminPayments (reference page)', () => {
     expect(screen.queryByRole('region', { name: 'Acciones en lote' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar pago 11 de Emma Quintana' }));
     const bar = await screen.findByRole('region', { name: 'Acciones en lote' });
-    expect(bar).toHaveTextContent('1 pago seleccionada');
+    expect(bar).toHaveTextContent('1 pago seleccionado');
     await userEvent.click(screen.getByRole('button', { name: /Exportar seleccionados/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: /CSV/ }));
     await waitFor(() => expect(adminExport).toHaveBeenCalledWith({ fmt: 'csv', ids: '11' }));
@@ -80,7 +80,7 @@ describe('AdminPayments (reference page)', () => {
     await screen.findByText('Emma Quintana');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las filas de esta página' }));
     await userEvent.click(screen.getByRole('button', { name: 'Seleccionar las 250 que coinciden' }));
-    expect(screen.getByRole('region', { name: 'Acciones en lote' })).toHaveTextContent('250 pagos que coinciden con los filtros seleccionadas');
+    expect(screen.getByRole('region', { name: 'Acciones en lote' })).toHaveTextContent('250 pagos que coinciden con los filtros seleccionados');
     await userEvent.click(screen.getByRole('button', { name: /Exportar seleccionados/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: /Excel/ }));
     await waitFor(() => expect(adminExport).toHaveBeenCalledWith({ status: 'failed', fmt: 'xlsx', ids: undefined }));
