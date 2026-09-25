@@ -71,19 +71,70 @@ def _redact(field, value, sensitive):
     return _jsonable(value)
 
 
-def record(action, instance, changes=None, *, actor=None, actor_label='', context=''):
-    """Write one immutable AuditLog row for a mutation on `instance`."""
+def record(action, instance=None, changes=None, *, actor=None, actor_label='', context='',
+           object_type='', object_id=''):
+    """Write one immutable AuditLog row for a mutation on `instance`.
+
+    Pass ``object_type``/``object_id`` instead of ``instance`` for events that
+    have no single row (an export, an import run, a bulk summary):
+    ``record('export', object_type='export:students', object_id='csv', ...)``.
+    """
     from .models import AuditLog
+    if instance is not None:
+        object_type = f'{instance._meta.app_label}.{instance._meta.model_name}'
+        object_id = str(instance.pk)
+    elif not object_type:
+        raise ValueError('record() needs an instance or an explicit object_type.')
     resolved_actor, label, ctx = _resolve(actor, actor_label, context)
-    AuditLog.objects.create(
+    return AuditLog.objects.create(
         actor=resolved_actor if getattr(resolved_actor, 'pk', None) else None,
         actor_label=label[:150],
         action=action,
-        object_type=f'{instance._meta.app_label}.{instance._meta.model_name}',
-        object_id=str(instance.pk),
+        object_type=object_type[:100],
+        object_id=str(object_id)[:64],
         changes=changes or {},
         context=(ctx or '')[:200],
     )
+
+
+def record_export(entity, fmt, filters, row_count, actor, *, context=''):
+    """Audit personal data leaving the system: one row per export download.
+
+    ``object_type='export:<entity>'``, ``object_id=<fmt>``; the filters that
+    scoped the file and the row count go in ``changes`` (LFPDPPP traceability).
+    """
+    return record(
+        'export',
+        object_type=f'export:{entity}',
+        object_id=fmt,
+        changes={'fmt': fmt, 'rows': int(row_count), 'filters': _jsonable_dict(filters)},
+        actor=actor,
+        context=context or f'export:{entity}',
+    )
+
+
+def record_import(entity, counts, actor, *, dry_run=False, context='', filename=''):
+    """One summary row per import commit (``object_type='import:<entity>'``)."""
+    return record(
+        'import',
+        object_type=f'import:{entity}',
+        object_id=(filename or entity)[:64],
+        changes={'dry_run': bool(dry_run), 'counts': dict(counts or {})},
+        actor=actor,
+        context=context or f'import:{entity}',
+    )
+
+
+def _jsonable_dict(filters):
+    """Query params / dicts → plain JSON-safe dict (lists collapsed to their last value)."""
+    if not filters:
+        return {}
+    out = {}
+    for key, value in dict(filters).items():
+        if isinstance(value, (list, tuple)):
+            value = value[-1] if len(value) == 1 else [str(v) for v in value]
+        out[str(key)] = _jsonable(value) if not isinstance(value, list) else value
+    return out
 
 
 # ── request actor middleware ──────────────────────────────
