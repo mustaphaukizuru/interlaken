@@ -51,13 +51,25 @@ MEDICAL_FIELDS = ('blood_type', 'allergies', 'medical_notes')
 class StudentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     age = serializers.ReadOnlyField()
+    loyverse_code = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentProfile
-        fields = ['id', 'user', 'student_id', 'grade', 'group', 'loyverse_id',
+        fields = ['id', 'user', 'student_id', 'loyverse_code', 'grade', 'group', 'loyverse_id',
                   'enrollment_date', 'is_active', 'status',
                   'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
                   'blood_type', 'allergies', 'medical_notes']
+
+    def get_loyverse_code(self, obj):
+        """The matrícula exactly as Loyverse spells it (``ci09932``), i.e. what
+        the office sees on the POS and what the credencial barcode carries;
+        ``student_id`` (the canonical digits) when no Loyverse card is bound.
+        Same rule as ``MyCardsView``. List views ``select_related
+        ('loyverse_profile')`` so this never adds a query per row."""
+        profile = getattr(obj, 'loyverse_profile', None)
+        if profile is not None and profile.customer_code:
+            return profile.customer_code
+        return obj.student_id
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

@@ -258,6 +258,17 @@ class LoyverseProfile(models.Model):
 
     loyverse_created_at = models.DateTimeField('Alta en Loyverse', null=True, blank=True)
     loyverse_updated_at = models.DateTimeField('Última actualización (Loyverse)', null=True, blank=True)
+    # The Loyverse name (grade suffix stripped) that the roster sync last
+    # applied to, or acknowledged for, the linked student. The sync rewrites
+    # User.first_name/last_name only when the incoming Loyverse name differs
+    # from THIS, so a correction typed in the console survives every nightly
+    # run until the office actually renames the customer in Loyverse. It
+    # cannot be ``name`` above: that snapshot is refreshed within seconds by
+    # the customers.update webhook and every ~20 h by the balance cron, so by
+    # the time the roster sync runs at 06:07 the snapshot already carries the
+    # new spelling and a rename would never be detected.
+    applied_name   = models.CharField('Nombre aplicado al roster', max_length=200,
+                                      blank=True, default='')
     # The complete customer object as returned by the API — future-proofs against
     # fields we don't model yet, without another migration.
     raw            = models.JSONField('Datos completos (Loyverse)', default=dict, blank=True)
@@ -335,6 +346,13 @@ class LoyverseSyncState(models.Model):
     # is the signal for "the cron stopped", which used to be inferred from the
     # log file's mtime by a crontab line that piped to a `mail` the VPS lacks.
     last_poll_at = models.DateTimeField('Último sondeo', null=True, blank=True)
+    # When ``sync_roster`` last COMPLETED a written run (link → import →
+    # replay). Until 2026-09-24 the daily roster job had never run in
+    # production: it shared a lock file with the 5-minute poll, lost the race
+    # every morning and exited silently, and nothing measured it. This is what
+    # ``check_sync_fresh`` and the console's Roster light read.
+    last_roster_sync_at = models.DateTimeField(
+        'Última sincronización del roster', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Estado de sincronización Loyverse'

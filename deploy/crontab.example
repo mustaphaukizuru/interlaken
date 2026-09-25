@@ -1,6 +1,8 @@
-# Scheduled jobs for the VPS. Install with:
+# Scheduled jobs for the VPS. This file IS the crontab: install it whole, as
+# the user that owns /opt/interlaken, and reinstall it with every deploy that
+# touches it (docs/DEPLOY_HOSTINGER_VPS.md, Step 9):
 #
-#   crontab -e        (as the user that owns /opt/interlaken)
+#   crontab /opt/interlaken/deploy/crontab.example && crontab -l | grep -c manage.py
 #
 # Prerequisite, or every line below fails silently into a directory that does
 # not exist:
@@ -36,15 +38,21 @@ CRON_TZ=America/Mexico_City
 # enabled (the default) it is a harmless no-op.
 0 18 * * 1-5 cd $COMPOSE && flock -n /tmp/interlaken-digest.lock docker compose exec -T app python manage.py send_spending_digest >> /var/log/interlaken/daily.log 2>&1
 
-# ── Nightly convergence, 05:40 and 06:05 local ──────────────────────────────
-# 05:40: re-read the last 7 days of receipts. The 5-minute poll only looks a
+# ── Nightly convergence, 05:42 and 06:07 local ──────────────────────────────
+# These two share the Loyverse lock with the 5-minute poll above, so they must
+# NOT sit on the 5-minute grid and must WAIT for the lock (-w 900) instead of
+# giving up (-n). Until 2026-09-24 they fired at 05:40 and 06:05, the poll won
+# the lock every morning, and `flock -n` made both exit silently: the roster
+# job had never run in production. See backend/apps/cafeteria/test_crontab.py.
+# 05:42: re-read the last 7 days of receipts. The 5-minute poll only looks a
 # few minutes behind its cursor, so a receipt that reached Loyverse late (a
 # tablet syncing after a day offline) or an edited one could otherwise hide
 # behind it forever. Idempotent: everything already recorded is a no-op.
-40 5 * * * cd $COMPOSE && flock -n /tmp/interlaken-loyverse.lock docker compose exec -T app python manage.py sync_purchases --since-days 7 >> /var/log/interlaken/loyverse.log 2>&1
-# 06:05: link/import pupils the cashier enrolled at the POS, replay their
-# parked receipts, flag links whose customer is gone. Never deletes anything.
-5 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-loyverse.lock docker compose exec -T app python manage.py sync_roster >> /var/log/interlaken/loyverse.log 2>&1
+42 5 * * * cd $COMPOSE && flock -w 900 /tmp/interlaken-loyverse.lock docker compose exec -T app python manage.py sync_purchases --since-days 7 >> /var/log/interlaken/loyverse.log 2>&1
+# 06:07: link/import pupils the cashier enrolled at the POS, refresh grade and
+# name from Loyverse, replay their parked receipts, flag links whose customer
+# is gone and customers without a grade code. Never deletes anything.
+7 6 * * * cd $COMPOSE && flock -w 900 /tmp/interlaken-loyverse.lock docker compose exec -T app python manage.py sync_roster >> /var/log/interlaken/loyverse.log 2>&1
 # 07:35: email admins if any wallet, link or receipt is out of step, before
 # the cafetería opens so nothing in flight is mistaken for drift.
 35 7 * * * cd $COMPOSE && docker compose exec -T app python manage.py check_wallet_drift >> /var/log/interlaken/loyverse.log 2>&1

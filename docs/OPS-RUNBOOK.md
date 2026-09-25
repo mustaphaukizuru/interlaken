@@ -49,6 +49,7 @@ Activación, una sola vez:
 | Deploy nuevo no levanta | migración fallida | `deploy.sh` imprime el comando de rollback; ejecútelo y abra el log de `app` |
 | Familias no reciben correos | buzón/credenciales SMTP | `python manage.py send_test_email <correo>`; revise `EMAIL_*` en .env y el reporte de entrega del comunicado |
 | Saldos de cafetería desactualizados | token Loyverse vencido | `/admin/cafeteria` → Sincronizar todo; si falla, renueve `LOYVERSE_TOKEN` |
+| Cambios hechos en Loyverse (grado, nombre, código) no aparecen en la app; luz *Roster* en rojo | el `sync_roster` de las 06:07 no corrió (crontab viejo o sin reinstalar) | `/admin/cafeteria` → Sincronizar roster ahora; en el servidor `crontab -l` debe mostrar `7 6 * * *` con `flock -w 900`; si no, reinstale el crontab (§7c) |
 | Push no llega en iPhone | app no instalada en pantalla de inicio | pedir instalar (InstallHint) y activar avisos en Mi perfil |
 | Certificado TLS | Caddy sin email o puerto 80 cerrado | `docker compose logs caddy`, `ACME_EMAIL` en .env, firewalld 80/443 |
 
@@ -58,6 +59,7 @@ Activación, una sola vez:
 |---|---|
 | Cada 5 min | sync Loyverse, `cms_schedule` (páginas y comunicados programados) |
 | Diario 03:00 / 06:15 | respaldo DB / recordatorios, alertas de saldo, pagos vencidos, despacho de notificaciones |
+| Diario 05:42 / 06:07 | `sync_purchases --since-days 7` (repaso de recibos) / `sync_roster` (roster desde Loyverse: altas, grado, nombre, código; ver §7b) |
 | Semanal dom 05:00 | `purge_retention --apply` |
 | Mensual 1er dom 04:00 | `restore-db.sh` (simulacro) |
 | Anual (julio) | `/admin/nuevo-ciclo`; revisar docs/RETENTION.md con Dirección |
@@ -125,8 +127,8 @@ sin vincular, o recibos del monedero sin alumno.
 | Hora | Comando | Qué hace |
 | --- | --- | --- |
 | cada 5 min | `sync_purchases` + `mirror_pos_topups` | compras y recargas en caja; el espejo espera 3 minutos tras cualquier movimiento antes de acreditar una diferencia |
-| 05:40 | `sync_purchases --since-days 7` | vuelve a leer una semana de recibos por si alguno llegó tarde |
-| 06:05 | `sync_roster` | vincula e importa alumnos nuevos, aplica sus recibos pendientes, marca enlaces obsoletos |
+| 05:42 | `sync_purchases --since-days 7` | vuelve a leer una semana de recibos por si alguno llegó tarde |
+| 06:07 | `sync_roster` | vincula e importa alumnos nuevos, actualiza grado y nombre desde Loyverse, aplica recibos pendientes, marca enlaces obsoletos y clientes sin código de grado (posible baja); enciende la luz *Roster* |
 | 07:35 | `check_wallet_drift` | correo a los administradores si algo quedó fuera de lugar |
 
 **Si la luz de saldos está en ámbar por la mañana** (antes de que abra la
@@ -167,3 +169,44 @@ eliminó. Las compras al monedero de una tarjeta sin alumno se guardan y se ven
 con el botón de compras de esa fila. Se refresca en cada pasada del espejo
 (5 minutos) y con cada aviso de Loyverse; nada de lo que existe en Loyverse
 queda invisible en la app.
+
+### 7b. Qué pasa cuando la oficina edita en Loyverse
+
+Loyverse manda en la identidad del alumno (decisión del 24-09-2026). La
+oficina edita ahí, y la app la sigue así:
+
+| Lo que edita la oficina en Loyverse | Cómo lo guarda la app | Dónde se ve |
+| --- | --- | --- |
+| **Código de cliente** `ci09932` (el prefijo `ci` que hace que el código de barras vuelva a leerse en caja) | `Matrícula` sigue siendo `09932` (clave interna, clave del CSV); el código exacto de Loyverse se guarda aparte | Columna y campo **Código Loyverse** en Alumnos, en el expediente, en Cafetería (Saldos, Saldo bajo) y en la credencial de la familia. Buscar `ci09932` o `09932` encuentra al mismo alumno en Alumnos, Cafetería y Clientes Loyverse; el CSV acepta las dos formas |
+| **Nombre** con sufijo de grado: `Chavez Lopez Juan Antonio-4PRI` | El sufijo se quita; la app muestra "Nombre Apellidos" (`Juan Antonio Chavez Lopez`) | El nombre **solo se reescribe cuando cambió en Loyverse** desde la última sincronización. Una corrección hecha en la consola sobrevive hasta que la oficina vuelva a cambiar ese nombre en Loyverse. Cada cambio de nombre queda en Auditoría (`import:loyverse`) |
+| **Código de grado** en la dirección (`4PRI`, `4APRI`) o como sufijo del nombre | `4PRI` → grado 4° Primaria, el grupo se conserva; `4APRI` → grado y grupo A | Grado y grupo del alumno |
+| Cliente **sin código de grado** (ni dirección ni sufijo) | No cambia nada solo | Alumnos → Vincular Loyverse → "Sin grado en Loyverse (posible baja)"; la oficina confirma con *Dar de baja* |
+
+**Cuándo llega cada cosa:**
+
+- Saldos, recargas en caja y la copia de las tarjetas (Clientes Loyverse):
+  cada 5 minutos y con cada aviso de Loyverse.
+- Roster (altas, grado, nombre, Código Loyverse, posibles bajas): **cada
+  madrugada a las 06:07** (`sync_roster`), o al momento con **Administración
+  → Cafetería → Sincronizar roster ahora** (mismo código que el cron). La luz
+  **Roster** del panel dice cuándo corrió por última vez; se pone en rojo a
+  las 30 h sin correr y `check_sync_fresh` avisa por correo a los
+  administradores.
+- **Importar desde Loyverse** (Alumnos) muestra, antes de aplicar, una tabla
+  con cada cambio por alumno (nombre, grado, grupo, código, vínculo: antes y
+  después) y los clientes omitidos con su motivo.
+
+### 7c. Instalar o reinstalar el crontab
+
+`deploy/crontab.example` **es** el crontab: se instala completo, como el
+usuario dueño de `/opt/interlaken`, y se reinstala en cada deploy que lo
+cambie (no se edita a mano):
+
+    crontab /opt/interlaken/deploy/crontab.example && crontab -l | grep -c manage.py
+
+**Nota de la versión 24-09-2026:** el crontab en vivo **debe reinstalarse con
+este deploy**. Los trabajos nocturnos de Loyverse pasan de 05:40 y 06:05 a
+**05:42 y 06:07** y de `flock -n` a `flock -w 900`: compartían el candado con
+el sondeo de cada 5 minutos, perdían la carrera cada mañana y salían en
+silencio, así que `sync_roster` nunca había corrido en producción.
+`backend/apps/cafeteria/test_crontab.py` impide que esa forma vuelva.

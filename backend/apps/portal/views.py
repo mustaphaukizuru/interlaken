@@ -76,7 +76,7 @@ class DashboardView(APIView):
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students
             balances = (CafeteriaBalance.objects.filter(student__in=students)
-                        .select_related('student__user'))
+                        .select_related('student__user', 'student__loyverse_profile'))
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
             recent_payments = (

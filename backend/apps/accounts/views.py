@@ -11,9 +11,10 @@ from django.db.models import Q
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from rest_framework import generics, permissions, status
+from rest_framework import filters, generics, permissions, status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -391,11 +392,23 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
         return context
 
 
+class MatriculaSearchFilter(filters.SearchFilter):
+    """DRF's ``SearchFilter`` with one twist: a term written the Loyverse way
+    (``ci09932``) is looked up as the digits the app stores (``09932``), so
+    the office can paste either spelling and find the same student."""
+
+    def get_search_terms(self, request):
+        from apps.core.matricula import search_key
+        return [search_key(term) for term in super().get_search_terms(request)]
+
+
 class StudentListView(generics.ListAPIView):
     """GET /api/v1/accounts/students/?search= — List students (admin only or parent's own children)."""
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    # Powers the admin Ctrl+K palette (global SearchFilter backend applies).
+    # Powers the admin Ctrl+K palette. Same backends as the project default,
+    # with the search one swapped for the matrícula-aware variant.
+    filter_backends = [DjangoFilterBackend, MatriculaSearchFilter, filters.OrderingFilter]
     search_fields = ['user__first_name', 'user__last_name', 'user__email',
                      'student_id', 'grade']
 
@@ -405,7 +418,7 @@ class StudentListView(generics.ListAPIView):
         # (StudentProfile has no Meta.ordering).
         order = ('user__last_name', 'user__first_name', 'id')
         if user.role == User.Role.ADMIN:
-            qs = StudentProfile.objects.select_related('user')
+            qs = StudentProfile.objects.select_related('user', 'loyverse_profile')
             # Roster filters (BACKLOG P1-A6/A7): ?estado=active|on_leave|graduated|withdrawn
             # and ?acceso=never (family login never used) | nopass (no password yet).
             estado = self.request.query_params.get('estado')
@@ -438,12 +451,12 @@ class StudentListView(generics.ListAPIView):
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
             return (StudentProfile.objects.filter(parents=user)
-                    .select_related('user').order_by(*order))
+                    .select_related('user', 'loyverse_profile').order_by(*order))
         elif user.role == User.Role.STUDENT:
             # A school-email student sees its own file (and any sibling it is a
             # self-guardian of) — same rule as StudentDetailView and the dashboard.
             return (StudentProfile.objects.filter(Q(user=user) | Q(parents=user))
-                    .distinct().select_related('user').order_by(*order))
+                    .distinct().select_related('user', 'loyverse_profile').order_by(*order))
         return StudentProfile.objects.none()
 
 
@@ -471,10 +484,11 @@ class StudentDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        qs = StudentProfile.objects.select_related('user', 'loyverse_profile')
         if user.role == User.Role.ADMIN:
-            return StudentProfile.objects.all()
+            return qs
         elif user.role == User.Role.PARENT:
-            return StudentProfile.objects.filter(parents=user)
+            return qs.filter(parents=user)
         elif user.role == User.Role.STUDENT:
-            return StudentProfile.objects.filter(user=user)
+            return qs.filter(user=user)
         return StudentProfile.objects.none()

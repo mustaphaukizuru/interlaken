@@ -224,6 +224,10 @@ REST_FRAMEWORK = {
         # handful per minute; the ceiling blunts scripted mass-rewriting of
         # every family credential from one compromised admin session.
         'admin-set-password': '20/min',
+        # Admin bulk/roster operations (sync-roster today, the bulk contract
+        # later): each run fetches the whole Loyverse store and rewrites up to
+        # ~400 rows, so a scripted loop from one session is capped.
+        'admin-bulk': '30/min',
     },
 }
 

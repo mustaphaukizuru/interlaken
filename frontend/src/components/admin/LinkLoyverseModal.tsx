@@ -7,15 +7,17 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { portalApi } from '@/services/api';
 
-/** An active student with no Loyverse customer: in practice, a leaver. */
+/** An active student the office may need to withdraw: no Loyverse customer
+ *  (a leaver, in practice) or a customer without a grade code (posible baja). */
 export interface UnmatchedStudent {
-  id: number; matricula: string; name: string; grade: string; status: string; balance: string;
+  id: number; matricula: string; loyverse_code?: string; name: string; grade: string; status: string; balance: string;
 }
 
 interface Report {
   customers: number; students: number;
   linked: number; already_linked: number; skipped_conflict: number;
   unmatched_students: UnmatchedStudent[];
+  possible_leavers?: UnmatchedStudent[];
   unmatched_customer_count: number; duplicate_codes: string[];
 }
 
@@ -60,7 +62,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
         setPhase('preview');
       } catch (e: any) {
         if (cancelled) return;
-        setError(e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
+        setError(e?.response?.data?.detail || e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
         setPhase('error');
       }
     })();
@@ -74,21 +76,31 @@ function LinkLoyverseBody({ onClose, onLinked }: {
 
   // Leavers. The school deletes a student's Loyverse customer when they go
   // and nothing else tells the app, so 36 graduates were still "activo" a
-  // full cycle later. Selected rows go through the existing bulk status
-  // endpoint (audited per row); the balance column is there so leftover money
-  // is a visible decision, never a silent write-off.
+  // full cycle later. Since 2026-09-24 a second group: the office sometimes
+  // keeps the customer and only strips the grade suffix, so a linked
+  // customer with no grade code is flagged as "posible baja". Both groups
+  // share one selection; selected rows go through the existing bulk status
+  // endpoint (audited per row); the balance column is there so leftover
+  // money is a visible decision, never a silent write-off. Nothing changes
+  // status on its own.
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmBaja, setConfirmBaja] = useState(false);
   const [bajaBusy, setBajaBusy] = useState(false);
   const unmatched = report?.unmatched_students ?? [];
-  const allSelected = unmatched.length > 0 && unmatched.every((u) => selected.has(u.id));
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(unmatched.map((u) => u.id)));
+  const noGrade = report?.possible_leavers ?? [];
+  const candidates = [...unmatched, ...noGrade];
   const toggleOne = (id: number) => setSelected((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const selectedBalance = unmatched
+  const toggleGroup = (rows: UnmatchedStudent[]) => setSelected((prev) => {
+    const next = new Set(prev);
+    const all = rows.length > 0 && rows.every((u) => next.has(u.id));
+    for (const u of rows) { if (all) next.delete(u.id); else next.add(u.id); }
+    return next;
+  });
+  const selectedBalance = candidates
     .filter((u) => selected.has(u.id))
     .reduce((sum, u) => sum + parseFloat(u.balance || '0'), 0);
 
@@ -116,7 +128,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
       onLinked?.();
       onClose();
     } catch (e: any) {
-      setError(e?.response?.data?.error || 'No se pudo completar la vinculación.');
+      setError(e?.response?.data?.detail || e?.response?.data?.error || 'No se pudo completar la vinculación.');
       setPhase('error');
     }
   }
@@ -157,20 +169,13 @@ function LinkLoyverseBody({ onClose, onLinked }: {
             <Stat label="Ya vinculados" value={report.already_linked} tone="muted" />
             <Stat label="Sin coincidencia" value={report.unmatched_students.length} tone={report.unmatched_students.length ? 'warn' : 'muted'} />
             <Stat label="Conflictos (otro id)" value={report.skipped_conflict} tone={report.skipped_conflict ? 'warn' : 'muted'} />
+            <Stat label="Sin grado en Loyverse" value={noGrade.length} tone={noGrade.length ? 'warn' : 'muted'} />
           </div>
 
-          {unmatched.length > 0 && (
-            <div className="rounded-xl border border-line">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-subtle">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    aria-label="Seleccionar todos los alumnos sin cliente en Loyverse"
-                  />
-                  Sin cliente en Loyverse ({unmatched.length}): egresados o bajas no registradas
-                </label>
+          {candidates.length > 0 && (
+            <section aria-label="Dar de baja" className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Dar de baja</p>
                 <Button
                   size="sm"
                   variant="danger"
@@ -180,26 +185,28 @@ function LinkLoyverseBody({ onClose, onLinked }: {
                   <UserMinus size={14} aria-hidden="true" /> Dar de baja ({selected.size})
                 </Button>
               </div>
-              <ul className="max-h-64 divide-y divide-line overflow-y-auto text-sm">
-                {unmatched.map((u) => (
-                  <li key={u.id} className="flex items-center gap-3 px-3 py-1.5">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(u.id)}
-                      onChange={() => toggleOne(u.id)}
-                      aria-label={`Seleccionar a ${u.name}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-ink">{u.name}</span>
-                      <span className="block text-xs text-subtle">{u.matricula || '—'} · {u.grade || 'sin grado'}</span>
-                    </span>
-                    <span className={`whitespace-nowrap text-xs ${parseFloat(u.balance) > 0 ? 'font-semibold text-amber' : 'text-subtle'}`}>
-                      ${parseFloat(u.balance || '0').toFixed(2)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {unmatched.length > 0 && (
+                <LeaverGroup
+                  rows={unmatched}
+                  selected={selected}
+                  onToggle={toggleOne}
+                  onToggleAll={() => toggleGroup(unmatched)}
+                  selectAllLabel="Seleccionar todos los alumnos sin cliente en Loyverse"
+                  title={`Sin cliente en Loyverse (${unmatched.length}): egresados o bajas no registradas`}
+                />
+              )}
+              {noGrade.length > 0 && (
+                <LeaverGroup
+                  rows={noGrade}
+                  selected={selected}
+                  onToggle={toggleOne}
+                  onToggleAll={() => toggleGroup(noGrade)}
+                  selectAllLabel="Seleccionar todos los alumnos sin grado en Loyverse"
+                  title={`Sin grado en Loyverse (posible baja) (${noGrade.length})`}
+                  hint="El cliente sigue en Loyverse pero ya no trae código de grado (ni en la dirección ni como sufijo del nombre). Confirme con la oficina antes de dar de baja."
+                />
+              )}
+            </section>
           )}
 
           <ConfirmDialog
@@ -243,6 +250,52 @@ function LinkLoyverseBody({ onClose, onLinked }: {
         </div>
       ) : null}
     </>
+  );
+}
+
+function LeaverGroup({ rows, selected, onToggle, onToggleAll, selectAllLabel, title, hint }: {
+  rows: UnmatchedStudent[];
+  selected: Set<number>;
+  onToggle: (id: number) => void;
+  onToggleAll: () => void;
+  selectAllLabel: string;
+  title: string;
+  hint?: string;
+}) {
+  const allSelected = rows.length > 0 && rows.every((u) => selected.has(u.id));
+  return (
+    <div className="rounded-xl border border-line">
+      <div className="border-b border-line px-3 py-2">
+        <label className="flex items-center gap-2 text-xs font-semibold text-subtle">
+          <input type="checkbox" checked={allSelected} onChange={onToggleAll} aria-label={selectAllLabel} />
+          {title}
+        </label>
+        {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
+      </div>
+      <ul className="max-h-64 divide-y divide-line overflow-y-auto text-sm">
+        {rows.map((u) => (
+          <li key={u.id} className="flex items-center gap-3 px-3 py-1.5">
+            <input
+              type="checkbox"
+              checked={selected.has(u.id)}
+              onChange={() => onToggle(u.id)}
+              aria-label={`Seleccionar a ${u.name}`}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-ink">{u.name}</span>
+              <span className="block text-xs text-subtle">
+                {u.matricula || '—'}
+                {u.loyverse_code && u.loyverse_code !== u.matricula ? ` (Código Loyverse ${u.loyverse_code})` : ''}
+                {' · '}{u.grade || 'sin grado'}
+              </span>
+            </span>
+            <span className={`whitespace-nowrap text-xs ${parseFloat(u.balance) > 0 ? 'font-semibold text-amber' : 'text-subtle'}`}>
+              ${parseFloat(u.balance || '0').toFixed(2)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

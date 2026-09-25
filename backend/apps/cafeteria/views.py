@@ -44,6 +44,7 @@ from .services import (
     LoyverseError,
     add_points_to_customer,
     adjust_balance,
+    get_all_customers,
     get_balance_from_customer,
     get_customer_by_id,
     mirror_pos_topups,
@@ -139,7 +140,8 @@ class MyBalanceView(APIView):
         CafeteriaBalance.objects.bulk_create(
             [CafeteriaBalance(student=s) for s in students], ignore_conflicts=True)
         balances = (CafeteriaBalance.objects.filter(student__in=students)
-                    .select_related('student__user').order_by('student_id'))
+                    .select_related('student__user', 'student__loyverse_profile')
+                    .order_by('student_id'))
         context = {'include_spend': include_spend}
         if include_spend:
             context['spend_map'] = build_spend_map(students)
@@ -762,12 +764,30 @@ class TopUpRequestCreateView(generics.CreateAPIView):
 
 
 class AdminBalancesView(generics.ListAPIView):
-    """GET /api/v1/cafeteria/admin/balances/"""
+    """GET /api/v1/cafeteria/admin/balances/?q=&page=
+
+    ``q`` searches the whole roster server-side (the page used to be filtered
+    in the browser, one page at a time): student names, the canonical
+    matrícula and the Loyverse code, so ``09932`` and ``ci09932`` both find
+    the same wallet. Ordered by student name so paging is stable.
+    """
     serializer_class = CafeteriaBalanceSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        return CafeteriaBalance.objects.select_related('student__user').all()
+        from django.db.models import Q
+
+        from apps.core.matricula import search_key
+
+        qs = CafeteriaBalance.objects.select_related('student__user', 'student__loyverse_profile')
+        q = (self.request.query_params.get('q') or '').strip()
+        if q:
+            key = search_key(q)
+            qs = qs.filter(Q(student__student_id__icontains=key)
+                           | Q(student__loyverse_profile__customer_code__icontains=key)
+                           | Q(student__user__first_name__icontains=q)
+                           | Q(student__user__last_name__icontains=q))
+        return qs.order_by('student__user__last_name', 'student__user__first_name', 'pk')
 
 
 class AdminApplyTopUpView(APIView):
@@ -979,9 +999,42 @@ class AdminSyncHealthView(APIView):
                 'last_transaction_at': h['last_transaction_at'].isoformat() if h['last_transaction_at'] else None,
                 'last_webhook_at': h['last_webhook_at'].isoformat() if h['last_webhook_at'] else None,
                 'last_poll_at': h['last_poll_at'].isoformat() if h['last_poll_at'] else None,
+                'last_roster_sync_at': (h['last_roster_sync_at'].isoformat()
+                                        if h['last_roster_sync_at'] else None),
             }
             cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
         return Response(data)
+
+
+class AdminSyncRosterView(APIView):
+    """POST /api/v1/cafeteria/admin/sync-roster/  body {dry_run: bool}
+
+    "Sincronizar roster ahora": the same link → import → replay pass as the
+    06:07 cron (``services.sync_roster``), for the morning the office edits
+    Loyverse and wants to see it in the app before tomorrow. One full
+    customer fetch plus a few hundred row updates, well inside the 60 s
+    request budget. ``dry_run`` previews the report without writing.
+    """
+    permission_classes = [IsAdmin]
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'admin-bulk'
+
+    def post(self, request):
+        from apps.core.flags import truthy
+
+        dry_run = truthy(request.data.get('dry_run', False))
+        try:
+            customers = get_all_customers()
+        except LoyverseError as exc:
+            return Response({'detail': f'No se pudo conectar con Loyverse: {exc}'},
+                            status=502)
+        from apps.cafeteria.services import roster_sync_line, sync_roster
+        report = sync_roster(customers, commit=not dry_run)
+        if not dry_run:
+            # The health panel caches its payload for a minute; the Roster
+            # light must turn green on the very next read.
+            cache.delete(AdminSyncHealthView.CACHE_KEY)
+        return Response({**report, 'detail': roster_sync_line(report)})
 
 
 class AdminReconcileFixView(APIView):
@@ -1332,7 +1385,7 @@ class AdminLowBalanceView(APIView):
         # same rule as the dashboard counter and the weekly alert.
         from apps.cafeteria.services import low_balance_queryset
         balances = (low_balance_queryset()
-                    .select_related('student__user')
+                    .select_related('student__user', 'student__loyverse_profile')
                     .order_by('balance', 'student_id'))
         try:
             page = max(1, int(request.query_params.get('page', 1)))
@@ -1374,7 +1427,14 @@ class AdminLoyverseCustomersView(APIView):
             qs = qs.filter(kind=kind)
         q = (request.query_params.get('q') or '').strip()
         if q:
+            # ``ci09932`` and ``09932`` are one code: match the Loyverse
+            # spelling as typed and the bare digits against both the card and
+            # the linked student's matrícula.
+            from apps.core.matricula import search_key
+            key = search_key(q)
             qs = qs.filter(Q(name__icontains=q) | Q(customer_code__icontains=q)
+                           | Q(customer_code__icontains=key)
+                           | Q(student__student_id__icontains=key)
                            | Q(email__icontains=q))
         qs = qs.order_by('kind', '-last_visit', 'name')
         try:

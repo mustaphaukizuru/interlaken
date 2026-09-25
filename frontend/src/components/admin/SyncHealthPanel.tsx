@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, PlugZap, Scale, Timer, Users, Zap, DatabaseBackup } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, ListChecks, PlugZap, RefreshCw, Scale, Timer, Users, Zap, DatabaseBackup } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/Button';
 import { cafeteriaApi, type SyncHealth } from '@/services/api';
 
 type Tone = 'ok' | 'warn' | 'bad';
@@ -20,6 +22,9 @@ const STALE_HOURS = 1;
 const WEBHOOK_STALE_HOURS = 30;
 /** Nightly at 02:30; anything older than a day and a bit is a missed night. */
 const BACKUP_STALE_HOURS = 30;
+/** The roster sync runs daily at 06:07; a day plus slack is a missed morning.
+ *  Same threshold as `check_sync_fresh --max-roster-age-hours`. */
+const ROSTER_STALE_HOURS = 30;
 
 function ago(iso: string | null): string {
   if (!iso) return 'nunca';
@@ -40,7 +45,7 @@ interface Check {
 }
 
 /**
- * Turn the raw health payload into the four questions an admin is actually
+ * Turn the raw health payload into the questions an admin is actually
  * asking, in the order that makes them diagnostic: a dead token makes every
  * later signal meaningless, an unlinked roster explains "unmatched", a stale
  * cursor means nothing is polling, and a fresh cursor with a stale ledger is
@@ -52,6 +57,8 @@ export function buildChecks(h: SyncHealth): Check[] {
   const pollAt = h.last_poll_at ?? h.last_purchases_cursor;
   const cursorHours = hoursSince(pollAt);
   const pollStale = cursorHours === null || cursorHours > STALE_HOURS;
+  const rosterHours = hoursSince(h.last_roster_sync_at ?? null);
+  const rosterStale = rosterHours === null || rosterHours > ROSTER_STALE_HOURS;
   const unlinked = h.active_students - h.linked_students;
   const hookHours = hoursSince(h.last_webhook_at);
   const hookStale = hookHours === null || hookHours > WEBHOOK_STALE_HOURS;
@@ -90,6 +97,25 @@ export function buildChecks(h: SyncHealth): Check[] {
         ? `Última corrida del sondeo: ${ago(pollAt)}. Si no corre cada 5 minutos, `
           + 'los saldos solo se mueven cuando alguien presiona Sincronizar.'
         : `Corrió ${ago(pollAt)}; último recibo leído ${ago(h.last_purchases_cursor)}.`,
+    },
+    {
+      key: 'roster_sync',
+      icon: ListChecks,
+      // The daily job that carries the office's Loyverse edits (grade code,
+      // name, ci code) into the app. It never ran before 2026-09-24 and
+      // nothing said so; this light is the alarm.
+      tone: rosterStale ? 'bad' : 'ok',
+      label: rosterStale
+        ? (h.last_roster_sync_at
+          ? `El roster no se ha sincronizado desde ${format(new Date(h.last_roster_sync_at), "d 'de' MMMM, HH:mm", { locale: es })}`
+          : 'El roster nunca se ha sincronizado con Loyverse')
+        : `Roster sincronizado ${ago(h.last_roster_sync_at ?? null)}`,
+      detail: rosterStale
+        ? 'Debe correr cada madrugada a las 06:07 (sync_roster en el crontab). Los cambios que la '
+          + 'oficina hace en Loyverse (grado, nombre, código) no llegan a la app hasta entonces: use '
+          + 'Sincronizar roster ahora y, si mañana sigue en rojo, revise `crontab -l` en el servidor.'
+        : 'Grado, nombre y Código Loyverse de cada alumno siguen a Loyverse. Corre cada madrugada '
+          + 'a las 06:07, o ahora mismo con el botón.',
     },
     {
       key: 'webhook',
@@ -187,10 +213,31 @@ export function buildChecks(h: SyncHealth): Check[] {
  * and the cause stayed invisible.
  */
 export function SyncHealthPanel() {
+  const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['cafeteria-sync-health'],
     queryFn: async () => (await cafeteriaApi.syncHealth()).data,
     staleTime: 60_000,
+  });
+
+  // The 06:07 job, on demand: for the morning the office edits Loyverse and
+  // wants it in the app before tomorrow. Same server code as the cron.
+  const syncRoster = useMutation({
+    mutationFn: () => cafeteriaApi.syncRoster(false),
+    onSuccess: ({ data: r }) => {
+      const s = r.summary;
+      toast.success(
+        `Roster sincronizado: ${s.created} alta(s), ${s.updated} actualizado(s), ${s.renamed} nombre(s), `
+        + `${s.linked} vinculado(s)`
+        + (s.possible_leavers ? `, ${s.possible_leavers} sin grado en Loyverse (posible baja)` : '')
+        + '.',
+        { duration: 8000 },
+      );
+      for (const key of ['cafeteria-sync-health', 'admin-cafeteria-balances', 'admin-cafeteria-low-balance', 'admin-students']) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'No se pudo sincronizar el roster con Loyverse.'),
   });
 
   if (isLoading || isError || !data) return null;
@@ -200,14 +247,25 @@ export function SyncHealthPanel() {
 
   return (
     <section aria-label="Estado de la sincronización" className="mb-4">
-      <h2 className="mb-2 flex items-center gap-1.5 font-head text-[13px] font-bold uppercase tracking-wider text-subtle">
-        Estado de la sincronización
-        {worst === 'ok' ? (
-          <CheckCircle2 size={14} className="text-green-dark" aria-label="Todo en orden" />
-        ) : (
-          <AlertTriangle size={14} className={worst === 'bad' ? 'text-coral' : 'text-amber'} aria-label="Requiere atención" />
-        )}
-      </h2>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-1.5 font-head text-[13px] font-bold uppercase tracking-wider text-subtle">
+          Estado de la sincronización
+          {worst === 'ok' ? (
+            <CheckCircle2 size={14} className="text-green-dark" aria-label="Todo en orden" />
+          ) : (
+            <AlertTriangle size={14} className={worst === 'bad' ? 'text-coral' : 'text-amber'} aria-label="Requiere atención" />
+          )}
+        </h2>
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={syncRoster.isPending}
+          onClick={() => syncRoster.mutate()}
+          title="Vincula, importa y actualiza grado, nombre y código desde Loyverse; lo mismo que corre cada madrugada."
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Sincronizar roster ahora
+        </Button>
+      </div>
       <ul className="grid gap-2 sm:grid-cols-2">
         {checks.map((c) => {
           const Icon = c.tone === 'ok' ? CheckCircle2 : c.icon;

@@ -139,15 +139,17 @@ function SchoolExportButtons() {
 // ── Roster ───────────────────────────────────────────────────────────────────
 function RosterTab() {
   const queryClient = useQueryClient();
-  // URL-synced (debounced 300 ms) so a filtered roster is shareable; the
-  // filtering itself stays client-side over the current page.
+  // URL-synced (debounced 300 ms) so a filtered roster is shareable. The
+  // search runs server-side over the whole roster (name, matrícula, Código
+  // Loyverse in either spelling), not over the current page.
   const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
   const [page, setPage] = useUrlPage();
 
   const { data, isLoading, isError, refetch, dataUpdatedAt, isFetching } = useQuery({
-    queryKey: ['admin-cafeteria-balances', page],
+    queryKey: ['admin-cafeteria-balances', page, debouncedSearch],
     ...LIVE,
-    queryFn: async () => toPaged<CafeteriaBalance>((await cafeteriaApi.getAllBalances({ page })).data),
+    queryFn: async () => toPaged<CafeteriaBalance>(
+      (await cafeteriaApi.getAllBalances({ page, q: debouncedSearch || undefined })).data),
     placeholderData: keepPreviousData,
   });
 
@@ -208,11 +210,7 @@ function RosterTab() {
     onError: () => toast.error('Error al sincronizar.'),
   });
 
-  const filtered = balances?.filter((b) =>
-    !search ||
-    b.student.user.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    b.student.student_id.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = balances;
 
   return (
     <Card>
@@ -221,8 +219,8 @@ function RosterTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
           <input
             className="input-field pl-9"
-            placeholder="Buscar alumno o matrícula…"
-            aria-label="Buscar alumno o matrícula"
+            placeholder="Buscar alumno, matrícula o código Loyverse…"
+            aria-label="Buscar alumno, matrícula o código Loyverse"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -258,7 +256,6 @@ function RosterTab() {
           )}
         </div>
       )}
-      <p className="-mt-2 mb-4 text-xs text-subtle">La búsqueda filtra la página actual.</p>
 
       <ActiveFilterChips
         chips={debouncedSearch
@@ -272,7 +269,7 @@ function RosterTab() {
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
       ) : !filtered?.length ? (
-        <EmptyState icon={Coffee} title={search ? 'Sin resultados' : 'Sin saldos registrados'} />
+        <EmptyState icon={Coffee} title={debouncedSearch ? 'Sin resultados' : 'Sin saldos registrados'} />
       ) : (
         <>
           {/* Mobile: stacked cards (mobile-priority workflow) */}
@@ -284,7 +281,9 @@ function RosterTab() {
                   <div className="flex items-start justify-between gap-3">
                     <Link to={`/admin/cafeteria/${b.student.id}`} className="min-w-0 font-medium text-ink hover:text-brand-700">
                       {b.student.user.full_name}
-                      <span className="block text-xs font-normal text-subtle">{b.student.student_id}</span>
+                      <span className="block text-xs font-normal text-subtle">
+                        {b.student.student_id} · Código Loyverse <span className="font-mono">{b.student.loyverse_code || b.student.student_id}</span>
+                      </span>
                     </Link>
                     <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>
                   </div>
@@ -331,6 +330,7 @@ function RosterTab() {
                 cell: (b) => <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>,
               },
               { header: 'Matrícula', className: 'text-muted', cell: (b) => b.student.student_id },
+              { header: 'Código Loyverse', className: 'font-mono text-xs text-muted', cell: (b) => b.student.loyverse_code || b.student.student_id },
               { header: 'Saldo', align: 'right', className: 'font-semibold text-ink', cell: (b) => `$${parseFloat(b.balance).toFixed(2)}` },
               {
                 header: 'Estado',
@@ -806,6 +806,7 @@ function LowBalanceTab() {
                 cell: (b) => <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>,
               },
               { header: 'Matrícula', className: 'text-muted', cell: (b) => b.student.student_id },
+              { header: 'Código Loyverse', className: 'font-mono text-xs text-muted', cell: (b) => b.student.loyverse_code || b.student.student_id },
               { header: 'Saldo', align: 'right', className: 'font-semibold text-amber', cell: (b) => `$${parseFloat(b.balance).toFixed(2)}` },
               { header: 'Umbral', align: 'right', className: 'text-muted', cell: (b) => `$${parseFloat(b.low_balance_threshold ?? '50').toFixed(2)}` },
               { header: 'Últ. sinc.', className: 'text-muted whitespace-nowrap', cell: (b) => fmtDate(b.last_synced) },

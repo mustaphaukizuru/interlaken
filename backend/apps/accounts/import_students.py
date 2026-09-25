@@ -11,6 +11,9 @@ Required per row: matricula, nombre, apellidos, grado. Parent columns are
 optional as a group, but if any is present email_padre is required.
 
 Semantics (idempotent — re-importing the same file changes nothing):
+  * matricula is normalised first (``ci09932`` and ``09932`` are one key, the
+    app stores the digits; see apps.core.matricula), before the in-file
+    duplicate check and the roster match.
   * matricula new  → create student User (unusable password) + StudentProfile.
   * matricula seen → update nombre/apellidos/grado/grupo/loyverse_id.
   * email_padre new  → create parent User (unusable password; logs in via
@@ -27,6 +30,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.matricula import normalize_matricula
 from apps.core.permissions import IsAdmin
 
 from .models import StudentProfile, User
@@ -100,7 +104,9 @@ class ImportStudentsView(APIView):
                          **stats, 'rows': results})
 
     def _process_row(self, row, line, dry_run, seen, stats):
-        matricula = _row_value(row, 'matricula')
+        # Both spellings are one student: the office writes ci09932 in
+        # Loyverse and its spreadsheets, the app keys on 09932.
+        matricula = normalize_matricula(_row_value(row, 'matricula'))
         nombre = _row_value(row, 'nombre')
         apellidos = _row_value(row, 'apellidos')
         grado = _row_value(row, 'grado')

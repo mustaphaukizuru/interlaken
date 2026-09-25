@@ -308,6 +308,10 @@ export default function AdminStudents() {
                       <dd className="text-muted">{s.student_id}</dd>
                     </div>
                     <div>
+                      <dt className="text-xs font-semibold text-muted">Código Loyverse</dt>
+                      <dd className="font-mono text-muted">{s.loyverse_code || s.student_id}</dd>
+                    </div>
+                    <div>
                       <dt className="text-xs font-semibold text-muted">Grado</dt>
                       <dd className="text-muted">{s.grade}</dd>
                     </div>
@@ -345,6 +349,7 @@ export default function AdminStudents() {
                         </div>
                       </td>
                       {visible('student_id') && <td className="text-muted">{s.student_id}</td>}
+                      {visible('loyverse_code') && <td className="font-mono text-xs text-muted">{s.loyverse_code || s.student_id}</td>}
                       {visible('grade') && <td className="text-muted">{s.grade}</td>}
                       {visible('group') && <td className="text-muted">{s.group}</td>}
                       {visible('email') && <td className="text-subtle text-xs">{s.user.email}</td>}
