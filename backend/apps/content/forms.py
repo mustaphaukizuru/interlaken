@@ -170,6 +170,10 @@ class FormSubmission(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Envío de formulario'
         verbose_name_plural = 'Envíos de formularios'
+        indexes = [
+            # Submissions of one form filtered by handled, newest first (Data Ops Phase 1).
+            models.Index(fields=['form', 'is_handled', '-created_at'], name='content_formsub_handled'),
+        ]
 
     @property
     def reply_to(self) -> str:

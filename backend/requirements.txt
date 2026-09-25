@@ -19,6 +19,9 @@ PyJWT==2.14.0
 # Pillow: avatar cropping (apps/accounts/avatar.py) and CMS media variants
 # (apps/content/media.py). PDFs are generated dependency-free in apps/core/pdf.py.
 Pillow==12.3.0
+# XLSX export/import for the admin console (Data Ops round). Pure Python: the
+# production image has no compiler. Write-only workbooks keep exports streaming.
+openpyxl==3.1.5
 # Durable object storage for uploaded media (admissions documents) — the
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).

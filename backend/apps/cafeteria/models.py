@@ -38,6 +38,15 @@ class CafeteriaBalance(models.Model):
 
     class Meta:
         verbose_name = 'Saldo de Cafetería'
+        # Deterministic order for the paginated Saldos list (Data Ops Phase 1):
+        # an unordered queryset under PageNumberPagination can show a wallet on
+        # two pages or on none.
+        ordering = ['student__user__last_name', 'student__user__first_name', 'pk']
+        # No ``balance >= 0`` CheckConstraint on purpose (Data Ops Phase 1 decision):
+        # ``services._record_receipt`` debits POS purchases below zero by design
+        # (receipts are authoritative for spend; the POS top-up mirror credits the
+        # wallet afterwards), so the constraint would abort ``sync_purchases``.
+        # ``check_data_integrity`` reports negative balances instead.
 
     def __str__(self):
         return f'{self.student} — ${self.balance:.2f}'
@@ -89,6 +98,8 @@ class CafeteriaTransaction(models.Model):
             models.Index(fields=['student', '-date']),
             models.Index(fields=['transaction_type', 'date']),
             models.Index(fields=['student', '-recorded_at']),
+            # School-wide date-range lists and exports (Data Ops Phase 1).
+            models.Index(fields=['date'], name='caf_tx_date'),
         ]
 
     def __str__(self):
@@ -161,6 +172,14 @@ class TopUpRequest(models.Model):
                 fields=['pos_unload_needed_at', 'pos_unloaded_at'],
                 name='cafeteria_topup_pos_unload',
             ),
+            # Depósitos log filtered by status, newest first (Data Ops Phase 1).
+            models.Index(fields=['status', '-created_at'], name='caf_topup_status_created'),
+        ]
+        constraints = [
+            # A top-up is money in; zero or negative amounts are refused by the views
+            # and now by the database.
+            models.CheckConstraint(condition=models.Q(amount__gt=0),
+                                   name='caf_topup_amount_positive'),
         ]
 
     def __str__(self):
@@ -207,6 +226,10 @@ class BalanceAdjustment(models.Model):
         verbose_name = 'Ajuste de Saldo'
         verbose_name_plural = 'Ajustes de Saldo'
         ordering = ['-created_at']
+        indexes = [
+            # Adjustments list by date (Data Ops Phase 1).
+            models.Index(fields=['created_at'], name='caf_adjustment_created'),
+        ]
 
     def __str__(self):
         return f'{self.student} — {self.get_kind_display()} ${self.amount}'
@@ -278,6 +301,10 @@ class LoyverseProfile(models.Model):
         verbose_name = 'Perfil de Loyverse'
         verbose_name_plural = 'Perfiles de Loyverse'
         ordering = ['-last_visit']
+        indexes = [
+            # Matrícula lookups (ci09938 / 09938) from search and the importers.
+            models.Index(fields=['customer_code'], name='caf_loyprofile_code'),
+        ]
 
     def __str__(self):
         return f'{self.name or self.customer_code} — {self.total_visits} visitas'
@@ -309,6 +336,10 @@ class UnmatchedReceipt(models.Model):
         verbose_name = 'Recibo sin alumno'
         verbose_name_plural = 'Recibos sin alumno'
         ordering = ['-seen_at']
+        indexes = [
+            # "Still unresolved" queue for the replay job and the reconciliation tab.
+            models.Index(fields=['resolved_at'], name='caf_unmatched_resolved'),
+        ]
 
     def __str__(self):
         return f'{self.receipt_number} ({self.customer_id}) ${self.points}'

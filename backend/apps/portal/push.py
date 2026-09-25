@@ -22,6 +22,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.exceptions import error_body
+
 from .models import PushSubscription
 
 logger = logging.getLogger(__name__)
@@ -77,7 +79,7 @@ class PushSubscribeView(APIView):
         keys = request.data.get('keys') or {}
         p256dh, auth = keys.get('p256dh', ''), keys.get('auth', '')
         if not (endpoint and p256dh and auth):
-            return Response({'error': 'Suscripción inválida.'},
+            return Response(error_body('Suscripción inválida.'),
                             status=status.HTTP_400_BAD_REQUEST)
         # Endpoint is globally unique: re-subscribing moves it to this user.
         PushSubscription.objects.update_or_create(

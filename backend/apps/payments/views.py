@@ -17,6 +17,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.exceptions import error_body
+from apps.core.listing import apply_date_range, day_start
 from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
@@ -127,7 +129,7 @@ class _WebhookProcessMixin:
                            .select_for_update()
                            .get(pk=event.payment_id))
             except (Payment.DoesNotExist, TypeError, ValueError):
-                return status.HTTP_404_NOT_FOUND, {'error': 'payment_not_found'}, None
+                return status.HTTP_404_NOT_FOUND, error_body('payment_not_found'), None
 
             # Refunded is fully closed. Gateway-DECLINED FAILED is closed too.
             # Soft-FAILED (expire/supersede/create_checkout) still accepts a late
@@ -191,7 +193,7 @@ class _WebhookProcessMixin:
             if event is not None:
                 break
         if event is None:
-            return Response({'error': 'invalid_signature'},
+            return Response(error_body('invalid_signature'),
                             status=status.HTTP_401_UNAUTHORIZED)
 
         # Automated money movement: attribute audit records to the gateway job.
@@ -266,7 +268,7 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
 
     def post(self, request):
         if not _sandbox_payments_enabled():
-            return Response({'error': 'not_found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(error_body('not_found'), status=status.HTTP_404_NOT_FOUND)
 
         order_id = request.data.get('order_id')
         result = 'success' if request.data.get('result', 'success') == 'success' else 'failed'
@@ -312,8 +314,6 @@ def _filtered_history(request):
 
     ?status=  ?student=<profile id>  ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
     """
-    from django.utils.dateparse import parse_date
-
     from .services import payments_visible_to
 
     qs = payments_visible_to(request.user).select_related('related_topup__student__user')
@@ -322,12 +322,8 @@ def _filtered_history(request):
         qs = qs.filter(status=p['status'])
     if p.get('student', '').isdigit():
         qs = qs.filter(related_topup__student_id=int(p['student']))
-    d = parse_date(p.get('from', '') or '')
-    if d:
-        qs = qs.filter(created_at__date__gte=d)
-    d = parse_date(p.get('to', '') or '')
-    if d:
-        qs = qs.filter(created_at__date__lte=d)
+    # Aware bounds (invalid dates ignored) so the created_at index is usable.
+    qs = apply_date_range(qs, 'created_at', p.get('from'), p.get('to'))
     return apply_ordering(qs, request, PAYMENT_ORDERING, '-created_at')
 
 
@@ -439,7 +435,7 @@ class AdminPaymentsSummaryView(APIView):
         except ValueError:
             days = 30
         since = timezone.localdate() - timedelta(days=days - 1)
-        qs = Payment.objects.filter(created_at__date__gte=since)
+        qs = Payment.objects.filter(created_at__gte=day_start(since))
         by_status = {
             r['status']: {'count': r['c'], 'total': str(r['t'] or 0)}
             for r in qs.values('status').annotate(c=Count('id'), t=Sum('amount'))

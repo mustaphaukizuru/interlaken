@@ -6,12 +6,12 @@ from django.core.cache import cache
 from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.listing import apply_date_range
 from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
@@ -130,13 +130,9 @@ class AdminAuditLogView(generics.ListAPIView):
         object_id = (p.get('object_id') or '').strip()
         if object_id:
             qs = qs.filter(object_id=object_id)
-        # Invalid dates are ignored (parse_date → None) instead of 500ing.
-        date_from = parse_date(p.get('from') or '')
-        if date_from:
-            qs = qs.filter(created_at__date__gte=date_from)
-        date_to = parse_date(p.get('to') or '')
-        if date_to:
-            qs = qs.filter(created_at__date__lte=date_to)
+        # Invalid dates are ignored (date_bounds → None) instead of 500ing; the
+        # bounds are aware datetimes so the created_at index is usable.
+        qs = apply_date_range(qs, 'created_at', p.get('from'), p.get('to'))
 
         return apply_ordering(qs, self.request, AUDIT_ORDERING, '-created_at')
 

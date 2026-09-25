@@ -20,6 +20,7 @@ import re
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
+from uuid import uuid4
 
 import requests
 from django.conf import settings
@@ -1190,19 +1191,19 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
             fields.append('last_low_balance_alert_at')
         cb.save(update_fields=fields)
 
+        # loyverse_receipt_id is unique=True; inserting '' and stamping the
+        # reference afterwards let two concurrent adjustments (any students,
+        # two gunicorn workers) collide on the blank value on Postgres. The
+        # synthetic reference is generated BEFORE the insert (Data Ops Phase 1),
+        # keeping the adjust-tx-* convention the ledger repair tools recognise.
         tx = CafeteriaTransaction.objects.create(
             student=student,
             transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT,
             amount=amount.copy_abs(),
             description=(f'Ajuste manual: {reason}' if reason else 'Ajuste manual'),
+            loyverse_receipt_id=f'adjust-tx-{uuid4().hex}',
             balance_after=cb.balance,
         )
-        # loyverse_receipt_id is unique=True; leaving it '' means only ONE such
-        # row can ever exist system-wide, so the second manual adjustment (any
-        # student) would hit an IntegrityError. Stamp a unique synthetic
-        # reference, mirroring the refund-tx-<id> / topup-* convention.
-        tx.loyverse_receipt_id = f'adjust-tx-{tx.id}'
-        tx.save(update_fields=['loyverse_receipt_id'])
         adj = BalanceAdjustment.objects.create(
             student=student,
             admin=admin,

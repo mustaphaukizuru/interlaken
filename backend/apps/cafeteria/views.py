@@ -20,6 +20,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.exceptions import error_body
+from apps.core.listing import apply_date_range, day_end_exclusive, day_start
 from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
@@ -111,7 +113,7 @@ class MyBalanceView(APIView):
             try:
                 profile = user.student_profile
             except StudentProfile.DoesNotExist:
-                return Response({'error': 'Perfil de alumno no encontrado.'}, status=404)
+                return Response(error_body('Perfil de alumno no encontrado.'), status=404)
             balance, _ = CafeteriaBalance.objects.get_or_create(student=profile)
             return Response(CafeteriaBalanceSerializer(
                 balance, context={'include_spend': True}).data)
@@ -194,12 +196,8 @@ class MyTransactionsView(generics.ListAPIView):
         if tx_type in CafeteriaTransaction.TxType.values:
             qs = qs.filter(transaction_type=tx_type)
 
-        date_from = params.get('from')
-        if date_from:
-            qs = qs.filter(date__date__gte=date_from)
-        date_to = params.get('to')
-        if date_to:
-            qs = qs.filter(date__date__lte=date_to)
+        # Aware bounds (invalid dates ignored) so the (student, -date) index is usable.
+        qs = apply_date_range(qs, 'date', params.get('from'), params.get('to'))
 
         return apply_ordering(qs, self.request, TRANSACTION_ORDERING, '-date')
 
@@ -244,7 +242,7 @@ class MySpendingTrendView(APIView):
             CafeteriaTransaction.objects
             .filter(student__in=students,
                     transaction_type=CafeteriaTransaction.TxType.PURCHASE,
-                    date__date__gte=start)
+                    date__gte=day_start(start))
             .annotate(day=TruncDate('date'))
             .values('day')
             .annotate(total=models.Sum('amount'))
@@ -281,9 +279,9 @@ class UpdateLowBalanceThresholdView(APIView):
 
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             if not _can_manage_student_cafeteria(user, student):
-                return Response({'error': 'No autorizado para este alumno.'}, status=403)
+                return Response(error_body('No autorizado para este alumno.'), status=403)
         elif user.role != User.Role.ADMIN:
-            return Response({'error': 'No autorizado.'}, status=403)
+            return Response(error_body('No autorizado.'), status=403)
 
         serializer = LowBalanceThresholdSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -310,9 +308,9 @@ class UpdateSpendLimitsView(APIView):
 
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             if not _can_manage_student_cafeteria(user, student):
-                return Response({'error': 'No autorizado para este alumno.'}, status=403)
+                return Response(error_body('No autorizado para este alumno.'), status=403)
         elif user.role != User.Role.ADMIN:
-            return Response({'error': 'No autorizado.'}, status=403)
+            return Response(error_body('No autorizado.'), status=403)
 
         serializer = SpendLimitsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -366,7 +364,7 @@ class MySpendingCategoriesView(APIView):
         txns = (CafeteriaTransaction.objects
                 .filter(student__in=students,
                         transaction_type=CafeteriaTransaction.TxType.PURCHASE,
-                        date__date__gte=start)
+                        date__gte=day_start(start))
                 .values_list('items', 'amount'))
 
         # Aggregate line totals by category. Fall back to the receipt total under
@@ -589,7 +587,7 @@ class LoyverseWebhookView(APIView):
     def post(self, request, token=None):
         secret = (getattr(settings, 'LOYVERSE_WEBHOOK_SECRET', '') or '').strip()
         if not secret or not self._authorized(request, secret, token):
-            return Response({'error': 'unauthorized'}, status=401)
+            return Response(error_body('unauthorized'), status=401)
 
         payload = request.data if isinstance(request.data, dict) else {}
         event = payload.get('type') or ('customers.update' if 'customers' in payload else 'receipts.update')
@@ -622,7 +620,7 @@ class LoyverseWebhookView(APIView):
                 result = mirror_pos_topups(customers=fresh_customers, fresh=all_fresh)
             except Exception:  # noqa: BLE001
                 logger.exception('Loyverse customers.update processing failed')
-                return Response({'error': 'processing_error'}, status=500)
+                return Response(error_body('processing_error'), status=500)
             # Keep the customer snapshots (staff cards included) current in
             # real time too. Partial list: never marks anyone missing.
             try:
@@ -641,13 +639,13 @@ class LoyverseWebhookView(APIView):
             receipts = [payload] if (payload.get('receipt_number')
                                      or payload.get('customer_id')) else []
         if not isinstance(receipts, list):
-            return Response({'error': 'receipts debe ser una lista.'}, status=400)
+            return Response(error_body('receipts debe ser una lista.'), status=400)
 
         try:
             result = record_receipts(receipts)
         except Exception:  # noqa: BLE001 — never leak internals to the caller
             logger.exception('Loyverse webhook processing failed')
-            return Response({'error': 'processing_error'}, status=500)
+            return Response(error_body('processing_error'), status=500)
         logger.info('Loyverse webhook %s: %d receipt(s), %d new, %d unmatched, %d skipped',
                     event, len(receipts), result['created'], result['unmatched'], result['skipped'])
         return Response({'ok': True, **result})
@@ -685,7 +683,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         # Student-role school-email logins are self-guardians (see Loyverse import).
         user = request.user
         if not _can_manage_student_cafeteria(user, student):
-            return Response({'error': 'No autorizado para este alumno.'}, status=403)
+            return Response(error_body('No autorizado para este alumno.'), status=403)
 
         # Online/office top-ups only make sense once the student is on Loyverse —
         # office apply and POS load both require loyverse_id downstream.
@@ -704,7 +702,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         if method == TopUpRequest.Method.ONLINE:
             gateway_name = (request.data.get('gateway') or '').lower() or None
             if gateway_name and gateway_name not in GATEWAY_CHOICES:
-                return Response({'error': 'Pasarela de pago no válida.'}, status=400)
+                return Response(error_body('Pasarela de pago no válida.'), status=400)
             gateway = get_gateway(gateway_name)
             amount = serializer.validated_data['amount']
 
@@ -741,13 +739,13 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                 payment.mark_failed(e, stage='create_checkout')
                 from apps.cafeteria.services import fail_online_topup
                 fail_online_topup(payment)
-                return Response({'error': f'No se pudo iniciar el pago: {e}'}, status=502)
+                return Response(error_body(f'No se pudo iniciar el pago: {e}'), status=502)
 
             if not redirect_url:
                 payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
                 from apps.cafeteria.services import fail_online_topup
                 fail_online_topup(payment)
-                return Response({'error': 'No se pudo iniciar el pago.'}, status=502)
+                return Response(error_body('No se pudo iniciar el pago.'), status=502)
 
             data.update({
                 'payment_id': payment.id,
@@ -798,7 +796,7 @@ class AdminApplyTopUpView(APIView):
         topup = get_object_or_404(TopUpRequest, pk=pk)
 
         if topup.status != TopUpRequest.Status.PENDING:
-            return Response({'error': 'Esta recarga ya fue procesada.'}, status=400)
+            return Response(error_body('Esta recarga ya fue procesada.'), status=400)
 
         # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
         # top-ups are credited exclusively by the signed gateway webhook
@@ -807,20 +805,20 @@ class AdminApplyTopUpView(APIView):
         # idempotency key.
         if topup.method != TopUpRequest.Method.OFFICE:
             return Response(
-                {'error': 'Las recargas en línea se acreditan automáticamente al '
-                          'confirmarse el pago; no se aplican manualmente.'},
+                error_body('Las recargas en línea se acreditan automáticamente al '
+                          'confirmarse el pago; no se aplican manualmente.'),
                 status=400)
 
         # Guard against a non-positive request slipping through (older rows, or a
         # request created before the serializer floor existed): a negative amount
         # would DEBIT the child's balance.
         if topup.amount is None or topup.amount <= 0:
-            return Response({'error': 'El monto de la recarga debe ser positivo.'},
+            return Response(error_body('El monto de la recarga debe ser positivo.'),
                             status=400)
 
         student = topup.student
         if not student.loyverse_id:
-            return Response({'error': 'Alumno sin ID de Loyverse configurado.'}, status=400)
+            return Response(error_body('Alumno sin ID de Loyverse configurado.'), status=400)
 
         try:
             # Pass a stable reference so the credit writes a TOPUP ledger row and
@@ -834,7 +832,7 @@ class AdminApplyTopUpView(APIView):
                 reference=f'topup-request-{topup.id}',
             )
         except Exception as e:
-            return Response({'error': str(e)}, status=502)
+            return Response(error_body(str(e)), status=502)
 
         topup.status = TopUpRequest.Status.COMPLETED
         topup.processed_at = timezone.now()
@@ -861,7 +859,7 @@ class RefreshFromLoyverseView(APIView):
             result = sync_purchases()
         except Exception as e:
             logger.exception('cafeteria refresh failed')
-            return Response({'error': str(e)}, status=502)
+            return Response(error_body(str(e)), status=502)
         return Response({
             'detail': 'Sincronización con Loyverse completada.',
             'receipts': result.get('receipts', 0),
@@ -923,7 +921,7 @@ class AdminSyncBalanceView(APIView):
                 'skipped': purchases.get('skipped', 0),
             })
         except Exception as e:
-            return Response({'error': str(e)}, status=502)
+            return Response(error_body(str(e)), status=502)
 
 
 class AdminSyncAllView(APIView):
@@ -970,7 +968,7 @@ class AdminSyncAllView(APIView):
                 'skipped': purchases.get('skipped', 0),
             })
         except Exception as e:
-            return Response({'error': str(e)}, status=502)
+            return Response(error_body(str(e)), status=502)
 
 
 # ── Admin console (Phase D) ──────────────────────────────────────────────────
@@ -1056,12 +1054,12 @@ class AdminReconcileFixView(APIView):
     def post(self, request, pk):
         student = get_object_or_404(StudentProfile, pk=pk)
         if not student.loyverse_id:
-            return Response({'error': 'El alumno no está vinculado a Loyverse.'}, status=400)
+            return Response(error_body('El alumno no está vinculado a Loyverse.'), status=400)
 
         try:
             remote = get_balance_from_customer(get_customer_by_id(student.loyverse_id))
         except LoyverseError as exc:
-            return Response({'error': f'No se pudo leer el saldo en Loyverse: {exc}'}, status=502)
+            return Response(error_body(f'No se pudo leer el saldo en Loyverse: {exc}'), status=502)
 
         cb, _ = CafeteriaBalance.objects.get_or_create(student=student)
         local = cb.balance or Decimal('0')
@@ -1076,7 +1074,7 @@ class AdminReconcileFixView(APIView):
                 reason=f'Reconciliación con Loyverse (local ${local:.2f} → ${remote:.2f})',
                 admin=request.user, notify=False, mirror=False)
         except ValueError as exc:
-            return Response({'error': str(exc)}, status=400)
+            return Response(error_body(str(exc)), status=400)
 
         cb.refresh_from_db()
         return Response({'detail': 'Saldo reconciliado con Loyverse.', 'adjusted': True,
@@ -1115,12 +1113,8 @@ class AdminTopUpLogView(generics.ListAPIView):
         if method_f in TopUpRequest.Method.values:
             qs = qs.filter(method=method_f)
 
-        date_from = params.get('from')
-        if date_from:
-            qs = qs.filter(created_at__date__gte=date_from)
-        date_to = params.get('to')
-        if date_to:
-            qs = qs.filter(created_at__date__lte=date_to)
+        # Aware bounds (invalid dates ignored) so the (status, -created_at) index is usable.
+        qs = apply_date_range(qs, 'created_at', params.get('from'), params.get('to'))
 
         # Operational queue: paid online, local ledger credited, not yet loaded
         # into Loyverse POS so the child can spend at the cafeteria. Exclude
@@ -1165,18 +1159,18 @@ class AdminMarkTopUpPosLoadedView(APIView):
         )
         if topup.method != TopUpRequest.Method.ONLINE:
             return Response(
-                {'error': 'Solo las recargas en línea requieren carga en el POS.'},
+                error_body('Solo las recargas en línea requieren carga en el POS.'),
                 status=400,
             )
         if topup.status != TopUpRequest.Status.COMPLETED:
             return Response(
-                {'error': 'La recarga aún no está acreditada en el saldo local.'},
+                error_body('La recarga aún no está acreditada en el saldo local.'),
                 status=400,
             )
         linked = topup.payments.order_by('-created_at').first()
         if linked is not None and linked.status == Payment.Status.REFUNDED:
             return Response(
-                {'error': 'Esta recarga fue reembolsada; no la cargue en el POS.'},
+                error_body('Esta recarga fue reembolsada; no la cargue en el POS.'),
                 status=400,
             )
 
@@ -1213,7 +1207,7 @@ class AdminMarkTopUpPosUnloadedView(APIView):
         )
         if topup.pos_unload_needed_at is None:
             return Response(
-                {'error': 'Esta recarga no está en la cola de quitar del POS.'},
+                error_body('Esta recarga no está en la cola de quitar del POS.'),
                 status=400,
             )
 
@@ -1291,7 +1285,7 @@ class AdminAdjustBalanceView(APIView):
                 admin=request.user,
             )
         except ValueError as e:
-            return Response({'error': str(e)}, status=400)
+            return Response(error_body(str(e)), status=400)
 
         return Response(BalanceAdjustmentSerializer(adj).data, status=201)
 
@@ -1316,7 +1310,7 @@ class AdminRefundView(APIView):
                 admin=request.user,
             )
         except ValueError as e:
-            return Response({'error': str(e)}, status=400)
+            return Response(error_body(str(e)), status=400)
 
         return Response(BalanceAdjustmentSerializer(adj).data, status=201)
 
@@ -1501,7 +1495,7 @@ class ParentExportView(APIView):
 
         user = request.user
         if user.role not in (User.Role.PARENT, User.Role.STUDENT, User.Role.ADMIN):
-            return Response({'error': 'No autorizado.'}, status=403)
+            return Response(error_body('No autorizado.'), status=403)
         return exports.parent_family_statement_csv(user)
 
 
@@ -1569,8 +1563,12 @@ class MyStatementPdfView(APIView):
             end = _date(y, m, _cal.monthrange(y, m)[1])
         except (ValueError, TypeError):
             return Response({'month': ['Use AAAA-MM.']}, status=400)
-        rows = list(CafeteriaTransaction.objects.filter(student=student, date__date__range=(start, end)).order_by('date', 'id'))
-        prev = CafeteriaTransaction.objects.filter(student=student, date__date__lt=start).order_by('-date', '-id').first()
+        # Aware bounds instead of ``date__date__range`` so the (student, -date) index is usable.
+        rows = list(CafeteriaTransaction.objects.filter(
+            student=student, date__gte=day_start(start), date__lt=day_end_exclusive(end),
+        ).order_by('date', 'id'))
+        prev = (CafeteriaTransaction.objects.filter(student=student, date__lt=day_start(start))
+                .order_by('-date', '-id').first())
         if prev is not None and prev.balance_after is not None:
             opening = prev.balance_after
         elif rows and rows[0].balance_after is not None:

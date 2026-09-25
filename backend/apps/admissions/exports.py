@@ -9,7 +9,7 @@ import csv
 from django.http import HttpResponse
 from rest_framework.views import APIView
 
-from apps.core.audit import record
+from apps.core.audit import record_export
 from apps.core.exports import as_download, export_filename, fmt_dt
 from apps.core.permissions import IsAdmin
 
@@ -44,9 +44,9 @@ class PreRegistrationExportView(APIView):
             w.writerow([fmt_dt(r.created_at), f'{r.child_first_name} {r.child_last_name}', r.child_dob, r.get_level_display(),
                         r.grade_applying, r.cycle, r.parent_name, r.parent_email, r.parent_phone, r.relationship,
                         r.referral_source, 'Sí' if r.wants_visit else 'No', r.get_status_display(), r.notes])
-        if rows:
-            record('update', rows[0], {'export': 'pre-registros', 'rows': len(rows), 'filters': dict(p)},
-                   actor=request.user, context='admissions.export')
+        # One export row per download (object_type='export:pre-registros'), even
+        # when the file is empty: the attempt is what LFPDPPP traceability needs.
+        record_export('pre-registros', 'csv', p, len(rows), request.user, context='admissions.export')
         return as_download(resp, export_filename('pre-registros'))
 
 
@@ -68,7 +68,5 @@ class RegistrationExportView(APIView):
             w.writerow([fmt_dt(r.created_at), fmt_dt(r.submitted_at), f'{r.child_first_name} {r.child_last_name}',
                         r.child_dob, r.level, r.grade_applying, r.cycle, r.parent1_name, r.parent1_email,
                         r.parent1_phone, r.get_status_display(), f'{approved}/{len(r.documents.all())}'])
-        if rows:
-            record('update', rows[0], {'export': 'inscripciones', 'rows': len(rows), 'filters': dict(p)},
-                   actor=request.user, context='admissions.export')
+        record_export('inscripciones', 'csv', p, len(rows), request.user, context='admissions.export')
         return as_download(resp, export_filename('inscripciones'))
