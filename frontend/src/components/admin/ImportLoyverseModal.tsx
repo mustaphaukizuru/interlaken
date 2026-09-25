@@ -213,7 +213,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
                 empty={{ icon: ListChecks, title: 'Ningún cambio coincide con la búsqueda' }}
                 columns={[
                   {
-                    header: 'Alumno', className: 'text-ink',
+                    id: 'alumno', header: 'Alumno', className: 'text-ink',
                     cell: (c) => (
                       <span>
                         <span className="font-medium">{c.name || '—'}</span>
@@ -222,15 +222,15 @@ function ImportLoyverseBody({ onClose, onImported }: {
                     ),
                   },
                   {
-                    header: 'Campo',
+                    id: 'campo', header: 'Campo',
                     cell: (c) => (
                       <Badge variant={c.action === 'crear' ? 'success' : 'info'}>
                         {c.action === 'crear' ? `Alta · ${FIELD_LABEL[c.field]}` : FIELD_LABEL[c.field]}
                       </Badge>
                     ),
                   },
-                  { header: 'Antes', className: 'text-muted', cell: (c) => c.before || '—' },
-                  { header: 'Después', className: 'font-medium text-ink', cell: (c) => c.after || '—' },
+                  { id: 'antes', header: 'Antes', className: 'text-muted', cell: (c) => c.before || '—' },
+                  { id: 'despues', header: 'Después', className: 'font-medium text-ink', cell: (c) => c.after || '—' },
                 ]}
               />
               {visible.length < changes.length && (
