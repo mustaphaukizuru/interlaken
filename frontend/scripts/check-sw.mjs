@@ -56,4 +56,14 @@ if (!/importScripts\(["']push-sw\.js["']\)/.test(sw)) {
   fail('dist/sw.js does not import push-sw.js (push notifications would stop working).');
 }
 
-console.log('✓ check-sw: no navigation hijack, server paths excluded, push companion imported');
+// Data Ops: export/import/template endpoints must stay NetworkOnly (the regex
+// literal survives minification verbatim). Without it a CSV/XLSX download
+// could be answered from the 5-minute JSON cache.
+if (!/\\\/\(export\|import\|template\)\\\//.test(sw)) {
+  fail(
+    'dist/sw.js no longer carries the NetworkOnly rule for /api/v1/**/(export|import|template)/ ' +
+      '— see the Data Ops runtimeCaching entry in vite.config.ts.',
+  );
+}
+
+console.log('✓ check-sw: no navigation hijack, server paths excluded, push companion imported, export/import NetworkOnly');

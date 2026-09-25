@@ -40,6 +40,10 @@ interface Props {
   /** Right-align numeric columns, matching the cells below. */
   align?: 'left' | 'right';
   className?: string;
+  /** Column width/min-width when the table is resizable (DataTable v2). */
+  style?: React.CSSProperties;
+  /** Rendered inside the th but outside the sort button (the resize handle). */
+  after?: React.ReactNode;
 }
 
 /**
@@ -52,7 +56,7 @@ interface Props {
  * `aria-sort` on the th is what a screen reader announces; the button carries
  * the action, so the whole header stays keyboard-reachable.
  */
-export function SortableTh({ columnKey, sort, onSort, children, align = 'left', className = '' }: Props) {
+export function SortableTh({ columnKey, sort, onSort, children, align = 'left', className = '', style, after }: Props) {
   const active = sort.key === columnKey;
   const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
   return (
@@ -60,6 +64,7 @@ export function SortableTh({ columnKey, sort, onSort, children, align = 'left', 
       scope="col"
       aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
       className={`${align === 'right' ? 'text-right' : 'text-left'} ${className}`}
+      style={style}
     >
       <button
         type="button"
@@ -74,6 +79,7 @@ export function SortableTh({ columnKey, sort, onSort, children, align = 'left', 
         {children}
         <Icon size={13} aria-hidden="true" className={active ? 'text-purple' : 'text-subtle'} />
       </button>
+      {after}
     </th>
   );
 }

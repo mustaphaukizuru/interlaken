@@ -8,6 +8,15 @@
  * read from localStorage or a URL.
  */
 import axios from 'axios';
+import type { ExportParams } from './dataOps';
+
+// Data Operations contracts (lists, exports, imports, bulk actions) live in
+// ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
+// make this module (loaded by every public route) depend on whichever chunk
+// the bundler puts dataOps in, and it dragged ExportMenu + Dropdown + icons
+// into the public entry (+15 kB gz). Import the helpers (`idsParam`,
+// `exportFilename`, `validateImportFile`, …) from '@/services/dataOps'.
+export type * from './dataOps';
 
 export interface StaffUser {
   id: number;
@@ -670,9 +679,17 @@ export const paymentsApi = {
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
   getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
   /** Admin ledger (BACKLOG P1-D9). */
-  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; from?: string; to?: string; ordering?: string }) =>
+  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/admin/', { params }),
   adminSummary: (days = 30) => api.get<AdminPaymentsSummary>('/payments/admin/summary/', { params: { days } }),
+  /**
+   * Admin export of the current ledger view (Data Ops C3): honours `q`,
+   * `status`, `gateway`, `student`, `from`, `to`, `ordering`, `fmt` and `ids`.
+   * Replaces the family endpoint `/payments/history/export/` the console used
+   * to call by mistake.
+   */
+  adminExport: (params: ExportParams) =>
+    api.get<Blob>('/payments/admin/export/', { params, responseType: 'blob' }),
 };
 
 // Cafetería top-ups are the only money path; there is no tuition/finance API.
@@ -689,8 +706,9 @@ export interface ContactMessage {
 }
 
 export const coreApi = {
-  exportAuditLog: (params?: { actor?: string; action?: string; from?: string; to?: string }) =>
-    api.get('/core/admin/audit/export/', { params, responseType: 'blob' }),
+  /** Audit export (Data Ops C3): same filters and ordering as the list, plus `fmt` and `ids`. */
+  exportAuditLog: (params: ExportParams) =>
+    api.get<Blob>('/core/admin/audit/export/', { params, responseType: 'blob' }),
   /** Website inbox (BACKLOG P1-G7). */
   getContactMessages: (params?: { page?: number; q?: string; handled?: string }) =>
     api.get('/core/admin/contact-messages/', { params }),

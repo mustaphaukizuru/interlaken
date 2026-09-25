@@ -6,9 +6,18 @@ import { axe } from 'vitest-axe';
 // One shared api mock serves every page in this file. Query methods resolve
 // minimal deterministic data so each page renders its real layout (not just
 // skeletons); handler-only methods are plain spies.
-vi.mock('@/services/api', () => {
+vi.mock('@/services/api', async () => {
   const ok = (data: unknown) => vi.fn().mockResolvedValue({ data });
   const emptyPage = { results: [], count: 0 };
+  const payment = {
+    id: 11, payment_type: 'cafeteria', amount: '150.00', currency: 'MXN', description: 'Ana Tutor', status: 'success',
+    gateway: 'banorte', gateway_label: 'Banorte', gateway_tx_id: 'TX-1', student_id: 10, student_name: 'Emma Quintana',
+    created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-20T10:00:00Z',
+  };
+  const auditEntry = {
+    id: 1, actor: 1, actor_label: 'ana@x.mx', action: 'update', action_display: 'Modificación', object_type: 'StudentProfile',
+    object_id: '9', changes: { grade: ['1°', '2°'] }, context: 'import:students', created_at: '2026-09-20T10:00:00Z',
+  };
   const cafeteriaAccount = {
     id: 1,
     student: {
@@ -24,10 +33,13 @@ vi.mock('@/services/api', () => {
     last_synced: '2026-08-01T12:00:00Z',
   };
   return {
+    // Data Ops contracts (types + pure helpers) are re-exported from api.ts.
+    ...(await vi.importActual<typeof import('@/services/dataOps')>('@/services/dataOps')),
     api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
     authApi: { me: vi.fn(), googleLogin: vi.fn() },
     bootstrapSession: vi.fn(),
     downloadBlob: vi.fn(),
+    coreApi: { getAuditLog: ok({ results: [auditEntry], count: 1 }), exportAuditLog: vi.fn() },
     portalApi: {
       getDashboard: ok({
         children_count: 1,
@@ -40,7 +52,12 @@ vi.mock('@/services/api', () => {
       }),
       markAnnouncementsRead: ok({}),
     },
-    paymentsApi: { getMyPayments: ok(emptyPage) },
+    paymentsApi: {
+      getMyPayments: ok(emptyPage),
+      adminList: ok({ results: [payment], count: 1 }),
+      adminSummary: ok({ days: 30, since: '2026-08-22', by_status: { success: { count: 1, total: '150.00' } }, stuck_pending: 0, series: [{ date: '2026-09-20', total: '150.00', count: 1 }] }),
+      adminExport: vi.fn(),
+    },
     cafeteriaApi: {
       getMyBalance: ok([cafeteriaAccount]),
       getTransactions: ok(emptyPage),
@@ -92,6 +109,8 @@ import CafeteriaPage from '@/pages/parent/CafeteriaPage';
 import PaymentsPage from '@/pages/parent/PaymentsPage';
 import CostosPage from '@/pages/public/CostosPage';
 import AdminCafeteria from '@/pages/admin/AdminCafeteria';
+import AdminPayments from '@/pages/admin/AdminPayments';
+import AdminAudit from '@/pages/admin/AdminAudit';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 /**
@@ -118,6 +137,9 @@ const PAGES: { name: string; ui: () => ReactElement; route: string }[] = [
   { name: 'PaymentsPage', ui: () => <PaymentsPage />, route: '/portal/pagos' },
   { name: 'CostosPage', ui: () => <CostosPage />, route: '/admisiones/costos' },
   { name: 'AdminCafeteria', ui: () => <AdminCafeteria />, route: '/admin/cafeteria' },
+  // Data Ops reference pages: FilterBar + DataTable v2 (selection, column controls) + ExportMenu v2.
+  { name: 'AdminPayments', ui: () => <AdminPayments />, route: '/admin/pagos' },
+  { name: 'AdminAudit', ui: () => <AdminAudit />, route: '/admin/auditoria' },
 ];
 
 /**

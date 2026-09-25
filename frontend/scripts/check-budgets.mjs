@@ -90,6 +90,9 @@ const FORBIDDEN_ON_PUBLIC = [
   'schemas',          // zod + react-hook-form (public FORM pages only — never home/costos/admisiones)
   'PortalLayout',     // authenticated chrome (sidebar, notifications, date-fns es locale)
   'CredencialPage',   // jsbarcode + qrcode
+  'DataTable',        // Data Ops admin table (v2: selection, column controls, toolbar)
+  'ExportMenu',       // Data Ops export menu (CSV/XLSX/PDF, admin only)
+  'dataOpsHooks',     // Data Ops hooks layer (useAdminList/useBulk/useExport/useImport)
 ];
 
 // ── helpers ────────────────────────────────────────────────────────────────
