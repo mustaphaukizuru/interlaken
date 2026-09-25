@@ -635,8 +635,9 @@ class ImportView(APIView):
 
     Stateless: the dry-run and the commit both re-parse the file. ``report``
     returns the annotated file of the dry-run instead of JSON. A commit with
-    error rows is refused unless ``only_valid=1`` ("Importar solo las filas
-    válidas"), which imports the crear/actualizar rows and leaves the rest.
+    error rows is refused unless ``only_valid=1`` (the UI sends ``valid_only=1``;
+    both spellings are accepted) — "Importar solo las filas válidas" imports the
+    crear/actualizar rows and leaves the rest.
     """
 
     permission_classes = [IsAdmin]
@@ -690,7 +691,10 @@ class ImportView(APIView):
         if truthy(request.data.get("dry_run"), True):
             return Response(report.as_dict())
 
-        if report.has_errors and not truthy(request.data.get("only_valid"), False):
+        only_valid = truthy(request.data.get("only_valid"), False) or truthy(
+            request.data.get("valid_only"), False
+        )
+        if report.has_errors and not only_valid:
             counts = report.counts
             return error_response(
                 f'El archivo tiene {counts["error"]} fila(s) con error. Corríjalas o marque '

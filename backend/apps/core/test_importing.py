@@ -389,6 +389,13 @@ class TestImportView:
         assert ContactMessage.objects.filter(email="ana@x.mx").exists()
         assert AuditLog.objects.filter(object_type="import:mensajes").count() == 1
 
+    def test_commit_accepts_the_ui_spelling_valid_only(self):
+        # ImportDialog (Phase 2) posts ``valid_only=1``; the server must treat it
+        # exactly like ``only_valid=1`` so the merged UI works on day one.
+        resp = _post({"file": _upload(CSV), "dry_run": "0", "valid_only": "1"})
+        assert resp.status_code == 200 and resp.data["dry_run"] is False
+        assert ContactMessage.objects.filter(email="ana@x.mx").exists()
+
     def test_missing_file_and_missing_headers_are_400_with_help(self):
         resp = _post({})
         assert resp.status_code == 400
