@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { portalApi, type StudentWrite, type StudentStatus } from '@/services/api';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
+import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import type { StudentProfile } from '@/types';
 
 interface Props {
@@ -18,15 +19,10 @@ interface Props {
 
 export type FieldErrors = Partial<Record<keyof StudentWrite | 'detail', string>>;
 
-/** DRF `{field: [msg]}` / `{detail}` payload → per-field messages (first message wins). */
+/** DRF `{field: [msg]}` / `{detail}` payload → per-field messages (first message wins).
+ *  Delegates to the shared mapper (`lib/apiErrors`); kept as an alias until Phase 10 retires it. */
 export function fieldErrorsFrom(err: unknown): FieldErrors | null {
-  const data = (err as { response?: { data?: unknown } })?.response?.data;
-  if (!data || typeof data !== 'object') return null;
-  const next: FieldErrors = {};
-  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
-    next[k as keyof FieldErrors] = Array.isArray(v) ? String(v[0]) : String(v);
-  }
-  return next;
+  return fieldErrorsOrNull(err) as FieldErrors | null;
 }
 
 const GRADES = [

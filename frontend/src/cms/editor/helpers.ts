@@ -45,14 +45,8 @@ export function pageStatusLabel(p: Pick<CmsPageAdmin, 'status' | 'has_unpublishe
   return { label: 'Publicada', tone: 'success' };
 }
 
-/** DRF error payload → flat {field: message}. Empty object when not a field error. */
-export function apiErrors(err: unknown): Record<string, string> {
-  const data = (err as { response?: { data?: unknown } })?.response?.data;
-  if (!data || typeof data !== 'object') return {};
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(data as Record<string, unknown>)) out[k] = Array.isArray(v) ? String(v[0]) : String(v);
-  return out;
-}
+/** DRF error payload → flat {field: message}. Now the shared mapper (`lib/apiErrors`); kept as an alias until Phase 10 retires it. */
+export { apiErrors } from '@/lib/apiErrors';
 
 /** Block-level diff between two block lists (CMS versions, BACKLOG P3-4 extra). */
 export interface BlockDiffLine { kind: 'added' | 'removed' | 'changed' | 'same' | 'moved'; type: string; id: string; summary: string }
