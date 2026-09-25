@@ -68,6 +68,13 @@ export default defineConfig(({ command }) => ({
           '**/assets/CredencialPage-*.js',
           '**/assets/schemas-*.js',
           '**/assets/Admin*.js',
+          // Data Ops shared admin chunks (DataTable v2 + toolbar + column
+          // controls, ExportMenu v2, the hooks layer). Admin-only by import
+          // graph (scripts/check-budgets.mjs FORBIDDEN_ON_PUBLIC enforces it),
+          // so they are picked up on demand by the 'lazy-chunks' route.
+          '**/assets/DataTable-*.js',
+          '**/assets/ExportMenu-*.js',
+          '**/assets/dataOpsHooks-*.js',
         ],
         // index.html references hashed assets at /static/assets/* (vite base),
         // so precache them under that URL — a bare 'assets/…' entry would never
@@ -102,6 +109,14 @@ export default defineConfig(({ command }) => ({
               url.pathname.startsWith('/api/v1/payments') ||
               url.pathname.startsWith('/api/v1/cafeteria/balance') ||
               url.pathname === '/healthz',
+            handler: 'NetworkOnly',
+          },
+          {
+            // Data Ops (C3/C4): exports, imports and import templates are
+            // one-off files (CSV/XLSX/PDF blobs) that must be fresh every time
+            // and never fill the JSON cache. NetworkOnly, and ABOVE the generic
+            // /api/ rule so it wins. scripts/check-sw.mjs asserts it survives.
+            urlPattern: ({ url }) => /^\/api\/v1\/.*\/(export|import|template)\//.test(url.pathname),
             handler: 'NetworkOnly',
           },
           {
