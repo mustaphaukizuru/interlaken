@@ -228,13 +228,26 @@ class OpenSchoolSignupTests(APITestCase):
 
     @override_settings(RATELIMIT_ENABLE=True)
     def test_signup_is_rate_limited(self):
+        import time as _time
+        from unittest import mock
+
         from django.core.cache import cache
+
+        # django-ratelimit counts in wall-clock windows (per-key jittered
+        # 60 s buckets; the window end is part of the cache key). When the 12
+        # posts straddled a bucket edge, which a slow full-suite run makes
+        # likely, the counter restarted and no 429 appeared. Freeze the
+        # limiter's clock so all requests land in one window, as
+        # apps/accounts/test_throttle.py does for the login limit.
+        frozen = _time.time()
         cache.clear()
         slot = self._slot(capacity=100)
-        codes = [self.client.post(
-            reverse('open-school-signup'),
-            {'slot': slot.id, 'name': f'P{i}', 'email': f'p{i}@x.mx', 'phone': '5'},
-        ).status_code for i in range(12)]
+        with mock.patch('django_ratelimit.core.time') as fake_time:
+            fake_time.time.return_value = frozen
+            codes = [self.client.post(
+                reverse('open-school-signup'),
+                {'slot': slot.id, 'name': f'P{i}', 'email': f'p{i}@x.mx', 'phone': '5'},
+            ).status_code for i in range(12)]
         self.assertIn(429, codes)                 # the shared limit engaged
         self.assertEqual(codes[:10], [201] * 10)  # first 10 allowed
 
