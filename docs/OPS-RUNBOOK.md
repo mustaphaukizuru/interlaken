@@ -210,3 +210,7 @@ este deploy**. Los trabajos nocturnos de Loyverse pasan de 05:40 y 06:05 a
 el sondeo de cada 5 minutos, perdían la carrera cada mañana y salían en
 silencio, así que `sync_roster` nunca había corrido en producción.
 `backend/apps/cafeteria/test_crontab.py` impide que esa forma vuelva.
+
+## 8. Calendario escolar suscrito (.ics)
+
+`GET /api/v1/content/calendar.ics` publica los eventos **publicados** del calendario escolar (del último año en adelante) como un feed iCalendar (RFC 5545: eventos de día completo, `DTEND` exclusivo, líneas plegadas a 75 octetos). Es público y sin sesión, igual que `/calendario`. La respuesta se guarda 10 minutos en la caché del proceso (`content:calendar.ics`) y cualquier alta, edición, borrado, acción masiva o importación del calendario desde la consola la invalida; como gunicorn corre 3 procesos con caché local, un cambio puede tardar hasta 10 minutos en verse en todos. Google Calendar además refresca las suscripciones por su cuenta (de horas a un día): eso no se controla desde el servidor. Para comprobarlo: `curl -sI https://interlaken.edu.mx/api/v1/content/calendar.ics` debe responder `200`, `Content-Type: text/calendar; charset=utf-8` y `Cache-Control: public, max-age=600`. La liga se copia desde Calendario → **Copiar liga .ics**.

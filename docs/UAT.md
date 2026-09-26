@@ -53,6 +53,16 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
     - Alumnos → Importar desde Loyverse: la vista previa es una tabla por alumno (Campo, Antes, Después) con buscador y chips por campo; "N clientes omitidos: ver motivos" explica cada omisión. Corrija un nombre en el expediente y vuelva a abrir la importación: no aparece ningún cambio de nombre para ese alumno.
     - Alumnos → Vincular Loyverse: si un cliente de Loyverse no trae código de grado, aparece bajo "Sin grado en Loyverse (posible baja)" con su Código Loyverse; nada cambia hasta presionar Dar de baja.
 
+15. Comunicados y Contenido en tablas de datos (Data Ops Phase 8, 25-09-2026):
+    - Comunicados: buscar por título, filtrar por Estado/Dirigido a/Programación/Enterado y fechas; ordenar por Leídos. Seleccionar dos comunicados → **Duplicar**: aparecen "Copia de …" como inactivos. Seleccionar uno ya enviado → **Eliminar no enviados**: el plan dice "1 porque ya se envió a las familias". **Exportar** CSV/Excel respeta los filtros. En "Ver entrega", **Exportar destinatarios** descarga una fila por familia (leído, enterado, estado de correo y push).
+    - Páginas: filtrar Borradores y Plantilla; seleccionar un borrador vacío y una página con bloques → **Publicar**: el plan marca el vacío como "no se puede procesar" y publica el otro. **Eliminar borradores** omite las páginas que ya se publicaron alguna vez. Una cuenta de staff ve la tabla pero sin casillas ni Exportar.
+    - Medios: arrastrar a la zona punteada una imagen nueva, un PDF, una foto de más de 10 MB y una imagen ya subida: cada archivo muestra su resultado; la repetida ofrece **Ya existe: usar el existente**. Filtro "Sin usar" + **Eliminar sin usar**: las imágenes en uso se omiten. **Agregar etiqueta** a varias.
+    - Formularios: ordenar por Pendientes; abrir **Envíos**: abre en Pendientes, la búsqueda encuentra texto de cualquier respuesta, **Seleccionar las N que coinciden** → Marcar atendidos. Exportar envíos en Excel: una columna por campo.
+    - Navegación → Redirecciones: **Importar** un CSV `de,a,permanente` con una ruta repetida y una ruta reservada (`/api/x`): el paso de revisión marca ambas como error, "Descargar reporte de errores" baja el archivo anotado, "Importar solo las filas válidas" crea el resto.
+    - Testimonios: cambiar el número de **Orden** en la tabla y presionar Enter: se guarda y la bitácora registra el cambio.
+    - Calendario: **Importar** con la plantilla (fechas DD/MM/AAAA); un evento con el mismo título e inicio se actualiza. **Copiar liga .ics** y suscribirse desde Google Calendar: aparecen solo los eventos publicados (en 10 minutos como máximo tras un cambio).
+    - Auditoría: cada alta, edición, borrado, acción masiva, importación y exportación anterior aparece con actor y contexto (`cms.*`, `bulk:content.*`, `import:content.*`, `export:*`).
+
 ## 4. Comunicación (staff) (5 min)
 1. Ve solo Analítica, Páginas y Medios.
 2. Edita una página y "Solicitar aprobación"; Dirección recibe aviso con enlace de vista previa; "Pedir cambios" llega al editor.
