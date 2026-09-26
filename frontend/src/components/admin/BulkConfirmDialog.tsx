@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -22,6 +22,8 @@ interface Props {
   execute: (body: BulkRequest) => Promise<BulkResult>;
   /** Called after a committed run (also after a retry), with the last result. */
   onDone?: (result: BulkResult) => void;
+  /** Extra lines under the dry-run plan (e.g. the MXN a bulk apply credits). */
+  renderPlan?: (plan: BulkResult) => ReactNode;
 }
 
 type Phase = 'planning' | 'plan' | 'plan-error' | 'running' | 'done';
@@ -40,7 +42,7 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, execute, onDone }: Props) {
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, execute, onDone, renderPlan }: Props) {
   const title = action ? `${action.label}: ${allMatching ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${ids.length} ${entityLabel}`}` : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
@@ -57,6 +59,7 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
           filters={filters}
           execute={execute}
           onDone={onDone}
+          renderPlan={renderPlan}
           onClose={onClose}
         />
       )}
@@ -64,7 +67,7 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
   );
 }
 
-function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, execute, onDone, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, execute, onDone, renderPlan, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
   // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
   const p = (stem: string) => `${stem}${gender === 'm' ? 'o' : 'a'}s`;
   const [phase, setPhase] = useState<Phase>('planning');
@@ -175,6 +178,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
               {plan.failed.length > 0 && (
                 <p className="text-xs text-coral-700">{plan.failed.length} no se pueden procesar (ver detalle al terminar).</p>
               )}
+              {renderPlan?.(plan)}
               {snapshot.allMatching && <p className="text-xs">Se aplicará a tod{gender === 'm' ? 'os los' : 'as las'} {entityLabel} que coinciden con los filtros actuales.</p>}
             </div>
           </div>

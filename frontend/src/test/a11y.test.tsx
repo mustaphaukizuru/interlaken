@@ -63,18 +63,13 @@ vi.mock('@/services/api', async () => {
       getTransactions: ok(emptyPage),
       getSpendingCategories: ok({ days: 30, total: 0, categories: [] }),
       getSpendingTrend: ok({ days: 30, total: 0, average: 0, series: [] }),
-      getAllBalances: ok({ results: [cafeteriaAccount], count: 1 }),
-      getTopUpLog: ok(emptyPage),
-      getLowBalance: ok(emptyPage),
       requestTopUp: vi.fn(),
       updateLowBalanceThreshold: vi.fn(),
       updateSpendLimits: vi.fn(),
-      reconcile: vi.fn(),
       syncAll: vi.fn(),
       syncBalance: vi.fn(),
       markTopUpPosLoaded: vi.fn(),
       markTopUpPosUnloaded: vi.fn(),
-      exportSchool: vi.fn(),
       exportMovements: vi.fn(),
     },
     contentApi: {
@@ -91,6 +86,17 @@ vi.mock('@/services/api', async () => {
         policies: [{ text: 'Los costos pueden actualizarse cada ciclo escolar.', order: 1 }],
       }),
     },
+  };
+});
+// Admin Cafetería lists (Data Ops Phase 6): a populated Saldos table.
+vi.mock('@/services/cafeteriaAdmin', () => {
+  const balance = {
+    id: 1, balance: '150.00', low_balance_threshold: '50', last_synced: '2026-08-01T12:00:00Z',
+    student: { id: 10, user: { full_name: 'Emma Quintana' }, student_id: '09824', loyverse_code: 'ci09824', grade: '4°', group: 'A', loyverse_id: 'loy-emma' },
+  };
+  return {
+    cafeteriaAdminApi: { balances: vi.fn().mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [balance] } }) },
+    adjustmentImportApi: vi.fn(),
   };
 });
 // No real HTTP / toasts while rendering.

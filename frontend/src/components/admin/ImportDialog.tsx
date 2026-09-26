@@ -37,6 +37,8 @@ interface Props {
   /** Link shown in the summary; defaults to the audit log. */
   auditHref?: string;
   onImported?: (report: ImportReport) => void;
+  /** Entity-specific preview columns (e.g. the resulting balance), after "Clave". */
+  extraColumns?: Column<ImportRow>[];
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -77,16 +79,16 @@ const ROW_COLUMNS: Column<ImportRow>[] = [
  * válidas" when errors exist), and the summary with the audit link. A bottom
  * sheet on phones through `Modal`.
  */
-export function ImportDialog({ open, onClose, title, entity, related, api, headers = [], templatePrefix, description, auditHref = '/admin/auditoria', onImported }: Props) {
+export function ImportDialog({ open, onClose, title, entity, related, api, headers = [], templatePrefix, description, auditHref = '/admin/auditoria', onImported, extraColumns }: Props) {
   return (
     <Modal open={open} onClose={onClose} title={title} maxWidth={760}>
       {/* Keyed by `open`: every opening starts at step 1 with no file. */}
-      <ImportFlow key={String(open)} entity={entity} related={related} api={api} headers={headers} templatePrefix={templatePrefix ?? entity} description={description} auditHref={auditHref} onImported={onImported} onClose={onClose} />
+      <ImportFlow key={String(open)} entity={entity} related={related} api={api} headers={headers} templatePrefix={templatePrefix ?? entity} description={description} auditHref={auditHref} onImported={onImported} extraColumns={extraColumns} onClose={onClose} />
     </Modal>
   );
 }
 
-function ImportFlow({ entity, related, api, headers, templatePrefix, description, auditHref, onImported, onClose }: Omit<Props, 'open' | 'title'> & { headers: ImportHeader[]; templatePrefix: string; auditHref: string }) {
+function ImportFlow({ entity, related, api, headers, templatePrefix, description, auditHref, onImported, extraColumns, onClose }: Omit<Props, 'open' | 'title'> & { headers: ImportHeader[]; templatePrefix: string; auditHref: string }) {
   const { dryRun, commit, report, template } = useImport(entity, api, related);
   const [step, setStep] = useState<Step>(1);
   const [file, setFile] = useState<File | null>(null);
@@ -147,6 +149,10 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
   const errors = counts?.error ?? 0;
   const importable = preview ? preview.counts.crear + preview.counts.actualizar : 0;
   const rows = useMemo(() => (preview ? (filter ? preview.rows.filter((r) => r.action === filter) : preview.rows) : []), [preview, filter]);
+  const columns = useMemo(
+    () => (extraColumns?.length ? [...ROW_COLUMNS.slice(0, 2), ...extraColumns, ...ROW_COLUMNS.slice(2)] : ROW_COLUMNS),
+    [extraColumns],
+  );
 
   return (
     <div className="space-y-4">
@@ -218,7 +224,7 @@ function ImportFlow({ entity, related, api, headers, templatePrefix, description
             ))}
           </div>
           <DataTable<ImportRow>
-            columns={ROW_COLUMNS}
+            columns={columns}
             rows={rows}
             rowKey={(r) => r.line}
             wrapClassName="!max-h-72"

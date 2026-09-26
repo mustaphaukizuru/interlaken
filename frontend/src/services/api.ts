@@ -579,10 +579,7 @@ export const cafeteriaApi = {
   /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
   bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean }) => api.post('/cafeteria/admin/bulk-topup/', data),
 
-  // Admin
-  /** `q` searches the whole roster server-side: names, matrícula, Loyverse code (ci09932 or 09932). */
-  getAllBalances: (params?: { page?: number; q?: string }) =>
-    api.get('/cafeteria/admin/balances/', { params }),
+  // Admin (the lists live in services/cafeteriaAdmin.ts, admin-only chunk)
 
 
   syncBalance: (studentId: number) =>
@@ -630,25 +627,15 @@ export const cafeteriaApi = {
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
-  getTopUpLog: (params?: {
-    status?: string;
-    method?: string;
-    from?: string;
-    to?: string;
-    needs_pos?: boolean | number | string;
-    needs_unload?: boolean | number | string;
-    page?: number;
-  }) =>
-    api.get('/cafeteria/admin/topups/', { params }),
-
   markTopUpPosLoaded: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/pos-loaded/`),
 
   markTopUpPosUnloaded: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/pos-unloaded/`),
 
-  getStudentDetail: (studentId: number) =>
-    api.get(`/cafeteria/admin/student/${studentId}/`),
+  /** `ledger: 0` omits the capped lists; the console pages them via admin/transactions + admin/adjustments. */
+  getStudentDetail: (studentId: number, params?: { ledger?: 0 | 1 }) =>
+    api.get(`/cafeteria/admin/student/${studentId}/`, { params }),
 
   adjustBalance: (studentId: number, amount: number, reason: string) =>
     api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason }),
@@ -656,21 +643,6 @@ export const cafeteriaApi = {
   refundTransaction: (txId: number, reason?: string) =>
     api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
 
-  reconcile: (onlyDrift?: boolean, params?: { limit?: number; offset?: number }) =>
-    api.get('/cafeteria/admin/reconcile/', {
-      params: {
-        ...(onlyDrift ? { only: 'drift' } : {}),
-        ...(params?.limit != null ? { limit: params.limit } : {}),
-        ...(params?.offset != null ? { offset: params.offset } : {}),
-      },
-    }),
-
-  getLowBalance: (params?: { page?: number }) =>
-    api.get('/cafeteria/admin/low-balance/', { params }),
-
-  /** The whole Loyverse store, one row per customer card (pupils, staff, tests). */
-  getLoyverseCustomers: (params?: { page?: number; kind?: string; q?: string }) =>
-    api.get<LoyverseCustomerPage>('/cafeteria/admin/customers/', { params }),
   /** Wallet receipts of a card that has no student (staff meals). */
   getLoyverseCustomerReceipts: (loyverseId: string) =>
     api.get<LoyverseCustomerReceipts>(`/cafeteria/admin/customers/${encodeURIComponent(loyverseId)}/receipts/`),
@@ -680,10 +652,6 @@ export const cafeteriaApi = {
       params: { fmt }, responseType: 'blob',
     }),
 
-  exportSchool: (fmt: 'csv' | 'pdf') =>
-    api.get('/cafeteria/admin/export/school/', {
-      params: { fmt }, responseType: 'blob',
-    }),
 };
 
 /** Trigger a browser download for an axios blob response. */

@@ -80,4 +80,14 @@ describe('BulkConfirmDialog', () => {
     expect(await screen.findByRole('button', { name: 'Confirmar (5)' })).toBeInTheDocument();
     expect(execute.mock.calls[0][0]).toMatchObject({ all_matching: true, filters: { status: 'pending' }, ids: [] });
   });
+
+  it('renders entity-specific plan lines (renderPlan) under the dry-run plan', async () => {
+    const execute = vi.fn(async () => ({ ...plan, skipped: [], total: '300.00' }) as BulkResult);
+    renderWithProviders(
+      <BulkConfirmDialog open onClose={() => {}} entityLabel="depósitos" gender="m" ids={[1]} execute={execute}
+        action={{ name: 'apply', label: 'Aplicar', planVerb: 'Se aplicarán' }}
+        renderPlan={(p) => <p>Total: {(p as BulkResult & { total?: string }).total}</p>} />,
+    );
+    expect(await screen.findByText('Total: 300.00')).toBeInTheDocument();
+  });
 });
