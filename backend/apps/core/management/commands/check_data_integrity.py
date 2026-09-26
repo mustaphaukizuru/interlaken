@@ -1,10 +1,12 @@
 """
 check_data_integrity — report the duplicates the Data Ops constraints would refuse.
 
-Read-only. Run it in production BEFORE shipping the partial unique constraints
-(``StudentProfile.loyverse_id`` where not blank, ``Lower(User.email)``) planned
-for Data Ops Phase 10, and before the CheckConstraints of Phase 1
-(``TopUpRequest.amount > 0``, ``CafeteriaBalance.balance >= 0``):
+Read-only. It gated the partial unique constraints (``StudentProfile.loyverse_id``
+where not blank, ``Lower(User.email)``; shipped in Data Ops Phase 10 as
+``accounts.0014_data_ops_unique_constraints``) and the CheckConstraints of
+Phase 1 (``TopUpRequest.amount > 0``, ``CafeteriaBalance.balance >= 0``). Run it
+before restoring an old backup or a bulk data fix, and before any migration
+that adds a constraint:
 
     docker compose exec -T app python manage.py check_data_integrity
     docker compose exec -T app python manage.py check_data_integrity --json

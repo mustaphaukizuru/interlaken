@@ -1,6 +1,11 @@
 """
 check_data_integrity — read-only report of the duplicates the Phase 10 unique
-constraints would refuse (loyverse_id, lower(email)), exit code 1 on findings.
+constraints refuse (loyverse_id, lower(email)), exit code 1 on findings.
+
+Since Phase 10 the database itself refuses those duplicates, so the tests that
+need them drop the two unique indexes inside the test transaction (both
+constraints are plain unique indexes on SQLite and Postgres; the DROP is rolled
+back with the test).
 """
 
 import io
@@ -8,11 +13,20 @@ import json
 
 import pytest
 from django.core.management import call_command
+from django.db import connection
 
 from apps.accounts.factories import StudentProfileFactory, UserFactory
 from apps.core.management.commands.check_data_integrity import run_checks
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def without_unique_constraints():
+    """Simulate a pre-Phase-10 database that still holds duplicates."""
+    with connection.cursor() as cursor:
+        cursor.execute("DROP INDEX accounts_student_loyverse_id_uniq")
+        cursor.execute("DROP INDEX accounts_user_email_ci_uniq")
 
 
 def _run(*args):
@@ -34,7 +48,7 @@ def test_clean_database_is_ok():
     assert all(v == [] for v in run_checks().values())
 
 
-def test_reports_duplicate_loyverse_ids_and_case_duplicate_emails():
+def test_reports_duplicate_loyverse_ids_and_case_duplicate_emails(without_unique_constraints):
     a = StudentProfileFactory(loyverse_id="dup-1")
     b = StudentProfileFactory(loyverse_id="dup-1")
     UserFactory(email="Familia@x.mx")
@@ -53,7 +67,7 @@ def test_reports_duplicate_loyverse_ids_and_case_duplicate_emails():
     assert report["findings"]["non_positive_topups"] == []
 
 
-def test_plain_output_lists_findings():
+def test_plain_output_lists_findings(without_unique_constraints):
     StudentProfileFactory(loyverse_id="dup-2")
     StudentProfileFactory(loyverse_id="dup-2")
     code, out = _run()
