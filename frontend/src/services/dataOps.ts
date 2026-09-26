@@ -162,6 +162,10 @@ export interface BulkRequest {
 export interface BulkFailure { id: string | number; error: string }
 export interface BulkSkip { id: string | number; reason: string }
 
+/** A row the action will process but the person should know about (e.g. a
+ *  student withdrawn while the wallet still holds money). Dry run only. */
+export interface BulkWarning { id: string | number; message: string }
+
 export interface BulkResult {
   action: string;
   requested: number;
@@ -169,6 +173,7 @@ export interface BulkResult {
   failed: BulkFailure[];
   skipped: BulkSkip[];
   dry_run: boolean;
+  warnings?: BulkWarning[];
 }
 
 export type BulkFetcher = (body: BulkRequest) => Promise<AxiosResponse<BulkResult>>;

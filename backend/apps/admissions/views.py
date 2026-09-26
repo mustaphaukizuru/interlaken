@@ -19,12 +19,14 @@ from rest_framework.views import APIView
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
+from apps.core.audit import record
 from apps.core.exceptions import error_body
 from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.portal.services import send_email
 
+from .filters import PreRegistrationFilter, RegistrationFilter
 from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
     DocumentVerifySerializer,
@@ -37,7 +39,15 @@ from .serializers import (
     RegistrationSerializer,
     RegistrationStatusSerializer,
     child_full_name,
-    current_school_cycle,
+)
+from .services import (
+    OUTCOME_STATES,
+    PREREG_ENTITY,
+    REG_ENTITY,
+    change_status,
+    email_registration_outcome,
+    email_rejected_documents,
+    invite_preregistration,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
@@ -87,13 +97,14 @@ PREREGISTRATION_ORDERING = {
 }
 
 
-@method_decorator(ratelimit('admissions-submit', '5/m', method='POST'), name='dispatch')
-class PreRegistrationListCreateView(AdminListMixin, generics.ListCreateAPIView):
-    """POST /api/v1/admissions/pre-register/ — Public, no auth.
-    GET — Admin-only paginated list for the Admisiones console (Data Ops C1:
-    ``q`` search with ``search`` as a one-release alias, whitelisted
-    ``ordering``, ``page_size`` ≤ 100)."""
+class PreRegistrationListConfig(AdminListMixin):
+    """The pre-registros list contract, shared by the list, its export sibling
+    and the bulk ``all_matching`` resolver (Data Ops C1): ``q`` over child
+    names, parent name, email and phone (``search`` alias for one release),
+    whitelisted ``ordering``, FilterSet ``status/level/cycle/wants_visit`` +
+    ``from/to`` on ``created_at``, ``page_size`` ≤ 100."""
     queryset = PreRegistration.objects.all()
+    serializer_class = PreRegistrationAdminSerializer
     search_fields = (
         'child_first_name',
         'child_last_name',
@@ -104,6 +115,19 @@ class PreRegistrationListCreateView(AdminListMixin, generics.ListCreateAPIView):
     legacy_search_param = 'search'
     ordering = PREREGISTRATION_ORDERING
     default_ordering = '-created_at'
+    filterset_class = PreRegistrationFilter
+
+
+class PreRegistrationAdminListView(PreRegistrationListConfig, generics.ListAPIView):
+    """GET-only twin of the list (not routed): the export view subclasses it and
+    the bulk view resolves ``all_matching`` through it, so neither can inherit
+    the public POST of ``PreRegistrationListCreateView``."""
+
+
+@method_decorator(ratelimit('admissions-submit', '5/m', method='POST'), name='dispatch')
+class PreRegistrationListCreateView(PreRegistrationListConfig, generics.ListCreateAPIView):
+    """POST /api/v1/admissions/pre-register/ — Public, no auth.
+    GET — Admin-only paginated list for the Admisiones console."""
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -152,13 +176,28 @@ class PreRegistrationListCreateView(AdminListMixin, generics.ListCreateAPIView):
 class PreRegistrationDetailView(generics.UpdateAPIView):
     """PATCH /api/v1/admissions/pre-register/<pk>/ — admin: update status/notes.
 
-    Lets staff move a pre-registration through the pipeline
-    (pending → contacted → enrolled/rejected) straight from the console.
+    A status change obeys the same transition table as the bulk action
+    (``apps.core.transitions``); undoing a decision (contacted/rejected →
+    pending) needs ``note`` in the body. Every change is audited.
     """
     queryset = PreRegistration.objects.all()
     serializer_class = PreRegistrationStatusSerializer
     permission_classes = [IsAdmin]
     http_method_names = ['patch']
+
+    def perform_update(self, serializer):
+        pre = serializer.instance
+        data = serializer.validated_data
+        target = data.get('status', pre.status)
+        note = str(self.request.data.get('note') or '').strip()
+        if target != pre.status:
+            change_status(pre, target, entity=PREREG_ENTITY, actor=self.request.user,
+                          note=note, context='admissions: pre-registro')
+        if 'notes' in data and data['notes'] != pre.notes:
+            pre.notes = data['notes']
+            pre.save(update_fields=['notes', 'updated_at'])
+            record('update', pre, {'notes': 'editadas'}, actor=self.request.user,
+                   context='admissions: pre-registro')
 
 
 class PreRegistrationInviteView(APIView):
@@ -175,60 +214,56 @@ class PreRegistrationInviteView(APIView):
 
     def post(self, request, pk):
         pre = get_object_or_404(PreRegistration, pk=pk)
-
-        reg = pre.registrations.filter(status=Registration.Status.DRAFT).first()
-        if reg is None:
-            reg = Registration(pre_registration=pre)
-        # (Re)seed the draft from the pre-registration so the applicant lands on a
-        # pre-filled form. Only overwrite while still a fresh draft.
-        reg.child_first_name = pre.child_first_name
-        reg.child_last_name = pre.child_last_name
-        reg.child_dob = pre.child_dob
-        reg.level = pre.level
-        reg.grade_applying = pre.grade_applying
-        reg.cycle = pre.cycle or current_school_cycle()
-        reg.parent1_name = pre.parent_name
-        reg.parent1_email = pre.parent_email
-        reg.parent1_phone = pre.parent_phone
-        reg.save()
-
-        raw = issue_invite(reg)
-        invite_url = f'{settings.FRONTEND_URL}/inscripcion?rid={reg.id}&token={raw}'
-
-        # Issuing an invite means admissions has engaged the family — advance the
-        # pre-registration out of "pending" so the pipeline reflects reality.
-        if pre.status == PreRegistration.Status.PENDING:
-            pre.status = PreRegistration.Status.CONTACTED
-            pre.save(update_fields=['status'])
-
-        self._email_invite(reg, invite_url)
+        out = invite_preregistration(pre, request.user)
+        reg = out['registration']
         return Response({
             'registration_id': reg.id,
-            'invite_token': raw,
-            'invite_url': invite_url,
+            'invite_token': out['raw'],
+            'invite_url': out['url'],
             'expires_at': reg.invite_expires_at,
         }, status=status.HTTP_201_CREATED)
 
-    def _email_invite(self, reg, invite_url):
-        send_email(
-            'Invitación de inscripción — Colegio Interlaken',
-            (
-                f'Estimado/a {reg.parent1_name},\n\n'
-                f'Le invitamos a completar la inscripción de {reg.child_first_name} '
-                f'{reg.child_last_name} para el ciclo {reg.cycle}.\n\n'
-                f'Ingrese al siguiente enlace para continuar:\n{invite_url}\n\n'
-                f'El enlace es personal y expira en 14 días.\n\n'
-                f'Colegio Interlaken'
-            ),
-            [reg.parent1_email],
-        )
+
+# Columns the inscripciones table can sort by (public key → ORM field(s)).
+REGISTRATION_ORDERING = {
+    'created_at': 'created_at',
+    'updated_at': 'updated_at',
+    'submitted_at': 'submitted_at',
+    'child': ('child_last_name', 'child_first_name'),
+    'level': 'level',
+    'status': 'status',
+}
+
+
+class RegistrationListConfig(AdminListMixin):
+    """The inscripciones list contract (Data Ops C1): ``q`` over child names,
+    CURP, parent names, emails and phones; FilterSet ``status/level/cycle/
+    documents_pending`` + ``from/to``; whitelisted ``ordering``."""
+    queryset = Registration.objects.all().prefetch_related('documents')
+    serializer_class = RegistrationAdminListSerializer
+    search_fields = (
+        'child_first_name',
+        'child_last_name',
+        'child_curp',
+        'parent1_name',
+        'parent1_email',
+        'parent2_email',
+        'parent1_phone',
+        'parent2_phone',
+    )
+    ordering = REGISTRATION_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = RegistrationFilter
+
+
+class RegistrationAdminListView(RegistrationListConfig, generics.ListAPIView):
+    """GET-only twin (not routed) for the export sibling and bulk ``all_matching``."""
 
 
 @method_decorator(ratelimit('admissions-submit', '5/m', method='POST'), name='dispatch')
-class RegistrationListCreateView(generics.ListCreateAPIView):
+class RegistrationListCreateView(RegistrationListConfig, generics.ListCreateAPIView):
     """POST /api/v1/admissions/register/ — Start a registration (no auth).
     GET — Admin-only paginated list for the Inscripciones console."""
-    queryset = Registration.objects.all().prefetch_related('documents')
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -281,9 +316,11 @@ class MyRegistrationsView(APIView):
 class RegistrationStatusView(generics.UpdateAPIView):
     """PATCH /api/v1/admissions/register/<pk>/status/ — admin review action.
 
-    Moves a registration through review (reviewing → approved / rejected /
-    complete) and records admin notes. On an approve/reject the applicant is
-    emailed the outcome (fail-soft).
+    Moves a registration through review under the transition table shared
+    with the bulk actions (``apps.core.transitions``): a reverse move needs
+    ``note``; ``complete`` is reserved for the convert path. Records admin
+    notes; every change is audited. On an approve/reject the applicant is
+    emailed the outcome (fail-soft) unless ``notify`` is false.
     """
     queryset = Registration.objects.all()
     serializer_class = RegistrationStatusSerializer
@@ -291,28 +328,23 @@ class RegistrationStatusView(generics.UpdateAPIView):
     http_method_names = ['patch']
 
     def perform_update(self, serializer):
-        before = serializer.instance.status
-        reg = serializer.save()
-        if reg.status != before and reg.status in (
-                Registration.Status.APPROVED, Registration.Status.REJECTED):
-            self._email_outcome(reg)
-
-    def _email_outcome(self, reg):
-        approved = reg.status == Registration.Status.APPROVED
-        subject = ('Inscripción aprobada' if approved else
-                   'Actualización de su inscripción') + ' — Colegio Interlaken'
-        body = (
-            f'Estimado/a {reg.parent1_name},\n\n'
-            + (f'Nos complace informarle que la inscripción de {reg.child_first_name} '
-               f'{reg.child_last_name} ha sido APROBADA. En breve le compartiremos los '
-               f'siguientes pasos.\n\n'
-               if approved else
-               f'Hemos revisado la solicitud de inscripción de {reg.child_first_name} '
-               f'{reg.child_last_name}. Un asesor de admisiones se pondrá en contacto con '
-               f'usted para darle más información.\n\n')
-            + 'Colegio Interlaken'
-        )
-        send_email(subject, body, [reg.parent1_email])
+        reg = serializer.instance
+        data = serializer.validated_data
+        target = data.get('status', reg.status)
+        note = str(self.request.data.get('note') or '').strip()
+        notify = str(self.request.data.get('notify', True)).lower() not in ('0', 'false', 'no')
+        changed = False
+        if target != reg.status:
+            change_status(reg, target, entity=REG_ENTITY, actor=self.request.user,
+                          note=note, context='admissions: inscripción')
+            changed = True
+        if 'admin_notes' in data and data['admin_notes'] != reg.admin_notes:
+            reg.admin_notes = data['admin_notes']
+            reg.save(update_fields=['admin_notes', 'updated_at'])
+            record('update', reg, {'admin_notes': 'editadas'}, actor=self.request.user,
+                   context='admissions: inscripción')
+        if changed and notify and reg.status in OUTCOME_STATES:
+            email_registration_outcome(reg)
 
 
 class DocumentListView(APIView):
@@ -364,17 +396,15 @@ class DocumentVerifyView(generics.UpdateAPIView):
     http_method_names = ['patch']
 
     def perform_update(self, serializer):
+        before = serializer.instance.status
         doc = serializer.save()
+        if doc.status != before:
+            changes = {'status': [before, doc.status]}
+            if doc.review_note:
+                changes['note'] = doc.review_note
+            record('update', doc, changes, actor=self.request.user, context='admissions: documento')
         if doc.status == RegistrationDocument.Review.REJECTED:
-            reg = doc.registration
-            send_email(
-                'Documento por corregir - Colegio Interlaken',
-                f'Estimado/a {reg.parent1_name},\n\nEl documento "{doc.get_doc_type_display()}" de '
-                f'{reg.child_first_name} necesita corrección'
-                + (f': {doc.review_note}' if doc.review_note else '.') + '\n\n'
-                'Solicite un nuevo enlace de documentos a admisiones si el suyo caducó.\n\nColegio Interlaken',
-                [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL,
-            )
+            email_rejected_documents(doc.registration, [doc])
 
 
 class DocumentDownloadView(APIView):

@@ -81,6 +81,17 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         return data
 
 
+class StudentRosterSerializer(StudentProfileSerializer):
+    """Admin roster row: the profile plus the wallet balance the list annotates
+    (``roster_queryset``), so the Saldo column and ``?ordering=balance`` cost no
+    extra query."""
+    balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True,
+                                       default=None)
+
+    class Meta(StudentProfileSerializer.Meta):
+        fields = StudentProfileSerializer.Meta.fields + ['balance']
+
+
 class ParentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     # A parent's children come via the reverse of StudentProfile.parents (related_name='children').

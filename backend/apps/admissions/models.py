@@ -10,6 +10,18 @@ from django.utils import timezone
 from apps.core.fields import EncryptedTextField
 
 
+def current_school_cycle() -> str:
+    """Admissions cycle string, e.g. '2026-2027': the cycle the public form
+    advertises. Matches the frontend `CURRENT_CYCLE` (current calendar year to
+    next), so a record stores exactly the cycle the applicant saw.
+
+    Used as the model default (Data Ops Phase 4): the hard-coded '2025-2026'
+    default went stale on 1 January and stamped every new registration with
+    last year's cycle."""
+    year = timezone.localdate().year
+    return f'{year}-{year + 1}'
+
+
 class PreRegistration(models.Model):
     """Public pre-registration form — no login required."""
 
@@ -30,7 +42,7 @@ class PreRegistration(models.Model):
     child_dob        = models.DateField(verbose_name='Fecha de nacimiento')
     level            = models.CharField(max_length=20, choices=Level.choices, verbose_name='Nivel educativo')
     grade_applying   = models.CharField(max_length=30, verbose_name='Grado a solicitar')
-    cycle            = models.CharField(max_length=20, default='2025-2026', verbose_name='Ciclo escolar')
+    cycle            = models.CharField(max_length=20, default=current_school_cycle, verbose_name='Ciclo escolar')
 
     # Parent/guardian contact
     parent_name  = models.CharField(max_length=200, verbose_name='Nombre del padre/tutor')
@@ -106,7 +118,7 @@ class Registration(models.Model):
     child_nationality= models.CharField(max_length=50, default='Mexicana')
     level            = models.CharField(max_length=20)
     grade_applying   = models.CharField(max_length=30)
-    cycle            = models.CharField(max_length=20, default='2025-2026')
+    cycle            = models.CharField(max_length=20, default=current_school_cycle)
 
     # Parent 1
     parent1_name     = models.CharField(max_length=200)

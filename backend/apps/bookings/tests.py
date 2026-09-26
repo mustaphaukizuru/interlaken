@@ -323,6 +323,9 @@ class AdminBookingsConsoleTests(APITestCase):
         self.assertEqual(resp.data['count'], 0)  # the booking isn't cancelled
 
     def test_admin_action_confirm_sets_status(self):
+        # Bookings are created confirmed; confirming needs a pending one (a
+        # confirmed -> confirmed move is refused by the transition table).
+        Booking.objects.filter(pk=self.booking.pk).update(status=Booking.Status.PENDING)
         self.client.force_authenticate(self.admin)
         resp = self.client.post(
             reverse('bookings-admin-action', args=[self.booking.id, 'confirm']))

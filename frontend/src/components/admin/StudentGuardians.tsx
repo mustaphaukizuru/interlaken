@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Users, UserPlus, Unlink, Link2, KeyRound, Pencil } from 'lucide-react';
+import { Users, UserPlus, Unlink, Link2, KeyRound, Pencil, Search } from 'lucide-react';
 import { GuardianEditModal, type GuardianEditTarget } from '@/components/admin/GuardianEditModal';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -38,7 +38,17 @@ interface GuardiansResponse {
     grade: string;
   };
   guardians: Guardian[];
+  /** Linked guardians before `q` filtered the list. */
+  count?: number;
 }
+
+const GUARDIAN_SORTS = [
+  { value: '', label: 'Cuenta familiar primero' },
+  { value: 'name', label: 'Nombre (A-Z)' },
+  { value: '-name', label: 'Nombre (Z-A)' },
+  { value: 'email', label: 'Correo' },
+  { value: 'relationship', label: 'Parentesco' },
+];
 
 interface Props {
   studentId: number;
@@ -57,9 +67,14 @@ export function StudentGuardians({ studentId }: Props) {
   // receives no mail), so every account listed here gets an admin reset action.
   const [toReset, setToReset] = useState<ResetPasswordTarget | null>(null);
 
+  // Sub-list search + sort (Data Ops Phase 3): server-side, like every console list.
+  const [q, setQ] = useState('');
+  const [ordering, setOrdering] = useState('');
+  const params = { q: q.trim() || undefined, ordering: ordering || undefined };
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-student-guardians', studentId],
-    queryFn: async () => (await portalApi.listGuardians(studentId)).data as GuardiansResponse,
+    queryKey: ['admin-student-guardians', studentId, params],
+    queryFn: async () => (await portalApi.listGuardians(studentId, params)).data as GuardiansResponse,
+    placeholderData: keepPreviousData,
   });
 
   const invalidate = () => {
@@ -118,7 +133,9 @@ export function StudentGuardians({ studentId }: Props) {
   const guardians = data?.guardians ?? [];
   const studentEmail = data?.student?.email ?? '';
   const studentUserId = data?.student?.user_id ?? 0;
-  const selfLinked = guardians.some((g) => g.is_self);
+  const total = data?.count ?? guardians.length;
+  const selfLinked = !q && guardians.some((g) => g.is_self);
+  const showTools = total > 2 || !!q;
 
   return (
     <Card
@@ -222,10 +239,32 @@ export function StudentGuardians({ studentId }: Props) {
         </form>
       )}
 
+      {showTools && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[180px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+            <input
+              type="text"
+              inputMode="search"
+              className="input-field pl-9"
+              placeholder="Buscar tutor por nombre, correo o teléfono…"
+              aria-label="Buscar tutores"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <select className="input-field w-auto" aria-label="Ordenar tutores" value={ordering} onChange={(e) => setOrdering(e.target.value)}>
+            {GUARDIAN_SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      )}
+
       {isError ? (
         <ErrorState onRetry={() => refetch()} />
       ) : isLoading ? (
         <ListSkeleton rows={2} />
+      ) : !guardians.length && q ? (
+        <EmptyState icon={Search} title="Sin coincidencias" description="Ningún tutor coincide con la búsqueda." />
       ) : !guardians.length ? (
         <EmptyState
           icon={Users}
