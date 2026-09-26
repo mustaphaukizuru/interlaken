@@ -8,7 +8,7 @@
  * read from localStorage or a URL.
  */
 import axios from 'axios';
-import type { ExportParams } from './dataOps';
+import type { BulkRequest, BulkResult, ExportParams } from './dataOps';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -712,7 +712,7 @@ export const paymentsApi = {
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
   getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
   /** Admin ledger (BACKLOG P1-D9). */
-  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
+  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; type?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/admin/', { params }),
   adminSummary: (days = 30) => api.get<AdminPaymentsSummary>('/payments/admin/summary/', { params: { days } }),
   /**
@@ -742,17 +742,24 @@ export const coreApi = {
   /** Audit export (Data Ops C3): same filters and ordering as the list, plus `fmt` and `ids`. */
   exportAuditLog: (params: ExportParams) =>
     api.get<Blob>('/core/admin/audit/export/', { params, responseType: 'blob' }),
-  /** Website inbox (BACKLOG P1-G7). */
-  getContactMessages: (params?: { page?: number; q?: string; handled?: string }) =>
+  /** Website inbox (BACKLOG P1-G7) on the list contract: q, handled, from/to, ordering. */
+  getContactMessages: (params?: { page?: number; q?: string; handled?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/core/admin/contact-messages/', { params }),
   setContactHandled: (id: number, is_handled: boolean) =>
     api.patch<ContactMessage>(`/core/admin/contact-messages/${id}/`, { is_handled }),
+  /** Inbox export (C3): same filters and ordering as the list, plus `fmt` and `ids`. */
+  exportContactMessages: (params: ExportParams) =>
+    api.get<Blob>('/core/admin/contact-messages/export/', { params, responseType: 'blob' }),
+  /** Inbox bulk actions (C5): `mark_handled`, `reopen`. */
+  bulkContactMessages: (body: BulkRequest) =>
+    api.post<BulkResult>('/core/admin/contact-messages/bulk/', body),
   /** Live sidebar counters (BACKLOG P1-E3). */
   getBadges: () => api.get<Record<string, number>>('/core/badges/'),
   /** Read-only admin audit log (append-only), paginated + filterable. */
   getAuditLog: (params?: {
     page?: number;
     ordering?: string;
+    q?: string;
     actor?: string;
     action?: string;
     context?: string;
@@ -783,8 +790,14 @@ export const legalApi = {
   /** Acceso: download everything held on the requesting household. */
   exportMyData: () => api.get('/legal/arco/export/'),
   // Staff console
-  adminListArco: (status?: string, page?: number) =>
-    api.get('/legal/admin/arco/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
+  /** ARCO queue on the list contract: q, status (`open` = received + in review), type, overdue, from/to, ordering. */
+  adminListArco: (params?: ArcoListParams) =>
+    api.get<ArcoListResponse>('/legal/admin/arco/', { params }),
+  /** ARCO export (C3): same filters and ordering as the list, plus `fmt` and `ids`. */
+  adminExportArco: (params: ExportParams) =>
+    api.get<Blob>('/legal/admin/arco/export/', { params, responseType: 'blob' }),
+  /** ARCO bulk (C5): `in_review` only; resolve and reject stay single-row. */
+  adminBulkArco: (body: BulkRequest) => api.post<BulkResult>('/legal/admin/arco/bulk/', body),
   adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
     api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
   /** Record a request received via privacidad@ / WhatsApp / in person (BACKLOG P5-5). */
@@ -1088,6 +1101,9 @@ export interface SiteRedirect { id: number; from_path: string; to_path: string; 
 export interface AnnouncementAttachment { id: number; name: string; url?: string }
 export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
 export interface ArcoRequest { id: number; requester_email: string; requester_name: string; channel: string; request_type: string; details: string; status: 'received' | 'in_review' | 'resolved' | 'rejected'; resolution_note: string; statutory_deadline: string; created_at: string; resolved_at: string | null; is_overdue: boolean; days_left: number }
+export interface ArcoListParams { page?: number; q?: string; status?: string; type?: string; overdue?: string; from?: string; to?: string; ordering?: string }
+/** The ARCO list adds `overdue_count` over the whole filtered set (not just the page). */
+export interface ArcoListResponse { count: number; next: string | null; previous: string | null; results: ArcoRequest[]; overdue_count: number }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
 export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }

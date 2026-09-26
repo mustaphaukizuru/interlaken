@@ -7,6 +7,7 @@
  * importing.py (imports), bulk.py (bulk actions).
  */
 import type { AxiosResponse } from 'axios';
+import type { LucideIcon } from 'lucide-react';
 
 // ── C1: list contract ─────────────────────────────────────────────────────
 
@@ -188,5 +189,5 @@ export interface BulkActionDef {
   notifyOption?: boolean;
   /** es-MX verb phrase for the plan: "Se confirmarán", "Se cancelarán". */
   planVerb?: string;
-  icon?: React.ComponentType<{ size?: number; className?: string; 'aria-hidden'?: boolean | 'true' }>;
+  icon?: LucideIcon;
 }
