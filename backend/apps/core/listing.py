@@ -8,8 +8,8 @@ serializer field and dropped the ``-pk`` tiebreak. This module is the single
 place the console relies on:
 
 * ``ListPagination``: DRF page numbers, ``?page_size=`` up to 100.
-* ``AdminListMixin``: ``?q=`` search over ``search_fields`` (legacy ``search``
-  alias per view), whitelisted ``?ordering=`` through ``apply_ordering``,
+* ``AdminListMixin``: ``?q=`` search over ``search_fields`` (the legacy
+  ``search`` alias was removed in Phase 10), whitelisted ``?ordering=`` through ``apply_ordering``,
   optional django-filter ``filterset_class``, and an explicitly EMPTY
   ``filter_backends`` so the implicit backends can never re-sort a list.
 * ``date_bounds``: aware ``datetime`` bounds in America/Mexico_City so date

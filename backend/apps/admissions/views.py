@@ -99,7 +99,7 @@ PREREGISTRATION_ORDERING = {
 class PreRegistrationListConfig(AdminListMixin):
     """The pre-registros list contract, shared by the list, its export sibling
     and the bulk ``all_matching`` resolver (Data Ops C1): ``q`` over child
-    names, parent name, email and phone (``search`` alias for one release),
+    names, parent name, email and phone (the ``search`` alias is gone since Phase 10),
     whitelisted ``ordering``, FilterSet ``status/level/cycle/wants_visit`` +
     ``from/to`` on ``created_at``, ``page_size`` ≤ 100."""
     queryset = PreRegistration.objects.all()

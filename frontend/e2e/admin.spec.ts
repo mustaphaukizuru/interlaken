@@ -159,8 +159,7 @@ test('Alumnos data ops: import with errors, valid-only commit, bulk group change
   await valueDialog.getByLabel('Nuevo grupo').fill('b'); // uppercased as typed
   await valueDialog.getByRole('button', { name: 'Continuar' }).click();
 
-  // Matched by prefix: the title counts the live selection, which onDone clears
-  // (it reads "…: 0 alumnos" on the summary step).
+  // Matched by prefix; the title keeps the count the dialog opened with.
   const confirmDialog = page.getByRole('dialog', { name: /^Cambiar grupo a «B»:/ });
   await expect(confirmDialog).toContainText('Se cambiará a «B» a 2 alumnos');
   await confirmDialog.getByRole('button', { name: 'Cambiar grupo a «B» (2)' }).click();

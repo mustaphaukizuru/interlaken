@@ -250,3 +250,67 @@ exporta todos los saldos sin filtros. Referencia técnica: `docs/API-LISTING.md`
 ## 8. Calendario escolar suscrito (.ics)
 
 `GET /api/v1/content/calendar.ics` publica los eventos **publicados** del calendario escolar (del último año en adelante) como un feed iCalendar (RFC 5545: eventos de día completo, `DTEND` exclusivo, líneas plegadas a 75 octetos). Es público y sin sesión, igual que `/calendario`. La respuesta se guarda 10 minutos en la caché del proceso (`content:calendar.ics`) y cualquier alta, edición, borrado, acción masiva o importación del calendario desde la consola la invalida; como gunicorn corre 3 procesos con caché local, un cambio puede tardar hasta 10 minutos en verse en todos. Google Calendar además refresca las suscripciones por su cuenta (de horas a un día): eso no se controla desde el servidor. Para comprobarlo: `curl -sI https://interlaken.edu.mx/api/v1/content/calendar.ics` debe responder `200`, `Content-Type: text/calendar; charset=utf-8` y `Cache-Control: public, max-age=600`. La liga se copia desde Calendario → **Copiar liga .ics**.
+
+## 9. Importaciones y exportaciones
+
+Todas las tablas de la consola comparten el mismo motor (Data Ops, ver
+`docs/API-LISTING.md` para el detalle por página). No hay trabajos en segundo
+plano: cada importación, exportación o acción en lote termina dentro de la
+misma petición, por eso tienen límites fijos.
+
+**Límites.** Si se rebasan, el servidor responde 413 y la consola muestra el
+mensaje tal cual ("Acote los filtros: el límite es N filas."):
+
+| Operación | Límite |
+| --- | --- |
+| Importar (CSV o Excel) | 2,000 filas o 5 MB por archivo (Ajuste masivo de cafetería: 500 filas) |
+| Exportar CSV o Excel | 10,000 filas |
+| Exportar PDF | 1,000 filas |
+| "Solo seleccionados (N)" | 500 filas |
+| Acción en lote | 500 filas por llamada; "Seleccionar las N que coinciden" hasta 2,000 |
+| Reconciliación de cafetería, *Corregir* | 50 filas por vez (cada una consulta Loyverse) |
+
+**Frecuencia.** Por persona: exportaciones 30 por minuto (`admin-export`; en el
+portal de familias `portal-export`, también 30), importaciones 10 por minuto
+(`admin-import`), acciones en lote 30 por minuto (`admin-bulk`). Al rebasarlo
+la consola avisa "Demasiadas solicitudes seguidas"; basta esperar un minuto.
+
+**Cómo leer el reporte de errores.** Toda importación empieza con una vista
+previa (nada se escribe). "Descargar reporte de errores" devuelve el mismo
+archivo que se subió (CSV si era CSV, Excel si era Excel) con cuatro columnas
+al final: `fila` (la línea del archivo original, contando el encabezado como
+1), `resultado` (`crear`, `actualizar`, `omitir` o `error`), `errores` y
+`avisos`. Las filas con error van primero. Se corrigen en el archivo original y
+se vuelve a subir; o bien se marca "Importar solo las filas válidas" y el resto
+se importa ahora. Un duplicado dentro del mismo archivo aparece como
+"Duplicado de la fila N" en la fila posterior. La vista previa y la
+importación hacen exactamente las mismas validaciones.
+
+**Qué queda en Auditoría.** Cada fila creada o modificada por una importación
+(contexto `import:<entidad>`) más un resumen de la importación; cada fila de
+una acción en lote (`bulk:<entidad>:<acción>`) más un resumen `bulk:<entidad>`;
+cada descarga de una exportación (`export:<entidad>`, con el formato, los
+filtros y el número de filas). Las exportaciones nunca incluyen datos médicos
+(se enmascaran) ni CURP en los listados generales.
+
+**Errores de la API.** Desde la fase 10 todas las respuestas de error traen
+`{"detail": "..."}` (más `code` cuando la consola necesita distinguir un caso,
+por ejemplo `not_invited` en el acceso con Google). La clave antigua `error`
+ya no existe; si una integración externa la leía, debe leer `detail`.
+
+**Integridad de datos.** `check_data_integrity` es de solo lectura y reporta
+lo que las restricciones de la base rechazarían: `loyverse_id` repetido entre
+alumnos, correos repetidos sin distinguir mayúsculas, saldos negativos y
+recargas con monto no positivo. Termina con código 1 si encuentra algo:
+
+```bash
+docker compose exec -T app python manage.py check_data_integrity
+docker compose exec -T app python manage.py check_data_integrity --json
+```
+
+Desde la migración `accounts.0014_data_ops_unique_constraints` la base ya no
+acepta esos duplicados (una vinculación Loyverse repetida o un correo que solo
+cambia en mayúsculas se rechazan). Córralo antes de restaurar un respaldo
+antiguo o de una corrección masiva de datos; si reporta algo, la limpieza se
+hace con *Fusionar cuentas de familia* (`/admin/fusionar-cuentas`) para correos, y con
+Vincular Loyverse para los `loyverse_id`.
