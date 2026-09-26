@@ -143,5 +143,6 @@ class TestAssertTransition:
 
     def test_labels_fall_back_to_raw_values(self):
         assert label("bookings.booking", "no_show") == "No asistió"
-        assert label("portal.announcement", "active") == "active"
+        # Announcement has no status column: its states are named in STATE_LABELS.
+        assert label("portal.announcement", "active") == "Activo"
         assert label("nope.model", "x") == "x"
