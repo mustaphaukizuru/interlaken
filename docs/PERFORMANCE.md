@@ -90,3 +90,200 @@ If a user reports "404 Página no encontrada" at `/auth/google/` or `/admin/`
 again, the first question is whether the deployed `https://interlaken.edu.mx/sw.js`
 contains `NavigationRoute` (`curl -s https://interlaken.edu.mx/sw.js | grep -c
 NavigationRoute` should print `0`).
+
+## Data Ops: Postgres query plans (Phase 10)
+
+The admin lists (roster, cafetería ledger, auditoría, pagos, pre-registros)
+are cheap on the SQLite test database no matter what, so their plans were
+checked on a throwaway Postgres 17 filled with production-like volumes.
+**Never run any of this against production**: the seed inserts hundreds of
+thousands of fake rows.
+
+### Seeding a throwaway Postgres
+
+```bash
+docker run -d --name ik-perf-pg -e POSTGRES_PASSWORD=perf -e POSTGRES_DB=ikperf \
+  -p 55432:5432 postgres:17
+cd backend
+export DEBUG=True SECRET_KEY=x GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x \
+  DB_NAME=ikperf DB_USER=postgres DB_PASSWORD=perf DB_HOST=127.0.0.1 \
+  DB_PORT=55432 DB_SSLMODE=disable          # and NO SQLITE_LOCAL
+python manage.py migrate
+python manage.py seed_perf_data --students 400 --transactions 80000 --audit 250000
+docker exec ik-perf-pg psql -U postgres -d ikperf -c 'ANALYZE;'
+# ... EXPLAIN (below) ...
+docker rm -f ik-perf-pg
+```
+
+`seed_perf_data` (in `apps/core`) refuses to run with `DEBUG=False` unless
+`--force`, and is idempotent: every row it writes is tagged (users
+`perf-NNNNN@perf.invalid` / `perf-parent-NNNNN@perf.invalid`, matrículas
+`PERF-NNNNN`, `loyverse_id` `perf-lv-NNNNN`, receipts `PERF-R-...`, payment
+refs `PERF-P-...`, audit `actor_label` starting with `perf-`, pre-registro
+emails `perf-pre-NNNNN@perf.invalid`), and a re-run only tops up to the
+requested totals. Besides the three flags above it takes `--payments`
+(default 3000) and `--preregistrations` (default 3000). It creates one wallet
+per student with a varied balance (some negative, some large), ledger rows
+spread over the last ~2 years, and payments and pre-registros in every
+status. It only ever inserts (AuditLog refuses `.update()` / `.delete()`).
+The full 400 / 80k / 250k seed takes about 25 s.
+
+### Getting the real SQL
+
+Drive the real views, so filters, search, ordering and pagination are exactly
+what the console sends, and EXPLAIN every SELECT they issue (count + page):
+
+```python
+# python manage.py shell (same env as above)
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from rest_framework.test import APIRequestFactory, force_authenticate
+from apps.accounts.models import User
+from apps.accounts.views import StudentListView
+from apps.admissions.views import PreRegistrationListCreateView
+from apps.cafeteria.admin_data import AdminTransactionListView
+from apps.core.views import AdminAuditLogView
+from apps.payments.views import AdminPaymentsView
+
+admin, _ = User.objects.get_or_create(email='perf-admin@perf.invalid',
+    defaults={'first_name': 'Perf', 'last_name': 'Admin', 'role': 'admin'})
+TARGETS = [
+    (StudentListView, {'ordering': 'balance', 'page_size': 20}),
+    (AdminTransactionListView, {'from': '2026-08-27', 'to': '2026-09-26', 'page_size': 20}),
+    (AdminAuditLogView, {'q': 'perf-parent-00042', 'page_size': 20}),
+    (AdminPaymentsView, {'page_size': 20}),
+    (PreRegistrationListCreateView, {'status': 'contacted', 'page_size': 20}),
+]
+for view, params in TARGETS:
+    req = APIRequestFactory().get('/', params)
+    force_authenticate(req, user=admin)
+    with CaptureQueriesContext(connection) as ctx:
+        view.as_view()(req).render()
+    for q in ctx.captured_queries:
+        with connection.cursor() as cur:
+            cur.execute('EXPLAIN (ANALYZE, BUFFERS) ' + q['sql'])
+            print('\n'.join(r[0] for r in cur.fetchall()))
+```
+
+### Results (2026-09-26)
+
+Postgres 17.11, 400 students, 80k ledger rows, 250k audit rows, 3k payments,
+3k pre-registros, after `ANALYZE`. Every list issues exactly 2 queries
+(count + page). Plans trimmed to the lines that matter.
+
+**1. Roster sorted by wallet balance** (`/accounts/students/?ordering=balance`)
+
+```text
+Limit (actual time=0.620..0.623 rows=20)
+  -> Sort  Sort Key: (COALESCE(cafeteria_cafeteriabalance.balance, 0.00)), accounts_studentprofile.id DESC
+           Sort Method: top-N heapsort  Memory: 33kB
+     -> Hash Left Join ... Seq Scan on accounts_studentprofile (rows=400)
+                       ... Seq Scan on cafeteria_cafeteriabalance (rows=400)
+Execution Time: 0.662 ms      (count: Seq Scan, 0.046 ms)
+```
+
+Verdict: fine, no index wanted. The sort key is a `COALESCE` over a LEFT JOIN,
+which no index can serve, but a top-N heapsort over a few hundred students is
+under 1 ms (`-balance` is identical). Revisit only if the roster grows by two
+orders of magnitude.
+
+**2. Cafetería ledger by date range** (`/cafeteria/admin/transactions/?from=&to=`, 30 days)
+
+```text
+Limit (actual time=0.120..0.122 rows=20)
+  -> Incremental Sort  Presorted Key: cafeteria_cafeteriatransaction.date
+     -> Index Scan Backward using caf_tx_date on cafeteria_cafeteriatransaction (rows=21)
+          Index Cond: ((date >= ...) AND (date < ...))
+Execution Time: 0.160 ms
+count: Index Only Scan using caf_tx_date (rows=3329, Heap Fetches: 0)   0.290 ms
+```
+
+Verdict: uses the Phase 1 `caf_tx_date` index for both queries; the page
+stops after 21 rows.
+
+**3. Auditoría search** (`/core/admin/audit/?q=perf-parent-00042`), before `core/0006`
+
+```text
+count: Parallel Seq Scan on core_auditlog
+         Filter: (upper(unaccent(actor_label)) ~~ '%...%') OR (upper(unaccent(context)) ~~ ...)
+                 OR (upper(unaccent(object_id)) ~~ ...)
+         Rows Removed by Filter: 82917 (per worker, 3 workers)
+       Execution Time: 202.288 ms            (q=refund: 178.773 ms)
+page:  Parallel Index Scan Backward using core_auditlog_created_at_3d40b819
+         Filter: same LIKEs   Rows Removed by Filter: 14032 (per worker)
+       Execution Time: 58.181 ms             (q=refund: 8.698 ms)
+```
+
+Before the fix: **the trigram indexes were not used.** Migration `core/0005` builds
+`gin (UPPER(context) gin_trgm_ops)` and `gin (UPPER(actor_label) gin_trgm_ops)`,
+but the search now compiles to `UPPER(UNACCENT(col)) LIKE ...` (the
+accent-insensitive transform in `apps/core/listing.py`), so the index
+expression never matches. `object_id` is also searched and has no trigram
+index, and one unindexed OR branch forces a scan on its own. The same count
+without `UNACCENT`, on actor_label + context only:
+
+```text
+Bitmap Heap Scan on core_auditlog
+  -> BitmapOr
+       -> Bitmap Index Scan on core_audit_actor_trgm    (rows=1250)
+       -> Bitmap Index Scan on core_audit_context_trgm  (rows=0)
+Execution Time: 12.556 ms          (adding the object_id OR branch: Parallel Seq Scan, 53 ms)
+```
+
+Fixed in the same PR: migration `core/0006_audit_search_unaccent_trgm` adds
+`public.immutable_unaccent(text)` (an `IMMUTABLE PARALLEL SAFE` SQL wrapper
+over the extension's `unaccent`, dictionary schema-qualified so it does not
+depend on `search_path`; `unaccent()` itself is only `STABLE` and cannot be
+indexed), replaces the two unusable Phase 1 indexes with GIN trigram indexes
+on `UPPER(immutable_unaccent(col))` for `actor_label`, `context` and
+`object_id`, and `UnaccentTransform` in `apps/core/listing.py` now calls the
+wrapper. Same seed, after the migration:
+
+```text
+count (q=perf-parent-00042):
+Bitmap Heap Scan on core_auditlog   (rows=1250)
+  -> BitmapOr
+       -> Bitmap Index Scan on core_audit_actor_unacc_trgm    (rows=1250)
+       -> Bitmap Index Scan on core_audit_context_unacc_trgm  (rows=0)
+       -> Bitmap Index Scan on core_audit_objid_unacc_trgm    (rows=0)
+Execution Time: 24.347 ms            (was 202 ms)
+page: same BitmapOr, then top-N sort of the 1,250 hits   24.887 ms (was 58 ms)
+
+count (q=refund, 25k hits): Parallel Bitmap Heap Scan over the same BitmapOr
+Execution Time: 31.252 ms            (was 179 ms)
+page: Index Scan Backward on created_at, stops after 21 rows   0.941 ms
+```
+
+Verdict: every branch of the OR uses its trigram index; the search is accent
+insensitive exactly as before (`immutable_unaccent('Lucía Pérez Ñandú')` =
+`Lucia Perez Nandu`). The migration is reversible (it restores the Phase 1
+indexes and drops the wrapper) and is a no-op on SQLite. If the `unaccent`
+extension is ever missing, the wrapper is created as the identity so the
+search keeps working without accent folding.
+
+**4. Pagos, default ordering** (`/payments/admin/`)
+
+```text
+Limit (actual time=0.081..0.083 rows=20)
+  -> Incremental Sort  Presorted Key: payments_payment.created_at
+     -> Index Scan Backward using pay_payment_created on payments_payment (rows=21)
+Execution Time: 0.148 ms      (count: Index Only Scan, 0.205 ms)
+```
+
+Verdict: uses the Phase 1 `pay_payment_created` index.
+
+**5. Pre-registros by status** (`/admissions/pre-register/?status=contacted`)
+
+```text
+Limit (actual time=0.035..0.037 rows=20)
+  -> Incremental Sort  Presorted Key: created_at
+     -> Index Scan using adm_prereg_status_created on admissions_preregistration
+          Index Cond: ((status)::text = 'contacted'::text)
+Execution Time: 0.045 ms      (count: Index Only Scan, 0.134 ms)
+```
+
+Verdict: uses the Phase 1 `adm_prereg_status_created` index for both queries.
+
+The `-pk` tiebreak shows up as an Incremental Sort on top of the presorted
+date index in lists 2, 4 and 5; it only sorts the handful of rows that share
+the boundary timestamp, so no composite `(created_at, id)` index is needed.
