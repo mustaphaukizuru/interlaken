@@ -57,6 +57,26 @@ describe('ComunicadosPage', () => {
     expect((await screen.findAllByText(/Aviso página dos/i)).length).toBeGreaterThan(0);
   });
 
+  it('opens on the page named by ?page= (Back from a comunicado keeps the page)', async () => {
+    getAnnouncements.mockResolvedValue({
+      data: { count: 45, results: [announcement(3, 'Aviso página tres')] },
+    } as never);
+    renderWithProviders(<ComunicadosPage />, { route: '/portal/comunicados?page=3' });
+    expect((await screen.findAllByText(/Aviso página tres/i)).length).toBeGreaterThan(0);
+    expect(getAnnouncements).toHaveBeenCalledWith({ page: 3 });
+    expect(getAnnouncements).not.toHaveBeenCalledWith({ page: 1 });
+  });
+
+  it('falls back to page 1 when a bookmarked page no longer exists (DRF 404)', async () => {
+    getAnnouncements.mockImplementation((async (params?: { page?: number }) => {
+      if ((params?.page ?? 1) > 1) throw Object.assign(new Error('404'), { response: { status: 404, data: { detail: 'Página inválida.' } } });
+      return { data: { count: 1, results: [announcement(1, 'Único aviso')] } };
+    }) as never);
+    renderWithProviders(<ComunicadosPage />, { route: '/portal/comunicados?page=9' });
+    expect((await screen.findAllByText(/Único aviso/i)).length).toBeGreaterThan(0);
+    expect(getAnnouncements).toHaveBeenLastCalledWith({ page: 1 });
+  });
+
   it('shows empty state when there are no comunicados', async () => {
     getAnnouncements.mockResolvedValue({ data: { count: 0, results: [] } } as never);
     renderWithProviders(<ComunicadosPage />, { route: '/portal/comunicados' });

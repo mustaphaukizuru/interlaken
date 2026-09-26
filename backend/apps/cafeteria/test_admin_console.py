@@ -597,7 +597,7 @@ class TestParentExport:
         assert resp.status_code == 200
         assert resp["Content-Type"].startswith("text/csv")
         assert "attachment" in resp["Content-Disposition"]
-        body = resp.content.decode("utf-8")
+        body = b"".join(resp.streaming_content).decode("utf-8")
         assert child.student_id in body
         assert "Jugo" in body
         assert other.student_id not in body

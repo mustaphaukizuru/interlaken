@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, RotateCcw, FileDown, Wallet, CalendarDays, FileText } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, RotateCcw, Wallet, CalendarDays, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -13,6 +13,10 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { SortChips, type SortOption } from '@/components/portal/SortChips';
+import { PortalExportButtons } from '@/components/portal/PortalExportButtons';
 import { ADMIN_PAGE_SIZE, toPaged } from '@/lib/pagination';
 import { formatMXN } from '@/lib/format';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
@@ -32,6 +36,16 @@ const statusMeta: Record<string, { label: string; variant: 'success' | 'warning'
                 help: 'El colegio devolvió este pago; el saldo de cafetería se ajustó.' },
 };
 
+/** Portal sort keys; a subset of `PAYMENT_ORDERING` (apps/payments/views.py). */
+const PAYMENT_SORT_OPTIONS: SortOption[] = [
+  { key: 'date', label: 'Fecha' },
+  { key: 'amount', label: 'Monto' },
+  { key: 'status', label: 'Estado' },
+];
+
+/** `2026-09-01` → `01/09/2026` (es-MX chips); passes anything else through. */
+const dmy = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split('-').reverse().join('/') : iso);
+
 /** Pagos is the cafetería wallet's money view: summary, filterable history, export.
  *  Real top-ups happen in Cafetería (gateway redirect); no other fees are sold in-app. */
 export default function PaymentsPage() {
@@ -41,7 +55,16 @@ export default function PaymentsPage() {
   const student = get('alumno');
   const from = get('desde');
   const to = get('hasta');
-  const params = { page, status: status || undefined, student: student || undefined, from: from || undefined, to: to || undefined };
+  const rawSort = parseSort(get('orden'));
+  const sort: SortState = PAYMENT_SORT_OPTIONS.some((o) => o.key === rawSort.key) ? rawSort : { key: '', dir: 'desc' };
+  const filters = {
+    status: status || undefined,
+    student: student || undefined,
+    from: from || undefined,
+    to: to || undefined,
+    ordering: serializeSort(sort) ?? undefined,
+  };
+  const params = { page, ...filters };
 
   const summary = useQuery({
     queryKey: ['payments-summary'],
@@ -57,11 +80,9 @@ export default function PaymentsPage() {
     onSuccess: ({ id, blob }) => downloadBlob(blob, `comprobante_${id}.pdf`),
     onError: () => toast.error('No se pudo generar el comprobante.'),
   });
-  const exportCsv = useMutation({
-    mutationFn: async () => (await paymentsApi.exportMyPayments(params)).data as Blob,
-    onSuccess: (blob) => downloadBlob(blob, 'pagos.csv'),
-    onError: () => toast.error('No se pudo generar el archivo.'),
-  });
+  // The download is the list on screen: same filters and orden, no page.
+  const exportPayments = async (fmt: 'csv' | 'xlsx') =>
+    (await paymentsApi.exportMyPayments({ fmt, ...filters })).data as Blob;
 
   const payments = data?.results;
   const count = data?.count ?? 0;
@@ -69,19 +90,16 @@ export default function PaymentsPage() {
   const chips = [
     ...(status ? [{ key: 'estado', label: `Estado: ${statusMeta[status]?.label ?? status}`, onClear: () => set({ estado: null, page: null }) }] : []),
     ...(student ? [{ key: 'alumno', label: `Alumno: ${children.find((c) => String(c.student_id) === student)?.name ?? student}`, onClear: () => set({ alumno: null, page: null }) }] : []),
-    ...(from || to ? [{ key: 'fecha', label: `Fechas: ${from || '…'} a ${to || '…'}`, onClear: () => set({ desde: null, hasta: null, page: null }) }] : []),
+    ...(from || to ? [{ key: 'fecha', label: `Fechas: ${from ? dmy(from) : '…'} a ${to ? dmy(to) : '…'}`, onClear: () => set({ desde: null, hasta: null, page: null }) }] : []),
   ];
+  const clearAll = () => set({ estado: null, alumno: null, desde: null, hasta: null, page: null });
 
   return (
     <>
       <PageHeader
         title="Pagos"
         subtitle="Recargas de cafetería pagadas en línea o en caja, y su historial."
-        actions={(
-          <Button variant="secondary" loading={exportCsv.isPending} onClick={() => exportCsv.mutate()}>
-            <FileDown size={16} aria-hidden="true" /> Exportar CSV
-          </Button>
-        )}
+        actions={<PortalExportButtons what="pagos" filenamePrefix="pagos" fetch={exportPayments} />}
       />
 
       <SummaryTiles summary={summary.data} loading={summary.isLoading} />
@@ -97,7 +115,7 @@ export default function PaymentsPage() {
       </div>
 
       <Card title="Historial de pagos">
-        <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="pf-alumno">Alumno</label>
             <select id="pf-alumno" className="input-field min-h-[44px]" value={student} onChange={(e) => set({ alumno: e.target.value || null, page: null })}>
@@ -112,16 +130,20 @@ export default function PaymentsPage() {
               {Object.entries(statusMeta).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
             </select>
           </div>
-          <div>
-            <label className="label" htmlFor="pf-desde">Desde</label>
-            <input id="pf-desde" type="date" className="input-field" value={from} onChange={(e) => set({ desde: e.target.value || null, page: null })} />
-          </div>
-          <div>
-            <label className="label" htmlFor="pf-hasta">Hasta</label>
-            <input id="pf-hasta" type="date" className="input-field" value={to} onChange={(e) => set({ hasta: e.target.value || null, page: null })} />
-          </div>
         </div>
-        <ActiveFilterChips chips={chips} onClearAll={() => set({ estado: null, alumno: null, desde: null, hasta: null, page: null })} />
+        <DateRangeFilter
+          idPrefix="pf"
+          className="mb-3"
+          value={{ from, to }}
+          onChange={(r) => set({ desde: r.from || null, hasta: r.to || null, page: null })}
+        />
+        <SortChips
+          className="mb-3"
+          options={PAYMENT_SORT_OPTIONS}
+          sort={sort}
+          onSort={(next) => set({ orden: serializeSort(next), page: null })}
+        />
+        <ActiveFilterChips chips={chips} onClearAll={clearAll} />
 
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
@@ -131,12 +153,16 @@ export default function PaymentsPage() {
           <EmptyState
             icon={CreditCard}
             title={chips.length ? 'Sin pagos con esos filtros' : 'Sin pagos'}
-            description="Los pagos realizados aparecerán aquí."
-            action={
+            description={chips.length
+              ? 'Ningún pago coincide con los filtros. Ajústelos o límpielos para ver más.'
+              : 'Los pagos realizados aparecerán aquí.'}
+            action={chips.length ? (
+              <Button variant="secondary" size="sm" onClick={clearAll}>Limpiar filtros</Button>
+            ) : (
               <Link to="/portal/cafeteria" className="btn-secondary text-sm">
                 <Coffee className="h-4 w-4" /> Recargar cafetería
               </Link>
-            }
+            )}
           />
         ) : (
           <>

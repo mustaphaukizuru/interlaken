@@ -135,3 +135,19 @@ Public: `GET /content/calendar.ics` (published events from one year back, all-da
 Audit contexts: `portal.announcement`, `cms.page`, `cms.publish`/`cms.unpublish`, `cms.media`, `cms.form`, `cms.form-submission`, `cms.redirect`, `cms.testimonial`, `cms.calendar`; bulk rows `bulk:<entity>:<action>` plus one `bulk:<entity>` summary; imports `import:<entity>`; exports `export:<entity>`.
 
 Guards: a comunicado's activation follows the `portal.announcement` transition table (draft/inactive ↔ active) on both the single PATCH and bulk; a comunicado already sent to families (`fanout_at`) cannot be deleted, single or bulk (deactivate archives it).
+
+## Portal de familias (Phase 9)
+
+Family-scoped lists: a parent sees only their linked children, a student login only their own profile, an admin everything; another family's `student` id yields an empty list or file, never their rows. Staff are refused on the cafetería export. No search, no bulk actions and no imports in the portal. Each export subclasses its list view, so scoping, filters and ordering are the same code; formats are CSV (UTF-8 BOM, CRLF) and XLSX (real dates and numbers), capped at 10,000 rows, throttled under `portal-export` (30/min per user) and audited with `context='portal'`.
+
+| Endpoint | Ordering keys (default) | Filters | Export | Frontend |
+| --- | --- | --- | --- | --- |
+| `GET /api/v1/cafeteria/transactions/` | `date`, `amount`, `type`, `balance` (`-date`) | `student` (profile id), `type` (`purchase`, `topup`, `refund`), `from`, `to` | `GET /api/v1/cafeteria/export/?fmt=csv\|xlsx` + same params; entity `cafeteria.family_transactions`; columns Alumno, Matrícula, Fecha, Tipo, Descripción, Monto, Saldo | `pages/parent/CafeteriaPage.tsx` |
+| `GET /api/v1/payments/history/` | `date`, `amount`, `status`, `gateway` (`-date`); the portal offers `date`, `amount`, `status` | `status`, `student` (profile id), `from`, `to` | `GET /api/v1/payments/history/export/?fmt=csv\|xlsx` + same params; entity `payments.family`; columns Fecha, Alumno, Concepto, Monto, Moneda, Estado, Pasarela, Referencia | `pages/parent/PaymentsPage.tsx` |
+| `GET /api/v1/portal/announcements/` | fixed (newest first) | none (audience-scoped server-side) | n/a | `pages/parent/ComunicadosPage.tsx` |
+| `GET /api/v1/portal/notifications/` | fixed (`-created_at`) | `type` (`info`, `warning`, `payment`, `cafeteria`), `unread=1` | n/a | `pages/parent/NotificationsPage.tsx` |
+| `GET /api/v1/admissions/my-registrations/` | fixed | none server-side (a family has a handful; `?estado=` filters in the page) | n/a | `pages/parent/InscripcionesPage.tsx` |
+
+Unchanged documents: the monthly cafetería statement (`GET /api/v1/cafeteria/statement/?student=&month=YYYY-MM`, PDF) and the payment comprobante (`GET /api/v1/payments/<id>/receipt/`, PDF).
+
+Frontend URL vocabulary on these pages: `orden` → `ordering`, `page`, `alumno` → `student`, `tipo` → `type`, `estado` → `status`, `desde` / `hasta` → `from` / `to`, `sin_leer` → `unread`. On Cafetería, `?alumno=` is kept in step with the portal child switcher (the last one changed wins). A bookmarked `?page=` past the end (DRF 404) falls back to page 1.

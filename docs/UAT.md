@@ -30,6 +30,14 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
 5. Comunicados: marcar leído, comentar; la notificación en campana desaparece.
 6. Mi perfil: foto (subir, recortar, quitar), datos, preferencias de aviso, Seguridad (historial de accesos, "Cerrar otras sesiones").
 7. "Olvidé mi contraseña": solo muestra instrucciones para pedirla por WhatsApp o correo (no hay restablecimiento en línea).
+8. Listas del portal (operaciones de datos, Phase 9), con la familia de 2 hijos:
+    - Cafetería → Historial: elegir un hijo, tipo "Compras" y el preset "Este mes"; ordenar por Monto (primer toque de mayor a menor, segundo de menor a mayor, tercero vuelve a "más recientes"). Recargar la página: filtros, orden y página se conservan en la URL; el selector de alumnos del portal marca al mismo hijo.
+    - Cafetería → Descargar CSV y Excel: el archivo trae solo los movimientos filtrados y en el mismo orden (Alumno, Matrícula, Fecha, Tipo, Descripción, Monto, Saldo); Excel abre con fechas y montos como números. El Estado de cuenta (PDF) mensual no cambia.
+    - Pagos: filtrar por estado y con los presets de fecha (ya no hay dos campos sueltos), ordenar por Fecha, Monto o Estado; los chips muestran las fechas como DD/MM/AAAA. Descargar CSV y Excel: mismas filas y orden que la lista. El comprobante PDF de un pago completado no cambia.
+    - Con la cuenta de la otra familia, las descargas no incluyen ningún movimiento ni pago de la familia de 2 hijos (y viceversa). En Dirección → Auditoría aparecen `export:cafeteria.family_transactions` y `export:payments.family` con el usuario de la familia y los filtros usados.
+    - Comunicados: pasar a la página 2, abrir un comunicado y volver: sigue en la página 2. Con `?page=99` en la URL se muestra la página 1.
+    - Notificaciones: filtrar "Sin leer", "Marcar todas como leídas": la lista queda vacía con "Está al día" y el botón "Ver todas" quita el filtro.
+    - Inscripciones (familia con más de una solicitud): los chips de estado filtran y se conservan en la URL.
 
 ## 3. Portal Dirección (20 min)
 1. Tablero: KPIs de cafetería y colas (admisiones, visitas, recargas, contraseñas, mensajes, formularios).

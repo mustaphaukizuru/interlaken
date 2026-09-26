@@ -9,6 +9,8 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
 import { admissionsApi } from '@/services/api';
 
 interface ParentRegistration {
@@ -61,6 +63,13 @@ export default function InscripcionesPage() {
     queryKey: ['my-registrations'],
     queryFn: async () => (await admissionsApi.getMyRegistrations()).data,
   });
+  // ?estado= (Data Ops Phase 9). A family has a handful of solicitudes, so the
+  // endpoint returns them all and the filter runs here; the chips only appear
+  // when there is more than one status to choose from.
+  const { get, set } = useUrlFilters();
+  const estado = get('estado');
+  const statuses = Array.from(new Map((data ?? []).map((r) => [r.status, r.status_label || r.status])));
+  const visible = estado ? (data ?? []).filter((r) => r.status === estado) : (data ?? []);
 
   return (
     <>
@@ -78,6 +87,17 @@ export default function InscripcionesPage() {
           <MessageCircle size={15} /> Contactar admisiones
         </Link>
       </div>
+
+      {statuses.length > 1 && (
+        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
+          <StatusChip active={!estado} onClick={() => set({ estado: null })}>Todas</StatusChip>
+          {statuses.map(([value, label]) => (
+            <StatusChip key={value} active={estado === value} onClick={() => set({ estado: value })}>
+              {label}
+            </StatusChip>
+          ))}
+        </div>
+      )}
 
       <Card>
         {isError ? (
@@ -99,9 +119,16 @@ export default function InscripcionesPage() {
               </Link>
             }
           />
+        ) : !visible.length ? (
+          <EmptyState
+            icon={ClipboardList}
+            title="Sin solicitudes en este estado"
+            description="Ninguna de sus solicitudes tiene el estado seleccionado."
+            action={<Button variant="secondary" size="sm" onClick={() => set({ estado: null })}>Ver todas</Button>}
+          />
         ) : (
           <ul className="divide-y divide-line" aria-label="Solicitudes de inscripción">
-            {data.map((reg) => (
+            {visible.map((reg) => (
               <li key={reg.id} className="flex flex-col gap-3 py-5 first:pt-0 last:pb-0">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -146,5 +173,20 @@ export default function InscripcionesPage() {
         </span>
       </p>
     </>
+  );
+}
+
+function StatusChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`min-h-[44px] rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+        active ? 'bg-purple text-white' : 'border border-line bg-white text-muted hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
   );
 }

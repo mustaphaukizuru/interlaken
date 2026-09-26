@@ -281,6 +281,26 @@ def collect_rows(qs, cap: int, *, chunk_size: int = 500):
     return count, qs[:cap].iterator(chunk_size=chunk_size)
 
 
+def export_response(request, qs, spec: ExportSpec, *, formats=FORMATS, context: str = ""):
+    """Render ``qs`` (already scoped, filtered and ordered) as ``?fmt=`` and audit it.
+
+    The function form of ``AdminExportMixin.list`` for views that are not on
+    the admin list contract, e.g. the family portal exports, which subclass
+    their own family-scoped list view and call this from ``list()``. Same
+    caps (413 over ``spec.cap_for(fmt)``), same ``?ids=`` narrowing, same
+    ``record_export`` row.
+    """
+    fmt = parse_fmt(request, formats)
+    ids = parse_ids(request)
+    if ids:
+        qs = qs.filter(pk__in=ids)
+    count, rows = collect_rows(qs, spec.cap_for(fmt))
+    response = render_export(rows, spec, fmt)
+    filters = {k: v for k, v in request.query_params.lists() if k != "fmt"}
+    record_export(spec.audit_entity, fmt, filters, count, request.user, context=context)
+    return response
+
+
 class AdminExportMixin:
     """Turn a list view into its export sibling.
 

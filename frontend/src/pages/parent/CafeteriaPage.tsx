@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
@@ -23,10 +23,22 @@ import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { cafeteriaApi, downloadBlob } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { SortChips, type SortOption } from '@/components/portal/SortChips';
+import { PortalExportButtons } from '@/components/portal/PortalExportButtons';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
+const TX_TYPES = ['purchase', 'topup', 'refund'] as const;
+/** The four keys `TRANSACTION_ORDERING` whitelists (apps/cafeteria/views.py). */
+const TX_SORT_OPTIONS: SortOption[] = [
+  { key: 'date', label: 'Fecha' },
+  { key: 'amount', label: 'Monto' },
+  { key: 'type', label: 'Tipo' },
+  { key: 'balance', label: 'Saldo' },
+];
 const TOPUP_MIN = 50;
 const TOPUP_MAX = 2000;
 
@@ -71,28 +83,18 @@ export default function CafeteriaPage() {
   const [budgetDaily, setBudgetDaily] = useState('');
   const [budgetWeekly, setBudgetWeekly] = useState('');
 
-  // History filters + pagination — default student filter follows portal child switcher.
-  // A manual selection here is keyed to the childId it was made under, so when
-  // the parent switches alumno elsewhere in the portal the filter derives back
-  // to that child during render (replaces the old sync effect).
-  const [filterStudentSel, setFilterStudentSel] =
-    useState<{ child: number | null; value: number | 'all' } | null>(null);
-  const filterStudent: number | 'all' =
-    filterStudentSel && filterStudentSel.child === childId
-      ? filterStudentSel.value
-      : (childId ?? 'all');
-  const setFilterStudent = (value: number | 'all') =>
-    setFilterStudentSel({ child: childId, value });
-  const [filterType, setFilterType] = useState<TypeFilter>('');
-  const [filterFrom, setFilterFrom] = useState('');
-  const [filterTo, setFilterTo] = useState('');
-
-  // The page is keyed to the filters it was chosen for; any filter change
-  // derives back to page 1 (stale page would show empty) — no reset effect.
-  const filterKey = `${filterStudent}|${filterType}|${filterFrom}|${filterTo}`;
-  const [pageSel, setPageSel] = useState<{ key: string; page: number } | null>(null);
-  const page = pageSel && pageSel.key === filterKey ? pageSel.page : 1;
-  const setPage = (p: number) => setPageSel({ key: filterKey, page: p });
+  // History filters, sort and page live in the URL (Data Ops Phase 9), so a
+  // filtered view survives refresh and Back: ?alumno= ?tipo= ?desde= ?hasta=
+  // ?orden= ?page=. Any filter or sort change goes back to page 1.
+  const { get, set } = useUrlFilters();
+  const [page, setPage] = useUrlPage();
+  const rawType = get('tipo');
+  const filterType: TypeFilter = (TX_TYPES as readonly string[]).includes(rawType) ? (rawType as TypeFilter) : '';
+  const filterFrom = get('desde');
+  const filterTo = get('hasta');
+  const rawSort = parseSort(get('orden'));
+  const sort: SortState = TX_SORT_OPTIONS.some((o) => o.key === rawSort.key) ? rawSort : { key: '', dir: 'desc' };
+  const ordering = serializeSort(sort) ?? undefined;
 
   const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances, dataUpdatedAt: balancesUpdatedAt, isFetching: balancesFetching } = useQuery<CafeteriaBalance[]>({
     queryKey: ['cafeteria-balances'],
@@ -103,17 +105,33 @@ export default function CafeteriaPage() {
     },
   });
 
+  // The alumno filter IS the portal child switcher (shared store), kept in
+  // step with ?alumno= by the effect below. A valid ?alumno= (one of this
+  // family's children) wins during render, so a shared link or Back never
+  // fetches the wrong child's page first.
+  const urlAlumno = get('alumno');
+  const urlChild = balances?.some((b) => String(b.student.id) === urlAlumno) ? Number(urlAlumno) : null;
+  const filterStudent: number | 'all' = urlChild ?? childId ?? 'all';
+  // One param set for the list and its export, so the file is the list.
+  const historyParams = {
+    student: filterStudent === 'all' ? undefined : filterStudent,
+    type: filterType || undefined,
+    from: filterFrom || undefined,
+    to: filterTo || undefined,
+    ordering,
+  };
+
   const { data: txData, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<{
     results: CafeteriaTransaction[]; count: number;
   }>({
-    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, page],
+    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, ordering, page],
     ...LIVE,
+    // The history only renders once balances are known (and ?alumno= can be
+    // validated against them).
+    enabled: !!balances,
     queryFn: async () => {
       const { data } = await cafeteriaApi.getTransactions({
-        student: filterStudent === 'all' ? undefined : filterStudent,
-        type: filterType || undefined,
-        from: filterFrom || undefined,
-        to: filterTo || undefined,
+        ...historyParams,
         page,
       });
       const results = data.results ?? data;
@@ -123,6 +141,24 @@ export default function CafeteriaPage() {
   });
   const transactions = txData?.results;
   const txCount = txData?.count ?? 0;
+
+  // ?alumno= ↔ child switcher, whichever side moved last wins: a new
+  // selection in the switcher or the select is written to the URL (and resets
+  // ?page=); a URL change (shared link, refresh, Back) naming one of this
+  // family's children selects it in the store; an empty or foreign ?alumno=
+  // just mirrors the store. Declared before the one-shot ?hijo= and ?recarga=
+  // effects so their URL writes land last in the same pass.
+  const lastSync = useRef({ childId, urlAlumno });
+  useEffect(() => {
+    if (!balances) return;
+    const prev = lastSync.current;
+    lastSync.current = { childId, urlAlumno };
+    const want = childId == null ? '' : String(childId);
+    if (urlAlumno === want) return;
+    if (childId !== prev.childId) set({ alumno: want || null, page: null });
+    else if (urlChild != null) setChildId(urlChild);
+    else set({ alumno: want || null });
+  }, [balances, childId, urlAlumno, urlChild, set, setChildId]);
 
   // Quick top-up deep link from the dashboard chips (`?recarga=200`): prefill
   // the amount and open the top-up modal for the active (or first Loyverse-
@@ -235,7 +271,6 @@ export default function CafeteriaPage() {
   };
 
   const [refreshing, setRefreshing] = useState(false);
-  const [exporting, setExporting] = useState(false);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -270,19 +305,9 @@ export default function CafeteriaPage() {
     }
   };
 
-  const exportMovements = async () => {
-    setExporting(true);
-    try {
-      const { data } = await cafeteriaApi.exportMyTransactions();
-      const stamp = format(new Date(), 'yyyyMMdd');
-      downloadBlob(data, `movimientos_cafeteria_${stamp}.csv`);
-      toast.success('Descarga de movimientos lista.');
-    } catch {
-      toast.error('No se pudo descargar los movimientos. Intente nuevamente.');
-    } finally {
-      setExporting(false);
-    }
-  };
+  // The download is the list on screen: same alumno, tipo, fechas and orden.
+  const exportMovements = async (fmt: 'csv' | 'xlsx') =>
+    (await cafeteriaApi.exportMyTransactions({ fmt, ...historyParams })).data as Blob;
 
   // History filters: track whether any is active so we can give feedback and a
   // one-tap reset (the list auto-applies filters, so without this a filter that
@@ -290,10 +315,7 @@ export default function CafeteriaPage() {
   const filtersActive =
     filterType !== '' || filterFrom !== '' || filterTo !== '' || filterStudent !== 'all';
   const clearFilters = () => {
-    setFilterType('');
-    setFilterFrom('');
-    setFilterTo('');
-    setFilterStudent('all');
+    set({ tipo: null, desde: null, hasta: null, alumno: null, page: null });
     setChildId(null);
   };
 
@@ -336,17 +358,6 @@ export default function CafeteriaPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
-          {!balancesLoading && balances && balances.length > 0 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              loading={exporting}
-              onClick={exportMovements}
-              className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40"
-            >
-              <Download className="w-3 h-3" /> Descargar movimientos
-            </Button>
-          )}
           {selectedStudent && (
             <Button variant="secondary" size="sm" onClick={downloadStatement} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
               <Download className="w-3 h-3" /> Estado de cuenta (PDF)
@@ -788,9 +799,8 @@ export default function CafeteriaPage() {
               className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
               value={filterStudent}
               onChange={(e) => {
-                const next = e.target.value === 'all' ? 'all' : Number(e.target.value);
-                setFilterStudent(next);
-                setChildId(next === 'all' ? null : next);
+                // The sync effect mirrors this into ?alumno= and resets ?page=.
+                setChildId(e.target.value === 'all' ? null : Number(e.target.value));
               }}
               aria-label="Filtrar por alumno"
             >
@@ -803,7 +813,7 @@ export default function CafeteriaPage() {
           <select
             className="input-field min-h-[44px] text-base sm:text-sm lg:w-auto"
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value as TypeFilter)}
+            onChange={(e) => set({ tipo: e.target.value || null, page: null })}
             aria-label="Filtrar por tipo"
           >
             <option value="">Todos los tipos</option>
@@ -829,8 +839,22 @@ export default function CafeteriaPage() {
           idPrefix="mov"
           className="mb-4"
           value={{ from: filterFrom, to: filterTo }}
-          onChange={(r) => { setFilterFrom(r.from); setFilterTo(r.to); }}
+          onChange={(r) => set({ desde: r.from || null, hasta: r.to || null, page: null })}
         />
+
+        {/* Sort (server-side, whole history) + download of exactly this view. */}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SortChips
+            options={TX_SORT_OPTIONS}
+            sort={sort}
+            onSort={(next) => set({ orden: serializeSort(next), page: null })}
+          />
+          <PortalExportButtons
+            what="movimientos"
+            filenamePrefix="movimientos_cafeteria"
+            fetch={exportMovements}
+          />
+        </div>
 
         {txError ? (
           <ErrorState onRetry={() => refetchTx()} />
