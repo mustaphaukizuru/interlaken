@@ -46,6 +46,9 @@ def test_detail_masks_until_consent_and_admin_sees_all(kid, admin_client):
 
 @pytest.mark.django_db
 def test_exports_never_carry_medical(kid, admin_client):
-    csv = admin_client.get(reverse('export-students')).content.decode('utf-8-sig')
-    assert 'Nuez' not in csv and 'Asma' not in csv
+    for fmt in ('csv', 'xlsx', 'pdf'):
+        resp = admin_client.get(reverse('export-students'), {'fmt': fmt})
+        assert resp.status_code == 200
+        body = b''.join(resp.streaming_content) if resp.streaming else resp.content
+        assert b'Nuez' not in body and b'Asma' not in body
     assert mask_medical({'allergies': 'Nuez', 'grade': '1'}) == {'allergies': MASK, 'grade': '1'}
