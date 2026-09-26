@@ -1,5 +1,5 @@
 """
-cafeteria/admin_data.py — the admin Cafetería lists on the Data Ops contracts (Phase 6).
+cafeteria/admin_data.py: the admin Cafetería lists on the Data Ops contracts (Phase 6).
 
 Every admin list of the Cafetería console lives here, on the shared contracts
 of ``apps.core``: ``AdminListMixin`` (``q``, whitelisted ``ordering`` with the
