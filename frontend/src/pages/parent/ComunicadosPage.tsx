@@ -1,10 +1,11 @@
-import { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Megaphone, MessageCircle, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
+import { SectionCard } from '@/components/ui/SectionCard';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { useStalePageReset, useUrlPage } from '@/hooks/useUrlFilters';
 import { Pagination } from '@/components/ui/Pagination';
 import { Reveal } from '@/components/ui/Reveal';
 import { portalApi } from '@/services/api';
@@ -26,9 +27,11 @@ const audienceLabel: Record<string, string> = {
 };
 
 export default function ComunicadosPage() {
-  const [page, setPage] = useState(1);
+  // ?page= in the URL (Data Ops Phase 9): Back from a comunicado returns to
+  // the same page instead of page 1.
+  const [page, setPage] = useUrlPage();
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['announcements', page],
     queryFn: async () => {
       const { data: body } = await portalApi.getAnnouncements({ page });
@@ -37,6 +40,8 @@ export default function ComunicadosPage() {
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 2,
   });
+
+  useStalePageReset(error, page, setPage);
 
   const announcements = data?.results ?? [];
   const count = data?.count ?? 0;
@@ -54,7 +59,11 @@ export default function ComunicadosPage() {
               {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-16 rounded-xl2" />)}
             </div>
           ) : !announcements.length ? (
-            <SectionEmpty icon={Megaphone}>Sin comunicados por ahora</SectionEmpty>
+            <EmptyState
+              icon={Megaphone}
+              title="Sin comunicados por ahora"
+              description="Los avisos y noticias del colegio para su familia aparecerán aquí."
+            />
           ) : (
             <>
               <div>

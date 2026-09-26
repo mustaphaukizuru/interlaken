@@ -139,7 +139,7 @@ class TestOrdering:
         assert rows[0]["description"] == "Devolucion A1"
 
     def test_whitelist_is_the_four_portal_keys(self):
-        # frontend/src/pages/parent/CafeteriaPage.tsx TX_SORT_KEYS uses the same four.
+        # frontend/src/pages/parent/CafeteriaPage.tsx TX_SORT_OPTIONS uses the same four.
         assert set(cafeteria_views.TRANSACTION_ORDERING) == {"date", "amount", "type", "balance"}
 
 

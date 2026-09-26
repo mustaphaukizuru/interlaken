@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Bell, Check } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { NotificationList } from '@/components/portal/NotificationList';
 import { NOTIF_META, notifDestination, type Notif } from '@/lib/notifications';
 import { portalApi } from '@/services/api';
 import { toPaged } from '@/lib/pagination';
-import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useStalePageReset, useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 
 const PAGE_SIZE = 20;
 
@@ -26,7 +27,7 @@ export default function NotificationsPage() {
   const unreadOnly = get('sin_leer') === '1';
   const [busy, setBusy] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['notifications-page', page, type, unreadOnly],
     queryFn: async () => toPaged<Notif>((await portalApi.getNotifications({ page, type: type || undefined, unread: unreadOnly ? '1' : undefined })).data),
     placeholderData: keepPreviousData,
@@ -47,8 +48,12 @@ export default function NotificationsPage() {
     navigate(notifDestination(n));
   };
 
+  // Marking everything read under ?sin_leer=1 empties the later pages.
+  useStalePageReset(error, page, setPage);
+
   const items = data?.results ?? [];
   const count = data?.count ?? 0;
+  const filtered = Boolean(type) || unreadOnly;
 
   return (
     <>
@@ -69,9 +74,21 @@ export default function NotificationsPage() {
       <Card className="overflow-hidden p-0">
         {isError ? <div className="p-4"><ErrorState onRetry={() => refetch()} /></div>
           : isLoading ? <div className="p-4"><ListSkeleton /></div>
+          : !items.length ? (
+            <EmptyState
+              icon={Bell}
+              title={unreadOnly ? 'Está al día' : filtered ? 'Sin notificaciones de este tipo' : 'Sin notificaciones'}
+              description={unreadOnly ? 'No tiene notificaciones sin leer.' : 'Los avisos del colegio, la cafetería y los pagos aparecerán aquí.'}
+              action={filtered ? (
+                <Button variant="secondary" size="sm" onClick={() => set({ tipo: null, sin_leer: null, page: null })}>
+                  Ver todas
+                </Button>
+              ) : undefined}
+            />
+          )
           : (
             <>
-              <NotificationList items={items} onOpen={open} emptyText={unreadOnly ? 'No tienes notificaciones sin leer.' : 'Sin notificaciones.'} />
+              <NotificationList items={items} onOpen={open} />
               {count > PAGE_SIZE && (
                 <div className="border-t border-line px-4 py-3">
                   <Pagination page={page} pageSize={PAGE_SIZE} count={count} onChange={setPage} itemLabel="notificaciones" />

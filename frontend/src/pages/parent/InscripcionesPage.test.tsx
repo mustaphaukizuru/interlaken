@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -58,6 +59,53 @@ describe('InscripcionesPage', () => {
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
     expect(screen.getByText(/Primaria 2°/)).toBeInTheDocument();
     expect(screen.getByText('En revisión')).toBeInTheDocument();
+  });
+
+  it('filters by estado from the URL chips and shows a filtered empty state', async () => {
+    const base = {
+      grade_applying: 'Primaria 2°', cycle: '2026-2027', submitted_at: null,
+      created_at: '2026-08-01T12:00:00Z', updated_at: '2026-08-02T12:00:00Z',
+    };
+    getMine.mockResolvedValue({
+      data: [
+        { ...base, id: 1, child_name: 'Ana Pérez', status: 'reviewing', status_label: 'En revisión' },
+        { ...base, id: 2, child_name: 'Luis Pérez', status: 'approved', status_label: 'Aprobada' },
+      ],
+    } as never);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/portal/inscripciones?estado=approved']}>
+          <InscripcionesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Ana Pérez')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Aprobada' })).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Todas' }));
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
+  });
+
+  it('an estado with no solicitudes offers "Ver todas"', async () => {
+    getMine.mockResolvedValue({
+      data: [{
+        id: 1, child_name: 'Ana Pérez', grade_applying: 'Primaria 2°', cycle: '', status: 'reviewing',
+        status_label: 'En revisión', submitted_at: null, created_at: '2026-08-01T12:00:00Z', updated_at: '2026-08-02T12:00:00Z',
+      }],
+    } as never);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/portal/inscripciones?estado=rejected']}>
+          <InscripcionesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('Sin solicitudes en este estado')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver todas' }));
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
   });
 
   it('shows error state when the API fails', async () => {

@@ -507,6 +507,8 @@ export const cafeteriaApi = {
     type?: 'purchase' | 'topup' | 'refund';
     from?: string;
     to?: string;
+    /** `date` | `amount` | `type` | `balance`, `-` prefix = descending. */
+    ordering?: string;
   }) =>
     api.get('/cafeteria/transactions/', { params }),
 
@@ -571,9 +573,9 @@ export const cafeteriaApi = {
       students: number;
     }>('/cafeteria/refresh/'),
 
-  /** Parent family CSV of children's cafeteria transactions. */
-  exportMyTransactions: () =>
-    api.get('/cafeteria/export/', { responseType: 'blob' }),
+  /** Family history file (CSV/Excel): same student/type/from/to/ordering as `getTransactions`. */
+  exportMyTransactions: (params: { fmt: 'csv' | 'xlsx'; student?: number; type?: string; from?: string; to?: string; ordering?: string }) =>
+    api.get<Blob>('/cafeteria/export/', { params, responseType: 'blob' }),
   /** Monthly statement PDF (BACKLOG P4-3). */
   statementPdf: (student: number, month: string) => api.get('/cafeteria/statement/', { params: { student, month }, responseType: 'blob' }),
   /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
@@ -705,10 +707,11 @@ export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
-  getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string }) =>
+  getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/history/', { params }),
-  exportMyPayments: (params?: { status?: string; student?: string; from?: string; to?: string }) =>
-    api.get('/payments/history/export/', { params, responseType: 'blob' }),
+  /** Family history file (CSV/Excel): same filters and ordering as `getMyPayments`. */
+  exportMyPayments: (params: { fmt: 'csv' | 'xlsx'; status?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
+    api.get<Blob>('/payments/history/export/', { params, responseType: 'blob' }),
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
   getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
   /** Admin ledger (BACKLOG P1-D9). */

@@ -51,6 +51,18 @@ export function useUrlPage(): [number, (page: number) => void] {
 }
 
 /**
+ * A URL-synced page can outlive its data: a bookmarked `?page=4` after rows
+ * were read, archived or filtered away makes DRF answer 404 ("Página
+ * inválida"). Instead of an error card, fall back to page 1.
+ */
+export function useStalePageReset(error: unknown, page: number, setPage: (page: number) => void) {
+  const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
+  useEffect(() => {
+    if (page > 1 && status === 404) setPage(1);
+  }, [status, page, setPage]);
+}
+
+/**
  * Search input two-way synced to a URL param, debounced 300 ms.
  * Returns the immediate input value (for the field), its setter, and the
  * debounced value (for query keys). Writing the search resets `?page=`.
