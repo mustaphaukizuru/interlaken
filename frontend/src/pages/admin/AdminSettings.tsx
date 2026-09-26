@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { contentApi } from '@/services/api';
+import { apiFieldErrors } from '@/lib/apiErrors';
 import { socialEntries } from '@/lib/siteContact';
 import type { SiteSettings } from '@/types/content';
 
@@ -27,18 +28,11 @@ const EMPTY: SettingsForm = {
 
 const FORM_KEYS = Object.keys(EMPTY) as (keyof SettingsForm)[];
 
-/** First DRF field message per known settings key; ignores unknown keys. */
-function fieldErrorsFromDrf(data: unknown): FieldErrors {
-  if (!data || typeof data !== 'object') return {};
+/** First DRF field message per known settings key (shared mapper); ignores unknown keys. */
+function settingsFieldErrors(err: unknown): FieldErrors {
+  const all = apiFieldErrors(err);
   const out: FieldErrors = {};
-  for (const key of FORM_KEYS) {
-    const raw = (data as Record<string, unknown>)[key];
-    if (Array.isArray(raw) && typeof raw[0] === 'string' && raw[0]) {
-      out[key] = raw[0];
-    } else if (typeof raw === 'string' && raw) {
-      out[key] = raw;
-    }
-  }
+  for (const key of FORM_KEYS) if (all[key]) out[key] = all[key];
   return out;
 }
 
@@ -222,15 +216,13 @@ export default function AdminSettings() {
     },
     onSuccess: () => toast.success('Ajustes guardados. El sitio público se actualizará.'),
     onError: (err: unknown) => {
-      const data = (err as { response?: { data?: unknown } })?.response?.data;
-      const next = fieldErrorsFromDrf(data);
+      const next = settingsFieldErrors(err);
       if (Object.keys(next).length > 0) {
         setFieldErrors(next);
         toast.error('Revise los campos marcados e intente de nuevo.');
         return;
       }
-      const detail = (data as { detail?: string } | undefined)?.detail;
-      toast.error(typeof detail === 'string' && detail ? detail : 'No se pudieron guardar los ajustes.');
+      toast.error(apiFieldErrors(err).detail || 'No se pudieron guardar los ajustes.');
     },
   });
 

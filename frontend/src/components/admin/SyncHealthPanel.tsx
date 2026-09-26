@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, ListChecks, PlugZap,
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { cafeteriaApi, type SyncHealth } from '@/services/api';
+import { apiErrorMessage } from '@/lib/apiErrors';
 
 type Tone = 'ok' | 'warn' | 'bad';
 
@@ -241,7 +242,7 @@ export function SyncHealthPanel() {
         queryClient.invalidateQueries({ queryKey: ['admin', entity] });
       }
     },
-    onError: (e: any) => toast.error(e?.response?.data?.detail || 'No se pudo sincronizar el roster con Loyverse.'),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo sincronizar el roster con Loyverse.')),
   });
 
   if (isLoading || isError || !data) return null;

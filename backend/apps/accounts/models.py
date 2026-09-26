@@ -3,6 +3,7 @@ accounts/models.py — Custom User + Role system for Colegio Interlaken
 """
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from apps.core.fields import EncryptedTextField
@@ -63,6 +64,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         ordering = ['last_name', 'first_name']
         indexes = [
             models.Index(fields=['role', 'is_active']),
+        ]
+        constraints = [
+            # Data Ops Phase 10: one account per address whatever the case
+            # (``Ana@x.mx`` and ``ana@x.mx`` used to be two users). Shipped once
+            # ``check_data_integrity`` reported zero case-duplicates in production;
+            # ``apps/accounts/merge.py`` is the cleanup path if one ever appears.
+            models.UniqueConstraint(Lower('email'), name='accounts_user_email_ci_uniq'),
         ]
 
     def __str__(self):
@@ -150,6 +158,16 @@ class StudentProfile(models.Model):
             models.Index(fields=['is_active', 'loyverse_id']),
             # Roster filters and bulk top-up select by grade/group (audit 2026-08).
             models.Index(fields=['grade', 'group']),
+        ]
+        constraints = [
+            # Data Ops Phase 10: a Loyverse customer backs at most one student
+            # (empty = not linked, any number allowed). Shipped once
+            # ``check_data_integrity`` reported zero duplicates in production.
+            models.UniqueConstraint(
+                fields=['loyverse_id'],
+                condition=~models.Q(loyverse_id=''),
+                name='accounts_student_loyverse_id_uniq',
+            ),
         ]
 
     def __str__(self):

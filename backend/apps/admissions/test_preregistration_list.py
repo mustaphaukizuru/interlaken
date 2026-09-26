@@ -67,8 +67,9 @@ class TestSearch:
         assert _children(admin_client.get(URL, {"q": "ana@test.mx"})) == ["Ana Alvarado"]
         assert _children(admin_client.get(URL, {"q": "5553333333"})) == ["Pedro Ruiz"]
 
-    def test_legacy_search_alias(self, admin_client, rows):
-        assert _children(admin_client.get(URL, {"search": "pedro"})) == ["Pedro Ruiz"]
+    def test_legacy_search_alias_is_ignored(self, admin_client, rows):
+        # Removed in Phase 10: ``search`` no longer filters.
+        assert len(_children(admin_client.get(URL, {"search": "pedro"}))) == len(rows)
 
     def test_terms_are_anded(self, admin_client, rows):
         assert _children(admin_client.get(URL, {"q": "ruiz pedro"})) == ["Pedro Ruiz"]

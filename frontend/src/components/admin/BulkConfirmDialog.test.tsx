@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { BulkConfirmDialog } from './BulkConfirmDialog';
@@ -17,13 +17,17 @@ describe('BulkConfirmDialog', () => {
       <BulkConfirmDialog open onClose={() => {}} entityLabel="reservas" ids={Array.from({ length: 16 }, (_, i) => i + 1)}
         action={{ name: 'confirm', label: 'Confirmar', planVerb: 'Se confirmarán' }} execute={execute} />,
     );
-    expect(await screen.findByText(/Se confirmarán/)).toHaveTextContent('Se confirmarán 14 reservas; 2 se omitirán.');
+    // Wait for the FINAL state, not the first DOM mutation: the plan commit
+    // resolves `findBy*` through the MutationObserver, but the focus move runs
+    // in a passive effect React may flush a task later (always true under a
+    // loaded full-suite run). Asserting focus synchronously raced that effect.
+    const confirm = await screen.findByRole('button', { name: 'Confirmar (14)' });
+    await waitFor(() => expect(confirm).toHaveFocus());
+    expect(screen.getByText(/Se confirmarán/)).toHaveTextContent('Se confirmarán 14 reservas; 2 se omitirán.');
     expect(screen.getByRole('list', { name: 'Motivos de omisión' })).toHaveTextContent('2 porque ya está cancelada');
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute.mock.calls[0][0]).toMatchObject({ action: 'confirm', dry_run: true, all_matching: false });
     expect(execute.mock.calls[0][0].ids).toHaveLength(16);
-    // The confirm button takes focus once the plan is ready.
-    expect(screen.getByRole('button', { name: 'Confirmar (14)' })).toHaveFocus();
   });
 
   it('requires a note for reverse transitions and sends notify in the payload', async () => {
@@ -35,14 +39,15 @@ describe('BulkConfirmDialog', () => {
     );
     const confirm = await screen.findByRole('button', { name: 'Reabrir (16)' });
     expect(confirm).toBeDisabled();
-    expect(screen.getByLabelText('Motivo (obligatorio)')).toHaveFocus();
+    // Same passive-effect focus move as above: wait for it instead of racing it.
+    await waitFor(() => expect(screen.getByLabelText('Motivo (obligatorio)')).toHaveFocus());
     await userEvent.type(screen.getByLabelText('Motivo (obligatorio)'), 'Error de captura');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Notificar a las familias' }));
     expect(confirm).toBeEnabled();
     await userEvent.click(confirm);
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(execute.mock.calls[1][0]).toMatchObject({ dry_run: false, ids: [1, 2], payload: { note: 'Error de captura', notify: false } });
-    expect(screen.getByRole('status')).toHaveTextContent('14 reservas procesadas.');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('14 reservas procesadas.'));
   });
 
   it('lists per-row failures and retries only the failed ids', async () => {
@@ -78,7 +83,21 @@ describe('BulkConfirmDialog', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Acote los filtros: el límite es 2000 filas.');
     await userEvent.click(screen.getByRole('button', { name: /Reintentar/ }));
     expect(await screen.findByRole('button', { name: 'Confirmar (5)' })).toBeInTheDocument();
+    expect(execute).toHaveBeenCalledTimes(2);
     expect(execute.mock.calls[0][0]).toMatchObject({ all_matching: true, filters: { status: 'pending' }, ids: [] });
+  });
+
+  it('keeps the opening count in the title when the selection is cleared on done', async () => {
+    const execute = vi.fn(async (body: BulkRequest) => ({ ...plan, requested: 2, ok: 2, skipped: [], dry_run: !!body.dry_run }));
+    const action = { name: 'group', label: 'Cambiar grupo' };
+    // Plain `render` so `rerender` updates the same tree (the dialog needs no providers).
+    const { rerender } = render(
+      <BulkConfirmDialog open onClose={() => {}} entityLabel="alumnos" gender="m" ids={[1, 2]} action={action} execute={execute} />,
+    );
+    expect(await screen.findByRole('dialog', { name: 'Cambiar grupo: 2 alumnos' })).toBeInTheDocument();
+    // What a page's `onDone` does: clear the selection while the summary is still open.
+    rerender(<BulkConfirmDialog open onClose={() => {}} entityLabel="alumnos" gender="m" ids={[]} action={action} execute={execute} />);
+    expect(screen.getByRole('dialog', { name: 'Cambiar grupo: 2 alumnos' })).toBeInTheDocument();
   });
 
   it('renders entity-specific plan lines (renderPlan) under the dry-run plan', async () => {

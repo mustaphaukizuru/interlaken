@@ -50,7 +50,6 @@ urlpatterns = [
     path('admin/customers/<str:loyverse_id>/receipts/',
          views.AdminLoyverseCustomerReceiptsView.as_view(), name='admin-customer-receipts'),
     path('admin/export/student/<int:pk>/', views.AdminExportStudentView.as_view(), name='admin-export-student'),
-    path('admin/export/school/',         views.AdminExportSchoolView.as_view(),   name='admin-export-school'),
 
     # Data Ops Phase 6: list contract, exports, bulk and the ajuste masivo import
     # (apps/cafeteria/admin_data.py; docs/API-LISTING.md).

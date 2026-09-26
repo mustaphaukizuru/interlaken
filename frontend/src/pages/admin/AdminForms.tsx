@@ -23,7 +23,8 @@ import {
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { contentApi, type BulkActionDef, type FormDefinitionAdmin, type FormField, type FormFieldType, type FormSubmission } from '@/services/api';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
-import { apiErrors, slugify } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
+import { slugify } from '@/cms/editor/helpers';
 import { formatDateTime } from '@/lib/format';
 
 const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
@@ -195,7 +196,7 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
   const save = useMutation({
     mutationFn: () => (form.id ? contentApi.adminUpdateForm(form.id, form) : contentApi.adminCreateForm({ ...form, slug: form.slug || slugify(form.title ?? '') })),
     onSuccess: () => { toast.success('Formulario guardado.'); onSaved(); },
-    onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.fields || f.slug || f.detail || 'Revise los campos.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.fields || f.slug || f.detail || 'Revise los campos.'); },
   });
   const submit = (e: FormEvent) => { e.preventDefault(); setErrors({}); save.mutate(); };
   return (

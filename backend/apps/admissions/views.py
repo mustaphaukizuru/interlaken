@@ -22,7 +22,7 @@ from apps.bookings.services import SlotUnavailable, create_booking
 from apps.core.audit import record
 from apps.core.exceptions import error_body
 from apps.core.listing import AdminListMixin
-from apps.core.permissions import IsAdmin
+from apps.core.permissions import IsAdmin, is_admin_or_django_staff
 from apps.core.ratelimit import ratelimit
 from apps.portal.services import send_email
 
@@ -55,12 +55,11 @@ logger = logging.getLogger(__name__)
 
 
 def _is_staff(request):
-    """True for authenticated staff/admin users (JWT), who bypass the token gate."""
-    user = getattr(request, 'user', None)
-    return bool(
-        user and user.is_authenticated
-        and (user.is_staff or getattr(user, 'role', '') == 'admin')
-    )
+    """True for authenticated staff/admin users (JWT), who bypass the token gate.
+
+    The rule lives in ``apps.core.permissions.is_admin_or_django_staff``.
+    """
+    return is_admin_or_django_staff(getattr(request, 'user', None))
 
 
 def _session_token(request):
@@ -100,7 +99,7 @@ PREREGISTRATION_ORDERING = {
 class PreRegistrationListConfig(AdminListMixin):
     """The pre-registros list contract, shared by the list, its export sibling
     and the bulk ``all_matching`` resolver (Data Ops C1): ``q`` over child
-    names, parent name, email and phone (``search`` alias for one release),
+    names, parent name, email and phone (the ``search`` alias is gone since Phase 10),
     whitelisted ``ordering``, FilterSet ``status/level/cycle/wants_visit`` +
     ``from/to`` on ``created_at``, ``page_size`` ≤ 100."""
     queryset = PreRegistration.objects.all()
@@ -112,7 +111,6 @@ class PreRegistrationListConfig(AdminListMixin):
         'parent_email',
         'parent_phone',
     )
-    legacy_search_param = 'search'
     ordering = PREREGISTRATION_ORDERING
     default_ordering = '-created_at'
     filterset_class = PreRegistrationFilter

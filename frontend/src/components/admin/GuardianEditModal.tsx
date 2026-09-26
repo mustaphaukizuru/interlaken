@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { portalApi, type GuardianWrite } from '@/services/api';
-import { fieldErrorsFrom } from '@/components/admin/StudentFormModal';
+import { fieldErrorsOrNull } from '@/lib/apiErrors';
 
 export interface GuardianEditTarget {
   id: number;
@@ -59,7 +59,7 @@ function GuardianForm({ studentId, guardian, onClose }: { studentId: number; gua
       onClose();
     },
     onError: (err: unknown) => {
-      const next = fieldErrorsFrom(err) as typeof errors | null;
+      const next = fieldErrorsOrNull(err) as typeof errors | null;
       if (next) {
         setErrors(next);
         toast.error(next.error ?? next.detail ?? 'Revise los campos marcados.');

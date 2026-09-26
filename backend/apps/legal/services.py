@@ -111,8 +111,15 @@ def export_household_data(user) -> dict:
         ],
     }
 
+    # Two reads for the whole household, not two per child (Data Ops Phase 10).
+    # The ledger keeps its model ordering within each child.
+    balances = {b.student_id: b for b in CafeteriaBalance.objects.filter(student__in=children)}
+    ledgers = {child.pk: [] for child in children}
+    for t in CafeteriaTransaction.objects.filter(student__in=children):
+        ledgers[t.student_id].append(t)
+
     for child in children:
-        balance = CafeteriaBalance.objects.filter(student=child).first()
+        balance = balances.get(child.pk)
         data['children'].append({
             'student_id': child.student_id, 'grade': child.grade, 'group': child.group,
             'is_active': child.is_active,
@@ -120,7 +127,7 @@ def export_household_data(user) -> dict:
             'cafeteria_transactions': [
                 {'type': t.transaction_type, 'amount': str(t.amount),
                  'date': _iso(t.date), 'description': t.description}
-                for t in CafeteriaTransaction.objects.filter(student=child)
+                for t in ledgers[child.pk]
             ],
         })
 

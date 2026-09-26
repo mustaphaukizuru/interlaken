@@ -19,11 +19,6 @@ interface Props {
 
 export type FieldErrors = Partial<Record<keyof StudentWrite | 'detail', string>>;
 
-/** DRF `{field: [msg]}` / `{detail}` payload → per-field messages (first message wins).
- *  Delegates to the shared mapper (`lib/apiErrors`); kept as an alias until Phase 10 retires it. */
-export function fieldErrorsFrom(err: unknown): FieldErrors | null {
-  return fieldErrorsOrNull(err) as FieldErrors | null;
-}
 
 const GRADES = [
   'Maternal', '1° Preescolar', '2° Preescolar', '3° Preescolar',
@@ -98,7 +93,7 @@ function StudentForm({ student, onClose, onSaved, qc }: {
       onClose();
     },
     onError: (err: unknown) => {
-      const next = fieldErrorsFrom(err);
+      const next = fieldErrorsOrNull(err) as FieldErrors | null;
       if (next) {
         setErrors(next);
         toast.error(next.detail ?? 'Revise los campos marcados.');

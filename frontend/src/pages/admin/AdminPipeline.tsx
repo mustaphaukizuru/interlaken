@@ -13,9 +13,9 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { admissionsApi, type PipelineCard, type ConvertResult } from '@/services/api';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { credentialTemplate, mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
+import { STATUS_BADGE } from '@/lib/admissionsStatus';
 
-const TONE: Record<string, 'info' | 'warning' | 'success' | 'neutral' | 'error'> = { submitted: 'info', reviewing: 'warning', approved: 'success', complete: 'neutral', rejected: 'error' };
 
 /** Docs progress label for a card. */
 export function docsLabel(c: Pick<PipelineCard, 'docs_verified' | 'docs_required' | 'missing'>): string {
@@ -37,12 +37,12 @@ export default function AdminPipeline() {
   const requestDocs = useMutation({
     mutationFn: (id: number) => admissionsApi.requestDocs(id),
     onSuccess: ({ data: r }) => { toast.success(`Solicitud enviada a ${r.sent_to}.`); invalidate(); },
-    onError: (e) => toast.error(apiErrors(e).detail || 'No se pudo enviar.'),
+    onError: (e) => toast.error(apiFieldErrors(e).detail || 'No se pudo enviar.'),
   });
   const convert = useMutation({
     mutationFn: () => admissionsApi.convert(converting!.id, { student_id: studentId || undefined, group: group || undefined }),
     onSuccess: ({ data: r }) => { setResult(r); setErrors({}); invalidate(); toast.success(r.already ? 'Este expediente ya era alumno.' : 'Alumno y cuentas creados.'); },
-    onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.detail || f.student_id || 'No se pudo convertir.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.student_id || 'No se pudo convertir.'); },
   });
 
   return (
@@ -70,7 +70,7 @@ export default function AdminPipeline() {
                           <Link to={`/admin/admisiones?inscripcion=${c.id}`} className="block truncate font-semibold text-ink hover:text-purple">{c.child_name}</Link>
                           <p className="truncate text-xs text-subtle">{c.grade_applying} · {c.parent_name}</p>
                         </div>
-                        <Badge variant={TONE[c.status] ?? 'neutral'}>{col.label}</Badge>
+                        <Badge variant={STATUS_BADGE[c.status]?.variant ?? 'neutral'}>{col.label}</Badge>
                       </div>
                       <p className={`mt-2 inline-flex items-center gap-1 text-xs ${c.missing.length ? 'text-amber' : 'text-green-700'}`}>
                         {c.missing.length ? <FileWarning size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />} {docsLabel(c)}

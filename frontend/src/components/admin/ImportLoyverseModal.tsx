@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/ui/DataTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { portalApi, type RosterChange } from '@/services/api';
+import { apiErrorMessage } from '@/lib/apiErrors';
 
 interface ImportReport {
   total_customers: number;
@@ -98,7 +99,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
         setPhase('preview');
       } catch (e: any) {
         if (cancelled) return;
-        setError(e?.response?.data?.detail || e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
+        setError(apiErrorMessage(e, 'No se pudo consultar Loyverse. Intente de nuevo.'));
         setPhase('error');
       }
     })();
@@ -124,7 +125,7 @@ function ImportLoyverseBody({ onClose, onImported }: {
       onImported?.();
       onClose();
     } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.response?.data?.error || 'No se pudo completar la importación.');
+      setError(apiErrorMessage(e, 'No se pudo completar la importación.'));
       setPhase('error');
     }
   }

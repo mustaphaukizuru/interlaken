@@ -129,7 +129,7 @@ class TestPreRegistrationStatusUpdate:
 
 @pytest.mark.django_db
 class TestPreRegistrationAdminListSearch:
-    """GET /admissions/pre-register/?search= must filter across the roster,
+    """GET /admissions/pre-register/?q= must filter across the roster,
     not just the current page — powers the Admisiones console search box."""
 
     url = reverse('pre-register')
@@ -153,7 +153,7 @@ class TestPreRegistrationAdminListSearch:
         self._pre(parent_email='other@test.mx', child_first_name='Other',
                   parent_name='Otro Tutor', parent_phone='5552222222')
         api_client.force_authenticate(AdminFactory())
-        resp = api_client.get(self.url, {'search': 'match@test.mx'})
+        resp = api_client.get(self.url, {'q': 'match@test.mx'})
         assert resp.status_code == 200, resp.content
         rows = resp.json()['results']
         assert len(rows) == 1
@@ -164,7 +164,7 @@ class TestPreRegistrationAdminListSearch:
         self._pre(child_first_name='Pedro', child_last_name='Ruiz',
                   parent_email='pedro@test.mx', parent_phone='5553333333')
         api_client.force_authenticate(AdminFactory())
-        resp = api_client.get(self.url, {'search': 'Lucía'})
+        resp = api_client.get(self.url, {'q': 'Lucía'})
         assert resp.status_code == 200
         names = [r['child_name'] for r in resp.json()['results']]
         assert names == ['Lucía Gómez']

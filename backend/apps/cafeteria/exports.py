@@ -1,9 +1,9 @@
 """
 cafeteria/exports.py — CSV / PDF account statements (spec §5 F5 "Export").
 
-Two scopes:
-- **per-student statement** — a student's balance + full transaction ledger,
-- **whole-school roster** — every student's current balance & low-balance flag.
+Per-student statement: a student's balance + full transaction ledger. (The
+whole-school roster export moved to ``admin/balances/export/`` in Data Ops
+Phase 6; the old ``admin/export/school/`` endpoint was removed in Phase 10.)
 
 CSV is produced with the stdlib ``csv`` module; PDF reuses the dependency-free
 ``apps.core.pdf`` helper. Each builder returns a ready-to-send
@@ -55,6 +55,7 @@ def student_statement_csv(student) -> HttpResponse:
     writer.writerow([])
     writer.writerow(header)
     writer.writerows(rows)
+    response.export_row_count = len(rows)  # read by the view's record_export
     return as_download(response, export_filename(f'estado_cafeteria_{student.student_id}', 'csv'))
 
 
@@ -80,60 +81,5 @@ def student_statement_pdf(student) -> HttpResponse:
 
     pdf = simple_document_pdf('Estado de cuenta de cafetería', lines)
     response = HttpResponse(pdf, content_type='application/pdf')
+    response.export_row_count = len(rows)  # read by the view's record_export
     return as_download(response, export_filename(f'estado_cafeteria_{student.student_id}', 'pdf'))
-
-
-# ── whole-school roster ──────────────────────────────────────────────────────
-
-def _school_rows():
-    balances = (CafeteriaBalance.objects
-                .select_related('student__user')
-                .order_by('student__user__last_name', 'student__user__first_name'))
-    header = ['Alumno', 'Matrícula', 'Grado', 'Saldo', 'Saldo bajo', 'Últ. sinc.']
-    rows = []
-    for cb in balances:
-        s = cb.student
-        rows.append([
-            s.user.full_name,
-            s.student_id,
-            f'{s.grade} {s.group}'.strip(),
-            f'{Decimal(str(cb.balance)):.2f}',
-            'Sí' if cb.is_low_balance else 'No',
-            fmt_dt(cb.last_synced),
-        ])
-    return header, rows
-
-
-def school_statement_csv() -> HttpResponse:
-    header, rows = _school_rows()
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response.write('﻿')
-    writer = csv.writer(response)
-    writer.writerow(['Saldos de cafetería — toda la escuela'])
-    writer.writerow(['Generado', fmt_dt(timezone.now())])
-    writer.writerow([])
-    writer.writerow(header)
-    writer.writerows(rows)
-    return as_download(response, export_filename('saldos_cafeteria_escuela', 'csv'))
-
-
-def school_statement_pdf() -> HttpResponse:
-    header, rows = _school_rows()
-    widths = [26, 12, 14, 11, 10]
-
-    def _line(cells):
-        # Last column (last-synced) is free-width at the end.
-        fixed = ''.join(str(c)[:w - 1].ljust(w) for c, w in zip(cells, widths, strict=False))
-        return fixed + str(cells[-1]) if len(cells) > len(widths) else fixed
-
-    lines = [
-        f'Generado: {fmt_dt(timezone.now())}   Alumnos: {len(rows)}',
-        '',
-        _line(header),
-        '-' * 90,
-    ]
-    lines += [_line(r) for r in rows] or ['(Sin saldos registrados)']
-
-    pdf = simple_document_pdf('Saldos de cafetería — toda la escuela', lines)
-    response = HttpResponse(pdf, content_type='application/pdf')
-    return as_download(response, export_filename('saldos_cafeteria_escuela', 'pdf'))

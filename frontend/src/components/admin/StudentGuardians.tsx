@@ -15,6 +15,7 @@ import {
   type ResetPasswordTarget,
 } from '@/components/admin/ResetPasswordDialog';
 import { portalApi } from '@/services/api';
+import { apiErrorMessage } from '@/lib/apiErrors';
 
 interface Guardian {
   id: number;
@@ -114,10 +115,7 @@ export function StudentGuardians({ studentId }: Props) {
       setOpen(false);
       invalidate();
     },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg || 'No se pudo vincular el tutor.');
-    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo vincular el tutor.')),
   });
 
   const unlink = useMutation({

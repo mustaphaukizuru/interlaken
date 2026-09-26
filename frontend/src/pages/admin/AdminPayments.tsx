@@ -15,17 +15,12 @@ import { useRowSelection } from '@/hooks/useRowSelection';
 import { usePaymentsExport, usePaymentsList, usePaymentsSummary, type PaymentsListParams } from '@/hooks/queries/payments';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import type { Payment } from '@/types';
+import { PAYMENT_STATUS_META, PAYMENT_STATUS_OPTIONS } from '@/lib/status/payment';
 
-const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
-  success: { label: 'Completado', variant: 'success' },
-  pending: { label: 'Pendiente', variant: 'warning' },
-  processing: { label: 'Procesando', variant: 'info' },
-  failed: { label: 'Fallido', variant: 'error' },
-  refunded: { label: 'Reembolsado', variant: 'neutral' },
-};
+const STATUS = PAYMENT_STATUS_META;
 const GATEWAYS: Record<string, string> = { global_payments: 'Global Payments', banorte: 'Banorte', sandbox: 'Sandbox' };
 
-const STATUS_OPTIONS = Object.entries(STATUS).map(([value, m]) => ({ value, label: m.label }));
+const STATUS_OPTIONS = PAYMENT_STATUS_OPTIONS;
 // The API filters on real gateways only (sandbox rows carry one of them).
 const GATEWAY_OPTIONS = Object.entries(GATEWAYS).filter(([value]) => value !== 'sandbox').map(([value, label]) => ({ value, label }));
 

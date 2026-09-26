@@ -87,7 +87,7 @@ class TestTopUpInitiation:
             format="json",
         )
         assert resp.status_code == 400, resp.data
-        assert "Loyverse" in resp.data["error"]
+        assert "Loyverse" in resp.data["detail"]
         assert not TopUpRequest.objects.filter(student=student).exists()
         assert not Payment.objects.filter(user=parent, payment_type=Payment.Type.CAFETERIA).exists()
 

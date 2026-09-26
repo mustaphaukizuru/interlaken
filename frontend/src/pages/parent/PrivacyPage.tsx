@@ -13,6 +13,7 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { legalApi } from '@/services/api';
+import { ARCO_STATUS_META, ARCO_TYPE_LABEL } from '@/lib/status/arco';
 
 const PURPOSE_LABELS: Record<string, string> = {
   academic_processing: 'Tratamiento académico',
@@ -22,26 +23,6 @@ const PURPOSE_LABELS: Record<string, string> = {
   medical_data: 'Datos de salud',
 };
 
-const ARCO_TYPE_LABELS: Record<string, string> = {
-  access: 'Acceso',
-  rectification: 'Rectificación',
-  cancellation: 'Cancelación',
-  opposition: 'Oposición',
-};
-
-const ARCO_STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success' | 'error' | 'neutral'> = {
-  received: 'warning',
-  in_review: 'info',
-  resolved: 'success',
-  rejected: 'error',
-};
-
-const ARCO_STATUS_LABELS: Record<string, string> = {
-  received: 'Recibida',
-  in_review: 'En revisión',
-  resolved: 'Resuelta',
-  rejected: 'Rechazada',
-};
 
 type ConsentState = Record<string, boolean>;
 
@@ -218,7 +199,7 @@ export default function PrivacyPage() {
                 value={arcoType}
                 onChange={(e) => setArcoType(e.target.value)}
               >
-                {Object.entries(ARCO_TYPE_LABELS).map(([value, label]) => (
+                {Object.entries(ARCO_TYPE_LABEL).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
@@ -272,10 +253,10 @@ export default function PrivacyPage() {
                   <li key={row.id} className="rounded-xl border border-line px-3 py-2.5 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium text-ink">
-                        {ARCO_TYPE_LABELS[row.request_type] ?? row.request_type}
+                        {ARCO_TYPE_LABEL[row.request_type] ?? row.request_type}
                       </span>
-                      <Badge variant={ARCO_STATUS_VARIANT[row.status] ?? 'neutral'}>
-                        {ARCO_STATUS_LABELS[row.status] ?? row.status}
+                      <Badge variant={ARCO_STATUS_META[row.status]?.variant ?? 'neutral'}>
+                        {ARCO_STATUS_META[row.status]?.label ?? row.status}
                       </Badge>
                     </div>
                     <p className="mt-1 text-muted line-clamp-2">{row.details}</p>

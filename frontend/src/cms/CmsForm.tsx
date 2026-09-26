@@ -5,7 +5,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { contentApi, type FormDefinitionPublic, type FormField } from '@/services/api';
-import { apiErrors } from './editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 
 type Values = Record<string, string | boolean>;
 
@@ -25,7 +25,7 @@ export function CmsForm({ slug }: { slug: string }) {
   const submit = useMutation({
     mutationFn: () => contentApi.submitForm(slug, { ...values, consent, _page: pathname }),
     onSuccess: ({ data }) => setDone(data.message),
-    onError: (e) => setErrors(apiErrors(e)),
+    onError: (e) => setErrors(apiFieldErrors(e)),
   });
   if (isError || !def) return null;
   if (done) return <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center" role="status"><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" aria-hidden="true" /><p className="font-semibold text-ink">{done}</p></div>;

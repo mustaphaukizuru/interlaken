@@ -254,7 +254,7 @@ class TestGoogleTokenExchange:
         }
         resp = api_client.post(reverse("google-token"), {"credential": "fake"}, format="json")
         assert resp.status_code == 403
-        assert resp.data["error"] == "not_invited"
+        assert resp.data["code"] == "not_invited" and "error" not in resp.data
         assert not User.objects.filter(email="stranger@gmail.com").exists()
 
     @patch("apps.accounts.views.google_id_token.verify_oauth2_token")

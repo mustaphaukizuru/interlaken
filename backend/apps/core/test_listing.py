@@ -129,7 +129,6 @@ class ContactListView(AdminListMixin, generics.ListAPIView):
     serializer_class = ContactMessageAdminSerializer
     queryset = ContactMessage.objects.all()
     search_fields = ("name", "email")
-    legacy_search_param = "search"
     ordering = {"name": "name", "date": "created_at", "both": ("subject", "name")}
     default_ordering = "name"
     filterset_class = ContactFilter
@@ -177,11 +176,11 @@ class TestAdminListMixin:
         assert len(resp.data["results"]) == 2 and resp.data["count"] == 3
         assert resp.data["next"] is not None
 
-    def test_q_and_legacy_search_alias(self, rows):
+    def test_q_searches_and_the_legacy_search_alias_is_gone(self, rows):
         assert [r["name"] for r in _get({"q": "beto"}).data["results"]] == ["Beto"]
-        assert [r["name"] for r in _get({"search": "b@x.mx"}).data["results"]] == ["Beto"]
-        # q wins when both are sent.
-        assert [r["name"] for r in _get({"q": "ana", "search": "beto"}).data["results"]] == ["Ana"]
+        assert [r["name"] for r in _get({"q": "b@x.mx"}).data["results"]] == ["Beto"]
+        # The one-release ``search`` alias was removed in Phase 10: it is ignored.
+        assert len(_get({"search": "beto"}).data["results"]) == 3
 
     def test_whitelisted_ordering_with_compound_key_and_fallback(self, rows):
         assert [r["name"] for r in _get({"ordering": "-name"}).data["results"]] == [

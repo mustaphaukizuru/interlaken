@@ -34,7 +34,7 @@ def test_submit_without_privacy_acceptance_is_blocked(api_client):
     reg_id, token = _session(api_client)
     resp = _submit(api_client, reg_id, token)  # no accept_privacy
     assert resp.status_code == 400
-    assert "Aviso de Privacidad" in resp.data["error"]
+    assert "Aviso de Privacidad" in resp.data["detail"]
     assert Registration.objects.get(pk=reg_id).status == Registration.Status.DRAFT
 
 
@@ -52,7 +52,7 @@ def test_medical_fields_require_medical_consent(api_client):
     # Accepted privacy but no medical consent → blocked.
     blocked = _submit(api_client, reg_id, token, {"accept_privacy": True})
     assert blocked.status_code == 400
-    assert "datos de salud" in blocked.data["error"]
+    assert "datos de salud" in blocked.data["detail"]
 
     # Grant medical consent (PATCH) then submit succeeds.
     api_client.patch(reverse("register-detail", args=[reg_id]),
@@ -67,7 +67,7 @@ def test_estatura_peso_alone_require_medical_consent(api_client):
     reg_id, token = _session(api_client, {"estatura": "1.20 m", "peso": "25 kg"})
     blocked = _submit(api_client, reg_id, token, {"accept_privacy": True})
     assert blocked.status_code == 400
-    assert "datos de salud" in blocked.data["error"]
+    assert "datos de salud" in blocked.data["detail"]
 
     api_client.patch(
         reverse("register-detail", args=[reg_id]),

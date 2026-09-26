@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { portalApi, type SchoolYearPreview, type SchoolYearResult } from '@/services/api';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 
 type Step = 'preview' | 'confirm' | 'done';
 
@@ -31,7 +31,7 @@ export default function AdminSchoolYear() {
       ...(promoteGrades === null ? {} : { promote_grades: promoteGrades }),
     }),
     onSuccess: ({ data: res }) => { setResult(res); setStep('done'); qc.invalidateQueries({ queryKey: ['admin-students'] }); qc.invalidateQueries({ queryKey: ['school-year-preview'] }); toast.success('Nuevo ciclo aplicado.'); },
-    onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.confirm || f.new_cycle || f.reset_threshold || f.detail || 'No se pudo aplicar.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.confirm || f.new_cycle || f.reset_threshold || f.detail || 'No se pudo aplicar.'); },
   });
   const newCycle = cycle || data?.suggested_cycle || '';
 

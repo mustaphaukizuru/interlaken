@@ -1115,8 +1115,9 @@ class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     Linked, active students: local ledger vs live Loyverse points (one read
     per row of the page). ``total`` is the matching roster (drives the
     pager); ``count`` stays the rows returned after ``only=drift`` (which
-    filters within the page, as before). Legacy ``limit``/``offset`` still
-    work for one release.
+    filters within the page, as before). ``offset``/``limit``/``has_more``
+    describe the page; the legacy ``limit``/``offset`` query params were
+    removed in Data Ops Phase 10 (``page``/``page_size`` only).
     """
 
     filterset_class = StudentFilter
@@ -1132,29 +1133,15 @@ class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
             .select_related("user", "loyverse_profile", "cafeteria_balance")
         )
 
-    @staticmethod
-    def _int(value, default):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
-
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())
         params = request.query_params
-        next_url = previous_url = None
-        if "limit" in params or "offset" in params:
-            limit = max(1, min(self._int(params.get("limit"), 50), 200))
-            offset = max(0, self._int(params.get("offset"), 0))
-            total = qs.count()
-            students = list(qs[offset : offset + limit])
-        else:
-            students = list(self.paginate_queryset(qs) or [])
-            paginator = self.paginator
-            total = paginator.page.paginator.count
-            limit = paginator.get_page_size(request) or paginator.page_size
-            offset = (paginator.page.number - 1) * limit
-            next_url, previous_url = paginator.get_next_link(), paginator.get_previous_link()
+        students = list(self.paginate_queryset(qs) or [])
+        paginator = self.paginator
+        total = paginator.page.paginator.count
+        limit = paginator.get_page_size(request) or paginator.page_size
+        offset = (paginator.page.number - 1) * limit
+        next_url, previous_url = paginator.get_next_link(), paginator.get_previous_link()
         rows = [serialize_reconcile_row(live_reconcile_row(s)) for s in students]
         if params.get("only") == "drift":
             rows = [r for r in rows if not r["in_sync"]]

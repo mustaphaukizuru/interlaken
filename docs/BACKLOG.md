@@ -247,3 +247,22 @@ Business rules that override everything (AE): no colegiatura payments; no inscri
 1. People and money are edited only in the portal; Django admin shows them read-only.
 2. Auth, permissions, legal evidence and raw ledgers live only in the Django admin; the portal never edits them.
 3. Content is authored in the portal CMS; Django admin only mirrors it.
+
+---
+
+## Decision log: Data Operations round (Sept 2026, PRs #197 to Phase 10)
+
+Spec: `docs/DATA-OPS-PROMPT.md`. Endpoint reference: `docs/API-LISTING.md`. Operator guide: `docs/OPS-RUNBOOK.md` section 9.
+
+| Date | Decision | Why |
+|------|----------|-----|
+| 2026-09-24 | **XLSX reinstated** for imports, exports and error reports, rendered and parsed on the server with `openpyxl` (the only new backend dependency; pure Python). No spreadsheet parsing in the browser, no pandas / reportlab / django-import-export, no new frontend dependency. | Offices work in Excel; the production image has no compiler; bundle budgets. |
+| 2026-09-24 | **No background workers.** Every import, export and bulk action finishes in one request, bounded by caps and throttles instead of a job queue. | gunicorn 3 sync workers, 60 s timeout, no Celery/Redis by decision (GO-LIVE-AUDIT #16). |
+| 2026-09-24 | **Caps**: import 2,000 rows or 5 MB (cafetería ajuste masivo 500); export CSV/XLSX 10,000 rows, PDF 1,000; `?ids=` 500; bulk 500 ids, `all_matching` up to 2,000. Over cap = HTTP 413 `{"detail": "Acote los filtros: el límite es N filas."}`. Throttles `admin-export` 30/min, `admin-import` 10/min, `admin-bulk` 30/min, `portal-export` 30/min. | Keeps every call inside the worker timeout; measured in tests. |
+| 2026-09-24 | **Bulk contract**: `POST .../bulk/` with `{action, ids, all_matching, filters, payload, dry_run}`; the confirm dialog always shows the dry-run plan first; per-row savepoint, per-row `select_for_update`, per-row audit plus one `bulk:<entity>` summary; `.update()` / `bulk_update()` never used on audited models; the same transition table (`apps/core/transitions.py`) guards single-row and bulk paths. | Single and bulk moves cannot diverge; every state change is audited. |
+| 2026-09-24 | **Import contract**: template download, mandatory dry run identical to the commit, in-file and database dedupe, error report in the upload's format (`fila, resultado, errores, avisos`), "Importar solo las filas válidas", per-row audit. | One predictable flow on every page. |
+| 2026-09-24 | **Archive, not delete** for people: students `withdrawn`, staff deactivated. Hard delete only where the entity allows it (drafts never published, unreferenced media, forms without submissions, slots without bookings, comunicados never sent). | Records and ledgers stay traceable. |
+| 2026-09-26 | **`LEGACY_ERROR_KEY` flipped to False** (Phase 10): error bodies are `{detail}` only; machine codes (`not_invited`, `invalid_signature`, `loyverse_unreachable`, ...) travel in `code`. Every page reads errors through `frontend/src/lib/apiErrors.ts`; the `apiErrors` / `fieldErrorsFrom` shims are gone. | One error shape; the alias was scheduled for removal once the mapper was everywhere. |
+| 2026-09-26 | **One-release aliases removed** (Phase 10): the `search` query param (use `q`), the cafetería reconcile `limit`/`offset` (use `page`/`page_size`) and `GET /cafeteria/admin/export/school/` (use `balances/export/` with no filters, "Toda la escuela"). | Announced in Phases 1, 3, 4 and 6. |
+| 2026-09-26 | **Unique constraints shipped** (Phase 10, `accounts.0014`): `StudentProfile.loyverse_id` unique when not blank, `User.email` unique case-insensitively. | `check_data_integrity` reported zero findings in production. |
+| 2026-09-26 | **Accent-insensitive search is indexable** (Phase 10, `core.0006`): an IMMUTABLE `immutable_unaccent` wrapper plus trigram indexes on the audit search fields. | Postgres EXPLAIN showed the audit search seq-scanning 250k rows (docs/PERFORMANCE.md). |

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { portalApi, type MergePreview, type MergeResult } from '@/services/api';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 
 /** /admin/fusionar-cuentas — merge two parent accounts (BACKLOG P4-6). */
 export default function AdminGuardianMerge() {
@@ -22,12 +22,12 @@ export default function AdminGuardianMerge() {
   const load = useMutation({
     mutationFn: () => portalApi.guardianMergePreview(keep.trim(), drop.trim()),
     onSuccess: ({ data }) => { setPreview(data); setResult(null); setError(''); },
-    onError: (e) => { setPreview(null); setError(apiErrors(e).detail || 'No se pudo cargar la vista previa.'); },
+    onError: (e) => { setPreview(null); setError(apiFieldErrors(e).detail || 'No se pudo cargar la vista previa.'); },
   });
   const run = useMutation({
     mutationFn: () => portalApi.guardianMerge({ keep: preview!.keep.id, drop: preview!.drop.id, confirm }),
     onSuccess: ({ data }) => { setResult(data); setPreview(null); setConfirm(''); toast.success('Cuentas fusionadas.'); qc.invalidateQueries({ queryKey: ['admin-students'] }); },
-    onError: (e) => { const f = apiErrors(e); setError(f.detail || f.confirm || 'No se pudo fusionar.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setError(f.detail || f.confirm || 'No se pudo fusionar.'); },
   });
   const submit = (e: FormEvent) => { e.preventDefault(); load.mutate(); };
   const movedTotal = result ? Object.values(result.moved).reduce((a, b) => a + b, 0) : 0;

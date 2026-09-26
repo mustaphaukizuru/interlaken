@@ -10,11 +10,10 @@ import { Badge } from '@/components/ui/Badge';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { bookingsApi, type WeekBooking, type WeekSlot } from '@/services/api';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
+import { BOOKING_STATUS_META, type BookingStatus } from '@/lib/status/booking';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const STATUS_TONE: Record<string, 'info' | 'success' | 'warning' | 'error' | 'neutral'> = { pending: 'warning', confirmed: 'info', attended: 'success', no_show: 'error', cancelled: 'neutral' };
-const STATUS_LABEL: Record<string, string> = { pending: 'Pendiente', confirmed: 'Confirmada', attended: 'Asistió', no_show: 'No asistió', cancelled: 'Cancelada' };
 const OUTCOMES: [string, string][] = [['interested', 'Interesada, dar seguimiento'], ['enrolling', 'Se inscribirá'], ['not_now', 'No por ahora'], ['declined', 'No le interesó']];
 
 /** Monday of the week containing `d` (ISO date). */
@@ -44,7 +43,7 @@ export default function AdminVisitsWeek() {
   const reschedule = useMutation({
     mutationFn: () => bookingsApi.adminReschedule(moving!.id, targetSlot!),
     onSuccess: () => { toast.success('Visita reprogramada; se avisó a la familia.'); setMoving(null); invalidate(); },
-    onError: (e) => toast.error(apiErrors(e).slot || 'No se pudo reprogramar.'),
+    onError: (e) => toast.error(apiFieldErrors(e).slot || 'No se pudo reprogramar.'),
   });
   const setOutcomeM = useMutation({
     mutationFn: () => bookingsApi.adminOutcome(outcomeFor!.id, { outcome, note }),
@@ -90,7 +89,7 @@ export default function AdminVisitsWeek() {
                             <li key={b.id} className="rounded-lg bg-cream-2 p-1.5">
                               <div className="flex items-center justify-between gap-1">
                                 <span className="truncate font-medium text-ink">{b.parent_name}{b.child_name ? ` · ${b.child_name}` : ''}</span>
-                                <Badge variant={STATUS_TONE[b.status] ?? 'neutral'}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
+                                <Badge variant={BOOKING_STATUS_META[b.status as BookingStatus]?.variant ?? 'neutral'}>{BOOKING_STATUS_META[b.status as BookingStatus]?.label ?? b.status}</Badge>
                               </div>
                               {b.outcome && <p className="text-[11px] text-green-700">Resultado: {OUTCOMES.find(([k]) => k === b.outcome)?.[1] ?? b.outcome}</p>}
                               <div className="mt-1 flex flex-wrap gap-1">

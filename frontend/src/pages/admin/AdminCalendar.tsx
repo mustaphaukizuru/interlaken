@@ -23,7 +23,7 @@ import { invalidateEntity } from '@/hooks/queries/keys';
 import { calendarAdminApi, calendarIcsUrl } from '@/services/AdminContentApi';
 import { contentApi, type BulkActionDef, type SchoolEvent, type SchoolEventWrite } from '@/services/api';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
-import { fieldErrorsFrom } from '@/components/admin/StudentFormModal';
+import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import { EVENT_KINDS, LEVELS, PUBLISHED_OPTIONS, formatDateOnly, levelLabel, publishedMeta } from '@/lib/status/AdminContentStatus';
 
 const EMPTY: SchoolEventWrite = { title: '', kind: 'event', start_date: '', end_date: '', level: '', description: '', is_published: true };
@@ -215,7 +215,7 @@ function EventForm({ event, onClose, onSaved }: { event: SchoolEvent | null; onC
       return event ? contentApi.adminUpdateCalendar(event.id, payload) : contentApi.adminCreateCalendar(payload);
     },
     onSuccess: () => { toast.success('Guardado.'); onSaved(); onClose(); },
-    onError: (e: unknown) => { const f = fieldErrorsFrom(e); if (f) setErrors(f as typeof errors); else toast.error('No se pudo guardar.'); },
+    onError: (e: unknown) => { const f = fieldErrorsOrNull(e); if (f) setErrors(f as typeof errors); else toast.error('No se pudo guardar.'); },
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();

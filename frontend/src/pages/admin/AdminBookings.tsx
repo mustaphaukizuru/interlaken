@@ -91,8 +91,8 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
       toast.success(data.detail ?? 'Horarios generados.');
       onDone();
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.detail ?? 'No fue posible generar los horarios.');
+    onError: (err: unknown) => {
+      toast.error(apiErrorMessage(err, 'No fue posible generar los horarios.'));
     },
   });
 

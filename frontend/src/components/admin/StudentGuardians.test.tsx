@@ -126,7 +126,7 @@ describe('StudentGuardians', () => {
     );
 
     linkGuardian.mockRejectedValueOnce({
-      response: { data: { error: 'Ese correo ya pertenece a un alumno.' } },
+      response: { status: 400, data: { detail: 'Ese correo ya pertenece a un alumno.' } },
     });
     await userEvent.click(screen.getByRole('button', { name: /^Vincular$/i }));
     fireEvent.change(screen.getByLabelText(/Correo del tutor/i), {

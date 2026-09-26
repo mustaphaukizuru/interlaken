@@ -22,19 +22,25 @@ import { formatMXN } from '@/lib/format';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { paymentsApi, downloadBlob, type PaymentSummary } from '@/services/api';
 import type { Payment } from '@/types';
+import { PAYMENT_STATUS_META } from '@/lib/status/payment';
 
-const statusMeta: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral'; icon: typeof Clock; help?: string }> = {
-  // Keys MUST match the backend Payment.Status values.
-  success:    { label: 'Completado',  variant: 'success', icon: CheckCircle },
-  pending:    { label: 'Pendiente',   variant: 'warning', icon: Clock,
+// Label + variant come from the shared map (`lib/status/payment`); the portal
+// adds an icon and a help line per status.
+const STATUS_EXTRA: Record<string, { icon: typeof Clock; help?: string }> = {
+  success:    { icon: CheckCircle },
+  pending:    { icon: Clock,
                 help: 'Si pagó con tarjeta, el saldo se aplica en minutos. Si eligió pago en caja, el colegio lo aplicará al recibir el efectivo.' },
-  processing: { label: 'Procesando',  variant: 'info',    icon: Clock,
+  processing: { icon: Clock,
                 help: 'La pasarela está confirmando el cargo. No vuelva a pagar; consulte en unos minutos.' },
-  failed:     { label: 'Fallido',     variant: 'error',   icon: XCircle,
+  failed:     { icon: XCircle,
                 help: 'El banco rechazó el cargo. Puede intentar de nuevo desde Cafetería.' },
-  refunded:   { label: 'Reembolsado', variant: 'neutral', icon: RotateCcw,
+  refunded:   { icon: RotateCcw,
                 help: 'El colegio devolvió este pago; el saldo de cafetería se ajustó.' },
 };
+type PaymentStatusMeta = (typeof PAYMENT_STATUS_META)[string] & { icon: typeof Clock; help?: string };
+const statusMeta: Record<string, PaymentStatusMeta> = Object.fromEntries(
+  Object.entries(PAYMENT_STATUS_META).map(([k, m]) => [k, { ...m, ...STATUS_EXTRA[k] }]),
+);
 
 /** Portal sort keys; a subset of `PAYMENT_ORDERING` (apps/payments/views.py). */
 const PAYMENT_SORT_OPTIONS: SortOption[] = [

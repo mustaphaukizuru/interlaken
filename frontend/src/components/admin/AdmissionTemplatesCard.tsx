@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { admissionsApi } from '@/services/api';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 
 /** Ajustes → plantillas de admisiones (BACKLOG P4-1). */
 export function AdmissionTemplatesCard() {
@@ -15,7 +15,7 @@ export function AdmissionTemplatesCard() {
   const save = useMutation({
     mutationFn: (missing_docs: string) => admissionsApi.updateTemplates({ missing_docs }),
     onSuccess: () => { toast.success('Plantilla guardada.'); setDraft(null); setError(''); },
-    onError: (e) => setError(apiErrors(e).missing_docs || 'No se pudo guardar.'),
+    onError: (e) => setError(apiFieldErrors(e).missing_docs || 'No se pudo guardar.'),
   });
   return (
     <Card title="Plantillas de admisiones">

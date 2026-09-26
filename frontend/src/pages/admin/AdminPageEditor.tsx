@@ -16,7 +16,8 @@ import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { BlockRenderer } from '@/cms/CmsPage';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
-import { apiErrors, cmsBase, diffBlocks, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
+import { cmsBase, diffBlocks, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
 import { useAuthStore } from '@/store/authStore';
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertical, Send } from 'lucide-react';
 import type { PageIssue } from '@/services/api';
@@ -63,7 +64,7 @@ export default function AdminPageEditor() {
   const save = useMutation({
     mutationFn: () => contentApi.adminUpdatePage(pageId, { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }),
     onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); },
-    onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
   });
 
   // Autosave 1.5 s after the last change.
@@ -81,7 +82,7 @@ export default function AdminPageEditor() {
       setConfirmUnpublish(false);
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); qc.invalidateQueries({ queryKey: ['cms-page'] });
     },
-    onError: (e) => { const f = apiErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
+    onError: (e) => { const f = apiFieldErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
   });
 
   const review = useMutation({
@@ -91,7 +92,7 @@ export default function AdminPageEditor() {
       setRejecting(false); setRejectNote('');
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
     },
-    onError: (e) => toast.error(apiErrors(e).detail || 'No se pudo enviar.'),
+    onError: (e) => toast.error(apiFieldErrors(e).detail || 'No se pudo enviar.'),
   });
 
   const checks = useMutation({

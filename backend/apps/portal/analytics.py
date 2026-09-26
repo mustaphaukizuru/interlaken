@@ -16,28 +16,17 @@ from django.core.cache import cache
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
-from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
 from apps.core.listing import day_start
+from apps.core.permissions import IsStaffOrAdmin
 
 CACHE_KEY_PREFIX = 'staff-analytics-v4'  # v4: funnel + cafetería adoption (P4-10)
 CACHE_TTL_SECONDS = 60
 # Whitelisted trend windows for ?days= (default 30).
 ALLOWED_RANGE_DAYS = (7, 30, 90)
-
-
-class IsStaffOrAdmin(permissions.BasePermission):
-    """School personnel only: role staff/admin (Django is_staff also counts)."""
-
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(
-            user and user.is_authenticated
-            and (user.role in (User.Role.ADMIN, User.Role.STAFF) or user.is_staff)
-        )
 
 
 def _zero_filled(choices, counted):

@@ -29,6 +29,7 @@ import { PortalExportButtons } from '@/components/portal/PortalExportButtons';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
+import { fieldErrorsOrNull } from '@/lib/apiErrors';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TX_TYPES = ['purchase', 'topup', 'refund'] as const;
@@ -57,13 +58,9 @@ const txLabel = (type: string) => {
 type TypeFilter = '' | 'purchase' | 'topup' | 'refund';
 
 function topupErrorMessage(err: unknown): string {
-  const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data;
-  if (!data) return 'No fue posible procesar la recarga. Intente nuevamente.';
-  if (typeof data.error === 'string') return data.error;
-  const amount = data.amount;
-  if (Array.isArray(amount) && typeof amount[0] === 'string') return amount[0];
-  if (typeof amount === 'string') return amount;
-  return 'No fue posible procesar la recarga. Revise el monto e intente nuevamente.';
+  const fields = fieldErrorsOrNull(err);
+  if (!fields) return 'No fue posible procesar la recarga. Intente nuevamente.';
+  return fields.detail || fields.amount || 'No fue posible procesar la recarga. Revise el monto e intente nuevamente.';
 }
 
 export default function CafeteriaPage() {

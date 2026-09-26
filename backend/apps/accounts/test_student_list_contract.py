@@ -52,8 +52,10 @@ class TestSearch:
         assert _names(admin_client.get(URL, {"q": "09933"})) == ["Carla"]
         assert _names(admin_client.get(URL, {"q": "carla.mora@"})) == ["Carla"]
 
-    def test_legacy_search_alias_still_works(self, admin_client, roster):
-        assert _names(admin_client.get(URL, {"search": "Zuñiga"})) == ["Ana"]
+    def test_legacy_search_alias_is_ignored(self, admin_client, roster):
+        # Removed in Phase 10: ``search`` no longer filters, ``q`` does.
+        assert len(_names(admin_client.get(URL, {"search": "Zuñiga"}))) == len(roster)
+        assert _names(admin_client.get(URL, {"q": "Zuñiga"})) == ["Ana"]
 
     def test_loyverse_spelling_finds_the_stored_digits(self, admin_client, roster):
         # Decision C3.1 (Phase 0): ci09932 and 09932 are one matrícula; the

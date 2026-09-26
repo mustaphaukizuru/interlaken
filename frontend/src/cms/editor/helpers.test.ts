@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiErrors, moveBlock, newBlock, pageStatusLabel, slugify } from './helpers';
+import { moveBlock, newBlock, pageStatusLabel, slugify } from './helpers';
 
 describe('cms editor helpers', () => {
   it('newBlock shapes props from the registry', () => {
@@ -24,10 +24,6 @@ describe('cms editor helpers', () => {
     expect(pageStatusLabel({ status: 'draft', has_unpublished_changes: false }).label).toBe('Borrador');
     expect(pageStatusLabel({ status: 'published', has_unpublished_changes: true }).tone).toBe('warning');
     expect(pageStatusLabel({ status: 'published', has_unpublished_changes: false }).tone).toBe('success');
-  });
-  it('apiErrors flattens DRF payloads', () => {
-    expect(apiErrors({ response: { data: { blocks: ['Bloque #2: falta "title".'], slug: 'ya existe' } } })).toEqual({ blocks: 'Bloque #2: falta "title".', slug: 'ya existe' });
-    expect(apiErrors(new Error('x'))).toEqual({});
   });
 });
 

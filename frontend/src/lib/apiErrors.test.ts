@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiErrorMessage, apiErrorStatus, apiFieldErrors, fieldErrorsOrNull, isOverCap } from './apiErrors';
+import { apiErrorCode, apiErrorMessage, apiErrorStatus, apiFieldErrors, fieldErrorsOrNull, isOverCap } from './apiErrors';
 
 const failure = (status: number, data: unknown) => ({ response: { status, data } });
 
@@ -10,10 +10,12 @@ describe('apiErrors', () => {
     expect(apiErrorMessage(err)).toBe('No autorizado.');
   });
 
-  it('folds the legacy {error} shape into detail', () => {
-    const err = failure(400, { error: 'Archivo inválido.' });
-    expect(apiFieldErrors(err)).toEqual({ detail: 'Archivo inválido.' });
-    expect(apiErrorMessage(err)).toBe('Archivo inválido.');
+  it('keeps the machine code out of the field map', () => {
+    const err = failure(403, { detail: 'No hay una cuenta registrada con este correo.', code: 'not_invited' });
+    expect(apiErrorCode(err)).toBe('not_invited');
+    expect(apiFieldErrors(err)).toEqual({ detail: 'No hay una cuenta registrada con este correo.' });
+    expect(apiErrorMessage(failure(401, { code: 'invalid_signature' }))).toMatch(/No se pudo|permiso/);
+    expect(apiErrorCode(new Error('x'))).toBeUndefined();
   });
 
   it('maps field dicts (first message wins) and nested serializers', () => {

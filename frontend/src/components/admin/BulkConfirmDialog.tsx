@@ -47,7 +47,14 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * notify families expose the checkbox.
  */
 export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan }: Props) {
-  const title = action ? `${action.label}: ${allMatching ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${ids.length} ${entityLabel}`}` : '';
+  // The title keeps the count the dialog opened with: `onDone` usually clears
+  // the selection, which must not turn "Cambiar grupo: 2 alumnos" into "0 alumnos".
+  const [opened, setOpened] = useState<{ n: number; all: boolean } | null>(null);
+  if (open && opened === null) setOpened({ n: ids.length, all: allMatching });
+  if (!open && opened !== null) setOpened(null);
+  const count = opened?.n ?? ids.length;
+  const all = opened?.all ?? allMatching;
+  const title = action ? `${action.label}: ${all ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${count} ${entityLabel}`}` : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
       {action && (

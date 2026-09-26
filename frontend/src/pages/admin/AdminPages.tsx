@@ -22,7 +22,8 @@ import { PAGES_ENTITY, usePagesBulk, usePagesExport, usePagesList } from '@/hook
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { contentApi, type BulkActionDef, type CmsPageAdmin } from '@/services/api';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
-import { apiErrors, cmsBase, pageStatusLabel, slugify } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
+import { cmsBase, pageStatusLabel, slugify } from '@/cms/editor/helpers';
 import { formatDateTime } from '@/lib/format';
 import { useAuthStore } from '@/store/authStore';
 
@@ -190,7 +191,7 @@ function CreatePageModal({ open, onClose }: { open: boolean; onClose: () => void
   const create = useMutation({
     mutationFn: () => contentApi.adminCreatePage({ title, slug: slug || slugify(title), template, draft_blocks: [], seo: {} }),
     onSuccess: () => { toast.success('Página creada.'); void invalidateEntity(qc, PAGES_ENTITY); onClose(); setTitle(''); setSlug(''); },
-    onError: (e) => setErrors(apiErrors(e)),
+    onError: (e) => setErrors(apiFieldErrors(e)),
   });
   const submit = (e: FormEvent) => { e.preventDefault(); setErrors({}); create.mutate(); };
   return (

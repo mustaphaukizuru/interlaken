@@ -137,7 +137,7 @@ class _WebhookProcessMixin:
                            .select_for_update()
                            .get(pk=event.payment_id))
             except (Payment.DoesNotExist, TypeError, ValueError):
-                return status.HTTP_404_NOT_FOUND, error_body('payment_not_found'), None
+                return status.HTTP_404_NOT_FOUND, error_body('Pago no encontrado.', code='payment_not_found'), None
 
             # Refunded is fully closed. Gateway-DECLINED FAILED is closed too.
             # Soft-FAILED (expire/supersede/create_checkout) still accepts a late
@@ -201,7 +201,7 @@ class _WebhookProcessMixin:
             if event is not None:
                 break
         if event is None:
-            return Response(error_body('invalid_signature'),
+            return Response(error_body('Firma del webhook no válida.', code='invalid_signature'),
                             status=status.HTTP_401_UNAUTHORIZED)
 
         # Automated money movement: attribute audit records to the gateway job.
@@ -276,7 +276,7 @@ class SandboxCompleteView(_WebhookProcessMixin, APIView):
 
     def post(self, request):
         if not _sandbox_payments_enabled():
-            return Response(error_body('not_found'), status=status.HTTP_404_NOT_FOUND)
+            return Response(error_body('No encontrado.', code='not_found'), status=status.HTTP_404_NOT_FOUND)
 
         order_id = request.data.get('order_id')
         result = 'success' if request.data.get('result', 'success') == 'success' else 'failed'

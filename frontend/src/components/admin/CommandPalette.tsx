@@ -85,7 +85,7 @@ const asList = <T,>(data: unknown): T[] =>
  * Global admin search + actions (Ctrl/Cmd+K): an 'Acciones' group (quick navs
  * and flows opened via URL params on the target page) plus alumnos y reservas
  * from one box, grouped, keyboard-navigable. Search hits the existing
- * list endpoints (?search= / ?q=) — no new backend surface.
+ * list endpoints (?q=) — no new backend surface.
  */
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -182,7 +182,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
 
   const students = useQuery({
     queryKey: ['palette-students', q],
-    queryFn: async () => asList<StudentProfile>((await portalApi.getStudents({ search: q })).data),
+    queryFn: async () => asList<StudentProfile>((await portalApi.getStudents({ q })).data),
     enabled,
     staleTime: 30_000,
   });

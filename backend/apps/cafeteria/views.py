@@ -24,7 +24,7 @@ from apps.core.audit import record
 from apps.core.exceptions import error_body
 from apps.core.listing import apply_date_range, day_end_exclusive, day_start
 from apps.core.ordering import apply_ordering
-from apps.core.permissions import IsAdmin
+from apps.core.permissions import IsAdmin, IsParentOrAdmin
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
@@ -59,15 +59,6 @@ from .services import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class IsParentOrAdmin(permissions.BasePermission):
-    """Family portal actors: parent, student (school-email / Loyverse self-guardian), or admin."""
-
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated
-                    and user.role in (User.Role.PARENT, User.Role.STUDENT, User.Role.ADMIN))
 
 
 def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
@@ -500,7 +491,7 @@ class MyLoyverseHistoryView(APIView):
             raw = get_recent_transactions(student.loyverse_id, limit=limit)
         except Exception:  # noqa: BLE001 — fail-soft, never 500 the portal
             logger.warning('Loyverse read-only history fetch failed', exc_info=True)
-            return Response({'linked': True, 'receipts': [], 'error': 'loyverse_unreachable'})
+            return Response({'linked': True, 'receipts': [], 'code': 'loyverse_unreachable'})
 
         receipts = []
         for r in raw or []:
@@ -584,7 +575,7 @@ class LoyverseWebhookView(APIView):
     def post(self, request, token=None):
         secret = (getattr(settings, 'LOYVERSE_WEBHOOK_SECRET', '') or '').strip()
         if not secret or not self._authorized(request, secret, token):
-            return Response(error_body('unauthorized'), status=401)
+            return Response(error_body('No autorizado.', code='unauthorized'), status=401)
 
         payload = request.data if isinstance(request.data, dict) else {}
         event = payload.get('type') or ('customers.update' if 'customers' in payload else 'receipts.update')
@@ -617,7 +608,7 @@ class LoyverseWebhookView(APIView):
                 result = mirror_pos_topups(customers=fresh_customers, fresh=all_fresh)
             except Exception:  # noqa: BLE001
                 logger.exception('Loyverse customers.update processing failed')
-                return Response(error_body('processing_error'), status=500)
+                return Response(error_body('No se pudo procesar el evento.', code='processing_error'), status=500)
             # Keep the customer snapshots (staff cards included) current in
             # real time too. Partial list: never marks anyone missing.
             try:
@@ -642,7 +633,7 @@ class LoyverseWebhookView(APIView):
             result = record_receipts(receipts)
         except Exception:  # noqa: BLE001 — never leak internals to the caller
             logger.exception('Loyverse webhook processing failed')
-            return Response(error_body('processing_error'), status=500)
+            return Response(error_body('No se pudo procesar el evento.', code='processing_error'), status=500)
         logger.info('Loyverse webhook %s: %d receipt(s), %d new, %d unmatched, %d skipped',
                     event, len(receipts), result['created'], result['unmatched'], result['skipped'])
         return Response({'ok': True, **result})
@@ -686,12 +677,10 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         # office apply and POS load both require loyverse_id downstream.
         if not (student.loyverse_id or '').strip():
             return Response(
-                {
-                    'error': (
-                        'Este alumno aún no está vinculado a cafetería/Loyverse. '
-                        'Contacte al colegio para activar el servicio.'
-                    ),
-                },
+                error_body(
+                    'Este alumno aún no está vinculado a cafetería/Loyverse. '
+                    'Contacte al colegio para activar el servicio.'
+                ),
                 status=400,
             )
 
@@ -1292,31 +1281,28 @@ class ParentExportView(MyTransactionsView):
 
 
 class AdminExportStudentView(APIView):
-    """GET /api/v1/cafeteria/admin/export/student/<pk>/?fmt=csv|pdf"""
+    """GET /api/v1/cafeteria/admin/export/student/<pk>/?fmt=csv|pdf
+
+    Audited like every export (``record_export``, entity
+    ``cafeteria.student_statement``; Data Ops Phase 10).
+    """
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
+        from apps.core.audit import record_export
+
         from . import exports
 
         student = get_object_or_404(
             StudentProfile.objects.select_related('user'), pk=pk)
-        fmt = (request.query_params.get('fmt') or 'csv').lower()
+        fmt = 'pdf' if (request.query_params.get('fmt') or 'csv').lower() == 'pdf' else 'csv'
         if fmt == 'pdf':
-            return exports.student_statement_pdf(student)
-        return exports.student_statement_csv(student)
-
-
-class AdminExportSchoolView(APIView):
-    """GET /api/v1/cafeteria/admin/export/school/?fmt=csv|pdf"""
-    permission_classes = [IsAdmin]
-
-    def get(self, request):
-        from . import exports
-
-        fmt = (request.query_params.get('fmt') or 'csv').lower()
-        if fmt == 'pdf':
-            return exports.school_statement_pdf()
-        return exports.school_statement_csv()
+            response = exports.student_statement_pdf(student)
+        else:
+            response = exports.student_statement_csv(student)
+        record_export('cafeteria.student_statement', fmt, {'student': student.pk},
+                      getattr(response, 'export_row_count', 0), request.user)
+        return response
 
 
 class MyStatementPdfView(APIView):
