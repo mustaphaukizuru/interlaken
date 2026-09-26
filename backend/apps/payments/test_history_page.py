@@ -53,7 +53,7 @@ def test_history_filters(api_client, family):
 def test_csv_export(api_client, family):
     resp = api_client.get(reverse('payment-history-export'), {'status': 'success'})
     assert resp.status_code == 200 and resp['Content-Disposition'].startswith('attachment; filename="pagos_')
-    body = resp.content.decode('utf-8-sig')
+    body = b''.join(resp.streaming_content).decode('utf-8-sig')
     assert body.count('\n') == 3 and '999.00' not in body  # header + 2 family rows, other family excluded
 
 

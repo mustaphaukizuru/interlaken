@@ -367,27 +367,26 @@ class PaymentSummaryView(APIView):
         })
 
 
-class PaymentHistoryExportView(APIView):
-    """GET /api/v1/payments/history/export/ — CSV of the filtered family history (P1-D5)."""
-    permission_classes = [permissions.IsAuthenticated]
+class PaymentHistoryExportView(PaymentHistoryView):
+    """GET /api/v1/payments/history/export/?fmt=csv|xlsx&status=&student=&from=&to=&ordering=
 
-    def get(self, request):
-        import csv
+    The filtered family history (P1-D5) as a file. Subclasses the list so the
+    family scoping, filters and ordering are shared (Data Ops Phase 9); capped
+    at 10,000 rows (413 above; it used to truncate silently at 5,000),
+    throttled under ``portal-export`` and audited with ``record_export``.
+    """
+    pagination_class = None
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'portal-export'
 
-        from django.http import HttpResponse
+    def list(self, request, *args, **kwargs):
+        from apps.core.exporting import export_response
 
-        from apps.core.exports import as_download, export_filename, fmt_dt
+        from .portal_exports import FAMILY_EXPORT_FORMATS, FAMILY_PAYMENTS_EXPORT_SPEC
 
-        resp = HttpResponse(content_type='text/csv; charset=utf-8')
-        resp.write('\ufeff')
-        w = csv.writer(resp)
-        w.writerow(['Fecha', 'Alumno', 'Concepto', 'Monto', 'Moneda', 'Estado', 'Pasarela', 'Referencia'])
-        for p in _filtered_history(request)[:5000]:
-            topup = p.related_topup
-            w.writerow([fmt_dt(p.created_at), topup.student.user.full_name if topup else '',
-                        p.description or p.get_payment_type_display(), p.amount, p.currency,
-                        p.get_status_display(), p.get_gateway_display(), p.gateway_tx_id or p.gateway_ref])
-        return as_download(resp, export_filename('pagos'))
+        return export_response(request, self.filter_queryset(self.get_queryset()),
+                               FAMILY_PAYMENTS_EXPORT_SPEC, formats=FAMILY_EXPORT_FORMATS,
+                               context='portal')
 
 
 class AdminPaymentsView(generics.ListAPIView):

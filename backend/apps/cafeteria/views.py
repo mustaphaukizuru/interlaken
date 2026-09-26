@@ -1481,22 +1481,29 @@ class AdminLoyverseCustomerReceiptsView(APIView):
         })
 
 
-class ParentExportView(APIView):
-    """GET /api/v1/cafeteria/export/
+class ParentExportView(MyTransactionsView):
+    """GET /api/v1/cafeteria/export/?fmt=csv|xlsx&student=&type=&from=&to=&ordering=
 
-    CSV of cafeteria transactions for children linked to the authenticated user
-    (``user.children``). Parents, student-role family logins (self-guardian),
-    and admins may call it.
+    The family history (``MyTransactionsView``) as a file (Data Ops Phase 9):
+    subclassing the list keeps the scoping (a parent's own children, a
+    student's own profile) and the filters and ordering in one place, so the
+    download is exactly the list the family is looking at. Capped at 10,000
+    rows (413 above), throttled under ``portal-export`` and audited with
+    ``record_export``. Staff are refused (``IsParentOrAdmin``).
     """
     permission_classes = [IsParentOrAdmin]
+    pagination_class = None
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'portal-export'
 
-    def get(self, request):
-        from . import exports
+    def list(self, request, *args, **kwargs):
+        from apps.core.exporting import export_response
 
-        user = request.user
-        if user.role not in (User.Role.PARENT, User.Role.STUDENT, User.Role.ADMIN):
-            return Response(error_body('No autorizado.'), status=403)
-        return exports.parent_family_statement_csv(user)
+        from .portal_exports import FAMILY_EXPORT_FORMATS, FAMILY_TRANSACTIONS_EXPORT_SPEC
+
+        qs = self.filter_queryset(self.get_queryset()).select_related('student__user')
+        return export_response(request, qs, FAMILY_TRANSACTIONS_EXPORT_SPEC,
+                               formats=FAMILY_EXPORT_FORMATS, context='portal')
 
 
 class AdminExportStudentView(APIView):
