@@ -1,14 +1,29 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CornerDownRight, Plus, RotateCcw, Trash2, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { contentApi, type SiteRedirect } from '@/services/api';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { BulkActionBar } from '@/components/admin/BulkActionBar';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { ImportDialog } from '@/components/admin/ImportDialog';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useRowSelection } from '@/hooks/useRowSelection';
+import { REDIRECTS_ENTITY, useRedirectsBulk, useRedirectsExport, useRedirectsList } from '@/hooks/queries/AdminContentQueries';
+import { invalidateEntity } from '@/hooks/queries/keys';
+import { redirectsAdminApi } from '@/services/AdminContentApi';
+import { contentApi, type BulkActionDef, type SiteRedirect } from '@/services/api';
+import { idsParam, type ExportFormat } from '@/services/dataOps';
+import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
 import { apiErrors } from '@/cms/editor/helpers';
 
@@ -35,7 +50,7 @@ export default function AdminNavigation() {
   return (
     <>
       <PageHeader title="Navegación" subtitle="El menú del encabezado, el pie de página y el menú móvil se editan aquí una sola vez. Las redirecciones evitan enlaces rotos al renombrar páginas." />
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div className="space-y-6">
         <MenuEditor />
         <RedirectsPanel />
       </div>
@@ -111,15 +126,42 @@ function MenuEditor() {
   );
 }
 
+const REDIRECT_BULK: BulkActionDef[] = [
+  { name: 'delete', label: 'Eliminar', planVerb: 'Se eliminarán', danger: true, icon: Trash2 },
+];
+const PERMANENT_OPTIONS = [
+  { value: '1', label: '301 permanentes' },
+  { value: '0', label: '302 temporales' },
+];
+const REDIRECT_IMPORT_HEADERS = [{ key: 'de', required: true }, { key: 'a', required: true }, { key: 'permanente' }];
+
+/** Redirects on the Data Ops list contract (Phase 8): search, filter, sort, paging,
+ *  bulk delete, export and CSV/Excel import (`de, a, permanente`; dedupe by `de`). */
 function RedirectsPanel() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['admin-redirects'], queryFn: async () => (await contentApi.adminListRedirects()).data });
+  const [page, setPage] = useUrlPage();
+  const { get, set } = useUrlFilters();
+  const sort = parseSort(get('orden'));
+  const filters = {
+    q: get('q') || undefined,
+    permanent: get('tipo') || undefined,
+    ordering: serializeSort(sort) || undefined,
+  };
+  const { data, isLoading, isError, refetch } = useRedirectsList({ page, ...filters });
+  const exportRedirects = useRedirectsExport();
+  const bulk = useRedirectsBulk();
+  const rows = data?.results;
+  const count = data?.count ?? 0;
+  const selection = useRowSelection(count, JSON.stringify(filters));
+
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [permanent, setPermanent] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toDelete, setToDelete] = useState<SiteRedirect | null>(null);
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admin-redirects'] }); qc.invalidateQueries({ queryKey: ['cms-redirects'] }); };
+  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
+  const [importing, setImporting] = useState(false);
+  const invalidate = () => { void invalidateEntity(qc, REDIRECTS_ENTITY); void qc.invalidateQueries({ queryKey: ['cms-redirects'] }); };
   const create = useMutation({
     mutationFn: () => contentApi.adminCreateRedirect({ from_path: from, to_path: to, permanent }),
     onSuccess: () => { toast.success('Redirección creada.'); setFrom(''); setTo(''); setErrors({}); invalidate(); },
@@ -128,26 +170,100 @@ function RedirectsPanel() {
   const remove = useMutation({
     mutationFn: (id: number) => contentApi.adminDeleteRedirect(id),
     onSuccess: () => { setToDelete(null); invalidate(); },
+    onError: () => toast.error('No se pudo eliminar.'),
   });
   const submit = (e: FormEvent) => { e.preventDefault(); create.mutate(); };
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exportRedirects.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
+
+  const columns: Column<SiteRedirect>[] = [
+    { id: 'from', header: 'Ruta antigua', sortKey: 'from', hideable: false, minWidth: 160, className: 'font-mono text-xs text-ink break-all', cell: (r) => r.from_path },
+    { id: 'to', header: 'Enviar a', sortKey: 'to', minWidth: 180, className: 'font-mono text-xs text-muted break-all', cell: (r) => r.to_path },
+    { id: 'permanent', header: 'Tipo', sortKey: 'permanent', minWidth: 80, cell: (r) => <Badge variant={r.permanent ? 'info' : 'neutral'}>{r.permanent ? '301' : '302'}</Badge> },
+    { id: 'hits', header: 'Visitas', sortKey: 'hits', align: 'right', minWidth: 80, className: 'tabular-nums text-muted', cell: (r) => r.hits.toLocaleString('es-MX') },
+    { id: 'created', header: 'Creada', sortKey: 'created', minWidth: 140, defaultHidden: true, className: 'whitespace-nowrap text-xs text-muted', cell: (r) => formatDateTime(r.created_at) },
+  ];
+
   return (
     <Card>
-      <h2 className="mb-3 font-head text-lg font-bold text-ink">Redirecciones</h2>
-      <form onSubmit={submit} className="space-y-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-head text-lg font-bold text-ink">Redirecciones</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setImporting(true)}><Upload size={14} aria-hidden="true" /> Importar</Button>
+          <ExportMenu filenamePrefix="redirecciones" selectedCount={selection.count} fetch={fetchExport} />
+        </div>
+      </div>
+      <form onSubmit={submit} className="mb-4 grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
         <Input label="Ruta antigua" value={from} onChange={(e) => setFrom(e.target.value)} placeholder="/inscripciones" error={errors.from_path} required />
         <Input label="Enviar a" value={to} onChange={(e) => setTo(e.target.value)} placeholder="/admisiones" error={errors.to_path} required />
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={permanent} onChange={(e) => setPermanent(e.target.checked)} /> Permanente (301)</label>
-        <Button type="submit" size="sm" loading={create.isPending}><Plus size={14} aria-hidden="true" /> Agregar</Button>
+        <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={permanent} onChange={(e) => setPermanent(e.target.checked)} /> Permanente (301)</label>
+        <Button type="submit" size="sm" loading={create.isPending} className="min-h-[44px]"><Plus size={14} aria-hidden="true" /> Agregar</Button>
       </form>
-      <ul className="mt-4 divide-y divide-line" aria-label="Redirecciones">
-        {isLoading ? <ListSkeleton /> : (data ?? []).length === 0 ? <li className="py-3 text-sm text-muted">Sin redirecciones.</li> : (data ?? []).map((r) => (
-          <li key={r.id} className="flex items-center justify-between gap-2 py-2 text-sm">
-            <div className="min-w-0"><p className="truncate font-mono text-xs text-ink">{r.from_path} → {r.to_path}</p><p className="text-xs text-subtle">{r.permanent ? '301' : '302'} · {r.hits} visitas</p></div>
-            <button type="button" aria-label={`Eliminar ${r.from_path}`} className="rounded p-1 text-subtle hover:text-coral-600" onClick={() => setToDelete(r)}><Trash2 size={14} /></button>
-          </li>
-        ))}
-      </ul>
+      <DataTable<SiteRedirect>
+        tableId="redirects"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        rowLabel={(r) => `redirección ${r.from_path}`}
+        caption="Redirecciones"
+        sort={sort}
+        onSort={(next: SortState) => set({ orden: serializeSort(next), page: null })}
+        page={page}
+        count={count}
+        onPage={setPage}
+        itemLabel="redirecciones"
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={() => refetch()}
+        columnControls
+        selection={selection}
+        rowActions={(r) => (
+          <Button size="sm" variant="ghost" onClick={() => setToDelete(r)} aria-label={`Eliminar ${r.from_path}`}><Trash2 size={14} aria-hidden="true" /></Button>
+        )}
+        toolbar={(
+          <FilterBar
+            search={{ placeholder: 'Ruta antigua o destino…', label: 'Buscar redirecciones' }}
+            tabs={{ paramKey: 'tipo', options: PERMANENT_OPTIONS, allLabel: 'Todas', label: 'Filtrar por tipo' }}
+          />
+        )}
+        bulkBar={(
+          <BulkActionBar
+            count={selection.count}
+            allMatching={selection.allMatching}
+            allMatchingCount={count}
+            onSelectAllMatching={selection.onSelectAllMatching}
+            onClear={selection.onClear}
+            actions={REDIRECT_BULK}
+            onAction={setBulkAction}
+            itemLabel="redirecciones"
+            exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="redirecciones" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+          />
+        )}
+        empty={{ icon: CornerDownRight, title: 'Sin redirecciones', description: 'Agregue una al renombrar o retirar una página, o impórtelas desde un archivo.' }}
+      />
       <ConfirmDialog open={!!toDelete} title="¿Eliminar redirección?" message={`${toDelete?.from_path} volverá a mostrar 404 si la página ya no existe.`} confirmLabel="Eliminar redirección" loading={remove.isPending} onConfirm={() => toDelete && remove.mutate(toDelete.id)} onClose={() => setToDelete(null)} />
+      <BulkConfirmDialog
+        open={!!bulkAction}
+        onClose={() => setBulkAction(null)}
+        action={bulkAction}
+        entityLabel="redirecciones"
+        ids={selection.ids}
+        allMatching={selection.allMatching}
+        filters={filters}
+        execute={(body) => bulk.mutateAsync(body)}
+        onDone={() => { selection.onClear(); void qc.invalidateQueries({ queryKey: ['cms-redirects'] }); }}
+      />
+      <ImportDialog
+        open={importing}
+        onClose={() => setImporting(false)}
+        title="Importar redirecciones"
+        entity={REDIRECTS_ENTITY}
+        api={redirectsAdminApi.import}
+        headers={REDIRECT_IMPORT_HEADERS}
+        templatePrefix="plantilla_redirecciones"
+        description={<>Una fila por ruta antigua. Si la ruta ya existe se actualiza su destino. «permanente»: sí (301) o no (302); vacío = sí.</>}
+        onImported={() => { void qc.invalidateQueries({ queryKey: ['cms-redirects'] }); }}
+      />
     </Card>
   );
 }

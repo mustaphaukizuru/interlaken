@@ -2,9 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+vi.mock('@/services/AdminContentApi', () => ({
+  announcementsAdminApi: { list: vi.fn(), export: vi.fn(), bulk: vi.fn(), deliveryExport: vi.fn() },
+}));
+
 vi.mock('@/services/api', () => ({
   portalApi: {
-    adminListAnnouncements: vi.fn(),
     adminCreateAnnouncement: vi.fn(),
     adminUpdateAnnouncement: vi.fn(),
     adminDeleteAnnouncement: vi.fn(),
@@ -13,15 +16,19 @@ vi.mock('@/services/api', () => ({
 }));
 
 vi.mock('react-hot-toast', () => ({
-  default: { error: vi.fn(), success: vi.fn() },
+  default: { error: vi.fn(), success: vi.fn(), loading: vi.fn(() => 't1'), dismiss: vi.fn() },
 }));
 
 import toast from 'react-hot-toast';
 import AdminAnnouncements from './AdminAnnouncements';
 import { portalApi } from '@/services/api';
+import { announcementsAdminApi } from '@/services/AdminContentApi';
+import { stubViewport } from '@/test/viewport';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
-const list = vi.mocked(portalApi.adminListAnnouncements);
+const list = vi.mocked(announcementsAdminApi.list);
+const bulk = vi.mocked(announcementsAdminApi.bulk);
+const exportList = vi.mocked(announcementsAdminApi.export);
 const create = vi.mocked(portalApi.adminCreateAnnouncement);
 const broadcast = vi.mocked(portalApi.adminEmergencyBroadcast);
 const toastSuccess = vi.mocked(toast.success);
@@ -42,7 +49,8 @@ const SAMPLE = {
 describe('AdminAnnouncements', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    list.mockResolvedValue({ data: { results: [SAMPLE] } } as never);
+    stubViewport(1280);
+    list.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [SAMPLE] } } as never);
     create.mockResolvedValue({ data: {} } as never);
     broadcast.mockResolvedValue({
       data: { notified: 12, dispatched: 4, whatsapp_sent: 0 },
@@ -53,9 +61,10 @@ describe('AdminAnnouncements', () => {
     renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
 
     expect(await screen.findByText('Junta de padres')).toBeInTheDocument();
-    expect(screen.getByText('Padres')).toBeInTheDocument();
-    expect(screen.getByText(/3 leídos/i)).toBeInTheDocument();
-    expect(screen.getByText('Inactivo')).toBeInTheDocument();
+    const row = screen.getByRole('row', { name: /Junta de padres/ });
+    expect(within(row).getByText('Padres')).toBeInTheDocument();
+    expect(within(row).getByText(/3 leídos/i)).toBeInTheDocument();
+    expect(within(row).getByText('Inactivo')).toBeInTheDocument();
   });
 
   it('disables publish until title/body exist, then creates the comunicado', async () => {
@@ -178,5 +187,39 @@ describe('AdminAnnouncements', () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('WhatsApp no configurado.');
     });
+  });
+
+  it('maps URL filters and sort onto the list request and marks the sorted header', async () => {
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados?q=junta&estado=0&audiencia=parents&orden=-reads&page=2' });
+    await screen.findByText('Junta de padres');
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({
+      page: 2, q: 'junta', active: '0', audience: 'parents', ordering: '-reads',
+    }));
+    expect(screen.getByRole('columnheader', { name: 'Leídos' })).toHaveAttribute('aria-sort', 'descending');
+  });
+
+  it('selects a row, shows the dry-run plan and commits the bulk deactivate', async () => {
+    const user = userEvent.setup();
+    bulk
+      .mockResolvedValueOnce({ data: { action: 'delete', requested: 1, ok: 0, failed: [], skipped: [{ id: 4, reason: 'ya se envió a las familias; desactívelo para archivarlo' }], dry_run: true } } as never);
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar comunicado Junta de padres' }));
+    const bar = screen.getByRole('region', { name: 'Acciones en lote' });
+    await user.click(within(bar).getByRole('button', { name: 'Más' }));
+    await user.click(screen.getByRole('menuitem', { name: /Eliminar no enviados/ }));
+    expect(await screen.findByText(/1 porque ya se envió a las familias/)).toBeInTheDocument();
+    expect(bulk).toHaveBeenCalledWith(expect.objectContaining({ action: 'delete', ids: [4], dry_run: true }));
+    expect(screen.getByRole('button', { name: /Eliminar no enviados \(0\)/ })).toBeDisabled();
+  });
+
+  it('exports the current view as Excel with the active filters', async () => {
+    const user = userEvent.setup();
+    exportList.mockResolvedValue({ data: new Blob(['x']) } as never);
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados?audiencia=staff' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /^Exportar$/ }));
+    await user.click(screen.getByRole('menuitem', { name: /Excel/ }));
+    await waitFor(() => expect(exportList).toHaveBeenCalledWith(expect.objectContaining({ audience: 'staff', fmt: 'xlsx' })));
   });
 });

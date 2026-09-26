@@ -7,8 +7,24 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { admissionsAdminApi } from '@/services/api';
-import { STATUS_BADGE, REGISTRATION_STATUS_OPTIONS } from '@/lib/admissionsStatus';
+import type { BulkActionDef } from '@/services/dataOps';
+import { apiErrorMessage } from '@/lib/apiErrors';
+import { REG_ENTITY, registrationDetailKey, useDocumentBulk } from '@/hooks/queries/admissions';
+import { invalidateEntity } from '@/hooks/queries/keys';
+import {
+  STATUS_BADGE, REGISTRATION_STATUS_OPTIONS, REGISTRATION_TRANSITIONS, isReverseTransition,
+} from '@/lib/admissionsStatus';
+
+/** Bulk review of the selected documents (Data Ops C5, `/admissions/admin/documents/bulk/`). */
+const DOC_ACTIONS: Record<'approve' | 'reject', BulkActionDef> = {
+  approve: { name: 'approve', label: 'Aprobar seleccionados', planVerb: 'Se aprobarán' },
+  reject: {
+    name: 'reject', label: 'Rechazar seleccionados', danger: true, requiresNote: true,
+    notifyOption: true, planVerb: 'Se rechazarán',
+  },
+};
 
 const DOC_LABELS: Record<string, string> = {
   birth_cert: 'Acta de Nacimiento', curp_doc: 'CURP', photo: 'Fotografía',
@@ -36,13 +52,23 @@ export function RegistrationReviewModal({ id, open, onClose }: {
 }) {
   const qc = useQueryClient();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-registration', id],
+    queryKey: registrationDetailKey(id),
     queryFn: async () => (await admissionsAdminApi.getRegistration(id!)).data as Reg,
     enabled: open && id != null,
   });
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<{ id: number; label: string; note: string } | null>(null);
+  const [pickedDocs, setPickedDocs] = useState<Set<number>>(() => new Set());
+  const [docAction, setDocAction] = useState<BulkActionDef | null>(null);
+  const docBulk = useDocumentBulk();
+  const togglePick = (docId: number) => setPickedDocs((prev) => {
+    const next = new Set(prev);
+    if (next.has(docId)) next.delete(docId);
+    else next.add(docId);
+    return next;
+  });
+  const refreshRegistration = () => invalidateEntity(qc, REG_ENTITY);
 
   // Prod serves no /media/, so we fetch the file with auth (JWT via the api
   // client) and save the returned blob rather than linking to a URL.
@@ -68,11 +94,8 @@ export function RegistrationReviewModal({ id, open, onClose }: {
   const reviewDoc = useMutation({
     mutationFn: ({ docId, status, note }: { docId: number; status: 'approved' | 'rejected' | 'pending'; note?: string }) =>
       admissionsAdminApi.reviewDocument(docId, status, note),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-registration', id] });
-      qc.invalidateQueries({ queryKey: ['admin-registrations'] });
-    },
-    onError: () => toast.error('No se pudo actualizar el documento.'),
+    onSuccess: () => { void refreshRegistration(); },
+    onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo actualizar el documento.')),
   });
   const sendDocsLink = useMutation({
     mutationFn: () => admissionsAdminApi.sendDocumentsLink(id!),
@@ -82,10 +105,7 @@ export function RegistrationReviewModal({ id, open, onClose }: {
   const verifyDoc = useMutation({
     mutationFn: ({ docId, next }: { docId: number; next: boolean }) =>
       admissionsAdminApi.verifyDocument(docId, next),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-registration', id] });
-      qc.invalidateQueries({ queryKey: ['admin-registrations'] });
-    },
+    onSuccess: () => { void refreshRegistration(); },
     onError: () => toast.error('No se pudo actualizar el documento.'),
   });
 
@@ -195,6 +215,19 @@ export function RegistrationReviewModal({ id, open, onClose }: {
                 {sendDocsLink.isPending ? 'Enviando…' : 'Solicitar documentos'}
               </button>
             </p>
+            {pickedDocs.size > 0 && (
+              <div role="region" aria-label="Acciones sobre documentos seleccionados"
+                className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm">
+                <span className="text-brand-700" aria-live="polite">
+                  <strong className="text-ink">{pickedDocs.size}</strong> {pickedDocs.size === 1 ? 'documento seleccionado' : 'documentos seleccionados'}
+                </span>
+                <div className="ml-auto flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={() => setDocAction(DOC_ACTIONS.approve)}>Aprobar seleccionados</Button>
+                  <Button type="button" size="sm" variant="danger" onClick={() => setDocAction(DOC_ACTIONS.reject)}>Rechazar seleccionados</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setPickedDocs(new Set())}>Limpiar</Button>
+                </div>
+              </div>
+            )}
             {data.documents.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center text-sm text-subtle">
                 Sin documentos adjuntos.
@@ -204,7 +237,14 @@ export function RegistrationReviewModal({ id, open, onClose }: {
                 {data.documents.map((d) => (
                   <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2.5">
                     <span className="flex min-w-0 items-center gap-2 text-sm text-ink">
-                      <FileText className="h-4 w-4 shrink-0 text-subtle" />
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 shrink-0 rounded border-line text-purple focus:ring-purple/40"
+                        checked={pickedDocs.has(d.id)}
+                        onChange={() => togglePick(d.id)}
+                        aria-label={`Seleccionar ${DOC_LABELS[d.doc_type] ?? d.doc_type}`}
+                      />
+                      <FileText className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
                       <span className="truncate">{DOC_LABELS[d.doc_type] ?? d.doc_type}</span>
                       <span className="truncate text-xs text-subtle">· {d.filename}</span>
                     </span>
@@ -247,6 +287,17 @@ export function RegistrationReviewModal({ id, open, onClose }: {
               </ul>
             )}
           </div>
+
+          <BulkConfirmDialog
+            open={!!docAction}
+            onClose={() => setDocAction(null)}
+            action={docAction}
+            entityLabel="documentos"
+            gender="m"
+            ids={Array.from(pickedDocs)}
+            execute={(body) => docBulk.mutateAsync(body)}
+            onDone={(r) => { if (!r.failed.length) setPickedDocs(new Set()); }}
+          />
 
           <Modal open={!!rejecting} onClose={() => setRejecting(null)} title={`Rechazar: ${rejecting?.label ?? ''}`} maxWidth={460}>
             <div className="space-y-3">
@@ -296,17 +347,33 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
   // remounts this block per registration id) — no sync effect needed.
   const [status, setStatus] = useState(registration.status);
   const [notes, setNotes] = useState(registration.admin_notes ?? '');
+  const [reason, setReason] = useState('');
+  const [notify, setNotify] = useState(true);
+  // Only the moves the transition table allows (the server enforces it too);
+  // `complete` is reached through "Convertir en alumno" in the pipeline.
+  const allowed = new Set([registration.status, ...(REGISTRATION_TRANSITIONS[registration.status] ?? [])]);
+  const options = REGISTRATION_STATUS_OPTIONS.filter((o) => allowed.has(o.value));
+  if (!options.some((o) => o.value === registration.status)) {
+    options.unshift({ value: registration.status, label: STATUS_BADGE[registration.status]?.label ?? registration.status });
+  }
+  const changed = status !== registration.status;
+  const needsReason = changed && isReverseTransition('registration', registration.status, status);
+  const emailsFamily = changed && (status === 'approved' || status === 'rejected');
 
   const save = useMutation({
     mutationFn: () =>
-      admissionsAdminApi.updateRegistrationStatus(registration.id, { status, admin_notes: notes }),
+      admissionsAdminApi.updateRegistrationStatus(registration.id, {
+        status,
+        admin_notes: notes,
+        ...(needsReason ? { note: reason.trim() } : {}),
+        ...(emailsFamily && !notify ? { notify: false } : {}),
+      }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-registrations'] });
-      qc.invalidateQueries({ queryKey: ['admin-registration', registration.id] });
+      void invalidateEntity(qc, REG_ENTITY);
       toast.success('Inscripción actualizada.');
       onClose();
     },
-    onError: () => toast.error('No se pudo guardar la revisión.'),
+    onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo guardar la revisión.')),
   });
 
   return (
@@ -314,21 +381,36 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
       <div>
         <label htmlFor="reg-status" className="label">Estado de la revisión</label>
         <select id="reg-status" className="input-field" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {REGISTRATION_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
+      {needsReason && (
+        <div>
+          <label htmlFor="reg-reason" className="label">Motivo del cambio (obligatorio)</label>
+          <textarea id="reg-reason" className="input-field min-h-[72px] resize-none" value={reason}
+            onChange={(e) => setReason(e.target.value)} placeholder="Se guardará en la bitácora de auditoría." />
+        </div>
+      )}
       <div>
         <label htmlFor="reg-notes" className="label">Notas internas</label>
         <textarea id="reg-notes" className="input-field min-h-[72px] resize-none" value={notes}
           onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones de admisiones (no visibles para la familia)…" />
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-subtle">
-        <ShieldCheck className="h-3.5 w-3.5" />
-        Aprobar o rechazar envía un correo automático al tutor.
-      </p>
+      {emailsFamily ? (
+        <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
+          <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
+            checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+          Notificar a la familia por correo
+        </label>
+      ) : (
+        <p className="flex items-center gap-1.5 text-xs text-subtle">
+          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+          Aprobar o rechazar envía un correo automático al tutor.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button onClick={() => save.mutate()} loading={save.isPending}>Guardar revisión</Button>
+        <Button onClick={() => save.mutate()} loading={save.isPending} disabled={needsReason && reason.trim().length < 3}>Guardar revisión</Button>
       </div>
     </div>
   );

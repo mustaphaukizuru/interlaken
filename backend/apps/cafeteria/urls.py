@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import admin_data, views
 
 urlpatterns = [
     path('balance/',                     views.MyBalanceView.as_view(),           name='cafeteria-balance'),
@@ -25,7 +25,7 @@ urlpatterns = [
     path('export/',                      views.ParentExportView.as_view(),        name='cafeteria-export'),
     # On-demand Loyverse poll (parents/staff) — does not wait for cron.
     path('refresh/',                     views.RefreshFromLoyverseView.as_view(), name='cafeteria-refresh'),
-    path('admin/balances/',              views.AdminBalancesView.as_view(),       name='admin-balances'),
+    path('admin/balances/',              admin_data.AdminBalancesView.as_view(),       name='admin-balances'),
     path('admin/topup/<int:pk>/apply/',  views.AdminApplyTopUpView.as_view(),     name='admin-apply-topup'),
     path('admin/topup/<int:pk>/pos-loaded/', views.AdminMarkTopUpPosLoadedView.as_view(),
          name='admin-topup-pos-loaded'),
@@ -40,15 +40,36 @@ urlpatterns = [
     path('admin/sync-roster/',           views.AdminSyncRosterView.as_view(),     name='admin-sync-roster'),
 
     # Phase D — admin console
-    path('admin/topups/',                views.AdminTopUpLogView.as_view(),       name='admin-topups'),
+    path('admin/topups/',                admin_data.AdminTopUpLogView.as_view(),       name='admin-topups'),
     path('admin/student/<int:pk>/',      views.AdminStudentDetailView.as_view(),  name='admin-student-detail'),
     path('admin/adjust/<int:student_pk>/', views.AdminAdjustBalanceView.as_view(), name='admin-adjust'),
     path('admin/refund/<int:tx_pk>/',    views.AdminRefundView.as_view(),         name='admin-refund'),
-    path('admin/reconcile/',             views.AdminReconcileView.as_view(),      name='admin-reconcile'),
-    path('admin/low-balance/',           views.AdminLowBalanceView.as_view(),     name='admin-low-balance'),
-    path('admin/customers/',             views.AdminLoyverseCustomersView.as_view(), name='admin-customers'),
+    path('admin/reconcile/',             admin_data.AdminReconcileView.as_view(),      name='admin-reconcile'),
+    path('admin/low-balance/',           admin_data.AdminLowBalanceView.as_view(),     name='admin-low-balance'),
+    path('admin/customers/',             admin_data.AdminLoyverseCustomersView.as_view(), name='admin-customers'),
     path('admin/customers/<str:loyverse_id>/receipts/',
          views.AdminLoyverseCustomerReceiptsView.as_view(), name='admin-customer-receipts'),
     path('admin/export/student/<int:pk>/', views.AdminExportStudentView.as_view(), name='admin-export-student'),
     path('admin/export/school/',         views.AdminExportSchoolView.as_view(),   name='admin-export-school'),
+
+    # Data Ops Phase 6: list contract, exports, bulk and the ajuste masivo import
+    # (apps/cafeteria/admin_data.py; docs/API-LISTING.md).
+    path('admin/balances/export/',       admin_data.AdminBalancesExportView.as_view(), name='admin-balances-export'),
+    path('admin/balances/bulk/',         admin_data.AdminBalancesBulkView.as_view(),   name='admin-balances-bulk'),
+    path('admin/balances/import/',       admin_data.AdminAdjustmentImportView.as_view(), name='admin-balances-import'),
+    path('admin/balances/import/template/', admin_data.AdminAdjustmentTemplateView.as_view(),
+         name='admin-balances-import-template'),
+    path('admin/transactions/',          admin_data.AdminTransactionListView.as_view(), name='admin-transactions'),
+    path('admin/transactions/export/',   admin_data.AdminTransactionExportView.as_view(),
+         name='admin-transactions-export'),
+    path('admin/adjustments/',           admin_data.AdminAdjustmentListView.as_view(), name='admin-adjustments'),
+    path('admin/topups/export/',         admin_data.AdminTopUpExportView.as_view(),    name='admin-topups-export'),
+    path('admin/topups/bulk/',           admin_data.AdminTopUpBulkView.as_view(),      name='admin-topups-bulk'),
+    path('admin/low-balance/export/',    admin_data.AdminLowBalanceExportView.as_view(),
+         name='admin-low-balance-export'),
+    path('admin/customers/export/',      admin_data.AdminLoyverseCustomersExportView.as_view(),
+         name='admin-customers-export'),
+    path('admin/reconcile/export/',      admin_data.AdminReconcileExportView.as_view(),
+         name='admin-reconcile-export'),
+    path('admin/reconcile/bulk/',        admin_data.AdminReconcileBulkView.as_view(),  name='admin-reconcile-bulk'),
 ]

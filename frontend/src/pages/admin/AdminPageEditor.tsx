@@ -62,7 +62,7 @@ export default function AdminPageEditor() {
 
   const save = useMutation({
     mutationFn: () => contentApi.adminUpdatePage(pageId, { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }),
-    onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] }); },
+    onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); },
     onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
   });
 
@@ -79,7 +79,7 @@ export default function AdminPageEditor() {
     onSuccess: (res, action) => {
       toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');
       setConfirmUnpublish(false);
-      qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] }); qc.invalidateQueries({ queryKey: ['cms-page'] });
+      qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); qc.invalidateQueries({ queryKey: ['cms-page'] });
     },
     onError: (e) => { const f = apiErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
   });
@@ -89,7 +89,7 @@ export default function AdminPageEditor() {
     onSuccess: (res, args) => {
       toast.success(args.action === 'request' ? 'Solicitud enviada a Dirección.' : 'Cambios solicitados al editor.');
       setRejecting(false); setRejectNote('');
-      qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin-pages'] });
+      qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
     },
     onError: (e) => toast.error(apiErrors(e).detail || 'No se pudo enviar.'),
   });

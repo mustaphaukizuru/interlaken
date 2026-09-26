@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Check, ClipboardList, Download, Inbox, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState, type FormEvent } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowDown, ArrowUp, Check, ClipboardList, Inbox, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -9,10 +9,20 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { ListSkeleton } from '@/components/ui/ListSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { contentApi, type FormDefinitionAdmin, type FormField, type FormFieldType, type FormSubmission, downloadBlob } from '@/services/api';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { BulkActionBar } from '@/components/admin/BulkActionBar';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useRowSelection } from '@/hooks/useRowSelection';
+import {
+  FORMS_ENTITY, SUBMISSIONS_ENTITY, useFormsBulk, useFormsExport, useFormsList, useSubmissionsBulk, useSubmissionsExport, useSubmissionsList,
+} from '@/hooks/queries/AdminContentQueries';
+import { invalidateEntity } from '@/hooks/queries/keys';
+import { contentApi, type BulkActionDef, type FormDefinitionAdmin, type FormField, type FormFieldType, type FormSubmission } from '@/services/api';
+import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { apiErrors, slugify } from '@/cms/editor/helpers';
 import { formatDateTime } from '@/lib/format';
 
@@ -27,49 +37,150 @@ const EMPTY: Partial<FormDefinitionAdmin> = {
   consent_text: 'He leído el Aviso de Privacidad y acepto el tratamiento de mis datos.', notify_to: '', success_message: 'Gracias. Le responderemos en menos de 2 días hábiles.', submit_label: 'Enviar', is_published: true,
 };
 
-/** /admin/formularios — forms builder + submissions inbox (BACKLOG P3-6). */
+const FORM_BULK: BulkActionDef[] = [
+  { name: 'delete', label: 'Eliminar sin envíos', planVerb: 'Se eliminarán', danger: true, icon: Trash2 },
+];
+const SUBMISSION_BULK: BulkActionDef[] = [
+  { name: 'mark_handled', label: 'Marcar atendidos', planVerb: 'Se marcarán como atendidos', icon: Check },
+  { name: 'reopen', label: 'Reabrir', planVerb: 'Se reabrirán', icon: RotateCcw },
+  { name: 'delete', label: 'Eliminar', planVerb: 'Se eliminarán', danger: true, icon: Trash2 },
+];
+const PUBLISHED_OPTIONS = [{ value: '1', label: 'Publicados' }, { value: '0', label: 'Borradores' }];
+// No param = pendientes (the inbox opens on what still needs an answer).
+const HANDLED_OPTIONS = [{ value: '1', label: 'Atendidos' }, { value: 'todos', label: 'Todos' }];
+
+/** /admin/formularios — forms builder + submissions inbox (BACKLOG P3-6) on the Data Ops
+ *  list contract (Phase 8). The inbox is a paginated, searchable DataTable in a modal whose
+ *  state (`envios=<form id>` plus `e*` filters) also lives in the URL. */
 export default function AdminForms() {
   const qc = useQueryClient();
+  const [page, setPage] = useUrlPage();
+  const { get, set } = useUrlFilters();
+  const sort = parseSort(get('orden'));
+  const filters = {
+    q: get('q') || undefined,
+    published: get('publicado') || undefined,
+    ordering: serializeSort(sort) || undefined,
+  };
+  const { data, isLoading, isError, refetch } = useFormsList({ page, ...filters });
+  const exportForms = useFormsExport();
+  const bulk = useFormsBulk();
+  const rows = data?.results;
+  const count = data?.count ?? 0;
+  const selection = useRowSelection(count, JSON.stringify(filters));
+
   const [editing, setEditing] = useState<Partial<FormDefinitionAdmin> | null>(null);
-  const [inbox, setInbox] = useState<FormDefinitionAdmin | null>(null);
   const [toDelete, setToDelete] = useState<FormDefinitionAdmin | null>(null);
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-forms'], queryFn: async () => (await contentApi.adminListForms()).data });
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admin-forms'] }); qc.invalidateQueries({ queryKey: ['badges'] }); };
+  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
+  const inboxId = Number.parseInt(get('envios'), 10);
+  const inbox = Number.isFinite(inboxId) ? (rows ?? []).find((f) => f.id === inboxId) ?? null : null;
+  const openInbox = (f: FormDefinitionAdmin) => set({ envios: String(f.id) });
+  const closeInbox = () => set({ envios: null, eq: null, eatendido: null, edesde: null, ehasta: null, eorden: null, epage: null });
+
+  const invalidate = () => { void invalidateEntity(qc, FORMS_ENTITY); void qc.invalidateQueries({ queryKey: ['badges'] }); };
   const remove = useMutation({
     mutationFn: (id: number) => contentApi.adminDeleteForm(id),
     onSuccess: () => { toast.success('Formulario eliminado.'); setToDelete(null); invalidate(); },
     onError: () => toast.error('No se pudo eliminar.'),
   });
-  const rows = data ?? [];
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exportForms.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
+
+  const columns: Column<FormDefinitionAdmin>[] = [
+    {
+      id: 'title', header: 'Formulario', sortKey: 'title', hideable: false, minWidth: 200,
+      cell: (f) => (
+        <div className="min-w-0">
+          <p className="font-semibold text-ink">{f.title}</p>
+          <p className="truncate text-xs text-subtle">bloque: <code>{f.slug}</code> · {f.fields.length} campos</p>
+        </div>
+      ),
+    },
+    { id: 'notify', header: 'Buzón', minWidth: 160, className: 'text-xs text-muted break-all', cell: (f) => f.notify_to || 'info@ (contacto general)' },
+    { id: 'submissions', header: 'Envíos', sortKey: 'submissions', align: 'right', minWidth: 80, className: 'tabular-nums', cell: (f) => f.submissions_count },
+    {
+      id: 'pending', header: 'Pendientes', sortKey: 'pending', align: 'right', minWidth: 100,
+      cell: (f) => (f.pending_count ? <Badge variant="warning">{f.pending_count}</Badge> : <span className="text-subtle">0</span>),
+    },
+    { id: 'published', header: 'Estado', sortKey: 'published', minWidth: 100, cell: (f) => (f.is_published ? <Badge variant="success">Publicado</Badge> : <Badge variant="neutral">Borrador</Badge>) },
+    { id: 'updated', header: 'Actualizado', sortKey: 'updated', minWidth: 150, defaultHidden: true, className: 'whitespace-nowrap text-xs text-muted', cell: (f) => formatDateTime(f.updated_at) },
+  ];
+
   return (
     <>
       <PageHeader title="Formularios" subtitle="Cree formularios para el sitio, elija el buzón que recibe cada envío y atienda las respuestas."
-        actions={<Button onClick={() => setEditing(EMPTY)}><Plus size={16} aria-hidden="true" /> Nuevo formulario</Button>} />
-      <Card>
-        {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading ? <ListSkeleton /> : rows.length === 0 ? (
-          <EmptyState icon={ClipboardList} title="Sin formularios" description="Cree el primero y colóquelo en una página con el bloque Formulario." />
-        ) : (
-          <ul className="divide-y divide-cream" aria-label="Formularios">
-            {rows.map((f) => (
-              <li key={f.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold text-ink">{f.title} {!f.is_published && <Badge variant="neutral">Borrador</Badge>}</p>
-                  <p className="truncate text-xs text-subtle">bloque: <code>{f.slug}</code> · {f.fields.length} campos · avisa a {f.notify_to || 'info@'}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant={f.pending_count ? 'primary' : 'secondary'} onClick={() => setInbox(f)}><Inbox size={14} aria-hidden="true" /> Envíos{f.pending_count ? ` (${f.pending_count})` : ''}</Button>
-                  <Button size="sm" variant="secondary" onClick={() => setEditing(f)} aria-label={`Editar ${f.title}`}><Pencil size={14} aria-hidden="true" /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => setToDelete(f)} aria-label={`Eliminar ${f.title}`}><Trash2 size={14} aria-hidden="true" /></Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <ExportMenu filenamePrefix="formularios" selectedCount={selection.count} fetch={fetchExport} />
+            <Button onClick={() => setEditing(EMPTY)}><Plus size={16} aria-hidden="true" /> Nuevo formulario</Button>
+          </div>
+        )} />
+      <Card title={`${count.toLocaleString('es-MX')} formularios`}>
+        <DataTable<FormDefinitionAdmin>
+          tableId="forms"
+          columns={columns}
+          rows={rows}
+          rowKey={(f) => f.id}
+          rowLabel={(f) => `formulario ${f.title}`}
+          caption="Formularios"
+          sort={sort}
+          onSort={(next: SortState) => set({ orden: serializeSort(next), page: null })}
+          page={page}
+          count={count}
+          onPage={setPage}
+          itemLabel="formularios"
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          columnControls
+          resizable
+          selection={selection}
+          rowActions={(f) => (
+            <>
+              <Button size="sm" variant={f.pending_count ? 'primary' : 'secondary'} onClick={() => openInbox(f)}><Inbox size={14} aria-hidden="true" /> Envíos{f.pending_count ? ` (${f.pending_count})` : ''}</Button>
+              <Button size="sm" variant="secondary" onClick={() => setEditing(f)} aria-label={`Editar ${f.title}`}><Pencil size={14} aria-hidden="true" /></Button>
+              <Button size="sm" variant="ghost" onClick={() => setToDelete(f)} aria-label={`Eliminar ${f.title}`}><Trash2 size={14} aria-hidden="true" /></Button>
+            </>
+          )}
+          toolbar={(
+            <FilterBar
+              search={{ placeholder: 'Título o clave…', label: 'Buscar formularios' }}
+              tabs={{ paramKey: 'publicado', options: PUBLISHED_OPTIONS, allLabel: 'Todos', label: 'Filtrar por publicación' }}
+            />
+          )}
+          bulkBar={(
+            <BulkActionBar
+              count={selection.count}
+              allMatching={selection.allMatching}
+              allMatchingCount={count}
+              onSelectAllMatching={selection.onSelectAllMatching}
+              onClear={selection.onClear}
+              actions={FORM_BULK}
+              onAction={setBulkAction}
+              itemLabel="formularios"
+              gender="m"
+              exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="formularios" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+            />
+          )}
+          empty={{ icon: ClipboardList, title: 'Sin formularios', description: 'Cree el primero y colóquelo en una página con el bloque Formulario.' }}
+        />
       </Card>
       {editing && <FormBuilderModal initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); invalidate(); }} />}
-      {inbox && <SubmissionsModal form={inbox} onClose={() => setInbox(null)} />}
+      {inbox && <SubmissionsModal form={inbox} onClose={closeInbox} />}
       <ConfirmDialog open={!!toDelete} title="¿Eliminar formulario?" message={`Se borrarán también sus ${toDelete?.submissions_count ?? 0} envíos. Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar formulario" requireText={toDelete?.submissions_count ? 'ELIMINAR' : undefined} loading={remove.isPending} onConfirm={() => toDelete && remove.mutate(toDelete.id)} onClose={() => setToDelete(null)} />
+      <BulkConfirmDialog
+        open={!!bulkAction}
+        onClose={() => setBulkAction(null)}
+        action={bulkAction}
+        entityLabel="formularios"
+        gender="m"
+        ids={selection.ids}
+        allMatching={selection.allMatching}
+        filters={filters}
+        execute={(body) => bulk.mutateAsync(body)}
+        onDone={() => selection.onClear()}
+      />
     </>
   );
 }
@@ -147,50 +258,118 @@ function FormBuilderModal({ initial, onClose, onSaved }: { initial: Partial<Form
   );
 }
 
+function answer(s: FormSubmission, key: string): string {
+  const v = s.data[key];
+  if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+  return v ? String(v) : '—';
+}
+
 function SubmissionsModal({ form, onClose }: { form: FormDefinitionAdmin; onClose: () => void }) {
   const qc = useQueryClient();
-  const [onlyPending, setOnlyPending] = useState(true);
-  const { data, isLoading } = useQuery({ queryKey: ['admin-form-submissions', form.id, onlyPending], queryFn: async () => (await contentApi.adminFormSubmissions(form.id, onlyPending ? { handled: '0' } : undefined)).data });
+  const { get, set } = useUrlFilters();
+  const sort = parseSort(get('eorden'));
+  const rawPage = Number.parseInt(get('epage'), 10);
+  const page = Number.isFinite(rawPage) && rawPage > 1 ? rawPage : 1;
+  // Pending first: the inbox opens on what still needs an answer.
+  const handled = get('eatendido', '0');
+  const filters = {
+    q: get('eq') || undefined,
+    handled: handled === 'todos' ? undefined : handled,
+    from: get('edesde') || undefined,
+    to: get('ehasta') || undefined,
+    ordering: serializeSort(sort) || undefined,
+  };
+  const { data, isLoading, isError, refetch } = useSubmissionsList(form.id, { page, ...filters });
+  const exportSubs = useSubmissionsExport(form.id);
+  const bulk = useSubmissionsBulk();
+  const rows = data?.results;
+  const count = data?.count ?? 0;
+  const selection = useRowSelection(count, JSON.stringify(filters));
+  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
+
+  const refresh = () => { void invalidateEntity(qc, SUBMISSIONS_ENTITY, [FORMS_ENTITY]); void qc.invalidateQueries({ queryKey: ['badges'] }); };
   const handle = useMutation({
     mutationFn: ({ id, v }: { id: number; v: boolean }) => contentApi.adminHandleSubmission(id, v),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-form-submissions', form.id] }); qc.invalidateQueries({ queryKey: ['admin-forms'] }); qc.invalidateQueries({ queryKey: ['badges'] }); },
+    onSuccess: refresh,
+    onError: () => toast.error('No se pudo actualizar el envío.'),
   });
-  const rows: FormSubmission[] = data ?? [];
-  // Authenticated download (a plain <a href> would carry no Bearer token → 401).
-  const exportCsv = async () => {
-    try {
-      const { data: blob } = await contentApi.adminFormSubmissionsCsv(form.id);
-      downloadBlob(blob, `envios-${form.slug || form.id}.csv`);
-    } catch {
-      toast.error('No se pudo exportar el CSV.');
-    }
-  };
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exportSubs.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
+
+  const columns = useMemo<Column<FormSubmission>[]>(() => [
+    { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-xs text-muted', cell: (s) => formatDateTime(s.created_at) },
+    ...form.fields.map((f, i): Column<FormSubmission> => ({
+      id: `f:${f.key}`, header: f.label, minWidth: 140, defaultHidden: i >= 4, className: 'text-sm text-ink break-words', cell: (s) => answer(s, f.key),
+    })),
+    { id: 'page', header: 'Página', sortKey: 'page', minWidth: 110, defaultHidden: true, className: 'text-xs text-subtle', cell: (s) => s.page || '—' },
+    { id: 'handled', header: 'Estado', sortKey: 'handled', minWidth: 110, cell: (s) => (s.is_handled ? <Badge variant="success">Atendido</Badge> : <Badge variant="warning">Pendiente</Badge>) },
+  ], [form.fields]);
+
   return (
-    <Modal open onClose={onClose} title={`Envíos: ${form.title}`} maxWidth={720}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} /> Solo pendientes</label>
-        <button type="button" onClick={() => { void exportCsv(); }} className="btn-outline inline-flex items-center gap-1 text-sm"><Download size={14} aria-hidden="true" /> CSV</button>
+    <Modal open onClose={onClose} title={`Envíos: ${form.title}`} maxWidth={960}>
+      <div className="mb-3 flex justify-end">
+        <ExportMenu formats={['csv', 'xlsx']} filenamePrefix={`envios-${form.slug || form.id}`} selectedCount={selection.count} fetch={fetchExport} />
       </div>
-      {isLoading ? <ListSkeleton /> : rows.length === 0 ? <p className="py-6 text-center text-sm text-muted">Sin envíos{onlyPending ? ' pendientes' : ''}.</p> : (
-        <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto" aria-label="Envíos">
-          {rows.map((s) => (
-            <li key={s.id} className="space-y-1 py-3 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-subtle">{formatDateTime(s.created_at)}{s.page ? ` · ${s.page}` : ''}</span>
-                <div className="flex items-center gap-2">
-                  {s.reply_to && <a href={`mailto:${s.reply_to}`} className="text-xs font-semibold text-purple">Responder</a>}
-                  <Button size="sm" variant={s.is_handled ? 'ghost' : 'secondary'} onClick={() => handle.mutate({ id: s.id, v: !s.is_handled })}><Check size={14} aria-hidden="true" /> {s.is_handled ? 'Atendido' : 'Marcar atendido'}</Button>
-                </div>
-              </div>
-              <dl className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
-                {form.fields.filter((f) => f.key in s.data).map((f) => (
-                  <div key={f.key} className="flex gap-2"><dt className="shrink-0 text-subtle">{f.label}:</dt><dd className="break-words text-ink">{typeof s.data[f.key] === 'boolean' ? (s.data[f.key] ? 'Sí' : 'No') : String(s.data[f.key] || '-')}</dd></div>
-                ))}
-              </dl>
-            </li>
-          ))}
-        </ul>
-      )}
+      <DataTable<FormSubmission>
+        tableId={`form-submissions-${form.id}`}
+        columns={columns}
+        rows={rows}
+        rowKey={(s) => s.id}
+        rowLabel={(s) => `envío del ${formatDateTime(s.created_at)}`}
+        caption={`Envíos del formulario ${form.title}`}
+        sort={sort}
+        onSort={(next: SortState) => set({ eorden: serializeSort(next), epage: null })}
+        page={page}
+        count={count}
+        onPage={(p) => set({ epage: p > 1 ? String(p) : null })}
+        itemLabel="envíos"
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={() => refetch()}
+        columnControls
+        selection={selection}
+        rowActions={(s) => (
+          <>
+            {s.reply_to && <a href={`mailto:${s.reply_to}`} className="inline-flex min-h-[36px] items-center px-2 text-xs font-semibold text-purple">Responder</a>}
+            <Button size="sm" variant={s.is_handled ? 'ghost' : 'secondary'} onClick={() => handle.mutate({ id: s.id, v: !s.is_handled })}>
+              <Check size={14} aria-hidden="true" /> {s.is_handled ? 'Reabrir' : 'Marcar atendido'}
+            </Button>
+          </>
+        )}
+        toolbar={(
+          <FilterBar
+            search={{ paramKey: 'eq', placeholder: 'Buscar en las respuestas…', label: 'Buscar envíos' }}
+            tabs={{ paramKey: 'eatendido', options: HANDLED_OPTIONS, allLabel: 'Pendientes', label: 'Filtrar por estado' }}
+            dateRange={{ idPrefix: 'envios', fromKey: 'edesde', toKey: 'ehasta' }}
+          />
+        )}
+        bulkBar={(
+          <BulkActionBar
+            count={selection.count}
+            allMatching={selection.allMatching}
+            allMatchingCount={count}
+            onSelectAllMatching={selection.onSelectAllMatching}
+            onClear={selection.onClear}
+            actions={SUBMISSION_BULK}
+            onAction={setBulkAction}
+            itemLabel="envíos"
+            gender="m"
+          />
+        )}
+        empty={{ icon: Inbox, title: 'Sin envíos', description: 'Ningún envío coincide con los filtros.' }}
+      />
+      <BulkConfirmDialog
+        open={!!bulkAction}
+        onClose={() => setBulkAction(null)}
+        action={bulkAction}
+        entityLabel="envíos"
+        gender="m"
+        ids={selection.ids}
+        allMatching={selection.allMatching}
+        filters={{ ...filters, form: form.id }}
+        execute={(body) => bulk.mutateAsync(body)}
+        onDone={() => { selection.onClear(); void qc.invalidateQueries({ queryKey: ['badges'] }); }}
+      />
     </Modal>
   );
 }

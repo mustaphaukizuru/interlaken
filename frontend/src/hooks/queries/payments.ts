@@ -9,6 +9,7 @@ export interface PaymentsListParams {
   q?: string;
   status?: string;
   gateway?: string;
+  type?: string;
   student?: string;
   from?: string;
   to?: string;
@@ -16,7 +17,7 @@ export interface PaymentsListParams {
 }
 
 /** Ordering keys whitelisted by `/payments/admin/`. */
-export const PAYMENTS_ORDERING_KEYS = ['date', 'amount', 'status', 'gateway'] as const;
+export const PAYMENTS_ORDERING_KEYS = ['date', 'amount', 'status', 'gateway', 'student'] as const;
 
 export const usePaymentsList = createListHook<Payment, PaymentsListParams>(PAYMENTS_ENTITY, paymentsApi.adminList);
 

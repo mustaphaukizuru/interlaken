@@ -8,6 +8,7 @@ export const AUDIT_ENTITY = 'audit';
 export interface AuditListParams {
   page?: number;
   ordering?: string;
+  q?: string;
   actor?: string;
   action?: string;
   context?: string;
@@ -18,7 +19,7 @@ export interface AuditListParams {
 }
 
 /** Ordering keys the backend whitelists for `/core/admin/audit/` (docs/API-LISTING.md). */
-export const AUDIT_ORDERING_KEYS = ['date', 'actor', 'action', 'object'] as const;
+export const AUDIT_ORDERING_KEYS = ['date', 'actor', 'action', 'object', 'context'] as const;
 
 export const useAuditList = createListHook<AuditLogEntry, AuditListParams>(AUDIT_ENTITY, coreApi.getAuditLog);
 

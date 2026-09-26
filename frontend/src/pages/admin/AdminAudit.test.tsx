@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(() => 't1'), success: vi.fn(), error: vi.fn() } }));
@@ -64,11 +64,11 @@ describe('AdminAudit (reference page)', () => {
     expect(screen.getByRole('button', { name: /Columnas/ })).toBeInTheDocument();
   });
 
-  it('exports the current view through the audit export endpoint (CSV and Excel only)', async () => {
+  it('exports the current view through the audit export endpoint (CSV, Excel and PDF)', async () => {
     renderWithProviders(<AdminAudit />, { route: '/admin/auditoria?accion=create&orden=actor' });
     await screen.findByText('ana@x.mx');
     await userEvent.click(screen.getByRole('button', { name: /^Exportar$/ }));
-    expect(screen.queryByRole('menuitem', { name: /PDF/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /PDF/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('menuitem', { name: /Excel/ }));
     await waitFor(() => expect(exportAuditLog).toHaveBeenCalledWith({ action: 'create', ordering: 'actor', fmt: 'xlsx' }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalled());
@@ -80,5 +80,36 @@ describe('AdminAudit (reference page)', () => {
     await screen.findByText('ana@x.mx');
     await userEvent.click(screen.getByRole('button', { name: 'Actor' }));
     await waitFor(() => expect(getAuditLog).toHaveBeenLastCalledWith({ page: 1, ordering: '-actor' }));
+  });
+
+  it('maps the context and object filters from the URL onto the request', async () => {
+    renderWithProviders(<AdminAudit />, { route: '/admin/auditoria?contexto=cafeteria&objeto=accounts.studentprofile&id=9' });
+    await screen.findByText('ana@x.mx');
+    expect(getAuditLog).toHaveBeenCalledWith({
+      page: 1, actor: undefined, action: undefined, from: undefined, to: undefined, ordering: undefined,
+      context: 'cafeteria', object_type: 'accounts.studentprofile', object_id: '9',
+    });
+    expect(screen.getByRole('textbox', { name: 'Filtrar por contexto' })).toHaveValue('cafeteria');
+    expect(screen.getByRole('button', { name: 'Quitar filtro: Objeto: accounts.studentprofile' })).toBeInTheDocument();
+  });
+
+  it('opens a row drawer with the before/after diff, the details and "Historial de este objeto"', async () => {
+    const rows = [
+      { ...entries[0], object_type: 'accounts.studentprofile', changes: { grade: ['1°', '2°'], group: ['A', 'A'], note: 'Cambio de grupo' } },
+      entries[2],
+    ];
+    getAuditLog.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: rows } } as never);
+    renderWithProviders(<AdminAudit />, { route: '/admin/auditoria' });
+    await userEvent.click(await screen.findByText('accounts.studentprofile#9'));
+    const dialog = await screen.findByRole('dialog', { name: 'Registro #1' });
+    const diff = within(dialog).getByRole('table', { name: 'Cambios: valor anterior y nuevo' });
+    const grade = within(diff).getByRole('row', { name: /grade/ });
+    expect(grade).toHaveTextContent('Antes: 1°');
+    expect(grade).toHaveTextContent('Después: 2°');
+    expect(within(dialog).getByText('Cambio de grupo')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /Abrir ficha del alumno/ })).toHaveAttribute('href', '/admin/alumnos/9');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Historial de este objeto/ }));
+    await waitFor(() => expect(getAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ object_type: 'accounts.studentprofile', object_id: '9', page: 1 })));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

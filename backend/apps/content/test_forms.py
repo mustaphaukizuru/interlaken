@@ -62,12 +62,14 @@ class TestAdminForms:
     def test_submissions_list_csv_and_handle(self, admin_client, form):
         FormSubmission.objects.create(form=form, data={'nombre': 'Ana', 'correo': 'a@x.mx', 'nivel': 'Primaria', 'grado': '2'})
         r = admin_client.get(reverse('admin-form-submissions', args=[form.pk]))
-        assert r.status_code == 200 and r.data[0]['reply_to'] == 'a@x.mx'
-        csv = admin_client.get(reverse('admin-form-submissions', args=[form.pk]) + '?export=csv')
-        assert csv['Content-Type'].startswith('text/csv') and 'Ana' in csv.content.decode('utf-8-sig')
-        sid = r.data[0]['id']
+        assert r.status_code == 200 and r.data['count'] == 1
+        assert r.data['results'][0]['reply_to'] == 'a@x.mx'
+        csv = admin_client.get(reverse('admin-form-submissions-export', args=[form.pk]) + '?fmt=csv')
+        assert csv['Content-Type'].startswith('text/csv')
+        assert 'Ana' in b''.join(csv.streaming_content).decode('utf-8-sig')
+        sid = r.data['results'][0]['id']
         assert admin_client.patch(reverse('admin-form-submission-detail', args=[sid]), {'is_handled': True}, format='json').status_code == 200
-        assert admin_client.get(reverse('admin-form-submissions', args=[form.pk]) + '?handled=0').data == []
+        assert admin_client.get(reverse('admin-form-submissions', args=[form.pk]) + '?handled=0').data['results'] == []
 
     def test_parent_cannot_access(self, auth_client, form):
         assert auth_client.get(reverse('admin-forms')).status_code == 403

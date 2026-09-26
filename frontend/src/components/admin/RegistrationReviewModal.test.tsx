@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
+  api: { post: vi.fn() },
   admissionsAdminApi: {
     getRegistration: vi.fn(),
     updateRegistrationStatus: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('react-hot-toast', () => ({
 
 import toast from 'react-hot-toast';
 import { RegistrationReviewModal } from './RegistrationReviewModal';
-import { admissionsAdminApi } from '@/services/api';
+import { admissionsAdminApi, api } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const getRegistration = vi.mocked(admissionsAdminApi.getRegistration);
@@ -25,6 +26,7 @@ const updateStatus = vi.mocked(admissionsAdminApi.updateRegistrationStatus);
 const verifyDocument = vi.mocked(admissionsAdminApi.verifyDocument);
 const downloadDocument = vi.mocked(admissionsAdminApi.downloadDocument);
 const toastSuccess = vi.mocked(toast.success);
+const apiPost = vi.mocked(api.post);
 const toastError = vi.mocked(toast.error);
 
 const DOC = {
@@ -230,5 +232,52 @@ describe('RegistrationReviewModal', () => {
       expect(toastError).toHaveBeenCalledWith('No se pudo guardar la revisión.');
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+  it('offers only the allowed review moves and asks a reason for a reverse move', async () => {
+    getRegistration.mockResolvedValue({ data: { ...baseReg, status: 'approved' } } as never);
+    renderModal();
+    const select = await screen.findByLabelText(/Estado de la revisión/i);
+    const values = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(values).toEqual(['reviewing', 'approved']);
+    fireEvent.change(select, { target: { value: 'reviewing' } });
+    const save = screen.getByRole('button', { name: /Guardar revisión/i });
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Motivo del cambio/i), { target: { value: 'Falta firma' } });
+    await userEvent.click(save);
+    await waitFor(() => {
+      expect(updateStatus).toHaveBeenCalledWith(9, { status: 'reviewing', admin_notes: '', note: 'Falta firma' });
+    });
+  });
+
+  it('can skip the family email when approving', async () => {
+    renderModal();
+    fireEvent.change(await screen.findByLabelText(/Estado de la revisión/i), { target: { value: 'approved' } });
+    await userEvent.click(screen.getByRole('checkbox', { name: /Notificar a la familia/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Guardar revisión/i }));
+    await waitFor(() => {
+      expect(updateStatus).toHaveBeenCalledWith(9, { status: 'approved', admin_notes: '', notify: false });
+    });
+  });
+
+  it('bulk-rejects the selected documents with a note through the documents bulk endpoint', async () => {
+    const DOC2 = { ...DOC, id: 45, doc_type: 'curp_doc', filename: 'curp.pdf' };
+    getRegistration.mockResolvedValue({ data: { ...baseReg, documents: [DOC, DOC2] } } as never);
+    apiPost.mockImplementation(async (_url: string, body: unknown) => ({
+      data: { action: 'reject', requested: 2, ok: 2, failed: [], skipped: [], dry_run: !!(body as { dry_run?: boolean }).dry_run },
+    }) as never);
+    renderModal();
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Seleccionar Acta de Nacimiento' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar CURP' }));
+    expect(screen.getByRole('region', { name: /documentos seleccionados/i })).toHaveTextContent('2 documentos seleccionados');
+    await userEvent.click(screen.getByRole('button', { name: 'Rechazar seleccionados' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/admissions/admin/documents/bulk/', {
+      action: 'reject', ids: [44, 45], all_matching: false, filters: undefined, dry_run: true,
+    }));
+    fireEvent.change(await screen.findByLabelText('Motivo (obligatorio)'), { target: { value: 'Ilegibles' } });
+    await userEvent.click(screen.getByRole('button', { name: /Rechazar seleccionados \(2\)/ }));
+    await waitFor(() => expect(apiPost).toHaveBeenLastCalledWith('/admissions/admin/documents/bulk/', {
+      action: 'reject', ids: [44, 45], all_matching: false, filters: undefined, dry_run: false,
+      payload: { note: 'Ilegibles', notify: true },
+    }));
   });
 });

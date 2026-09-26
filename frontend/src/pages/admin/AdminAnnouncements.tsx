@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Megaphone, Plus, Pencil, Trash2, Eye, Siren, Send } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Archive, Copy, Eye, Megaphone, Pencil, Plus, Power, Send, Siren, Trash2 } from 'lucide-react';
 import { DeliveryReportModal } from '@/components/admin/DeliveryReportModal';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -13,32 +11,35 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { AttachmentsField } from '@/components/admin/AttachmentsField';
 import { toLocalInput } from '@/cms/editor/helpers';
-import type { AnnouncementAttachment } from '@/services/api';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { Pagination } from '@/components/ui/Pagination';
-import { useUrlPage } from '@/hooks/useUrlFilters';
-import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { BulkActionBar } from '@/components/admin/BulkActionBar';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useRowSelection } from '@/hooks/useRowSelection';
+import { ANNOUNCEMENTS_ENTITY, useAnnouncementsBulk, useAnnouncementsExport, useAnnouncementsList } from '@/hooks/queries/AdminContentQueries';
+import { invalidateEntity } from '@/hooks/queries/keys';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { portalApi } from '@/services/api';
+import { portalApi, type AnnouncementAttachment, type BulkActionDef } from '@/services/api';
+import { idsParam, type ExportFormat } from '@/services/dataOps';
+import { apiErrorMessage } from '@/lib/apiErrors';
+import { formatDateTime } from '@/lib/format';
+import { AUDIENCES as AUDIENCE, announcementStatus, audienceMeta, type AdminAnnouncement as Announcement } from '@/lib/status/AdminAnnouncementStatus';
 
-interface Announcement {
-  id: number; title: string; body: string; audience: string;
-  is_active: boolean; push_enabled: boolean; created_at: string;
-  show_on_site?: boolean; site_until?: string | null; site_link?: string;
-  publish_at?: string | null; requires_ack?: boolean; attachments?: AnnouncementAttachment[]; ack_count?: number;
-  created_by_name: string; read_count: number;
-}
-
-const AUDIENCE: { value: string; label: string; variant: 'info' | 'success' | 'warning' | 'neutral' }[] = [
-  { value: 'all',      label: 'Todos',    variant: 'info' },
-  { value: 'parents',  label: 'Padres',   variant: 'success' },
-  { value: 'students', label: 'Alumnos',  variant: 'warning' },
-  { value: 'staff',    label: 'Personal', variant: 'neutral' },
+const STATE_OPTIONS = [
+  { value: '1', label: 'Activos' },
+  { value: '0', label: 'Inactivos' },
 ];
-const audienceMeta = (a: string) => AUDIENCE.find((x) => x.value === a) ?? AUDIENCE[0];
+
+const BULK_ACTIONS: BulkActionDef[] = [
+  { name: 'activate', label: 'Activar', planVerb: 'Se activarán', icon: Power },
+  { name: 'deactivate', label: 'Desactivar (archivar)', planVerb: 'Se desactivarán', icon: Archive },
+  { name: 'duplicate', label: 'Duplicar', planVerb: 'Se duplicarán como borrador', icon: Copy },
+  { name: 'delete', label: 'Eliminar no enviados', planVerb: 'Se eliminarán', danger: true, icon: Trash2 },
+];
 
 const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true, show_on_site: false, site_until: null as string | null, site_link: '', publish_at: null as string | null, requires_ack: false, attachments: [] as AnnouncementAttachment[] };
 const EMPTY_ALERT = { title: '', message: '', audience: 'parents', whatsapp: false };
@@ -56,15 +57,29 @@ export default function AdminAnnouncements() {
   const [alertConfirm, setAlertConfirm] = useState(false);
 
   const [page, setPage] = useUrlPage();
-  const { data: paged, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-announcements', page],
-    queryFn: async () => toPaged<Announcement>((await portalApi.adminListAnnouncements({ page })).data),
-    placeholderData: keepPreviousData,
-  });
-  const data = paged?.results;
+  const { get, set } = useUrlFilters();
+  const sort = parseSort(get('orden'));
+  const filters = {
+    q: get('q') || undefined,
+    active: get('estado') || undefined,
+    audience: get('audiencia') || undefined,
+    scheduled: get('programado') || undefined,
+    requires_ack: get('enterado') || undefined,
+    from: get('desde') || undefined,
+    to: get('hasta') || undefined,
+    ordering: serializeSort(sort) || undefined,
+  };
+  const { data: paged, isLoading, isError, refetch } = useAnnouncementsList({ page, ...filters });
+  const exportAnnouncements = useAnnouncementsExport();
+  const bulk = useAnnouncementsBulk();
+  const rows = paged?.results;
   const count = paged?.count ?? 0;
+  const selection = useRowSelection(count, JSON.stringify(filters));
+  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-announcements'] });
+  const invalidate = () => invalidateEntity(qc, ANNOUNCEMENTS_ENTITY);
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exportAnnouncements.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -75,7 +90,7 @@ export default function AdminAnnouncements() {
       }
     },
     onSuccess: () => {
-      invalidate();
+      void invalidate();
       toast.success(editing ? 'Comunicado actualizado.' : 'Comunicado publicado.');
       setOpen(false);
     },
@@ -84,14 +99,14 @@ export default function AdminAnnouncements() {
 
   const toggleActive = useMutation({
     mutationFn: (a: Announcement) => portalApi.adminUpdateAnnouncement(a.id, { is_active: !a.is_active }),
-    onSuccess: invalidate,
-    onError: () => toast.error('No se pudo cambiar el estado.'),
+    onSuccess: () => { void invalidate(); },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo cambiar el estado.')),
   });
 
   const remove = useMutation({
     mutationFn: (id: number) => portalApi.adminDeleteAnnouncement(id),
-    onSuccess: () => { invalidate(); toast.success('Comunicado eliminado.'); setToDelete(null); },
-    onError: () => toast.error('No se pudo eliminar.'),
+    onSuccess: () => { void invalidate(); toast.success('Comunicado eliminado.'); setToDelete(null); },
+    onError: (e: unknown) => { toast.error(apiErrorMessage(e, 'No se pudo eliminar.')); setToDelete(null); },
   });
 
   const broadcast = useMutation({
@@ -104,7 +119,7 @@ export default function AdminAnnouncements() {
       }),
     onSuccess: (resp) => {
       const d = resp.data as { notified: number; dispatched: number; whatsapp_sent: number };
-      invalidate();
+      void invalidate();
       setAlertOpen(false);
       setAlertConfirm(false);
       setAlertForm(EMPTY_ALERT);
@@ -115,10 +130,7 @@ export default function AdminAnnouncements() {
           '.',
       );
     },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg || 'No se pudo enviar el aviso urgente.');
-    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo enviar el aviso urgente.')),
   });
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
@@ -164,6 +176,28 @@ export default function AdminAnnouncements() {
     setAlertOpen(true);
   };
 
+  const columns: Column<Announcement>[] = [
+    {
+      id: 'title', header: 'Comunicado', sortKey: 'title', hideable: false, minWidth: 240,
+      cell: (a) => (
+        <div className="min-w-0">
+          <p className={`font-semibold ${a.is_active ? 'text-ink' : 'text-subtle'}`}>{a.title}</p>
+          <p className="line-clamp-1 text-xs text-muted">{a.body}</p>
+        </div>
+      ),
+    },
+    { id: 'audience', header: 'Dirigido a', sortKey: 'audience', minWidth: 110, cell: (a) => { const m = audienceMeta(a.audience); return <Badge variant={m.variant}>{m.label}</Badge>; } },
+    { id: 'status', header: 'Estado', sortKey: 'active', minWidth: 110, cell: (a) => { const s = announcementStatus(a); return <Badge variant={s.variant}>{s.label}</Badge>; } },
+    { id: 'created', header: 'Creado', sortKey: 'created', minWidth: 150, className: 'whitespace-nowrap text-xs text-muted', cell: (a) => formatDateTime(a.created_at) },
+    { id: 'publish_at', header: 'Programado', sortKey: 'publish_at', minWidth: 150, defaultHidden: true, className: 'whitespace-nowrap text-xs text-muted', cell: (a) => formatDateTime(a.publish_at) || '—' },
+    {
+      id: 'reads', header: 'Leídos', sortKey: 'reads', align: 'right', minWidth: 90, className: 'tabular-nums text-muted',
+      cell: (a) => <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" aria-hidden="true" /> {a.read_count} leídos</span>,
+    },
+    { id: 'ack', header: 'Enterados', align: 'right', minWidth: 90, defaultHidden: true, className: 'tabular-nums text-muted', cell: (a) => (a.requires_ack ? a.ack_count ?? 0 : '—') },
+    { id: 'author', header: 'Autor', minWidth: 130, defaultHidden: true, className: 'text-xs text-muted', cell: (a) => a.created_by_name || '—' },
+  ];
+
   return (
     <>
       <PageHeader
@@ -171,6 +205,7 @@ export default function AdminAnnouncements() {
         subtitle="Publica avisos para las familias, alumnos y personal."
         actions={(
           <div className="flex flex-wrap gap-2">
+            <ExportMenu formats={['csv', 'xlsx']} filenamePrefix="comunicados" selectedCount={selection.count} fetch={fetchExport} />
             <Button variant="danger" onClick={openAlert}>
               <Siren className="h-4 w-4" aria-hidden="true" /> Aviso urgente
             </Button>
@@ -179,56 +214,91 @@ export default function AdminAnnouncements() {
         )}
       />
 
-      <Card>
-        {isLoading ? (
-          <TableSkeleton />
-        ) : isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : !data?.length ? (
-          <EmptyState icon={Megaphone} title="Sin comunicados"
-            description="Los avisos que publiques aparecerán aquí y en el portal de las familias."
-            action={<Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>} />
-        ) : (
-          <ul className="divide-y divide-line">
-            {data.map((a) => {
-              const meta = audienceMeta(a.audience);
-              return (
-                <li key={a.id} className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className={`font-semibold ${a.is_active ? 'text-ink' : 'text-subtle line-through'}`}>{a.title}</p>
-                      <Badge variant={meta.variant}>{meta.label}</Badge>
-                      {!a.is_active && <Badge variant="neutral">Inactivo</Badge>}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted">{a.body}</p>
-                    <p className="mt-1 flex items-center gap-3 text-xs text-subtle">
-                      <span>{format(new Date(a.created_at), "d MMM yyyy", { locale: es })}</span>
-                      <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {a.read_count} leídos</span>
-                      {a.created_by_name && a.created_by_name !== '—' && <span>· {a.created_by_name}</span>}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <button type="button" onClick={() => toggleActive.mutate(a)}
-                      disabled={toggleActive.isPending && toggleActive.variables?.id === a.id}
-                      className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-cream disabled:opacity-50">
-                      {toggleActive.isPending && toggleActive.variables?.id === a.id
-                        ? 'Guardando…'
-                        : a.is_active ? 'Desactivar' : 'Activar'}
-                    </button>
-                    <button type="button" onClick={() => setReport(a)} aria-label={`Ver entrega del comunicado "${a.title}"`}
-                      className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Send className="h-4 w-4" /></button>
-                    <button type="button" onClick={() => openEdit(a)} aria-label={`Editar el comunicado "${a.title}"`}
-                      className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                    <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
-                      className="rounded-lg p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" /></button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="comunicados" />
+      <Card title={`${count.toLocaleString('es-MX')} comunicados`}>
+        <DataTable<Announcement>
+          tableId="announcements"
+          columns={columns}
+          rows={rows}
+          rowKey={(a) => a.id}
+          rowLabel={(a) => `comunicado ${a.title}`}
+          caption="Comunicados"
+          sort={sort}
+          onSort={(next: SortState) => set({ orden: serializeSort(next), page: null })}
+          page={page}
+          count={count}
+          onPage={setPage}
+          itemLabel="comunicados"
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          columnControls
+          resizable
+          pinFirstColumn
+          selection={selection}
+          rowActions={(a) => (
+            <>
+              <button type="button" onClick={() => toggleActive.mutate(a)}
+                disabled={toggleActive.isPending && toggleActive.variables?.id === a.id}
+                className="min-h-[36px] rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-cream disabled:opacity-50">
+                {toggleActive.isPending && toggleActive.variables?.id === a.id
+                  ? 'Guardando…'
+                  : a.is_active ? 'Desactivar' : 'Activar'}
+              </button>
+              <button type="button" onClick={() => setReport(a)} aria-label={`Ver entrega del comunicado "${a.title}"`}
+                className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Send className="h-4 w-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => openEdit(a)} aria-label={`Editar el comunicado "${a.title}"`}
+                className="rounded-lg p-2 text-subtle hover:bg-cream hover:text-ink"><Pencil className="h-4 w-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => setToDelete(a)} aria-label={`Eliminar el comunicado "${a.title}"`}
+                className="rounded-lg p-2 text-subtle hover:bg-coral-50 hover:text-coral-dark"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+            </>
+          )}
+          toolbar={(
+            <FilterBar
+              search={{ placeholder: 'Título o mensaje…', label: 'Buscar comunicados' }}
+              tabs={{ paramKey: 'estado', options: STATE_OPTIONS, allLabel: 'Todos', label: 'Filtrar por estado' }}
+              selects={[
+                { key: 'audiencia', label: 'Dirigido a', options: AUDIENCE.map(({ value, label }) => ({ value, label })), allLabel: 'Todas las audiencias' },
+                { key: 'programado', label: 'Programación', options: [{ value: '1', label: 'Programados' }, { value: '0', label: 'Ya enviados o inmediatos' }], allLabel: 'Con o sin programación' },
+                { key: 'enterado', label: 'Enterado', options: [{ value: '1', label: 'Piden enterado' }, { value: '0', label: 'Sin enterado' }], allLabel: 'Con o sin enterado' },
+              ]}
+              dateRange={{ idPrefix: 'comunicados' }}
+            />
+          )}
+          bulkBar={(
+            <BulkActionBar
+              count={selection.count}
+              allMatching={selection.allMatching}
+              allMatchingCount={count}
+              onSelectAllMatching={selection.onSelectAllMatching}
+              onClear={selection.onClear}
+              actions={BULK_ACTIONS}
+              onAction={setBulkAction}
+              itemLabel="comunicados"
+              gender="m"
+              exportMenu={<ExportMenu label="Exportar seleccionados" formats={['csv', 'xlsx']} filenamePrefix="comunicados" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+            />
+          )}
+          empty={{
+            icon: Megaphone,
+            title: 'Sin comunicados',
+            description: 'Los avisos que publiques aparecerán aquí y en el portal de las familias.',
+            action: <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>,
+          }}
+        />
       </Card>
+
+      <BulkConfirmDialog
+        open={!!bulkAction}
+        onClose={() => setBulkAction(null)}
+        action={bulkAction}
+        entityLabel="comunicados"
+        gender="m"
+        ids={selection.ids}
+        allMatching={selection.allMatching}
+        filters={filters}
+        execute={(body) => bulk.mutateAsync(body)}
+        onDone={() => selection.onClear()}
+      />
 
       {/* Composer */}
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Editar comunicado' : 'Nuevo comunicado'} maxWidth={520}>
@@ -370,7 +440,7 @@ export default function AdminAnnouncements() {
         onClose={() => setToDelete(null)}
         onConfirm={() => toDelete && remove.mutate(toDelete.id)}
         title="Eliminar comunicado"
-        message={`Se eliminará "${toDelete?.title}" de forma permanente. Esta acción no se puede deshacer.`}
+        message={`Se eliminará "${toDelete?.title}" de forma permanente. Solo se pueden eliminar comunicados que aún no se enviaron; los enviados se desactivan para archivarlos.`}
         confirmLabel="Eliminar"
         loading={remove.isPending}
       />

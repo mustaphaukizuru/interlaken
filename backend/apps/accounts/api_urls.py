@@ -3,13 +3,18 @@ from django.urls import path
 from . import password_views, views
 from .admin_password import AdminSetPasswordView
 from .avatar import AvatarServeView, MyAvatarView
-from .exports import AdminExportStudentsView
+from .exports import AdminStudentExportView
 from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
-from .import_students import ImportStudentsView
+from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
 from .merge import GuardianMergePreviewView, GuardianMergeView
-from .password_requests import PasswordRequestDetailView, PasswordRequestListCreateView
+from .password_requests import (
+    PasswordRequestBulkView,
+    PasswordRequestDetailView,
+    PasswordRequestExportView,
+    PasswordRequestListCreateView,
+)
 from .school_year import SchoolYearPreviewView, SchoolYearRunView
 from .security import (
     CloseOtherSessionsView,
@@ -18,12 +23,23 @@ from .security import (
     TotpEnableView,
     TotpSetupView,
 )
-from .staff_users import StaffDetailView, StaffListCreateView, StaffResetPasswordView
+from .staff_users import (
+    StaffBulkView,
+    StaffDetailView,
+    StaffExportView,
+    StaffImportTemplateView,
+    StaffImportView,
+    StaffListCreateView,
+    StaffResetPasswordView,
+)
 from .student_admin import AdminStudentBulkView, AdminStudentCreateView, AdminStudentUpdateView
 
 urlpatterns = [
-    path('admin/import-students/', ImportStudentsView.as_view(), name='import-students'),
-    path('admin/export/students/', AdminExportStudentsView.as_view(), name='export-students'),
+    # Data Ops (C3/C4/C5): export, import and bulk on the roster.
+    path('admin/students/export/', AdminStudentExportView.as_view(), name='export-students'),
+    path('admin/students/import/', ImportStudentsView.as_view(), name='import-students'),
+    path('admin/students/import/template/', ImportStudentsTemplateView.as_view(),
+         name='import-students-template'),
     path('admin/import-loyverse/', ImportLoyverseView.as_view(), name='import-loyverse'),
     path('admin/link-loyverse/',   LinkLoyverseView.as_view(),   name='link-loyverse'),
     # Portal student editor (ownership map: people are edited in the portal only).
@@ -44,10 +60,19 @@ urlpatterns = [
          name='admin-set-password'),
     # Staff user management (P1-H1).
     path('admin/staff/', StaffListCreateView.as_view(), name='admin-staff'),
+    path('admin/staff/export/', StaffExportView.as_view(), name='admin-staff-export'),
+    path('admin/staff/bulk/', StaffBulkView.as_view(), name='admin-staff-bulk'),
+    path('admin/staff/import/', StaffImportView.as_view(), name='admin-staff-import'),
+    path('admin/staff/import/template/', StaffImportTemplateView.as_view(),
+         name='admin-staff-import-template'),
     path('admin/staff/<int:pk>/', StaffDetailView.as_view(), name='admin-staff-detail'),
     path('admin/staff/<int:pk>/reset-password/', StaffResetPasswordView.as_view(), name='admin-staff-reset'),
     # Password request inbox (families ask by WhatsApp/email; admins resolve here).
     path('admin/password-requests/', PasswordRequestListCreateView.as_view(), name='password-requests'),
+    path('admin/password-requests/export/', PasswordRequestExportView.as_view(),
+         name='password-requests-export'),
+    path('admin/password-requests/bulk/', PasswordRequestBulkView.as_view(),
+         name='password-requests-bulk'),
     path('admin/password-requests/<int:pk>/', PasswordRequestDetailView.as_view(), name='password-request-detail'),
     path('token/',           views.RateLimitedTokenObtainView.as_view(), name='token-obtain'),
     path('token/refresh/',   views.CookieTokenRefreshView.as_view(), name='token-refresh'),

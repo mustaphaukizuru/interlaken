@@ -106,8 +106,17 @@ class TransitionError(ValidationError):
     """400 with an es-MX message; ``code`` tells bulk whether to skip or fail."""
 
 
+# Entities whose states are not a ``status`` choices column (Announcement maps
+# is_active + fanout_at onto draft/inactive/active) name their states here.
+STATE_LABELS: dict[str, dict[str, str]] = {
+    "portal.announcement": {"draft": "Borrador", "inactive": "Inactivo", "active": "Activo"},
+}
+
+
 def _labels(entity: str) -> dict[str, str]:
     """``{'pending': 'Pendiente', ...}`` from the model's ``status`` choices, if any."""
+    if entity in STATE_LABELS:
+        return STATE_LABELS[entity]
     try:
         model = apps.get_model(entity)
         field = model._meta.get_field("status")

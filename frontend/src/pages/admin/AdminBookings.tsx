@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { CalendarClock, CalendarPlus, Check, FileDown, Loader2, X, UserCheck } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Ban, CalendarClock, CalendarPlus, Check, Eye, EyeOff, Loader2, RotateCcw, Trash2, Upload, UserCheck, UserX, X,
+  type LucideIcon,
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -8,24 +11,31 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
+import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Pagination } from '@/components/ui/Pagination';
-import { bookingsApi, downloadBlob } from '@/services/api';
-import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
-import type { Booking } from '@/types';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { DataTable } from '@/components/ui/DataTable';
-
-const statusMeta: Record<string, { label: string; variant: any }> = {
-  pending:   { label: 'Pendiente', variant: 'warning' },
-  confirmed: { label: 'Confirmada', variant: 'success' },
-  cancelled: { label: 'Cancelada', variant: 'error' },
-  attended:  { label: 'Asistió', variant: 'info' },
-  no_show:   { label: 'No asistió', variant: 'error' },
-};
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { BulkActionBar } from '@/components/admin/BulkActionBar';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { ImportDialog } from '@/components/admin/ImportDialog';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useRowSelection } from '@/hooks/useRowSelection';
+import {
+  BOOKINGS_ENTITY, SLOTS_ENTITY, slotsImportApi, useBookingAction, useBookingsBulk, useBookingsExport, useBookingsList,
+  useSlotDelete, useSlotsBulk, useSlotsExport, useSlotsList, useSlotUpdate,
+} from '@/hooks/queries/bookings';
+import { invalidateEntity } from '@/hooks/queries/keys';
+import { apiErrorMessage } from '@/lib/apiErrors';
+import {
+  BOOKING_SOURCE_OPTIONS, BOOKING_STATUS_OPTIONS, VISIT_TYPE_LABEL, VISIT_TYPE_OPTIONS, bookingStatusMeta, canMove,
+  type BookingStatus,
+} from '@/lib/status/booking';
+import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
+import { bookingsApi, type AdminBookingsParams, type AdminSlot, type AdminSlotsParams, type BookingAction } from '@/services/api';
+import type { Booking } from '@/types';
 
 const WEEKDAYS = [
   { value: 1, label: 'Lun' },
@@ -220,423 +230,273 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
   );
 }
 
-type BookingAct = 'confirm' | 'cancel' | 'attended' | 'no_show';
+// ── shared bits ───────────────────────────────────────────
+const fmtDate = (iso: string) => format(parseISO(iso), 'd MMM yyyy', { locale: es });
+const hhmm = (t: string) => (t ?? '').slice(0, 5);
+const SOURCE_LABEL = Object.fromEntries(BOOKING_SOURCE_OPTIONS.map((o) => [o.value, o.label]));
 
-function BookingActions({
-  booking,
-  onAction,
-  onCancelRequest,
-  pendingAct,
+const ICON_BTN =
+  'inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 md:h-9 md:w-9';
+
+type View = 'reservas' | 'horarios';
+
+/** `BulkActionDef.icon` is typed narrower than lucide's `size: number | string`; the bar only passes numbers. */
+const bulkIcon = (icon: LucideIcon) => icon as unknown as BulkActionDef['icon'];
+
+/** Note prompt for the reverse moves (reabrir, corregir asistencia): the server audits it. */
+function NoteDialog({
+  open, title, message, confirmLabel, loading, onConfirm, onClose,
+}: {
+  open: boolean; title: string; message: string; confirmLabel: string; loading: boolean;
+  onConfirm: (note: string) => void; onClose: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const close = () => { setNote(''); onClose(); };
+  return (
+    <Modal open={open} onClose={close} title={title} maxWidth={460}>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => { e.preventDefault(); if (note.trim().length >= 3) onConfirm(note.trim()); }}
+      >
+        <p className="text-sm text-muted">{message}</p>
+        <div>
+          <label className="label" htmlFor="booking-note">Motivo (queda en la bitácora)</label>
+          <textarea
+            id="booking-note"
+            className="input-field min-h-[88px] text-base"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+            required
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={close}>Volver</Button>
+          <Button type="submit" loading={loading} disabled={note.trim().length < 3}>{confirmLabel}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ── Reservas ──────────────────────────────────────────────
+const BOOKING_COLUMNS: Column<Booking>[] = [
+  {
+    id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 130, className: 'whitespace-nowrap',
+    cell: (b) => (
+      <>
+        <div className="font-medium text-ink">{fmtDate(b.slot_date)}</div>
+        <div className="text-xs text-subtle">{hhmm(b.slot_start_time)} - {hhmm(b.slot_end_time)}</div>
+      </>
+    ),
+  },
+  { id: 'type', header: 'Tipo', minWidth: 130, cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
+  { id: 'parent', header: 'Tutor', sortKey: 'parent', hideable: false, minWidth: 160, className: 'text-ink', cell: (b) => b.parent_name },
+  {
+    id: 'child', header: 'Alumno', sortKey: 'child', minWidth: 140, className: 'text-muted',
+    cell: (b) => (
+      <>
+        {b.child_name || '—'}
+        {b.child_grade && <div className="text-xs text-subtle">{b.child_grade}</div>}
+      </>
+    ),
+  },
+  {
+    id: 'contact', header: 'Contacto', minWidth: 190,
+    cell: (b) => (
+      <>
+        <div className="break-words text-muted">{b.parent_email}</div>
+        <div className="text-xs text-subtle">{b.parent_phone}</div>
+      </>
+    ),
+  },
+  { id: 'attendees', header: 'Asistentes', sortKey: 'attendees', align: 'right', minWidth: 100, className: 'tabular-nums', cell: (b) => b.num_attendees },
+  {
+    id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
+    cell: (b) => { const m = bookingStatusMeta(b.status); return <Badge variant={m.variant}>{m.label}</Badge>; },
+  },
+  { id: 'source', header: 'Origen', defaultHidden: true, minWidth: 120, className: 'text-muted', cell: (b) => SOURCE_LABEL[b.source] ?? b.source },
+  {
+    id: 'created_at', header: 'Registrada', sortKey: 'created_at', defaultHidden: true, minWidth: 150, className: 'whitespace-nowrap text-muted',
+    cell: (b) => new Date(b.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
+  },
+];
+
+const BOOKING_BULK: BulkActionDef[] = [
+  { name: 'confirm', label: 'Confirmar', icon: bulkIcon(Check), notifyOption: true, planVerb: 'Se confirmarán' },
+  { name: 'attended', label: 'Asistió', icon: bulkIcon(UserCheck), planVerb: 'Se registrará la asistencia de' },
+  { name: 'no_show', label: 'No asistió', icon: bulkIcon(UserX), planVerb: 'Se registrará la inasistencia de' },
+  { name: 'cancel', label: 'Cancelar', icon: bulkIcon(Ban), danger: true, planVerb: 'Se cancelarán' },
+];
+
+interface NoteAsk { booking: Booking; act: BookingAction; title: string; message: string; confirmLabel: string }
+
+/** Row actions: only the moves the transition table allows from the row's status. */
+function BookingRowActions({
+  booking, busyAct, onAct, onCancel, onNote,
 }: {
   booking: Booking;
-  onAction: (v: { id: number; act: BookingAct }) => void;
-  onCancelRequest: (b: Booking) => void;
-  /** Action currently in flight for THIS booking (undefined when idle). */
-  pendingAct?: BookingAct;
+  busyAct?: BookingAction;
+  onAct: (b: Booking, act: BookingAction) => void;
+  onCancel: (b: Booking) => void;
+  onNote: (ask: NoteAsk) => void;
 }) {
-  const { id, parent_name: parentName } = booking;
-  const pending = pendingAct !== undefined;
-  const base =
-    'inline-flex items-center justify-center w-11 h-11 md:w-9 md:h-9 rounded-lg text-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50';
+  const s = booking.status as BookingStatus;
+  const who = booking.parent_name;
+  const busy = busyAct !== undefined;
+  const icon = (act: BookingAction, Icon: typeof Check) =>
+    busyAct === act ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Icon className="h-4 w-4" aria-hidden="true" />;
   return (
-    <>
-      <button
-        title="Marcar asistió"
-        aria-label={`Marcar que ${parentName} asistió`}
-        onClick={() => onAction({ id, act: 'attended' })}
-        disabled={pending}
-        className={`${base} hover:bg-brand-50 hover:text-brand-600`}
-      >
-        {pendingAct === 'attended'
-          ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <UserCheck className="w-4 h-4" />}
-      </button>
-      <button
-        title="Confirmar"
-        aria-label={`Confirmar la reserva de ${parentName}`}
-        onClick={() => onAction({ id, act: 'confirm' })}
-        disabled={pending}
-        className={`${base} hover:bg-green-50 hover:text-green-600`}
-      >
-        {pendingAct === 'confirm'
-          ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <Check className="w-4 h-4" />}
-      </button>
-      <button
-        title="Cancelar"
-        aria-label={`Cancelar la reserva de ${parentName}`}
-        onClick={() => onCancelRequest(booking)}
-        disabled={pending}
-        className={`${base} hover:bg-coral-50 hover:text-coral-600`}
-      >
-        {pendingAct === 'cancel' || pendingAct === 'no_show'
-          ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <X className="w-4 h-4" />}
-      </button>
-    </>
+    <div className="flex items-center gap-1">
+      {canMove(s, 'confirmed') && (
+        <button type="button" title="Confirmar" aria-label={`Confirmar la reserva de ${who}`} disabled={busy}
+          onClick={() => onAct(booking, 'confirm')} className={`${ICON_BTN} hover:bg-green-50 hover:text-green-600`}>
+          {icon('confirm', Check)}
+        </button>
+      )}
+      {canMove(s, 'attended') && (
+        <button type="button" title="Asistió" aria-label={`Marcar que ${who} asistió`} disabled={busy}
+          onClick={() => (s === 'no_show'
+            ? onNote({ booking, act: 'attended', title: 'Corregir: sí asistió', confirmLabel: 'Marcar asistió', message: `La visita de ${who} está marcada como «No asistió». Indique por qué se corrige.` })
+            : onAct(booking, 'attended'))}
+          className={`${ICON_BTN} hover:bg-brand-50 hover:text-brand-600`}>
+          {icon('attended', UserCheck)}
+        </button>
+      )}
+      {canMove(s, 'no_show') && (
+        <button type="button" title="No asistió" aria-label={`Marcar que ${who} no asistió`} disabled={busy}
+          onClick={() => (s === 'attended'
+            ? onNote({ booking, act: 'no_show', title: 'Corregir: no asistió', confirmLabel: 'Marcar no asistió', message: `La visita de ${who} está marcada como «Asistió». Indique por qué se corrige.` })
+            : onAct(booking, 'no_show'))}
+          className={`${ICON_BTN} hover:bg-coral-50 hover:text-coral-600`}>
+          {icon('no_show', UserX)}
+        </button>
+      )}
+      {canMove(s, 'cancelled') && (
+        <button type="button" title="Cancelar" aria-label={`Cancelar la reserva de ${who}`} disabled={busy}
+          onClick={() => onCancel(booking)} className={`${ICON_BTN} hover:bg-coral-50 hover:text-coral-600`}>
+          {icon('cancel', X)}
+        </button>
+      )}
+      {canMove(s, 'pending') && (
+        <button type="button" title="Reabrir" aria-label={`Reabrir la reserva de ${who}`} disabled={busy}
+          onClick={() => onNote({ booking, act: 'reopen', title: 'Reabrir reserva', confirmLabel: 'Reabrir', message: `La reserva de ${who} volverá a «Pendiente» si el horario aún tiene cupo para ${booking.num_attendees} persona(s).` })}
+          className={`${ICON_BTN} hover:bg-brand-50 hover:text-brand-600`}>
+          {icon('reopen', RotateCcw)}
+        </button>
+      )}
+    </div>
   );
 }
 
-interface AdminSlot {
-  id: number; visit_type: string; title: string; date: string;
-  start_time: string; end_time: string; capacity: number; location: string;
-  is_active: boolean; booked_count: number; spots_remaining: number; is_full: boolean;
-}
+function BookingsView() {
+  const [page, setPage] = useUrlPage();
+  const { get, set } = useUrlFilters();
+  const sort = parseSort(get('orden'));
+  const filters: Omit<AdminBookingsParams, 'page'> = {
+    q: get('q') || undefined,
+    status: get('estado') || undefined,
+    type: get('tipo') || undefined,
+    source: get('origen') || undefined,
+    from: get('desde') || undefined,
+    to: get('hasta') || undefined,
+    ordering: serializeSort(sort) || undefined,
+  };
+  const filterKey = JSON.stringify(filters);
 
-const VISIT_TYPE_LABEL: Record<string, string> = {
-  individual: 'Individual', open_class: 'Puertas Abiertas',
-};
-
-/** View / deactivate / delete published availability slots. */
-function SlotManager() {
-  const qc = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [typeFilter, setTypeFilter] = useState<'individual' | 'open_class' | ''>('');
-  const [deleteFor, setDeleteFor] = useState<AdminSlot | null>(null);
-
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-slots', page, typeFilter],
-    queryFn: async () =>
-      toPaged<AdminSlot>(
-        (await bookingsApi.getAdminSlots({
-          page,
-          ...(typeFilter ? { type: typeFilter } : {}),
-        })).data,
-      ),
-    placeholderData: keepPreviousData,
-  });
-  const slots = data?.results;
+  const { data, isLoading, isError, refetch } = useBookingsList({ page, ...filters });
+  const rows = data?.results ?? [];
   const count = data?.count ?? 0;
-
-  const toggleActive = useMutation({
-    mutationFn: (s: AdminSlot) => bookingsApi.updateSlot(s.id, { is_active: !s.is_active }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-slots'] }); toast.success('Horario actualizado.'); },
-    onError: () => toast.error('No se pudo actualizar el horario.'),
-  });
-  const del = useMutation({
-    mutationFn: (id: number) => bookingsApi.deleteSlot(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-slots'] }); setDeleteFor(null); toast.success('Horario eliminado.'); },
-    onError: (e: any) => { toast.error(e?.response?.data?.detail ?? 'No se pudo eliminar el horario.'); setDeleteFor(null); },
-  });
-
-  return (
-    <>
-      <div className="mb-4">
-        <select
-          className="input-field text-base sm:text-sm py-1.5 max-w-xs"
-          aria-label="Filtrar horarios por tipo"
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value as 'individual' | 'open_class' | '');
-            setPage(1);
-          }}
-        >
-          <option value="">Todos los tipos</option>
-          <option value="individual">Visitas individuales</option>
-          <option value="open_class">Puertas Abiertas</option>
-        </select>
-      </div>
-
-      {isError ? (
-        <ErrorState onRetry={() => refetch()} />
-      ) : isLoading ? (
-        <TableSkeleton />
-      ) : !slots?.length ? (
-        <EmptyState
-          icon={CalendarClock}
-          title="Sin horarios"
-          description={
-            typeFilter
-              ? 'Ningún horario coincide con el filtro. Genere disponibilidad arriba o cambie el filtro.'
-              : 'Genere disponibilidad con el formulario de arriba.'
-          }
-        />
-      ) : (
-      <div className="divide-y divide-line">
-        {slots.map((s) => (
-          <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-ink">
-                {format(parseISO(s.date), 'EEE d MMM yyyy', { locale: es })} · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
-                {s.title ? ` · ${s.title}` : ''}
-              </p>
-              <p className="text-xs text-subtle">
-                {VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type} · {s.booked_count}/{s.capacity} reservas · {s.location || 'Campus'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={s.is_active ? 'success' : 'neutral'}>{s.is_active ? 'Activo' : 'Inactivo'}</Badge>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => toggleActive.mutate(s)}
-                loading={toggleActive.isPending && toggleActive.variables?.id === s.id}
-              >
-                {s.is_active ? 'Desactivar' : 'Activar'}
-              </Button>
-              <Button variant="ghost" size="sm" className="text-coral-600" onClick={() => setDeleteFor(s)}>
-                Eliminar
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-      )}
-      {!!slots?.length && (
-        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="horarios" />
-      )}
-      <ConfirmDialog
-        open={!!deleteFor}
-        title="¿Eliminar horario?"
-        confirmLabel="Eliminar"
-        loading={del.isPending}
-        onClose={() => setDeleteFor(null)}
-        onConfirm={() => deleteFor && del.mutate(deleteFor.id)}
-        message={
-          <>
-            Se eliminará este horario de forma permanente. Los horarios con
-            reservas no pueden eliminarse — use <span className="font-semibold text-ink">Desactivar</span> para ocultarlos sin perder el historial.
-          </>
-        }
-      />
-    </>
-  );
-}
-
-export default function AdminBookings() {
-  const qc = useQueryClient();
-  // Default to individual visits — matches page copy / slot generator; open_class
-  // bookings are still reachable via the type filter.
-  const [typeFilter, setTypeFilter] = useState<'individual' | 'open_class' | ''>('individual');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(1);
+  const selection = useRowSelection(count, filterKey);
+  const exporter = useBookingsExport();
+  const bulk = useBookingsBulk();
+  const action = useBookingAction();
+  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
+  const [noteAsk, setNoteAsk] = useState<NoteAsk | null>(null);
 
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-bookings', typeFilter, statusFilter, page],
-    queryFn: async () =>
-      toPaged<Booking>(
-        (await bookingsApi.getAdminBookings({
-          ...(typeFilter ? { type: typeFilter } : {}),
-          ...(statusFilter ? { status: statusFilter } : {}),
-          page,
-        })).data,
-      ),
-    placeholderData: keepPreviousData,
-  });
+  const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exporter.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
 
-  const bookings = data?.results;
-  const count = data?.count ?? 0;
-
-  const action = useMutation({
-    mutationFn: ({ id, act }: { id: number; act: 'confirm' | 'cancel' | 'attended' | 'no_show' }) =>
-      bookingsApi.bookingAction(id, act),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-bookings'] });
-      toast.success('Reserva actualizada.');
-      setCancelFor(null);
-    },
-    onError: () => toast.error('No fue posible actualizar la reserva.'),
-  });
-
-  const exportCsv = useMutation({
-    mutationFn: async () =>
-      (await bookingsApi.exportBookings({
-        ...(typeFilter ? { type: typeFilter } : {}),
-        ...(statusFilter ? { status: statusFilter } : {}),
-      })).data as Blob,
-    onSuccess: (blob) => downloadBlob(blob, 'visitas.csv'),
-    onError: () => toast.error('No se pudo generar el archivo.'),
-  });
+  const act = (b: Booking, a: BookingAction, note?: string) =>
+    action.mutate({ id: b.id, act: a, note }, {
+      onSuccess: () => { toast.success('Reserva actualizada.'); setCancelFor(null); setNoteAsk(null); },
+      onError: (e) => toast.error(apiErrorMessage(e, 'No fue posible actualizar la reserva.')),
+    });
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Visitas"
-        subtitle="Publique fechas para visitas individuales (/agendar-visita) y Puertas Abiertas (/puertas-abiertas)."
+    <Card title={`${count.toLocaleString('es-MX')} reservas`}
+      action={<ExportMenu filenamePrefix="visitas" selectedCount={selection.count} fetch={fetchExport} />}>
+      <DataTable<Booking>
+        tableId="bookings"
+        caption="Reservas de visitas"
+        columns={BOOKING_COLUMNS}
+        rows={rows}
+        rowKey={(b) => b.id}
+        rowLabel={(b) => `reserva de ${b.parent_name} del ${fmtDate(b.slot_date)}`}
+        rowClassName={(b) => (b.status === 'cancelled' ? 'opacity-60' : '')}
+        sort={sort}
+        onSort={onSort}
+        page={page}
+        count={count}
+        onPage={setPage}
+        itemLabel="reservas"
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={() => refetch()}
+        columnControls
+        resizable
+        pinFirstColumn
+        selection={selection}
+        rowActions={(b) => (
+          <BookingRowActions
+            booking={b}
+            busyAct={action.isPending && action.variables?.id === b.id ? action.variables.act : undefined}
+            onAct={act}
+            onCancel={setCancelFor}
+            onNote={setNoteAsk}
+          />
+        )}
+        toolbar={(
+          <FilterBar
+            search={{ placeholder: 'Tutor, correo, teléfono o alumno…', label: 'Buscar reservas' }}
+            tabs={{ paramKey: 'estado', options: BOOKING_STATUS_OPTIONS, allLabel: 'Todas', label: 'Filtrar por estado' }}
+            selects={[
+              { key: 'tipo', label: 'Tipo de visita', options: VISIT_TYPE_OPTIONS, allLabel: 'Todos los tipos' },
+              { key: 'origen', label: 'Origen', options: BOOKING_SOURCE_OPTIONS, allLabel: 'Todos los orígenes' },
+            ]}
+            dateRange={{ idPrefix: 'visitas', label: 'Fecha de la visita' }}
+          />
+        )}
+        bulkBar={(
+          <BulkActionBar
+            count={selection.count}
+            allMatching={selection.allMatching}
+            allMatchingCount={count}
+            onSelectAllMatching={selection.onSelectAllMatching}
+            onClear={selection.onClear}
+            itemLabel="reservas"
+            actions={BOOKING_BULK}
+            onAction={setBulkAction}
+            busy={bulk.isPending}
+            exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="visitas" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+          />
+        )}
+        empty={{ icon: CalendarClock, title: 'Sin reservas', description: 'Ninguna reserva coincide con los filtros. Las visitas agendadas aparecerán aquí.' }}
       />
 
-      <Card
-        title="Publicar disponibilidad"
-        subtitle="Elija el tipo: recorrido individual o evento de clase abierta."
-      >
-        <SlotGenerator onDone={() => {
-          qc.invalidateQueries({ queryKey: ['admin-bookings'] });
-          qc.invalidateQueries({ queryKey: ['admin-slots'] });
-        }} />
-      </Card>
-
-      <Card title="Horarios publicados" subtitle="Active, desactive o elimine los horarios de ambos tipos.">
-        <SlotManager />
-      </Card>
-
-      <Card
-        title="Reservas"
-        action={
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <select
-              className="input-field w-full sm:w-auto text-base sm:text-sm py-1.5"
-              aria-label="Filtrar por tipo de visita"
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value as 'individual' | 'open_class' | '');
-                setPage(1);
-              }}
-            >
-              <option value="individual">Individuales</option>
-              <option value="open_class">Puertas Abiertas</option>
-              <option value="">Todos los tipos</option>
-            </select>
-            <select
-              className="input-field w-full sm:w-auto text-base sm:text-sm py-1.5"
-              aria-label="Filtrar por estado"
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            >
-              <option value="">Todas</option>
-              <option value="confirmed">Confirmadas</option>
-              <option value="pending">Pendientes</option>
-              <option value="attended">Asistió</option>
-              <option value="cancelled">Canceladas</option>
-              <option value="no_show">No asistió</option>
-            </select>
-            <Button
-              size="sm"
-              variant="secondary"
-              loading={exportCsv.isPending}
-              onClick={() => exportCsv.mutate()}
-            >
-              <FileDown className="w-3.5 h-3.5" /> Exportar CSV
-            </Button>
-          </div>
-        }
-      >
-        {isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : isLoading ? (
-          <TableSkeleton />
-        ) : !bookings?.length ? (
-          <EmptyState
-            icon={CalendarClock}
-            title={(statusFilter || typeFilter) ? 'Sin resultados' : 'Sin reservas'}
-            description={(statusFilter || typeFilter)
-              ? 'Ninguna reserva coincide con los filtros seleccionados.'
-              : 'Las visitas agendadas aparecerán aquí.'}
-            action={(statusFilter || typeFilter)
-              ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => { setStatusFilter(''); setTypeFilter(''); setPage(1); }}
-                >
-                  Ver todas
-                </Button>
-              )
-              : undefined}
-          />
-        ) : (
-          <>
-            {/* Mobile: stacked cards */}
-            <ul className="space-y-3 md:hidden">
-              {bookings.map((b) => {
-                const meta = statusMeta[b.status] ?? statusMeta.pending;
-                return (
-                  <li key={b.id} className="rounded-xl2 border border-line p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-ink">
-                          {format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}
-                        </p>
-                        <p className="text-subtle text-xs">
-                          {b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge variant="neutral">
-                          {VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}
-                        </Badge>
-                        <Badge variant={meta.variant}>{meta.label}</Badge>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-sm">
-                      <p className="text-muted">{b.parent_name}</p>
-                      {b.child_name && (
-                        <p className="text-subtle text-xs">Alumno: {b.child_name}</p>
-                      )}
-                      <p className="text-muted mt-1 break-words">{b.parent_email}</p>
-                      <p className="text-subtle text-xs">{b.parent_phone}</p>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-1">
-                      <BookingActions
-                        booking={b}
-                        onAction={action.mutate}
-                        onCancelRequest={setCancelFor}
-                        pendingAct={action.isPending && action.variables?.id === b.id ? action.variables?.act : undefined}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* Desktop: dense table */}
-            <DataTable
-              wrapClassName="hidden md:block"
-              rows={bookings}
-              rowKey={(b) => b.id}
-              columns={[
-                {
-                  header: 'Fecha', className: 'whitespace-nowrap',
-                  cell: (b) => (
-                    <>
-                      <div className="font-medium text-ink">{format(parseISO(b.slot_date), 'd MMM yyyy', { locale: es })}</div>
-                      <div className="text-subtle text-xs">{b.slot_start_time.slice(0, 5)} - {b.slot_end_time.slice(0, 5)}</div>
-                    </>
-                  ),
-                },
-                { header: 'Tipo', cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
-                {
-                  header: 'Tutor', className: 'text-muted',
-                  cell: (b) => (
-                    <>
-                      {b.parent_name}
-                      {b.child_name && <div className="text-subtle text-xs">Alumno: {b.child_name}</div>}
-                    </>
-                  ),
-                },
-                {
-                  header: 'Contacto',
-                  cell: (b) => (
-                    <>
-                      <div className="text-muted">{b.parent_email}</div>
-                      <div className="text-subtle text-xs">{b.parent_phone}</div>
-                    </>
-                  ),
-                },
-                {
-                  header: 'Estado',
-                  cell: (b) => { const meta = statusMeta[b.status] ?? statusMeta.pending; return <Badge variant={meta.variant}>{meta.label}</Badge>; },
-                },
-                {
-                  header: 'Acciones',
-                  cell: (b) => (
-                    <div className="flex items-center gap-1">
-                      <BookingActions
-                        booking={b}
-                        onAction={action.mutate}
-                        onCancelRequest={setCancelFor}
-                        pendingAct={action.isPending && action.variables?.id === b.id ? action.variables?.act : undefined}
-                      />
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </>
-        )}
-
-        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="reservas" />
-      </Card>
+      <BulkConfirmDialog
+        open={!!bulkAction}
+        onClose={() => setBulkAction(null)}
+        action={bulkAction}
+        entityLabel="reservas"
+        ids={selection.ids}
+        allMatching={selection.allMatching}
+        filters={filters}
+        execute={(body) => bulk.mutateAsync(body)}
+        onDone={(r) => { if (r.ok) selection.onClear(); }}
+      />
 
       <ConfirmDialog
         open={!!cancelFor}
@@ -644,20 +504,294 @@ export default function AdminBookings() {
         confirmLabel="Cancelar visita"
         loading={action.isPending}
         onClose={() => setCancelFor(null)}
-        onConfirm={() => cancelFor && action.mutate({ id: cancelFor.id, act: 'cancel' })}
-        message={
-          cancelFor && (
-            <>
-              Esto cancelará la visita de{' '}
-              <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
-              <span className="font-semibold text-ink">
-                {format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}
-              </span>{' '}
-              a las {cancelFor.slot_start_time.slice(0, 5)}. Se liberará el cupo y se notificará al tutor.
-            </>
-          )
-        }
+        onConfirm={() => cancelFor && act(cancelFor, 'cancel')}
+        message={cancelFor && (
+          <>
+            Esto cancelará la visita de <span className="font-semibold text-ink">{cancelFor.parent_name}</span> del{' '}
+            <span className="font-semibold text-ink">{format(parseISO(cancelFor.slot_date), "d 'de' MMM yyyy", { locale: es })}</span>{' '}
+            a las {hhmm(cancelFor.slot_start_time)} y liberará el cupo.
+          </>
+        )}
       />
+
+      <NoteDialog
+        // A fresh note per booking and move: never carry the last motive over.
+        key={noteAsk ? `${noteAsk.booking.id}-${noteAsk.act}` : 'closed'}
+        open={!!noteAsk}
+        title={noteAsk?.title ?? ''}
+        message={noteAsk?.message ?? ''}
+        confirmLabel={noteAsk?.confirmLabel ?? 'Guardar'}
+        loading={action.isPending}
+        onClose={() => setNoteAsk(null)}
+        onConfirm={(note) => noteAsk && act(noteAsk.booking, noteAsk.act, note)}
+      />
+    </Card>
+  );
+}
+
+// ── Horarios ──────────────────────────────────────────────
+const SLOT_COLUMNS: Column<AdminSlot>[] = [
+  {
+    id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 130, className: 'whitespace-nowrap font-medium text-ink',
+    cell: (s) => format(parseISO(s.date), 'EEE d MMM yyyy', { locale: es }),
+  },
+  { id: 'start', header: 'Horario', sortKey: 'start', minWidth: 110, className: 'whitespace-nowrap tabular-nums', cell: (s) => `${hhmm(s.start_time)}–${hhmm(s.end_time)}` },
+  { id: 'type', header: 'Tipo', sortKey: 'type', minWidth: 130, cell: (s) => <Badge variant="neutral">{VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type}</Badge> },
+  { id: 'title', header: 'Evento', minWidth: 140, className: 'text-muted', cell: (s) => s.title || '—' },
+  { id: 'location', header: 'Lugar', minWidth: 140, className: 'text-muted', cell: (s) => s.location || '—' },
+  { id: 'capacity', header: 'Cupo', sortKey: 'capacity', align: 'right', minWidth: 80, className: 'tabular-nums', cell: (s) => s.capacity },
+  {
+    id: 'booked', header: 'Reservados', sortKey: 'booked', align: 'right', minWidth: 110, className: 'tabular-nums',
+    cell: (s) => <span className={s.is_full ? 'font-semibold text-coral-700' : ''}>{s.booked_count}/{s.capacity}</span>,
+  },
+  {
+    id: 'active', header: 'Estado', minWidth: 100,
+    cell: (s) => <Badge variant={s.is_active ? 'success' : 'neutral'}>{s.is_active ? 'Activo' : 'Inactivo'}</Badge>,
+  },
+];
+
+const SLOT_BULK: BulkActionDef[] = [
+  { name: 'activate', label: 'Activar', icon: bulkIcon(Eye), planVerb: 'Se activarán' },
+  { name: 'deactivate', label: 'Desactivar', icon: bulkIcon(EyeOff), planVerb: 'Se desactivarán' },
+  { name: 'delete', label: 'Eliminar', icon: bulkIcon(Trash2), danger: true, planVerb: 'Se eliminarán' },
+];
+
+const ACTIVE_OPTIONS = [
+  { value: 'true', label: 'Activos' },
+  { value: 'false', label: 'Inactivos' },
+];
+
+const IMPORT_HEADERS = [
+  { key: 'tipo', required: true },
+  { key: 'fecha', required: true },
+  { key: 'inicio', required: true },
+  { key: 'fin', required: true },
+  { key: 'cupo', required: true },
+  { key: 'lugar' },
+  { key: 'titulo' },
+];
+
+function SlotsView() {
+  const qc = useQueryClient();
+  const [page, setPage] = useUrlPage();
+  const { get, set } = useUrlFilters();
+  const sort = parseSort(get('orden'));
+  const active = get('activo');
+  const filters: Omit<AdminSlotsParams, 'page'> = {
+    q: get('q') || undefined,
+    type: get('tipo') || undefined,
+    active: active === 'true' || active === 'false' ? active : undefined,
+    from: get('desde') || undefined,
+    to: get('hasta') || undefined,
+    ordering: serializeSort(sort) || undefined,
+  };
+  const filterKey = JSON.stringify(filters);
+
+  const { data, isLoading, isError, refetch } = useSlotsList({ page, ...filters });
+  const rows = data?.results ?? [];
+  const count = data?.count ?? 0;
+  const selection = useRowSelection(count, filterKey);
+  const exporter = useSlotsExport();
+  const bulk = useSlotsBulk();
+  const update = useSlotUpdate();
+  const del = useSlotDelete();
+  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
+  const [deleteFor, setDeleteFor] = useState<AdminSlot | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exporter.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
+
+  const toggle = (s: AdminSlot) =>
+    update.mutate({ id: s.id, is_active: !s.is_active }, {
+      onSuccess: () => toast.success(s.is_active ? 'Horario desactivado.' : 'Horario activado.'),
+      onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo actualizar el horario.')),
+    });
+  const remove = (s: AdminSlot) =>
+    del.mutate(s.id, {
+      onSuccess: () => { toast.success('Horario eliminado.'); setDeleteFor(null); },
+      onError: (e) => { toast.error(apiErrorMessage(e, 'No se pudo eliminar el horario.')); setDeleteFor(null); },
+    });
+
+  return (
+    <>
+      <Card title="Publicar disponibilidad" subtitle="Elija el tipo: recorrido individual o evento de clase abierta.">
+        <SlotGenerator onDone={() => { void invalidateEntity(qc, SLOTS_ENTITY, [BOOKINGS_ENTITY]); }} />
+      </Card>
+
+      <Card
+        title={`${count.toLocaleString('es-MX')} horarios publicados`}
+        subtitle="Active, desactive, elimine o cargue horarios desde un archivo."
+        action={(
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Cargar horarios
+            </Button>
+            <ExportMenu filenamePrefix="horarios_visita" selectedCount={selection.count} fetch={fetchExport} />
+          </div>
+        )}
+      >
+        <DataTable<AdminSlot>
+          tableId="booking-slots"
+          caption="Horarios de visita publicados"
+          columns={SLOT_COLUMNS}
+          rows={rows}
+          rowKey={(s) => s.id}
+          rowLabel={(s) => `horario del ${fmtDate(s.date)} a las ${hhmm(s.start_time)}`}
+          rowClassName={(s) => (s.is_active ? '' : 'opacity-60')}
+          sort={sort}
+          onSort={onSort}
+          page={page}
+          count={count}
+          onPage={setPage}
+          itemLabel="horarios"
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          columnControls
+          resizable
+          pinFirstColumn
+          selection={selection}
+          rowActions={(s) => (
+            <div className="flex items-center gap-1">
+              <button type="button" title={s.is_active ? 'Desactivar' : 'Activar'}
+                aria-label={`${s.is_active ? 'Desactivar' : 'Activar'} el horario del ${fmtDate(s.date)} a las ${hhmm(s.start_time)}`}
+                disabled={update.isPending && update.variables?.id === s.id}
+                onClick={() => toggle(s)} className={`${ICON_BTN} hover:bg-brand-50 hover:text-brand-600`}>
+                {update.isPending && update.variables?.id === s.id
+                  ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  : s.is_active ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+              </button>
+              <button type="button" title="Eliminar"
+                aria-label={`Eliminar el horario del ${fmtDate(s.date)} a las ${hhmm(s.start_time)}`}
+                onClick={() => setDeleteFor(s)} className={`${ICON_BTN} hover:bg-coral-50 hover:text-coral-600`}>
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          toolbar={(
+            <FilterBar
+              search={{ placeholder: 'Evento o lugar…', label: 'Buscar horarios' }}
+              tabs={{ paramKey: 'activo', options: ACTIVE_OPTIONS, allLabel: 'Todos', label: 'Filtrar por estado' }}
+              selects={[{ key: 'tipo', label: 'Tipo de visita', options: VISIT_TYPE_OPTIONS, allLabel: 'Todos los tipos' }]}
+              dateRange={{ idPrefix: 'horarios', label: 'Fecha del horario' }}
+            />
+          )}
+          bulkBar={(
+            <BulkActionBar
+              count={selection.count}
+              allMatching={selection.allMatching}
+              allMatchingCount={count}
+              onSelectAllMatching={selection.onSelectAllMatching}
+              onClear={selection.onClear}
+              itemLabel="horarios"
+              gender="m"
+              actions={SLOT_BULK}
+              onAction={setBulkAction}
+              busy={bulk.isPending}
+              exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="horarios_visita" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+            />
+          )}
+          empty={{ icon: CalendarClock, title: 'Sin horarios', description: 'Genere disponibilidad con el formulario de arriba o cargue un archivo.' }}
+        />
+      </Card>
+
+      <BulkConfirmDialog
+        open={!!bulkAction}
+        onClose={() => setBulkAction(null)}
+        action={bulkAction}
+        entityLabel="horarios"
+        gender="m"
+        ids={selection.ids}
+        allMatching={selection.allMatching}
+        filters={filters}
+        execute={(body) => bulk.mutateAsync(body)}
+        onDone={(r) => { if (r.ok) selection.onClear(); }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteFor}
+        title="¿Eliminar horario?"
+        confirmLabel="Eliminar"
+        loading={del.isPending}
+        onClose={() => setDeleteFor(null)}
+        onConfirm={() => deleteFor && remove(deleteFor)}
+        message={(
+          <>
+            Se eliminará este horario de forma permanente. Los horarios con reservas no pueden eliminarse: use{' '}
+            <span className="font-semibold text-ink">Desactivar</span> para ocultarlos sin perder el historial.
+          </>
+        )}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Cargar horarios de visita"
+        entity={SLOTS_ENTITY}
+        related={[BOOKINGS_ENTITY]}
+        api={slotsImportApi}
+        headers={IMPORT_HEADERS}
+        templatePrefix="plantilla_horarios"
+        description={(
+          <>
+            Una fila por horario: <strong>tipo</strong> (individual o puertas abiertas), <strong>fecha</strong> (DD/MM/AAAA),{' '}
+            <strong>inicio</strong> y <strong>fin</strong> (HH:MM), <strong>cupo</strong>, <strong>lugar</strong> y, opcional,{' '}
+            <strong>titulo</strong>. Un horario que ya existe (mismo tipo, fecha y horas) se actualiza; nunca se duplica.
+          </>
+        )}
+      />
+    </>
+  );
+}
+
+// ── page ──────────────────────────────────────────────────
+const VIEWS: { value: View; label: string }[] = [
+  { value: 'reservas', label: 'Reservas' },
+  { value: 'horarios', label: 'Horarios' },
+];
+
+/**
+ * /admin/visitas — reservas and published horarios on the Data Ops contracts:
+ * every filter, the sort, the page and the view live in the URL (`?vista=`),
+ * DataTable v2 with column controls, selection + bulk actions, CSV / Excel /
+ * PDF export and, for horarios, the file import.
+ */
+export default function AdminBookings() {
+  const { get, set, params } = useUrlFilters();
+  const view: View = get('vista') === 'horarios' ? 'horarios' : 'reservas';
+  // A view switch starts clean: the two lists do not share filters.
+  const switchTo = (next: View) => {
+    if (next === view) return;
+    const cleared: Record<string, null | string> = {};
+    params.forEach((_v, k) => { cleared[k] = null; });
+    set({ ...cleared, vista: next === 'reservas' ? null : next });
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Visitas"
+        subtitle="Reservas de visitas individuales (/agendar-visita) y Puertas Abiertas (/puertas-abiertas), y los horarios publicados."
+      />
+      <div role="tablist" aria-label="Vista" className="inline-flex rounded-xl2 border border-line bg-white p-1">
+        {VIEWS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={view === t.value}
+            onClick={() => switchTo(t.value)}
+            className={`min-h-[44px] rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
+              view === t.value ? 'bg-purple text-white' : 'text-muted hover:text-ink'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {view === 'reservas' ? <BookingsView /> : <SlotsView />}
     </div>
   );
 }
