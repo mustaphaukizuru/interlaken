@@ -4,20 +4,32 @@ Core API views: public contact form, health check + admin audit viewer.
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.listing import apply_date_range
-from apps.core.ordering import apply_ordering
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 
-from .models import AuditLog
-from .serializers import AuditLogSerializer, ContactMessageSerializer
+from .audit import record
+from .bulk import AdminBulkView, BulkAction, BulkSkip
+from .exporting import AdminExportMixin
+from .filters import (
+    AUDIT_EXPORT_SPEC,
+    AUDIT_ORDERING,
+    AUDIT_SEARCH_FIELDS,
+    CONTACT_EXPORT_SPEC,
+    CONTACT_ORDERING,
+    CONTACT_SEARCH_FIELDS,
+    AuditLogFilterSet,
+    ContactMessageFilterSet,
+)
+from .filtersets import parse_bool_param
+from .listing import AdminListMixin
+from .models import AuditLog, ContactMessage
+from .serializers import AuditLogSerializer, ContactMessageAdminSerializer, ContactMessageSerializer
 
 
 @method_decorator(ratelimit('contact', '5/m', method='POST'), name='dispatch')
@@ -91,50 +103,23 @@ class HealthView(APIView):
         )
 
 
-# Columns the auditoría table can sort by (public key → ORM field).
-AUDIT_ORDERING = {
-    'date': 'created_at',
-    'action': 'action',
-    'actor': 'actor__email',
-    'object': 'object_type',
-}
-
-
-class AdminAuditLogView(generics.ListAPIView):
+class AdminAuditLogView(AdminListMixin, generics.ListAPIView):
     """GET /api/v1/core/admin/audit/ — read-only, paginated audit trail (admin).
 
-    Filters: ``actor`` (label/email icontains), ``action`` (choice),
-    ``context`` (icontains — semantic category, e.g. ``finance.mark_paid``),
-    ``object_type`` + ``object_id`` (target filter, e.g. one invoice's history),
-    ``from`` / ``to`` (ISO dates, inclusive). Newest first.
+    Data Ops list contract (Phase 7): ``?q=`` over actor label, context and
+    object id; filters ``action``, ``actor`` (label/email contains),
+    ``object_type`` + ``object_id`` (one record's history), ``context``
+    (contains), ``from`` / ``to``; ordering ``date``, ``action``, ``actor``
+    (actor email), ``object``, ``context`` with the ``-pk`` tiebreak.
     """
     serializer_class = AuditLogSerializer
-    permission_classes = [IsAdmin]
+    search_fields = AUDIT_SEARCH_FIELDS
+    ordering = AUDIT_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = AuditLogFilterSet
 
     def get_queryset(self):
-        qs = AuditLog.objects.select_related('actor')
-        p = self.request.query_params
-
-        actor = (p.get('actor') or '').strip()
-        if actor:
-            qs = qs.filter(Q(actor_label__icontains=actor) | Q(actor__email__icontains=actor))
-        action = (p.get('action') or '').strip()
-        if action in AuditLog.Action.values:
-            qs = qs.filter(action=action)
-        context = (p.get('context') or '').strip()
-        if context:
-            qs = qs.filter(context__icontains=context)
-        object_type = (p.get('object_type') or '').strip()
-        if object_type:
-            qs = qs.filter(object_type=object_type)
-        object_id = (p.get('object_id') or '').strip()
-        if object_id:
-            qs = qs.filter(object_id=object_id)
-        # Invalid dates are ignored (date_bounds → None) instead of 500ing; the
-        # bounds are aware datetimes so the created_at index is usable.
-        qs = apply_date_range(qs, 'created_at', p.get('from'), p.get('to'))
-
-        return apply_ordering(qs, self.request, AUDIT_ORDERING, '-created_at')
+        return AuditLog.objects.select_related('actor')
 
 
 class PortalBadgesView(APIView):
@@ -207,62 +192,78 @@ class FacturacionRequestView(APIView):
         return Response({'detail': 'Solicitud enviada.'}, status=status.HTTP_201_CREATED)
 
 
-class ContactInboxView(generics.ListAPIView):
-    """GET /api/v1/core/admin/contact-messages/?handled=0 — website inbox (BACKLOG P1-G7)."""
-    serializer_class = None
-    permission_classes = [IsAdmin]
+class ContactInboxView(AdminListMixin, generics.ListAPIView):
+    """GET /api/v1/core/admin/contact-messages/ — website inbox (BACKLOG P1-G7).
 
-    def get_serializer_class(self):
-        from .serializers import ContactMessageAdminSerializer
-        return ContactMessageAdminSerializer
+    Data Ops list contract (Phase 7): ``?q=`` over name, email, subject and
+    message; ``?handled=1|0``; ``from`` / ``to``; ordering ``date``, ``name``,
+    ``email``, ``subject``, ``handled``.
+    """
+    serializer_class = ContactMessageAdminSerializer
+    search_fields = CONTACT_SEARCH_FIELDS
+    ordering = CONTACT_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = ContactMessageFilterSet
 
     def get_queryset(self):
-        from .models import ContactMessage
+        return ContactMessage.objects.all()
 
-        qs = ContactMessage.objects.all()
-        handled = self.request.query_params.get('handled')
-        if handled in ('0', 'false'):
-            qs = qs.filter(is_handled=False)
-        elif handled in ('1', 'true'):
-            qs = qs.filter(is_handled=True)
-        q = (self.request.query_params.get('q') or '').strip()
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(email__icontains=q) | Q(subject__icontains=q))
-        return qs.order_by('-created_at')
+
+class ContactInboxExportView(AdminExportMixin, ContactInboxView):
+    """GET /api/v1/core/admin/contact-messages/export/?fmt=csv|xlsx|pdf (audited)."""
+    export_spec = CONTACT_EXPORT_SPEC
 
 
 class ContactMessageHandleView(APIView):
-    """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool}"""
+    """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool} (audited)."""
     permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
         from django.shortcuts import get_object_or_404
 
-        from .models import ContactMessage
-        from .serializers import ContactMessageAdminSerializer
-
         m = get_object_or_404(ContactMessage, pk=pk)
-        m.is_handled = bool(request.data.get('is_handled', True))
-        m.save(update_fields=['is_handled'])
+        handled = parse_bool_param(request.data.get('is_handled', True))
+        if handled is None:
+            handled = bool(request.data.get('is_handled'))
+        if m.is_handled != handled:
+            before = m.is_handled
+            m.is_handled = handled
+            m.save(update_fields=['is_handled'])
+            record('update', m, {'is_handled': [before, handled]}, actor=request.user,
+                   context='contact.handled')
         return Response(ContactMessageAdminSerializer(m).data)
 
 
-class AdminAuditExportView(AdminAuditLogView):
-    """GET /api/v1/core/admin/audit/export/ — CSV of the filtered audit trail (P1-H3)."""
+def _handled_action(name: str, label_es: str, target: bool) -> BulkAction:
+    """``mark_handled`` / ``reopen``: rows already in the target state are *omitidas*."""
+    def check(message, payload):
+        if message.is_handled == target:
+            raise BulkSkip('ya está atendido' if target else 'ya está pendiente')
 
-    def list(self, request, *args, **kwargs):
-        import csv
-        import json
+    def handler(message, payload, actor):
+        check(message, payload)
+        before = message.is_handled
+        message.is_handled = target
+        message.save(update_fields=['is_handled'])
+        return {'is_handled': [before, target]}
 
-        from django.http import HttpResponse
+    return BulkAction(name=name, label_es=label_es, handler=handler, plan=check, side_effects='none')
 
-        from apps.core.exports import as_download, export_filename, fmt_dt
 
-        resp = HttpResponse(content_type='text/csv; charset=utf-8')
-        resp.write('﻿')
-        w = csv.writer(resp)
-        w.writerow(['Fecha', 'Actor', 'Acción', 'Objeto', 'ID', 'Contexto', 'Cambios'])
-        for a in self.get_queryset()[:10000]:
-            w.writerow([fmt_dt(a.created_at), a.actor_label or (a.actor.email if a.actor else ''), a.action,
-                        a.object_type, a.object_id, a.context, json.dumps(a.changes, ensure_ascii=False)[:2000]])
-        return as_download(resp, export_filename('auditoria'))
+class ContactInboxBulkView(AdminBulkView):
+    """POST /api/v1/core/admin/contact-messages/bulk/ — ``mark_handled`` / ``reopen`` (C5)."""
+    entity = 'core.contactmessage'
+    list_view_class = ContactInboxView
+    actions = {
+        a.name: a
+        for a in (
+            _handled_action('mark_handled', 'Marcar atendidos', True),
+            _handled_action('reopen', 'Reabrir', False),
+        )
+    }
+
+
+class AdminAuditExportView(AdminExportMixin, AdminAuditLogView):
+    """GET /api/v1/core/admin/audit/export/?fmt=csv|xlsx|pdf — the filtered, sorted
+    audit trail as a file (P1-H3 on the C3 export contract; audited itself)."""
+    export_spec = AUDIT_EXPORT_SPEC
