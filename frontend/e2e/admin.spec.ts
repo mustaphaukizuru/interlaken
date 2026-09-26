@@ -1,10 +1,12 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { login, portalNav, DEV_PARENT } from './helpers';
 
 /**
  * Admin-critical flows. All announcement APIs are stubbed with page.route
  * (the point is the UI flow — composer, listing — not the data plumbing);
- * auth is real for both roles.
+ * auth is real for both roles. The Alumnos data-ops flow runs against the
+ * real dev backend (import, bulk and export are the plumbing under test).
  */
 
 test('publishing a comunicado posts it and lists it in the admin console', async ({ page }) => {
@@ -83,4 +85,99 @@ test('a published comunicado is listed in the parent portal', async ({ page }) =
 
   await expect(page.getByText('Suspensión de clases')).toBeVisible();
   await expect(page.getByText('Mañana no habrá clases por mantenimiento del plantel.')).toBeVisible();
+});
+
+test('Alumnos data ops: import with errors, valid-only commit, bulk group change, XLSX export', async ({ page }) => {
+  // Unique per run so reruns against the same dev DB always take the "crear"
+  // path: 8 digits of the clock, suffixed 1/2/3 into three new matrículas.
+  const stamp = String(Date.now()).slice(-8);
+  const [m1, m2, m3] = [`${stamp}1`, `${stamp}2`, `${stamp}3`];
+  const nombre = `E2E${stamp}`;
+  // Two valid new students (so two rows can be bulk-edited after the commit),
+  // a later row repeating the first matrícula (in-file duplicate) and a row
+  // without apellidos (required column): 2 importable, 2 errors.
+  const csv = [
+    'matricula,nombre,apellidos,grado,grupo',
+    `${m1},${nombre},Uno,4° Primaria,A`,
+    `${m2},${nombre},Dos,4° Primaria,A`,
+    `${m1},${nombre},Repetido,4° Primaria,A`,
+    `${m3},${nombre},,4° Primaria,A`,
+  ].join('\n');
+
+  await login(page); // admin
+  await page.goto('/admin/alumnos');
+  await expect(page.getByRole('heading', { name: 'Alumnos', exact: true })).toBeVisible();
+
+  // ── Import: dry run shows the errors ────────────────────────────────────
+  await page.getByRole('button', { name: 'Más acciones' }).click();
+  await page.getByRole('menuitem', { name: 'Importar archivo' }).click();
+  const importDialog = page.getByRole('dialog', { name: 'Importar alumnos' });
+  await importDialog.getByLabel('Elegir archivo').setInputFiles({
+    name: 'alumnos_e2e.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csv, 'utf-8'),
+  });
+  await expect(importDialog.getByText('2 filas tienen errores.')).toBeVisible();
+  await expect(importDialog.getByRole('button', { name: 'Crear (2)' })).toBeVisible();
+  await expect(importDialog.getByRole('button', { name: 'Error (2)' })).toBeVisible();
+  await expect(importDialog.getByText('Duplicado de la fila 2.')).toBeVisible();
+
+  // The error report is the same file re-posted with report=csv.
+  const reportDownload = page.waitForEvent('download');
+  await importDialog.getByRole('button', { name: 'Descargar reporte de errores' }).click();
+  const report = await reportDownload;
+  expect(report.suggestedFilename()).toBe('reporte_alumnos.csv');
+  const reportText = await readFile(await report.path(), 'utf-8');
+  expect(reportText).toContain('resultado');
+  expect(reportText).toContain(m3);
+
+  // ── Commit only the valid rows ──────────────────────────────────────────
+  await importDialog.getByRole('button', { name: 'Continuar' }).click();
+  const commitButton = importDialog.getByRole('button', { name: 'Importar 2 filas' });
+  await expect(commitButton).toBeDisabled(); // errors present, valid-only not ticked
+  await importDialog.getByRole('checkbox', { name: /Importar solo las filas válidas/ }).check();
+  await commitButton.click();
+  await expect(importDialog.getByRole('status')).toContainText('Importación completa: 2 creados');
+  await page.keyboard.press('Escape');
+  await expect(importDialog).toBeHidden();
+
+  // ── Select the two new students and change their group ──────────────────
+  await page.getByRole('textbox', { name: 'Buscar alumnos', exact: true }).fill(nombre);
+  // The search is debounced into ?q=, and a filter change resets the selection:
+  // wait for the filtered view before ticking rows, or the reset eats a tick.
+  await expect(page).toHaveURL(new RegExp(`[?&]q=${nombre}`));
+  await expect(page.getByRole('heading', { name: '2 alumnos', exact: true })).toBeVisible();
+  const uno = page.getByRole('checkbox', { name: `Seleccionar ${nombre} Uno` });
+  const dos = page.getByRole('checkbox', { name: `Seleccionar ${nombre} Dos` });
+  await uno.check();
+  await dos.check();
+  const bulkBar = page.getByRole('region', { name: 'Acciones en lote' });
+  await expect(bulkBar).toContainText('2 alumnos seleccionados');
+  await bulkBar.getByRole('button', { name: 'Cambiar grupo' }).click();
+
+  const valueDialog = page.getByRole('dialog', { name: 'Cambiar grupo: 2 alumnos' });
+  await valueDialog.getByLabel('Nuevo grupo').fill('b'); // uppercased as typed
+  await valueDialog.getByRole('button', { name: 'Continuar' }).click();
+
+  // Matched by prefix: the title counts the live selection, which onDone clears
+  // (it reads "…: 0 alumnos" on the summary step).
+  const confirmDialog = page.getByRole('dialog', { name: /^Cambiar grupo a «B»:/ });
+  await expect(confirmDialog).toContainText('Se cambiará a «B» a 2 alumnos');
+  await confirmDialog.getByRole('button', { name: 'Cambiar grupo a «B» (2)' }).click();
+  await expect(confirmDialog.getByRole('status')).toContainText('2 alumnos procesados.');
+  await page.keyboard.press('Escape');
+  await expect(confirmDialog).toBeHidden();
+  for (const apellido of ['Uno', 'Dos']) {
+    await expect(page.getByRole('row', { name: new RegExp(`${nombre} ${apellido}`) }).getByRole('cell', { name: 'B', exact: true })).toBeVisible();
+  }
+
+  // ── Export the (filtered) view as Excel ─────────────────────────────────
+  await page.getByRole('button', { name: 'Exportar', exact: true }).click();
+  const xlsxDownload = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: /Excel/ }).click();
+  const xlsx = await xlsxDownload;
+  expect(xlsx.suggestedFilename()).toMatch(/^alumnos_\d{4}-\d{2}-\d{2}\.xlsx$/);
+  // An .xlsx is a zip: check the PK signature rather than trusting the name.
+  const bytes = await readFile(await xlsx.path());
+  expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
 });

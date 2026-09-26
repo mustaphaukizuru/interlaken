@@ -149,6 +149,14 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   const csrf = getCookie(CSRF_COOKIE);
   if (csrf) config.headers['X-CSRF-Token'] = csrf;
+  // The instance default is JSON, and axios 1.x serialises a FormData body to
+  // JSON when the Content-Type says so: every C4 import upload reached the
+  // server as application/json and got a 415 (caught by the Alumnos E2E).
+  // Multipart lets axios hand the FormData to the browser, which sets the
+  // boundary itself.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers['Content-Type'] = 'multipart/form-data';
+  }
   return config;
 });
 
@@ -919,7 +927,7 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  /** Roster (Data Ops C1): `q` (legacy `search`), `ordering`, `page_size` and the
+  /** Roster (Data Ops C1): `q`, `ordering`, `page_size` and the
    *  filters `status`, `access`, `level`, `grade`, `group`, `linked`, `enrolled_from/to`. */
   getStudents: (params?: ListParams) =>
     api.get('/accounts/students/', { params }),

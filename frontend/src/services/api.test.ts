@@ -55,6 +55,20 @@ describe('api 401 → cookie refresh interceptor', () => {
     expect(seenAuth).toBe('Bearer my-token');
   });
 
+  it('sends a FormData body as multipart, not serialised to JSON by the instance default', async () => {
+    let seen: { data: unknown; type: unknown } | null = null;
+    apiMock.onPost('/accounts/admin/students/import/').reply((config) => {
+      seen = { data: config.data, type: config.headers?.['Content-Type'] };
+      return [200, {}];
+    });
+    const fd = new FormData();
+    fd.append('dry_run', '1');
+
+    await api.post('/accounts/admin/students/import/', fd);
+    expect(seen!.data).toBeInstanceOf(FormData);
+    expect(String(seen!.type)).not.toContain('application/json');
+  });
+
   it('propagates non-401 errors without attempting a refresh', async () => {
     apiMock.onGet('/accounts/me/').reply(500);
     let refreshCalled = false;
