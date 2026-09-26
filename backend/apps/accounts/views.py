@@ -221,7 +221,7 @@ class GoogleTokenView(APIView):
     def post(self, request):
         credential = request.data.get('credential')
         if not credential:
-            return Response(error_body('credential required'), status=status.HTTP_400_BAD_REQUEST)
+            return Response(error_body('credential required', code='credential_required'), status=status.HTTP_400_BAD_REQUEST)
 
         # Verify the ID token LOCALLY (signature + audience + expiry) instead of
         # GETting Google's tokeninfo endpoint with the credential in the URL
@@ -230,13 +230,13 @@ class GoogleTokenView(APIView):
             payload = google_id_token.verify_oauth2_token(
                 credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
         except ValueError:
-            return Response(error_body('invalid_token'), status=status.HTTP_401_UNAUTHORIZED)
+            return Response(error_body('El token de Google no es válido o caducó.', code='invalid_token'), status=status.HTTP_401_UNAUTHORIZED)
 
         email = payload.get('email')
         if not email:
-            return Response(error_body('no_email'), status=status.HTTP_400_BAD_REQUEST)
+            return Response(error_body('No fue posible obtener su correo de Google.', code='no_email'), status=status.HTTP_400_BAD_REQUEST)
         if not _email_is_verified(payload):
-            return Response(error_body('email_unverified'), status=status.HTTP_401_UNAUTHORIZED)
+            return Response(error_body('Su correo de Google no está verificado.', code='email_unverified'), status=status.HTTP_401_UNAUTHORIZED)
 
         user = _resolve_google_user(email, defaults={
             'first_name': payload.get('given_name', ''),
@@ -247,8 +247,9 @@ class GoogleTokenView(APIView):
         })
         if user is None:
             return Response(
-                error_body('not_invited', detail='No hay una cuenta registrada con este correo. '
-                           'Pida al colegio que lo invite o vincule como tutor.'),
+                error_body('No hay una cuenta registrada con este correo. '
+                           'Pida al colegio que lo invite o vincule como tutor.',
+                           code='not_invited'),
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -437,7 +438,6 @@ class StudentListView(AdminListMixin, generics.ListAPIView):
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
     search_fields = STUDENT_SEARCH_FIELDS
-    legacy_search_param = 'search'
     normalize_search_term = staticmethod(search_key)
     ordering = STUDENT_ORDERING
     default_ordering = ('user__last_name', 'user__first_name')

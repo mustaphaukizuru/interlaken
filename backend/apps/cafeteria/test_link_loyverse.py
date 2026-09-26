@@ -115,7 +115,7 @@ class TestLinkLoyverseEndpoint:
         api_client.force_authenticate(AdminFactory())
         resp = api_client.post(URL, {'commit': '1'}, format='json')
         assert resp.status_code == 502
-        assert 'Loyverse' in resp.json()['error']
+        assert 'Loyverse' in resp.json()['detail']
 
 
 @pytest.mark.django_db

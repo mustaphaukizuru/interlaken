@@ -1,7 +1,7 @@
 """
 apps.core.exceptions — one error shape: DRF's {detail} / field dicts are kept,
 Django ValidationError becomes a 400, stray {'error'} bodies are folded into
-{detail} (with the legacy alias while LEGACY_ERROR_KEY is on), and every cap
+{detail} (the legacy ``error`` alias is off since Phase 10), and every cap
 answers 413 with the es-MX message.
 """
 
@@ -42,7 +42,7 @@ class TestHandler:
         resp = handler(APIException({"error": "algo salió mal", "code": "x7"}), _ctx())
         assert resp.status_code == 500
         assert resp.data["detail"] == "algo salió mal" and resp.data["code"] == "x7"
-        assert resp.data.get("error") in (None, "algo salió mal")  # alias only while flagged
+        assert "error" not in resp.data  # legacy alias removed in Phase 10
 
     def test_unhandled_exception_passes_through(self):
         assert handler(RuntimeError("x"), _ctx()) is None
@@ -65,9 +65,15 @@ class TestErrorResponse:
         resp = error_response("No.", 404)
         assert resp.status_code == 404 and resp.data == {"detail": "No."}
 
-    def test_legacy_alias_while_the_flag_is_on(self, monkeypatch):
-        monkeypatch.setattr(exceptions, "LEGACY_ERROR_KEY", True)
-        assert error_body("No.") == {"detail": "No.", "error": "No."}
+    def test_legacy_alias_is_off(self):
+        assert exceptions.LEGACY_ERROR_KEY is False
+        assert error_body("No.") == {"detail": "No."}
+
+    def test_machine_code_travels_in_code(self):
+        assert error_body("Firma no válida.", code="invalid_signature") == {
+            "detail": "Firma no válida.",
+            "code": "invalid_signature",
+        }
 
 
 @pytest.mark.django_db
@@ -83,3 +89,4 @@ class TestEndpointsUseDetail:
         resp = api_client.post(reverse("google-token"), {}, format="json")
         assert resp.status_code == 400
         assert resp.data["detail"] == "credential required"
+        assert "error" not in resp.data

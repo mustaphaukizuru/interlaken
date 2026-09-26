@@ -51,7 +51,7 @@ class TestRosterSearch:
         url = reverse('students')
 
         def ids(term):
-            return [r['id'] for r in api_client.get(url, {'search': term}).json()['results']]
+            return [r['id'] for r in api_client.get(url, {'q': term}).json()['results']]
 
         assert ids('ci09932') == [juan.id]
         assert ids('09932') == [juan.id]
@@ -63,7 +63,7 @@ class TestRosterSearch:
         s.user.first_name = 'Cielo'
         s.user.save(update_fields=['first_name'])
         api_client.force_authenticate(AdminFactory())
-        found = api_client.get(reverse('students'), {'search': 'cielo'}).json()['results']
+        found = api_client.get(reverse('students'), {'q': 'cielo'}).json()['results']
         assert [r['id'] for r in found] == [s.id]
 
 

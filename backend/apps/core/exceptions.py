@@ -9,11 +9,11 @@ this module adds:
   ``ValidationError`` (model ``clean()``, transition guards) to a 400 with the
   DRF shape, and folds any stray ``{'error': ...}`` body into ``{'detail'}``.
 * ``error_response`` / ``error_body``: what a view uses instead of hand-writing
-  ``Response({'error': msg})``. While ``LEGACY_ERROR_KEY`` is on, the body
-  also carries the old ``error`` key so the pages that still read
-  ``response.data.error`` keep their messages until the frontend error mapper
-  ships (Data Ops Phase 2); Phase 10 flips the flag and deletes the alias
-  together with the ``search`` query-param alias.
+  ``Response({'error': msg})``. The body is ``{"detail": msg}``; a machine code
+  a client branches on (OAuth ``not_invited``, webhook ``invalid_signature``)
+  travels in ``code``. The legacy ``error`` alias was removed in Data Ops
+  Phase 10 (``LEGACY_ERROR_KEY = False``) once every page read errors through
+  ``frontend/src/lib/apiErrors.ts``.
 * ``PayloadTooLarge``: the 413 every cap in the round answers with, body
   ``{"detail": "Acote los filtros: el límite es N filas."}``.
 """
@@ -26,8 +26,9 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
-# Removed in Data Ops Phase 10 together with the ``search`` query-param alias.
-LEGACY_ERROR_KEY = True
+# Flipped in Data Ops Phase 10: no response carries the old ``error`` key any more.
+# Kept as a flag (not deleted) so a rollback is one line.
+LEGACY_ERROR_KEY = False
 
 
 def cap_message(limit: int, *, noun: str = "filas", verb: str = "Acote los filtros") -> str:
@@ -48,9 +49,11 @@ class PayloadTooLarge(APIException):
         super().__init__(detail=detail)
 
 
-def error_body(message: str, **extra) -> dict:
-    """``{'detail': message, ...extra}`` plus the legacy ``error`` alias while it lasts."""
+def error_body(message: str, *, code: str | None = None, **extra) -> dict:
+    """``{'detail': message, ...extra}``; ``code`` adds a machine-readable ``code`` key."""
     body = {"detail": message}
+    if code:
+        body["code"] = code
     if LEGACY_ERROR_KEY:
         body["error"] = message
     body.update(extra)

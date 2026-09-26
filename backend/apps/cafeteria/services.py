@@ -1373,67 +1373,6 @@ def _payment_for_transaction(tx):
     return None
 
 
-def reconcile_balances(*, limit: int = 50, offset: int = 0):
-    """Compare linked students' local ledger against Loyverse ``total_points``.
-
-    Paginated (default ``limit=50``) so the admin reconcile endpoint does not
-    timeout on a full roster. Returns a dict::
-
-        {rows, checked, total, offset, limit, has_more}
-
-    Read-only — never writes to either side (surfacing drift is the point; see
-    spec §7 R1). Students whose Loyverse fetch errors are reported with
-    ``error`` set rather than dropped.
-    """
-    from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import CafeteriaBalance
-
-    limit = max(1, min(int(limit or 50), 200))
-    offset = max(0, int(offset or 0))
-
-    qs = (StudentProfile.objects.filter(is_active=True)
-          .exclude(loyverse_id='')
-          .select_related('user')
-          .order_by('id'))
-    total = qs.count()
-    page = list(qs[offset:offset + limit])
-
-    rows = []
-    for student in page:
-        cb, _ = CafeteriaBalance.objects.get_or_create(student=student)
-        local = Decimal(str(cb.balance or 0))
-        row = {
-            'student_id': student.id,
-            'student_name': student.user.full_name,
-            'student_code': student.student_id,
-            'loyverse_id': student.loyverse_id,
-            'local_balance': local,
-            'loyverse_balance': None,
-            'drift': None,
-            'in_sync': False,
-            'error': None,
-        }
-        try:
-            customer = get_customer_by_id(student.loyverse_id)
-            remote = get_balance_from_customer(customer)
-            row['loyverse_balance'] = remote
-            row['drift'] = local - remote
-            row['in_sync'] = (local == remote)
-        except LoyverseError as e:
-            row['error'] = str(e)
-        rows.append(row)
-
-    checked = len(rows)
-    return {
-        'rows': rows,
-        'checked': checked,
-        'total': total,
-        'offset': offset,
-        'limit': limit,
-        'has_more': (offset + checked) < total,
-    }
-
-
 # The POS mirror must not trust a points delta while the ledger is still moving.
 # Loyverse's ``customers.update`` fires with a PRE-SALE points snapshot a few
 # seconds after the receipt event has already debited the wallet, so for a

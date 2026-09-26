@@ -76,7 +76,7 @@ class TestCsv:
 
     def test_honours_q_filters_and_ordering(self, admin_client, roster):
         assert _names(admin_client.get(URL, {"q": "ci09932"})) == ["Beto Alvarado"]
-        assert _names(admin_client.get(URL, {"search": "mora"})) == ["Carla Mora"]
+        assert _names(admin_client.get(URL, {"q": "mora"})) == ["Carla Mora"]
         assert _names(admin_client.get(URL, {"nivel": "primaria", "ordering": "-balance"})) == [
             "Ana Zuñiga",
             "Carla Mora",

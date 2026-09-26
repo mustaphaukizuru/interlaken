@@ -79,7 +79,7 @@ class TestStudentGuardians:
             format='json',
         )
         assert resp.status_code == 400
-        assert 'rol' in resp.data['error'].lower()
+        assert 'rol' in resp.data['detail'].lower()
 
     def test_rejects_admin_email(self, api_client, admin_user):
         student = StudentProfileFactory()
@@ -90,7 +90,7 @@ class TestStudentGuardians:
             format='json',
         )
         assert resp.status_code == 400
-        assert 'rol' in resp.data['error'].lower()
+        assert 'rol' in resp.data['detail'].lower()
 
     def test_link_student_self_guardian(self, api_client, admin_user):
         """School-email family login: alumno may be linked as self-guardian."""

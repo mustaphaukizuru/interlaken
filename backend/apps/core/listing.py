@@ -52,11 +52,17 @@ class ListPagination(PageNumberPagination):
 
 # ── search ────────────────────────────────────────────────
 class UnaccentTransform(Transform):
-    """Postgres ``unaccent(col)``; bilateral so the search term is folded too."""
+    """Postgres ``immutable_unaccent(col)``; bilateral so the search term is folded too.
+
+    ``immutable_unaccent`` is the IMMUTABLE wrapper over the ``unaccent``
+    extension created by ``core.0006_audit_search_unaccent_trgm``: unlike the
+    STABLE ``unaccent()`` it can be indexed, so ``UPPER(immutable_unaccent(col))
+    LIKE ...`` uses the trigram indexes (Data Ops Phase 10, docs/PERFORMANCE.md).
+    """
 
     bilateral = True
     lookup_name = "unaccent"
-    function = "UNACCENT"
+    function = "IMMUTABLE_UNACCENT"
 
 
 _unaccent_registered = False
@@ -73,9 +79,10 @@ def _register_unaccent():
 def search_lookup(field: str) -> str:
     """``field__icontains`` on SQLite; ``field__unaccent__icontains`` on Postgres.
 
-    ``unaccent`` is created by ``core.0004_pg_extensions`` (guarded, Postgres
-    only), so "Lucia" finds "Lucía" and vice versa in production while the
-    SQLite test suite keeps plain ``icontains``.
+    ``unaccent`` is created by ``core.0004_pg_extensions`` and wrapped by
+    ``core.0006`` (both guarded, Postgres only), so "Lucia" finds "Lucía" and
+    vice versa in production while the SQLite test suite keeps plain
+    ``icontains``.
     """
     if connection.vendor == "postgresql":
         _register_unaccent()
@@ -169,7 +176,6 @@ class AdminListMixin:
 
         class AdminFooListView(AdminListMixin, generics.ListAPIView):
             search_fields = ('name', 'email')
-            legacy_search_param = 'search'          # one release, then drop
             ordering = {'name': 'name', 'date': 'created_at'}
             default_ordering = '-created_at'
             filterset_class = FooFilterSet          # optional
@@ -184,7 +190,6 @@ class AdminListMixin:
 
     search_fields: tuple[str, ...] = ()
     search_param = "q"
-    legacy_search_param: str | None = None
     ordering: dict[str, str | tuple[str, ...]] = {}
     default_ordering: str | tuple[str, ...] = "-pk"
     filterset_class = None
@@ -192,10 +197,7 @@ class AdminListMixin:
     # -- search --------------------------------------------------------
     def get_search_term(self) -> str:
         params = self.request.query_params
-        raw = params.get(self.search_param)
-        if not raw and self.legacy_search_param:
-            raw = params.get(self.legacy_search_param)
-        return (raw or "").strip()
+        return (params.get(self.search_param) or "").strip()
 
     @staticmethod
     def normalize_search_term(term: str) -> str:

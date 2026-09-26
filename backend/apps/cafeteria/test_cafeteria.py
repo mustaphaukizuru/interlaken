@@ -953,7 +953,7 @@ class TestLoyverseReadOnlyHistory:
         resp = api_client.get(reverse("cafeteria-loyverse-history"), {"student": student.id})
         assert resp.status_code == 200
         assert resp.data["receipts"] == []
-        assert resp.data.get("error") == "loyverse_unreachable"
+        assert resp.data.get("code") == "loyverse_unreachable"
 
 
 class TestPointsWalletExtraction:

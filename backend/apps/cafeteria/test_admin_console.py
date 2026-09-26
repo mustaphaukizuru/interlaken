@@ -352,7 +352,7 @@ class TestMarkPosLoaded:
             reverse("admin-topup-pos-loaded", args=[topup.id]), {}, format="json",
         )
         assert resp.status_code == 400
-        assert "reembolsada" in resp.data["error"].lower()
+        assert "reembolsada" in resp.data["detail"].lower()
 
         queue = api_client.get(reverse("admin-topups"), {"needs_pos": "1"})
         assert queue.data["results"] == []
@@ -462,22 +462,32 @@ class TestReconcile:
         assert api_client.get(reverse("admin-reconcile")).status_code == 403
 
     @patch("apps.cafeteria.services.get_customer_by_id")
-    def test_reconcile_respects_limit_offset(self, mock_get, api_client):
+    def test_reconcile_pages_with_page_size(self, mock_get, api_client):
         for i in range(3):
             s = StudentProfileFactory(loyverse_id=f"loy-{i}")
             _balance(s, 50)
         mock_get.return_value = {"total_points": 50}
         api_client.force_authenticate(user=AdminFactory())
-        resp = api_client.get(reverse("admin-reconcile"), {"limit": 2, "offset": 0})
+        resp = api_client.get(reverse("admin-reconcile"), {"page_size": 2})
         assert resp.status_code == 200
         assert resp.data["checked"] == 2
         assert resp.data["total"] == 3
         assert resp.data["has_more"] is True
         assert len(resp.data["results"]) == 2
 
-        page2 = api_client.get(reverse("admin-reconcile"), {"limit": 2, "offset": 2})
+        page2 = api_client.get(reverse("admin-reconcile"), {"page_size": 2, "page": 2})
         assert page2.data["checked"] == 1
         assert page2.data["has_more"] is False
+
+    @patch("apps.cafeteria.services.get_customer_by_id")
+    def test_legacy_limit_offset_is_ignored(self, mock_get, api_client):
+        # Removed in Phase 10: ``limit``/``offset`` no longer page the list.
+        for i in range(3):
+            _balance(StudentProfileFactory(loyverse_id=f"loy-{i}"), 50)
+        mock_get.return_value = {"total_points": 50}
+        api_client.force_authenticate(user=AdminFactory())
+        resp = api_client.get(reverse("admin-reconcile"), {"limit": 1, "offset": 2})
+        assert resp.data["checked"] == 3 and resp.data["offset"] == 0
 
 
 class TestLowBalanceReport:
@@ -539,6 +549,18 @@ class TestExports:
         assert student.student_id in body
         assert "Ajuste" in body
 
+    def test_student_statement_export_is_audited(self, api_client):
+        from apps.core.models import AuditLog
+
+        student = StudentProfileFactory(loyverse_id="")
+        _balance(student, 100)
+        admin = AdminFactory()
+        api_client.force_authenticate(user=admin)
+        api_client.get(reverse("admin-export-student", args=[student.id]), {"fmt": "pdf"})
+        entry = AuditLog.objects.get(object_type="export:cafeteria.student_statement")
+        assert entry.actor == admin and entry.object_id == "pdf"
+        assert entry.changes["filters"] == {"student": student.pk}
+
     def test_student_pdf_download(self, api_client):
         student = StudentProfileFactory(loyverse_id="")
         _balance(student, 100)
@@ -549,21 +571,11 @@ class TestExports:
         assert resp["Content-Type"] == "application/pdf"
         assert resp.content.startswith(b"%PDF-1.4")
 
-    def test_school_csv_download(self, api_client):
-        s1 = StudentProfileFactory()
-        _balance(s1, 100)
-        api_client.force_authenticate(user=AdminFactory())
-        resp = api_client.get(reverse("admin-export-school"))
-        assert resp.status_code == 200
-        assert resp["Content-Type"].startswith("text/csv")
-        assert s1.student_id in resp.content.decode("utf-8")
-
     def test_export_is_admin_only(self, api_client):
         student = StudentProfileFactory()
         api_client.force_authenticate(user=ParentFactory())
         assert api_client.get(
             reverse("admin-export-student", args=[student.id])).status_code == 403
-        assert api_client.get(reverse("admin-export-school")).status_code == 403
 
 
 class TestParentExport:
