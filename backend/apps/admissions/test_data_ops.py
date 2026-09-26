@@ -528,3 +528,26 @@ class TestPipelineBound:
         data, names = complete_names({"all": "1"})
         assert names == {"Reciente Ruiz", "Antigua Ruiz"} and data["bounded"] is False
         assert recent.pk
+
+
+# ── C2: ordering whitelist == frontend constants ──────────
+def test_ordering_keys_match_the_frontend_constants():
+    """frontend/src/hooks/queries/admissions.ts PREREG_ORDERING_KEYS / REG_ORDERING_KEYS."""
+    from apps.admissions.views import PREREGISTRATION_ORDERING, REGISTRATION_ORDERING
+
+    assert list(PREREGISTRATION_ORDERING) == [
+        "created_at",
+        "child",
+        "level",
+        "grade",
+        "status",
+        "parent",
+    ]
+    assert list(REGISTRATION_ORDERING) == [
+        "created_at",
+        "updated_at",
+        "submitted_at",
+        "child",
+        "level",
+        "status",
+    ]
