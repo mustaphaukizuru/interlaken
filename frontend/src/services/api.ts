@@ -8,7 +8,7 @@
  * read from localStorage or a URL.
  */
 import axios from 'axios';
-import type { BulkRequest, BulkResult, ExportParams, ImportFormat } from './dataOps';
+import type { BulkRequest, BulkResult, ExportParams, ImportFormat, ListParams } from './dataOps';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -579,10 +579,7 @@ export const cafeteriaApi = {
   /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
   bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean }) => api.post('/cafeteria/admin/bulk-topup/', data),
 
-  // Admin
-  /** `q` searches the whole roster server-side: names, matrícula, Loyverse code (ci09932 or 09932). */
-  getAllBalances: (params?: { page?: number; q?: string }) =>
-    api.get('/cafeteria/admin/balances/', { params }),
+  // Admin (the lists live in services/cafeteriaAdmin.ts, admin-only chunk)
 
 
   syncBalance: (studentId: number) =>
@@ -630,25 +627,15 @@ export const cafeteriaApi = {
     }>('/cafeteria/admin/sync-all/'),
 
   // Admin console (Phase D)
-  getTopUpLog: (params?: {
-    status?: string;
-    method?: string;
-    from?: string;
-    to?: string;
-    needs_pos?: boolean | number | string;
-    needs_unload?: boolean | number | string;
-    page?: number;
-  }) =>
-    api.get('/cafeteria/admin/topups/', { params }),
-
   markTopUpPosLoaded: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/pos-loaded/`),
 
   markTopUpPosUnloaded: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/pos-unloaded/`),
 
-  getStudentDetail: (studentId: number) =>
-    api.get(`/cafeteria/admin/student/${studentId}/`),
+  /** `ledger: 0` omits the capped lists; the console pages them via admin/transactions + admin/adjustments. */
+  getStudentDetail: (studentId: number, params?: { ledger?: 0 | 1 }) =>
+    api.get(`/cafeteria/admin/student/${studentId}/`, { params }),
 
   adjustBalance: (studentId: number, amount: number, reason: string) =>
     api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason }),
@@ -656,21 +643,6 @@ export const cafeteriaApi = {
   refundTransaction: (txId: number, reason?: string) =>
     api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
 
-  reconcile: (onlyDrift?: boolean, params?: { limit?: number; offset?: number }) =>
-    api.get('/cafeteria/admin/reconcile/', {
-      params: {
-        ...(onlyDrift ? { only: 'drift' } : {}),
-        ...(params?.limit != null ? { limit: params.limit } : {}),
-        ...(params?.offset != null ? { offset: params.offset } : {}),
-      },
-    }),
-
-  getLowBalance: (params?: { page?: number }) =>
-    api.get('/cafeteria/admin/low-balance/', { params }),
-
-  /** The whole Loyverse store, one row per customer card (pupils, staff, tests). */
-  getLoyverseCustomers: (params?: { page?: number; kind?: string; q?: string }) =>
-    api.get<LoyverseCustomerPage>('/cafeteria/admin/customers/', { params }),
   /** Wallet receipts of a card that has no student (staff meals). */
   getLoyverseCustomerReceipts: (loyverseId: string) =>
     api.get<LoyverseCustomerReceipts>(`/cafeteria/admin/customers/${encodeURIComponent(loyverseId)}/receipts/`),
@@ -680,10 +652,6 @@ export const cafeteriaApi = {
       params: { fmt }, responseType: 'blob',
     }),
 
-  exportSchool: (fmt: 'csv' | 'pdf') =>
-    api.get('/cafeteria/admin/export/school/', {
-      params: { fmt }, responseType: 'blob',
-    }),
 };
 
 /** Trigger a browser download for an axios blob response. */
@@ -712,7 +680,7 @@ export const paymentsApi = {
   getSummary: () => api.get<PaymentSummary>('/payments/summary/'),
   getReceipt: (paymentId: number) => api.get(`/payments/${paymentId}/receipt/`, { responseType: 'blob' }),
   /** Admin ledger (BACKLOG P1-D9). */
-  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
+  adminList: (params?: { page?: number; q?: string; status?: string; gateway?: string; type?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/admin/', { params }),
   adminSummary: (days = 30) => api.get<AdminPaymentsSummary>('/payments/admin/summary/', { params: { days } }),
   /**
@@ -742,17 +710,24 @@ export const coreApi = {
   /** Audit export (Data Ops C3): same filters and ordering as the list, plus `fmt` and `ids`. */
   exportAuditLog: (params: ExportParams) =>
     api.get<Blob>('/core/admin/audit/export/', { params, responseType: 'blob' }),
-  /** Website inbox (BACKLOG P1-G7). */
-  getContactMessages: (params?: { page?: number; q?: string; handled?: string }) =>
+  /** Website inbox (BACKLOG P1-G7) on the list contract: q, handled, from/to, ordering. */
+  getContactMessages: (params?: { page?: number; q?: string; handled?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/core/admin/contact-messages/', { params }),
   setContactHandled: (id: number, is_handled: boolean) =>
     api.patch<ContactMessage>(`/core/admin/contact-messages/${id}/`, { is_handled }),
+  /** Inbox export (C3): same filters and ordering as the list, plus `fmt` and `ids`. */
+  exportContactMessages: (params: ExportParams) =>
+    api.get<Blob>('/core/admin/contact-messages/export/', { params, responseType: 'blob' }),
+  /** Inbox bulk actions (C5): `mark_handled`, `reopen`. */
+  bulkContactMessages: (body: BulkRequest) =>
+    api.post<BulkResult>('/core/admin/contact-messages/bulk/', body),
   /** Live sidebar counters (BACKLOG P1-E3). */
   getBadges: () => api.get<Record<string, number>>('/core/badges/'),
   /** Read-only admin audit log (append-only), paginated + filterable. */
   getAuditLog: (params?: {
     page?: number;
     ordering?: string;
+    q?: string;
     actor?: string;
     action?: string;
     context?: string;
@@ -783,8 +758,14 @@ export const legalApi = {
   /** Acceso: download everything held on the requesting household. */
   exportMyData: () => api.get('/legal/arco/export/'),
   // Staff console
-  adminListArco: (status?: string, page?: number) =>
-    api.get('/legal/admin/arco/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
+  /** ARCO queue on the list contract: q, status (`open` = received + in review), type, overdue, from/to, ordering. */
+  adminListArco: (params?: ArcoListParams) =>
+    api.get<ArcoListResponse>('/legal/admin/arco/', { params }),
+  /** ARCO export (C3): same filters and ordering as the list, plus `fmt` and `ids`. */
+  adminExportArco: (params: ExportParams) =>
+    api.get<Blob>('/legal/admin/arco/export/', { params, responseType: 'blob' }),
+  /** ARCO bulk (C5): `in_review` only; resolve and reject stay single-row. */
+  adminBulkArco: (body: BulkRequest) => api.post<BulkResult>('/legal/admin/arco/bulk/', body),
   adminSetArcoStatus: (id: number, status: string, resolutionNote?: string) =>
     api.post(`/legal/admin/arco/${id}/status/`, { status, resolution_note: resolutionNote }),
   /** Record a request received via privacidad@ / WhatsApp / in person (BACKLOG P5-5). */
@@ -935,11 +916,20 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string; nivel?: string; grado?: string; grupo?: string; ordering?: string }) =>
+  /** Roster (Data Ops C1): `q` (legacy `search`), `ordering`, `page_size` and the
+   *  filters `status`, `access`, `level`, `grade`, `group`, `linked`, `enrolled_from/to`. */
+  getStudents: (params?: ListParams) =>
     api.get('/accounts/students/', { params }),
 
-  /** Bulk roster edit (BACKLOG P1-A8). */
-  bulkStudents: (data: { ids: number[]; action: 'status' | 'group' | 'grade'; value: string }) => api.post<{ updated: number }>('/accounts/admin/students/bulk/', data),
+  /** Roster bulk actions (Data Ops C5): status, grade, group, sync_loyverse. */
+  studentsBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/students/bulk/', body),
+  /** Legacy shape kept for LinkLoyverseModal ("Dar de baja"): one value for many ids. */
+  bulkStudents: async (data: { ids: number[]; action: 'status' | 'group' | 'grade'; value: string }) => {
+    const res = await api.post<BulkResult>('/accounts/admin/students/bulk/', {
+      action: data.action, ids: data.ids, payload: { value: data.value },
+    });
+    return { ...res, data: { ...res.data, updated: res.data.ok } };
+  },
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
@@ -949,11 +939,9 @@ export const portalApi = {
   updateStudent: (studentId: number, data: Partial<StudentWrite>) =>
     api.patch(`/accounts/admin/students/${studentId}/`, data),
 
-  /** CSV roster export (grade/group/guardians count), honors ?search=. */
-  exportStudents: (search?: string) =>
-    api.get('/accounts/admin/export/students/', {
-      params: search ? { search } : {}, responseType: 'blob',
-    }),
+  /** Roster export (Data Ops C3): same q, filters and ordering as the list, plus `fmt` and `ids`. */
+  exportStudents: (params: ExportParams) =>
+    api.get<Blob>('/accounts/admin/students/export/', { params, responseType: 'blob' }),
 
   // Aggregated staff analytics (staff/admin only; server-cached 60s per range).
   getStaffAnalytics: (days?: number) =>
@@ -1025,16 +1013,6 @@ export const portalApi = {
   unsubscribePush: (endpoint: string) =>
     api.post('/portal/push/unsubscribe/', { endpoint }),
 
-  // Bulk CSV import (admin): dry_run=true simulates and returns per-row results.
-  importStudents: (file: File, dryRun: boolean) => {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('dry_run', dryRun ? '1' : '0');
-    return api.post('/accounts/admin/import-students/', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-
   // Roster ↔ Loyverse linking (admin): commit=false previews the plan, true persists.
   linkLoyverse: (commit: boolean) =>
     api.post('/accounts/admin/link-loyverse/', { commit: commit ? '1' : '0' }),
@@ -1047,8 +1025,8 @@ export const portalApi = {
     }),
 
   // Per-student parent/guardian linking (admin).
-  listGuardians: (studentId: number) =>
-    api.get(`/accounts/admin/students/${studentId}/guardians/`),
+  listGuardians: (studentId: number, params?: { q?: string; ordering?: string }) =>
+    api.get(`/accounts/admin/students/${studentId}/guardians/`, { params }),
   linkGuardian: (
     studentId: number,
     data: {
@@ -1063,8 +1041,11 @@ export const portalApi = {
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
   /** Staff user management (BACKLOG P1-H1). */
-  listStaff: (page?: number) =>
-    api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/', { params: page && page > 1 ? { page } : undefined }),
+  listStaff: (params?: ListParams) =>
+    api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/', { params }),
+  exportStaff: (params: ExportParams) =>
+    api.get<Blob>('/accounts/admin/staff/export/', { params, responseType: 'blob' }),
+  staffBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/staff/bulk/', body),
   inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role'] }) =>
     api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
   updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name'>>) =>
@@ -1072,8 +1053,11 @@ export const portalApi = {
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
   /** Password request inbox (admin). */
-  getPasswordRequests: (status?: string, page?: number) =>
-    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
+  getPasswordRequests: (params?: ListParams) =>
+    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params }),
+  exportPasswordRequests: (params: ExportParams) =>
+    api.get<Blob>('/accounts/admin/password-requests/export/', { params, responseType: 'blob' }),
+  passwordRequestsBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/password-requests/bulk/', body),
   createPasswordRequest: (data: { requested_email: string; requester_name?: string; channel: string; note?: string }) =>
     api.post<PasswordRequest>('/accounts/admin/password-requests/', data),
   updatePasswordRequest: (id: number, data: { action: 'resolve' | 'reject'; delivered_via?: string; note?: string }) =>
@@ -1147,6 +1131,9 @@ export interface SiteRedirect { id: number; from_path: string; to_path: string; 
 export interface AnnouncementAttachment { id: number; name: string; url?: string }
 export interface NovedadItem { type: 'comunicado' | 'evento' | 'cafeteria' | 'pago' | 'sitio' | string; title: string; text: string; link: string; at: string; unread: boolean }
 export interface ArcoRequest { id: number; requester_email: string; requester_name: string; channel: string; request_type: string; details: string; status: 'received' | 'in_review' | 'resolved' | 'rejected'; resolution_note: string; statutory_deadline: string; created_at: string; resolved_at: string | null; is_overdue: boolean; days_left: number }
+export interface ArcoListParams { page?: number; q?: string; status?: string; type?: string; overdue?: string; from?: string; to?: string; ordering?: string }
+/** The ARCO list adds `overdue_count` over the whole filtered set (not just the page). */
+export interface ArcoListResponse { count: number; next: string | null; previous: string | null; results: ArcoRequest[]; overdue_count: number }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
 export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }
@@ -1189,6 +1176,8 @@ export interface MediaAsset {
   focal_y: number;
   tags: string;
   urls: Record<string, string>;
+  /** Used by a page (draft or published), a page SEO image or a comunicado attachment (admin list only). */
+  referenced?: boolean | null;
   created_at: string;
 }
 

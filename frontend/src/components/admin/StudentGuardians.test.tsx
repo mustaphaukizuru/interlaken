@@ -329,3 +329,18 @@ describe('StudentGuardians — admin password reset', () => {
     });
   });
 });
+
+describe('StudentGuardians search and sort (Data Ops Phase 3)', () => {
+  it('shows the tools past two guardians and sends q and ordering to the API', async () => {
+    const many = [GUARDIAN, { ...GUARDIAN, id: 32, email: 'beto@example.com', full_name: 'Beto Arce' }, { ...GUARDIAN, id: 33, email: 'caro@example.com', full_name: 'Caro Diaz' }];
+    listGuardians.mockResolvedValue({ data: { student: STUDENT, guardians: many, count: 3 } } as never);
+    renderWithProviders(<StudentGuardians studentId={7} />);
+    await screen.findByText('Beto Arce');
+    await userEvent.selectOptions(screen.getByLabelText('Ordenar tutores'), 'email');
+    await waitFor(() => expect(listGuardians).toHaveBeenLastCalledWith(7, { q: undefined, ordering: 'email' }));
+    listGuardians.mockResolvedValue({ data: { student: STUDENT, guardians: [], count: 3 } } as never);
+    await userEvent.type(screen.getByLabelText('Buscar tutores'), 'zz');
+    await waitFor(() => expect(listGuardians).toHaveBeenLastCalledWith(7, { q: 'zz', ordering: 'email' }));
+    expect(await screen.findByText('Sin coincidencias')).toBeInTheDocument();
+  });
+});

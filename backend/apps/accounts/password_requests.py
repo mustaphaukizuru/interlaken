@@ -15,16 +15,22 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import serializers, status
+from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.audit import record
+from apps.core.bulk import AdminBulkView, BulkAction
+from apps.core.exporting import AdminExportMixin, Col, ExportSpec
+from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
+from apps.core.transitions import assert_transition
 
 from .admin_password import _audit_set_password, generate_temporary_password, revoke_refresh_tokens
+from .filters import PasswordRequestFilterSet
 from .models import PasswordRequest, User
 
-PAGE = 20  # matches DRF's global PAGE_SIZE so the admin pager lines up
+ENTITY = 'accounts.passwordrequest'
 
 
 def delivery_templates(user: User, password: str) -> dict:
@@ -74,26 +80,35 @@ class PasswordRequestSerializer(serializers.ModelSerializer):
         return o.resolved_by.full_name if o.resolved_by else ''
 
 
-class PasswordRequestListCreateView(APIView):
-    permission_classes = [IsAdmin]
+PASSWORD_REQUEST_ORDERING = {
+    'created_at': 'created_at',
+    'status': 'status',
+    'requested_email': 'requested_email',
+    'channel': 'channel',
+    'resolved_at': 'resolved_at',
+}
 
-    def get(self, request):
-        qs = PasswordRequest.objects.select_related('user', 'created_by', 'resolved_by')
-        st = request.query_params.get('status')
-        if st in PasswordRequest.Status.values:
-            qs = qs.filter(status=st)
-        # Paged: the inbox only ever showed the newest PAGE rows, so older
-        # requests became unreachable once the queue grew.
-        try:
-            page = max(1, int(request.query_params.get('page', 1)))
-        except (TypeError, ValueError):
-            page = 1
-        start = (page - 1) * PAGE
-        return Response({
-            'count': qs.count(),
-            'open_count': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
-            'results': PasswordRequestSerializer(qs[start:start + PAGE], many=True).data,
-        })
+
+class PasswordRequestListCreateView(AdminListMixin, generics.ListAPIView):
+    """GET (list contract: ``q`` over requested email / requester / linked account,
+    ``ordering``, ``status``/``estado``, ``channel``/``canal``, ``from``/``to``) and
+    POST (log a request). The page also carries ``open_count`` for the tab badge."""
+
+    serializer_class = PasswordRequestSerializer
+    search_fields = ('requested_email', 'requester_name', 'user__email', 'user__first_name',
+                     'user__last_name')
+    ordering = PASSWORD_REQUEST_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = PasswordRequestFilterSet
+
+    def get_queryset(self):
+        return PasswordRequest.objects.select_related('user', 'created_by', 'resolved_by')
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        response.data['open_count'] = PasswordRequest.objects.filter(
+            status=PasswordRequest.Status.OPEN).count()
+        return response
 
     def post(self, request):
         email = (request.data.get('requested_email') or '').strip().lower()
@@ -118,6 +133,70 @@ class PasswordRequestListCreateView(APIView):
         return Response(PasswordRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 
 
+def reject_request(req: PasswordRequest, actor, note: str = '') -> dict:
+    """open → rejected under the transition table; returns the audit diff."""
+    assert_transition(ENTITY, req.status, PasswordRequest.Status.REJECTED)
+    before = req.status
+    req.status = PasswordRequest.Status.REJECTED
+    req.resolved_by, req.resolved_at = actor, timezone.now()
+    note = (note or '').strip()
+    if note:
+        req.note = note[:300]
+    req.save(update_fields=['status', 'resolved_by', 'resolved_at', 'note'])
+    changes = {'status': [before, req.status]}
+    if note:
+        changes['note'] = note[:300]
+    return changes
+
+
+class PasswordRequestExportView(AdminExportMixin, PasswordRequestListCreateView):
+    """GET /accounts/admin/password-requests/export/?fmt=csv|xlsx|pdf — audited."""
+
+    http_method_names = ['get', 'head', 'options']  # never the inherited POST
+    export_spec = ExportSpec(
+        filename_prefix='solicitudes_contrasena',
+        title='Solicitudes de contraseña',
+        sheet_title='Solicitudes',
+        audit_entity='password_requests',
+        columns=[
+            Col('created_at', 'Fecha', width=17, fmt='datetime'),
+            Col('requested_email', 'Correo solicitado', width=30),
+            Col('requester_name', 'Solicitante', width=24),
+            Col('account', 'Cuenta vinculada', lambda r: r.user.email if r.user else '', width=30),
+            Col('channel', 'Canal', lambda r: r.get_channel_display(), width=12),
+            Col('status', 'Estado', lambda r: r.get_status_display(), width=12),
+            Col('note', 'Nota', width=30),
+            Col('created_by', 'Registró', lambda r: r.created_by.full_name if r.created_by else '',
+                width=22),
+            Col('resolved_by', 'Atendió', lambda r: r.resolved_by.full_name if r.resolved_by else '',
+                width=22),
+            Col('resolved_at', 'Atendida', width=17, fmt='datetime'),
+            Col('delivered_via', 'Entregada vía', lambda r: r.get_delivered_via_display(),
+                width=12),
+        ],
+    )
+
+
+class PasswordRequestBulkView(AdminBulkView):
+    """POST /accounts/admin/password-requests/bulk/ — ``reject`` (note required).
+
+    ``resolve`` stays single-row on purpose: it generates a password that must be
+    shown once and delivered to one family."""
+
+    entity = ENTITY
+    list_view_class = PasswordRequestListCreateView
+    actions = {
+        'reject': BulkAction(
+            'reject', 'Rechazar',
+            handler=lambda req, payload, actor: reject_request(req, actor, payload.get('note')),
+            plan=lambda req, payload: assert_transition(
+                ENTITY, req.status, PasswordRequest.Status.REJECTED),
+            requires_note=True,
+            side_effects='none',
+        ),
+    }
+
+
 class PasswordRequestDetailView(APIView):
     permission_classes = [IsAdmin]
 
@@ -131,10 +210,10 @@ class PasswordRequestDetailView(APIView):
 
         action = request.data.get('action')
         if action == 'reject':
-            req.status = PasswordRequest.Status.REJECTED
-            req.resolved_by, req.resolved_at = request.user, timezone.now()
-            req.note = (request.data.get('note') or req.note)[:300]
-            req.save(update_fields=['status', 'resolved_by', 'resolved_at', 'note'])
+            with transaction.atomic():
+                changes = reject_request(req, request.user, request.data.get('note') or '')
+                record('update', req, {'via': 'portal', **changes}, actor=request.user,
+                       context='portal: solicitud de contraseña rechazada')
             return Response(PasswordRequestSerializer(req).data)
         if action != 'resolve':
             return Response({'action': ['Use "resolve" o "reject".']}, status=status.HTTP_400_BAD_REQUEST)

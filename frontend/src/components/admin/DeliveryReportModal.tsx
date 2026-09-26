@@ -5,7 +5,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { portalApi, type DeliveryReport } from '@/services/api';
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { portalApi } from '@/services/api';
+import { announcementsAdminApi } from '@/services/AdminContentApi';
 
 interface Props {
   announcementId: number | null;
@@ -62,7 +64,15 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
               </ul>
             </div>
           )}
-          <Button className="w-full" onClick={onClose}>Cerrar</Button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            <ExportMenu
+              label="Exportar destinatarios"
+              formats={['csv', 'xlsx']}
+              filenamePrefix={`entrega-comunicado-${announcementId}`}
+              fetch={async (fmt) => (await announcementsAdminApi.deliveryExport(announcementId!, fmt === 'xlsx' ? 'xlsx' : 'csv')).data}
+            />
+            <Button onClick={onClose}>Cerrar</Button>
+          </div>
         </div>
       )}
     </Modal>

@@ -3,7 +3,8 @@ Portal views: role-aware dashboard, announcements, notifications.
 """
 import logging
 
-from django.db.models import Count, Exists, OuterRef, Q, Sum
+import django_filters
+from django.db.models import Count, Exists, OuterRef, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -15,9 +16,23 @@ from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.cafeteria.services import low_balance_queryset
+from apps.content.ops import audit_value, bool_filter, delete_action, delete_keep_pk, tri_state
+from apps.core.audit import record, record_export
+from apps.core.bulk import AdminBulkView, BulkAction
 from apps.core.exceptions import error_body
+from apps.core.exporting import (
+    AdminExportMixin,
+    Col,
+    ExportSpec,
+    collect_rows,
+    parse_fmt,
+    render_export,
+)
+from apps.core.listing import AdminListMixin, apply_date_range
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
+from apps.core.throttling import SharedScopedRateThrottle
+from apps.core.transitions import assert_transition
 from apps.payments.models import Payment
 
 from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification
@@ -266,50 +281,252 @@ class AnnouncementCommentListCreateView(generics.ListCreateAPIView):
         serializer.save(announcement=self._announcement(), author=self.request.user)
 
 
-class AnnouncementAdminListCreateView(generics.ListCreateAPIView):
-    """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive).
+ANNOUNCEMENT_ENTITY = 'portal.announcement'
+ANNOUNCEMENT_AUDIT_FIELDS = (
+    'title', 'body', 'audience', 'is_active', 'push_enabled', 'show_on_site', 'site_until',
+    'site_link', 'publish_at', 'requires_ack', 'attachments',
+)
+
+
+def announcement_state(a) -> str:
+    """Lifecycle state for ``assert_transition``: never-sent inactive = draft."""
+    if a.is_active:
+        return 'active'
+    return 'draft' if a.fanout_at is None else 'inactive'
+
+
+def _maybe_fanout(announcement, *, context):
+    """First publish fans out once; scheduled comunicados wait for the cron."""
+    scheduled_later = bool(announcement.publish_at and announcement.publish_at > timezone.now())
+    if not announcement.is_active or announcement.fanout_at is not None or scheduled_later:
+        return
+    try:
+        fanout_and_stamp(announcement)
+    except Exception:  # noqa: BLE001 — best-effort notification
+        logging.getLogger(__name__).exception('Announcement %s %s fan-out failed', announcement.pk, context)
+
+
+def _admin_announcements():
+    return (Announcement.objects.select_related('created_by')
+            .annotate(read_count_ann=Count('reads'),
+                      ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
+
+
+class AnnouncementFilterSet(django_filters.FilterSet):
+    """``?audience=&active=&scheduled=&requires_ack=&from=&to=`` (dates on created_at)."""
+    audience = django_filters.ChoiceFilter(choices=Announcement.Audience.choices)
+    active = bool_filter('is_active')
+    requires_ack = bool_filter('requires_ack')
+    scheduled = django_filters.CharFilter(method='filter_scheduled')
+
+    class Meta:
+        model = Announcement
+        fields: list[str] = []
+
+    def filter_scheduled(self, qs, _name, value):
+        flag = tri_state(value)
+        if flag is None:
+            return qs
+        later = Q(publish_at__gt=timezone.now())
+        return qs.filter(later) if flag else qs.exclude(later)
+
+    @property
+    def qs(self):
+        params = self.data or {}
+        return apply_date_range(super().qs, 'created_at', params.get('from'), params.get('to'))
+
+
+ANNOUNCEMENT_ORDERING = {
+    'created': 'created_at',
+    'publish_at': 'publish_at',
+    'title': 'title',
+    'audience': 'audience',
+    'reads': 'read_count_ann',
+    'active': 'is_active',
+}
+
+
+class AnnouncementAdminListCreateView(AdminListMixin, generics.ListCreateAPIView):
+    """GET /api/v1/portal/admin/announcements/ — all comunicados (incl. inactive),
+    Data Ops list contract: ``q`` (title, body), ``audience``, ``active``,
+    ``scheduled``, ``requires_ack``, ``from``/``to``; ordering keys in
+    ``ANNOUNCEMENT_ORDERING``.
     POST — compose a new audience-targeted comunicado (author = current admin)."""
-    queryset = (Announcement.objects.select_related('created_by')
-                .annotate(read_count_ann=Count('reads'), ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [IsAdmin]
+    search_fields = ('title', 'body')
+    ordering = ANNOUNCEMENT_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = AnnouncementFilterSet
+
+    def get_queryset(self):
+        return _admin_announcements()
 
     def perform_create(self, serializer):
         announcement = serializer.save(created_by=self.request.user)
+        record('create', announcement,
+               {k: [None, audit_value(getattr(announcement, k))] for k in ANNOUNCEMENT_AUDIT_FIELDS},
+               actor=self.request.user, context='portal.announcement')
         # Alert the audience (in-app). Fail-soft: a fan-out hiccup must never
         # turn a saved comunicado into a 500. Drafts (is_active=False) notify
         # nobody until published (see perform_update on activate).
-        if not announcement.is_active or (announcement.publish_at and announcement.publish_at > timezone.now()):
-            return
-        try:
-            fanout_and_stamp(announcement)
-        except Exception:  # noqa: BLE001 — best-effort notification
-            logging.getLogger(__name__).exception(
-                'Announcement %s fan-out failed', announcement.pk)
+        _maybe_fanout(announcement, context='create')
 
 
 class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """PATCH (edit / toggle active) or DELETE a comunicado (admin)."""
-    queryset = (Announcement.objects.select_related('created_by')
-                .annotate(read_count_ann=Count('reads'), ack_count_ann=Count('reads', filter=Q(reads__acknowledged_at__isnull=False))))
+    """PATCH (edit / toggle active) or DELETE a comunicado (admin).
+
+    Activation goes through the ``portal.announcement`` transition table; a
+    comunicado that already reached the families (``fanout_at``) cannot be
+    deleted, only deactivated (its delivery history stays auditable)."""
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [IsAdmin]
     http_method_names = ['get', 'patch', 'delete']
 
+    def get_queryset(self):
+        return _admin_announcements()
+
     def perform_update(self, serializer):
-        previous = self.get_object()
-        was_active = previous.is_active
-        already_fanned = previous.fanout_at is not None
+        previous = serializer.instance
+        before = {k: getattr(previous, k) for k in ANNOUNCEMENT_AUDIT_FIELDS}
+        state = announcement_state(previous)
+        wants_active = serializer.validated_data.get('is_active', previous.is_active)
+        if wants_active != previous.is_active:
+            assert_transition(ANNOUNCEMENT_ENTITY, state, 'active' if wants_active else 'inactive')
         announcement = serializer.save()
+        diff = {k: [audit_value(before[k]), audit_value(getattr(announcement, k))]
+                for k in ANNOUNCEMENT_AUDIT_FIELDS if before[k] != getattr(announcement, k)}
+        if diff:
+            record('update', announcement, diff, actor=self.request.user, context='portal.announcement')
         # First-time publish of a draft: fan out once. Re-activate after a
         # prior fan-out must not spam the audience again.
-        scheduled_later = bool(announcement.publish_at and announcement.publish_at > timezone.now())
-        if announcement.is_active and not was_active and not already_fanned and not scheduled_later:
-            try:
-                fanout_and_stamp(announcement)
-            except Exception:  # noqa: BLE001 — best-effort notification
-                logging.getLogger(__name__).exception(
-                    'Announcement %s activate fan-out failed', announcement.pk)
+        _maybe_fanout(announcement, context='activate')
+
+    def destroy(self, request, *args, **kwargs):
+        reason = _delete_guard(self.get_object())
+        if reason:
+            return Response(error_body(f'No se puede eliminar: {reason}.'), status=400)
+        return super().destroy(request, *args, **kwargs)
+
+    def perform_destroy(self, instance):
+        delete_keep_pk(instance)
+        record('delete', instance, {'title': [instance.title, None]},
+               actor=self.request.user, context='portal.announcement')
+
+
+def _delete_guard(a) -> str | None:
+    if a.fanout_at is not None:
+        return 'ya se envió a las familias; desactívelo para archivarlo'
+    return None
+
+
+def _activation(name, label_es, target):
+    def plan(a, payload):
+        assert_transition(ANNOUNCEMENT_ENTITY, announcement_state(a), target)
+
+    def handler(a, payload, actor):
+        current = announcement_state(a)
+        assert_transition(ANNOUNCEMENT_ENTITY, current, target)
+        a.is_active = target == 'active'
+        a.save(update_fields=['is_active', 'updated_at'])
+        if a.is_active:
+            _maybe_fanout(a, context='bulk-activate')
+        return {'state': [current, target]}
+
+    return BulkAction(name=name, label_es=label_es, handler=handler, plan=plan, side_effects='per_row')
+
+
+def _duplicate(a, payload, actor):
+    copy = Announcement.objects.create(
+        title=f'Copia de {a.title}'[:200], body=a.body, audience=a.audience, created_by=actor,
+        is_active=False, push_enabled=a.push_enabled, show_on_site=False, site_until=None,
+        site_link=a.site_link, publish_at=None, requires_ack=a.requires_ack,
+        attachments=list(a.attachments or []),
+    )
+    record('create', copy, {'duplicated_from': a.pk}, actor=actor, context='portal.announcement')
+    return {'duplicate_id': copy.pk}
+
+
+class AnnouncementBulkView(AdminBulkView):
+    """POST /api/v1/portal/admin/announcements/bulk/ — ``activate`` (first
+    activation fans out), ``deactivate`` (archive), ``delete`` (never fanned
+    out only), ``duplicate`` (inactive draft copy)."""
+    entity = ANNOUNCEMENT_ENTITY
+    list_view_class = AnnouncementAdminListCreateView
+    actions = {
+        a.name: a for a in (
+            _activation('activate', 'Activar', 'active'),
+            _activation('deactivate', 'Desactivar', 'inactive'),
+            delete_action(guard=_delete_guard),
+            BulkAction(name='duplicate', label_es='Duplicar', handler=_duplicate, side_effects='none',
+                       audit_action='create'),
+        )
+    }
+
+
+ANNOUNCEMENT_EXPORT = ExportSpec(
+    filename_prefix='comunicados',
+    title='Comunicados',
+    audit_entity=ANNOUNCEMENT_ENTITY,
+    columns=[
+        Col('created_at', 'Creado', fmt='datetime', width=18),
+        Col('title', 'Título', width=36),
+        Col('audience', 'Dirigido a', getter=lambda a: a.get_audience_display(), width=12),
+        Col('state', 'Estado', getter=lambda a: {'active': 'Activo', 'inactive': 'Inactivo', 'draft': 'Borrador'}[announcement_state(a)], width=10),
+        Col('publish_at', 'Programado', fmt='datetime', width=18),
+        Col('requires_ack', 'Pide enterado', fmt='bool', width=10),
+        Col('read_count_ann', 'Leídos', fmt='int', width=8),
+        Col('ack_count_ann', 'Enterados', fmt='int', width=10),
+        Col('fanout_at', 'Enviado', fmt='datetime', width=18),
+        Col('created_by', 'Autor', getter=lambda a: a.created_by.full_name if a.created_by else '', width=22),
+        Col('body', 'Mensaje', width=60),
+    ],
+)
+
+
+class AnnouncementAdminExportView(AdminExportMixin, AnnouncementAdminListCreateView):
+    """GET /api/v1/portal/admin/announcements/export/?fmt=csv|xlsx&…list filters…"""
+    http_method_names = ['get', 'head', 'options']
+    export_formats = ('csv', 'xlsx')
+    export_spec = ANNOUNCEMENT_EXPORT
+
+
+DELIVERY_EXPORT_COLUMNS = [
+    Col('user_name', 'Destinatario', getter=lambda n: n.user.full_name, width=28),
+    Col('user_email', 'Correo', getter=lambda n: n.user.email, width=30),
+    Col('user_role', 'Rol', getter=lambda n: n.user.get_role_display(), width=12),
+    Col('created_at', 'Notificado', fmt='datetime', width=18),
+    Col('is_read', 'Leído', fmt='bool', width=8),
+    Col('acknowledged', 'Enterado', getter=lambda n: getattr(n, 'ack_at', None), fmt='datetime', width=18),
+    Col('email_status', 'Correo (estado)', getter=lambda n: n.get_email_status_display(), width=14),
+    Col('push_status', 'Push (estado)', getter=lambda n: n.get_push_status_display(), width=14),
+    Col('attempts', 'Intentos', fmt='int', width=8),
+    Col('last_error', 'Último error', width=36),
+]
+
+
+class AnnouncementDeliveryExportView(APIView):
+    """GET /api/v1/portal/admin/announcements/<pk>/delivery/export/?fmt=csv|xlsx —
+    one row per recipient: read, acknowledged and per-channel status (audited)."""
+    permission_classes = [IsAdmin]
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'admin-export'
+
+    def get(self, request, pk):
+        announcement = get_object_or_404(Announcement, pk=pk)
+        fmt = parse_fmt(request, ('csv', 'xlsx'))
+        ack = AnnouncementRead.objects.filter(announcement=announcement, user=OuterRef('user_id'))
+        qs = (Notification.objects.filter(announcement=announcement)
+              .select_related('user')
+              .annotate(ack_at=Subquery(ack.values('acknowledged_at')[:1]))
+              .order_by('user__last_name', 'user__first_name', 'pk'))
+        spec = ExportSpec(filename_prefix=f'entrega-comunicado-{announcement.pk}',
+                          title=f'Entrega: {announcement.title}', audit_entity='portal.announcement.delivery',
+                          columns=DELIVERY_EXPORT_COLUMNS)
+        count, rows = collect_rows(qs, spec.cap_for(fmt))
+        response = render_export(rows, spec, fmt)
+        record_export(spec.audit_entity, fmt, {'announcement': announcement.pk}, count, request.user)
+        return response
 
 
 class NotificationListView(generics.ListAPIView):

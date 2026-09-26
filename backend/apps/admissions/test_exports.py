@@ -93,4 +93,6 @@ def test_audit_export(api_client):
     api_client.force_authenticate(user=AdminFactory())
     _pre()  # creates audit rows via signals
     resp = api_client.get(reverse('core-admin-audit-export'))
-    assert resp.status_code == 200 and resp.content.decode('utf-8-sig').startswith('Fecha,')
+    # The audit export streams since Data Ops Phase 7 (AdminExportMixin CSV).
+    body = b''.join(resp.streaming_content).decode('utf-8-sig')
+    assert resp.status_code == 200 and body.startswith('Fecha,')

@@ -14,11 +14,14 @@ from __future__ import annotations
 
 from django.db import transaction
 from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.audit import record
+from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.permissions import IsAdmin
+from apps.core.transitions import assert_transition
 
 from .import_students import STUDENT_EMAIL_DOMAIN
 from .models import StudentProfile, User
@@ -178,44 +181,143 @@ class AdminStudentUpdateView(APIView):
         return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)
 
 
-class AdminStudentBulkView(APIView):
-    """POST /accounts/admin/students/bulk/ {"ids": [...], "action": "status"|"group"|"grade", "value": "..."} (BACKLOG P1-A8).
+# ── bulk actions (Data Ops C5) ─────────────────────────────
+STUDENT_ENTITY = 'accounts.studentprofile'
+STATUS_LABEL = dict(StudentProfile.Status.choices)
 
-    Applies one change to many roster rows in a transaction; each row is audited
-    like a single edit so the trail stays per-student."""
-    permission_classes = [IsAdmin]
+
+def _value(payload) -> str:
+    return str(payload.get('value') or '').strip()
+
+
+def _plan_status(profile, payload):
+    assert_transition(STUDENT_ENTITY, profile.status, _value(payload))
+
+
+def _apply_status(profile, payload, actor):
+    target = _value(payload)
+    current = profile.status
+    assert_transition(STUDENT_ENTITY, current, target)
+    profile.save(update_fields=profile.apply_status(target))
+    return {'status': [current, target], 'via': 'portal-bulk'}
+
+
+def _field_action(field: str, label: str):
+    def plan(profile, payload):
+        if getattr(profile, field) == _value(payload):
+            raise BulkSkip(f'Ya tiene ese {label}.')
+
+    def handler(profile, payload, actor):
+        value = _value(payload)
+        before = getattr(profile, field)
+        if before == value:
+            raise BulkSkip(f'Ya tiene ese {label}.')
+        setattr(profile, field, value)
+        profile.save(update_fields=[field])
+        return {field: [before, value], 'via': 'portal-bulk'}
+
+    return plan, handler
+
+
+def _plan_sync(profile, payload):
+    if not profile.loyverse_id:
+        raise BulkSkip('No está vinculado a Loyverse.')
+    cb = getattr(profile, 'cafeteria_balance', None)
+    if cb is not None and cb.last_synced is not None:
+        raise BulkSkip('El saldo ya está sincronizado (el ledger local manda).')
+
+
+def _apply_sync(profile, payload, actor):
+    from apps.cafeteria.services import LoyverseError, sync_student_balance
+
+    _plan_sync(profile, payload)
+    try:
+        balance = sync_student_balance(profile)
+    except LoyverseError as exc:
+        raise ValueError(f'Loyverse no respondió: {exc}') from None
+    return {'seeded_balance': str(balance), 'via': 'portal-bulk'}
+
+
+_plan_grade, _apply_grade = _field_action('grade', 'grado')
+_plan_group, _apply_group = _field_action('group', 'grupo')
+
+STUDENT_BULK_ACTIONS = {
+    a.name: a for a in (
+        BulkAction('status', 'Cambiar estado', handler=_apply_status, plan=_plan_status,
+                   side_effects='none'),
+        BulkAction('grade', 'Cambiar grado', handler=_apply_grade, plan=_plan_grade,
+                   side_effects='none'),
+        BulkAction('group', 'Cambiar grupo', handler=_apply_group, plan=_plan_group,
+                   side_effects='none'),
+        # Seeds the opening wallet balance from Loyverse for linked students
+        # that were never seeded (sync_student_balance); a no-op otherwise.
+        BulkAction('sync_loyverse', 'Sincronizar con Loyverse', handler=_apply_sync,
+                   plan=_plan_sync, side_effects='per_row'),
+    )
+}
+
+
+def withdrawal_warnings(ids) -> list[dict]:
+    """Students in ``ids`` whose wallet still holds money (C5: archiving a student
+    surfaces the balance so the office refunds or transfers it first)."""
+    from apps.cafeteria.models import CafeteriaBalance
+
+    rows = (CafeteriaBalance.objects.filter(student_id__in=list(ids), balance__gt=0)
+            .select_related('student__user').order_by('-balance', 'student_id'))
+    return [{
+        'id': cb.student_id,
+        'name': cb.student.user.full_name,
+        'student_id': cb.student.student_id,
+        'balance': str(cb.balance),
+        'message': f'{cb.student.user.full_name} ({cb.student.student_id}) tiene '
+                   f'${cb.balance:,.2f} de saldo en cafetería.',
+    } for cb in rows]
+
+
+class AdminStudentBulkView(AdminBulkView):
+    """POST /api/v1/accounts/admin/students/bulk/ — the C5 bulk contract for the roster.
+
+    Actions: ``status`` (payload ``{"value": "active|on_leave|graduated|withdrawn"}``,
+    under the ``accounts.studentprofile`` transition table; the dry run of a
+    withdrawal lists the students that still hold a wallet balance under
+    ``warnings``), ``grade`` / ``group`` (``{"value": "..."}``) and
+    ``sync_loyverse`` (seed the opening balance of linked, never-seeded
+    students). There is no delete: ``withdrawn`` is the archive.
+    """
+    entity = STUDENT_ENTITY
+    actions = STUDENT_BULK_ACTIONS
+
+    @property
+    def list_view_class(self):
+        from .views import StudentListView
+        return StudentListView
+
+    def get_queryset(self):
+        return StudentProfile.objects.select_related('user', 'cafeteria_balance')
+
+    def validate_payload(self, action: str, payload: dict):
+        value = _value(payload)
+        if action == 'status' and value not in StudentProfile.Status.values:
+            raise ValidationError({'value': ['Estado no válido.']})
+        if action == 'grade' and not 1 <= len(value) <= 20:
+            raise ValidationError({'value': ['Indique un grado de hasta 20 caracteres.']})
+        if action == 'group' and not 1 <= len(value) <= 5:
+            raise ValidationError({'value': ['Indique un grupo de hasta 5 caracteres.']})
 
     def post(self, request):
-        from django.db import transaction
-
-        ids = request.data.get('ids')
-        action = request.data.get('action')
-        value = str(request.data.get('value') or '').strip()
-        if not isinstance(ids, list) or not ids or len(ids) > 500:
-            return Response({'ids': ['Seleccione entre 1 y 500 alumnos.']}, status=status.HTTP_400_BAD_REQUEST)
-        if action == 'status' and value not in StudentProfile.Status.values:
-            return Response({'value': ['Estado no válido.']}, status=status.HTTP_400_BAD_REQUEST)
-        if action == 'group' and len(value) > 5:
-            return Response({'value': ['Grupo de hasta 5 caracteres.']}, status=status.HTTP_400_BAD_REQUEST)
-        if action == 'grade' and not (1 <= len(value) <= 20):
-            return Response({'value': ['Grado no válido.']}, status=status.HTTP_400_BAD_REQUEST)
-        if action not in ('status', 'group', 'grade'):
-            return Response({'action': ['Use status, group o grade.']}, status=status.HTTP_400_BAD_REQUEST)
-        updated = 0
-        with transaction.atomic():
-            for profile in StudentProfile.objects.select_for_update().filter(pk__in=ids).select_related('user'):
-                before = {'status': profile.status, 'group': profile.group, 'grade': profile.grade}
-                if action == 'status':
-                    if profile.status == value:
-                        continue
-                    fields = profile.apply_status(value)
-                else:
-                    if getattr(profile, action) == value:
-                        continue
-                    setattr(profile, action, value)
-                    fields = [action]
-                profile.save(update_fields=fields)
-                record('update', profile, {'via': 'portal-bulk', action: {'from': before[action], 'to': value}},
-                       actor=request.user, context='portal: edición masiva de alumnos')
-                updated += 1
-        return Response({'updated': updated})
+        data = request.data if isinstance(request.data, dict) else {}
+        payload = data.get('payload') if isinstance(data.get('payload'), dict) else {}
+        action = str(data.get('action') or '')
+        if action == 'group' and _value(payload):
+            payload['value'] = _value(payload).upper()
+        self.validate_payload(action, payload)
+        response = super().post(request)
+        result = response.data
+        if (result.get('dry_run') and action == 'status'
+                and _value(payload) == StudentProfile.Status.WITHDRAWN):
+            if data.get('all_matching'):
+                ids = self.matching_ids(request, data.get('filters') or {})
+            else:
+                ids = [int(i) for i in data.get('ids') or []]
+            result['warnings'] = withdrawal_warnings(ids)
+        return response

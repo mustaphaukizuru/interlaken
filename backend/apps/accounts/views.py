@@ -2,12 +2,14 @@
 Accounts views: Google OAuth flow, JWT token exchange, user profile, students list.
 """
 import secrets
+from decimal import Decimal
 from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
 from django.contrib.auth import logout
-from django.db.models import Q
+from django.db.models import DecimalField, F, Q, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -35,8 +37,9 @@ from .cookies import (
     set_csrf_cookie,
     set_refresh_cookie,
 )
+from .filters import StudentFilterSet
 from .models import StudentProfile, User
-from .serializers import StudentProfileSerializer, UserSerializer
+from .serializers import StudentProfileSerializer, StudentRosterSerializer, UserSerializer
 
 
 class GoogleLoginView(APIView):
@@ -394,14 +397,29 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
 
 
 # Columns the roster can sort by (public key → ORM field(s)); the frontend
-# sends the same keys (Data Ops C2).
+# sends the same keys (Data Ops C2). ``balance`` is the wallet annotation
+# (``CafeteriaBalance``, LEFT JOIN, 0 when the student has no wallet yet).
 STUDENT_ORDERING = {
     'name': ('user__last_name', 'user__first_name'),
     'student_id': 'student_id',
     'grade': ('grade', 'group'),
+    'group': ('group', 'grade'),
     'status': 'status',
     'last_login': 'user__last_login',
+    'enrollment_date': 'enrollment_date',
+    'balance': 'balance',
 }
+STUDENT_SEARCH_FIELDS = ('user__first_name', 'user__last_name', 'user__email', 'student_id', 'grade')
+
+
+def roster_queryset():
+    """The admin roster: user + Loyverse snapshot joined, wallet balance annotated.
+
+    One SELECT for any page size (the 2-query budget is count + page)."""
+    return (StudentProfile.objects.select_related('user', 'loyverse_profile')
+            .annotate(balance=Coalesce(F('cafeteria_balance__balance'),
+                                       Value(Decimal('0.00')),
+                                       output_field=DecimalField(max_digits=10, decimal_places=2))))
 
 
 class StudentListView(AdminListMixin, generics.ListAPIView):
@@ -409,45 +427,37 @@ class StudentListView(AdminListMixin, generics.ListAPIView):
 
     Data Ops C1 list contract: ``q`` search (``search`` kept as an alias for
     one release; powers the admin Ctrl+K palette), whitelisted ``ordering``
-    with a stable ``-pk`` tiebreak, ``page_size`` ≤ 100. A term written the
-    Loyverse way (``ci09932``) is looked up as the digits the app stores
-    (``09932``), so the office can paste either spelling (decision C3.1).
+    with a stable ``-pk`` tiebreak, ``page_size`` ≤ 100, and the roster
+    filters of ``StudentFilterSet`` (``status``/``estado``, ``access``/``acceso``,
+    ``level``/``nivel``, ``grade``/``grado``, ``group``/``grupo``, ``linked``,
+    ``enrolled_from``/``enrolled_to``; admin only). A term written the Loyverse
+    way (``ci09932``) is looked up as the digits the app stores (``09932``),
+    so the office can paste either spelling (decision C3.1).
     """
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    search_fields = ('user__first_name', 'user__last_name', 'user__email', 'student_id', 'grade')
+    search_fields = STUDENT_SEARCH_FIELDS
     legacy_search_param = 'search'
     normalize_search_term = staticmethod(search_key)
     ordering = STUDENT_ORDERING
     default_ordering = ('user__last_name', 'user__first_name')
+    filterset_class = StudentFilterSet
+
+    def _is_admin(self):
+        return getattr(self.request.user, 'role', None) == User.Role.ADMIN
+
+    def get_serializer_class(self):
+        return StudentRosterSerializer if self._is_admin() else StudentProfileSerializer
+
+    def apply_filterset(self, qs):
+        # Roster filters are an admin tool; families only ever see their own children.
+        return super().apply_filterset(qs) if self._is_admin() else qs
 
     def get_queryset(self):
         user = self.request.user
         if user.role == User.Role.ADMIN:
-            qs = StudentProfile.objects.select_related('user', 'loyverse_profile')
-            # Roster filters (BACKLOG P1-A6/A7): ?estado=active|on_leave|graduated|withdrawn
-            # and ?acceso=never (family login never used) | nopass (no password yet).
-            estado = self.request.query_params.get('estado')
-            if estado in StudentProfile.Status.values:
-                qs = qs.filter(status=estado)
-            acceso = self.request.query_params.get('acceso')
-            if acceso == 'never':
-                qs = qs.filter(user__last_login__isnull=True)
-            elif acceso == 'nopass':
-                # Django stores unusable passwords with a leading '!'.
-                qs = qs.filter(user__password__startswith='!')
-            # P1-A8: ?nivel=preescolar|primaria|secundaria (grade text), ?grado=, ?grupo=, ?ordering=
-            nivel = self.request.query_params.get('nivel')
-            if nivel in ('maternal', 'preescolar', 'primaria', 'secundaria'):
-                qs = qs.filter(grade__icontains=nivel)
-            grado = self.request.query_params.get('grado')
-            if grado:
-                qs = qs.filter(grade=grado[:20])
-            grupo = self.request.query_params.get('grupo')
-            if grupo:
-                qs = qs.filter(group__iexact=grupo[:5])
-            # Search + ordering are applied by AdminListMixin.filter_queryset.
-            return qs
+            # Filters, search and ordering are applied by AdminListMixin.filter_queryset.
+            return roster_queryset()
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
             return (StudentProfile.objects.filter(parents=user)

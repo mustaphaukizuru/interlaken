@@ -292,7 +292,7 @@ export interface AuditLogEntry {
   id: number;
   actor: number | null;
   actor_label: string;
-  action: 'create' | 'update' | 'delete' | 'permission';
+  action: 'create' | 'update' | 'delete' | 'permission' | 'export' | 'import';
   action_display: string;
   object_type: string;
   object_id: string;

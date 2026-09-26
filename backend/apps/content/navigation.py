@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 
+import django_filters
 from django.core.cache import cache
 from django.db import models
 from django.http import HttpResponse
@@ -21,8 +22,14 @@ from rest_framework import generics, permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.bulk import AdminBulkView
+from apps.core.exporting import AdminExportMixin, Col, ExportSpec
+from apps.core.importing import ImportCol, ImportSpec, ImportTemplateView, ImportView, parse_bool
+from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
+
+from .ops import AuditedCrudMixin, bool_filter, delete_action
 
 PATH_RE = re.compile(r'^/[A-Za-z0-9\-._~/]*$')
 SITEMAP_CACHE_KEY = 'cms:sitemap'
@@ -102,6 +109,7 @@ class Redirect(models.Model):
     def delete(self, *args, **kwargs):
         super().delete(*args, **kwargs)
         cache.delete(REDIRECTS_CACHE_KEY)
+        cache.delete(SITEMAP_CACHE_KEY)
 
 
 class RedirectSerializer(serializers.ModelSerializer):
@@ -153,17 +161,138 @@ class RedirectHitView(APIView):
         return Response({'ok': True})
 
 
-class AdminRedirectsView(generics.ListCreateAPIView):
-    permission_classes = [IsAdmin]
-    serializer_class = RedirectSerializer
-    pagination_class = None
-    queryset = Redirect.objects.all()
+class RedirectFilterSet(django_filters.FilterSet):
+    permanent = bool_filter('permanent')
+
+    class Meta:
+        model = Redirect
+        fields: list[str] = []
 
 
-class AdminRedirectDetailView(generics.RetrieveUpdateDestroyAPIView):
+REDIRECT_ORDERING = {
+    'from': 'from_path',
+    'to': 'to_path',
+    'permanent': 'permanent',
+    'hits': 'hits',
+    'created': 'created_at',
+}
+
+
+class AdminRedirectsView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
+    """GET/POST /content/admin/redirects/ — Data Ops list contract (``q`` over
+    both paths, ``permanent``, ordering keys in ``REDIRECT_ORDERING``)."""
+    serializer_class = RedirectSerializer
+    search_fields = ('from_path', 'to_path')
+    ordering = REDIRECT_ORDERING
+    default_ordering = 'from_path'
+    filterset_class = RedirectFilterSet
+    audit_context = 'cms.redirect'
+
+    def get_queryset(self):
+        return Redirect.objects.all()
+
+
+class AdminRedirectDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdmin]
     serializer_class = RedirectSerializer
     queryset = Redirect.objects.all()
+    audit_context = 'cms.redirect'
+
+
+REDIRECT_EXPORT = ExportSpec(
+    filename_prefix='redirecciones',
+    title='Redirecciones',
+    audit_entity='content.redirect',
+    columns=[
+        Col('from_path', 'de', width=36),
+        Col('to_path', 'a', width=48),
+        Col('permanent', 'permanente', fmt='bool', width=12),
+        Col('hits', 'Visitas', fmt='int', width=10),
+        Col('created_at', 'Creada', fmt='datetime', width=18),
+    ],
+)
+
+
+class AdminRedirectsExportView(AdminExportMixin, AdminRedirectsView):
+    """GET /content/admin/redirects/export/?fmt=csv|xlsx|pdf (headers match the import)."""
+    http_method_names = ['get', 'head', 'options']
+    export_spec = REDIRECT_EXPORT
+
+
+class AdminRedirectsBulkView(AdminBulkView):
+    """POST /content/admin/redirects/bulk/ — ``delete``."""
+    entity = 'content.redirect'
+    list_view_class = AdminRedirectsView
+    actions = {'delete': delete_action()}
+
+
+def _serializer_check(method):
+    """Run a RedirectSerializer field validator as an import parser (ValueError on failure)."""
+    def parse(value):
+        try:
+            return getattr(RedirectSerializer(), method)(str(value))
+        except serializers.ValidationError as exc:
+            detail = exc.detail[0] if isinstance(exc.detail, list) and exc.detail else exc.detail
+            raise ValueError(str(detail).rstrip('.')) from None
+    return parse
+
+
+def _redirect_row(data, row):
+    if data.get('de') and data.get('de') == data.get('a'):
+        row.error('a: el destino es igual al origen.')
+
+
+def _redirect_create(data, actor):
+    return Redirect.objects.create(
+        from_path=data['de'], to_path=data['a'],
+        permanent=True if data.get('permanente') is None else data['permanente'])
+
+
+def _redirect_update(redirect, data, actor):
+    redirect.to_path = data['a']
+    if data.get('permanente') is not None:
+        redirect.permanent = data['permanente']
+    redirect.save()
+    return redirect
+
+
+def _redirect_skip(data, instance):
+    if instance is None:
+        return None
+    same_perm = data.get('permanente') is None or data['permanente'] == instance.permanent
+    if instance.to_path == data.get('a') and same_perm:
+        return 'Sin cambios: la redirección ya existe igual.'
+    return None
+
+
+REDIRECT_IMPORT = ImportSpec(
+    entity='content.redirect',
+    label='Redirecciones',
+    columns=[
+        ImportCol('de', ('from', 'from_path', 'origen', 'ruta_antigua'), required=True,
+                  parse=_serializer_check('validate_from_path'), example='/inscripciones'),
+        ImportCol('a', ('to', 'to_path', 'destino', 'enviar_a'), required=True,
+                  parse=_serializer_check('validate_to_path'), example='/admisiones'),
+        ImportCol('permanente', ('permanent', '301'), parse=parse_bool, example='sí'),
+    ],
+    dedupe_keys=[('de',)],
+    db_match=lambda d: Redirect.objects.filter(from_path=d['de']).first() if d.get('de') else None,
+    create=_redirect_create,
+    update=_redirect_update,
+    validate_row=_redirect_row,
+    skip_reason=_redirect_skip,
+)
+
+
+class AdminRedirectsImportTemplateView(ImportTemplateView):
+    """GET /content/admin/redirects/import/template/?fmt=csv|xlsx"""
+    spec = REDIRECT_IMPORT
+
+
+class AdminRedirectsImportView(ImportView):
+    """POST /content/admin/redirects/import/ (``de, a, permanente``; dedupe by ``de``)."""
+    spec = REDIRECT_IMPORT
+    template_url = '/api/v1/content/admin/redirects/import/template/'
 
 
 def build_sitemap() -> str:
