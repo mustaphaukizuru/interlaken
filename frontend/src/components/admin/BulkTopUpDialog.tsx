@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { cafeteriaApi, type BulkTopUpPreview } from '@/services/api';
-import { GRADES } from '@/lib/rosterTable';
+import { GRADES } from '@/lib/grades';
 import { apiErrors } from '@/cms/editor/helpers';
 import { formatMXN } from '@/lib/format';
 
@@ -29,7 +29,9 @@ export function BulkTopUpDialog() {
       const r = data as { credited: number; total: string };
       toast.success(`${r.credited} monederos recargados (${formatMXN(r.total)}).`);
       setOpen(false); setPreview(null); setAmount(''); setReason('');
-      qc.invalidateQueries({ queryKey: ['admin-balances'] });
+      for (const entity of ['cafeteria-balances', 'cafeteria-low-balance', 'cafeteria-transactions']) {
+        qc.invalidateQueries({ queryKey: ['admin', entity] });
+      }
     },
     onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.detail || f.amount || f.reason || 'No se pudo aplicar.'); },
   });

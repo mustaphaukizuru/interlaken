@@ -11,6 +11,8 @@ rather than star-imported to avoid clashing with Python's stdlib ``calendar``.
 from . import calendar
 from .booking import SlotUnavailable, create_booking
 from .notifications import send_booking_confirmation, send_booking_reminder
+from .status import CapacityError, change_booking_status, occupied_seats, plan_booking_status
 
 __all__ = ['send_booking_confirmation', 'send_booking_reminder', 'calendar',
-           'create_booking', 'SlotUnavailable']
+           'create_booking', 'SlotUnavailable', 'CapacityError', 'change_booking_status',
+           'occupied_seats', 'plan_booking_status']

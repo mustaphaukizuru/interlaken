@@ -4,7 +4,12 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import PreRegistration, Registration, RegistrationDocument
+from .models import (  # noqa: F401 (re-exported)
+    PreRegistration,
+    Registration,
+    RegistrationDocument,
+    current_school_cycle,
+)
 
 
 def _validate_child_dob(value):
@@ -16,14 +21,6 @@ def _validate_child_dob(value):
     if value < today - timedelta(days=365 * 25):
         raise serializers.ValidationError('La fecha de nacimiento no es válida.')
     return value
-
-
-def current_school_cycle() -> str:
-    """Admissions cycle string, e.g. '2026-2027' — the cycle the public form
-    advertises. Matches the frontend `CURRENT_CYCLE` (current calendar year →
-    next) so a pre-registration records exactly the cycle the applicant saw."""
-    year = timezone.localdate().year
-    return f'{year}-{year + 1}'
 
 
 def child_full_name(obj) -> str:
@@ -116,9 +113,10 @@ class PreRegistrationAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = PreRegistration
         fields = [
-            'id', 'child_name', 'level', 'grade_applying',
+            'id', 'child_name', 'child_dob', 'level', 'grade_applying', 'cycle',
             'parent_name', 'parent_email', 'parent_phone',
-            'status', 'notes', 'created_at',
+            'referral_source', 'wants_visit',
+            'status', 'notes', 'created_at', 'updated_at',
         ]
 
     def get_child_name(self, obj):
@@ -188,7 +186,8 @@ class RegistrationAdminListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'child_name', 'level', 'grade_applying', 'cycle',
             'parent1_name', 'parent1_email', 'parent1_phone',
-            'status', 'submitted_at', 'created_at', 'doc_count', 'doc_verified',
+            'parent2_email', 'child_curp',
+            'status', 'submitted_at', 'created_at', 'updated_at', 'doc_count', 'doc_verified',
         ]
 
     def get_child_name(self, obj):

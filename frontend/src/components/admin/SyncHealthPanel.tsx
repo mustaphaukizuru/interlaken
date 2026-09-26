@@ -233,8 +233,12 @@ export function SyncHealthPanel() {
         + '.',
         { duration: 8000 },
       );
-      for (const key of ['cafeteria-sync-health', 'admin-cafeteria-balances', 'admin-cafeteria-low-balance', 'admin-students']) {
+      for (const key of ['cafeteria-sync-health', 'admin-students']) {
         queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      // Admin list data (Data Ops hooks layer): ['admin', <entity>, …].
+      for (const entity of ['cafeteria-balances', 'cafeteria-low-balance', 'cafeteria-customers']) {
+        queryClient.invalidateQueries({ queryKey: ['admin', entity] });
       }
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || 'No se pudo sincronizar el roster con Loyverse.'),

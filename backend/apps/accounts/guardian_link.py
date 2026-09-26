@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.exceptions import error_body
+from apps.core.listing import split_terms, strip_accents
 from apps.core.permissions import IsAdmin
 
 from .import_students import _split_name
@@ -50,6 +51,39 @@ def _serialize_guardian(user: User, *, student: StudentProfile | None = None) ->
     }
 
 
+GUARDIAN_ORDERING = {
+    'name': lambda g: (g['last_name'].lower(), g['first_name'].lower()),
+    'email': lambda g: g['email'].lower(),
+    'relationship': lambda g: g['relationship'].lower(),
+}
+
+
+def filter_guardians(guardians: list[dict], q) -> list[dict]:
+    """``?q=`` over name, email, WhatsApp and phone (every term must match)."""
+    terms = [strip_accents(t).lower() for t in split_terms(q or '')]
+    if not terms:
+        return guardians
+
+    def haystack(g):
+        return strip_accents(' '.join(
+            str(g.get(k) or '') for k in ('full_name', 'email', 'whatsapp', 'phone', 'relationship')
+        )).lower()
+
+    return [g for g in guardians if all(t in haystack(g) for t in terms)]
+
+
+def sort_guardians(guardians: list[dict], ordering) -> list[dict]:
+    """``?ordering=[-]name|email|relationship``; default keeps the family account
+    first, then last name. The list is a handful of rows, so it sorts in Python."""
+    raw = (ordering or '').strip()
+    desc = raw.startswith('-')
+    key = GUARDIAN_ORDERING.get(raw.lstrip('-'))
+    if key is None:
+        return sorted(guardians, key=lambda g: (not g['is_self'], g['last_name'].lower(),
+                                                g['first_name'].lower(), g['id']))
+    return sorted(guardians, key=lambda g: (key(g), g['id']), reverse=desc)
+
+
 class StudentGuardiansView(APIView):
     """List linked guardians or link a guardian by email (admin only)."""
     permission_classes = [IsAdmin]
@@ -61,7 +95,11 @@ class StudentGuardiansView(APIView):
             pk=pk,
         )
         guardians = [_serialize_guardian(p, student=student) for p in student.parents.all()]
+        total = len(guardians)
+        guardians = sort_guardians(filter_guardians(guardians, request.query_params.get('q')),
+                                   request.query_params.get('ordering'))
         return Response({
+            'count': total,
             'student': {
                 'id': student.id,
                 'user_id': student.user_id,

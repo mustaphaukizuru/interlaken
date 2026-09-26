@@ -63,18 +63,13 @@ vi.mock('@/services/api', async () => {
       getTransactions: ok(emptyPage),
       getSpendingCategories: ok({ days: 30, total: 0, categories: [] }),
       getSpendingTrend: ok({ days: 30, total: 0, average: 0, series: [] }),
-      getAllBalances: ok({ results: [cafeteriaAccount], count: 1 }),
-      getTopUpLog: ok(emptyPage),
-      getLowBalance: ok(emptyPage),
       requestTopUp: vi.fn(),
       updateLowBalanceThreshold: vi.fn(),
       updateSpendLimits: vi.fn(),
-      reconcile: vi.fn(),
       syncAll: vi.fn(),
       syncBalance: vi.fn(),
       markTopUpPosLoaded: vi.fn(),
       markTopUpPosUnloaded: vi.fn(),
-      exportSchool: vi.fn(),
       exportMovements: vi.fn(),
     },
     contentApi: {
@@ -112,6 +107,17 @@ vi.mock('@/services/AdminContentApi', () => {
     calendarAdminApi: { ...entity({ id: 7, title: 'Examen bimestral', kind: 'exam', kind_label: 'Evaluaciones', start_date: '2026-10-05', end_date: null, level: 'primaria', description: '', is_published: true }), import: importApi },
     submissionsAdminApi: { list: page({ id: 8, form: 2, form_title: 'Informes', data: { nombre: 'Lucía' }, page: '/contacto', is_handled: false, reply_to: '', created_at: '2026-09-20T10:00:00Z' }), export: vi.fn(), bulk: vi.fn() },
     calendarIcsUrl: () => 'http://localhost/api/v1/content/calendar.ics',
+  };
+});
+// Admin Cafetería lists (Data Ops Phase 6): a populated Saldos table.
+vi.mock('@/services/cafeteriaAdmin', () => {
+  const balance = {
+    id: 1, balance: '150.00', low_balance_threshold: '50', last_synced: '2026-08-01T12:00:00Z',
+    student: { id: 10, user: { full_name: 'Emma Quintana' }, student_id: '09824', loyverse_code: 'ci09824', grade: '4°', group: 'A', loyverse_id: 'loy-emma' },
+  };
+  return {
+    cafeteriaAdminApi: { balances: vi.fn().mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [balance] } }) },
+    adjustmentImportApi: vi.fn(),
   };
 });
 // No real HTTP / toasts while rendering.

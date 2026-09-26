@@ -1,88 +1,108 @@
-import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { useState, type MouseEvent } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, FileUp, Link2, Download, FileDown, Plus, ArrowUp, ArrowDown, ArrowUpDown, Columns3, Rows3, MoreHorizontal } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { ImportStudentsModal } from '@/components/admin/ImportStudentsModal';
+import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet } from 'lucide-react';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
-import { ActiveFilterChips } from '@/components/admin/ActiveFilterChips';
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { BulkActionBar } from '@/components/admin/BulkActionBar';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { BulkValueDialog, type BulkValueOption } from '@/components/admin/BulkValueDialog';
+import { ImportDialog } from '@/components/admin/ImportDialog';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { Pagination } from '@/components/ui/Pagination';
-import { portalApi, downloadBlob } from '@/services/api';
-import { toPaged, ADMIN_PAGE_SIZE } from '@/lib/pagination';
-import { useUrlFilters, useUrlPage, useUrlSyncedSearch } from '@/hooks/useUrlFilters';
-import { STUDENT_STATUS } from '@/lib/studentStatus';
-import { GRADES, NIVELES, ROSTER_COLUMNS, nextOrdering, readPrefs, sortIndicator, writePrefs, type RosterColumn } from '@/lib/rosterTable';
-import { Dropdown } from '@/components/ui/Dropdown';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
-import AdminStudentDetail from './AdminStudentDetail';
 import { Badge } from '@/components/ui/Badge';
-import type { StudentProfile } from '@/types';
+import { Dropdown } from '@/components/ui/Dropdown';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
+import { useRowSelection } from '@/hooks/useRowSelection';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import {
+  studentsImportApi, useStudentsBulk, useStudentsExport, useStudentsList,
+  type RosterStudent, type StudentsListParams,
+} from '@/hooks/queries/students';
+import { STUDENT_STATUS } from '@/lib/studentStatus';
+import { GRADES, NIVELES } from '@/lib/grades';
+import { formatMXN } from '@/lib/format';
+import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
+import AdminStudentDetail from './AdminStudentDetail';
 
+type StatusKey = keyof typeof STUDENT_STATUS;
+
+const STATUS_OPTIONS = (Object.entries(STUDENT_STATUS) as [StatusKey, (typeof STUDENT_STATUS)[StatusKey]][])
+  .map(([value, m]) => ({ value, label: m.label }));
+const ACCESS_OPTIONS = [
+  { value: 'never', label: 'Nunca ha iniciado sesión' },
+  { value: 'nopass', label: 'Sin contraseña asignada' },
+  { value: 'active', label: 'Ya inició sesión' },
+];
+const LINKED_OPTIONS = [
+  { value: '1', label: 'Vinculados a Loyverse' },
+  { value: '0', label: 'Sin vínculo con Loyverse' },
+];
+const IMPORT_HEADERS = [
+  { key: 'matricula', required: true }, { key: 'nombre', required: true }, { key: 'apellidos', required: true },
+  { key: 'grado', required: true }, { key: 'grupo' }, { key: 'email_alumno' }, { key: 'loyverse_id' },
+  { key: 'nombre_padre' }, { key: 'email_padre' }, { key: 'telefono_padre' },
+];
+
+/** Bulk actions of the roster (C5). Status/grade/group ask for the value first. */
+const BULK_ACTIONS: BulkActionDef[] = [
+  { name: 'status', label: 'Cambiar estado', icon: UserCog },
+  { name: 'grade', label: 'Cambiar grado', icon: GraduationCap },
+  { name: 'group', label: 'Cambiar grupo', icon: UsersRound },
+  { name: 'sync_loyverse', label: 'Sincronizar con Loyverse', icon: RefreshCw, planVerb: 'Se sincronizará el saldo inicial de' },
+];
+
+const ROW_ACTION =
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px]';
+
+function initial(s: RosterStudent) {
+  return (s.user.first_name || s.user.full_name || '?').charAt(0).toUpperCase();
+}
+
+/**
+ * /admin/alumnos — the roster on the Data Ops UI foundation: FilterBar (search,
+ * estado tabs, nivel/grado/acceso/vínculo, grupo), DataTable v2 (server sort on
+ * every mapped column, column controls persisted as `students`, pinned name),
+ * selection with bulk status/grade/group/sync, export CSV/Excel/PDF of the view
+ * or the selection, and the generic ImportDialog. There is no delete: "Baja
+ * definitiva" is the archive. On 2xl screens a row opens the detail pane.
+ */
 export default function AdminStudents() {
-  // URL-synced filters (shareable, survive refresh); search writes are
-  // debounced (300 ms) so the URL doesn't churn per keystroke.
-  const { input: search, setInput: setSearch, search: debouncedSearch } = useUrlSyncedSearch('q');
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
-  const estado = get('estado');
-  const acceso = get('acceso');
-  const nivel = get('nivel');
-  const grado = get('grado');
-  const grupo = get('grupo');
-  const ordering = get('orden');
-  const [prefs, setPrefs] = useState(readPrefs);
-  const updatePrefs = (p: Partial<typeof prefs>) => { const n = { ...prefs, ...p }; setPrefs(n); writePrefs(n); };
-  const visible = (k: RosterColumn) => !prefs.hidden.includes(k);
-  const [selected, setSelected] = useState<number[]>([]);
-  const [bulk, setBulk] = useState<{ action: 'status' | 'group' | 'grade'; value: string } | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
-  const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-students', page, debouncedSearch, estado, acceso, nivel, grado, grupo, ordering],
-    queryFn: async () =>
-      toPaged<StudentProfile>(
-        (await portalApi.getStudents({ page, search: debouncedSearch || undefined, estado: estado || undefined, acceso: acceso || undefined, nivel: nivel || undefined, grado: grado || undefined, grupo: grupo || undefined, ordering: ordering || undefined })).data),
-    placeholderData: keepPreviousData,
-  });
-
-  const bulkMutation = useMutation({
-    mutationFn: (d: { action: 'status' | 'group' | 'grade'; value: string }) => portalApi.bulkStudents({ ids: selected, ...d }),
-    onSuccess: ({ data: r }) => { toast.success(`${r.updated} alumnos actualizados.`); setSelected([]); setBulk(null); refetch(); },
-    onError: () => toast.error('No se pudo aplicar el cambio.'),
-  });
-  const sortBy = (key?: string) => { if (!key) return; set({ orden: nextOrdering(ordering, key), page: null }); };
-  const SortHeader = ({ col }: { col: (typeof ROSTER_COLUMNS)[number] }) => {
-    const ind = col.sort ? sortIndicator(ordering, col.sort) : null;
-    return (
-      <th aria-sort={ind === 'asc' ? 'ascending' : ind === 'desc' ? 'descending' : undefined}>
-        {col.sort ? (
-          <button type="button" onClick={() => sortBy(col.sort)} className="inline-flex items-center gap-1 hover:text-ink">{col.label}{ind === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : ind === 'desc' ? <ArrowDown size={12} aria-hidden="true" /> : <ArrowUpDown size={12} className="opacity-40" aria-hidden="true" />}</button>
-        ) : col.label}
-      </th>
-    );
+  const sort = parseSort(get('orden'));
+  const filters: Omit<StudentsListParams, 'page'> = {
+    q: get('q') || undefined,
+    status: get('estado') || undefined,
+    access: get('acceso') || undefined,
+    level: get('nivel') || undefined,
+    grade: get('grado') || undefined,
+    group: get('grupo') || undefined,
+    linked: get('vinculado') || undefined,
+    ordering: serializeSort(sort) || undefined,
   };
+  const nivel = get('nivel');
+  const grupo = get('grupo');
 
-  const exportCsv = useMutation({
-    mutationFn: async () =>
-      (await portalApi.exportStudents(debouncedSearch || undefined)).data as Blob,
-    onSuccess: (blob) => downloadBlob(blob, 'alumnos.csv'),
-    onError: () => toast.error('No se pudo generar el archivo.'),
-  });
-
-  // Server-side search across the whole roster (SearchFilter on the viewset).
+  const { data, isLoading, isError, refetch } = useStudentsList({ page, ...filters });
+  const exportStudents = useStudentsExport();
+  const bulk = useStudentsBulk();
   const students = data?.results;
   const count = data?.count ?? 0;
+  const selection = useRowSelection(count, JSON.stringify(filters));
+  const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
+
+  const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
+  const [importOpen, setImportOpen] = useState(false);
+  const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [editing, setEditing] = useState<RosterStudent | null>(null);
+  const [picking, setPicking] = useState<BulkActionDef | null>(null);
+  const [confirming, setConfirming] = useState<{ action: BulkActionDef; payload?: Record<string, unknown> } | null>(null);
 
   // Large screens (2xl, docs/RESPONSIVE.md): list on the left, detail on the right, no navigation.
   const twoPane = useMediaQuery('(min-width: 1536px)');
@@ -93,285 +113,272 @@ export default function AdminStudents() {
     setSelectedId(id);
   };
 
-  const SECONDARY = [
-    { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download },
-    { key: 'link', label: 'Vincular Loyverse', icon: Link2 },
-    { key: 'csv-in', label: 'Importar CSV', icon: FileUp },
-    { key: 'csv-out', label: 'Exportar CSV', icon: FileDown },
-  ] as const;
-  const runSecondary = (key: (typeof SECONDARY)[number]['key']) => {
-    if (key === 'loyverse') setImportLoyverseOpen(true);
-    else if (key === 'link') setLinkOpen(true);
-    else if (key === 'csv-in') setImportOpen(true);
-    else exportCsv.mutate();
+  // Groups that exist in the data on screen, offered as suggestions (free text allowed).
+  const groupOptions = useMemo<BulkValueOption[]>(() => {
+    const seen = new Set((students ?? []).map((s) => s.group).filter(Boolean));
+    ['A', 'B', 'C'].forEach((g) => seen.add(g));
+    return Array.from(seen).sort().map((g) => ({ value: g, label: `Grupo ${g}` }));
+  }, [students]);
+
+  const columns = useMemo<Column<RosterStudent>[]>(() => [
+    {
+      id: 'name', header: 'Nombre', sortKey: 'name', hideable: false, minWidth: 200,
+      cell: (s) => (
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700" aria-hidden="true">
+            {initial(s)}
+          </span>
+          <Link
+            to={`/admin/alumnos/${s.id}`}
+            onClick={(e) => openStudent(e, s.id)}
+            className="font-medium text-ink hover:text-purple hover:underline"
+            aria-current={selectedId === s.id ? 'true' : undefined}
+          >
+            {s.user.full_name}
+          </Link>
+        </div>
+      ),
+    },
+    { id: 'student_id', header: 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted', cell: (s) => s.student_id },
+    // What the office compares against Loyverse: the code exactly as the POS spells it (ci09932).
+    { id: 'loyverse_code', header: 'Código Loyverse', minWidth: 120, className: 'font-mono text-xs text-muted', cell: (s) => s.loyverse_code || s.student_id },
+    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s) => s.grade },
+    { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s) => s.group || '—' },
+    { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
+    {
+      id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
+      cell: (s) => {
+        const meta = STUDENT_STATUS[(s.status ?? 'active') as StatusKey];
+        return <Badge variant={meta?.variant ?? 'neutral'}>{meta?.label ?? s.status}</Badge>;
+      },
+    },
+    {
+      id: 'balance', header: 'Saldo', sortKey: 'balance', align: 'right', minWidth: 100,
+      cell: (s) => (s.balance === undefined || s.balance === null ? '—' : formatMXN(s.balance)),
+    },
+    {
+      id: 'enrollment_date', header: 'Ingreso', sortKey: 'enrollment_date', defaultHidden: true, minWidth: 110, className: 'text-xs text-subtle',
+      cell: (s) => (s.enrollment_date ? new Date(`${s.enrollment_date}T12:00:00`).toLocaleDateString('es-MX') : '—'),
+    },
+    {
+      id: 'last_login', header: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'text-xs text-subtle',
+      cell: (s) => (s.user.last_login ? new Date(s.user.last_login).toLocaleDateString('es-MX') : <span className="text-coral-600">Nunca</span>),
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [twoPane, selectedId]);
+
+  const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
+    exportStudents.mutateAsync({
+      ...filters,
+      fmt,
+      ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined,
+    });
+
+  const startBulk = (action: BulkActionDef) => {
+    if (action.name === 'sync_loyverse') setConfirming({ action });
+    else setPicking(action);
   };
+  const pickedValue = (value: string) => {
+    if (!picking) return;
+    const labelFor = picking.name === 'status' ? STUDENT_STATUS[value as StatusKey]?.label ?? value : value;
+    const withdraw = picking.name === 'status' && value === 'withdrawn';
+    setConfirming({
+      action: {
+        ...picking,
+        label: `${picking.label} a «${labelFor}»`,
+        danger: withdraw,
+        planVerb: withdraw ? 'Se darán de baja' : `Se cambiará a «${labelFor}» a`,
+      },
+      payload: { value },
+    });
+    setPicking(null);
+  };
+
+  const pickerProps = (() => {
+    if (picking?.name === 'status') return { label: 'Nuevo estado', options: STATUS_OPTIONS, hint: '«Baja definitiva» archiva al alumno: no se borra nada y su saldo se muestra antes de confirmar.' };
+    if (picking?.name === 'grade') return { label: 'Nuevo grado', options: GRADES.map((g) => ({ value: g, label: g })), freeText: true, maxLength: 20 };
+    return { label: 'Nuevo grupo', options: groupOptions, freeText: true, maxLength: 5, uppercase: true, hint: 'Elija un grupo existente o escriba uno nuevo.' };
+  })();
+
+  const SECONDARY = [
+    { key: 'import', label: 'Importar archivo', icon: FileUp, run: () => setImportOpen(true) },
+    { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download, run: () => setImportLoyverseOpen(true) },
+    { key: 'link', label: 'Vincular Loyverse', icon: Link2, run: () => setLinkOpen(true) },
+  ];
+  const anyFilter = Object.entries(filters).some(([k, v]) => k !== 'ordering' && v);
 
   return (
     <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
-    <div className="space-y-6 min-w-0">
-      <PageHeader
-        title="Alumnos"
-        subtitle="Directorio de alumnos activos."
-        actions={(
-          <>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
-              <Plus size={16} aria-hidden="true" /> Nuevo alumno
-            </button>
-            {/* Five stacked full-width buttons filled the entire first screen at
-                390px before a single alumno was visible. The primary action
-                stays; the rest collapse into one menu on phones. */}
-            <div className="hidden flex-wrap gap-2 sm:flex">
-              {SECONDARY.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="btn-outline"
-                  disabled={key === 'csv-out' && exportCsv.isPending}
-                  onClick={() => runSecondary(key)}
-                >
-                  <Icon size={16} aria-hidden="true" /> {key === 'csv-out' && exportCsv.isPending ? 'Exportando…' : label}
-                </button>
-              ))}
-            </div>
-            <div className="sm:hidden">
+      <div className="min-w-0 space-y-6">
+        <PageHeader
+          title="Alumnos"
+          subtitle="Directorio de alumnos: búsqueda, filtros, acciones en lote, importación y exportación."
+          actions={(
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
+                <Plus size={16} aria-hidden="true" /> Nuevo alumno
+              </button>
+              <ExportMenu filenamePrefix="alumnos" selectedCount={selection.count} fetch={fetchExport} />
               <Dropdown
                 width={260}
                 trigger={({ open, toggle }) => (
-                  <button
-                    type="button"
-                    className="btn-outline"
-                    aria-haspopup="true"
-                    aria-expanded={open}
-                    onClick={toggle}
-                  >
+                  <button type="button" className="btn-outline min-h-[44px] sm:min-h-[40px]" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
                     <MoreHorizontal size={16} aria-hidden="true" /> Más acciones
                   </button>
                 )}
               >
                 {({ close }) => (
-                  <div className="py-1">
-                    {SECONDARY.map(({ key, label, icon: Icon }) => (
+                  <div role="menu" aria-label="Más acciones" className="p-1.5">
+                    {SECONDARY.map(({ key, label, icon: Icon, run }) => (
                       <button
                         key={key}
                         type="button"
-                        className="flex min-h-[44px] w-full items-center gap-2 px-4 text-left text-sm text-ink hover:bg-cream disabled:opacity-60"
-                        disabled={key === 'csv-out' && exportCsv.isPending}
-                        onClick={() => { close(); runSecondary(key); }}
+                        role="menuitem"
+                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2"
+                        onClick={() => { close(); run(); }}
                       >
-                        <Icon size={16} aria-hidden="true" /> {key === 'csv-out' && exportCsv.isPending ? 'Exportando…' : label}
+                        <Icon size={16} aria-hidden="true" /> {label}
                       </button>
                     ))}
                   </div>
                 )}
               </Dropdown>
             </div>
-          </div>
-          </>
-        )}
-      />
-      <StudentFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => refetch()} />
-      <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} />
-      <ImportLoyverseModal
-        open={importLoyverseOpen}
-        onClose={() => setImportLoyverseOpen(false)}
-        onImported={() => refetch()}
-      />
-      <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
-
-      <Card title={`${count} alumnos registrados`}>
-        <p role="status" aria-live="polite" className="sr-only">{count} alumnos encontrados</p>
-        <div className="relative mb-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" />
-          <input
-            className="input-field pl-9"
-            placeholder="Buscar por nombre, matrícula, correo o grado…"
-            aria-label="Buscar alumnos"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <p className="mb-3 text-xs text-subtle">Busca en todo el directorio de alumnos.</p>
-        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div>
-            <label className="label" htmlFor="f-nivel">Nivel</label>
-            <select id="f-nivel" className="input-field min-h-[44px]" value={nivel} onChange={(e) => set({ nivel: e.target.value || null, grado: null, page: null })}>
-              <option value="">Todos</option>
-              {NIVELES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="f-grado">Grado</label>
-            <select id="f-grado" className="input-field min-h-[44px]" value={grado} onChange={(e) => set({ grado: e.target.value || null, page: null })}>
-              <option value="">Todos</option>
-              {GRADES.filter((g) => !nivel || g.toLowerCase().includes(nivel)).map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="f-grupo">Grupo</label>
-            <input id="f-grupo" className="input-field min-h-[44px]" value={grupo} maxLength={5} placeholder="A" onChange={(e) => set({ grupo: e.target.value.toUpperCase() || null, page: null })} />
-          </div>
-          <div>
-            <label className="label" htmlFor="f-estado">Estado</label>
-            <select id="f-estado" className="input-field min-h-[44px]" value={estado} onChange={(e) => set({ estado: e.target.value || null, page: null })}>
-              <option value="">Todos</option>
-              {Object.entries(STUDENT_STATUS).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="f-acceso">Acceso al portal</label>
-            <select id="f-acceso" className="input-field min-h-[44px]" value={acceso} onChange={(e) => set({ acceso: e.target.value || null, page: null })}>
-              <option value="">Todos</option>
-              <option value="never">Nunca ha iniciado sesión</option>
-              <option value="nopass">Sin contraseña asignada</option>
-            </select>
-          </div>
-        </div>
-
-        <ActiveFilterChips
-          chips={[
-            ...(debouncedSearch ? [{ key: 'q', label: `Búsqueda: “${debouncedSearch}”`, onClear: () => setSearch('') }] : []),
-            ...(estado ? [{ key: 'estado', label: `Estado: ${STUDENT_STATUS[estado as keyof typeof STUDENT_STATUS]?.label ?? estado}`, onClear: () => set({ estado: null }) }] : []),
-            ...(acceso ? [{ key: 'acceso', label: acceso === 'never' ? 'Nunca ha iniciado sesión' : 'Sin contraseña', onClear: () => set({ acceso: null }) }] : []),
-          ]}
-          onClearAll={() => { setSearch(''); set({ estado: null, acceso: null }); }}
+          )}
         />
 
-        {isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : isLoading ? (
-          <TableSkeleton />
-        ) : !students?.length ? (
-          <EmptyState
-            icon={Users}
-            title={debouncedSearch ? 'Sin resultados' : 'Sin alumnos'}
-            description={debouncedSearch ? 'Ningún alumno coincide con la búsqueda.' : 'Los alumnos registrados aparecerán aquí.'}
-            action={debouncedSearch ? undefined : (
-              <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
-                <FileUp size={16} aria-hidden="true" /> Importar CSV
-              </button>
+        <StudentFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => refetch()} />
+        <StudentFormModal open={!!editing} student={editing} onClose={() => setEditing(null)} onSaved={() => refetch()} />
+        <ImportDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          title="Importar alumnos"
+          entity="students"
+          related={['cafeteria']}
+          api={studentsImportApi}
+          headers={IMPORT_HEADERS}
+          templatePrefix="alumnos"
+          description={<>Cree o actualice alumnos por matrícula (se aceptan <code>ci09932</code> y <code>09932</code>) y vincule a sus tutores por correo. CSV o Excel.</>}
+        />
+        <ImportLoyverseModal open={importLoyverseOpen} onClose={() => setImportLoyverseOpen(false)} onImported={() => refetch()} />
+        <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
+
+        <Card title={`${count.toLocaleString('es-MX')} alumnos`}>
+          <p role="status" aria-live="polite" className="sr-only">{count} alumnos encontrados</p>
+          <DataTable<RosterStudent>
+            tableId="students"
+            columns={columns}
+            rows={students}
+            rowKey={(s) => s.id}
+            rowLabel={(s) => s.user.full_name}
+            caption="Directorio de alumnos"
+            sort={sort}
+            onSort={onSort}
+            page={page}
+            count={count}
+            onPage={setPage}
+            itemLabel="alumnos"
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={() => refetch()}
+            columnControls
+            resizable
+            pinFirstColumn
+            selection={selection}
+            rowActions={(s) => (
+              <>
+                <Link to={`/admin/alumnos/${s.id}`} className={ROW_ACTION} aria-label={`Ver ficha de ${s.user.full_name}`}>
+                  Ficha
+                </Link>
+                <button type="button" onClick={() => setEditing(s)} className={ROW_ACTION} aria-label={`Editar a ${s.user.full_name}`}>
+                  Editar
+                </button>
+                <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} aria-label={`Cafetería de ${s.user.full_name}`}>
+                  <Wallet size={14} aria-hidden="true" /> Cafetería
+                </Link>
+              </>
             )}
+            toolbar={(
+              <FilterBar
+                search={{ placeholder: 'Buscar por nombre, matrícula, correo o grado…', label: 'Buscar alumnos' }}
+                tabs={{ paramKey: 'estado', options: STATUS_OPTIONS, allLabel: 'Todos', label: 'Filtrar por estado' }}
+                selects={[
+                  { key: 'nivel', label: 'Nivel', options: NIVELES.map(([value, label]) => ({ value, label })), allLabel: 'Todos los niveles' },
+                  {
+                    key: 'grado', label: 'Grado', allLabel: 'Todos los grados',
+                    options: GRADES.filter((g) => !nivel || g.toLowerCase().includes(nivel)).map((g) => ({ value: g, label: g })),
+                  },
+                  { key: 'acceso', label: 'Acceso al portal', options: ACCESS_OPTIONS, allLabel: 'Acceso: todos' },
+                  { key: 'vinculado', label: 'Loyverse', options: LINKED_OPTIONS, allLabel: 'Loyverse: todos' },
+                ]}
+                extraChips={grupo ? [{ key: 'grupo', label: `Grupo: ${grupo}`, onClear: () => set({ grupo: null, page: null }) }] : []}
+              >
+                <input
+                  className="input-field w-24"
+                  aria-label="Grupo"
+                  placeholder="Grupo"
+                  maxLength={5}
+                  autoComplete="off"
+                  value={grupo}
+                  onChange={(e) => set({ grupo: e.target.value.toUpperCase() || null, page: null })}
+                />
+              </FilterBar>
+            )}
+            bulkBar={(
+              <BulkActionBar
+                count={selection.count}
+                allMatching={selection.allMatching}
+                allMatchingCount={count}
+                onSelectAllMatching={selection.onSelectAllMatching}
+                onClear={selection.onClear}
+                itemLabel="alumnos"
+                gender="m"
+                actions={BULK_ACTIONS}
+                onAction={startBulk}
+                busy={bulk.isPending}
+                exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="alumnos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+              />
+            )}
+            empty={{
+              icon: Users,
+              title: anyFilter ? 'Sin resultados' : 'Sin alumnos',
+              description: anyFilter ? 'Ningún alumno coincide con los filtros.' : 'Los alumnos registrados aparecerán aquí.',
+              action: anyFilter ? undefined : (
+                <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
+                  <FileUp size={16} aria-hidden="true" /> Importar archivo
+                </button>
+              ),
+            }}
           />
-        ) : (
-          <>
-            {/* Table tools (P1-A8): column chooser + density; bulk bar when rows are selected */}
-            <div className="mb-2 hidden flex-wrap items-center justify-between gap-2 md:flex">
-              <div className="flex items-center gap-2 text-sm text-muted">
-                {selected.length > 0 ? (
-                  <>
-                    <span className="font-semibold text-ink">{selected.length} seleccionados</span>
-                    <select className="input-field !min-h-[36px] !py-1 text-sm" aria-label="Acción masiva" value={bulk ? `${bulk.action}:${bulk.value}` : ''} onChange={(e) => { const [action, value] = e.target.value.split(':'); setBulk(action ? { action: action as 'status' | 'group' | 'grade', value } : null); }}>
-                      <option value="">Acción…</option>
-                      <optgroup label="Cambiar estado">{Object.entries(STUDENT_STATUS).map(([v, m]) => <option key={v} value={`status:${v}`}>{m.label}</option>)}</optgroup>
-                      <optgroup label="Cambiar grupo">{['A', 'B', 'C'].map((g) => <option key={g} value={`group:${g}`}>Grupo {g}</option>)}</optgroup>
-                      <optgroup label="Cambiar grado">{GRADES.map((g) => <option key={g} value={`grade:${g}`}>{g}</option>)}</optgroup>
-                    </select>
-                    <Button size="sm" disabled={!bulk} loading={bulkMutation.isPending} onClick={() => bulk && bulkMutation.mutate(bulk)}>Aplicar</Button>
-                    <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelected([])}>Quitar selección</button>
-                  </>
-                ) : <span>Seleccione filas para acciones masivas.</span>}
-              </div>
-              <div className="flex items-center gap-1">
-                <button type="button" aria-pressed={prefs.dense} aria-label="Vista compacta" title="Vista compacta" onClick={() => updatePrefs({ dense: !prefs.dense })} className={`rounded-lg p-2 ${prefs.dense ? 'bg-purple/10 text-purple' : 'text-subtle hover:text-ink'}`}><Rows3 size={16} /></button>
-                <Dropdown width={220} trigger={({ toggle, open }) => (
-                  <button type="button" onClick={toggle} aria-expanded={open} aria-label="Columnas" title="Columnas" className="rounded-lg p-2 text-subtle hover:text-ink"><Columns3 size={16} /></button>
-                )}>
-                  {() => (
-                    <div className="p-2" role="group" aria-label="Columnas visibles">
-                      {ROSTER_COLUMNS.map((c) => (
-                        <label key={c.key} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-cream-2">
-                          <input type="checkbox" checked={visible(c.key)} onChange={(e) => updatePrefs({ hidden: e.target.checked ? prefs.hidden.filter((k) => k !== c.key) : [...prefs.hidden, c.key] })} /> {c.label}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </Dropdown>
-              </div>
-            </div>
+        </Card>
 
-            {/* Mobile: stacked cards */}
-            <ul className="space-y-3 md:hidden">
-              {students.map((s) => (
-                <li key={s.id} className="rounded-xl2 border border-line p-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                      {s.user.first_name[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <Link to={`/admin/alumnos/${s.id}`} onClick={(e) => openStudent(e, s.id)} className="block truncate font-medium text-ink hover:text-purple hover:underline">{s.user.full_name}</Link>
-                      <p className="text-subtle text-xs truncate">{s.user.email}</p>
-                    </div>
-                  </div>
-                  <dl className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <dt className="text-xs font-semibold text-muted">Matrícula</dt>
-                      <dd className="text-muted">{s.student_id}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold text-muted">Código Loyverse</dt>
-                      <dd className="font-mono text-muted">{s.loyverse_code || s.student_id}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold text-muted">Grado</dt>
-                      <dd className="text-muted">{s.grade}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold text-muted">Grupo</dt>
-                      <dd className="text-muted">{s.group}</dd>
-                    </div>
-                  </dl>
-                </li>
-              ))}
-            </ul>
-
-            {/* Desktop: dense table */}
-            <div className="admin-table-wrap hidden md:block">
-              <table className={`admin-table ${prefs.dense ? 'admin-table--dense' : ''}`}>
-                <thead>
-                  <tr>
-                    <th className="w-8"><input type="checkbox" aria-label="Seleccionar todos" checked={students.length > 0 && students.every((s) => selected.includes(s.id))} onChange={(e) => setSelected(e.target.checked ? Array.from(new Set([...selected, ...students.map((s) => s.id)])) : selected.filter((id) => !students.some((s) => s.id === id)))} /></th>
-                    <th aria-sort={sortIndicator(ordering, 'name') === 'asc' ? 'ascending' : sortIndicator(ordering, 'name') === 'desc' ? 'descending' : undefined}>
-                      <button type="button" onClick={() => sortBy('name')} className="inline-flex items-center gap-1 hover:text-ink">Nombre{sortIndicator(ordering, 'name') === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : sortIndicator(ordering, 'name') === 'desc' ? <ArrowDown size={12} aria-hidden="true" /> : <ArrowUpDown size={12} className="opacity-40" aria-hidden="true" />}</button>
-                    </th>
-                    {ROSTER_COLUMNS.filter((c) => visible(c.key)).map((c) => <SortHeader key={c.key} col={c} />)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => (
-                    <tr key={s.id} className={selected.includes(s.id) ? 'bg-purple/[0.04]' : undefined}>
-                      <td><input type="checkbox" aria-label={`Seleccionar ${s.user.full_name}`} checked={selected.includes(s.id)} onChange={(e) => setSelected(e.target.checked ? [...selected, s.id] : selected.filter((id) => id !== s.id))} /></td>
-                      <td>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                            {s.user.first_name[0]}
-                          </div>
-                          <Link to={`/admin/alumnos/${s.id}`} onClick={(e) => openStudent(e, s.id)} className="font-medium text-ink hover:text-purple hover:underline" aria-current={selectedId === s.id ? 'true' : undefined}>{s.user.full_name}</Link>
-                        </div>
-                      </td>
-                      {visible('student_id') && <td className="text-muted">{s.student_id}</td>}
-                      {visible('loyverse_code') && <td className="font-mono text-xs text-muted">{s.loyverse_code || s.student_id}</td>}
-                      {visible('grade') && <td className="text-muted">{s.grade}</td>}
-                      {visible('group') && <td className="text-muted">{s.group}</td>}
-                      {visible('email') && <td className="text-subtle text-xs">{s.user.email}</td>}
-                      {visible('status') && <td><Badge variant={STUDENT_STATUS[s.status ?? 'active']?.variant ?? 'neutral'}>{STUDENT_STATUS[s.status ?? 'active']?.label ?? s.status}</Badge></td>}
-                      {visible('last_login') && <td className="text-subtle text-xs">{s.user.last_login ? new Date(s.user.last_login).toLocaleDateString('es-MX') : <span className="text-coral-600">Nunca</span>}</td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        <Pagination page={page} pageSize={ADMIN_PAGE_SIZE} count={count} onChange={setPage} itemLabel="alumnos" />
-      </Card>
-    </div>
-    {twoPane && selectedId && (
-      <aside className="min-w-0 rounded-xl2 border border-line bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto" aria-label="Detalle del alumno">
-        <div className="mb-2 flex justify-end"><button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelectedId(null)}>Cerrar panel</button></div>
-        <AdminStudentDetail id={selectedId} embedded />
-      </aside>
-    )}
+        <BulkValueDialog
+          open={!!picking}
+          onClose={() => setPicking(null)}
+          title={picking ? `${picking.label}: ${selection.count.toLocaleString('es-MX')} alumnos` : ''}
+          onSubmit={pickedValue}
+          {...pickerProps}
+        />
+        <BulkConfirmDialog
+          open={!!confirming}
+          onClose={() => setConfirming(null)}
+          action={confirming?.action ?? null}
+          payload={confirming?.payload}
+          entityLabel="alumnos"
+          gender="m"
+          ids={selection.ids}
+          allMatching={selection.allMatching}
+          filters={filters}
+          execute={(body) => bulk.mutateAsync(body)}
+          onDone={(r) => { if (!r.failed.length) selection.onClear(); }}
+        />
+      </div>
+      {twoPane && selectedId && (
+        <aside className="min-w-0 rounded-xl2 border border-line bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto" aria-label="Detalle del alumno">
+          <div className="mb-2 flex justify-end"><button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelectedId(null)}>Cerrar panel</button></div>
+          <AdminStudentDetail id={selectedId} embedded />
+        </aside>
+      )}
     </div>
   );
 }

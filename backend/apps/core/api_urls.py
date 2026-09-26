@@ -11,5 +11,9 @@ urlpatterns = [
     path('admin/audit/export/', views.AdminAuditExportView.as_view(), name='core-admin-audit-export'),
     path('badges/', views.PortalBadgesView.as_view(), name='core-badges'),
     path('admin/contact-messages/', views.ContactInboxView.as_view(), name='core-contact-inbox'),
+    path('admin/contact-messages/export/', views.ContactInboxExportView.as_view(),
+         name='core-contact-inbox-export'),
+    path('admin/contact-messages/bulk/', views.ContactInboxBulkView.as_view(),
+         name='core-contact-inbox-bulk'),
     path('admin/contact-messages/<int:pk>/', views.ContactMessageHandleView.as_view(), name='core-contact-handle'),
 ]

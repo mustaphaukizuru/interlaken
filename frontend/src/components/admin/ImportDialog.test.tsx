@@ -115,4 +115,15 @@ describe('ImportDialog', () => {
     await waitFor(() => expect(api.upload).toHaveBeenCalledWith(csv, { dryRun: true }));
     expect(await screen.findByRole('table')).toBeInTheDocument();
   });
+
+  it('adds entity columns to the preview (extraColumns)', async () => {
+    const api = makeApi();
+    renderWithProviders(
+      <ImportDialog open onClose={() => {}} title="Ajuste masivo" entity="cafeteria-balances" api={api}
+        extraColumns={[{ id: 'saldo', header: 'Saldo resultante', cell: (r) => `saldo-${r.line}` }]} />,
+    );
+    await userEvent.upload(screen.getByLabelText(/Elegir archivo/) as HTMLInputElement, csv);
+    expect(await screen.findByRole('columnheader', { name: 'Saldo resultante' })).toBeInTheDocument();
+    expect(screen.getByText('saldo-2')).toBeInTheDocument();
+  });
 });

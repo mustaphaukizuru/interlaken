@@ -42,15 +42,15 @@ class TestBookingsExport:
         assert resp.status_code == 200
         assert resp['Content-Type'].startswith('text/csv')
         assert 'attachment' in resp['Content-Disposition']
-        content = resp.content.decode('utf-8')
+        content = b''.join(resp.streaming_content).decode('utf-8')
         assert content.startswith('﻿')
         assert ('Fecha,Hora,Tipo,Tutor,Correo,Teléfono,'
-                'Alumno,Grado de interés,Asistentes,Estado') in content
+                'Alumno,Grado de interés,Asistentes,Estado,Origen,Resultado,Creada') in content
         assert 'Ana Tutor' in content and 'Beto Tutor' in content
 
     def test_respects_type_filter(self, admin_client, bookings):
         resp = admin_client.get(reverse('bookings-admin-export'), {'type': 'individual'})
-        content = resp.content.decode('utf-8')
+        content = b''.join(resp.streaming_content).decode('utf-8')
         assert 'Ana Tutor' in content
         assert 'Beto Tutor' not in content
 

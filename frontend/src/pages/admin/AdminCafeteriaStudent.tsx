@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, ArrowDownCircle, ArrowUpCircle, RotateCcw, SlidersHorizontal,
-  Download, Plus, Minus,
+  Plus, Minus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -17,9 +17,15 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { cafeteriaApi, downloadBlob } from '@/services/api';
-import type { CafeteriaStudentDetail, CafeteriaTransaction } from '@/types';
+import { cafeteriaApi } from '@/services/api';
+import type { CafeteriaStudentDetail } from '@/types';
 import { DataTable } from '@/components/ui/DataTable';
+import { ExportMenu } from '@/components/admin/ExportMenu';
+import { useAdjustmentsList, useTransactionsList, CAF_MONEY_VIEWS } from '@/hooks/queries/cafeteria';
+import { invalidateEntity } from '@/hooks/queries/keys';
+import { apiErrorMessage } from '@/lib/apiErrors';
+import type { AdminTransaction } from '@/services/cafeteriaAdmin';
+import type { ExportFormat } from '@/services/dataOps';
 
 const txIcon = (type: string) => {
   if (type === 'topup')      return <ArrowUpCircle className="w-4 h-4 text-brand-500" />;
@@ -47,18 +53,23 @@ export default function AdminCafeteriaStudent() {
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
 
-  const [refundTx, setRefundTx] = useState<CafeteriaTransaction | null>(null);
+  const [refundTx, setRefundTx] = useState<AdminTransaction | null>(null);
+  // Ledger and adjustment trail are paged server-side (they grow without bound).
+  const [txPage, setTxPage] = useState(1);
+  const [adjPage, setAdjPage] = useState(1);
   const [refundReason, setRefundReason] = useState('');
 
   const { data, isLoading, isError, refetch } = useQuery<CafeteriaStudentDetail>({
     queryKey: ['admin-cafeteria-student', id],
-    queryFn: async () => (await cafeteriaApi.getStudentDetail(id)).data,
+    queryFn: async () => (await cafeteriaApi.getStudentDetail(id, { ledger: 0 })).data,
     enabled: !!id,
   });
+  const txs = useTransactionsList({ student: id, page: txPage }, { enabled: !!id });
+  const adjs = useAdjustmentsList({ student: id, page: adjPage }, { enabled: !!id });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-student', id] });
-    queryClient.invalidateQueries({ queryKey: ['admin-cafeteria-balances'] });
+    void invalidateEntity(queryClient, CAF_MONEY_VIEWS[0], CAF_MONEY_VIEWS);
   };
 
   const adjustMutation = useMutation({
@@ -71,10 +82,7 @@ export default function AdminCafeteriaStudent() {
       setAdjustReason('');
       invalidate();
     },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'No se pudo aplicar el ajuste.');
-    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo aplicar el ajuste.')),
   });
 
   const refundMutation = useMutation({
@@ -85,28 +93,20 @@ export default function AdminCafeteriaStudent() {
       setRefundReason('');
       invalidate();
     },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? 'No se pudo procesar la devolución.');
-    },
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo procesar la devolución.')),
   });
 
-  const doExport = async (fmt: 'csv' | 'pdf') => {
-    try {
-      const { data: blob } = await cafeteriaApi.exportStudent(id, fmt);
-      downloadBlob(blob, `estado_cafeteria_${data?.balance.student.student_id ?? id}.${fmt}`);
-    } catch {
-      toast.error('No se pudo generar el archivo.');
-    }
-  };
+  // The statement (header + full ledger) is its own document, not a list view.
+  const fetchStatement = async (fmt: ExportFormat) =>
+    (await cafeteriaApi.exportStudent(id, fmt === 'pdf' ? 'pdf' : 'csv')).data as Blob;
 
   if (isLoading) return <LoadingSpinner />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
-  const { balance, parents, transactions, adjustments, loyverse } = data;
+  const { balance, parents, loyverse } = data;
   const isLow = parseFloat(balance.balance) <= parseFloat(balance.low_balance_threshold ?? '50');
-  const refundable = (t: CafeteriaTransaction) =>
+  const refundable = (t: AdminTransaction) =>
     t.transaction_type === 'purchase' || t.transaction_type === 'topup';
 
   return (
@@ -126,12 +126,12 @@ export default function AdminCafeteriaStudent() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => doExport('csv')}>
-            <Download className="w-3.5 h-3.5" /> CSV
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => doExport('pdf')}>
-            <Download className="w-3.5 h-3.5" /> PDF
-          </Button>
+          <ExportMenu
+            label="Estado de cuenta"
+            formats={['csv', 'pdf']}
+            filenamePrefix={`estado_cafeteria_${balance.student.student_id}`}
+            fetch={(fmt) => fetchStatement(fmt)}
+          />
           <Button size="sm" onClick={() => { setAdjustSign(1); setShowAdjust(true); }}>
             <SlidersHorizontal className="w-3.5 h-3.5" /> Ajustar saldo
           </Button>
@@ -198,12 +198,19 @@ export default function AdminCafeteriaStudent() {
       {/* Transactions */}
       <Card>
         <h2 className="font-semibold text-ink mb-3">Movimientos</h2>
-        {!transactions.length ? (
-          <EmptyState icon={ArrowDownCircle} title="Sin movimientos" />
-        ) : (
-          <DataTable
-            rows={transactions}
+        {(
+          <DataTable<AdminTransaction>
+            rows={txs.data?.results}
             rowKey={(t) => t.id}
+            page={txPage}
+            count={txs.data?.count ?? 0}
+            onPage={setTxPage}
+            itemLabel="movimientos"
+            isLoading={txs.isLoading}
+            isError={txs.isError}
+            onRetry={() => txs.refetch()}
+            caption="Movimientos del alumno"
+            empty={{ icon: ArrowDownCircle, title: 'Sin movimientos' }}
             columns={[
               { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
               { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
@@ -226,12 +233,19 @@ export default function AdminCafeteriaStudent() {
       {/* Audit trail */}
       <Card>
         <h2 className="font-semibold text-ink mb-3">Historial de ajustes y devoluciones</h2>
-        {!adjustments.length ? (
-          <EmptyState icon={SlidersHorizontal} title="Sin ajustes registrados" />
-        ) : (
+        {(
           <DataTable
-            rows={adjustments}
+            rows={adjs.data?.results}
             rowKey={(a) => a.id}
+            page={adjPage}
+            count={adjs.data?.count ?? 0}
+            onPage={setAdjPage}
+            itemLabel="ajustes"
+            isLoading={adjs.isLoading}
+            isError={adjs.isError}
+            onRetry={() => adjs.refetch()}
+            caption="Historial de ajustes y devoluciones"
+            empty={{ icon: SlidersHorizontal, title: 'Sin ajustes registrados' }}
             columns={[
               { header: 'Fecha', className: 'whitespace-nowrap text-muted', cell: (a) => fmtDate(a.created_at) },
               { header: 'Tipo', cell: (a) => <Badge variant={a.kind === 'refund' ? 'info' : 'neutral'}>{a.kind_display}</Badge> },
