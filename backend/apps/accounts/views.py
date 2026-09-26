@@ -22,6 +22,9 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from apps.core.exceptions import error_body
+from apps.core.listing import AdminListMixin
+from apps.core.matricula import search_key
 from apps.core.ratelimit import ratelimit
 
 from .cookies import (
@@ -215,7 +218,7 @@ class GoogleTokenView(APIView):
     def post(self, request):
         credential = request.data.get('credential')
         if not credential:
-            return Response({'error': 'credential required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(error_body('credential required'), status=status.HTTP_400_BAD_REQUEST)
 
         # Verify the ID token LOCALLY (signature + audience + expiry) instead of
         # GETting Google's tokeninfo endpoint with the credential in the URL
@@ -224,13 +227,13 @@ class GoogleTokenView(APIView):
             payload = google_id_token.verify_oauth2_token(
                 credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
         except ValueError:
-            return Response({'error': 'invalid_token'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(error_body('invalid_token'), status=status.HTTP_401_UNAUTHORIZED)
 
         email = payload.get('email')
         if not email:
-            return Response({'error': 'no_email'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(error_body('no_email'), status=status.HTTP_400_BAD_REQUEST)
         if not _email_is_verified(payload):
-            return Response({'error': 'email_unverified'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(error_body('email_unverified'), status=status.HTTP_401_UNAUTHORIZED)
 
         user = _resolve_google_user(email, defaults={
             'first_name': payload.get('given_name', ''),
@@ -241,9 +244,8 @@ class GoogleTokenView(APIView):
         })
         if user is None:
             return Response(
-                {'error': 'not_invited',
-                 'detail': 'No hay una cuenta registrada con este correo. '
-                           'Pida al colegio que lo invite o vincule como tutor.'},
+                error_body('not_invited', detail='No hay una cuenta registrada con este correo. '
+                           'Pida al colegio que lo invite o vincule como tutor.'),
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -391,21 +393,38 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
         return context
 
 
-class StudentListView(generics.ListAPIView):
-    """GET /api/v1/accounts/students/?search= — List students (admin only or parent's own children)."""
+# Columns the roster can sort by (public key → ORM field(s)); the frontend
+# sends the same keys (Data Ops C2).
+STUDENT_ORDERING = {
+    'name': ('user__last_name', 'user__first_name'),
+    'student_id': 'student_id',
+    'grade': ('grade', 'group'),
+    'status': 'status',
+    'last_login': 'user__last_login',
+}
+
+
+class StudentListView(AdminListMixin, generics.ListAPIView):
+    """GET /api/v1/accounts/students/?q= — List students (admin only or parent's own children).
+
+    Data Ops C1 list contract: ``q`` search (``search`` kept as an alias for
+    one release; powers the admin Ctrl+K palette), whitelisted ``ordering``
+    with a stable ``-pk`` tiebreak, ``page_size`` ≤ 100. A term written the
+    Loyverse way (``ci09932``) is looked up as the digits the app stores
+    (``09932``), so the office can paste either spelling (decision C3.1).
+    """
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    # Powers the admin Ctrl+K palette (global SearchFilter backend applies).
-    search_fields = ['user__first_name', 'user__last_name', 'user__email',
-                     'student_id', 'grade']
+    search_fields = ('user__first_name', 'user__last_name', 'user__email', 'student_id', 'grade')
+    legacy_search_param = 'search'
+    normalize_search_term = staticmethod(search_key)
+    ordering = STUDENT_ORDERING
+    default_ordering = ('user__last_name', 'user__first_name')
 
     def get_queryset(self):
         user = self.request.user
-        # Stable ordering so pagination never skips/duplicates rows across pages
-        # (StudentProfile has no Meta.ordering).
-        order = ('user__last_name', 'user__first_name', 'id')
         if user.role == User.Role.ADMIN:
-            qs = StudentProfile.objects.select_related('user')
+            qs = StudentProfile.objects.select_related('user', 'loyverse_profile')
             # Roster filters (BACKLOG P1-A6/A7): ?estado=active|on_leave|graduated|withdrawn
             # and ?acceso=never (family login never used) | nopass (no password yet).
             estado = self.request.query_params.get('estado')
@@ -427,23 +446,17 @@ class StudentListView(generics.ListAPIView):
             grupo = self.request.query_params.get('grupo')
             if grupo:
                 qs = qs.filter(group__iexact=grupo[:5])
-            ordering = self.request.query_params.get('ordering', '')
-            allowed = {'name': ('user__last_name', 'user__first_name'), 'student_id': ('student_id',), 'grade': ('grade', 'group'),
-                       'status': ('status',), 'last_login': ('user__last_login',)}
-            key, desc = ordering.lstrip('-'), ordering.startswith('-')
-            if key in allowed:
-                fields = allowed[key] + ('id',)
-                order = tuple(f'-{f}' if desc else f for f in fields)
-            return qs.order_by(*order)
+            # Search + ordering are applied by AdminListMixin.filter_queryset.
+            return qs
         elif user.role == User.Role.PARENT:
             # Return only children linked to this parent
             return (StudentProfile.objects.filter(parents=user)
-                    .select_related('user').order_by(*order))
+                    .select_related('user', 'loyverse_profile'))
         elif user.role == User.Role.STUDENT:
             # A school-email student sees its own file (and any sibling it is a
             # self-guardian of) — same rule as StudentDetailView and the dashboard.
             return (StudentProfile.objects.filter(Q(user=user) | Q(parents=user))
-                    .distinct().select_related('user').order_by(*order))
+                    .distinct().select_related('user', 'loyverse_profile'))
         return StudentProfile.objects.none()
 
 
@@ -471,10 +484,11 @@ class StudentDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        qs = StudentProfile.objects.select_related('user', 'loyverse_profile')
         if user.role == User.Role.ADMIN:
-            return StudentProfile.objects.all()
+            return qs
         elif user.role == User.Role.PARENT:
-            return StudentProfile.objects.filter(parents=user)
+            return qs.filter(parents=user)
         elif user.role == User.Role.STUDENT:
-            return StudentProfile.objects.filter(user=user)
+            return qs.filter(user=user)
         return StudentProfile.objects.none()

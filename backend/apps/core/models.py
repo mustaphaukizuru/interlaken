@@ -19,6 +19,10 @@ class ContactMessage(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Mensaje de contacto'
         verbose_name_plural = 'Mensajes de contacto'
+        indexes = [
+            # Inbox filtered by handled/unhandled, newest first (Data Ops Phase 1).
+            models.Index(fields=['is_handled', '-created_at'], name='core_contact_handled_created'),
+        ]
 
     def __str__(self):
         return f'{self.name} — {self.subject}'
@@ -46,6 +50,9 @@ class AuditLog(models.Model):
         UPDATE     = 'update',     'Modificación'
         DELETE     = 'delete',     'Eliminación'
         PERMISSION = 'permission', 'Cambio de permisos'
+        # Data Ops: personal data leaving (export) or entering (import) the system.
+        EXPORT     = 'export',     'Exportación'
+        IMPORT     = 'import',     'Importación'
 
     # Null actor = automated/system action; actor_label carries e.g. 'system:webhook'
     # or a snapshot of the acting user's email (kept even if the user is deleted).
@@ -65,7 +72,13 @@ class AuditLog(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Registro de auditoría'
         verbose_name_plural = 'Registros de auditoría'
-        indexes = [models.Index(fields=['object_type', 'object_id'])]
+        indexes = [
+            models.Index(fields=['object_type', 'object_id']),
+            # Auditoría filtered by action, newest first (Data Ops Phase 1). The
+            # trigram indexes on context/actor_label are Postgres-only and live
+            # in migration 0005 as guarded SQL.
+            models.Index(fields=['action', '-created_at'], name='core_audit_action_created'),
+        ]
 
     def __str__(self):
         return f'{self.created_at:%Y-%m-%d %H:%M} {self.action} {self.object_type}#{self.object_id}'

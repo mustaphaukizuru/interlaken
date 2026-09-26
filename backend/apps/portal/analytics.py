@@ -21,6 +21,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.core.listing import day_start
 
 CACHE_KEY_PREFIX = 'staff-analytics-v4'  # v4: funnel + cafetería adoption (P4-10)
 CACHE_TTL_SECONDS = 60
@@ -79,10 +80,12 @@ def build_payload(days=30):
 
     # ── Payments: this month vs last (full + to-date) (3 queries) ──
     def month_window(start, end):
+        # Aware midnight bounds (America/Mexico_City) so the (status, completed_at)
+        # index is usable; ``end`` is exclusive.
         row = Payment.objects.filter(
             status=Payment.Status.SUCCESS,
-            completed_at__date__gte=start,
-            completed_at__date__lt=end,
+            completed_at__gte=day_start(start),
+            completed_at__lt=day_start(end),
         ).aggregate(total=Sum('amount'), n=Count('id'))
         return {'total': float(row['total'] or 0), 'count': row['n'] or 0}
 

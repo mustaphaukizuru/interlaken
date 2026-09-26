@@ -18,6 +18,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.exceptions import error_body
 from apps.core.permissions import IsAdmin
 
 from .import_students import _split_name
@@ -77,7 +78,7 @@ class StudentGuardiansView(APIView):
         email = (request.data.get('email') or '').strip().lower()
         if not email or '@' not in email:
             return Response(
-                {'error': 'Proporcione un correo válido del padre/tutor.'},
+                error_body('Proporcione un correo válido del padre/tutor.'),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -126,8 +127,8 @@ class StudentGuardiansView(APIView):
                     parent.save(update_fields=dirty)
             elif not is_self:
                 return Response(
-                    {'error': f'El correo {email} pertenece a un usuario con rol '
-                              f'«{parent.get_role_display()}», no a un padre/tutor.'},
+                    error_body(f'El correo {email} pertenece a un usuario con rol '
+                              f'«{parent.get_role_display()}», no a un padre/tutor.'),
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -178,10 +179,10 @@ class StudentGuardianDetailView(APIView):
         student = get_object_or_404(StudentProfile, pk=pk)
         parent = get_object_or_404(User, pk=user_id)
         if not student.parents.filter(pk=parent.pk).exists():
-            return Response({'error': 'Ese tutor no está vinculado a este alumno.'},
+            return Response(error_body('Ese tutor no está vinculado a este alumno.'),
                             status=status.HTTP_404_NOT_FOUND)
         if parent.role not in (User.Role.PARENT, User.Role.STUDENT):
-            return Response({'error': 'Solo se editan cuentas de padres/tutores.'},
+            return Response(error_body('Solo se editan cuentas de padres/tutores.'),
                             status=status.HTTP_403_FORBIDDEN)
 
         data = {k: (request.data.get(k) or '').strip() for k in self.EDITABLE if k in request.data}
@@ -226,7 +227,7 @@ class StudentGuardianDetailView(APIView):
         parent = get_object_or_404(User, pk=user_id)
         if not student.parents.filter(pk=parent.pk).exists():
             return Response(
-                {'error': 'Ese tutor no está vinculado a este alumno.'},
+                error_body('Ese tutor no está vinculado a este alumno.'),
                 status=status.HTTP_404_NOT_FOUND,
             )
         student.parents.remove(parent)

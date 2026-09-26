@@ -1,6 +1,22 @@
-import { describe, it, expect } from 'vitest';
-import { buildChecks } from './SyncHealthPanel';
-import type { SyncHealth } from '@/services/api';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+vi.mock('@/services/api', () => ({
+  cafeteriaApi: {
+    syncHealth: vi.fn(),
+    syncRoster: vi.fn(),
+  },
+}));
+
+vi.mock('react-hot-toast', () => ({
+  default: { error: vi.fn(), success: vi.fn() },
+}));
+
+import toast from 'react-hot-toast';
+import { buildChecks, SyncHealthPanel } from './SyncHealthPanel';
+import { cafeteriaApi, type SyncHealth } from '@/services/api';
+import { renderWithProviders } from '@/test/renderWithProviders';
 
 const base: SyncHealth = {
   loyverse_ok: true,
@@ -13,6 +29,7 @@ const base: SyncHealth = {
   transactions_last_7d: 12,
   purchases_last_7d: 12,
   last_poll_at: new Date().toISOString(),
+  last_roster_sync_at: new Date().toISOString(),
   last_webhook_at: new Date().toISOString(),
   last_webhook_type: 'receipts.update',
   backup: {
@@ -119,5 +136,71 @@ describe('buildChecks — convergence lights (2026-09-23 drift audit)', () => {
     expect(c.label).toMatch(/2 alumno\(s\) nuevo/);
     expect(c.label).toMatch(/4 recibo/);
     expect(c.detail).toMatch(/Dar de baja/);
+  });
+});
+
+describe('buildChecks — the Roster light (2026-09-24: sync_roster had never run)', () => {
+  it('is green with the last run time when the daily job ran within 30 h', () => {
+    const c = check({ last_roster_sync_at: hoursAgo(3) }, 'roster_sync');
+    expect(c.tone).toBe('ok');
+    expect(c.label).toMatch(/^Roster sincronizado hace/);
+    expect(c.detail).toMatch(/06:07/);
+  });
+
+  it('is red after 30 h and names the date it last ran plus the cron hint', () => {
+    const c = check({ last_roster_sync_at: hoursAgo(31) }, 'roster_sync');
+    expect(c.tone).toBe('bad');
+    expect(c.label).toMatch(/^El roster no se ha sincronizado desde /);
+    expect(c.detail).toMatch(/sync_roster en el crontab/);
+    expect(c.detail).toMatch(/Sincronizar roster ahora/);
+  });
+
+  it('is red, not "never" in fine print, when it has never run', () => {
+    const c = check({ last_roster_sync_at: null }, 'roster_sync');
+    expect(c.tone).toBe('bad');
+    expect(c.label).toBe('El roster nunca se ha sincronizado con Loyverse');
+  });
+});
+
+describe('SyncHealthPanel — Sincronizar roster ahora', () => {
+  const syncHealth = vi.mocked(cafeteriaApi.syncHealth);
+  const syncRoster = vi.mocked(cafeteriaApi.syncRoster);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncHealth.mockResolvedValue({ data: { ...base, last_roster_sync_at: hoursAgo(40) } } as never);
+  });
+
+  it('shows the red Roster light and runs the sync on click, reporting the counts', async () => {
+    const user = userEvent.setup();
+    syncRoster.mockResolvedValue({ data: {
+      commit: true, detail: 'sync_roster (written): …', synced_at: new Date().toISOString(), stale_links: 0,
+      summary: { linked: 2, conflicts: 0, created: 1, updated: 5, unchanged: 340, renamed: 3, skipped: 42,
+                 errors: 0, replayed: 0, absorbed: 0, stale_links: 0, unmatched_students: 0,
+                 possible_leavers: 4, unlinked_customers: 0 },
+      import: { created: 1, updated: 5, unchanged: 340, renamed: 3, changes: [] },
+      link: { linked: 2, already_linked: 340, possible_leavers: [] },
+    } } as never);
+
+    renderWithProviders(<SyncHealthPanel />);
+    expect(await screen.findByText(/El roster no se ha sincronizado desde/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Sincronizar roster ahora/ }));
+
+    await waitFor(() => expect(syncRoster).toHaveBeenCalledWith(false));
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
+      expect.stringMatching(/1 alta\(s\), 5 actualizado\(s\), 3 nombre\(s\), 2 vinculado\(s\), 4 sin grado en Loyverse/),
+      expect.anything(),
+    );
+    // The panel re-reads the health payload so the light can turn green.
+    await waitFor(() => expect(syncHealth).toHaveBeenCalledTimes(2));
+  });
+
+  it('surfaces the server detail when Loyverse is down', async () => {
+    const user = userEvent.setup();
+    syncRoster.mockRejectedValue({ response: { data: { detail: 'No se pudo conectar con Loyverse: 401' } } });
+    renderWithProviders(<SyncHealthPanel />);
+    await user.click(await screen.findByRole('button', { name: /Sincronizar roster ahora/ }));
+    await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalledWith('No se pudo conectar con Loyverse: 401'));
   });
 });

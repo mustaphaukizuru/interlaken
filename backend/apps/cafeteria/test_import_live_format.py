@@ -56,8 +56,14 @@ class TestParsers:
 class TestImportAgainstTheExistingRoster:
     def test_an_existing_student_is_updated_not_duplicated(self):
         """The 333 linked students hold bare-digit matrículas. Before
-        normalising, the dry run reported 'Creados: 350, Actualizados: 0'."""
+        normalising, the dry run reported 'Creados: 350, Actualizados: 0'.
+
+        Grade and link follow Loyverse. The name does NOT on a first pass:
+        with no record of what Loyverse said last time, the sync cannot tell a
+        rename from a console correction, so it keeps the console's name
+        (decision C3.2) and only lists the grade/link changes."""
         existing = StudentProfileFactory(student_id='09938', grade='N/D', group='')
+        console_name = (existing.user.first_name, existing.user.last_name)
 
         report = import_students_from_loyverse([LIVE], commit=True)
 
@@ -66,8 +72,19 @@ class TestImportAgainstTheExistingRoster:
         existing.refresh_from_db()
         assert existing.grade == '1° Primaria'
         assert existing.loyverse_id == 'uuid-09938'
-        assert existing.user.first_name == 'Sebastian'
-        assert existing.user.last_name == 'Calles Lopez'
+        assert (existing.user.first_name, existing.user.last_name) == console_name
+        assert {c['field'] for c in report['changes']} == {'grado', 'codigo', 'vinculo'}
+
+    def test_an_empty_console_name_is_filled_from_loyverse(self):
+        """The one first-pass case where Loyverse wins: the app holds no name."""
+        existing = StudentProfileFactory(student_id='09938', grade='N/D', group='')
+        existing.user.first_name = existing.user.last_name = ''
+        existing.user.save(update_fields=['first_name', 'last_name'])
+
+        import_students_from_loyverse([LIVE], commit=True)
+
+        existing.refresh_from_db()
+        assert (existing.user.first_name, existing.user.last_name) == ('Sebastian', 'Calles Lopez')
 
     def test_a_new_student_is_created_with_a_real_name_and_grade(self):
         report = import_students_from_loyverse([LIVE], commit=True)

@@ -129,6 +129,10 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
             <dd className="mt-1 text-sm font-medium text-ink">{student.student_id || '—'}</dd>
           </div>
           <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Código Loyverse</dt>
+            <dd className="mt-1 font-mono text-sm font-medium text-ink">{student.loyverse_code || student.student_id || '—'}</dd>
+          </div>
+          <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Grado y grupo</dt>
             <dd className="mt-1 text-sm font-medium text-ink">
               {student.grade}{student.group ? ` · ${student.group}` : ''}

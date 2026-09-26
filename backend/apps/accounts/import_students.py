@@ -11,6 +11,9 @@ Required per row: matricula, nombre, apellidos, grado. Parent columns are
 optional as a group, but if any is present email_padre is required.
 
 Semantics (idempotent — re-importing the same file changes nothing):
+  * matricula is normalised first (``ci09932`` and ``09932`` are one key, the
+    app stores the digits; see apps.core.matricula), before the in-file
+    duplicate check and the roster match.
   * matricula new  → create student User (unusable password) + StudentProfile.
   * matricula seen → update nombre/apellidos/grado/grupo/loyverse_id.
   * email_padre new  → create parent User (unusable password; logs in via
@@ -27,6 +30,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.exceptions import error_body
+from apps.core.matricula import normalize_matricula
 from apps.core.permissions import IsAdmin
 
 from .models import StudentProfile, User
@@ -60,32 +65,31 @@ class ImportStudentsView(APIView):
     def post(self, request):
         upload = request.FILES.get('file')
         if not upload:
-            return Response({'error': 'Adjunte un archivo CSV en el campo "file".'},
+            return Response(error_body('Adjunte un archivo CSV en el campo "file".'),
                             status=status.HTTP_400_BAD_REQUEST)
         dry_run = str(request.data.get('dry_run', '1')).lower() in ('1', 'true', 'si', 'sí')
 
         try:
             text = upload.read().decode('utf-8-sig')
         except UnicodeDecodeError:
-            return Response({'error': 'El archivo debe estar codificado en UTF-8.'},
+            return Response(error_body('El archivo debe estar codificado en UTF-8.'),
                             status=status.HTTP_400_BAD_REQUEST)
 
         reader = csv.DictReader(io.StringIO(text))
         if not reader.fieldnames:
-            return Response({'error': 'CSV vacío o sin encabezados.'},
+            return Response(error_body('CSV vacío o sin encabezados.'),
                             status=status.HTTP_400_BAD_REQUEST)
         reader.fieldnames = _clean_headers(reader.fieldnames)
         missing = [h for h in REQUIRED if h not in reader.fieldnames]
         if missing:
             return Response(
-                {'error': f'Faltan columnas requeridas: {", ".join(missing)}.',
-                 'expected_headers': list(KNOWN_HEADERS)},
+                error_body(f'Faltan columnas requeridas: {", ".join(missing)}.', expected_headers=list(KNOWN_HEADERS)),
                 status=status.HTTP_400_BAD_REQUEST)
 
         rows = list(reader)
         if len(rows) > MAX_ROWS:
-            return Response({'error': f'Máximo {MAX_ROWS} filas por archivo '
-                                      f'(recibidas: {len(rows)}).'},
+            return Response(error_body(f'Máximo {MAX_ROWS} filas por archivo '
+                                      f'(recibidas: {len(rows)}).'),
                             status=status.HTTP_400_BAD_REQUEST)
 
         results, stats = [], {'created_students': 0, 'updated_students': 0,
@@ -100,7 +104,9 @@ class ImportStudentsView(APIView):
                          **stats, 'rows': results})
 
     def _process_row(self, row, line, dry_run, seen, stats):
-        matricula = _row_value(row, 'matricula')
+        # Both spellings are one student: the office writes ci09932 in
+        # Loyverse and its spreadsheets, the app keys on 09932.
+        matricula = normalize_matricula(_row_value(row, 'matricula'))
         nombre = _row_value(row, 'nombre')
         apellidos = _row_value(row, 'apellidos')
         grado = _row_value(row, 'grado')

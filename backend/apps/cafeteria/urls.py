@@ -35,6 +35,9 @@ urlpatterns = [
     path('admin/sync-all/',              views.AdminSyncAllView.as_view(),        name='admin-sync-all'),
     path('admin/reconcile/<int:pk>/fix/', views.AdminReconcileFixView.as_view(),  name='admin-reconcile-fix'),
     path('admin/sync-health/',           views.AdminSyncHealthView.as_view(),     name='admin-sync-health'),
+    # On-demand roster sync (link → import → replay), the same code as the
+    # 06:07 cron; body {dry_run: bool}.
+    path('admin/sync-roster/',           views.AdminSyncRosterView.as_view(),     name='admin-sync-roster'),
 
     # Phase D — admin console
     path('admin/topups/',                views.AdminTopUpLogView.as_view(),       name='admin-topups'),

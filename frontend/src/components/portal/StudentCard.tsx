@@ -84,7 +84,9 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
               <p className="font-head text-2xl font-bold leading-none">{money(card.balance)}</p>
             </div>
             <div className="text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Matrícula</p>
+              {/* The code is the Loyverse spelling (ci09932), the same one the POS
+                  scans and the office reads on the register: label it as such. */}
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Código Loyverse</p>
               <p className="font-head text-base font-bold tracking-wider">{card.code || '—'}</p>
             </div>
           </div>

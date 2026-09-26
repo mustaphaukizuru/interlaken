@@ -20,6 +20,8 @@ export interface StudentProfile {
   id: number;
   user: User;
   student_id: string;
+  /** The matrícula as Loyverse spells it (ci09932) when a card is bound, else student_id. */
+  loyverse_code?: string;
   grade: string;
   group: string;
   loyverse_id: string;

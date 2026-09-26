@@ -233,12 +233,23 @@ roughly hourly anyway).
 
 ```bash
 sudo mkdir -p /var/log/interlaken /var/backups/interlaken
-crontab -e            # paste the contents of deploy/crontab.example
+crontab /opt/interlaken/deploy/crontab.example   # the file IS the crontab: install it whole
+crontab -l | grep -c manage.py                   # sanity: the number of app jobs installed
 ```
 
-That installs four things: the cafeteria sync every five minutes, the daily
-reminder/notification batch, the nightly database backup at 02:30, and two
-watchdogs that email if either the sync or the backup stops producing output.
+`deploy/crontab.example` is the crontab, not a template: never edit the live
+crontab by hand, and **re-run that `crontab` line after every deploy that
+changes the file** (`deploy.sh` does not touch cron). Release note 2026-09-24:
+the live crontab must be reinstalled with this deploy; the nightly Loyverse
+jobs moved from 05:40/06:05 to 05:42/06:07 and from `flock -n` to
+`flock -w 900` (they shared the poll's lock, lost the race every morning and
+`sync_roster` had never run).
+
+That installs five things: the cafeteria sync every five minutes, the nightly
+Loyverse convergence (receipt re-read at 05:42, roster sync at 06:07), the
+daily reminder/notification batch, the nightly database backup at 02:30, and
+two watchdogs that email if the sync, the roster sync or the backup stops
+producing output.
 
 Confirm after ten minutes:
 

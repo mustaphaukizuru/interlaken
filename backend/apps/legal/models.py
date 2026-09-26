@@ -170,6 +170,10 @@ class ArcoRequest(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Solicitud ARCO'
         verbose_name_plural = 'Solicitudes ARCO'
+        indexes = [
+            # ARCO inbox filtered by status, newest first (Data Ops Phase 1).
+            models.Index(fields=['status', '-created_at'], name='legal_arco_status_created'),
+        ]
 
     def __str__(self):
         return f'{self.get_request_type_display()} — {self.requester_email} ({self.status})'

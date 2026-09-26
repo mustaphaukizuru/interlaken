@@ -1,7 +1,10 @@
 /** Roster table preferences and sort helpers (BACKLOG P1-A8). */
-export type RosterColumn = 'student_id' | 'grade' | 'group' | 'email' | 'status' | 'last_login';
+export type RosterColumn = 'student_id' | 'loyverse_code' | 'grade' | 'group' | 'email' | 'status' | 'last_login';
 export const ROSTER_COLUMNS: { key: RosterColumn; label: string; sort?: string }[] = [
   { key: 'student_id', label: 'Matrícula', sort: 'student_id' },
+  // What the office compares against Loyverse: the code exactly as the POS
+  // spells it (ci09932). Matrícula stays the canonical digits.
+  { key: 'loyverse_code', label: 'Código Loyverse' },
   { key: 'grade', label: 'Grado', sort: 'grade' },
   { key: 'group', label: 'Grupo' },
   { key: 'email', label: 'Correo' },

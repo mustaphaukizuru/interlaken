@@ -73,3 +73,47 @@ describe('LinkLoyverseModal — leavers (sin cliente en Loyverse)', () => {
     }));
   });
 });
+
+describe('LinkLoyverseModal — posible baja (customer kept, grade code removed)', () => {
+  // The office does not always delete the customer when a pupil leaves;
+  // sometimes it only strips the "-3SEC" suffix. Those students are linked,
+  // so they never appear as "sin cliente": they get their own group and the
+  // same Dar de baja action, and nothing changes status by itself.
+  const withNoGrade = {
+    ...report,
+    possible_leavers: [
+      { id: 21, matricula: '09932', loyverse_code: 'ci09932', name: 'Juan Antonio Chavez Lopez',
+        grade: '4° Primaria', status: 'active', balance: '0.00' },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    linkLoyverse.mockResolvedValue({ data: withNoGrade } as never);
+  });
+
+  it('lists them under their own heading with the Loyverse code and a stat', async () => {
+    render(<LinkLoyverseModal open onClose={() => {}} />);
+    expect(await screen.findByText(/Sin grado en Loyverse \(posible baja\) \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Sin cliente en Loyverse \(2\)/)).toBeInTheDocument();
+    expect(screen.getByText(/09932 \(Código Loyverse ci09932\) · 4° Primaria/)).toBeInTheDocument();
+    expect(screen.getByText('Sin grado en Loyverse')).toBeInTheDocument();
+    expect(screen.getByText(/Confirme con la oficina/)).toBeInTheDocument();
+  });
+
+  it('selects across both groups and withdraws through the same bulk endpoint', async () => {
+    const user = userEvent.setup();
+    render(<LinkLoyverseModal open onClose={() => {}} />);
+    await screen.findByText('Juan Antonio Chavez Lopez');
+
+    await user.click(screen.getByRole('checkbox', { name: /Seleccionar todos los alumnos sin grado/ }));
+    await user.click(screen.getByRole('checkbox', { name: /Seleccionar a Sara/ }));
+    await user.click(screen.getByRole('button', { name: /Dar de baja \(2\)/ }));
+    expect(await screen.findByText(/queda un saldo de \$2\.00/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Dar de baja a 2/ }));
+
+    await waitFor(() => expect(bulkStudents).toHaveBeenCalledWith({
+      ids: [21, 11], action: 'status', value: 'withdrawn',
+    }));
+  });
+});

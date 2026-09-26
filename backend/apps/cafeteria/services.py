@@ -20,6 +20,7 @@ import re
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
+from uuid import uuid4
 
 import requests
 from django.conf import settings
@@ -1190,19 +1191,19 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
             fields.append('last_low_balance_alert_at')
         cb.save(update_fields=fields)
 
+        # loyverse_receipt_id is unique=True; inserting '' and stamping the
+        # reference afterwards let two concurrent adjustments (any students,
+        # two gunicorn workers) collide on the blank value on Postgres. The
+        # synthetic reference is generated BEFORE the insert (Data Ops Phase 1),
+        # keeping the adjust-tx-* convention the ledger repair tools recognise.
         tx = CafeteriaTransaction.objects.create(
             student=student,
             transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT,
             amount=amount.copy_abs(),
             description=(f'Ajuste manual: {reason}' if reason else 'Ajuste manual'),
+            loyverse_receipt_id=f'adjust-tx-{uuid4().hex}',
             balance_after=cb.balance,
         )
-        # loyverse_receipt_id is unique=True; leaving it '' means only ONE such
-        # row can ever exist system-wide, so the second manual adjustment (any
-        # student) would hit an IntegrityError. Stamp a unique synthetic
-        # reference, mirroring the refund-tx-<id> / topup-* convention.
-        tx.loyverse_receipt_id = f'adjust-tx-{tx.id}'
-        tx.save(update_fields=['loyverse_receipt_id'])
         adj = BalanceAdjustment.objects.create(
             student=student,
             admin=admin,
@@ -1827,6 +1828,9 @@ def sync_health() -> dict:
         'last_full_fetch_at': state.last_full_fetch_at,
         # When the poll last RAN: the honest "is the cron alive" signal.
         'last_poll_at': state.last_poll_at,
+        # When the daily roster sync (link → import → replay) last completed a
+        # written run; None until 2026-09-24 in production because it never had.
+        'last_roster_sync_at': state.last_roster_sync_at,
         # Real-time: stamped on every authenticated Loyverse delivery.
         'last_webhook_at': state.last_webhook_at,
         'last_webhook_type': state.last_webhook_type,
@@ -1852,6 +1856,24 @@ def sync_health() -> dict:
 # every id in one pass. Matching is EXACT (stripped) to avoid mis-linking one
 # child's spending onto another; an email fallback covers rosters keyed that way.
 
+# Per-student rows the console can act on (unmatched, possible leavers) and the
+# before/after preview are capped so a 400-pupil roster never returns an
+# unbounded payload.
+ROSTER_ROWS_CAP = 500
+SKIPPED_ROWS_CAP = 200
+
+
+def _leaver_row(s, *, loyverse_code):
+    """One row of ``unmatched_students`` / ``possible_leavers``: what the office
+    needs to decide a baja (id for the bulk-status endpoint, leftover balance so
+    money is never silently written off)."""
+    cb = getattr(s, 'cafeteria_balance', None)
+    return {
+        'id': s.id, 'matricula': s.student_id, 'loyverse_code': loyverse_code,
+        'name': s.user.full_name, 'grade': s.grade, 'status': s.status,
+        'balance': str(cb.balance if cb is not None else Decimal('0')),
+    }
+
 
 def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> dict:
     """Match Loyverse ``customers`` to students and backfill ``loyverse_id``.
@@ -1863,8 +1885,15 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
     only when ``commit`` (default is a dry-run preview).
 
     Returns a report: ``{customers, students, linked, already_linked,
-    skipped_conflict, unmatched_students[], unmatched_customer_count,
-    duplicate_codes[], commit, changes[]}``.
+    skipped_conflict, unmatched_students[], possible_leavers[],
+    unmatched_customer_count, duplicate_codes[], commit, changes[]}``.
+    ``changes`` rows carry ``field='vinculo'`` with ``before``/``after`` so the
+    console can show them in the same diff table as the import.
+    ``possible_leavers`` are linked students whose Loyverse customer carries no
+    grade code (neither in ``address`` nor as a name suffix): the office strips
+    the suffix when a pupil leaves, and nothing else tells the app. No status is
+    ever changed here; the office confirms through Vincular Loyverse → Dar de
+    baja.
     """
     from apps.accounts.models import StudentProfile
 
@@ -1884,12 +1913,13 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
     report = {
         'customers': len(customers), 'students': 0,
         'linked': 0, 'already_linked': 0, 'skipped_conflict': 0,
-        'unmatched_students': [], 'unmatched_customer_count': 0,
+        'unmatched_students': [], 'possible_leavers': [], 'unmatched_customer_count': 0,
         'duplicate_codes': sorted(dup_codes), 'commit': commit, 'changes': [],
     }
 
     matched_ids = set()
-    students = StudentProfile.objects.filter(is_active=True).select_related('user')
+    students = (StudentProfile.objects.filter(is_active=True)
+                .select_related('user', 'cafeteria_balance'))
     report['students'] = students.count()
 
     for s in students:
@@ -1902,19 +1932,17 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
         if cust is None:
             # An active student with no Loyverse customer is, in practice, a
             # leaver: the school deletes the customer when a student goes and
-            # nothing else tells the app. Carry what the admin needs to act on
-            # it (id for the bulk-status endpoint, leftover balance so money is
-            # never silently written off with the baja).
-            cb = getattr(s, 'cafeteria_balance', None)
-            report['unmatched_students'].append({
-                'id': s.id, 'matricula': s.student_id, 'name': s.user.full_name,
-                'grade': s.grade, 'status': s.status,
-                'balance': str(cb.balance if cb is not None else Decimal('0')),
-            })
+            # nothing else tells the app.
+            if len(report['unmatched_students']) < ROSTER_ROWS_CAP:
+                report['unmatched_students'].append(
+                    _leaver_row(s, loyverse_code=s.student_id))
             continue
 
         uuid = cust.get('id')
         matched_ids.add(uuid)
+        raw_code = (cust.get('customer_code') or '').strip() or s.student_id
+        if not _has_grade_code(cust) and len(report['possible_leavers']) < ROSTER_ROWS_CAP:
+            report['possible_leavers'].append(_leaver_row(s, loyverse_code=raw_code))
 
         if s.loyverse_id == uuid:
             report['already_linked'] += 1
@@ -1926,9 +1954,10 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
 
         report['linked'] += 1
         report['changes'].append({
-            'matricula': s.student_id, 'name': s.user.full_name,
-            'loyverse_id': uuid, 'matched_by': matched_by,
-            'was': s.loyverse_id or None,
+            'matricula': s.student_id, 'loyverse_code': raw_code, 'name': s.user.full_name,
+            'loyverse_id': uuid, 'matched_by': matched_by, 'was': s.loyverse_id or None,
+            'field': 'vinculo', 'before': s.loyverse_id or '', 'after': uuid,
+            'action': 'actualizar',
         })
         if commit:
             s.loyverse_id = uuid
@@ -1965,17 +1994,31 @@ _LEVEL_ABBR = {'PRE': 'Preescolar', 'KIN': 'Kinder', 'MAT': 'Maternal',
 # what actually excludes staff and junk records.
 _STUDENT_CODE_RE = re.compile(r'^(?:ci)?\d{3,10}$', re.IGNORECASE)
 
+# Why a customer is not treated as a pupil, in the office's words. Reported
+# per customer so an edited email or a typo in the code is visible instead of
+# silently folded into ``skipped_non_student``.
+SKIP_BAD_CODE = 'código no numérico'
+SKIP_BAD_EMAIL = 'correo no tiene la forma ci…@interlaken.com.mx'
+SKIP_DUPLICATE = 'matrícula duplicada en Loyverse'
+
+
+def _skip_reason(c) -> str:
+    """'' when ``c`` is a pupil, else the es-MX reason it is skipped."""
+    code = (c.get('customer_code') or '').strip()
+    email = (c.get('email') or '').strip().lower()
+    if not _STUDENT_CODE_RE.match(code):
+        return SKIP_BAD_CODE
+    if not (email.startswith('ci') and email.endswith('@interlaken.com.mx')):
+        return SKIP_BAD_EMAIL
+    return ''
+
 
 def _is_loyverse_student(c) -> bool:
     """A Loyverse customer is a student iff its matrícula is ``ci<digits>`` (or
     bare digits) AND it carries the school's student email shape
     ``ci<digits>@interlaken.com.mx`` — which cleanly excludes staff (name-based
     emails, ``ZP-`` prefixes) and test/junk records."""
-    code = (c.get('customer_code') or '').strip()
-    email = (c.get('email') or '').strip().lower()
-    return (bool(_STUDENT_CODE_RE.match(code))
-            and email.startswith('ci')
-            and email.endswith('@interlaken.com.mx'))
+    return _skip_reason(c) == ''
 
 
 _GRADE_CODE_RE = re.compile(r'^\s*(\d)\s*([A-Za-z])?\s*(PREP|PRE|KIN|MAT|PRI|SEC)\s*$', re.IGNORECASE)
@@ -2005,12 +2048,32 @@ def _strip_grade_suffix(name):
     return _NAME_GRADE_SUFFIX_RE.sub('', name or '').strip()
 
 
+def _customer_grade(c):
+    """(grade, group) for a customer: the ``address`` code first, else the
+    suffix on the name ("…-1PRI"). A code without a letter yields group ''
+    so the caller keeps whatever group the app already holds."""
+    grade, group = _parse_grade_code(c.get('address'))
+    if not grade:
+        m = _NAME_GRADE_SUFFIX_RE.search(c.get('name') or '')
+        if m:
+            grade, group = _parse_grade_code(m.group(0).lstrip(' -'))
+    return grade, group
+
+
+def _has_grade_code(c) -> bool:
+    """Does Loyverse still say which grade this customer is in? The office
+    removes the code when a pupil leaves, so its absence is the baja signal."""
+    return bool(_customer_grade(c)[0])
+
+
 def _matricula(code):
     """Loyverse writes the matrícula as ``ci09938``; the app stores ``09938``
     (and that is what every existing StudentProfile.student_id holds). Without
     this the import matched none of the 333 linked students and would have
-    created 350 duplicates beside them."""
-    return re.sub(r'^ci', '', (code or '').strip(), flags=re.IGNORECASE)
+    created 350 duplicates beside them. One rule for every caller: see
+    ``apps.core.matricula``."""
+    from apps.core.matricula import normalize_matricula
+    return normalize_matricula(code)
 
 
 def _split_loyverse_name(name):
@@ -2028,76 +2091,212 @@ def _split_loyverse_name(name):
     return ' '.join(parts[2:]), ' '.join(parts[:2])
 
 
+def _note_change(report, *, matricula, name, field, before, after, action):
+    if len(report['changes']) < ROSTER_ROWS_CAP:
+        report['changes'].append({
+            'matricula': matricula, 'name': name, 'field': field,
+            'before': before or '', 'after': after or '', 'action': action,
+        })
+
+
+def _note_skip(report, c, reason):
+    if len(report['skipped']) < SKIPPED_ROWS_CAP:
+        report['skipped'].append({
+            'customer_code': (c.get('customer_code') or '').strip(),
+            'name': (c.get('name') or '').strip(), 'reason': reason,
+        })
+
+
+def _plan_existing(existing, snapshot, *, first, last, incoming_name, grade, group,
+                   raw_code, uuid):
+    """What the import would change on an existing student, as
+    ``[(field, before, after)]`` plus whether the name gets rewritten.
+
+    The name rule (decision C3.2): Loyverse wins only when the Loyverse name
+    CHANGED since the roster sync last applied it (``LoyverseProfile
+    .applied_name``). With no marker yet (first run after this shipped, or a
+    customer never snapshotted) the name is written only when the app holds
+    none, so a correction typed in the console is never clobbered by a sync
+    that merely re-read the same Loyverse name.
+    """
+    u = existing.user
+    previous_name = snapshot.applied_name if snapshot is not None else ''
+    if previous_name:
+        rename = incoming_name != previous_name
+    else:
+        rename = not f'{u.first_name}{u.last_name}'.strip()
+    rename = rename and (u.first_name, u.last_name) != (first, last)
+
+    diffs = []
+    if rename:
+        diffs.append(('nombre', u.full_name, f'{first} {last}'.strip()))
+    if grade and existing.grade != grade:
+        diffs.append(('grado', existing.grade, grade))
+    if group and existing.group != group:
+        diffs.append(('grupo', existing.group, group))
+    shown_code = (snapshot.customer_code if snapshot is not None and snapshot.customer_code
+                  else existing.student_id)
+    if raw_code and shown_code != raw_code:
+        diffs.append(('codigo', shown_code, raw_code))
+    if uuid and existing.loyverse_id != uuid:
+        diffs.append(('vinculo', existing.loyverse_id, uuid))
+    return diffs, rename
+
+
+def _stamp_snapshot(profile, c, snapshot, incoming_name):
+    """Keep the student's LoyverseProfile row current for what the console
+    shows (Código Loyverse) and record the Loyverse name the sync just
+    applied/acknowledged. One refresh when the row is missing or its code,
+    name or binding drifted; one UPDATE when only the marker moved; nothing
+    when nothing changed, so the nightly run is mostly reads."""
+    from apps.cafeteria.loyverse_profile import parse_customer_snapshot, upsert_loyverse_profile
+    from apps.cafeteria.models import LoyverseProfile
+
+    fresh = parse_customer_snapshot(c)
+    if (snapshot is None or snapshot.student_id != profile.pk
+            or snapshot.customer_code != fresh['customer_code']
+            or snapshot.name != fresh['name']
+            or snapshot.address_code != fresh['address_code']):
+        snapshot, _ = upsert_loyverse_profile(profile, c)
+    if snapshot.applied_name != incoming_name:
+        LoyverseProfile.objects.filter(pk=snapshot.pk).update(applied_name=incoming_name)
+        snapshot.applied_name = incoming_name
+    return snapshot
+
+
 def import_students_from_loyverse(customers, *, commit=False, seed_balances=True) -> dict:
     """Create/refresh StudentProfiles from Loyverse customers (students only).
 
     Pure over the given ``customers`` list (no API calls), so unit-testable
     offline. Idempotent, keyed by matrícula (``student_id`` == ``customer_code``):
-    an existing student is updated (name/grade/loyverse_id), a new one is created
-    with a student ``User`` (unusable password). When ``seed_balances`` and the
-    customer has points, the opening balance is seeded **once** (respects the
-    seed-once rule: only when the balance was never touched). Writes only when
-    ``commit`` (default is a dry-run preview).
+    an existing student is refreshed (grade/group from the Loyverse grade code,
+    ``loyverse_id``, and the name only when Loyverse's name changed since the
+    last sync, see ``_plan_existing``), a new one is created with a student
+    ``User`` (unusable password). When ``seed_balances`` and the customer has
+    points, the opening balance is seeded **once** (respects the seed-once
+    rule: only when the balance was never touched). Writes only when
+    ``commit`` (default is a dry-run preview); the dry run computes exactly the
+    diffs the commit would apply.
 
     Returns a report: ``{total_customers, candidates, created, updated,
-    skipped_non_student, balance_seeded, errors[], commit, samples[]}``.
+    unchanged, renamed, skipped_non_student, skipped_duplicate, balance_seeded,
+    errors[], commit, samples[], skipped[{customer_code, name, reason}],
+    changes[{matricula, name, field, before, after, action}]}`` where
+    ``field`` is one of ``nombre``, ``grado``, ``grupo``, ``codigo``,
+    ``vinculo``. Every name rewrite is audited (``context='import:loyverse'``).
     """
     from django.db import transaction as _txn
 
     from apps.accounts.models import StudentProfile, User
-    from apps.cafeteria.models import CafeteriaBalance
+    from apps.cafeteria.models import CafeteriaBalance, LoyverseProfile
+    from apps.core.audit import record
 
     report = {
         'total_customers': len(customers), 'candidates': 0,
-        'created': 0, 'updated': 0, 'skipped_non_student': 0,
-        'balance_seeded': Decimal('0'), 'errors': [], 'commit': commit, 'samples': [],
+        'created': 0, 'updated': 0, 'unchanged': 0, 'renamed': 0,
+        'skipped_non_student': 0, 'skipped_duplicate': 0,
+        'balance_seeded': Decimal('0'), 'errors': [], 'commit': commit,
+        'samples': [], 'skipped': [], 'changes': [],
     }
 
+    # Two lookups for the whole run instead of one SELECT per customer: the
+    # roster by matrícula and the Loyverse snapshots by customer id.
+    pupils = [c for c in customers if _is_loyverse_student(c)]
+    existing_by_code = {
+        s.student_id: s for s in StudentProfile.objects
+        .filter(student_id__in={_matricula(c.get('customer_code')) for c in pupils})
+        .select_related('user')
+    }
+    snapshots = {
+        p.loyverse_id: p for p in LoyverseProfile.objects
+        .filter(loyverse_id__in={c.get('id') for c in pupils if c.get('id')})
+    }
+
+    seen_codes = set()
     for c in customers:
-        if not _is_loyverse_student(c):
+        reason = _skip_reason(c)
+        if reason:
             report['skipped_non_student'] += 1
+            _note_skip(report, c, reason)
             continue
+        code = _matricula(c.get('customer_code'))
+        if code in seen_codes:
+            # Two customers with one matrícula: the link pass uses the first
+            # and reports the code; importing the second would repoint the
+            # student's wallet to the other card.
+            report['skipped_duplicate'] += 1
+            _note_skip(report, c, SKIP_DUPLICATE)
+            continue
+        seen_codes.add(code)
         report['candidates'] += 1
 
-        code = _matricula(c.get('customer_code'))
         email = (c.get('email') or '').strip().lower()
         uuid = c.get('id') or ''
-        first, last = _split_loyverse_name(c.get('name'))
-        grade, group = _parse_grade_code(c.get('address'))
-        if not grade:
-            # Fall back to the suffix on the name ("…-1PRI") when address is blank.
-            m = _NAME_GRADE_SUFFIX_RE.search(c.get('name') or '')
-            if m:
-                grade, group = _parse_grade_code(m.group(0).lstrip(' -'))
+        raw_code = (c.get('customer_code') or '').strip()
+        incoming_name = _strip_grade_suffix(c.get('name'))
+        first, last = _split_loyverse_name(incoming_name)
+        grade, group = _customer_grade(c)
         points = _to_decimal(c.get('total_points'))
+        display_name = f'{first} {last}'.strip()
 
         try:
-            existing = (StudentProfile.objects.filter(student_id=code)
-                        .select_related('user').first())
+            existing = existing_by_code.get(code)
             is_new = existing is None
+            snapshot = snapshots.get(uuid)
             if len(report['samples']) < 10:
                 report['samples'].append({
-                    'matricula': code, 'name': f'{first} {last}'.strip(),
+                    'matricula': code, 'name': display_name,
                     'grade': grade or '—', 'group': group or '—',
                     'points': str(points), 'action': 'crear' if is_new else 'actualizar'})
 
+            if is_new:
+                rename = False
+                diffs = [('nombre', '', display_name), ('grado', '', grade or 'N/D')]
+                if group:
+                    diffs.append(('grupo', '', group))
+                diffs += [('codigo', '', raw_code), ('vinculo', '', uuid)]
+            else:
+                diffs, rename = _plan_existing(
+                    existing, snapshot, first=first, last=last, incoming_name=incoming_name,
+                    grade=grade, group=group, raw_code=raw_code, uuid=uuid)
+            for field, before, after in diffs:
+                _note_change(report, matricula=code, name=display_name if is_new else
+                             existing.user.full_name, field=field, before=before,
+                             after=after, action='crear' if is_new else 'actualizar')
+
             if not commit:
-                report['created' if is_new else 'updated'] += 1
+                if is_new:
+                    report['created'] += 1
+                elif diffs:
+                    report['updated'] += 1
+                else:
+                    report['unchanged'] += 1
+                if rename:
+                    report['renamed'] += 1
                 continue
 
             with _txn.atomic():
                 if existing:
                     profile = existing
                     u = profile.user
-                    u.first_name, u.last_name = first, last
-                    u.save(update_fields=['first_name', 'last_name'])
-                    if grade:
-                        profile.grade = grade
-                    if group:
-                        profile.group = group
-                    profile.loyverse_id = uuid
-                    profile.save()
-                    report['updated'] += 1
+                    if rename:
+                        old_first, old_last = u.first_name, u.last_name
+                        u.first_name, u.last_name = first, last
+                        u.save(update_fields=['first_name', 'last_name'])
+                        record('update', u,
+                               {'first_name': [old_first, first], 'last_name': [old_last, last]},
+                               context='import:loyverse')
+                        report['renamed'] += 1
+                    fields = []
+                    if grade and profile.grade != grade:
+                        profile.grade, fields = grade, fields + ['grade']
+                    if group and profile.group != group:
+                        profile.group, fields = group, fields + ['group']
+                    if uuid and profile.loyverse_id != uuid:
+                        profile.loyverse_id, fields = uuid, fields + ['loyverse_id']
+                    if fields:
+                        profile.save(update_fields=fields)
+                    report['updated' if diffs else 'unchanged'] += 1
                 else:
                     u = User.objects.filter(email=email).first()
                     if u is None:
@@ -2120,6 +2319,9 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
                 # fan out over ``student.parents``, to the family. Idempotent.
                 profile.parents.add(u)
 
+                if uuid:
+                    snapshots[uuid] = _stamp_snapshot(profile, c, snapshot, incoming_name)
+
                 if seed_balances and points > 0:
                     cb, _ = CafeteriaBalance.objects.get_or_create(student=profile)
                     if cb.last_synced is None:      # seed-once (never clobber a topup)
@@ -2133,3 +2335,73 @@ def import_students_from_loyverse(customers, *, commit=False, seed_balances=True
     if commit and (report['created'] or report['updated']):
         report['replay'] = replay_unmatched_receipts()
     return report
+
+
+# ── The daily roster sync, as one function ────────────────────────────────────
+
+
+def sync_roster(customers, *, commit=False) -> dict:
+    """Converge the roster with Loyverse: link → import → replay (→ audit).
+
+    The body of ``manage.py sync_roster``, shared with the console's
+    "Sincronizar roster ahora" so the button and the cron cannot drift. Pure
+    over ``customers`` except for the full-roster mirror pass on commit, which
+    fetches the store once more (it audits stale links and unlinked customers
+    and refuses a caller-supplied list as partial).
+
+    On a written run it stamps ``LoyverseSyncState.last_roster_sync_at`` (what
+    ``check_sync_fresh`` and the Roster light read) and writes one summary
+    audit entry with the counts. Returns ``{commit, link, import, replay,
+    audit, stale_links, synced_at, summary}``.
+    """
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.models import LoyverseSyncState
+    from apps.core.audit import record
+
+    link = link_students_to_loyverse(customers, commit=commit)
+    imp = import_students_from_loyverse(customers, commit=commit, seed_balances=True)
+    replay = (replay_unmatched_receipts() if commit
+              else {'replayed': 0, 'absorbed': 0, 'created': 0, 'pending': None})
+    audit = {}
+    if commit:
+        # The mirror needs the full list to audit; passing ``customers`` would
+        # mark it partial, so let it fetch (one call, two pages).
+        audit = mirror_pos_topups().get('audit', {})
+
+    stale_links = StudentProfile.objects.filter(
+        is_active=True, loyverse_missing_since__isnull=False).count()
+    summary = {
+        'linked': link['linked'], 'conflicts': link['skipped_conflict'],
+        'created': imp['created'], 'updated': imp['updated'], 'unchanged': imp['unchanged'],
+        'renamed': imp['renamed'], 'skipped': imp['skipped_non_student'] + imp['skipped_duplicate'],
+        'errors': len(imp['errors']), 'replayed': replay['replayed'],
+        'absorbed': replay['absorbed'], 'stale_links': stale_links,
+        'unmatched_students': len(link['unmatched_students']),
+        'possible_leavers': len(link['possible_leavers']),
+        'unlinked_customers': audit.get('unlinked_students'),
+    }
+
+    synced_at = None
+    if commit:
+        synced_at = timezone.now()
+        state = LoyverseSyncState.load()
+        state.last_roster_sync_at = synced_at
+        state.save(update_fields=['last_roster_sync_at'])
+        record('update', state, {**summary, 'last_roster_sync_at': synced_at.isoformat()},
+               context='system:sync_roster')
+
+    return {'commit': commit, 'link': link, 'import': imp, 'replay': replay,
+            'audit': audit, 'stale_links': stale_links, 'synced_at': synced_at,
+            'summary': summary}
+
+
+def roster_sync_line(report) -> str:
+    """The one log line ops greps for (``sync_roster (written): …``)."""
+    s = report['summary']
+    mode = 'written' if report['commit'] else 'DRY RUN'
+    unlinked = s['unlinked_customers'] if s['unlinked_customers'] is not None else '?'
+    return (f'sync_roster ({mode}): {s["linked"]} linked, {s["conflicts"]} conflicts, '
+            f'{s["created"]} created, {s["updated"]} refreshed, {s["renamed"]} renamed, '
+            f'{s["replayed"]} receipt(s) replayed, {s["absorbed"]} absorbed, '
+            f'{s["stale_links"]} stale link(s), {s["possible_leavers"]} without grade code, '
+            f'{unlinked} unlinked student-looking customer(s).')

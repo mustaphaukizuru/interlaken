@@ -38,6 +38,15 @@ class CafeteriaBalance(models.Model):
 
     class Meta:
         verbose_name = 'Saldo de Cafetería'
+        # Deterministic order for the paginated Saldos list (Data Ops Phase 1):
+        # an unordered queryset under PageNumberPagination can show a wallet on
+        # two pages or on none.
+        ordering = ['student__user__last_name', 'student__user__first_name', 'pk']
+        # No ``balance >= 0`` CheckConstraint on purpose (Data Ops Phase 1 decision):
+        # ``services._record_receipt`` debits POS purchases below zero by design
+        # (receipts are authoritative for spend; the POS top-up mirror credits the
+        # wallet afterwards), so the constraint would abort ``sync_purchases``.
+        # ``check_data_integrity`` reports negative balances instead.
 
     def __str__(self):
         return f'{self.student} — ${self.balance:.2f}'
@@ -89,6 +98,8 @@ class CafeteriaTransaction(models.Model):
             models.Index(fields=['student', '-date']),
             models.Index(fields=['transaction_type', 'date']),
             models.Index(fields=['student', '-recorded_at']),
+            # School-wide date-range lists and exports (Data Ops Phase 1).
+            models.Index(fields=['date'], name='caf_tx_date'),
         ]
 
     def __str__(self):
@@ -161,6 +172,14 @@ class TopUpRequest(models.Model):
                 fields=['pos_unload_needed_at', 'pos_unloaded_at'],
                 name='cafeteria_topup_pos_unload',
             ),
+            # Depósitos log filtered by status, newest first (Data Ops Phase 1).
+            models.Index(fields=['status', '-created_at'], name='caf_topup_status_created'),
+        ]
+        constraints = [
+            # A top-up is money in; zero or negative amounts are refused by the views
+            # and now by the database.
+            models.CheckConstraint(condition=models.Q(amount__gt=0),
+                                   name='caf_topup_amount_positive'),
         ]
 
     def __str__(self):
@@ -207,6 +226,10 @@ class BalanceAdjustment(models.Model):
         verbose_name = 'Ajuste de Saldo'
         verbose_name_plural = 'Ajustes de Saldo'
         ordering = ['-created_at']
+        indexes = [
+            # Adjustments list by date (Data Ops Phase 1).
+            models.Index(fields=['created_at'], name='caf_adjustment_created'),
+        ]
 
     def __str__(self):
         return f'{self.student} — {self.get_kind_display()} ${self.amount}'
@@ -258,6 +281,17 @@ class LoyverseProfile(models.Model):
 
     loyverse_created_at = models.DateTimeField('Alta en Loyverse', null=True, blank=True)
     loyverse_updated_at = models.DateTimeField('Última actualización (Loyverse)', null=True, blank=True)
+    # The Loyverse name (grade suffix stripped) that the roster sync last
+    # applied to, or acknowledged for, the linked student. The sync rewrites
+    # User.first_name/last_name only when the incoming Loyverse name differs
+    # from THIS, so a correction typed in the console survives every nightly
+    # run until the office actually renames the customer in Loyverse. It
+    # cannot be ``name`` above: that snapshot is refreshed within seconds by
+    # the customers.update webhook and every ~20 h by the balance cron, so by
+    # the time the roster sync runs at 06:07 the snapshot already carries the
+    # new spelling and a rename would never be detected.
+    applied_name   = models.CharField('Nombre aplicado al roster', max_length=200,
+                                      blank=True, default='')
     # The complete customer object as returned by the API — future-proofs against
     # fields we don't model yet, without another migration.
     raw            = models.JSONField('Datos completos (Loyverse)', default=dict, blank=True)
@@ -267,6 +301,10 @@ class LoyverseProfile(models.Model):
         verbose_name = 'Perfil de Loyverse'
         verbose_name_plural = 'Perfiles de Loyverse'
         ordering = ['-last_visit']
+        indexes = [
+            # Matrícula lookups (ci09938 / 09938) from search and the importers.
+            models.Index(fields=['customer_code'], name='caf_loyprofile_code'),
+        ]
 
     def __str__(self):
         return f'{self.name or self.customer_code} — {self.total_visits} visitas'
@@ -298,6 +336,10 @@ class UnmatchedReceipt(models.Model):
         verbose_name = 'Recibo sin alumno'
         verbose_name_plural = 'Recibos sin alumno'
         ordering = ['-seen_at']
+        indexes = [
+            # "Still unresolved" queue for the replay job and the reconciliation tab.
+            models.Index(fields=['resolved_at'], name='caf_unmatched_resolved'),
+        ]
 
     def __str__(self):
         return f'{self.receipt_number} ({self.customer_id}) ${self.points}'
@@ -335,6 +377,13 @@ class LoyverseSyncState(models.Model):
     # is the signal for "the cron stopped", which used to be inferred from the
     # log file's mtime by a crontab line that piped to a `mail` the VPS lacks.
     last_poll_at = models.DateTimeField('Último sondeo', null=True, blank=True)
+    # When ``sync_roster`` last COMPLETED a written run (link → import →
+    # replay). Until 2026-09-24 the daily roster job had never run in
+    # production: it shared a lock file with the 5-minute poll, lost the race
+    # every morning and exited silently, and nothing measured it. This is what
+    # ``check_sync_fresh`` and the console's Roster light read.
+    last_roster_sync_at = models.DateTimeField(
+        'Última sincronización del roster', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Estado de sincronización Loyverse'

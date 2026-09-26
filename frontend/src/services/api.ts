@@ -370,6 +370,32 @@ export const admissionsAdminApi = {
 // ── CAFETERIA ─────────────────────────────────────────────
 export interface BulkTopUpPreview { count: number; total: string; students: { id: number; name: string; grade: string; group: string }[] }
 
+/** One row of the roster-sync preview: what a commit changes on one student. */
+export interface RosterChange {
+  matricula: string;
+  name: string;
+  field: 'nombre' | 'grado' | 'grupo' | 'codigo' | 'vinculo';
+  before: string;
+  after: string;
+  action: 'crear' | 'actualizar';
+}
+
+/** POST /cafeteria/admin/sync-roster/ (and the import modal's `import` half). */
+export interface RosterSyncReport {
+  commit: boolean;
+  detail: string;
+  synced_at: string | null;
+  stale_links: number;
+  summary: {
+    linked: number; conflicts: number; created: number; updated: number; unchanged: number;
+    renamed: number; skipped: number; errors: number; replayed: number; absorbed: number;
+    stale_links: number; unmatched_students: number; possible_leavers: number;
+    unlinked_customers: number | null;
+  };
+  import: { created: number; updated: number; unchanged: number; renamed: number; changes: RosterChange[] };
+  link: { linked: number; already_linked: number; possible_leavers: unknown[] };
+}
+
 export interface SyncHealth {
   loyverse_ok: boolean;
   loyverse_error: string;
@@ -383,6 +409,8 @@ export interface SyncHealth {
   purchases_last_7d: number;
   /** When the purchase poll last RAN (the cursor stands still over a weekend; this does not). */
   last_poll_at: string | null;
+  /** When the daily roster sync (link → import → replay) last completed a written run. */
+  last_roster_sync_at: string | null;
   /** Stamped on every authenticated Loyverse webhook delivery. */
   last_webhook_at: string | null;
   last_webhook_type: string;
@@ -552,7 +580,8 @@ export const cafeteriaApi = {
   bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean }) => api.post('/cafeteria/admin/bulk-topup/', data),
 
   // Admin
-  getAllBalances: (params?: { page?: number }) =>
+  /** `q` searches the whole roster server-side: names, matrícula, Loyverse code (ci09932 or 09932). */
+  getAllBalances: (params?: { page?: number; q?: string }) =>
     api.get('/cafeteria/admin/balances/', { params }),
 
 
@@ -572,6 +601,10 @@ export const cafeteriaApi = {
 
   /** "Is the cafeteria sync working?" — see components/admin/SyncHealthPanel. */
   syncHealth: () => api.get<SyncHealth>('/cafeteria/admin/sync-health/'),
+
+  /** "Sincronizar roster ahora": the 06:07 cron's link → import → replay, on demand. */
+  syncRoster: (dryRun = false) =>
+    api.post<RosterSyncReport>('/cafeteria/admin/sync-roster/', { dry_run: dryRun }),
 
   /** Bring one student's local balance to Loyverse's points (audited adjustment). */
   reconcileFix: (studentId: number) =>

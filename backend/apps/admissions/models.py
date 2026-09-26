@@ -4,6 +4,7 @@ admissions/models.py — Pre-registration, Registration, Open School Day
 from uuid import uuid4
 
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from apps.core.fields import EncryptedTextField
@@ -53,6 +54,12 @@ class PreRegistration(models.Model):
         verbose_name = 'Pre-registro'
         verbose_name_plural = 'Pre-registros'
         ordering = ['-created_at']
+        indexes = [
+            # Console list filtered by status, newest first (Data Ops Phase 1).
+            models.Index(fields=['status', '-created_at'], name='adm_prereg_status_created'),
+            # Case-insensitive dedupe key for the fair-sheet importer.
+            models.Index(Lower('parent_email'), name='adm_prereg_email_lower'),
+        ]
 
     def __str__(self):
         return f'{self.child_first_name} {self.child_last_name} — {self.level} ({self.status})'
@@ -147,6 +154,15 @@ class Registration(models.Model):
         verbose_name = 'Inscripción'
         verbose_name_plural = 'Inscripciones'
         ordering = ['-created_at']
+        indexes = [
+            # Console list and pipeline by status (Data Ops Phase 1).
+            models.Index(fields=['status', '-updated_at'], name='adm_reg_status_updated'),
+            models.Index(fields=['status', '-created_at'], name='adm_reg_status_created'),
+            # Case-insensitive guardian lookups (dedupe, search, convert).
+            models.Index(Lower('parent1_email'), name='adm_reg_p1email_lower'),
+            models.Index(Lower('parent2_email'), name='adm_reg_p2email_lower'),
+            models.Index(fields=['child_curp'], name='adm_reg_child_curp'),
+        ]
 
     def __str__(self):
         return f'{self.child_first_name} {self.child_last_name} — {self.grade_applying} ({self.status})'

@@ -15,6 +15,7 @@ from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
 from apps.cafeteria.services import low_balance_queryset
+from apps.core.exceptions import error_body
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.payments.models import Payment
@@ -76,7 +77,7 @@ class DashboardView(APIView):
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students
             balances = (CafeteriaBalance.objects.filter(student__in=students)
-                        .select_related('student__user'))
+                        .select_related('student__user', 'student__loyverse_profile'))
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
             recent_payments = (
@@ -340,7 +341,7 @@ class AnnouncementMarkReadView(APIView):
         ids = request.data.get('ids')
         if (not isinstance(ids, list) or not ids
                 or not all(isinstance(i, int) for i in ids)):
-            return Response({'error': 'ids debe ser una lista de enteros.'}, status=400)
+            return Response(error_body('ids debe ser una lista de enteros.'), status=400)
 
         visible = list(Announcement.objects.filter(
             id__in=ids[:50], is_active=True,
@@ -393,7 +394,7 @@ class NotificationMarkReadView(APIView):
             notif.save(update_fields=['is_read'])
             return Response({'detail': 'Marcada como leída.'})
         except Notification.DoesNotExist:
-            return Response({'error': 'No encontrada.'}, status=404)
+            return Response(error_body('No encontrada.'), status=404)
 
     def post(self, request, pk):
         return self._mark(request, pk)
@@ -426,7 +427,7 @@ class AnnouncementRecipientCountView(APIView):
         audience = (request.query_params.get('audience')
                     or Announcement.Audience.ALL).strip()
         if audience not in Announcement.Audience.values:
-            return Response({'error': 'Audiencia no válida.'}, status=400)
+            return Response(error_body('Audiencia no válida.'), status=400)
         roles = _audience_roles().get(audience, [])
         count = User.objects.filter(is_active=True, role__in=roles).count()
         return Response({'audience': audience, 'count': count})
@@ -458,7 +459,7 @@ class EmergencyBroadcastView(APIView):
                 whatsapp=whatsapp,
             )
         except ValueError as exc:
-            return Response({'error': str(exc)}, status=400)
+            return Response(error_body(str(exc)), status=400)
         return Response(result, status=201)
 
 

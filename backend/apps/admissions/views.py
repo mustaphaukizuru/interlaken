@@ -19,6 +19,8 @@ from rest_framework.views import APIView
 from apps.bookings.models import AvailabilitySlot, Booking, VisitType
 from apps.bookings.serializers import BookingSerializer, OpenClassEventSerializer
 from apps.bookings.services import SlotUnavailable, create_booking
+from apps.core.exceptions import error_body
+from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 from apps.portal.services import send_email
@@ -74,19 +76,34 @@ def authorize_registration(request, pk):
     return reg
 
 
+# Columns the pre-registros table can sort by (public key → ORM field(s)).
+PREREGISTRATION_ORDERING = {
+    'created_at': 'created_at',
+    'child': ('child_last_name', 'child_first_name'),
+    'level': 'level',
+    'grade': 'grade_applying',
+    'status': 'status',
+    'parent': 'parent_name',
+}
+
+
 @method_decorator(ratelimit('admissions-submit', '5/m', method='POST'), name='dispatch')
-class PreRegistrationListCreateView(generics.ListCreateAPIView):
+class PreRegistrationListCreateView(AdminListMixin, generics.ListCreateAPIView):
     """POST /api/v1/admissions/pre-register/ — Public, no auth.
-    GET — Admin-only paginated list for the Admisiones console."""
+    GET — Admin-only paginated list for the Admisiones console (Data Ops C1:
+    ``q`` search with ``search`` as a one-release alias, whitelisted
+    ``ordering``, ``page_size`` ≤ 100)."""
     queryset = PreRegistration.objects.all()
-    # Admin GET ?search= — SearchFilter is in DEFAULT_FILTER_BACKENDS.
-    search_fields = [
+    search_fields = (
         'child_first_name',
         'child_last_name',
         'parent_name',
         'parent_email',
         'parent_phone',
-    ]
+    )
+    legacy_search_param = 'search'
+    ordering = PREREGISTRATION_ORDERING
+    default_ordering = '-created_at'
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -458,7 +475,7 @@ class RegistrationSubmitView(APIView):
 
         if reg.status != Registration.Status.DRAFT:
             return Response(
-                {'error': 'Esta inscripción ya fue enviada.'},
+                error_body('Esta inscripción ya fue enviada.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
         # LFPDPPP (IK-LEGAL B2): Stage B requires acceptance of the current notice.
@@ -466,7 +483,7 @@ class RegistrationSubmitView(APIView):
             from apps.legal.models import PrivacyNoticeVersion
             if not request.data.get('accept_privacy'):
                 return Response(
-                    {'error': 'Debe aceptar el Aviso de Privacidad para enviar la inscripción.'},
+                    error_body('Debe aceptar el Aviso de Privacidad para enviar la inscripción.'),
                     status=status.HTTP_400_BAD_REQUEST)
             reg.privacy_notice_version = PrivacyNoticeVersion.current()
             reg.privacy_accepted_at = timezone.now()
@@ -481,7 +498,7 @@ class RegistrationSubmitView(APIView):
         ])
         if has_medical and not reg.consent_medical_data:
             return Response(
-                {'error': 'Se requiere consentimiento de datos de salud para enviar información médica.'},
+                error_body('Se requiere consentimiento de datos de salud para enviar información médica.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
         reg.submit()
@@ -512,14 +529,14 @@ class DocumentUploadView(APIView):
 
         if not file or not doc_type:
             return Response(
-                {'error': 'Debe adjuntar un archivo y indicar el tipo de documento.'},
+                error_body('Debe adjuntar un archivo y indicar el tipo de documento.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
         # Validate doc_type against the model's choices — create() skips
         # full_clean(), so without this any string is stored.
         if doc_type not in RegistrationDocument.DocType.values:
             return Response(
-                {'error': 'Tipo de documento no válido.'},
+                error_body('Tipo de documento no válido.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
         # Validate extension
@@ -527,7 +544,7 @@ class DocumentUploadView(APIView):
         ext = os.path.splitext(file.name)[1].lower()
         if ext not in settings.ALLOWED_DOCUMENT_EXTENSIONS:
             return Response(
-                {'error': f'Tipo de archivo {ext} no permitido.'},
+                error_body(f'Tipo de archivo {ext} no permitido.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
         # Cap the size — the *_MAX_MEMORY_SIZE settings don't bound uploads, so
@@ -535,8 +552,8 @@ class DocumentUploadView(APIView):
         max_size = getattr(settings, 'MAX_DOCUMENT_UPLOAD_SIZE', 10 * 1024 * 1024)
         if file.size > max_size:
             return Response(
-                {'error': f'El archivo excede el tamaño máximo de '
-                          f'{max_size // (1024 * 1024)} MB.'},
+                error_body(f'El archivo excede el tamaño máximo de '
+                          f'{max_size // (1024 * 1024)} MB.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
         # Replacing the same doc_type avoids duplicate rows when a family
