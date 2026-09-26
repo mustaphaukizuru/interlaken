@@ -235,6 +235,9 @@ REST_FRAMEWORK = {
         'admin-export': '30/min',
         'admin-import': '10/min',
         'admin-bulk': '30/min',
+        # Family portal downloads (Pagos, movimientos de cafetería), per user:
+        # one family session cannot queue export work on the workers either.
+        'portal-export': '30/min',
     },
 }
 

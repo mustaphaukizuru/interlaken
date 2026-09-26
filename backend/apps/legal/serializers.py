@@ -36,6 +36,10 @@ class ArcoRequestSerializer(serializers.ModelSerializer):
     days_left = serializers.SerializerMethodField()
 
     def get_is_overdue(self, obj):
+        # The admin list annotates it in SQL (apps.legal.filters.annotate_overdue).
+        annotated = getattr(obj, 'is_overdue_ann', None)
+        if annotated is not None:
+            return bool(annotated)
         from django.utils import timezone
         return obj.status in ('received', 'in_review') and obj.statutory_deadline < timezone.localdate()
 

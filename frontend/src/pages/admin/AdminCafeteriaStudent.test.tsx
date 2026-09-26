@@ -13,6 +13,10 @@ vi.mock('@/services/api', () => ({
   downloadBlob: vi.fn(),
 }));
 
+vi.mock('@/services/cafeteriaAdmin', () => ({
+  cafeteriaAdminApi: { transactions: vi.fn(), adjustments: vi.fn() },
+}));
+
 vi.mock('react-hot-toast', () => ({
   default: { error: vi.fn(), success: vi.fn() },
 }));
@@ -20,6 +24,8 @@ vi.mock('react-hot-toast', () => ({
 import toast from 'react-hot-toast';
 import AdminCafeteriaStudent from './AdminCafeteriaStudent';
 import { cafeteriaApi } from '@/services/api';
+import { cafeteriaAdminApi } from '@/services/cafeteriaAdmin';
+import { stubViewport } from '@/test/viewport';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const getStudentDetail = vi.mocked(cafeteriaApi.getStudentDetail);
@@ -97,7 +103,11 @@ function renderPage() {
 describe('AdminCafeteriaStudent money actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getStudentDetail.mockResolvedValue({ data: DETAIL } as never);
+    stubViewport(1280);
+    getStudentDetail.mockResolvedValue({ data: { ...DETAIL, transactions: [], adjustments: [] } } as never);
+    // The ledger and the adjustment trail are paged through the admin lists.
+    vi.mocked(cafeteriaAdminApi.transactions).mockResolvedValue({ data: { count: 1, results: DETAIL.transactions } } as never);
+    vi.mocked(cafeteriaAdminApi.adjustments).mockResolvedValue({ data: { count: 1, results: DETAIL.adjustments } } as never);
     adjustBalance.mockResolvedValue({ data: {} } as never);
     refundTransaction.mockResolvedValue({ data: {} } as never);
   });
@@ -108,9 +118,12 @@ describe('AdminCafeteriaStudent money actions', () => {
     expect(await screen.findByRole('heading', { name: 'Luis López' })).toBeInTheDocument();
     expect(screen.getByText(/Matrícula A-007/i)).toBeInTheDocument();
     expect(screen.getByText(/Saldo actual/i)).toBeInTheDocument();
-    expect(screen.getByText('Jugo')).toBeInTheDocument();
-    expect(screen.getByText('Cortesía')).toBeInTheDocument();
+    expect(await screen.findByText('Jugo')).toBeInTheDocument();
+    expect(await screen.findByText('Cortesía')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Devolver/i })).toBeInTheDocument();
+    expect(getStudentDetail).toHaveBeenCalledWith(7, { ledger: 0 });
+    expect(cafeteriaAdminApi.transactions).toHaveBeenCalledWith({ student: 7, page: 1 });
+    expect(cafeteriaAdminApi.adjustments).toHaveBeenCalledWith({ student: 7, page: 1 });
   });
 
   it('abonars and descontar call adjustBalance with the signed amount', async () => {
@@ -152,7 +165,7 @@ describe('AdminCafeteriaStudent money actions', () => {
     renderPage();
     await screen.findByRole('heading', { name: 'Luis López' });
 
-    await user.click(screen.getByRole('button', { name: /Devolver/i }));
+    await user.click(await screen.findByRole('button', { name: /Devolver/i }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: /Confirmar devolución/i })).toBeInTheDocument();
 

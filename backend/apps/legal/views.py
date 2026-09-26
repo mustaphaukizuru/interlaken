@@ -2,15 +2,29 @@
 legal/views.py — privacy notice + consent capture (B2) + ARCO rights (B3).
 """
 from django.core.cache import cache
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.audit import record
+from apps.core.bulk import AdminBulkView, status_action
+from apps.core.exporting import AdminExportMixin
+from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
+from apps.core.transitions import assert_transition
 
+from .filters import (
+    ARCO_EXPORT_SPEC,
+    ARCO_ORDERING,
+    ARCO_SEARCH_FIELDS,
+    ArcoFilterSet,
+    annotate_overdue,
+)
 from .models import NOTICE_CACHE_KEY, ArcoRequest, PrivacyNoticeVersion
 from .serializers import (
     ArcoIntakeSerializer,
@@ -99,39 +113,93 @@ class ArcoExportView(APIView):
         return Response(export_household_data(request.user))
 
 
-class AdminArcoListView(generics.ListAPIView):
-    """GET /api/v1/legal/admin/arco/?status= — staff console queue."""
+class AdminArcoListView(AdminListMixin, generics.ListAPIView):
+    """GET /api/v1/legal/admin/arco/ — staff console queue (Data Ops Phase 7).
+
+    ``?q=`` requester email / name / details; ``?status=`` (``open`` = received
+    + in review, or a status, or a comma list), ``type``, ``channel``,
+    ``overdue=1|0``, ``from`` / ``to``; ordering ``date``, ``deadline``,
+    ``status``, ``type``, ``requester``. ``is_overdue`` is computed in SQL and
+    the response carries ``overdue_count`` for the whole filtered set (not
+    just the page), so the banner can never undercount.
+    """
     serializer_class = ArcoRequestSerializer
-    permission_classes = [IsAdmin]
+    search_fields = ARCO_SEARCH_FIELDS
+    ordering = ARCO_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = ArcoFilterSet
 
     def get_queryset(self):
-        qs = ArcoRequest.objects.all()
-        status_filter = self.request.query_params.get('status')
-        # 'open' is the console's default queue (received + in review). It used
-        # to be filtered client-side, which silently dropped every open request
-        # that fell past the first page.
-        if status_filter == 'open':
-            return qs.filter(status__in=[ArcoRequest.Status.RECEIVED, ArcoRequest.Status.IN_REVIEW])
-        return qs.filter(status=status_filter) if status_filter else qs
+        return annotate_overdue(ArcoRequest.objects.all())
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        if isinstance(response.data, dict):
+            qs = self.filter_queryset(self.get_queryset())
+            response.data['overdue_count'] = qs.filter(is_overdue_ann=True).count()
+        return response
+
+
+class AdminArcoExportView(AdminExportMixin, AdminArcoListView):
+    """GET /api/v1/legal/admin/arco/export/?fmt=csv|xlsx|pdf — the filtered queue (audited)."""
+    export_spec = ARCO_EXPORT_SPEC
+
+
+CLOSED = (ArcoRequest.Status.RESOLVED, ArcoRequest.Status.REJECTED)
 
 
 class AdminArcoStatusView(APIView):
-    """POST /api/v1/legal/admin/arco/<id>/status/ — advance an ARCO request."""
+    """POST /api/v1/legal/admin/arco/<id>/status/ — advance an ARCO request.
+
+    Guarded by the ``legal.arcorequest`` transition table (received → in_review
+    | resolved | rejected; in_review → resolved | rejected; resolved | rejected
+    → in_review with a note). Resolving or rejecting requires the
+    ``resolution_note`` the requester receives by email; reopening requires a
+    note that is kept in the audit entry. Every change is audited with the note.
+    """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
-        arco = get_object_or_404(ArcoRequest, pk=pk)
         serializer = ArcoStatusInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        new_status = serializer.validated_data['status']
-        arco.status = new_status
-        arco.resolution_note = serializer.validated_data.get('resolution_note', '')
-        if new_status in (ArcoRequest.Status.RESOLVED, ArcoRequest.Status.REJECTED):
-            arco.resolved_at = timezone.now()
-        # The status change is audit-logged automatically (register_audit + middleware).
-        arco.save(update_fields=['status', 'resolution_note', 'resolved_at', 'updated_at'])
+        target = serializer.validated_data['status']
+        note = (serializer.validated_data.get('resolution_note') or '').strip()
+        with transaction.atomic():
+            arco = get_object_or_404(ArcoRequest.objects.select_for_update(), pk=pk)
+            current = arco.status
+            assert_transition('legal.arcorequest', current, target, note=note)
+            if target in CLOSED and not note:
+                raise ValidationError({'resolution_note': ['Indique la resolución o el motivo.']})
+            arco.status = target
+            if target in CLOSED:
+                arco.resolution_note = note
+                arco.resolved_at = timezone.now()
+            else:
+                # Reopened (or first review): the case is live again.
+                arco.resolved_at = None
+            arco.save(update_fields=['status', 'resolution_note', 'resolved_at', 'updated_at'])
+            changes = {'status': [current, target]}
+            if note:
+                changes['note'] = note[:500]
+            record('update', arco, changes, actor=request.user, context='legal.arco.status')
         _notify_requester(arco)
         return Response(ArcoRequestSerializer(arco).data)
+
+
+ARCO_IN_REVIEW = status_action(
+    'in_review', 'Marcar en revisión', entity='legal.arcorequest', target='in_review',
+)
+# Bulk only moves new requests into review; reopening a closed one is a
+# single-row decision with its own note.
+ARCO_IN_REVIEW.allowed_from = frozenset({ArcoRequest.Status.RECEIVED})
+
+
+class AdminArcoBulkView(AdminBulkView):
+    """POST /api/v1/legal/admin/arco/bulk/ — ``in_review`` only (C5); resolve and
+    reject stay single-row because each needs its own resolution note."""
+    entity = 'legal.arcorequest'
+    list_view_class = AdminArcoListView
+    actions = {ARCO_IN_REVIEW.name: ARCO_IN_REVIEW}
 
 
 def _notify_requester(arco, *, intake=False):

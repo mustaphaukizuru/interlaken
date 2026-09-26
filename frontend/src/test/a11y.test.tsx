@@ -63,21 +63,17 @@ vi.mock('@/services/api', async () => {
       getTransactions: ok(emptyPage),
       getSpendingCategories: ok({ days: 30, total: 0, categories: [] }),
       getSpendingTrend: ok({ days: 30, total: 0, average: 0, series: [] }),
-      getAllBalances: ok({ results: [cafeteriaAccount], count: 1 }),
-      getTopUpLog: ok(emptyPage),
-      getLowBalance: ok(emptyPage),
       requestTopUp: vi.fn(),
       updateLowBalanceThreshold: vi.fn(),
       updateSpendLimits: vi.fn(),
-      reconcile: vi.fn(),
       syncAll: vi.fn(),
       syncBalance: vi.fn(),
       markTopUpPosLoaded: vi.fn(),
       markTopUpPosUnloaded: vi.fn(),
-      exportSchool: vi.fn(),
       exportMovements: vi.fn(),
     },
     contentApi: {
+      adminGetSettings: ok({ menu: [] }),
       getPricing: ok({
         enrollment_fees: [
           { section: 'Primaria', modality: 'nuevo_ingreso', gastos_administrativos: '2500.00', cuota: '6800.00', order: 1 },
@@ -93,8 +89,39 @@ vi.mock('@/services/api', async () => {
     },
   };
 });
+// Data Ops Phase 8 (Comunicados + Contenido): one row per list.
+vi.mock('@/services/AdminContentApi', () => {
+  const page = (row: unknown) => vi.fn().mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [row] } });
+  const entity = (row: unknown) => ({ list: page(row), export: vi.fn(), bulk: vi.fn() });
+  const importApi = { template: vi.fn(), upload: vi.fn() };
+  return {
+    announcementsAdminApi: {
+      ...entity({ id: 4, title: 'Junta de padres', body: 'Viernes 8:00', audience: 'parents', is_active: true, push_enabled: true, created_at: '2026-09-20T10:00:00Z', created_by_name: 'Admin', read_count: 3 }),
+      deliveryExport: vi.fn(),
+    },
+    pagesAdminApi: entity({ id: 1, slug: 'becas', title: 'Becas', template: 'simple', status: 'draft', has_unpublished_changes: true, draft_blocks: [], seo: {}, published_version_number: null, published_at: null, updated_at: '2026-09-20T10:00:00Z' }),
+    formsAdminApi: entity({ id: 2, slug: 'informes', title: 'Informes', description: '', fields: [{ key: 'nombre', label: 'Nombre', type: 'text' }], consent_text: '', success_message: '', submit_label: 'Enviar', notify_to: '', is_published: true, submissions_count: 1, pending_count: 1, updated_at: '2026-09-20T10:00:00Z' }),
+    mediaAdminApi: { ...entity({ id: 3, filename: 'campus.jpg', content_type: 'image/jpeg', size: 20480, width: 800, height: 600, alt: 'Campus', caption: '', focal_x: 0.5, focal_y: 0.5, tags: 'campus', urls: { original: '/x.jpg' }, referenced: true, created_at: '2026-09-20T10:00:00Z' }), upload: vi.fn() },
+    testimonialsAdminApi: entity({ id: 5, quote: 'Excelente colegio', author: 'Ana', role: 'Mamá', level: '', is_published: true, order: 1, created_at: '2026-09-20T10:00:00Z' }),
+    redirectsAdminApi: { ...entity({ id: 6, from_path: '/viejo', to_path: '/nuevo', permanent: true, hits: 2, created_at: '2026-09-20T10:00:00Z' }), import: importApi },
+    calendarAdminApi: { ...entity({ id: 7, title: 'Examen bimestral', kind: 'exam', kind_label: 'Evaluaciones', start_date: '2026-10-05', end_date: null, level: 'primaria', description: '', is_published: true }), import: importApi },
+    submissionsAdminApi: { list: page({ id: 8, form: 2, form_title: 'Informes', data: { nombre: 'Lucía' }, page: '/contacto', is_handled: false, reply_to: '', created_at: '2026-09-20T10:00:00Z' }), export: vi.fn(), bulk: vi.fn() },
+    calendarIcsUrl: () => 'http://localhost/api/v1/content/calendar.ics',
+  };
+});
+// Admin Cafetería lists (Data Ops Phase 6): a populated Saldos table.
+vi.mock('@/services/cafeteriaAdmin', () => {
+  const balance = {
+    id: 1, balance: '150.00', low_balance_threshold: '50', last_synced: '2026-08-01T12:00:00Z',
+    student: { id: 10, user: { full_name: 'Emma Quintana' }, student_id: '09824', loyverse_code: 'ci09824', grade: '4°', group: 'A', loyverse_id: 'loy-emma' },
+  };
+  return {
+    cafeteriaAdminApi: { balances: vi.fn().mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [balance] } }) },
+    adjustmentImportApi: vi.fn(),
+  };
+});
 // No real HTTP / toasts while rendering.
-vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn(), loading: vi.fn(), dismiss: vi.fn() } }));
 // jsdom has no IntersectionObserver — render Reveal content directly.
 vi.mock('@/components/ui/Reveal', () => ({
   Reveal: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -111,6 +138,13 @@ import CostosPage from '@/pages/public/CostosPage';
 import AdminCafeteria from '@/pages/admin/AdminCafeteria';
 import AdminPayments from '@/pages/admin/AdminPayments';
 import AdminAudit from '@/pages/admin/AdminAudit';
+import AdminAnnouncements from '@/pages/admin/AdminAnnouncements';
+import AdminPages from '@/pages/admin/AdminPages';
+import AdminMedia from '@/pages/admin/AdminMedia';
+import AdminForms from '@/pages/admin/AdminForms';
+import AdminNavigation from '@/pages/admin/AdminNavigation';
+import AdminTestimonials from '@/pages/admin/AdminTestimonials';
+import AdminCalendar from '@/pages/admin/AdminCalendar';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 /**
@@ -140,6 +174,15 @@ const PAGES: { name: string; ui: () => ReactElement; route: string }[] = [
   // Data Ops reference pages: FilterBar + DataTable v2 (selection, column controls) + ExportMenu v2.
   { name: 'AdminPayments', ui: () => <AdminPayments />, route: '/admin/pagos' },
   { name: 'AdminAudit', ui: () => <AdminAudit />, route: '/admin/auditoria' },
+  // Data Ops Phase 8: Comunicados + Contenido on DataTable v2.
+  { name: 'AdminAnnouncements', ui: () => <AdminAnnouncements />, route: '/admin/comunicados' },
+  { name: 'AdminPages', ui: () => <AdminPages />, route: '/admin/contenido' },
+  { name: 'AdminMedia', ui: () => <AdminMedia />, route: '/admin/contenido/medios' },
+  { name: 'AdminForms', ui: () => <AdminForms />, route: '/admin/formularios' },
+  { name: 'AdminForms (envíos)', ui: () => <AdminForms />, route: '/admin/formularios?envios=2' },
+  { name: 'AdminNavigation', ui: () => <AdminNavigation />, route: '/admin/navegacion' },
+  { name: 'AdminTestimonials', ui: () => <AdminTestimonials />, route: '/admin/testimonios' },
+  { name: 'AdminCalendar', ui: () => <AdminCalendar />, route: '/admin/calendario' },
 ];
 
 /**

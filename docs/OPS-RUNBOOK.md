@@ -210,3 +210,43 @@ este deploy**. Los trabajos nocturnos de Loyverse pasan de 05:40 y 06:05 a
 el sondeo de cada 5 minutos, perdían la carrera cada mañana y salían en
 silencio, así que `sync_roster` nunca había corrido en producción.
 `backend/apps/cafeteria/test_crontab.py` impide que esa forma vuelva.
+
+### 7d. Ajuste masivo y acciones en lote (Cafetería)
+
+**Ajuste masivo** (Cafetería → botón *Ajuste masivo*) aplica muchos ajustes de
+saldo desde un archivo CSV o Excel con tres columnas: `matricula` (acepta
+`09932` o `ci09932`), `monto` (positivo abona, negativo descuenta) y `motivo`.
+Descargue la plantilla desde el mismo diálogo. Antes de escribir nada, la
+vista previa muestra por fila el alumno, el saldo actual y el **saldo
+resultante**; una fila que dejaría el saldo en negativo, una matrícula que no
+existe, un monto en cero o mayor a $10,000, o un alumno repetido en el archivo
+se marcan como error, y "Descargar reporte de errores" devuelve el mismo
+archivo con las columnas `fila, resultado, errores, avisos`. Si el mismo
+ajuste ya se aplicó en las últimas 24 horas, la fila trae un aviso (archivo
+repetido). Límite: 500 filas por archivo. Las casillas *Notificar a las
+familias* y *Reflejar el saldo en Loyverse* vienen marcadas; para una
+corrección interna, desmarque la primera. Cada fila queda como Ajuste en el
+historial del alumno y en Auditoría (`import:ajustes_cafeteria`), más un
+resumen de la importación.
+
+**Acciones en lote** (casillas de selección en cada pestaña):
+
+- Saldos: *Sincronizar* (siembra el saldo inicial de los alumnos nunca
+  sembrados y hace una sola lectura de recibos) y *Cambiar umbral* del saldo bajo.
+- Depósitos: *Aplicar* recargas en caja pendientes (el diálogo muestra el total
+  en pesos antes de confirmar; una recarga ya aplicada se omite, nunca se
+  acredita dos veces), *Cargadas en POS*, *Quitadas del POS*.
+- Reconciliación: *Corregir* las filas seleccionadas (máximo 50 por vez, cada
+  una consulta Loyverse; no notifica a la familia).
+- Movimientos: solo exportar; la devolución sigue siendo de una fila, con la
+  palabra DEVOLVER.
+
+Toda acción en lote primero muestra el plan (cuántas filas se procesarán y
+por qué se omiten las demás), escribe una entrada de Auditoría por fila y un
+resumen `bulk:<entidad>`. Límite: 500 filas por llamada. Las exportaciones
+respetan la búsqueda, los filtros y el orden de la pestaña; *Toda la escuela*
+exporta todos los saldos sin filtros. Referencia técnica: `docs/API-LISTING.md`.
+
+## 8. Calendario escolar suscrito (.ics)
+
+`GET /api/v1/content/calendar.ics` publica los eventos **publicados** del calendario escolar (del último año en adelante) como un feed iCalendar (RFC 5545: eventos de día completo, `DTEND` exclusivo, líneas plegadas a 75 octetos). Es público y sin sesión, igual que `/calendario`. La respuesta se guarda 10 minutos en la caché del proceso (`content:calendar.ics`) y cualquier alta, edición, borrado, acción masiva o importación del calendario desde la consola la invalida; como gunicorn corre 3 procesos con caché local, un cambio puede tardar hasta 10 minutos en verse en todos. Google Calendar además refresca las suscripciones por su cuenta (de horas a un día): eso no se controla desde el servidor. Para comprobarlo: `curl -sI https://interlaken.edu.mx/api/v1/content/calendar.ics` debe responder `200`, `Content-Type: text/calendar; charset=utf-8` y `Cache-Control: public, max-age=600`. La liga se copia desde Calendario → **Copiar liga .ics**.

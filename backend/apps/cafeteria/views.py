@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import StudentProfile, User
+from apps.core.audit import record
 from apps.core.exceptions import error_body
 from apps.core.listing import apply_date_range, day_end_exclusive, day_start
 from apps.core.ordering import apply_ordering
@@ -38,7 +39,6 @@ from .serializers import (
     LoyverseProfileSerializer,
     RefundInputSerializer,
     SpendLimitsSerializer,
-    TopUpLogSerializer,
     TopUpRequestSerializer,
     build_spend_map,
 )
@@ -50,7 +50,6 @@ from .services import (
     get_balance_from_customer,
     get_customer_by_id,
     mirror_pos_topups,
-    reconcile_balances,
     record_receipts,
     refund_transaction,
     sync_all_balances,
@@ -92,10 +91,8 @@ def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
     return False
 
 
-# Bounds for the two admin-facing reads that would otherwise grow with
-# enrollment.
+# Bound for the admin-facing preview that would otherwise grow with enrollment.
 ADMIN_PREVIEW_LIMIT = 200
-LOW_BALANCE_PAGE = 20  # matches DRF's global PAGE_SIZE
 
 
 class MyBalanceView(APIView):
@@ -761,33 +758,6 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         return Response(data, status=201, headers=headers)
 
 
-class AdminBalancesView(generics.ListAPIView):
-    """GET /api/v1/cafeteria/admin/balances/?q=&page=
-
-    ``q`` searches the whole roster server-side (the page used to be filtered
-    in the browser, one page at a time): student names, the canonical
-    matrícula and the Loyverse code, so ``09932`` and ``ci09932`` both find
-    the same wallet. Ordered by student name so paging is stable.
-    """
-    serializer_class = CafeteriaBalanceSerializer
-    permission_classes = [IsAdmin]
-
-    def get_queryset(self):
-        from django.db.models import Q
-
-        from apps.core.matricula import search_key
-
-        qs = CafeteriaBalance.objects.select_related('student__user', 'student__loyverse_profile')
-        q = (self.request.query_params.get('q') or '').strip()
-        if q:
-            key = search_key(q)
-            qs = qs.filter(Q(student__student_id__icontains=key)
-                           | Q(student__loyverse_profile__customer_code__icontains=key)
-                           | Q(student__user__first_name__icontains=q)
-                           | Q(student__user__last_name__icontains=q))
-        return qs.order_by('student__user__last_name', 'student__user__first_name', 'pk')
-
-
 class AdminApplyTopUpView(APIView):
     """POST /api/v1/cafeteria/admin/topup/<pk>/apply/"""
     permission_classes = [IsAdmin]
@@ -837,6 +807,9 @@ class AdminApplyTopUpView(APIView):
         topup.status = TopUpRequest.Status.COMPLETED
         topup.processed_at = timezone.now()
         topup.save(update_fields=['status', 'processed_at'])
+        # Same audit row as the bulk apply (Data Ops C5: single and bulk agree).
+        record('update', topup, {'status': ['pending', 'completed'], 'amount': str(topup.amount)},
+               actor=request.user, context='cafeteria.topup.apply')
         # NB: do NOT re-pull the balance from Loyverse here — add_points_to_customer
         # already credited the local ledger (the source of truth per R1); a sync
         # would overwrite that credit with the (un-writable) Loyverse points.
@@ -1081,65 +1054,6 @@ class AdminReconcileFixView(APIView):
                          'delta': str(delta), 'balance': str(cb.balance)})
 
 
-class AdminTopUpLogView(generics.ListAPIView):
-    """GET /api/v1/cafeteria/admin/topups/?status=&method=&from=&to=&needs_pos=&needs_unload=
-
-    Deposits/top-up log: every ``TopUpRequest`` (office + online) enriched with its
-    linked gateway ``Payment`` state. Paginated; filters by ``status``, ``method``,
-    a ``from``/``to`` created-date range (spec §5), ``needs_pos=1`` for the
-    Loyverse POS load queue, and ``needs_unload=1`` for the post-refund unload queue.
-    """
-    serializer_class = TopUpLogSerializer
-    permission_classes = [IsAdmin]
-
-    def get_queryset(self):
-        from apps.payments.models import Payment
-
-        qs = (TopUpRequest.objects
-              .select_related('student__user', 'pos_loaded_by', 'pos_unloaded_by')
-              # Explicit ordered Prefetch: the serializer takes the FIRST
-              # prefetched row as "the" payment, and a plain .order_by() on the
-              # reverse manager would discard the prefetch cache (N+1).
-              .prefetch_related(models.Prefetch(
-                  'payments', queryset=Payment.objects.order_by('-created_at')))
-              .all())
-        params = self.request.query_params
-
-        status_f = params.get('status')
-        if status_f in TopUpRequest.Status.values:
-            qs = qs.filter(status=status_f)
-
-        method_f = params.get('method')
-        if method_f in TopUpRequest.Method.values:
-            qs = qs.filter(method=method_f)
-
-        # Aware bounds (invalid dates ignored) so the (status, -created_at) index is usable.
-        qs = apply_date_range(qs, 'created_at', params.get('from'), params.get('to'))
-
-        # Operational queue: paid online, local ledger credited, not yet loaded
-        # into Loyverse POS so the child can spend at the cafeteria. Exclude
-        # provider-refunded rows so staff never load a reversed credit.
-        needs_pos = (params.get('needs_pos') or '').lower()
-        if needs_pos in ('1', 'true', 'yes'):
-            qs = (qs.filter(
-                method=TopUpRequest.Method.ONLINE,
-                status=TopUpRequest.Status.COMPLETED,
-                pos_loaded_at__isnull=True,
-            ).exclude(
-                payments__status=Payment.Status.REFUNDED,
-            ).distinct())
-
-        # Post-refund unload: POS was loaded, then payment/ledger was reversed.
-        needs_unload = (params.get('needs_unload') or '').lower()
-        if needs_unload in ('1', 'true', 'yes'):
-            qs = qs.filter(
-                pos_unload_needed_at__isnull=False,
-                pos_unloaded_at__isnull=True,
-            )
-
-        return qs
-
-
 class AdminMarkTopUpPosLoadedView(APIView):
     """POST /api/v1/cafeteria/admin/topup/<pk>/pos-loaded/
 
@@ -1178,6 +1092,8 @@ class AdminMarkTopUpPosLoadedView(APIView):
             topup.pos_loaded_at = timezone.now()
             topup.pos_loaded_by = request.user
             topup.save(update_fields=['pos_loaded_at', 'pos_loaded_by'])
+            record('update', topup, {'pos_loaded': True}, actor=request.user,
+                   context='cafeteria.topup.pos_loaded')
 
         return Response({
             'id': topup.id,
@@ -1215,6 +1131,8 @@ class AdminMarkTopUpPosUnloadedView(APIView):
             topup.pos_unloaded_at = timezone.now()
             topup.pos_unloaded_by = request.user
             topup.save(update_fields=['pos_unloaded_at', 'pos_unloaded_by'])
+            record('update', topup, {'pos_unloaded': True}, actor=request.user,
+                   context='cafeteria.topup.pos_unloaded')
 
         return Response({
             'id': topup.id,
@@ -1233,6 +1151,8 @@ class AdminStudentDetailView(APIView):
 
     Per-student console: balance, linked parents, full transaction ledger and the
     audit trail of manual adjustments/refunds (spec §5 "Per-student detail").
+    ``?ledger=0`` omits the two capped lists: the console pages them through
+    ``admin/transactions/?student=`` and ``admin/adjustments/?student=``.
     """
     permission_classes = [IsAdmin]
 
@@ -1240,11 +1160,13 @@ class AdminStudentDetailView(APIView):
         student = get_object_or_404(
             StudentProfile.objects.select_related('user', 'loyverse_profile'), pk=pk)
         balance, _ = CafeteriaBalance.objects.get_or_create(student=student)
-        transactions = CafeteriaTransaction.objects.filter(student=student)[:200]
+        with_ledger = request.query_params.get('ledger') not in ('0', 'false')
+        transactions = (CafeteriaTransaction.objects.filter(student=student)[:200]
+                        if with_ledger else [])
         # select_related: BalanceAdjustmentSerializer reads admin.full_name per
         # row. Capped like the ledger — the audit trail can grow unbounded.
         adjustments = (BalanceAdjustment.objects.filter(student=student)
-                       .select_related('admin')[:100])
+                       .select_related('admin')[:100] if with_ledger else [])
 
         parents = [
             {'id': p.id, 'full_name': p.full_name, 'email': p.email, 'whatsapp': p.whatsapp}
@@ -1315,143 +1237,6 @@ class AdminRefundView(APIView):
         return Response(BalanceAdjustmentSerializer(adj).data, status=201)
 
 
-class AdminReconcileView(APIView):
-    """GET /api/v1/cafeteria/admin/reconcile/
-
-    Compare linked students' local ledger vs Loyverse points and flag drift.
-    Paginated via ``?limit=`` / ``?offset=`` (default limit 50) so large rosters
-    don't time out. ``?only=drift`` returns only the out-of-sync/errored rows
-    within the page.
-    """
-    permission_classes = [IsAdmin]
-
-    def get(self, request):
-        try:
-            limit = int(request.query_params.get('limit', 50))
-        except (TypeError, ValueError):
-            limit = 50
-        try:
-            offset = int(request.query_params.get('offset', 0))
-        except (TypeError, ValueError):
-            offset = 0
-
-        batch = reconcile_balances(limit=limit, offset=offset)
-        rows = batch['rows']
-
-        def _ser(r):
-            return {
-                **r,
-                'local_balance': str(r['local_balance']),
-                'loyverse_balance': None if r['loyverse_balance'] is None else str(r['loyverse_balance']),
-                'drift': None if r['drift'] is None else str(r['drift']),
-            }
-
-        data = [_ser(r) for r in rows]
-        if request.query_params.get('only') == 'drift':
-            data = [r for r in data if not r['in_sync']]
-
-        return Response({
-            'count': len(data),
-            'drift_count': sum(1 for r in data if not r['in_sync']),
-            'checked': batch['checked'],
-            'total': batch['total'],
-            'offset': batch['offset'],
-            'limit': batch['limit'],
-            'has_more': batch['has_more'],
-            'results': data,
-        })
-
-
-class AdminLowBalanceView(APIView):
-    """GET /api/v1/cafeteria/admin/low-balance/
-
-    Students whose balance is at or below their low-balance threshold, for
-    proactive outreach (spec §5).
-    """
-    permission_classes = [IsAdmin]
-
-    def get(self, request):
-        # Paged: at end of month most wallets sit under their threshold, so the
-        # unbounded serialize returned the entire roster in one payload. The
-        # admin console already sends ?page= and renders a pager.
-        # Lowest balances first, which is the outreach order anyway. Only
-        # wallets in use (a movement in the last 30 days) and not leavers, the
-        # same rule as the dashboard counter and the weekly alert.
-        from apps.cafeteria.services import low_balance_queryset
-        balances = (low_balance_queryset()
-                    .select_related('student__user', 'student__loyverse_profile')
-                    .order_by('balance', 'student_id'))
-        try:
-            page = max(1, int(request.query_params.get('page', 1)))
-        except (TypeError, ValueError):
-            page = 1
-        start = (page - 1) * LOW_BALANCE_PAGE
-        return Response({
-            'count': balances.count(),
-            'results': CafeteriaBalanceSerializer(balances[start:start + LOW_BALANCE_PAGE], many=True).data,
-        })
-
-
-CUSTOMERS_PAGE = 50
-
-
-class AdminLoyverseCustomersView(APIView):
-    """GET /api/v1/cafeteria/admin/customers/?kind=&q=&page=
-
-    The whole Loyverse store, one row per customer card: pupils (linked to
-    their student), staff meal cards, the school's own cards and test records.
-    Until 2026-09-23 anything that was not a pupil was invisible to the app;
-    now every card is synced on each full pass and listed here with its live
-    points, visits and whether Loyverse still has it. ``kind`` filters
-    (``student|staff|test|other``, or ``nonstudent`` for everything but
-    pupils); ``q`` matches name, code or email.
-    """
-    permission_classes = [IsAdmin]
-
-    def get(self, request):
-        from django.db.models import Count, Q
-
-        from apps.cafeteria.models import LoyverseProfile, UnmatchedReceipt
-
-        qs = LoyverseProfile.objects.select_related('student__user')
-        kind = (request.query_params.get('kind') or '').strip()
-        if kind == 'nonstudent':
-            qs = qs.exclude(kind=LoyverseProfile.Kind.STUDENT)
-        elif kind in LoyverseProfile.Kind.values:
-            qs = qs.filter(kind=kind)
-        q = (request.query_params.get('q') or '').strip()
-        if q:
-            # ``ci09932`` and ``09932`` are one code: match the Loyverse
-            # spelling as typed and the bare digits against both the card and
-            # the linked student's matrícula.
-            from apps.core.matricula import search_key
-            key = search_key(q)
-            qs = qs.filter(Q(name__icontains=q) | Q(customer_code__icontains=q)
-                           | Q(customer_code__icontains=key)
-                           | Q(student__student_id__icontains=key)
-                           | Q(email__icontains=q))
-        qs = qs.order_by('kind', '-last_visit', 'name')
-        try:
-            page = max(1, int(request.query_params.get('page', 1)))
-        except (TypeError, ValueError):
-            page = 1
-        start = (page - 1) * CUSTOMERS_PAGE
-        rows = list(qs[start:start + CUSTOMERS_PAGE])
-        counts = dict(
-            UnmatchedReceipt.objects.filter(customer_id__in=[r.loyverse_id for r in rows])
-            .values_list('customer_id').annotate(n=Count('id')).values_list('customer_id', 'n'))
-        summary = {k: 0 for k in LoyverseProfile.Kind.values}
-        summary.update(dict(LoyverseProfile.objects.values_list('kind')
-                            .annotate(n=Count('id')).values_list('kind', 'n')))
-        summary['missing'] = LoyverseProfile.objects.filter(missing_since__isnull=False).count()
-        return Response({
-            'count': qs.count(),
-            'summary': summary,
-            'results': LoyverseCustomerSerializer(
-                rows, many=True, context={'receipt_counts': counts}).data,
-        })
-
-
 class AdminLoyverseCustomerReceiptsView(APIView):
     """GET /api/v1/cafeteria/admin/customers/<loyverse_id>/receipts/
 
@@ -1481,22 +1266,29 @@ class AdminLoyverseCustomerReceiptsView(APIView):
         })
 
 
-class ParentExportView(APIView):
-    """GET /api/v1/cafeteria/export/
+class ParentExportView(MyTransactionsView):
+    """GET /api/v1/cafeteria/export/?fmt=csv|xlsx&student=&type=&from=&to=&ordering=
 
-    CSV of cafeteria transactions for children linked to the authenticated user
-    (``user.children``). Parents, student-role family logins (self-guardian),
-    and admins may call it.
+    The family history (``MyTransactionsView``) as a file (Data Ops Phase 9):
+    subclassing the list keeps the scoping (a parent's own children, a
+    student's own profile) and the filters and ordering in one place, so the
+    download is exactly the list the family is looking at. Capped at 10,000
+    rows (413 above), throttled under ``portal-export`` and audited with
+    ``record_export``. Staff are refused (``IsParentOrAdmin``).
     """
     permission_classes = [IsParentOrAdmin]
+    pagination_class = None
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'portal-export'
 
-    def get(self, request):
-        from . import exports
+    def list(self, request, *args, **kwargs):
+        from apps.core.exporting import export_response
 
-        user = request.user
-        if user.role not in (User.Role.PARENT, User.Role.STUDENT, User.Role.ADMIN):
-            return Response(error_body('No autorizado.'), status=403)
-        return exports.parent_family_statement_csv(user)
+        from .portal_exports import FAMILY_EXPORT_FORMATS, FAMILY_TRANSACTIONS_EXPORT_SPEC
+
+        qs = self.filter_queryset(self.get_queryset()).select_related('student__user')
+        return export_response(request, qs, FAMILY_TRANSACTIONS_EXPORT_SPEC,
+                               formats=FAMILY_EXPORT_FORMATS, context='portal')
 
 
 class AdminExportStudentView(APIView):

@@ -26,7 +26,8 @@ const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | '
 const GATEWAYS: Record<string, string> = { global_payments: 'Global Payments', banorte: 'Banorte', sandbox: 'Sandbox' };
 
 const STATUS_OPTIONS = Object.entries(STATUS).map(([value, m]) => ({ value, label: m.label }));
-const GATEWAY_OPTIONS = Object.entries(GATEWAYS).map(([value, label]) => ({ value, label }));
+// The API filters on real gateways only (sandbox rows carry one of them).
+const GATEWAY_OPTIONS = Object.entries(GATEWAYS).filter(([value]) => value !== 'sandbox').map(([value, label]) => ({ value, label }));
 
 /** /admin/pagos — gateway ledger: every online top-up, filters, totals, export (BACKLOG P1-D9).
  *  Refunds and cash approvals stay in the Cafetería console (money moves in one place).
@@ -39,7 +40,7 @@ const COLUMNS: Column<Payment>[] = [
     cell: (p) => new Date(p.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
   },
   {
-    id: 'student', header: 'Alumno', hideable: false, minWidth: 160, className: 'font-medium text-ink',
+    id: 'student', header: 'Alumno', sortKey: 'student', hideable: false, minWidth: 160, className: 'font-medium text-ink',
     cell: (p) => p.student_id
       ? <Link to={`/admin/cafeteria/${p.student_id}`} className="hover:text-purple hover:underline">{p.student_name}</Link>
       : '—',

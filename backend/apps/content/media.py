@@ -13,6 +13,7 @@ import io
 import mimetypes
 from pathlib import Path
 
+import django_filters
 from django.core.files.base import ContentFile
 from django.db import models
 from django.http import FileResponse, Http404, HttpResponseNotModified
@@ -22,7 +23,13 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.audit import record
+from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
+from apps.core.exporting import AdminExportMixin, Col, ExportSpec
+from apps.core.listing import AdminListMixin, apply_date_range
 from apps.core.permissions import IsAdminOrStaff
+
+from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, referenced_media_ids, tri_state
 
 MAX_UPLOAD = 10 * 1024 * 1024
 VARIANTS = {'thumb': 320, 'md': 960, 'lg': 1600}
@@ -108,13 +115,14 @@ def build_variants(asset: MediaAsset) -> dict:
 
 class MediaAssetSerializer(serializers.ModelSerializer):
     urls = serializers.SerializerMethodField()
+    referenced = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaAsset
         fields = ['id', 'filename', 'content_type', 'size', 'width', 'height', 'alt', 'caption',
-                  'focal_x', 'focal_y', 'tags', 'urls', 'uploaded_by', 'created_at', 'updated_at']
+                  'focal_x', 'focal_y', 'tags', 'urls', 'referenced', 'uploaded_by', 'created_at', 'updated_at']
         read_only_fields = ['id', 'filename', 'content_type', 'size', 'width', 'height', 'urls',
-                            'uploaded_by', 'created_at', 'updated_at']
+                            'referenced', 'uploaded_by', 'created_at', 'updated_at']
 
     def get_urls(self, a):
         urls = {'original': a.public_url('original')}
@@ -122,19 +130,94 @@ class MediaAssetSerializer(serializers.ModelSerializer):
             urls[k] = a.public_url(k)
         return urls
 
+    def get_referenced(self, a):
+        refs = self.context.get('referenced_ids')
+        return None if refs is None else a.pk in refs
 
-class MediaListCreateView(generics.ListCreateAPIView):
-    """GET /content/admin/media/?q=   POST multipart {file, alt, caption, tags}"""
+
+def destroy_asset(instance: MediaAsset) -> None:
+    """Delete the variants, the original and the row (storage errors never block)."""
+    storage = instance.file.storage
+    for name in list(instance.variants.values()):
+        try:
+            storage.delete(name)
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        instance.file.delete(save=False)
+    except Exception:  # noqa: BLE001
+        pass
+    delete_keep_pk(instance)
+
+
+MEDIA_TYPES = {'jpeg': 'image/jpeg', 'jpg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif'}
+
+
+class MediaFilterSet(django_filters.FilterSet):
+    """``?type=png|jpeg|webp|gif&from=&to=&unreferenced=1&missing_alt=1``."""
+
+    type = django_filters.CharFilter(method='filter_type')
+    unreferenced = django_filters.CharFilter(method='filter_unreferenced')
+    missing_alt = django_filters.CharFilter(method='filter_missing_alt')
+
+    class Meta:
+        model = MediaAsset
+        fields: list[str] = []
+
+    def filter_type(self, qs, _name, value):
+        ctype = MEDIA_TYPES.get(str(value).lower(), value)
+        return qs.filter(content_type=ctype) if ctype else qs
+
+    def filter_unreferenced(self, qs, _name, value):
+        flag = tri_state(value)
+        if flag is None:
+            return qs
+        refs = referenced_media_ids()
+        return qs.exclude(pk__in=refs) if flag else qs.filter(pk__in=refs)
+
+    def filter_missing_alt(self, qs, _name, value):
+        flag = tri_state(value)
+        if flag is None:
+            return qs
+        return qs.filter(alt='') if flag else qs.exclude(alt='')
+
+    @property
+    def qs(self):
+        qs = super().qs
+        params = self.data or {}
+        return apply_date_range(qs, 'created_at', params.get('from'), params.get('to'))
+
+
+MEDIA_ORDERING = {
+    'created': 'created_at',
+    'filename': 'filename',
+    'size': 'size',
+    'type': 'content_type',
+    'alt': 'alt',
+}
+
+
+class MediaListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
+    """GET /content/admin/media/?q=&type=&from=&to=&unreferenced=&ordering=
+    POST multipart {file, alt, caption, tags}; an identical file (sha256) → 409
+    ``{detail, existing}`` so the uploader can reuse the asset instead."""
     permission_classes = [IsAdminOrStaff]
     serializer_class = MediaAssetSerializer
     parser_classes = [MultiPartParser, FormParser]
+    search_fields = ('filename', 'alt', 'caption', 'tags')
+    ordering = MEDIA_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = MediaFilterSet
+    audit_context = 'cms.media'
 
     def get_queryset(self):
-        qs = MediaAsset.objects.all()
-        q = (self.request.query_params.get('q') or '').strip()
-        if q:
-            qs = qs.filter(models.Q(filename__icontains=q) | models.Q(alt__icontains=q) | models.Q(tags__icontains=q))
-        return qs
+        return MediaAsset.objects.all()
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        if self.request.method == 'GET':
+            ctx['referenced_ids'] = referenced_media_ids()
+        return ctx
 
     def create(self, request, *args, **kwargs):
         f = request.FILES.get('file')
@@ -149,7 +232,15 @@ class MediaListCreateView(generics.ListCreateAPIView):
         for chunk in f.chunks():
             digest.update(chunk)
         f.seek(0)
-        asset = MediaAsset(filename=f.name[:255], content_type=ctype, size=f.size, sha256=digest.hexdigest(),
+        sha = digest.hexdigest()
+        existing = MediaAsset.objects.filter(sha256=sha).order_by('pk').first()
+        if existing is not None:
+            return Response(
+                {'detail': f'Ya existe en la biblioteca: {existing.filename}.',
+                 'existing': MediaAssetSerializer(existing).data},
+                status=status.HTTP_409_CONFLICT,
+            )
+        asset = MediaAsset(filename=f.name[:255], content_type=ctype, size=f.size, sha256=sha,
                            alt=(request.data.get('alt') or '').strip()[:200],
                            caption=(request.data.get('caption') or '').strip()[:300],
                            tags=(request.data.get('tags') or '').strip()[:200],
@@ -158,26 +249,87 @@ class MediaListCreateView(generics.ListCreateAPIView):
         asset.save()
         asset.variants = build_variants(asset)
         asset.save(update_fields=['variants', 'width', 'height'])
+        record('create', asset, {'filename': [None, asset.filename], 'size': [None, asset.size]},
+               actor=request.user, context=self.audit_context)
         return Response(MediaAssetSerializer(asset).data, status=status.HTTP_201_CREATED)
 
 
-class MediaDetailView(generics.RetrieveUpdateDestroyAPIView):
+class MediaDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrStaff]
     serializer_class = MediaAssetSerializer
     queryset = MediaAsset.objects.all()
+    audit_context = 'cms.media'
 
     def perform_destroy(self, instance):
-        storage = instance.file.storage
-        for name in list(instance.variants.values()):
-            try:
-                storage.delete(name)
-            except Exception:  # noqa: BLE001
-                pass
-        try:
-            instance.file.delete(save=False)
-        except Exception:  # noqa: BLE001
-            pass
-        instance.delete()
+        destroy_asset(instance)
+        record('delete', instance, {'filename': [instance.filename, None]},
+               actor=self.request.user, context=self.audit_context)
+
+
+MEDIA_EXPORT = ExportSpec(
+    filename_prefix='medios',
+    title='Biblioteca de medios',
+    audit_entity='content.mediaasset',
+    columns=[
+        Col('filename', 'Archivo', width=32),
+        Col('content_type', 'Tipo', width=12),
+        Col('size', 'Tamaño (bytes)', fmt='int', width=12),
+        Col('dimensions', 'Dimensiones', getter=lambda a: f'{a.width}×{a.height}' if a.width else '', width=12),
+        Col('alt', 'Texto alternativo', width=36),
+        Col('tags', 'Etiquetas', width=24),
+        Col('url', 'URL', getter=lambda a: a.public_url('original'), width=36),
+        Col('created_at', 'Subida', fmt='datetime', width=18),
+    ],
+)
+
+
+class MediaExportView(AdminExportMixin, MediaListCreateView):
+    """GET /content/admin/media/export/?fmt=csv|xlsx|pdf&…list filters…"""
+    http_method_names = ['get', 'head', 'options']
+    export_spec = MEDIA_EXPORT
+
+
+def _add_tag_plan(asset, payload):
+    tag = str(payload.get('tag') or '').strip().lower()[:40]
+    if not tag or ',' in tag:
+        raise ValueError('Indique una etiqueta (sin comas).')
+    current = [t.strip().lower() for t in asset.tags.split(',') if t.strip()]
+    if tag in current:
+        raise BulkSkip('ya tiene esa etiqueta')
+    if len(', '.join([*current, tag])) > 200:
+        raise ValueError('Las etiquetas superan 200 caracteres.')
+    return current, tag
+
+
+def _add_tag(asset, payload, actor):
+    current, tag = _add_tag_plan(asset, payload)
+    before = asset.tags
+    asset.tags = ', '.join([*current, tag])
+    asset.save(update_fields=['tags', 'updated_at'])
+    return {'tags': [before, asset.tags]}
+
+
+class MediaBulkView(AdminBulkView):
+    """POST /content/admin/media/bulk/ — ``delete`` (unreferenced only) and
+    ``add_tag`` (payload ``tag``). Staff manage media like admins do."""
+    permission_classes = [IsAdminOrStaff]
+    entity = 'content.mediaasset'
+    list_view_class = MediaListCreateView
+    actions = {
+        'delete': delete_action(destroy=destroy_asset),
+        'add_tag': BulkAction(name='add_tag', label_es='Agregar etiqueta', handler=_add_tag,
+                              plan=_add_tag_plan, side_effects='none'),
+    }
+
+    def get_action(self, name):
+        action = super().get_action(name)
+        if name == 'delete':
+            refs = referenced_media_ids()  # once per request, not once per row
+            return delete_action(
+                destroy=destroy_asset,
+                guard=lambda a: 'se usa en una página o comunicado' if a.pk in refs else None,
+            )
+        return action
 
 
 class MediaServeView(APIView):

@@ -30,6 +30,14 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
 5. Comunicados: marcar leído, comentar; la notificación en campana desaparece.
 6. Mi perfil: foto (subir, recortar, quitar), datos, preferencias de aviso, Seguridad (historial de accesos, "Cerrar otras sesiones").
 7. "Olvidé mi contraseña": solo muestra instrucciones para pedirla por WhatsApp o correo (no hay restablecimiento en línea).
+8. Listas del portal (operaciones de datos, Phase 9), con la familia de 2 hijos:
+    - Cafetería → Historial: elegir un hijo, tipo "Compras" y el preset "Este mes"; ordenar por Monto (primer toque de mayor a menor, segundo de menor a mayor, tercero vuelve a "más recientes"). Recargar la página: filtros, orden y página se conservan en la URL; el selector de alumnos del portal marca al mismo hijo.
+    - Cafetería → Descargar CSV y Excel: el archivo trae solo los movimientos filtrados y en el mismo orden (Alumno, Matrícula, Fecha, Tipo, Descripción, Monto, Saldo); Excel abre con fechas y montos como números. El Estado de cuenta (PDF) mensual no cambia.
+    - Pagos: filtrar por estado y con los presets de fecha (ya no hay dos campos sueltos), ordenar por Fecha, Monto o Estado; los chips muestran las fechas como DD/MM/AAAA. Descargar CSV y Excel: mismas filas y orden que la lista. El comprobante PDF de un pago completado no cambia.
+    - Con la cuenta de la otra familia, las descargas no incluyen ningún movimiento ni pago de la familia de 2 hijos (y viceversa). En Dirección → Auditoría aparecen `export:cafeteria.family_transactions` y `export:payments.family` con el usuario de la familia y los filtros usados.
+    - Comunicados: pasar a la página 2, abrir un comunicado y volver: sigue en la página 2. Con `?page=99` en la URL se muestra la página 1.
+    - Notificaciones: filtrar "Sin leer", "Marcar todas como leídas": la lista queda vacía con "Está al día" y el botón "Ver todas" quita el filtro.
+    - Inscripciones (familia con más de una solicitud): los chips de estado filtran y se conservan en la URL.
 
 ## 3. Portal Dirección (20 min)
 1. Tablero: KPIs de cafetería y colas (admisiones, visitas, recargas, contraseñas, mensajes, formularios).
@@ -71,6 +79,37 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
     - Lote: seleccionar varias reservas → Confirmar muestra primero el plan ("Se confirmarán N; M se omitirán porque…") y la casilla "Notificar a las familias"; al confirmar, las fallidas aparecen con su motivo y "Reintentar fallidas". Probar también "Seleccionar las N que coinciden".
     - Exportar CSV, Excel y PDF de la vista filtrada y "Solo seleccionadas"; el archivo respeta filtros y orden. En Auditoría aparece la exportación con el número de filas.
     - Horarios (pestaña Horarios): buscar por lugar o evento, filtrar Activos/Inactivos, ordenar por Reservados. Lote Desactivar/Activar; Eliminar en lote omite los horarios con reservas e indica el motivo. Cargar horarios: descargar la plantilla, subirla con una fila repetida, una fecha pasada y un horario existente con otro cupo: la revisión marca error, error y Actualizar; "Descargar reporte de errores" baja el archivo anotado; importar solo las filas válidas.
+17. Operaciones de datos: Alumnos, Usuarios y Contraseñas (Data Ops fase 3):
+    - Alumnos, filtros: buscar, pestañas de estado, nivel, grado, grupo, acceso y Loyverse; cada filtro aparece como chip y queda en la URL (copiar la URL en otra pestaña muestra la misma vista). Ordenar por Nombre, Matrícula, Grado, Grupo, Estado, Saldo, Ingreso y Último acceso (flecha y `aria-sort` en el encabezado).
+    - Alumnos, columnas: Columnas → mostrar Correo e Ingreso, vista compacta, ancho de columna arrastrando el borde; recargar conserva la elección; Restablecer vuelve a la vista original. La columna Nombre queda fija al desplazarse de lado.
+    - Alumnos, lote: seleccionar 2 alumnos (uno con saldo en cafetería) → Cambiar estado → Baja definitiva → Continuar: el plan dice "Se darán de baja 2 alumnos" y en **Atención** lista al alumno con su saldo. Confirmar; ambos quedan en Baja definitiva (no se borra nada) y Auditoría muestra una fila por alumno más el resumen. Repetir con Cambiar grupo (sugiere los grupos existentes y acepta uno nuevo) y Cambiar grado. "Seleccionar las N que coinciden" aplica a todo el filtro.
+    - Alumnos, exportar: Exportar → CSV, Excel y PDF de la vista filtrada (abren en Excel con acentos; Excel trae saldo como número); con filas seleccionadas, "Exportar seleccionados" descarga solo esas. Ninguna exportación trae datos médicos. Auditoría registra cada exportación con sus filtros.
+    - Alumnos, importar: Más acciones → Importar archivo → Descargar plantilla (CSV y Excel) → subir un archivo con una fila nueva, una existente escrita `ci09932`, una fila sin matrícula y una con tutor sin correo. La revisión muestra Crear / Actualizar / Error con el motivo; "Descargar reporte de errores" baja el mismo archivo con las columnas fila, resultado, errores y avisos. Importar solo las filas válidas; el resumen enlaza a Auditoría. Volver a subir el mismo archivo: todas las filas salen "Omitir: Sin cambios".
+    - Expediente del alumno: con 3 o más tutores aparecen "Buscar tutores" y "Ordenar tutores".
+    - Usuarios: buscar, filtrar por rol y Activas/Inactivas, ordenar, exportar. Seleccionar su propia cuenta y otra → Desactivar: el plan omite su cuenta ("No puede desactivar su propia cuenta") y desactiva la otra; Reactivar la devuelve. Importar → plantilla con correo, nombre, apellidos, rol: las cuentas nuevas se crean sin contraseña; una cuenta existente sale "Omitir"; un correo de familia sale en error.
+    - Contraseñas: la vista abre en Pendientes (con el número en la pestaña); Resueltas, Rechazadas y Todas quedan en la URL; filtrar por canal y fechas; exportar. Seleccionar dos pendientes → Rechazar: el motivo es obligatorio y se guarda en la nota y en Auditoría. Rechazar una sola desde su fila también queda en Auditoría. "Generar contraseña" sigue siendo de una en una.
+18. Cafetería con operaciones de datos (Phase 6):
+    - Saldos: buscar por nombre, `ci09932`, `09932` y correo de un tutor; filtrar por grado, estado del alumno, Saldo bajo y Sin vincular; ordenar por Saldo (flecha y `aria-sort`); la URL conserva todo al recargar. Columnas: ocultar Umbral, cambiar densidad, Restablecer.
+    - Exportar la vista filtrada en CSV, Excel y PDF: el archivo trae solo las filas filtradas y en el mismo orden; *Toda la escuela* trae todos los saldos. Cada descarga aparece en Auditoría como `export:cafeteria.balances`.
+    - Seleccionar dos alumnos → *Cambiar umbral* a 80: el plan dice cuántos se cambiarán; confirmar; el umbral cambia y Auditoría muestra una fila por alumno y el resumen.
+    - *Ajuste masivo*: descargar la plantilla, subir un archivo con un abono, un descuento que dejaría el saldo negativo y una matrícula inexistente: la vista previa muestra el saldo resultante y dos errores; descargar el reporte de errores; importar solo las filas válidas: el saldo cambia, el historial del alumno muestra el Ajuste y la familia recibe aviso solo si la casilla estaba marcada. Volver a subir el mismo archivo: aviso de posible archivo repetido.
+    - Movimientos: filtrar por tipo y fechas, buscar un número de recibo; exportar; Devolver una compra exige escribir DEVOLVER.
+    - Depósitos: seleccionar una recarga en caja pendiente → *Aplicar*: el diálogo muestra el total en pesos; confirmar; repetir sobre la misma recarga: se omite (no hay doble abono).
+    - POS Loyverse: marcar varias recargas como cargadas con *Cargadas en POS*.
+    - Reconciliación: *Reconciliar*, paginar, seleccionar una fila con diferencia → *Corregir*: el saldo queda igual a Loyverse, sin aviso a la familia.
+    - Clientes Loyverse: 50 por página, filtros por tipo, exportar.
+    - Expediente de cafetería de un alumno: Movimientos y Ajustes paginan (más de 20 filas).
+    - En el teléfono (menos de 768 px) cada tabla se ve como tarjetas con casilla y menú de acciones; la barra de lote aparece abajo.
+
+15. Comunicados y Contenido en tablas de datos (Data Ops Phase 8, 25-09-2026):
+    - Comunicados: buscar por título, filtrar por Estado/Dirigido a/Programación/Enterado y fechas; ordenar por Leídos. Seleccionar dos comunicados → **Duplicar**: aparecen "Copia de …" como inactivos. Seleccionar uno ya enviado → **Eliminar no enviados**: el plan dice "1 porque ya se envió a las familias". **Exportar** CSV/Excel respeta los filtros. En "Ver entrega", **Exportar destinatarios** descarga una fila por familia (leído, enterado, estado de correo y push).
+    - Páginas: filtrar Borradores y Plantilla; seleccionar un borrador vacío y una página con bloques → **Publicar**: el plan marca el vacío como "no se puede procesar" y publica el otro. **Eliminar borradores** omite las páginas que ya se publicaron alguna vez. Una cuenta de staff ve la tabla pero sin casillas ni Exportar.
+    - Medios: arrastrar a la zona punteada una imagen nueva, un PDF, una foto de más de 10 MB y una imagen ya subida: cada archivo muestra su resultado; la repetida ofrece **Ya existe: usar el existente**. Filtro "Sin usar" + **Eliminar sin usar**: las imágenes en uso se omiten. **Agregar etiqueta** a varias.
+    - Formularios: ordenar por Pendientes; abrir **Envíos**: abre en Pendientes, la búsqueda encuentra texto de cualquier respuesta, **Seleccionar las N que coinciden** → Marcar atendidos. Exportar envíos en Excel: una columna por campo.
+    - Navegación → Redirecciones: **Importar** un CSV `de,a,permanente` con una ruta repetida y una ruta reservada (`/api/x`): el paso de revisión marca ambas como error, "Descargar reporte de errores" baja el archivo anotado, "Importar solo las filas válidas" crea el resto.
+    - Testimonios: cambiar el número de **Orden** en la tabla y presionar Enter: se guarda y la bitácora registra el cambio.
+    - Calendario: **Importar** con la plantilla (fechas DD/MM/AAAA); un evento con el mismo título e inicio se actualiza. **Copiar liga .ics** y suscribirse desde Google Calendar: aparecen solo los eventos publicados (en 10 minutos como máximo tras un cambio).
+    - Auditoría: cada alta, edición, borrado, acción masiva, importación y exportación anterior aparece con actor y contexto (`cms.*`, `bulk:content.*`, `import:content.*`, `export:*`).
 
 ## 4. Comunicación (staff) (5 min)
 1. Ve solo Analítica, Páginas y Medios.
