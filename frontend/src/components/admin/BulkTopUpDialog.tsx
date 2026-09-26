@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { cafeteriaApi, type BulkTopUpPreview } from '@/services/api';
-import { GRADES } from '@/lib/rosterTable';
+import { GRADES } from '@/lib/grades';
 import { apiErrors } from '@/cms/editor/helpers';
 import { formatMXN } from '@/lib/format';
 

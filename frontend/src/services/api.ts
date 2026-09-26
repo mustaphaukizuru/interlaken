@@ -8,7 +8,7 @@
  * read from localStorage or a URL.
  */
 import axios from 'axios';
-import type { ExportParams } from './dataOps';
+import type { BulkRequest, BulkResult, ExportParams, ListParams } from './dataOps';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -876,11 +876,20 @@ export const portalApi = {
   getDashboard: () =>
     api.get('/portal/dashboard/'),
 
-  getStudents: (params?: { page?: number; search?: string; estado?: string; acceso?: string; nivel?: string; grado?: string; grupo?: string; ordering?: string }) =>
+  /** Roster (Data Ops C1): `q` (legacy `search`), `ordering`, `page_size` and the
+   *  filters `status`, `access`, `level`, `grade`, `group`, `linked`, `enrolled_from/to`. */
+  getStudents: (params?: ListParams) =>
     api.get('/accounts/students/', { params }),
 
-  /** Bulk roster edit (BACKLOG P1-A8). */
-  bulkStudents: (data: { ids: number[]; action: 'status' | 'group' | 'grade'; value: string }) => api.post<{ updated: number }>('/accounts/admin/students/bulk/', data),
+  /** Roster bulk actions (Data Ops C5): status, grade, group, sync_loyverse. */
+  studentsBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/students/bulk/', body),
+  /** Legacy shape kept for LinkLoyverseModal ("Dar de baja"): one value for many ids. */
+  bulkStudents: async (data: { ids: number[]; action: 'status' | 'group' | 'grade'; value: string }) => {
+    const res = await api.post<BulkResult>('/accounts/admin/students/bulk/', {
+      action: data.action, ids: data.ids, payload: { value: data.value },
+    });
+    return { ...res, data: { ...res.data, updated: res.data.ok } };
+  },
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
@@ -890,11 +899,9 @@ export const portalApi = {
   updateStudent: (studentId: number, data: Partial<StudentWrite>) =>
     api.patch(`/accounts/admin/students/${studentId}/`, data),
 
-  /** CSV roster export (grade/group/guardians count), honors ?search=. */
-  exportStudents: (search?: string) =>
-    api.get('/accounts/admin/export/students/', {
-      params: search ? { search } : {}, responseType: 'blob',
-    }),
+  /** Roster export (Data Ops C3): same q, filters and ordering as the list, plus `fmt` and `ids`. */
+  exportStudents: (params: ExportParams) =>
+    api.get<Blob>('/accounts/admin/students/export/', { params, responseType: 'blob' }),
 
   // Aggregated staff analytics (staff/admin only; server-cached 60s per range).
   getStaffAnalytics: (days?: number) =>
@@ -966,16 +973,6 @@ export const portalApi = {
   unsubscribePush: (endpoint: string) =>
     api.post('/portal/push/unsubscribe/', { endpoint }),
 
-  // Bulk CSV import (admin): dry_run=true simulates and returns per-row results.
-  importStudents: (file: File, dryRun: boolean) => {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('dry_run', dryRun ? '1' : '0');
-    return api.post('/accounts/admin/import-students/', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-
   // Roster ↔ Loyverse linking (admin): commit=false previews the plan, true persists.
   linkLoyverse: (commit: boolean) =>
     api.post('/accounts/admin/link-loyverse/', { commit: commit ? '1' : '0' }),
@@ -988,8 +985,8 @@ export const portalApi = {
     }),
 
   // Per-student parent/guardian linking (admin).
-  listGuardians: (studentId: number) =>
-    api.get(`/accounts/admin/students/${studentId}/guardians/`),
+  listGuardians: (studentId: number, params?: { q?: string; ordering?: string }) =>
+    api.get(`/accounts/admin/students/${studentId}/guardians/`, { params }),
   linkGuardian: (
     studentId: number,
     data: {
@@ -1004,8 +1001,11 @@ export const portalApi = {
   unlinkGuardian: (studentId: number, userId: number) =>
     api.delete(`/accounts/admin/students/${studentId}/guardians/${userId}/`),
   /** Staff user management (BACKLOG P1-H1). */
-  listStaff: (page?: number) =>
-    api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/', { params: page && page > 1 ? { page } : undefined }),
+  listStaff: (params?: ListParams) =>
+    api.get<{ results: StaffUser[]; count: number }>('/accounts/admin/staff/', { params }),
+  exportStaff: (params: ExportParams) =>
+    api.get<Blob>('/accounts/admin/staff/export/', { params, responseType: 'blob' }),
+  staffBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/staff/bulk/', body),
   inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role'] }) =>
     api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
   updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name'>>) =>
@@ -1013,8 +1013,11 @@ export const portalApi = {
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
   /** Password request inbox (admin). */
-  getPasswordRequests: (status?: string, page?: number) =>
-    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params: { ...(status ? { status } : {}), ...(page && page > 1 ? { page } : {}) } }),
+  getPasswordRequests: (params?: ListParams) =>
+    api.get<{ count: number; open_count: number; results: PasswordRequest[] }>('/accounts/admin/password-requests/', { params }),
+  exportPasswordRequests: (params: ExportParams) =>
+    api.get<Blob>('/accounts/admin/password-requests/export/', { params, responseType: 'blob' }),
+  passwordRequestsBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/password-requests/bulk/', body),
   createPasswordRequest: (data: { requested_email: string; requester_name?: string; channel: string; note?: string }) =>
     api.post<PasswordRequest>('/accounts/admin/password-requests/', data),
   updatePasswordRequest: (id: number, data: { action: 'resolve' | 'reject'; delivered_via?: string; note?: string }) =>
