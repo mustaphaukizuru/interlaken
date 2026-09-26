@@ -459,3 +459,37 @@ def test_list_query_budgets(api_client, django_assert_num_queries, n):
     ):
         with django_assert_num_queries(budget):
             assert api_client.get(reverse(name, args=args)).status_code == 200
+
+
+# ── C2: backend whitelists == frontend *_ORDERING_KEYS ────
+def test_ordering_whitelists_match_the_frontend_constants():
+    import re
+    from pathlib import Path
+
+    from apps.content.forms import FORM_ORDERING, SUBMISSION_ORDERING
+    from apps.content.media import MEDIA_ORDERING
+    from apps.content.navigation import REDIRECT_ORDERING
+    from apps.content.pages import PAGE_ORDERING
+    from apps.content.views import CALENDAR_ORDERING, TESTIMONIAL_ORDERING
+    from apps.portal.views import ANNOUNCEMENT_ORDERING
+
+    source = (
+        Path(__file__).resolve().parents[3] / "frontend/src/hooks/queries/AdminContentQueries.ts"
+    )
+    if not source.exists():  # backend-only checkout (Docker build context)
+        pytest.skip("frontend sources not available")
+    text = source.read_text(encoding="utf-8")
+
+    def keys(name):
+        match = re.search(rf"{name} = \[([^\]]*)\]", text)
+        assert match, name
+        return set(re.findall(r"'([^']+)'", match.group(1)))
+
+    assert keys("ANNOUNCEMENT_ORDERING_KEYS") == set(ANNOUNCEMENT_ORDERING)
+    assert keys("PAGE_ORDERING_KEYS") == set(PAGE_ORDERING)
+    assert keys("MEDIA_ORDERING_KEYS") == set(MEDIA_ORDERING)
+    assert keys("FORM_ORDERING_KEYS") == set(FORM_ORDERING)
+    assert keys("SUBMISSION_ORDERING_KEYS") == set(SUBMISSION_ORDERING)
+    assert keys("REDIRECT_ORDERING_KEYS") == set(REDIRECT_ORDERING)
+    assert keys("TESTIMONIAL_ORDERING_KEYS") == set(TESTIMONIAL_ORDERING)
+    assert keys("CALENDAR_ORDERING_KEYS") == set(CALENDAR_ORDERING)

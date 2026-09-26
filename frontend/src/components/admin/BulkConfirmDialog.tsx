@@ -22,6 +22,8 @@ interface Props {
   execute: (body: BulkRequest) => Promise<BulkResult>;
   /** Called after a committed run (also after a retry), with the last result. */
   onDone?: (result: BulkResult) => void;
+  /** Action parameters collected by the page (e.g. `{tag}`), sent with the dry run and the commit. */
+  extraPayload?: Record<string, unknown>;
 }
 
 type Phase = 'planning' | 'plan' | 'plan-error' | 'running' | 'done';
@@ -40,7 +42,7 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, execute, onDone }: Props) {
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, execute, onDone, extraPayload }: Props) {
   const title = action ? `${action.label}: ${allMatching ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${ids.length} ${entityLabel}`}` : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
@@ -58,13 +60,14 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
           execute={execute}
           onDone={onDone}
           onClose={onClose}
+          extraPayload={extraPayload}
         />
       )}
     </Modal>
   );
 }
 
-function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, execute, onDone, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, execute, onDone, onClose, extraPayload }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
   // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
   const p = (stem: string) => `${stem}${gender === 'm' ? 'o' : 'a'}s`;
   const [phase, setPhase] = useState<Phase>('planning');
@@ -79,13 +82,14 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
   // Snapshot the selection at mount: `onDone` typically clears it while the
   // summary is still on screen, and a retry must target the ids that were
   // confirmed, not whatever the table holds now.
-  const [snapshot] = useState(() => ({ ids, allMatching, filters }));
+  const [snapshot] = useState(() => ({ ids, allMatching, filters, extraPayload }));
   const base = useMemo<Omit<BulkRequest, 'dry_run'>>(
     () => ({
       action: action.name,
       ids: snapshot.allMatching ? [] : snapshot.ids,
       all_matching: snapshot.allMatching,
       filters: snapshot.allMatching ? snapshot.filters : undefined,
+      ...(snapshot.extraPayload ? { payload: snapshot.extraPayload } : {}),
     }),
     [action.name, snapshot],
   );
@@ -113,7 +117,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
   }, [phase, action.requiresNote]);
 
   const payload = (): Record<string, unknown> => {
-    const p: Record<string, unknown> = {};
+    const p: Record<string, unknown> = { ...(snapshot.extraPayload ?? {}) };
     if (action.requiresNote) p.note = note.trim();
     if (action.notifyOption) p.notify = notify;
     return p;

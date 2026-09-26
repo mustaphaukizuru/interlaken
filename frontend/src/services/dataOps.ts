@@ -188,5 +188,5 @@ export interface BulkActionDef {
   notifyOption?: boolean;
   /** es-MX verb phrase for the plan: "Se confirmarán", "Se cancelarán". */
   planVerb?: string;
-  icon?: React.ComponentType<{ size?: number; className?: string; 'aria-hidden'?: boolean | 'true' }>;
+  icon?: React.ComponentType<{ size?: number | string; className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
 }

@@ -1130,6 +1130,8 @@ export interface MediaAsset {
   focal_y: number;
   tags: string;
   urls: Record<string, string>;
+  /** Used by a page (draft or published), a page SEO image or a comunicado attachment (admin list only). */
+  referenced?: boolean | null;
   created_at: string;
 }
 
