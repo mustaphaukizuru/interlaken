@@ -52,6 +52,13 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
     - Portal familia → Cafetería: la credencial dice **Código Loyverse** sobre el código de barras.
     - Alumnos → Importar desde Loyverse: la vista previa es una tabla por alumno (Campo, Antes, Después) con buscador y chips por campo; "N clientes omitidos: ver motivos" explica cada omisión. Corrija un nombre en el expediente y vuelva a abrir la importación: no aparece ningún cambio de nombre para ese alumno.
     - Alumnos → Vincular Loyverse: si un cliente de Loyverse no trae código de grado, aparece bajo "Sin grado en Loyverse (posible baja)" con su Código Loyverse; nada cambia hasta presionar Dar de baja.
+15. Visitas (Data Ops, fase 5):
+    - Reservas: buscar por teléfono o por nombre del alumno; filtrar por estado, tipo, origen y rango de fechas; ordenar por fecha, tutor, alumno, asistentes o estado. Recargar la página: filtros, orden y página se conservan (viven en la URL). Ocultar una columna en Columnas y recargar: sigue oculta.
+    - Acciones por fila: una reserva confirmada ofrece Asistió, No asistió y Cancelar (ya no Confirmar); una cancelada solo ofrece Reabrir, que pide un motivo y vuelve a Pendiente solo si el horario tiene cupo para todos sus asistentes. Corregir Asistió ↔ No asistió pide motivo. Cada cambio aparece en Auditoría con el motivo.
+    - Cupo por asistentes: en un horario de cupo 4 con una reserva de 3 personas, reabrir una reserva cancelada de 2 personas se rechaza con el mensaje de cupo.
+    - Lote: seleccionar varias reservas → Confirmar muestra primero el plan ("Se confirmarán N; M se omitirán porque…") y la casilla "Notificar a las familias"; al confirmar, las fallidas aparecen con su motivo y "Reintentar fallidas". Probar también "Seleccionar las N que coinciden".
+    - Exportar CSV, Excel y PDF de la vista filtrada y "Solo seleccionadas"; el archivo respeta filtros y orden. En Auditoría aparece la exportación con el número de filas.
+    - Horarios (pestaña Horarios): buscar por lugar o evento, filtrar Activos/Inactivos, ordenar por Reservados. Lote Desactivar/Activar; Eliminar en lote omite los horarios con reservas e indica el motivo. Cargar horarios: descargar la plantilla, subirla con una fila repetida, una fecha pasada y un horario existente con otro cupo: la revisión marca error, error y Actualizar; "Descargar reporte de errores" baja el archivo anotado; importar solo las filas válidas.
 
 ## 4. Comunicación (staff) (5 min)
 1. Ve solo Analítica, Páginas y Medios.
