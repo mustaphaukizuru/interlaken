@@ -16,6 +16,7 @@ import hashlib
 import json
 import uuid
 
+import django_filters
 from django.conf import settings
 from django.core import signing
 from django.core.cache import cache
@@ -27,7 +28,12 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
+from apps.core.exporting import AdminExportMixin, Col, ExportSpec
+from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin, IsAdminOrStaff
+
+from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, tri_state
 
 PAGE_CACHE = 'cms:page:{slug}'
 PREVIEW_SALT = 'cms-preview'
@@ -284,24 +290,166 @@ class PagePreviewByTokenView(APIView):
         return resp
 
 
-class PageListCreateView(generics.ListCreateAPIView):
+class PageFilterSet(django_filters.FilterSet):
+    """``?status=draft|published&template=&review=1`` (review = approval requested)."""
+
+    status = django_filters.ChoiceFilter(choices=Page.Status.choices)
+    template = django_filters.ChoiceFilter(choices=Page.Template.choices)
+    review = django_filters.CharFilter(method="filter_review")
+
+    class Meta:
+        model = Page
+        fields: list[str] = []
+
+    def filter_review(self, qs, _name, value):
+        flag = tri_state(value)
+        return qs if flag is None else qs.filter(review_requested_at__isnull=not flag)
+
+
+PAGE_ORDERING = {
+    "title": "title",
+    "slug": "slug",
+    "status": "status",
+    "template": "template",
+    "updated": "updated_at",
+    "published": "published_at",
+    "created": "created_at",
+}
+
+
+class PageListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
+    """GET/POST /content/admin/pages/ — Data Ops list contract (``q`` title/slug,
+    ``status``, ``template``, ``review``; ordering keys in ``PAGE_ORDERING``)."""
+
     permission_classes = [IsAdminOrStaff]
     serializer_class = PageAdminSerializer
-    queryset = Page.objects.select_related('published_version')
-    pagination_class = None  # the editor lists every page; the SPA sends no ?page=
+    search_fields = ("title", "slug")
+    ordering = PAGE_ORDERING
+    default_ordering = "slug"
+    filterset_class = PageFilterSet
+    audit_context = "cms.page"
+
+    def get_queryset(self):
+        return Page.objects.select_related("published_version", "review_requested_by")
 
 
-class PageDetailView(generics.RetrieveUpdateDestroyAPIView):
+class PageDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrStaff]
 
     serializer_class = PageAdminSerializer
-    queryset = Page.objects.select_related('published_version')
+    queryset = Page.objects.select_related("published_version")
+    audit_context = "cms.page"
 
     def perform_destroy(self, instance):
-        if getattr(self.request.user, 'role', None) != 'admin':
-            raise PermissionDenied('Solo Dirección puede eliminar páginas.')
+        if getattr(self.request.user, "role", None) != "admin":
+            raise PermissionDenied("Solo Dirección puede eliminar páginas.")
         cache.delete(PAGE_CACHE.format(slug=instance.slug))
-        instance.delete()
+        super().perform_destroy(instance)
+
+
+def _public_path(page: Page) -> str:
+    from .navigation import page_path
+
+    return page_path(page.slug)
+
+
+PAGE_EXPORT = ExportSpec(
+    filename_prefix="paginas",
+    title="Páginas del sitio",
+    audit_entity="content.page",
+    columns=[
+        Col("title", "Título", width=32),
+        Col("slug", "Dirección", getter=_public_path, width=28),
+        Col("template", "Plantilla", getter=lambda p: p.get_template_display(), width=16),
+        Col("status", "Estado", getter=lambda p: p.get_status_display(), width=12),
+        Col(
+            "version",
+            "Versión publicada",
+            getter=lambda p: p.published_version.number if p.published_version else None,
+            fmt="int",
+            width=10,
+        ),
+        Col("published_at", "Publicada", fmt="datetime", width=18),
+        Col("review_requested_at", "Aprobación solicitada", fmt="datetime", width=18),
+        Col("updated_at", "Actualizada", fmt="datetime", width=18),
+    ],
+)
+
+
+class PageExportView(AdminExportMixin, PageListCreateView):
+    """GET /content/admin/pages/export/?fmt=csv|xlsx|pdf&…list filters… (admin)."""
+
+    permission_classes = [IsAdmin]
+    http_method_names = ["get", "head", "options"]
+    export_spec = PAGE_EXPORT
+
+
+def _page_delete_guard(page: Page) -> str | None:
+    if page.status != Page.Status.DRAFT or page.published_version_id or page.versions.exists():
+        return "ya se publicó alguna vez; despublíquela en lugar de eliminarla"
+    return None
+
+
+def _page_destroy(page: Page) -> None:
+    cache.delete(PAGE_CACHE.format(slug=page.slug))
+    delete_keep_pk(page)
+
+
+def _page_publish_plan(page: Page, payload) -> None:
+    from .checks import run_checks
+
+    if page.status == Page.Status.PUBLISHED and page.published_version_id:
+        if not PageAdminSerializer().get_has_unpublished_changes(page):
+            raise BulkSkip("ya está publicada sin cambios pendientes")
+    errors = [i for i in run_checks(page) if i["level"] == "error"]
+    if errors:
+        raise ValueError("Corrija antes de publicar: " + " · ".join(e["message"] for e in errors[:3]))
+
+
+def _page_publish(page: Page, payload, actor) -> dict:
+    _page_publish_plan(page, payload)
+    version = page.publish(actor)
+    return {"status": ["draft", "published"], "published_version": version.number}
+
+
+def _page_unpublish_plan(page: Page, payload) -> None:
+    if page.status != Page.Status.PUBLISHED:
+        raise BulkSkip("ya es borrador")
+
+
+def _page_unpublish(page: Page, payload, actor) -> dict:
+    _page_unpublish_plan(page, payload)
+    page.unpublish(actor)
+    return {"status": ["published", "draft"]}
+
+
+class PageBulkView(AdminBulkView):
+    """POST /content/admin/pages/bulk/ — publish (checks per row), unpublish,
+    delete (drafts never published only). Admin only, like single publish."""
+
+    entity = "content.page"
+    list_view_class = PageListCreateView
+
+    def get_queryset(self):
+        return Page.objects.select_related("published_version")
+
+    actions = {
+        "publish": BulkAction(
+            name="publish",
+            label_es="Publicar",
+            handler=_page_publish,
+            plan=_page_publish_plan,
+            side_effects="none",
+        ),
+        "unpublish": BulkAction(
+            name="unpublish",
+            label_es="Despublicar",
+            handler=_page_unpublish,
+            plan=_page_unpublish_plan,
+            side_effects="none",
+        ),
+        "delete": delete_action(guard=_page_delete_guard, destroy=_page_destroy),
+    }
 
 
 class PagePublishView(APIView):

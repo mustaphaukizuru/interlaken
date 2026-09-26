@@ -11,13 +11,15 @@ FormSubmission  data JSON, page slug, client meta; listed in the portal inbox.
 
 Public:  GET  /content/forms/<slug>/          definition (published only)
          POST /content/forms/<slug>/submit/   validated server-side, honeypot
-Admin:   CRUD /content/admin/forms/, GET /content/admin/forms/<id>/submissions/
-         (?export=csv), PATCH .../submissions/<id>/ {is_handled}
+Admin:   CRUD /content/admin/forms/ (+ export/, bulk/), GET /content/admin/forms/<id>/submissions/
+         (paginated, q/handled/from/to; export/ sibling), PATCH /content/admin/form-submissions/<id>/
+         {is_handled}, POST /content/admin/form-submissions/bulk/
 """
 from __future__ import annotations
 
 import re
 
+import django_filters
 from django.conf import settings
 from django.db import models
 from django.http import Http404
@@ -26,8 +28,13 @@ from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
+from apps.core.exporting import AdminExportMixin, Col, ExportSpec
+from apps.core.listing import AdminListMixin, apply_date_range
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
+
+from .ops import AuditedCrudMixin, bool_filter, delete_action
 
 FIELD_TYPES = ('text', 'email', 'phone', 'textarea', 'select', 'radio', 'checkbox', 'date', 'number')
 KEY_RE = re.compile(r'^[a-z][a-z0-9_]{0,39}$')
@@ -130,6 +137,19 @@ def validate_submission(form: FormDefinition, payload: dict) -> dict:
     return clean
 
 
+SEARCH_TEXT_MAX = 10_000
+
+
+def build_search_text(data, page: str = '') -> str:
+    """Answers (strings and numbers, not checkbox booleans) + page, space-joined."""
+    parts = [str(page or '')]
+    for value in (data or {}).values():
+        if isinstance(value, bool) or value in (None, ''):
+            continue
+        parts.append(str(value))
+    return ' '.join(p for p in parts if p)[:SEARCH_TEXT_MAX]
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -164,6 +184,10 @@ class FormSubmission(models.Model):
     data = models.JSONField(default=dict)
     page = models.CharField(max_length=120, blank=True, help_text='Ruta desde la que se envió')
     is_handled = models.BooleanField(default=False)
+    # Every answer flattened into one column so the inbox ``q`` can search the
+    # JSON payload with a plain ``icontains`` (Data Ops Phase 8). Kept in sync
+    # by ``save()``; backfilled by migration 0026.
+    search_text = models.TextField(blank=True, default='', editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -174,6 +198,13 @@ class FormSubmission(models.Model):
             # Submissions of one form filtered by handled, newest first (Data Ops Phase 1).
             models.Index(fields=['form', 'is_handled', '-created_at'], name='content_formsub_handled'),
         ]
+
+    def save(self, *args, **kwargs):
+        self.search_text = build_search_text(self.data, self.page)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'data' in update_fields:
+            kwargs['update_fields'] = {*update_fields, 'search_text'}
+        super().save(*args, **kwargs)
 
     @property
     def reply_to(self) -> str:
@@ -259,55 +290,194 @@ def _annotated():
     )
 
 
-class FormListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAdmin]
+class FormFilterSet(django_filters.FilterSet):
+    published = bool_filter('is_published')
+
+    class Meta:
+        model = FormDefinition
+        fields: list[str] = []
+
+
+FORM_ORDERING = {
+    'title': 'title',
+    'slug': 'slug',
+    'updated': 'updated_at',
+    'submissions': 'submissions_count',
+    'pending': 'pending_count',
+    'published': 'is_published',
+}
+
+
+class FormListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
+    """GET/POST /content/admin/forms/ — Data Ops list contract (``q`` title/slug,
+    ``published``, ordering keys in ``FORM_ORDERING``)."""
     serializer_class = FormDefinitionSerializer
-    pagination_class = None
+    search_fields = ('title', 'slug')
+    ordering = FORM_ORDERING
+    default_ordering = 'title'
+    filterset_class = FormFilterSet
+    audit_context = 'cms.form'
 
     def get_queryset(self):
         return _annotated()
 
 
-class FormDetailView(generics.RetrieveUpdateDestroyAPIView):
+class FormDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdmin]
     serializer_class = FormDefinitionSerializer
+    audit_context = 'cms.form'
 
     def get_queryset(self):
         return _annotated()
 
 
-class FormSubmissionsView(APIView):
-    """GET submissions for a form (?handled=0|1, ?export=csv)."""
-    permission_classes = [IsAdmin]
-
-    def get(self, request, pk):
-        form = FormDefinition.objects.filter(pk=pk).first()
-        if form is None:
-            raise Http404
-        qs = form.submissions.select_related('form')  # form.title + reply_to touch the FK per row
-        handled = request.query_params.get('handled')
-        if handled in ('0', '1'):
-            qs = qs.filter(is_handled=(handled == '1'))
-        if request.query_params.get('export') == 'csv':
-            import csv
-
-            from django.http import HttpResponse
-
-            from apps.core.exports import as_download, export_filename, fmt_dt
-            resp = HttpResponse(content_type='text/csv; charset=utf-8')
-            resp.write('﻿')
-            w = csv.writer(resp)
-            cols = [f['key'] for f in form.fields]
-            w.writerow(['Fecha', 'Atendido', 'Página', *[f['label'] for f in form.fields]])
-            for s in qs:
-                w.writerow([fmt_dt(s.created_at), 'sí' if s.is_handled else 'no', s.page, *[str(s.data.get(c, '')) for c in cols]])
-            return as_download(resp, export_filename(f'formulario-{form.slug}'))
-        return Response(FormSubmissionSerializer(qs[:500], many=True).data)
+FORM_EXPORT = ExportSpec(
+    filename_prefix='formularios',
+    title='Formularios',
+    audit_entity='content.formdefinition',
+    columns=[
+        Col('title', 'Título', width=32),
+        Col('slug', 'Clave', width=20),
+        Col('fields', 'Campos', getter=lambda f: len(f.fields or []), fmt='int', width=8),
+        Col('recipient', 'Buzón', width=28),
+        Col('is_published', 'Publicado', fmt='bool', width=10),
+        Col('submissions_count', 'Envíos', fmt='int', width=8),
+        Col('pending_count', 'Pendientes', fmt='int', width=10),
+        Col('updated_at', 'Actualizado', fmt='datetime', width=18),
+    ],
+)
 
 
-class FormSubmissionDetailView(generics.RetrieveUpdateDestroyAPIView):
+class FormExportView(AdminExportMixin, FormListCreateView):
+    """GET /content/admin/forms/export/?fmt=csv|xlsx|pdf"""
+    http_method_names = ['get', 'head', 'options']
+    export_spec = FORM_EXPORT
+
+
+def _form_delete_guard(form) -> str | None:
+    count = getattr(form, 'submissions_count', None)
+    if count is None:
+        count = form.submissions.count()
+    return f'tiene {count} envío(s); elimínelo desde su ficha' if count else None
+
+
+class FormBulkView(AdminBulkView):
+    """POST /content/admin/forms/bulk/ — ``delete`` (forms without submissions only)."""
+    entity = 'content.formdefinition'
+    list_view_class = FormListCreateView
+    actions = {'delete': delete_action(guard=_form_delete_guard)}
+
+    def get_queryset(self):
+        return _annotated()
+
+
+# ── submissions ───────────────────────────────────────────
+class SubmissionFilterSet(django_filters.FilterSet):
+    handled = bool_filter('is_handled')
+
+    class Meta:
+        model = FormSubmission
+        fields: list[str] = []
+
+    @property
+    def qs(self):
+        params = self.data or {}
+        return apply_date_range(super().qs, 'created_at', params.get('from'), params.get('to'))
+
+
+SUBMISSION_ORDERING = {
+    'date': 'created_at',
+    'handled': 'is_handled',
+    'page': 'page',
+}
+
+
+class FormSubmissionsView(AdminListMixin, generics.ListAPIView):
+    """GET /content/admin/forms/<pk>/submissions/ — paginated inbox of one form.
+
+    ``q`` searches every answer (``search_text``), ``handled=0|1``, ``from``/``to``,
+    ordering ``date|handled|page``. ``?form=<id>`` works too (bulk all_matching).
+    """
+    serializer_class = FormSubmissionSerializer
+    search_fields = ('search_text',)
+    ordering = SUBMISSION_ORDERING
+    default_ordering = '-created_at'
+    filterset_class = SubmissionFilterSet
+
+    def get_form(self) -> FormDefinition:
+        if not hasattr(self, '_form'):
+            raw = self.kwargs.get('pk') or self.request.query_params.get('form')
+            form = FormDefinition.objects.filter(pk=raw).first() if str(raw or '').isdigit() else None
+            if form is None:
+                raise Http404
+            self._form = form
+        return self._form
+
+    def get_queryset(self):
+        form = self.get_form()
+        # form.title + reply_to touch the FK per row: join it once.
+        return FormSubmission.objects.filter(form=form).select_related('form')
+
+
+def _submission_value(key):
+    def get(sub):
+        value = (sub.data or {}).get(key, '')
+        if isinstance(value, bool):
+            return 'Sí' if value else 'No'
+        return '' if value is None else str(value)
+    return get
+
+
+class FormSubmissionsExportView(AdminExportMixin, FormSubmissionsView):
+    """GET /content/admin/forms/<pk>/submissions/export/?fmt=csv|xlsx|pdf — one
+    column per form field, same filters as the inbox (replaces ``?export=csv``)."""
+    http_method_names = ['get', 'head', 'options']
+
+    def get_export_spec(self):
+        form = self.get_form()
+        columns = [
+            Col('created_at', 'Fecha', fmt='datetime', width=18),
+            Col('is_handled', 'Atendido', fmt='bool', width=10),
+            Col('page', 'Página', width=20),
+        ]
+        columns += [Col(f'data:{f["key"]}', f['label'], getter=_submission_value(f['key']), width=24)
+                    for f in form.fields]
+        return ExportSpec(filename_prefix=f'formulario-{form.slug}', title=f'Envíos: {form.title}',
+                          audit_entity='content.formsubmission', columns=columns)
+
+
+def _handled_action(name, label_es, value, skip_reason):
+    def plan(sub, payload):
+        if sub.is_handled == value:
+            raise BulkSkip(skip_reason)
+
+    def handler(sub, payload, actor):
+        plan(sub, payload)
+        sub.is_handled = value
+        sub.save(update_fields=['is_handled'])
+        return {'is_handled': [not value, value]}
+
+    return BulkAction(name=name, label_es=label_es, handler=handler, plan=plan, side_effects='none')
+
+
+class FormSubmissionBulkView(AdminBulkView):
+    """POST /content/admin/form-submissions/bulk/ — ``mark_handled``, ``reopen``,
+    ``delete``. For ``all_matching`` the filters carry ``form``."""
+    entity = 'content.formsubmission'
+    list_view_class = FormSubmissionsView
+    actions = {
+        a.name: a for a in (
+            _handled_action('mark_handled', 'Marcar atendido', True, 'ya estaba atendido'),
+            _handled_action('reopen', 'Reabrir', False, 'ya estaba pendiente'),
+            delete_action(),
+        )
+    }
+
+
+class FormSubmissionDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdmin]
     serializer_class = FormSubmissionSerializer
+    audit_context = 'cms.form-submission'
 
     def get_queryset(self):
         return FormSubmission.objects.select_related('form')
