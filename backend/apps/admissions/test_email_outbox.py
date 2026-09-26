@@ -57,6 +57,9 @@ def test_invite_and_approval_email_parent(api_client, settings):
     assert any("maria@test.mx" in m.to for m in mail.outbox)
 
     reg = Registration.objects.get(pk=invite.data["registration_id"])
+    # The family submits the invited draft (drafts only move through the family
+    # form: Data Ops transition table), then admissions approves it.
+    reg.submit()
     mail.outbox.clear()
     approved = api_client.patch(
         reverse("register-status", args=[reg.id]),

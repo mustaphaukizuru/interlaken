@@ -49,6 +49,12 @@ export default function AdminPipeline() {
     <>
       <PageHeader title="Pipeline de inscripciones" subtitle="De solicitud enviada a alumno inscrito. Pida los documentos que faltan con un clic y convierta el expediente aprobado en alumno con sus cuentas de familia."
         actions={<Link to="/admin/admisiones" className="btn-outline">Lista clásica</Link>} />
+      {data?.bounded && (
+        <p className="mb-3 text-sm text-muted">
+          Se muestran los expedientes activos y los completados en los últimos {data.complete_window_days ?? 90} días.{' '}
+          <Link to="/admin/admisiones?vista=inscripciones" className="font-semibold text-purple hover:underline">Ver todos</Link>
+        </p>
+      )}
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
         <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
           <div className="grid grid-cols-1 gap-3 md:min-w-[1100px] md:grid-cols-5" role="list" aria-label="Columnas del pipeline">

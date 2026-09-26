@@ -52,6 +52,17 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
     - Portal familia → Cafetería: la credencial dice **Código Loyverse** sobre el código de barras.
     - Alumnos → Importar desde Loyverse: la vista previa es una tabla por alumno (Campo, Antes, Después) con buscador y chips por campo; "N clientes omitidos: ver motivos" explica cada omisión. Corrija un nombre en el expediente y vuelva a abrir la importación: no aparece ningún cambio de nombre para ese alumno.
     - Alumnos → Vincular Loyverse: si un cliente de Loyverse no trae código de grado, aparece bajo "Sin grado en Loyverse (posible baja)" con su Código Loyverse; nada cambia hasta presionar Dar de baja.
+15. Admisiones con operaciones de datos (Phase 4, 25-09-2026):
+    - Admisiones abre en **Pre-registros**; la pestaña **Inscripciones** cambia de tabla y limpia los filtros. Recargar la página conserva búsqueda, estado, nivel, ciclo, visita, fechas, orden y página (todo vive en la URL).
+    - Pre-registros: buscar por alumno, tutor, correo o teléfono; ordenar por Alumno, Grado, Tutor, Fecha y Estado; Columnas permite mostrar Nivel, Ciclo, Visita y Origen; en el teléfono la tabla se ve como tarjetas con casilla de selección.
+    - El selector de estado de cada fila solo ofrece los cambios permitidos (un pre-registro Inscrito no se puede cambiar). Pasar de Contactado a Pendiente pide un motivo; el cambio aparece en Auditoría con el motivo.
+    - Seleccionar dos filas, **Marcar contactados**: el diálogo muestra el plan (cuántos se cambian y cuántos se omiten y por qué) antes de confirmar. "Seleccionar las N que coinciden" aplica la acción a todo el filtro.
+    - **Invitar a inscripción** en lote: solo pendientes y contactados; cada familia recibe su enlace por correo; los rechazados e inscritos se omiten.
+    - **Importar**: descargar la plantilla CSV y Excel, cargar una hoja de feria con una fila repetida y una fecha inválida: la revisión marca la repetida como aviso (no bloquea) y la fecha como error; descargar el reporte de errores; importar solo las filas válidas. Los nuevos pre-registros quedan Pendientes, del ciclo actual, y ninguna familia recibe correo.
+    - **Exportar** CSV, Excel y PDF respeta búsqueda, filtros y orden; "Exportar seleccionados" solo incluye las filas marcadas. Cada descarga aparece en Auditoría.
+    - Inscripciones: filtro "Con documentos pendientes"; acciones en lote **Aprobar** y **Rechazar** con la casilla "Notificar a las familias" (desmarcada, no sale correo), **Pasar a revisión** (pide motivo) y **Solicitar documentos** (omite expedientes completos). La exportación no incluye datos médicos.
+    - Revisar expediente: marcar varios documentos y **Rechazar seleccionados** con motivo: la familia recibe un solo correo con la lista. El estado de la revisión solo ofrece los cambios permitidos; "Inscripción Completa" se logra con Convertir en alumno en el pipeline.
+    - Pipeline: muestra los activos y los completados de los últimos 90 días; "Ver todos" lleva a la lista de inscripciones.
 
 ## 4. Comunicación (staff) (5 min)
 1. Ve solo Analítica, Páginas y Medios.

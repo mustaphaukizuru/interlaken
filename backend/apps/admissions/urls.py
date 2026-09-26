@@ -1,7 +1,9 @@
 from django.urls import path
 
 from . import views
+from .bulk import DocumentBulkView, PreRegistrationBulkView, RegistrationBulkView
 from .exports import PreRegistrationExportView, RegistrationExportView
+from .imports import PreRegistrationImportTemplateView, PreRegistrationImportView
 from .pipeline import ConvertView, PipelineView, RequestDocsView, TemplatesView
 
 urlpatterns = [
@@ -21,6 +23,12 @@ urlpatterns = [
     path('register/<int:pk>/documents-link/', views.DocumentsLinkView.as_view(),   name='register-docs-link'),
     path('documents/<int:pk>/verify/', views.DocumentVerifyView.as_view(),          name='document-verify'),
     path('documents/<int:pk>/download/', views.DocumentDownloadView.as_view(),      name='document-download'),
+    path('admin/pre-registrations/bulk/', PreRegistrationBulkView.as_view(),         name='pre-register-bulk'),
+    path('admin/pre-registrations/import/', PreRegistrationImportView.as_view(),     name='pre-register-import'),
+    path('admin/pre-registrations/import/template/', PreRegistrationImportTemplateView.as_view(),
+         name='pre-register-import-template'),
+    path('admin/registrations/bulk/',  RegistrationBulkView.as_view(),               name='register-bulk'),
+    path('admin/documents/bulk/',      DocumentBulkView.as_view(),                   name='document-bulk'),
     path('admin/pipeline/',            PipelineView.as_view(),                       name='admissions-pipeline'),
     path('admin/templates/',           TemplatesView.as_view(),                      name='admissions-templates'),
     path('admin/register/<int:pk>/request-docs/', RequestDocsView.as_view(),         name='register-request-docs'),
