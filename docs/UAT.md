@@ -52,6 +52,18 @@ Marque cada paso ✅ / ❌ y anote el navegador y dispositivo (mínimo: Chrome e
     - Portal familia → Cafetería: la credencial dice **Código Loyverse** sobre el código de barras.
     - Alumnos → Importar desde Loyverse: la vista previa es una tabla por alumno (Campo, Antes, Después) con buscador y chips por campo; "N clientes omitidos: ver motivos" explica cada omisión. Corrija un nombre en el expediente y vuelva a abrir la importación: no aparece ningún cambio de nombre para ese alumno.
     - Alumnos → Vincular Loyverse: si un cliente de Loyverse no trae código de grado, aparece bajo "Sin grado en Loyverse (posible baja)" con su Código Loyverse; nada cambia hasta presionar Dar de baja.
+15. Cafetería con operaciones de datos (Phase 6):
+    - Saldos: buscar por nombre, `ci09932`, `09932` y correo de un tutor; filtrar por grado, estado del alumno, Saldo bajo y Sin vincular; ordenar por Saldo (flecha y `aria-sort`); la URL conserva todo al recargar. Columnas: ocultar Umbral, cambiar densidad, Restablecer.
+    - Exportar la vista filtrada en CSV, Excel y PDF: el archivo trae solo las filas filtradas y en el mismo orden; *Toda la escuela* trae todos los saldos. Cada descarga aparece en Auditoría como `export:cafeteria.balances`.
+    - Seleccionar dos alumnos → *Cambiar umbral* a 80: el plan dice cuántos se cambiarán; confirmar; el umbral cambia y Auditoría muestra una fila por alumno y el resumen.
+    - *Ajuste masivo*: descargar la plantilla, subir un archivo con un abono, un descuento que dejaría el saldo negativo y una matrícula inexistente: la vista previa muestra el saldo resultante y dos errores; descargar el reporte de errores; importar solo las filas válidas: el saldo cambia, el historial del alumno muestra el Ajuste y la familia recibe aviso solo si la casilla estaba marcada. Volver a subir el mismo archivo: aviso de posible archivo repetido.
+    - Movimientos: filtrar por tipo y fechas, buscar un número de recibo; exportar; Devolver una compra exige escribir DEVOLVER.
+    - Depósitos: seleccionar una recarga en caja pendiente → *Aplicar*: el diálogo muestra el total en pesos; confirmar; repetir sobre la misma recarga: se omite (no hay doble abono).
+    - POS Loyverse: marcar varias recargas como cargadas con *Cargadas en POS*.
+    - Reconciliación: *Reconciliar*, paginar, seleccionar una fila con diferencia → *Corregir*: el saldo queda igual a Loyverse, sin aviso a la familia.
+    - Clientes Loyverse: 50 por página, filtros por tipo, exportar.
+    - Expediente de cafetería de un alumno: Movimientos y Ajustes paginan (más de 20 filas).
+    - En el teléfono (menos de 768 px) cada tabla se ve como tarjetas con casilla y menú de acciones; la barra de lote aparece abajo.
 
 ## 4. Comunicación (staff) (5 min)
 1. Ve solo Analítica, Páginas y Medios.
