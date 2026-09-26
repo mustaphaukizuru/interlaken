@@ -1,72 +1,88 @@
 """
-admissions/exports.py — CSV exports for the Admisiones console (BACKLOG P1-H3).
+admissions/exports.py — CSV / XLSX / PDF exports of the Admisiones lists (Data Ops C3).
 
-Every export is audit-logged (who exported what, with which filter) so personal
-data leaving the system is traceable (LFPDPPP).
+Each export view subclasses the GET-only twin of its list, so ``q``, the
+FilterSet filters and ``ordering`` are the list's own code (never duplicated),
+and ``?ids=1,2,3`` exports the selected rows. Every download is audited with
+``record_export`` (``object_type='export:pre-registros'`` /
+``'export:inscripciones'``) so personal data leaving the system is traceable
+(LFPDPPP). The inscripciones export carries NO medical fields.
 """
-import csv
 
-from django.http import HttpResponse
-from rest_framework.views import APIView
+from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 
-from apps.core.audit import record_export
-from apps.core.exports import as_download, export_filename, fmt_dt
-from apps.core.permissions import IsAdmin
-
-from .models import PreRegistration, Registration
+from .serializers import child_full_name
+from .views import PreRegistrationAdminListView, RegistrationAdminListView
 
 
-def _csv():
-    resp = HttpResponse(content_type='text/csv; charset=utf-8')
-    resp.write('﻿')
-    return resp, csv.writer(resp)
+def _docs_approved(reg) -> str:
+    docs = reg.documents.all()  # prefetched by the list queryset
+    return f"{sum(1 for d in docs if d.is_verified)}/{len(docs)}"
 
 
-class PreRegistrationExportView(APIView):
-    """GET /api/v1/admissions/pre-register/export/?status=&search="""
-    permission_classes = [IsAdmin]
+PREREGISTRATION_EXPORT = ExportSpec(
+    filename_prefix="pre-registros",
+    audit_entity="pre-registros",
+    title="Pre-registros",
+    sheet_title="Pre-registros",
+    columns=[
+        Col("created_at", "Fecha", width=17, fmt="datetime"),
+        Col("child", "Alumno", getter=child_full_name, width=28),
+        Col("child_dob", "Nacimiento", width=12, fmt="date"),
+        Col("level", "Nivel", getter=lambda r: r.get_level_display(), width=12),
+        Col("grade_applying", "Grado", width=16),
+        Col("cycle", "Ciclo", width=11),
+        Col("parent_name", "Tutor", width=26),
+        Col("parent_email", "Correo", width=28),
+        Col("parent_phone", "Teléfono", width=15),
+        Col("relationship", "Parentesco", width=13),
+        Col("referral_source", "Cómo nos conoció", width=18),
+        Col("wants_visit", "Desea visita", width=8, fmt="bool"),
+        Col("status", "Estado", getter=lambda r: r.get_status_display(), width=13),
+        Col("notes", "Notas", width=30),
+    ],
+)
 
-    def get(self, request):
-        qs = PreRegistration.objects.all().order_by('-created_at')
-        p = request.query_params
-        if p.get('status') in PreRegistration.Status.values:
-            qs = qs.filter(status=p['status'])
-        q = (p.get('search') or '').strip()
-        if q:
-            from django.db.models import Q
-            qs = qs.filter(Q(child_first_name__icontains=q) | Q(child_last_name__icontains=q)
-                           | Q(parent_name__icontains=q) | Q(parent_email__icontains=q))
-        resp, w = _csv()
-        w.writerow(['Fecha', 'Alumno', 'Nacimiento', 'Nivel', 'Grado', 'Ciclo', 'Tutor', 'Correo', 'Teléfono',
-                    'Parentesco', 'Cómo nos conoció', 'Desea visita', 'Estado', 'Notas'])
-        rows = list(qs[:5000])
-        for r in rows:
-            w.writerow([fmt_dt(r.created_at), f'{r.child_first_name} {r.child_last_name}', r.child_dob, r.get_level_display(),
-                        r.grade_applying, r.cycle, r.parent_name, r.parent_email, r.parent_phone, r.relationship,
-                        r.referral_source, 'Sí' if r.wants_visit else 'No', r.get_status_display(), r.notes])
-        # One export row per download (object_type='export:pre-registros'), even
-        # when the file is empty: the attempt is what LFPDPPP traceability needs.
-        record_export('pre-registros', 'csv', p, len(rows), request.user, context='admissions.export')
-        return as_download(resp, export_filename('pre-registros'))
+REGISTRATION_EXPORT = ExportSpec(
+    filename_prefix="inscripciones",
+    audit_entity="inscripciones",
+    title="Inscripciones",
+    sheet_title="Inscripciones",
+    columns=[
+        Col("created_at", "Creada", width=17, fmt="datetime"),
+        Col("submitted_at", "Enviada", width=17, fmt="datetime"),
+        Col("child", "Alumno", getter=child_full_name, width=28),
+        Col("child_dob", "Nacimiento", width=12, fmt="date"),
+        Col("child_curp", "CURP", width=20),
+        Col("level", "Nivel", width=12),
+        Col("grade_applying", "Grado", width=16),
+        Col("cycle", "Ciclo", width=11),
+        Col("parent1_name", "Tutor 1", width=26),
+        Col("parent1_email", "Correo", width=28),
+        Col("parent1_phone", "Teléfono", width=15),
+        Col("parent2_name", "Tutor 2", width=24),
+        Col("parent2_email", "Correo 2", width=26),
+        Col("status", "Estado", getter=lambda r: r.get_status_display(), width=15),
+        Col("docs", "Documentos aprobados", getter=_docs_approved, width=10, fmt="text"),
+    ],
+)
 
 
-class RegistrationExportView(APIView):
-    """GET /api/v1/admissions/register/export/?status="""
-    permission_classes = [IsAdmin]
+class PreRegistrationExportView(AdminExportMixin, PreRegistrationAdminListView):
+    """GET /api/v1/admissions/pre-register/export/?fmt=csv|xlsx|pdf
 
-    def get(self, request):
-        qs = Registration.objects.all().order_by('-created_at')
-        p = request.query_params
-        if p.get('status') in Registration.Status.values:
-            qs = qs.filter(status=p['status'])
-        resp, w = _csv()
-        w.writerow(['Creada', 'Enviada', 'Alumno', 'Nacimiento', 'Nivel', 'Grado', 'Ciclo',
-                    'Tutor 1', 'Correo', 'Teléfono', 'Estado', 'Documentos aprobados'])
-        rows = list(qs.prefetch_related('documents')[:5000])
-        for r in rows:
-            approved = sum(1 for d in r.documents.all() if d.is_verified)
-            w.writerow([fmt_dt(r.created_at), fmt_dt(r.submitted_at), f'{r.child_first_name} {r.child_last_name}',
-                        r.child_dob, r.level, r.grade_applying, r.cycle, r.parent1_name, r.parent1_email,
-                        r.parent1_phone, r.get_status_display(), f'{approved}/{len(r.documents.all())}'])
-        record_export('inscripciones', 'csv', p, len(rows), request.user, context='admissions.export')
-        return as_download(resp, export_filename('inscripciones'))
+    Same ``q``, filters (status, level, cycle, wants_visit, from, to) and
+    ``ordering`` as the list, plus ``ids``.
+    """
+
+    export_spec = PREREGISTRATION_EXPORT
+
+
+class RegistrationExportView(AdminExportMixin, RegistrationAdminListView):
+    """GET /api/v1/admissions/register/export/?fmt=csv|xlsx|pdf
+
+    Same ``q``, filters (status, level, cycle, documents_pending, from, to)
+    and ``ordering`` as the list, plus ``ids``.
+    """
+
+    export_spec = REGISTRATION_EXPORT

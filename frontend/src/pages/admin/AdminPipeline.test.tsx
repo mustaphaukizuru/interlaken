@@ -5,7 +5,7 @@ import AdminPipeline, { docsLabel } from './AdminPipeline';
 
 vi.mock('@/services/api', () => ({
   admissionsApi: {
-    pipeline: vi.fn().mockResolvedValue({ data: { templates: { missing_docs: 'x' }, columns: [
+    pipeline: vi.fn().mockResolvedValue({ data: { templates: { missing_docs: 'x' }, bounded: true, complete_window_days: 90, columns: [
       { status: 'submitted', label: 'Enviado', cards: [{ id: 1, child_name: 'Ana López', level: 'primaria', grade_applying: '1° Primaria', parent_name: 'María', parent_email: 'm@x.mx', parent_phone: '5512345678', status: 'submitted', submitted_at: null, updated_at: '', docs_verified: 1, docs_required: 6, missing: ['CURP', 'Fotografía', 'Boleta Anterior'], student: null }] },
       { status: 'reviewing', label: 'En Revisión', cards: [] },
       { status: 'approved', label: 'Aprobado', cards: [{ id: 2, child_name: 'Bruno Soto', level: 'preescolar', grade_applying: '2° Preescolar', parent_name: 'Laura', parent_email: 'l@x.mx', parent_phone: '', status: 'approved', submitted_at: null, updated_at: '', docs_verified: 6, docs_required: 6, missing: [], student: null }] },
@@ -28,5 +28,10 @@ describe('AdminPipeline', () => {
     expect(screen.getByRole('button', { name: /Pedir documentos/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Convertir en alumno/ })).toBeInTheDocument();
     expect(screen.getByText('Expediente completo')).toBeInTheDocument();
+  });
+  it('says the board is bounded and links to the full list', async () => {
+    renderWithProviders(<AdminPipeline />, { route: '/admin/admisiones/pipeline' });
+    expect(await screen.findByText(/completados en los últimos 90 días/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/admin/admisiones?vista=inscripciones');
   });
 });

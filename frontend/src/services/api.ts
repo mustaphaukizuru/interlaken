@@ -8,7 +8,7 @@
  * read from localStorage or a URL.
  */
 import axios from 'axios';
-import type { BulkRequest, BulkResult, ExportParams, ListParams } from './dataOps';
+import type { BulkRequest, BulkResult, ExportParams, ImportFormat, ListParams } from './dataOps';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -284,7 +284,7 @@ export interface ConvertResult { student: number; student_id?: string; already: 
 
 export const admissionsApi = {
   /** Admissions pipeline (BACKLOG P4-1). */
-  pipeline: () => api.get<{ columns: { status: string; label: string; cards: PipelineCard[] }[]; templates: { missing_docs: string } }>('/admissions/admin/pipeline/'),
+  pipeline: () => api.get<{ columns: { status: string; label: string; cards: PipelineCard[] }[]; templates: { missing_docs: string }; bounded?: boolean; complete_window_days?: number | null }>('/admissions/admin/pipeline/'),
   requestDocs: (id: number) => api.post<{ sent_to: string; missing: string[]; text: string }>(`/admissions/admin/register/${id}/request-docs/`, {}),
   convert: (id: number, data: { student_id?: string; grade?: string; group?: string }) => api.post<ConvertResult>(`/admissions/admin/register/${id}/convert/`, data),
   getTemplates: () => api.get<{ missing_docs: string; default_missing_docs: string; placeholders: string[] }>('/admissions/admin/templates/'),
@@ -339,7 +339,7 @@ export const admissionsAdminApi = {
   invitePreRegistration: (preId: number) =>
     api.post(`/admissions/pre-register/${preId}/invite/`),
 
-  /** #1 — paginated registrations list for the review console. */
+  /** #1 — paginated registrations list (legacy; the console uses hooks/queries/admissions). */
   listRegistrations: (page = 1) =>
     api.get('/admissions/register/', { params: { page } }),
 
@@ -348,7 +348,7 @@ export const admissionsAdminApi = {
     api.get(`/admissions/register/${id}/`),
 
   /** Move a registration through review (approved / rejected / …) + notes. */
-  updateRegistrationStatus: (id: number, data: { status: string; admin_notes?: string }) =>
+  updateRegistrationStatus: (id: number, data: { status: string; admin_notes?: string; note?: string; notify?: boolean }) =>
     api.patch(`/admissions/register/${id}/status/`, data),
 
   /** Mark an uploaded document verified (or clear it). */
@@ -839,24 +839,83 @@ export const bookingsApi = {
     location?: string;
   }) => api.post('/bookings/availability/', data),
 
-  getAdminBookings: (params?: { type?: string; status?: string; date?: string; q?: string; page?: number }) =>
+  /** Visitas list (Data Ops C1): `q` (tutor, correo, teléfono, alumno), `type`, `status`,
+   *  `source`, `date`, `from`/`to` (slot date), `ordering`, `page`, `page_size`. */
+  getAdminBookings: (params?: AdminBookingsParams) =>
     api.get('/bookings/admin/bookings/', { params }),
 
-  /** CSV of the visits list, respecting the active filters. */
-  exportBookings: (params?: { type?: string; status?: string; date?: string; q?: string }) =>
-    api.get('/bookings/admin/bookings/export/', { params, responseType: 'blob' }),
+  /** CSV / Excel / PDF of the visits list (same filters, `q`, `ordering`; `ids` = selection). */
+  exportBookings: (params: ExportParams) =>
+    api.get<Blob>('/bookings/admin/bookings/export/', { params, responseType: 'blob' }),
 
-  bookingAction: (id: number, action: 'confirm' | 'cancel' | 'attended' | 'no_show') =>
-    api.post(`/bookings/admin/bookings/${id}/${action}/`),
+  /** Single-row status move. `reopen` (cancelled → pending) and the attended ↔ no-show
+   *  corrections need a `note`; `notify: false` skips the confirmation email. */
+  bookingAction: (id: number, action: BookingAction, body?: { note?: string; notify?: boolean }) =>
+    api.post(`/bookings/admin/bookings/${id}/${action}/`, body ?? {}),
+
+  /** Bulk confirm / cancel / attended / no_show (Data Ops C5). */
+  bulkBookings: (body: BulkRequest) =>
+    api.post<BulkResult>('/bookings/admin/bookings/bulk/', body),
 
   // Slot management (view / edit / deactivate / delete published availability).
-  getAdminSlots: (params?: { type?: string; active?: 'true' | 'false'; from?: string; to?: string; page?: number }) =>
+  getAdminSlots: (params?: AdminSlotsParams) =>
     api.get('/bookings/admin/slots/', { params }),
   updateSlot: (id: number, data: { capacity?: number; location?: string; title?: string; is_active?: boolean }) =>
     api.patch(`/bookings/admin/slots/${id}/`, data),
   deleteSlot: (id: number) =>
     api.delete(`/bookings/admin/slots/${id}/`),
+  exportSlots: (params: ExportParams) =>
+    api.get<Blob>('/bookings/admin/slots/export/', { params, responseType: 'blob' }),
+  /** Bulk activate / deactivate / delete (a slot with bookings is skipped, never deleted). */
+  bulkSlots: (body: BulkRequest) =>
+    api.post<BulkResult>('/bookings/admin/slots/bulk/', body),
+  /** Slot import (Data Ops C4): template + multipart upload (dry run, report or commit). */
+  slotsImportTemplate: (fmt: ImportFormat) =>
+    api.get<Blob>('/bookings/admin/slots/import/template/', { params: { fmt }, responseType: 'blob' }),
+  slotsImportUpload: (body: FormData, responseType: 'json' | 'blob' = 'json') =>
+    api.post('/bookings/admin/slots/import/', body, { responseType }),
 };
+
+export type BookingAction = 'confirm' | 'cancel' | 'attended' | 'no_show' | 'reopen';
+
+export interface AdminBookingsParams {
+  q?: string;
+  type?: string;
+  status?: string;
+  source?: string;
+  date?: string;
+  from?: string;
+  to?: string;
+  ordering?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AdminSlotsParams {
+  q?: string;
+  type?: string;
+  active?: 'true' | 'false';
+  from?: string;
+  to?: string;
+  ordering?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AdminSlot {
+  id: number;
+  visit_type: 'individual' | 'open_class';
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  location: string;
+  is_active: boolean;
+  booked_count: number;
+  spots_remaining: number;
+  is_full: boolean;
+}
 
 // ── PORTAL ────────────────────────────────────────────────
 export interface NotificationDetail {
