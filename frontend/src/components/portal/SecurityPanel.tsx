@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { authApi, type SessionsInfo } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 
 const REASON: Record<string, string> = { bad_password: 'contraseña incorrecta', totp_required: 'faltó el código', bad_totp: 'código incorrecto', inactive: 'cuenta inactiva' };
 
@@ -24,9 +24,9 @@ export function SecurityPanel() {
   const [err, setErr] = useState('');
   const invalidate = () => qc.invalidateQueries({ queryKey: ['my-sessions'] });
   const closeOthers = useMutation({ mutationFn: () => authApi.closeOtherSessions(), onSuccess: ({ data: d }) => { toast.success(d.closed ? `${d.closed} sesiones cerradas.` : 'No había otras sesiones.'); invalidate(); }, onError: () => toast.error('No se pudo cerrar.') });
-  const start = useMutation({ mutationFn: () => authApi.totpSetup(), onSuccess: ({ data: d }) => { setSetup(d); setErr(''); }, onError: (e) => setErr(apiErrors(e).detail || 'No disponible.') });
-  const enable = useMutation({ mutationFn: () => authApi.totpEnable(code), onSuccess: () => { toast.success('Segundo factor activado.'); setSetup(null); setCode(''); invalidate(); }, onError: (e) => setErr(apiErrors(e).code || 'Código incorrecto.') });
-  const disable = useMutation({ mutationFn: () => authApi.totpDisable(disableCode), onSuccess: () => { toast.success('Segundo factor desactivado.'); setDisableCode(''); invalidate(); }, onError: (e) => setErr(apiErrors(e).code || apiErrors(e).detail || 'Código incorrecto.') });
+  const start = useMutation({ mutationFn: () => authApi.totpSetup(), onSuccess: ({ data: d }) => { setSetup(d); setErr(''); }, onError: (e) => setErr(apiFieldErrors(e).detail || 'No disponible.') });
+  const enable = useMutation({ mutationFn: () => authApi.totpEnable(code), onSuccess: () => { toast.success('Segundo factor activado.'); setSetup(null); setCode(''); invalidate(); }, onError: (e) => setErr(apiFieldErrors(e).code || 'Código incorrecto.') });
+  const disable = useMutation({ mutationFn: () => authApi.totpDisable(disableCode), onSuccess: () => { toast.success('Segundo factor desactivado.'); setDisableCode(''); invalidate(); }, onError: (e) => setErr(apiFieldErrors(e).code || apiFieldErrors(e).detail || 'Código incorrecto.') });
   const staff = role === 'admin' || role === 'staff';
 
   return (

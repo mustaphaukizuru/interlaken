@@ -1,16 +1,17 @@
 /**
  * apiErrors.ts — the one DRF error mapper (Data Ops round, C6).
  *
- * Every API failure the console shows a person goes through here, so the
- * four payload shapes the backend emits read the same everywhere:
+ * Every API failure the app shows a person goes through here, so the
+ * payload shapes the backend emits read the same everywhere:
  *
- *   { detail: "…" }                  DRF default (auth, permission, 404, throttle, 413 caps)
- *   { error: "…" }                   legacy ad-hoc views (converted to {detail} in Phase 1)
+ *   { detail: "…", code?: "…" }      DRF default (auth, permission, 404, throttle, 413 caps);
+ *                                    `code` is a machine code (e.g. `not_invited`)
  *   { field: ["msg"], other: "msg" } serializer field errors
  *   { non_field_errors: ["msg"] }    serializer object-level errors
  *
- * The two older mappers (`cms/editor/helpers.ts apiErrors` and
- * `StudentFormModal.tsx fieldErrorsFrom`) now delegate to this module.
+ * The legacy `{ error: "…" }` body is gone since Data Ops Phase 10 (the backend
+ * flag `LEGACY_ERROR_KEY` is off), and so are the two older mappers
+ * (`cms/editor/helpers.ts apiErrors`, `StudentFormModal.tsx fieldErrorsFrom`).
  */
 
 export type FieldErrorMap = Record<string, string>;
@@ -47,11 +48,17 @@ function firstString(v: unknown): string {
   return v === null || v === undefined ? '' : String(v);
 }
 
+/** Machine-readable `code` of a failure body (`{detail, code}`), if any. */
+export function apiErrorCode(err: unknown): string | undefined {
+  const code = payload(err)?.code;
+  return typeof code === 'string' ? code : undefined;
+}
+
 /**
- * Flat `{field: message}` map (first message wins per field). `detail` and
- * `error` are folded into `detail`; `non_field_errors` is exposed under both
- * its own key and `detail` so callers can show it as the headline. Empty when
- * the failure carried no JSON body (network error, HTML 502, …).
+ * Flat `{field: message}` map (first message wins per field). `non_field_errors`
+ * is exposed under both its own key and `detail` so callers can show it as the
+ * headline; the machine `code` is not a field (read it with `apiErrorCode`).
+ * Empty when the failure carried no JSON body (network error, HTML 502, …).
  */
 export function apiFieldErrors(err: unknown): FieldErrorMap {
   const data = payload(err);
@@ -60,8 +67,8 @@ export function apiFieldErrors(err: unknown): FieldErrorMap {
   for (const [key, value] of Object.entries(data)) {
     const msg = firstString(value);
     if (!msg) continue;
-    if (key === 'error') out.detail = out.detail ?? msg;
-    else out[key] = msg;
+    if (key === 'code') continue;
+    out[key] = msg;
   }
   if (out.non_field_errors && !out.detail) out.detail = out.non_field_errors;
   return out;
@@ -74,7 +81,7 @@ export function fieldErrorsOrNull(err: unknown): FieldErrorMap | null {
 
 /**
  * One es-MX sentence for a toast or inline error. Order of preference:
- * server `detail`/`error` (this is where the 413 "Acote los filtros…" text
+ * server `detail` (this is where the 413 "Acote los filtros…" text
  * arrives), the first field message, a status-based fallback, then `fallback`.
  */
 export function apiErrorMessage(err: unknown, fallback = 'No se pudo completar la operación.'): string {
@@ -92,6 +99,3 @@ export function apiErrorMessage(err: unknown, fallback = 'No se pudo completar l
   if (code === 'ERR_NETWORK' || code === 'ECONNABORTED') return 'Sin conexión con el servidor. Revise su red e intente de nuevo.';
   return fallback;
 }
-
-/** Legacy-compatible alias (`cms/editor/helpers.ts apiErrors`). */
-export const apiErrors = apiFieldErrors;

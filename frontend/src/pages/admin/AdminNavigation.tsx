@@ -25,7 +25,7 @@ import { contentApi, type BulkActionDef, type SiteRedirect } from '@/services/ap
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 
 const ICON_OPTIONS = ['Users', 'BookOpen', 'Camera', 'Blocks', 'Pencil', 'GraduationCap', 'ClipboardList', 'FileText', 'CircleDollarSign', 'UserPlus', 'CalendarDays', 'MonitorSmartphone', 'Receipt', 'Phone', 'Mail', 'MapPin'];
 
@@ -72,7 +72,7 @@ function MenuEditor() {
   const save = useMutation({
     mutationFn: (value: MenuGroup[]) => contentApi.adminUpdateSettings({ menu: value }),
     onSuccess: () => { toast.success('Menú guardado. El sitio lo muestra en unos minutos.'); setError(''); setDraft(null); setCustomOverride(null); qc.invalidateQueries({ queryKey: ['admin-site-settings'] }); qc.invalidateQueries({ queryKey: ['site-settings'] }); },
-    onError: (e) => { const f = apiErrors(e); setError(f.menu || f.detail || 'No se pudo guardar.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setError(f.menu || f.detail || 'No se pudo guardar.'); },
   });
   const setGroup = (gi: number, patch: Partial<MenuGroup>) => setMenu((m) => m.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
   const setItem = (gi: number, ii: number, patch: Partial<MenuGroup['items'][number]>) => setGroup(gi, { items: menu[gi].items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) });
@@ -165,7 +165,7 @@ function RedirectsPanel() {
   const create = useMutation({
     mutationFn: () => contentApi.adminCreateRedirect({ from_path: from, to_path: to, permanent }),
     onSuccess: () => { toast.success('Redirección creada.'); setFrom(''); setTo(''); setErrors({}); invalidate(); },
-    onError: (e) => setErrors(apiErrors(e)),
+    onError: (e) => setErrors(apiFieldErrors(e)),
   });
   const remove = useMutation({
     mutationFn: (id: number) => contentApi.adminDeleteRedirect(id),

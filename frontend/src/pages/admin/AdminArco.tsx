@@ -20,12 +20,11 @@ import { apiErrorMessage, apiFieldErrors } from '@/lib/apiErrors';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { useArcoBulk, useArcoExport, useArcoList, useInvalidateArco, useSetArcoStatus, type ArcoListParams } from '@/hooks/queries/arco';
+import { ARCO_CHANNEL_LABEL, ARCO_STATUS_META, ARCO_TYPE_LABEL } from '@/lib/status/arco';
 
-const TYPE: Record<string, string> = { access: 'Acceso', rectification: 'Rectificación', cancellation: 'Cancelación', opposition: 'Oposición' };
-const STATUS: Record<string, { label: string; tone: 'info' | 'warning' | 'success' | 'error' }> = {
-  received: { label: 'Recibida', tone: 'info' }, in_review: { label: 'En revisión', tone: 'warning' }, resolved: { label: 'Resuelta', tone: 'success' }, rejected: { label: 'Rechazada', tone: 'error' },
-};
-const CHANNEL: Record<string, string> = { portal: 'Portal', email: 'Correo', whatsapp: 'WhatsApp', in_person: 'Presencial' };
+const TYPE = ARCO_TYPE_LABEL;
+const STATUS = ARCO_STATUS_META;
+const CHANNEL = ARCO_CHANNEL_LABEL;
 
 /** `?estado=` tabs; absent = the open queue (received + in review), the page's default. */
 const TABS = [
@@ -70,7 +69,7 @@ const COLUMNS: Column<ArcoRequest>[] = [
     ),
   },
   { id: 'channel', header: 'Canal', minWidth: 100, className: 'text-muted', cell: (r) => CHANNEL[r.channel] ?? r.channel },
-  { id: 'status', header: 'Estado', sortKey: 'status', minWidth: 110, cell: (r) => <Badge variant={STATUS[r.status]?.tone ?? 'neutral'}>{STATUS[r.status]?.label ?? r.status}</Badge> },
+  { id: 'status', header: 'Estado', sortKey: 'status', minWidth: 110, cell: (r) => <Badge variant={STATUS[r.status]?.variant ?? 'neutral'}>{STATUS[r.status]?.label ?? r.status}</Badge> },
   {
     id: 'deadline', header: 'Plazo', sortKey: 'deadline', minWidth: 130,
     cell: (r) => (

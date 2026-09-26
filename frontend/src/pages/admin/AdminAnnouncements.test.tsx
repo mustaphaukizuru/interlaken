@@ -166,7 +166,7 @@ describe('AdminAnnouncements', () => {
   it('surfaces backend error text from emergency broadcast', async () => {
     const user = userEvent.setup();
     broadcast.mockRejectedValueOnce({
-      response: { data: { error: 'WhatsApp no configurado.' } },
+      response: { status: 400, data: { detail: 'WhatsApp no configurado.' } },
     });
     renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
     await screen.findByText('Junta de padres');

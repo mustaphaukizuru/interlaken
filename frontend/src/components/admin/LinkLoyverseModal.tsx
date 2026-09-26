@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { portalApi } from '@/services/api';
+import { apiErrorMessage } from '@/lib/apiErrors';
 
 /** An active student the office may need to withdraw: no Loyverse customer
  *  (a leaver, in practice) or a customer without a grade code (posible baja). */
@@ -62,7 +63,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
         setPhase('preview');
       } catch (e: any) {
         if (cancelled) return;
-        setError(e?.response?.data?.detail || e?.response?.data?.error || 'No se pudo consultar Loyverse. Intente de nuevo.');
+        setError(apiErrorMessage(e, 'No se pudo consultar Loyverse. Intente de nuevo.'));
         setPhase('error');
       }
     })();
@@ -128,7 +129,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
       onLinked?.();
       onClose();
     } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.response?.data?.error || 'No se pudo completar la vinculación.');
+      setError(apiErrorMessage(e, 'No se pudo completar la vinculación.'));
       setPhase('error');
     }
   }

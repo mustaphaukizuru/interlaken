@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { cafeteriaApi, type BulkTopUpPreview } from '@/services/api';
 import { GRADES } from '@/lib/grades';
-import { apiErrors } from '@/cms/editor/helpers';
+import { apiFieldErrors } from '@/lib/apiErrors';
 import { formatMXN } from '@/lib/format';
 
 /** Admin: credit many wallets at once by grado/grupo (BACKLOG P4-3). */
@@ -33,7 +33,7 @@ export function BulkTopUpDialog() {
         qc.invalidateQueries({ queryKey: ['admin', entity] });
       }
     },
-    onError: (e) => { const f = apiErrors(e); setErrors(f); toast.error(f.detail || f.amount || f.reason || 'No se pudo aplicar.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.amount || f.reason || 'No se pudo aplicar.'); },
   });
   return (
     <>

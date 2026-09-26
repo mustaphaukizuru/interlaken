@@ -8,7 +8,7 @@ vi.mock('@/services/api', () => ({
 }));
 
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { StudentFormModal, fieldErrorsFrom } from './StudentFormModal';
+import { StudentFormModal } from './StudentFormModal';
 import { portalApi } from '@/services/api';
 
 const createStudent = vi.mocked(portalApi.createStudent);
@@ -37,9 +37,14 @@ describe('StudentFormModal', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('maps DRF field errors to per-field messages', () => {
-    const err = { response: { data: { student_id: ['Ya existe un alumno con esa matrícula.'], detail: 'x' } } };
-    expect(fieldErrorsFrom(err)).toEqual({ student_id: 'Ya existe un alumno con esa matrícula.', detail: 'x' });
-    expect(fieldErrorsFrom(new Error('network'))).toBeNull();
+  it('shows DRF field errors next to the field', async () => {
+    createStudent.mockRejectedValueOnce({ response: { status: 400, data: { student_id: ['Ya existe un alumno con esa matrícula.'] } } });
+    renderWithProviders(<StudentFormModal open onClose={() => {}} />);
+    await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Ana');
+    await userEvent.type(screen.getByLabelText(/apellidos/i), 'Pérez');
+    await userEvent.type(screen.getByLabelText(/matrícula/i), 'a1');
+    await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');
+    await userEvent.click(screen.getByRole('button', { name: /crear alumno/i }));
+    expect(await screen.findByText('Ya existe un alumno con esa matrícula.')).toBeInTheDocument();
   });
 });

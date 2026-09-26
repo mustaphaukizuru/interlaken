@@ -45,9 +45,6 @@ export function pageStatusLabel(p: Pick<CmsPageAdmin, 'status' | 'has_unpublishe
   return { label: 'Publicada', tone: 'success' };
 }
 
-/** DRF error payload → flat {field: message}. Now the shared mapper (`lib/apiErrors`); kept as an alias until Phase 10 retires it. */
-export { apiErrors } from '@/lib/apiErrors';
-
 /** Block-level diff between two block lists (CMS versions, BACKLOG P3-4 extra). */
 export interface BlockDiffLine { kind: 'added' | 'removed' | 'changed' | 'same' | 'moved'; type: string; id: string; summary: string }
 const summarize = (b: Block): string => {
