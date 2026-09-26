@@ -83,7 +83,7 @@ class PipelineView(APIView):
         if not show_all:
             complete_since = timezone.now() - timedelta(days=COMPLETE_WINDOW_DAYS)
             regs = regs.exclude(status=Registration.Status.COMPLETE, updated_at__lt=complete_since)
-        regs = regs.prefetch_related('documents').order_by('-updated_at')
+        regs = regs.select_related('student_profile').prefetch_related('documents').order_by('-updated_at')
         columns = {s: [] for s in STATUS_ORDER}
         for r in regs:
             columns.setdefault(r.status, []).append(_card(r))
