@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
@@ -15,9 +14,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.core.audit import record
+from apps.core.bulk import AdminBulkView
+from apps.core.exporting import AdminExportMixin
+from apps.core.importing import ImportTemplateView, ImportView
+from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 from apps.core.ratelimit import ratelimit
 
+from . import data_ops
 from .models import AvailabilitySlot, Booking
 from .serializers import (
     AdminSlotSerializer,
@@ -26,7 +31,13 @@ from .serializers import (
     BookingSerializer,
     SlotGeneratorSerializer,
 )
-from .services import SlotUnavailable, calendar, create_booking, send_booking_confirmation
+from .services import (
+    SlotUnavailable,
+    calendar,
+    change_booking_status,
+    create_booking,
+    occupied_seats,
+)
 
 
 def _can_access_booking(user, booking):
@@ -221,56 +232,54 @@ class BookingCancelView(APIView):
         return Response(BookingSerializer(booking).data)
 
 
-def filter_admin_bookings(params):
-    """Admin booking queryset for ``params`` — shared by the list and the CSV
-    export so the download always matches the on-screen filters."""
-    qs = (Booking.objects.select_related('slot')
-          .order_by('-slot__date', '-slot__start_time', '-id'))
-    visit_type = params.get('type')
-    if visit_type:
-        qs = qs.filter(slot__visit_type=visit_type)
-    booking_status = params.get('status')
-    if booking_status:
-        qs = qs.filter(status=booking_status)
-    date = params.get('date')
-    if date:
-        qs = qs.filter(slot__date=date)
-    q = params.get('q')
-    if q:
-        # Powers the admin Ctrl+K palette.
-        qs = qs.filter(
-            Q(parent_name__icontains=q) | Q(parent_email__icontains=q)
-            | Q(child_name__icontains=q))
-    return qs
+class AdminBookingsView(AdminListMixin, generics.ListAPIView):
+    """GET /api/v1/bookings/admin/bookings/ — the Visitas list (Data Ops C1).
 
-
-class AdminBookingsView(generics.ListAPIView):
-    """GET /api/v1/bookings/admin/bookings/?type=&status=&date=&q= — manage
-    bookings. Paginated (DRF PageNumberPagination) so the admin console's pager
-    is real: previously this returned every booking in one list, making the
-    frontend pager inert and the counts wrong."""
+    ``q`` over tutor name / email / phone and child name (powers the Ctrl+K
+    palette too); ``type``, ``status``, ``source``, ``date``, ``from``/``to``
+    (slot date) via ``BookingFilterSet``; whitelisted ``ordering`` keys
+    ``date, status, parent, child, created_at, attendees`` with a ``-pk``
+    tiebreak; ``page`` / ``page_size`` (≤ 100). Two queries whatever the page.
+    """
     serializer_class = BookingSerializer
-    permission_classes = [IsAdmin]
+    search_fields = data_ops.BOOKING_SEARCH_FIELDS
+    ordering = data_ops.BOOKING_ORDERING
+    default_ordering = data_ops.BOOKING_DEFAULT_ORDERING
+    filterset_class = data_ops.BookingFilterSet
 
     def get_queryset(self):
-        return filter_admin_bookings(self.request.query_params)
+        return Booking.objects.select_related('slot')
 
 
-class AdminBookingsExportView(APIView):
-    """GET /api/v1/bookings/admin/bookings/export/ — CSV of the visits list.
+class AdminBookingsExportView(AdminExportMixin, AdminBookingsView):
+    """GET /api/v1/bookings/admin/bookings/export/?fmt=csv|xlsx|pdf&ids=… — the
+    Visitas list as a file: same filters, ``q`` and ``ordering`` as the list
+    (it IS the list view), capped (10,000 / PDF 1,000 → 413) and audited."""
+    export_spec = data_ops.BOOKING_EXPORT
 
-    Accepts the same query params as the list endpoint (type / status / date / q)
-    so the download respects the active filters.
-    """
-    permission_classes = [IsAdmin]
 
-    def get(self, request):
-        from . import exports
-        return exports.bookings_csv(filter_admin_bookings(request.query_params))
+class AdminBookingBulkView(AdminBulkView):
+    """POST /api/v1/bookings/admin/bookings/bulk/ — confirm / cancel / attended /
+    no_show on ≤ 500 bookings (or ``all_matching`` the list filters). Every row
+    goes through ``change_booking_status`` (transition table, capacity by
+    ``num_attendees`` under a slot lock, confirmation email unless
+    ``payload.notify`` is false, calendar sync) and gets its own audit row."""
+    entity = 'bookings.booking'
+    list_view_class = AdminBookingsView
+    actions = data_ops.BOOKING_BULK_ACTIONS
+
+    def get_queryset(self):
+        return Booking.objects.select_related('slot')
 
 
 class AdminBookingActionView(APIView):
-    """POST /api/v1/bookings/admin/bookings/<id>/<action>/ — confirm/cancel/attended/no_show."""
+    """POST /api/v1/bookings/admin/bookings/<id>/<action>/ — confirm / cancel /
+    attended / no_show / reopen. Body (optional): ``{"note": "…", "notify": true}``.
+
+    Same guard as the bulk endpoint: the transition table (a cancelled booking
+    only reopens to pending; attended ↔ no-show needs a note), a capacity
+    check by ``num_attendees`` under a slot lock when the move claims seats,
+    and one audit row per change."""
     permission_classes = [IsAdmin]
 
     ACTIONS = {
@@ -278,6 +287,7 @@ class AdminBookingActionView(APIView):
         'cancel':   Booking.Status.CANCELLED,
         'attended': Booking.Status.ATTENDED,
         'no_show':  Booking.Status.NO_SHOW,
+        'reopen':   Booking.Status.PENDING,
     }
 
     def post(self, request, pk, action):
@@ -289,14 +299,14 @@ class AdminBookingActionView(APIView):
         except Booking.DoesNotExist:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-        booking.status = new_status
-        booking.save(update_fields=['status', 'updated_at'])
-        if action == 'confirm':
-            if not booking.confirmation_sent:
-                send_booking_confirmation(booking)
-            calendar.sync_booking_created(booking)
-        elif action == 'cancel':
-            calendar.sync_booking_cancelled(booking)
+        note = str(request.data.get('note') or '').strip()[:500]
+        notify = request.data.get('notify', True) not in (False, 'false', '0', 0)
+        previous = change_booking_status(booking, new_status, note=note, notify=notify)
+        changes = {'status': [previous, new_status]}
+        if note:
+            changes['note'] = note
+        record('update', booking, changes, actor=request.user,
+               context=f'bookings: {action}')
         return Response(BookingSerializer(booking).data)
 
 
@@ -319,8 +329,9 @@ class AdminBookingRescheduleView(APIView):
         # already does this; this path did not).
         with transaction.atomic():
             slot = AvailabilitySlot.objects.select_for_update().get(pk=slot.pk)
-            booked = (Booking.objects.filter(slot=slot).exclude(status=Booking.Status.CANCELLED)
-                      .exclude(pk=booking.pk).count())
+            # Seats = attendees, not rows, and no-shows free theirs: the same
+            # rule as create_booking and AvailabilitySlot.annotate_booked.
+            booked = occupied_seats(slot, exclude_pk=booking.pk)
             if booked + booking.num_attendees > slot.capacity:
                 return Response({'slot': ['Ese horario ya no tiene cupo suficiente.']}, status=status.HTTP_400_BAD_REQUEST)
             old = booking.slot
@@ -340,7 +351,6 @@ class AdminBookingRescheduleView(APIView):
             f'Hola {booking.parent_name}:\n\nSu visita quedó reprogramada para el {slot.date:%d/%m/%Y} a las {slot.start_time:%H:%M}'
             f' (antes {old.date:%d/%m/%Y} {old.start_time:%H:%M}).\n\nSi no le es posible, responda a este correo o escríbanos por WhatsApp.',
             [booking.parent_email], reply_to=settings.ADMISSIONS_EMAIL)
-        from apps.core.audit import record
         record('update', booking, {'slot': {'from': old.pk, 'to': slot.pk}}, actor=request.user, context='bookings: reprogramación')
         return Response(BookingSerializer(booking).data)
 
@@ -372,7 +382,6 @@ class AdminBookingOutcomeView(APIView):
             prereg.status = target
             prereg.save(update_fields=['status', 'updated_at'])
             linked = {'id': prereg.pk, 'status': prereg.status}
-        from apps.core.audit import record
         record('update', booking, {'outcome': outcome, 'prereg': linked}, actor=request.user, context='bookings: resultado de visita')
         data = BookingSerializer(booking).data
         data['pre_registration'] = linked
@@ -412,26 +421,49 @@ class AdminWeekView(APIView):
         return Response({'start': start.isoformat(), 'end': end.isoformat(), 'days': days})
 
 
-class AdminSlotListView(generics.ListAPIView):
-    """GET /api/v1/bookings/admin/slots/?type=&active=&from=&to= — every
-    published slot (incl. inactive/past), paginated, so the console can view
-    and manage availability (the admin could previously only generate slots)."""
+class AdminSlotListView(AdminListMixin, generics.ListAPIView):
+    """GET /api/v1/bookings/admin/slots/ — every published slot (incl. inactive/past).
+
+    Data Ops C1: ``q`` over title / location; ``type``, ``active=true|false``,
+    ``from``/``to`` via ``SlotFilterSet``; ordering keys ``date, start, type,
+    capacity, booked`` (``booked`` is the annotated attendee total) with a
+    ``-pk`` tiebreak; ``page`` / ``page_size``. One query per page + count."""
     serializer_class = AdminSlotSerializer
-    permission_classes = [IsAdmin]
+    search_fields = data_ops.SLOT_SEARCH_FIELDS
+    ordering = data_ops.SLOT_ORDERING
+    default_ordering = data_ops.SLOT_DEFAULT_ORDERING
+    filterset_class = data_ops.SlotFilterSet
 
     def get_queryset(self):
-        qs = AvailabilitySlot.objects.order_by('-date', '-start_time')
-        p = self.request.query_params
-        if p.get('type'):
-            qs = qs.filter(visit_type=p['type'])
-        active = p.get('active')
-        if active in ('true', 'false'):
-            qs = qs.filter(is_active=(active == 'true'))
-        if p.get('from'):
-            qs = qs.filter(date__gte=p['from'])
-        if p.get('to'):
-            qs = qs.filter(date__lte=p['to'])
-        return AvailabilitySlot.annotate_booked(qs)
+        return AvailabilitySlot.annotate_booked(AvailabilitySlot.objects.all())
+
+
+class AdminSlotExportView(AdminExportMixin, AdminSlotListView):
+    """GET /api/v1/bookings/admin/slots/export/?fmt=csv|xlsx|pdf&ids=…"""
+    export_spec = data_ops.SLOT_EXPORT
+
+
+class AdminSlotBulkView(AdminBulkView):
+    """POST /api/v1/bookings/admin/slots/bulk/ — activate / deactivate / delete.
+    A slot with any booking (even cancelled) is never deleted: it is reported
+    as skipped with the reason (deactivate it instead)."""
+    entity = 'bookings.availabilityslot'
+    list_view_class = AdminSlotListView
+    actions = data_ops.SLOT_BULK_ACTIONS
+
+
+class AdminSlotImportTemplateView(ImportTemplateView):
+    """GET /api/v1/bookings/admin/slots/import/template/?fmt=csv|xlsx"""
+    spec = data_ops.SLOT_IMPORT
+
+
+class AdminSlotImportView(ImportView):
+    """POST /api/v1/bookings/admin/slots/import/ — multipart ``file`` with
+    ``tipo, fecha (DD/MM/AAAA), inicio (HH:MM), fin, cupo, lugar`` (+ ``titulo``);
+    ``dry_run=1`` (default) previews, ``report=csv|xlsx`` returns the annotated
+    file, ``dry_run=0`` commits (``valid_only=1`` to skip error rows)."""
+    spec = data_ops.SLOT_IMPORT
+    template_url = '/api/v1/bookings/admin/slots/import/template/'
 
 
 class AdminSlotDetailView(generics.RetrieveUpdateDestroyAPIView):
