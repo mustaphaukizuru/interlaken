@@ -42,7 +42,7 @@ import {
 } from '@/hooks/queries/cafeteria';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { LIVE } from '@/lib/live';
-import { GRADES } from '@/lib/rosterTable';
+import { GRADES } from '@/lib/grades';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, options } from '@/lib/status/cafeteria';
 import type { CafeteriaBalance, TopUpLogEntry } from '@/types';

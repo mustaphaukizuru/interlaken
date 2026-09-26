@@ -16,6 +16,7 @@ POST /admissions/admin/register/<pk>/convert/    one click: StudentProfile + stu
 from __future__ import annotations
 
 import secrets
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -64,15 +65,32 @@ def _card(reg: Registration) -> dict:
     }
 
 
+# Completed registrations stay on the board this long; older ones live in the
+# Inscripciones list ("Ver todos"). Data Ops Phase 4: the board was unbounded.
+COMPLETE_WINDOW_DAYS = 90
+
+
 class PipelineView(APIView):
+    """GET /admissions/admin/pipeline/ — kanban of the non-terminal statuses plus
+    the last ``COMPLETE_WINDOW_DAYS`` days of *complete*. ``?all=1`` lifts the
+    window (the board then shows every completed registration)."""
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        regs = Registration.objects.exclude(status=Registration.Status.DRAFT).prefetch_related('documents').order_by('-updated_at')
+        show_all = str(request.query_params.get('all') or '').lower() in ('1', 'true', 'si', 'sí')
+        regs = Registration.objects.exclude(status=Registration.Status.DRAFT)
+        complete_since = None
+        if not show_all:
+            complete_since = timezone.now() - timedelta(days=COMPLETE_WINDOW_DAYS)
+            regs = regs.exclude(status=Registration.Status.COMPLETE, updated_at__lt=complete_since)
+        regs = regs.prefetch_related('documents').order_by('-updated_at')
         columns = {s: [] for s in STATUS_ORDER}
         for r in regs:
             columns.setdefault(r.status, []).append(_card(r))
         return Response({'columns': [{'status': s, 'label': Registration.Status(s).label, 'cards': columns[s]} for s in STATUS_ORDER],
+                         'bounded': not show_all,
+                         'complete_window_days': None if show_all else COMPLETE_WINDOW_DAYS,
+                         'complete_since': complete_since.isoformat() if complete_since else None,
                          'templates': {'missing_docs': _template()}})
 
 
@@ -103,15 +121,12 @@ class RequestDocsView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
-        from apps.portal.services import send_email
+        from .services import request_missing_documents
         reg = get_object_or_404(Registration, pk=pk)
-        if not checklist(reg)['missing']:
+        out = request_missing_documents(reg, request.user)
+        if not out['missing']:
             return Response({'detail': 'No falta ningún documento.'}, status=status.HTTP_400_BAD_REQUEST)
-        from .tokens import issue_invite
-        text, missing = render_missing_docs(reg, upload_url=documents_upload_url(reg, issue_invite(reg)))
-        send_email('Documentos pendientes para la inscripción', text, [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL)
-        record('update', reg, {'requested_docs': missing}, actor=request.user, context='admissions: solicitud de documentos')
-        return Response({'sent_to': reg.parent1_email, 'missing': missing, 'text': text})
+        return Response({'sent_to': out['sent_to'], 'missing': out['missing'], 'text': out['text']})
 
 
 def _password() -> str:

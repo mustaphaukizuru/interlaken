@@ -1,16 +1,75 @@
-# API listing contract: endpoints, search, ordering, filters, exports, bulk, import
+# Admin list endpoints: search, ordering, filters, export, bulk, import
 
-The admin lists follow one contract (Data Operations round, `docs/DATA-OPS-PROMPT.md` Part B, C1 to C5):
+One row per admin list on the Data Ops contracts (`docs/DATA-OPS-PROMPT.md`, C1 to C5). Every list accepts `q`, `ordering` (whitelist, `-pk` tiebreak), `page` and `page_size` (up to 100). Each phase appends its section.
 
-- `?q=` searches the fields listed below (every term must match somewhere; accent-insensitive on Postgres).
-- `?ordering=[-]<key>` accepts only the keys listed below; an unknown key falls back to the default. A `-pk` tiebreak is always appended.
-- `?page=` and `?page_size=` (at most 100). Response: `{count, next, previous, results}` unless noted.
-- Date filters `?from=` / `?to=` are inclusive ISO dates, applied as aware America/Mexico_City bounds.
-- Export siblings (`.../export/?fmt=csv|xlsx|pdf&ids=...`) take the same params as the list. Caps: 10,000 rows (CSV/XLSX), 1,000 (PDF), 500 `ids`; over cap answers 413. Every export writes an `export:<entity>` audit row. Throttle `admin-export` 30/min.
-- Bulk (`POST .../bulk/`): `{action, ids (max 500), all_matching, filters, payload, dry_run}` → `{action, requested, ok, failed, skipped, dry_run}`. One audit row per processed row plus one `bulk:<entity>` summary. Throttle `admin-bulk` 30/min.
-- Import (`POST .../import/`, `GET .../import/template/?fmt=csv|xlsx`): multipart `file`, `dry_run=1` (default), `report=csv|xlsx`, `valid_only=1`. Throttle `admin-import` 10/min.
+## Admisiones (Data Ops Phase 4)
 
-The frontend sort keys live next to the hooks (`frontend/src/hooks/queries/<entity>.ts`); a backend test pins each whitelist.
+| Endpoint | `q` searches | `ordering` keys | Filters | Export | Bulk actions | Import |
+|---|---|---|---|---|---|---|
+| `GET /api/v1/admissions/pre-register/` | child first/last name, parent name, email, phone (`search` alias for one release) | `created_at`, `child`, `level`, `grade`, `status`, `parent` (default `-created_at`) | `status`, `level`, `cycle`, `wants_visit`, `from`, `to` (created_at, America/Mexico_City days) | `GET .../pre-register/export/?fmt=csv\|xlsx\|pdf&ids=` | `POST /api/v1/admissions/admin/pre-registrations/bulk/`: `set_status` (`payload.status`, `payload.note` for reverse moves), `invite` | `GET .../admin/pre-registrations/import/template/`, `POST .../admin/pre-registrations/import/` |
+| `GET /api/v1/admissions/register/` | child first/last name, CURP, parent 1 name, parent 1/2 email, parent 1/2 phone | `created_at`, `updated_at`, `submitted_at`, `child`, `level`, `status` (default `-created_at`) | `status`, `level` (case-insensitive), `cycle`, `documents_pending` (true: a required document is missing or not approved), `from`, `to` | `GET .../register/export/?fmt=csv\|xlsx\|pdf&ids=` (no medical fields) | `POST /api/v1/admissions/admin/registrations/bulk/`: `approve`, `reject`, `reviewing` (`payload.note`, `payload.notify`), `request_docs` | none |
+| `POST /api/v1/admissions/admin/documents/bulk/` | n/a | n/a | n/a | n/a | `approve`, `reject` (note required; `payload.notify`, one email per registration) | none |
+| `GET /api/v1/admissions/admin/pipeline/` | n/a | n/a | `all=1` lifts the 90-day window on `complete` | n/a | n/a | n/a |
+
+Single-row endpoints share the transition tables with bulk (`apps/core/transitions.py`): `PATCH /admissions/pre-register/<pk>/` and `PATCH /admissions/register/<pk>/status/` accept `note` (required for reverse moves); the latter also takes `notify` and refuses `complete` (reserved for the convert path). Every change is audited.
+
+Pre-registros import columns: `nombre_alumno`*, `apellidos_alumno`*, `fecha_nacimiento`* (DD/MM/AAAA), `nivel` (derived from `grado` when empty), `grado`*, `nombre_tutor`*, `correo`*, `telefono`, `origen`, `mensaje`. Duplicates (`correo`, names, birth date; case-insensitive; retention placeholders ignored) warn only. Rows are created `pending` in `current_school_cycle()` and no email is sent.
+
+The frontend ordering constants live in `frontend/src/hooks/queries/admissions.ts` (`PREREG_ORDERING_KEYS`, `REG_ORDERING_KEYS`); `apps/admissions/test_data_ops.py` pins them to the backend whitelists.
+
+## Visitas (Data Ops Phase 5)
+
+| Endpoint | `q` searches | `ordering` keys | Filters | Export | Bulk actions | Import |
+|---|---|---|---|---|---|---|
+| `GET /api/v1/bookings/admin/bookings/` | parent name, email, phone, child name | `date` (slot date + start), `status`, `parent`, `child`, `created_at`, `attendees` (default `-date`) | `type` (`individual` \| `open_class`), `status`, `source` (`web` \| `whatsapp` \| `admin`), `date` (exact slot date), `from`, `to` (slot date, inclusive), `slot` | `GET .../admin/bookings/export/?fmt=csv\|xlsx\|pdf&ids=` (audit `export:bookings`) | `POST .../admin/bookings/bulk/`: `confirm`, `cancel`, `attended`, `no_show` (`payload.notify` default true; `payload.note` required for the attended ↔ no-show correction) | none |
+| `GET /api/v1/bookings/admin/slots/` | title, location | `date` (date + start), `start` (start + date), `type`, `capacity`, `booked` (annotated attendee total) (default `-date`) | `type`, `active` (`true` \| `false`), `from`, `to` (slot date, inclusive) | `GET .../admin/slots/export/?fmt=csv\|xlsx\|pdf&ids=` (audit `export:bookings.slots`) | `POST .../admin/slots/bulk/`: `activate`, `deactivate`, `delete` (a slot with any booking, even cancelled, is `skipped` with the reason, never deleted) | `GET .../admin/slots/import/template/`, `POST .../admin/slots/import/` |
+
+Single-row booking moves share the transition table with bulk (`apps/core/transitions.py`, `bookings.booking`): `POST /api/v1/bookings/admin/bookings/<id>/<confirm|cancel|attended|no_show|reopen>/` with body `{note?, notify?}`. pending → confirmed \| cancelled \| no_show \| attended; confirmed → attended \| no_show \| cancelled; cancelled → pending (`reopen`, note required); attended ↔ no_show (note required). A move to pending or confirmed locks the slot (`select_for_update`) and sums `num_attendees` of the other pending/confirmed/attended bookings, the same rule as `create_booking` and `AvailabilitySlot.annotate_booked` (cancelled and no-show free their seats); `.../<id>/reschedule/` uses the same count. Every change is audited (with the note).
+
+Horarios import columns: `tipo`* (individual \| puertas abiertas), `fecha`* (DD/MM/AAAA), `inicio`*, `fin`* (HH:MM), `cupo`* (1 to 1000), `lugar`, `titulo`. Matched on the unique tuple (tipo, fecha, inicio, fin): new → `crear` (`get_or_create`), existing with another cupo/lugar/titulo → `actualizar`, identical → `omitir`. Errors (caught in the dry run): past date, `fin` ≤ `inicio`, cupo below the seats already booked, duplicate tuple inside the file.
+
+Frontend `/admin/visitas`: `?vista=reservas` (default: `q`, `estado`, `tipo`, `origen`, `desde`, `hasta`, `orden`, `page`) and `?vista=horarios` (`q`, `activo`, `tipo`, `desde`, `hasta`, `orden`, `page`). The ordering constants live in `frontend/src/hooks/queries/bookings.ts` (`BOOKINGS_ORDERING_KEYS`, `SLOTS_ORDERING_KEYS`); `apps/bookings/test_data_ops.py` pins the backend whitelists. Both lists are 2 queries (count + page) whatever the page size.
+
+## Phase 3: Alumnos, Usuarios, Contraseñas
+
+### Alumnos: `GET /api/v1/accounts/students/`
+
+| | |
+| --- | --- |
+| Search (`q`, legacy alias `search`) | `user__first_name`, `user__last_name`, `user__email`, `student_id`, `grade`; a Loyverse spelling (`ci09932`) is searched as `09932` |
+| Ordering keys | `name` (last, first), `student_id`, `grade` (grade, group), `group` (group, grade), `status`, `last_login`, `enrollment_date`, `balance`; default `name` ascending |
+| Filters (English = Spanish alias; URL param in brackets) | `status`=`estado` [`estado`] active, on_leave, graduated, withdrawn; `access`=`acceso` [`acceso`] never, nopass, active; `level`=`nivel` [`nivel`] maternal, preescolar, primaria, secundaria; `grade`=`grado` [`grado`] exact text; `group`=`grupo` [`grupo`] case-insensitive; `linked`=`vinculado` [`vinculado`] 1 / 0 (Loyverse); `enrolled_from`, `enrolled_to` (dates). Unknown values are ignored, never 400. Filters apply to admins only; families always see just their own children. |
+| Extra field | `balance` (wallet, `0.00` without a wallet) on admin rows |
+| Query budget | 2 (count + page), any page size, any ordering including `balance` |
+| Export | `GET /api/v1/accounts/admin/students/export/` CSV/XLSX/PDF: Alumno, Matrícula, Código Loyverse, Grado, Grupo, Estado, Correo, Tutores, Saldo cafetería, Vinculado a Loyverse, Fecha de ingreso, Último acceso. No medical fields, CURP or emergency contact. Entity `students`. |
+| Bulk | `POST /api/v1/accounts/admin/students/bulk/`, entity `accounts.studentprofile`: `status` (`payload.value` in the four states, transition table; the dry run of `withdrawn` adds `warnings: [{id, name, student_id, balance, message}]` for students with money in the wallet), `grade` (`value` 1 to 20 chars), `group` (`value` 1 to 5 chars, uppercased), `sync_loyverse` (seed the opening balance of linked, never-seeded students; mocked in tests). No delete: `withdrawn` is the archive. |
+| Import | `POST /api/v1/accounts/admin/students/import/`, template `.../import/template/`. Columns: `matricula`*, `nombre`*, `apellidos`*, `grado`*, `grupo`, `email_alumno`, `loyverse_id`, `nombre_padre`, `email_padre`, `telefono_padre` (* required; accents, case and spaces in headers do not matter). Key: normalised matrícula; in-file duplicates by matrícula and by `email_alumno`; guardians matched with `email__iexact`. Unchanged rows are `omitir: Sin cambios.` Entity `students`. |
+
+Guardians sub-list `GET /api/v1/accounts/admin/students/<pk>/guardians/`: `?q=` over name, email, WhatsApp, phone and relationship; `?ordering=[-]name|email|relationship` (default: family account first, then last name); `count` is the total before `q`.
+
+### Usuarios del personal: `GET /api/v1/accounts/admin/staff/`
+
+| | |
+| --- | --- |
+| Search | `email`, `first_name`, `last_name` |
+| Ordering keys | `name`, `email`, `role`, `is_active`, `last_login`, `date_joined`; default active first, then role, then name |
+| Filters | `role`=`rol` [`rol`] admin, staff; `active`=`activo` [`activo`] 1 / 0 |
+| Query budget | 2 |
+| Export | `GET .../admin/staff/export/` (GET only): Nombre, Correo, Rol, Activo, Superusuario, Contraseña asignada, Último acceso, Alta. Entity `staff`. |
+| Bulk | `POST .../admin/staff/bulk/`, entity `accounts.user`: `deactivate` (revokes refresh tokens), `reactivate`. Per row: superusers and non-staff accounts skipped, own account skipped, the last active admin fails. No delete. |
+| Import (invite) | `POST .../admin/staff/import/`, template `.../import/template/`: `correo`*, `nombre`*, `apellidos`, `rol` (staff / admin, labels accepted). Creates accounts without a usable password; an existing staff account is `omitir`; an address that belongs to a family, student or superuser is an error. Entity `staff`. |
+
+### Solicitudes de contraseña: `GET /api/v1/accounts/admin/password-requests/`
+
+| | |
+| --- | --- |
+| Search | `requested_email`, `requester_name`, `user__email`, `user__first_name`, `user__last_name` |
+| Ordering keys | `created_at` (default, newest first), `status`, `requested_email`, `channel`, `resolved_at` |
+| Filters | `status`=`estado`; `channel`=`canal` [`canal`]; `linked` 1 / 0; `from`, `to` (created_at, aware bounds) [`desde`, `hasta`]. The page opens on `open` when `estado` is absent; `estado=todas` lifts it. |
+| Extra field | `open_count` on the page (the Pendientes badge) |
+| Query budget | 3 (count + page + open_count) |
+| Export | `GET .../admin/password-requests/export/` (GET only). Entity `password_requests`. |
+| Bulk | `POST .../admin/password-requests/bulk/`, entity `accounts.passwordrequest`: `reject` (`payload.note` required, stored in the note and the audit). `resolve` stays single-row (it generates a password shown once). The single-row reject is audited too. |
 
 ## Cafetería (Phase 6, `backend/apps/cafeteria/admin_data.py`)
 

@@ -18,6 +18,8 @@ interface Props {
   /** With `allMatching`, the server resolves the ids from `filters`. */
   allMatching?: boolean;
   filters?: BulkRequest['filters'];
+  /** Extra payload sent with the dry run and the commit (e.g. `{ value: 'withdrawn' }`). */
+  payload?: Record<string, unknown>;
   /** Runs the request; wire it to `useBulk(entity, api).mutateAsync`. */
   execute: (body: BulkRequest) => Promise<BulkResult>;
   /** Called after a committed run (also after a retry), with the last result. */
@@ -42,7 +44,7 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, execute, onDone, renderPlan }: Props) {
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, execute, onDone, renderPlan }: Props) {
   const title = action ? `${action.label}: ${allMatching ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${ids.length} ${entityLabel}`}` : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
@@ -57,6 +59,7 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
           ids={ids}
           allMatching={allMatching}
           filters={filters}
+          payload={payload}
           execute={execute}
           onDone={onDone}
           renderPlan={renderPlan}
@@ -67,7 +70,7 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
   );
 }
 
-function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, execute, onDone, renderPlan, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, payload: extraPayload, execute, onDone, renderPlan, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
   // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
   const p = (stem: string) => `${stem}${gender === 'm' ? 'o' : 'a'}s`;
   const [phase, setPhase] = useState<Phase>('planning');
@@ -82,13 +85,14 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
   // Snapshot the selection at mount: `onDone` typically clears it while the
   // summary is still on screen, and a retry must target the ids that were
   // confirmed, not whatever the table holds now.
-  const [snapshot] = useState(() => ({ ids, allMatching, filters }));
+  const [snapshot] = useState(() => ({ ids, allMatching, filters, extra: extraPayload }));
   const base = useMemo<Omit<BulkRequest, 'dry_run'>>(
     () => ({
       action: action.name,
       ids: snapshot.allMatching ? [] : snapshot.ids,
       all_matching: snapshot.allMatching,
       filters: snapshot.allMatching ? snapshot.filters : undefined,
+      ...(snapshot.extra ? { payload: snapshot.extra } : {}),
     }),
     [action.name, snapshot],
   );
@@ -116,7 +120,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
   }, [phase, action.requiresNote]);
 
   const payload = (): Record<string, unknown> => {
-    const p: Record<string, unknown> = {};
+    const p: Record<string, unknown> = { ...(snapshot.extra ?? {}) };
     if (action.requiresNote) p.note = note.trim();
     if (action.notifyOption) p.notify = notify;
     return p;
@@ -179,6 +183,14 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
                 <p className="text-xs text-coral-700">{plan.failed.length} no se pueden procesar (ver detalle al terminar).</p>
               )}
               {renderPlan?.(plan)}
+              {plan.warnings && plan.warnings.length > 0 && (
+                <div className="rounded-lg border border-amber/40 bg-amber/10 p-2 text-xs text-ink" role="note">
+                  <p className="font-semibold">Atención ({plan.warnings.length}):</p>
+                  <ul className="mt-1 max-h-32 list-disc space-y-0.5 overflow-y-auto pl-5" aria-label="Avisos">
+                    {plan.warnings.map((w) => <li key={String(w.id)}>{w.message}</li>)}
+                  </ul>
+                </div>
+              )}
               {snapshot.allMatching && <p className="text-xs">Se aplicará a tod{gender === 'm' ? 'os los' : 'as las'} {entityLabel} que coinciden con los filtros actuales.</p>}
             </div>
           </div>

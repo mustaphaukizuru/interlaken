@@ -108,8 +108,8 @@ class TestCsvImporter:
                                format='multipart')
 
         body = resp.json()
-        assert body['updated_students'] == 1 and body['created_students'] == 0
-        assert body['rows'][0]['matricula'] == '09932'
+        assert body['counts']['actualizar'] == 1 and body['counts']['crear'] == 0
+        assert body['rows'][0]['key'] == '09932'
         assert StudentProfile.objects.filter(student_id__in=['09932', 'ci09932']).count() == 1
         existing.refresh_from_db()
         assert existing.grade == '4° Primaria'
@@ -120,8 +120,9 @@ class TestCsvImporter:
             'file': _csv('ci09933,Ana,Ruiz,1° Primaria,A', '09933,Ana,Ruiz,1° Primaria,A'),
             'dry_run': '1'}, format='multipart')
         rows = resp.json()['rows']
-        assert rows[0]['action'] == 'creado'
-        assert rows[1]['action'] == 'error' and 'duplicada' in rows[1]['detail']
+        assert rows[0]['action'] == 'crear'
+        assert rows[1]['action'] == 'error'
+        assert rows[1]['errors'] == ['Duplicado de la fila 2.']
 
     def test_a_new_row_is_stored_and_mailed_with_the_digits(self, api_client):
         api_client.force_authenticate(AdminFactory())
