@@ -29,6 +29,7 @@ to AUT so a staging box can never charge a card. With no credentials at all and
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 import string
 from dataclasses import dataclass
@@ -137,6 +138,24 @@ def _parse_certificate(raw: bytes) -> BanorteCertificate:
         return load_certificate(raw)
     except BanorteCryptoError as exc:
         raise LiveCheckoutNotConfigured(str(exc)) from exc
+
+
+def online_payments_status(user) -> dict:
+    """Whether ``user`` may pay online right now, and whether it is a test.
+
+    Live (``PAYMENTS_LIVE=true``): everyone. Local development (``DEBUG`` or
+    ``SQLITE_LOCAL``, the same rule as the sandbox endpoint): everyone, against the mock page or the Payworks simulation. A deployed
+    server that is not live yet runs Banorte's simulation, where every card is
+    approved: opening that to families would hand out free wallet credit, so
+    only the accounts listed in ``PAYMENTS_TEST_EMAILS`` may use it.
+    """
+    if getattr(settings, "PAYMENTS_LIVE", False):
+        return {"online": True, "test_mode": False}
+    if getattr(settings, "DEBUG", False) or os.getenv("SQLITE_LOCAL"):
+        return {"online": True, "test_mode": True}
+    testers = {e.strip().lower() for e in getattr(settings, "PAYMENTS_TEST_EMAILS", []) if e}
+    email = (getattr(user, "email", "") or "").strip().lower()
+    return {"online": bool(email) and email in testers, "test_mode": True}
 
 
 def new_control_number(payment) -> str:

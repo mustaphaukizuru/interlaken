@@ -132,13 +132,33 @@ daily cron.
 ## 4. Testing before certification (no money moves)
 
 1. Set the credentials and the current certificate, keep `PAYMENTS_LIVE=false`,
-   `BANORTE_MODE=AUT`.
-2. As a parent, top up a linked child online. Banorte's window must open.
+   `BANORTE_MODE=AUT`, and list the test accounts in `PAYMENTS_TEST_EMAILS`.
+   In this mode Banorte approves every card, so a deployed server offers card
+   payment ONLY to those accounts; families see "pago en caja" until live.
+2. As a listed tester, top up a linked child online. Banorte's window must open.
    If it closes at once with an authentication error, `BanorteCheckout.last_error`
    says AUT-10: wrong credentials, or wrong or expired certificate.
 3. Pay with any test card. The return page must show "Pago confirmado" and the
    balance must rise. The operation shows as "Modo prueba (AUT)" in the POS queue.
 4. Repeat with `BANORTE_MODE=DEC` (declined) and cancel once inside the window.
+
+### Values that break silently
+
+- **`$` in the password.** Docker Compose expands `$` in `deploy/.env`. Wrap the
+  value in single quotes (`BANORTE_PASSWORD='...'`) or Banorte receives a
+  different password and answers AUT-10.
+- **Merchant name.** Max 25 characters and none of the forbidden characters
+  (no parentheses); longer or invalid text is folded and cut.
+
+### AUT-10 with `numeroControl: null`
+
+Seen on 2026-10-14 with the certificate from `LlaveCifrada2025.zip` (expired
+2026-02-21) and the real credentials, both with and without the whitespace
+padding. Banorte answering without our `numeroControl` suggests it could not
+decrypt the envelope at all, which points at the RSA key (certificate) rather
+than the user or password. Ask Banorte for the certificate valid today and
+confirm the execution user is active. The integration refuses an expired
+certificate on purpose.
 
 ## 5. Certification with Banorte
 

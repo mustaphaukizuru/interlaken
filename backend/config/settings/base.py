@@ -412,6 +412,10 @@ BANORTE_CREDENTIAL_OFFSET = env.int('BANORTE_CREDENTIAL_OFFSET', default=2048)
 BANORTE_SCRIPT_BASE = env('BANORTE_SCRIPT_BASE',
                           default='https://multicobros.banorte.com/orquestador')
 BANORTE_LIGHTBOX_ENV = env('BANORTE_LIGHTBOX_ENV', default='pro')
+# While PAYMENTS_LIVE=false a deployed server runs Banorte's simulation (every
+# card approved), so only these accounts (comma-separated emails) may pay
+# online there; everyone else sees "pago en caja". Ignored once live.
+PAYMENTS_TEST_EMAILS = env.list('PAYMENTS_TEST_EMAILS', default=[])
 
 # ── GOOGLE CALENDAR ───────────────────────────────────────
 # Server-side calendar writes for confirmed bookings use a *service account*

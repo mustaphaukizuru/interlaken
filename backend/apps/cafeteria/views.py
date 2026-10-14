@@ -692,6 +692,15 @@ class TopUpRequestCreateView(generics.CreateAPIView):
 
         method = serializer.validated_data.get('method') or TopUpRequest.Method.OFFICE
         if method == TopUpRequest.Method.ONLINE:
+            from apps.payments.gateways.banorte import online_payments_status
+
+            if not online_payments_status(user)['online']:
+                return Response(
+                    error_body('El pago en línea estará disponible próximamente. '
+                               'Mientras tanto puede pagar en caja escolar.',
+                               code='online_unavailable'),
+                    status=400,
+                )
             gateway_name = (request.data.get('gateway') or '').lower() or None
             if gateway_name and gateway_name not in GATEWAY_CHOICES:
                 return Response(error_body('Pasarela de pago no válida.'), status=400)

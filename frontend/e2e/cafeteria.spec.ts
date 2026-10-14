@@ -37,6 +37,9 @@ async function stubCafeteria(page: Page): Promise<{ readonly topupPayload: unkno
   await page.route('**/api/v1/cafeteria/spending-trend/**', (route) =>
     route.fulfill({ json: { days: 30, total: 0, average: 0, series: [] } }));
 
+  // Card payment open for this family (live, or a listed tester).
+  await page.route('**/api/v1/payments/availability/', (route) =>
+    route.fulfill({ json: { online: true, test_mode: false } }));
   await page.route('**/api/v1/cafeteria/topup/', (route) => {
     captured.payload = route.request().postDataJSON();
     // Dev shape (no Banorte credentials): a redirect to the mock page.

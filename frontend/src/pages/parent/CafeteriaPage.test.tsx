@@ -18,7 +18,10 @@ vi.mock('@/services/api', () => ({
     updateLowBalanceThreshold: vi.fn(),
     updateSpendLimits: vi.fn(),
   },
-  paymentsApi: { reportBanorteResult: vi.fn() },
+  paymentsApi: {
+    reportBanorteResult: vi.fn(),
+    getAvailability: vi.fn().mockResolvedValue({ data: { online: true, test_mode: false } }),
+  },
 }));
 
 vi.mock('@/lib/banorteCheckout', () => ({
@@ -313,5 +316,30 @@ describe('CafeteriaPage online top-up through the Banorte lightbox', () => {
     await waitFor(() => expect(paymentsApi.reportBanorteResult).toHaveBeenCalledWith(55, 'closed', expect.anything()));
     expect(screen.getByTestId('path').textContent).toBe('/portal/cafeteria');
     expect(closeBanorteLightbox).not.toHaveBeenCalled();
+  });
+});
+
+describe('CafeteriaPage when card payment is not open yet', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    vi.mocked(paymentsApi.getAvailability).mockResolvedValueOnce(
+      { data: { online: false, test_mode: true } } as never);
+  });
+
+  it('offers only the school cashier and requests an office top-up', async () => {
+    vi.mocked(cafeteriaApi.requestTopUp).mockResolvedValue({ data: { id: 2 } } as never);
+    const u = userEvent.setup();
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(await screen.findByText('El pago con tarjeta estará disponible próximamente.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Pago en línea con tarjeta')).toBeNull();
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    await u.click(screen.getByRole('button', { name: 'Solicitar recarga' }));
+    await waitFor(() => expect(cafeteriaApi.requestTopUp).toHaveBeenCalledWith(10, 200, 'office'));
+    expect(openBanorteLightbox).not.toHaveBeenCalled();
   });
 });

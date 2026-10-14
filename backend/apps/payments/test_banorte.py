@@ -631,3 +631,57 @@ class TestCheckCommand:
         settings.PAYMENTS_LIVE = True
         with pytest.raises(CommandError, match="incompleta"):
             call_command("check_banorte", stdout=StringIO())
+
+
+# ── who may pay online before going live ─────────────────────
+
+
+@pytest.mark.django_db
+class TestOnlineAvailability:
+    """A deployed server that is not live runs Banorte's simulation (every card
+    approved): families must not reach it, only the listed testers."""
+
+    @pytest.fixture
+    def deployed_not_live(self, banorte, monkeypatch):
+        monkeypatch.delenv("SQLITE_LOCAL", raising=False)
+        banorte.DEBUG = False
+        banorte.PAYMENTS_LIVE = False
+        banorte.PAYMENTS_TEST_EMAILS = ["Probador@Interlaken.test"]
+        return banorte
+
+    def test_families_cannot_pay_online_in_simulation(self, api_client, deployed_not_live):
+        parent, student = _family()
+        resp = _start(api_client, parent, student)
+        assert resp.status_code == 400
+        assert resp.data["code"] == "online_unavailable"
+        assert not Payment.objects.exists()
+        api_client.force_authenticate(user=parent)
+        avail = api_client.get(reverse("payment-availability"))
+        assert avail.data == {"online": False, "test_mode": True}
+
+    def test_listed_tester_can(self, api_client, deployed_not_live):
+        parent, student = _family()
+        parent.email = "probador@interlaken.test"
+        parent.save(update_fields=["email"])
+        resp = _start(api_client, parent, student)
+        assert resp.status_code == 201, resp.data
+        assert resp.data["checkout"]["kind"] == "lightbox"
+        avail = api_client.get(reverse("payment-availability"))
+        assert avail.data == {"online": True, "test_mode": True}
+
+    def test_office_top_up_is_unaffected(self, api_client, deployed_not_live):
+        parent, student = _family()
+        api_client.force_authenticate(user=parent)
+        resp = api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": student.id, "amount": "100.00", "method": "office"},
+            format="json",
+        )
+        assert resp.status_code == 201, resp.data
+
+    def test_everyone_once_live(self, api_client, deployed_not_live):
+        deployed_not_live.PAYMENTS_LIVE = True
+        parent, _ = _family()
+        api_client.force_authenticate(user=parent)
+        avail = api_client.get(reverse("payment-availability"))
+        assert avail.data == {"online": True, "test_mode": False}

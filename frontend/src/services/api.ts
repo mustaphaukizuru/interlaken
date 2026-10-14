@@ -681,6 +681,10 @@ export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
+  /** Whether the caller may pay by card now (and whether Banorte is in test mode). */
+  getAvailability: () =>
+    api.get<{ online: boolean; test_mode: boolean }>('/payments/availability/'),
+
   /** Forward a Banorte lightbox callback; the server decrypts and decides. */
   reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
     api.post<{ payment_id: number; status: string; detail: string }>(

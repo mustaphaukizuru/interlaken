@@ -62,6 +62,20 @@ class PaymentInitiateView(APIView):
                         status=status.HTTP_400_BAD_REQUEST)
 
 
+class PaymentAvailabilityView(APIView):
+    """GET /api/v1/payments/availability/ — ``{online, test_mode}`` for the caller.
+
+    The top-up form reads it to offer (or hide) card payment; the top-up
+    endpoint enforces the same rule.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .gateways.banorte import online_payments_status
+
+        return Response(online_payments_status(request.user))
+
+
 BANORTE_EVENTS = frozenset({'success', 'error', 'cancel', 'closed'})
 
 

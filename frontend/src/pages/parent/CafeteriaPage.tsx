@@ -69,7 +69,16 @@ export default function CafeteriaPage() {
   const childId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
-  const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
+  const [chosenMethod, setTopupMethod] = useState<'online' | 'office'>('online');
+  // Card payment is offered only when the server allows it for this family
+  // (live, or a listed tester while Banorte runs its simulation).
+  const { data: availability } = useQuery({
+    queryKey: ['payments-availability'],
+    queryFn: () => paymentsApi.getAvailability().then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+  const onlineAvailable = availability?.online ?? false;
+  const topupMethod: 'online' | 'office' = onlineAvailable ? chosenMethod : 'office';
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
   const [topupStep, setTopupStep] = useState<1 | 2 | 3>(1);
@@ -678,7 +687,7 @@ export default function CafeteriaPage() {
                 {([
                   ['online', 'Pago en línea con tarjeta', 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
                   ['office', 'Pago en caja escolar', 'Registra la solicitud; paga en efectivo en el colegio.'],
-                ] as const).map(([v, title, desc]) => (
+                ] as const).filter(([v]) => v === 'office' || onlineAvailable).map(([v, title, desc]) => (
                   <label key={v} htmlFor={`topup-method-${v}`} className={`flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border p-3 ${topupMethod === v ? 'border-purple bg-purple/[0.04]' : 'border-line'}`}>
                     <input id={`topup-method-${v}`} type="radio" name="topup-method" className="mt-1" value={v} checked={topupMethod === v} onChange={() => setTopupMethod(v)} aria-label={title} />
                     <span>
@@ -689,6 +698,14 @@ export default function CafeteriaPage() {
                 ))}
               </div>
             </fieldset>
+            {!onlineAvailable && (
+              <p className="text-xs text-muted">El pago con tarjeta estará disponible próximamente.</p>
+            )}
+            {topupMethod === 'online' && availability?.test_mode && (
+              <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
+                <strong>Modo de prueba Banorte:</strong> no se realiza ningún cargo real.
+              </p>
+            )}
             {topupMethod === 'online' && <BanortePaymentNotice />}
           </>
         )}
