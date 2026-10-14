@@ -43,7 +43,7 @@ SLUG_PATHS = {
     'inicio': '/',
     'documentacion': '/admisiones/documentacion',
     'costos': '/admisiones/costos',
-    'plataformas': '/comunidad/plataformas',
+    'plataformas': '/plataformas',
 }
 
 
@@ -57,7 +57,7 @@ STATIC_ROUTES = [
     ('/galeria', 'monthly', '0.5'), ('/niveles/preescolar', 'monthly', '0.8'), ('/niveles/primaria', 'monthly', '0.8'),
     ('/niveles/secundaria', 'monthly', '0.8'), ('/admisiones', 'weekly', '0.9'), ('/admisiones/documentacion', 'monthly', '0.6'),
     ('/admisiones/costos', 'monthly', '0.7'), ('/pre-registro', 'monthly', '0.8'), ('/agendar-visita', 'weekly', '0.7'),
-    ('/contacto', 'monthly', '0.6'), ('/calendario', 'weekly', '0.6'), ('/comunidad/plataformas', 'monthly', '0.4'),
+    ('/contacto', 'monthly', '0.6'), ('/calendario', 'weekly', '0.6'), ('/pagos', 'monthly', '0.5'), ('/plataformas', 'monthly', '0.4'),
     ('/comunidad/facturacion', 'monthly', '0.3'), ('/aviso-de-privacidad', 'yearly', '0.2'),
 ]
 

@@ -174,16 +174,30 @@ export function PricingSections() {
                       </button>
                     ))}
                   </div>
-                  <ul>
-                    {fees.map((f) => (
-                      <Row
-                        key={`${f.section}-${f.modality}`}
-                        left={f.section}
-                        sub={`Gastos administrativos: ${mxn(f.gastos_administrativos)}`}
-                        right={mxn(f.cuota)}
-                      />
-                    ))}
-                  </ul>
+                  {/* Dos columnas con título (bitácora ref. 5): la familia ve qué paga en cada concepto. */}
+                  <table className="w-full text-sm">
+                    <caption className="sr-only">
+                      {modality === 'nuevo_ingreso' ? 'Nuevo ingreso' : 'Alumnos Interlaken'}: gastos administrativos y {modality === 'nuevo_ingreso' ? 'inscripción' : 'reinscripción'} por nivel
+                    </caption>
+                    <thead>
+                      <tr className="border-b border-ink/5 text-xs uppercase tracking-wide text-muted">
+                        <th scope="col" className="px-5 py-2.5 text-left font-semibold">Nivel</th>
+                        <th scope="col" className="px-3 py-2.5 text-right font-semibold">Gastos administrativos</th>
+                        <th scope="col" className="px-5 py-2.5 text-right font-semibold">
+                          {modality === 'nuevo_ingreso' ? 'Inscripción' : 'Reinscripción'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fees.map((f) => (
+                        <tr key={`${f.section}-${f.modality}`} className="border-b border-ink/5 last:border-0">
+                          <th scope="row" className="px-5 py-3.5 text-left font-normal text-ink">{f.section}</th>
+                          <td className="px-3 py-3.5 text-right text-ink">{mxn(f.gastos_administrativos)}</td>
+                          <td className="px-5 py-3.5 text-right font-bold text-ink">{mxn(f.cuota)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </PriceCard>
               )}
 

@@ -130,7 +130,7 @@ export default function HomePage() {
                 to="/login"
                 className="btn-ghost btn-lg justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dark"
               >
-                Portal Familias
+                Cafetería
               </Link>
             </m.div>
           </m.div>

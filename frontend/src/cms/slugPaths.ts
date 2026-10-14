@@ -7,7 +7,7 @@ export const CMS_SLUG_PATHS: Record<string, string> = {
   inicio: '/',
   documentacion: '/admisiones/documentacion',
   costos: '/admisiones/costos',
-  plataformas: '/comunidad/plataformas',
+  plataformas: '/plataformas',
 };
 
 export function cmsPagePath(slug: string): string {

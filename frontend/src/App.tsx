@@ -38,6 +38,7 @@ const NivelPage       = lazy(() => import('./pages/public/NivelPage'));
 const ModeloEducativoPage = lazy(() => import('./pages/public/ModeloEducativoPage'));
 const GaleriaPage     = lazy(() => import('./pages/public/GaleriaPage'));
 const PlataformasPage = lazy(() => import('./pages/public/PlataformasPage'));
+const PagosPage = lazy(() => import('./pages/public/PagosPage'));
 const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
@@ -149,7 +150,10 @@ export default function App() {
               <Route path="/modelo-educativo" element={<CmsOverride slug="modelo-educativo"><ModeloEducativoPage /></CmsOverride>} />
               <Route path="/galeria" element={<CmsOverride slug="galeria"><GaleriaPage /></CmsOverride>} />
               <Route path="/niveles/:nivel"   element={<NivelPage />} />
-              <Route path="/comunidad/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
+              {/* Bitácora 13/10/2026: la antigua Plataformas se divide en Pagos y Plataformas. */}
+              <Route path="/comunidad/plataformas" element={<Navigate to="/pagos" replace />} />
+              <Route path="/pagos" element={<PagosPage />} />
+              <Route path="/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
