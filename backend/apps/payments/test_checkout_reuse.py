@@ -17,26 +17,38 @@ pytestmark = pytest.mark.django_db
 
 
 class TestCafeteriaCheckoutReuse:
-    def test_second_online_topup_reuses_payment(self, api_client):
+    def test_second_online_topup_supersedes_single_use_checkout(self, api_client):
+        """A Banorte controlNumber is single-use: a second "Ir a pagar" opens a new
+        Payment and soft-fails the previous one (a late approval still credits)."""
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         api_client.force_authenticate(user=parent)
         url = reverse("cafeteria-topup")
-        payload = {
-            "student": student.id, "amount": "200.00", "method": "online",
-            "gateway": "global_payments",
-        }
+        payload = {"student": student.id, "amount": "200.00", "method": "online"}
         first = api_client.post(url, payload, format="json")
         assert first.status_code == 201, first.data
         second = api_client.post(url, payload, format="json")
         assert second.status_code == 201, second.data
-        assert first.data["payment_id"] == second.data["payment_id"]
+        assert first.data["payment_id"] != second.data["payment_id"]
+        old = Payment.objects.get(pk=first.data["payment_id"])
+        assert old.status == Payment.Status.FAILED and old.is_soft_failed()
         assert Payment.objects.filter(
             related_topup__student=student, status=Payment.Status.PENDING,
         ).count() == 1
-        assert TopUpRequest.objects.filter(
-            student=student, status=TopUpRequest.Status.PENDING,
-        ).count() == 1
+
+    def test_reusable_gateway_still_reuses_fresh_checkout(self):
+        from apps.payments.services import reuse_or_clear_cafeteria_checkout
+
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        topup = TopUpRequest.objects.create(
+            student=student, amount=Decimal("200.00"), method=TopUpRequest.Method.ONLINE)
+        payment = Payment.objects.create(
+            user=parent, payment_type=Payment.Type.CAFETERIA, amount=Decimal("200.00"),
+            gateway=Payment.Gateway.BANORTE, related_topup=topup, status=Payment.Status.PENDING)
+        assert reuse_or_clear_cafeteria_checkout(
+            student, amount=Decimal("200.00"), gateway_name="banorte",
+            allow_reuse=True) == payment
 
     def test_different_amount_supersedes_prior_checkout(self, api_client):
         parent = ParentFactory()
@@ -45,15 +57,13 @@ class TestCafeteriaCheckoutReuse:
         url = reverse("cafeteria-topup")
         first = api_client.post(
             url,
-            {"student": student.id, "amount": "100.00", "method": "online",
-             "gateway": "global_payments"},
+            {"student": student.id, "amount": "100.00", "method": "online"},
             format="json",
         )
         assert first.status_code == 201, first.data
         second = api_client.post(
             url,
-            {"student": student.id, "amount": "250.00", "method": "online",
-             "gateway": "global_payments"},
+            {"student": student.id, "amount": "250.00", "method": "online"},
             format="json",
         )
         assert second.status_code == 201, second.data
@@ -101,10 +111,10 @@ class TestFinalizedPaymentNeverClobbered:
     """A checkout snapshotted as stale must NOT be failed if it finalized since.
 
     The expire/supersede sweeps take an unlocked snapshot of open PENDING
-    checkouts, then mark them FAILED. A SUCCESS webhook can commit between the
+    checkouts, then mark them FAILED. A SUCCESS result can be settled between the
     snapshot and that write; without a locked re-check the sweep overwrites
     SUCCESS with FAILED while the ledger keeps the credit — the books disagree
-    until the gateway happens to replay the webhook. ``fail_checkout_if_still_open``
+    until someone notices. ``fail_checkout_if_still_open``
     is the per-row locked guard; calling it against an already-finalized payment
     is the deterministic equivalent of that interleaving.
     """
@@ -140,7 +150,7 @@ class TestFinalizedPaymentNeverClobbered:
         from apps.cafeteria.services import complete_online_topup
 
         student, topup, payment = self._staged_topup()
-        payment.mark_success("GP-RACE-1", {"status": "CAPTURED"})
+        payment.mark_success("IK-RACE-1", {"status": "CAPTURED"})
         complete_online_topup(payment)
 
         assert fail_checkout_if_still_open(
@@ -160,7 +170,7 @@ class TestFinalizedPaymentNeverClobbered:
     def test_guard_skips_pending_that_advanced_past_checkout(self):
         """A non-terminal gateway notification stamped a tx id — not ours to expire."""
         _, topup, payment = self._staged_topup()
-        payment.gateway_tx_id = "GP-PROCESSING-1"
+        payment.gateway_tx_id = "IK-PROCESSING-1"
         payment.save(update_fields=["gateway_tx_id"])
 
         assert fail_checkout_if_still_open(
@@ -179,7 +189,7 @@ class TestFinalizedPaymentNeverClobbered:
         from apps.cafeteria.services import complete_online_topup
 
         student, topup, payment = self._staged_topup()
-        payment.mark_success("GP-RACE-2", {"status": "CAPTURED"})
+        payment.mark_success("IK-RACE-2", {"status": "CAPTURED"})
         complete_online_topup(payment)
 
         assert expire_stale_checkouts(older_than_minutes=45) == 0
@@ -191,16 +201,13 @@ class TestFinalizedPaymentNeverClobbered:
 
 
 class TestLateSuccessAfterSoftFail:
-    """Parents who finish an HPP after expire/supersede must still be credited."""
+    """Parents who finish a checkout after expire/supersede must still be credited."""
 
-    def test_expire_cascades_topup_then_late_success_credits(self, api_client, settings):
-        import hashlib
-        import hmac
-        import json
-
+    def test_expire_cascades_topup_then_late_success_credits(self):
         from apps.cafeteria.models import CafeteriaBalance
+        from apps.payments.gateways.base import PaymentEvent
+        from apps.payments.settlement import settle
 
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = "test-webhook-secret"
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         topup = TopUpRequest.objects.create(
@@ -221,32 +228,20 @@ class TestLateSuccessAfterSoftFail:
         assert payment.is_soft_failed()
         assert topup.status == TopUpRequest.Status.FAILED
 
-        body = json.dumps({
-            "order_id": payment.id, "status": "CAPTURED", "id": "late-tx",
-        }).encode()
-        sig = hmac.new(b"test-webhook-secret", body, hashlib.sha256).hexdigest()
-        resp = api_client.post(
-            reverse("payment-webhook"),
-            data=body,
-            content_type="application/json",
-            HTTP_X_WEBHOOK_SIGNATURE=sig,
-        )
-        assert resp.status_code == 200, resp.data
+        status, body = settle(PaymentEvent(payment.id, "success", "late-tx"), actor_label="test")
+        assert status == 200, body
         payment.refresh_from_db()
         topup.refresh_from_db()
         assert payment.status == Payment.Status.SUCCESS
         assert topup.status == TopUpRequest.Status.COMPLETED
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("150.00")
 
-    def test_gateway_declined_failed_rejects_late_success(self, api_client, settings):
-        """A real DECLINED webhook must not be revived by a later CAPTURED."""
-        import hashlib
-        import hmac
-        import json
-
+    def test_gateway_declined_failed_rejects_late_success(self):
+        """A real bank decline must not be revived by a later approval."""
         from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+        from apps.payments.gateways.base import PaymentEvent
+        from apps.payments.settlement import settle
 
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = "test-webhook-secret"
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         topup = TopUpRequest.objects.create(
@@ -258,32 +253,14 @@ class TestLateSuccessAfterSoftFail:
             amount=Decimal("100.00"), related_topup=topup,
             status=Payment.Status.PENDING,
         )
-        body_fail = json.dumps({
-            "order_id": payment.id, "status": "DECLINED", "id": "dec-1",
-        }).encode()
-        sig_fail = hmac.new(
-            b"test-webhook-secret", body_fail, hashlib.sha256).hexdigest()
-        assert api_client.post(
-            reverse("payment-webhook"), data=body_fail,
-            content_type="application/json",
-            HTTP_X_WEBHOOK_SIGNATURE=sig_fail,
-        ).status_code == 200
+        assert settle(PaymentEvent(payment.id, "failed", "dec-1"), actor_label="test")[0] == 200
         payment.refresh_from_db()
         assert payment.status == Payment.Status.FAILED
         assert not payment.is_soft_failed()
 
-        body_ok = json.dumps({
-            "order_id": payment.id, "status": "CAPTURED", "id": "cap-late",
-        }).encode()
-        sig_ok = hmac.new(
-            b"test-webhook-secret", body_ok, hashlib.sha256).hexdigest()
-        resp = api_client.post(
-            reverse("payment-webhook"), data=body_ok,
-            content_type="application/json",
-            HTTP_X_WEBHOOK_SIGNATURE=sig_ok,
-        )
-        assert resp.status_code == 200
-        assert resp.data["detail"] == "already_processed"
+        status, body = settle(PaymentEvent(payment.id, "success", "cap-late"), actor_label="test")
+        assert status == 200
+        assert body["detail"] == "already_processed"
         payment.refresh_from_db()
         assert payment.status == Payment.Status.FAILED
         assert not CafeteriaTransaction.objects.filter(student=student).exists()

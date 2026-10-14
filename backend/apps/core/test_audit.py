@@ -1,15 +1,12 @@
 """
-Append-only audit log (IK-SEC A3): immutability, automated (webhook) money
+Append-only audit log (IK-SEC A3): immutability, automated (gateway) money
 attribution, and minor-data / role-change diffs.
 """
-import hashlib
-import hmac
 import json
 from decimal import Decimal
 
 import pytest
 from django.db import IntegrityError
-from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
 from apps.accounts.models import User
@@ -19,8 +16,6 @@ from apps.core.models import AuditLog
 from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
-
-SECRET = "test-webhook-secret"
 
 
 def _logs_for(instance):
@@ -52,8 +47,10 @@ class TestAppendOnly:
 
 
 class TestAutomatedMoneyAttribution:
-    def test_webhook_payment_logs_as_system_webhook(self, api_client, settings):
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+    def test_gateway_settlement_logs_as_system_actor(self):
+        from apps.payments.gateways.base import PaymentEvent
+        from apps.payments.settlement import settle
+
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         topup = TopUpRequest.objects.create(
@@ -61,20 +58,18 @@ class TestAutomatedMoneyAttribution:
         )
         payment = Payment.objects.create(
             user=parent, payment_type=Payment.Type.CAFETERIA, amount=Decimal("200.00"),
-            gateway=Payment.Gateway.GLOBAL_PAYMENTS, related_topup=topup,
+            gateway=Payment.Gateway.BANORTE, related_topup=topup,
             status=Payment.Status.PENDING,
         )
 
-        body = json.dumps({"order_id": payment.id, "status": "CAPTURED", "id": "gp-1"}).encode()
-        sig = hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
-        resp = api_client.post(reverse("payment-webhook"), data=body,
-                               content_type="application/json", HTTP_X_WEBHOOK_SIGNATURE=sig)
-        assert resp.status_code == 200, resp.data
+        status, body = settle(PaymentEvent(payment.id, "success", "IK-audit-1"),
+                              actor_label="system:banorte")
+        assert status == 200, body
 
         # The pending→success transition is audited as an automated system action.
         entry = _logs_for(payment).filter(action="update").latest("created_at")
         assert entry.actor is None
-        assert entry.actor_label == "system:webhook"
+        assert entry.actor_label == "system:banorte"
         assert "status" in entry.changes
 
 

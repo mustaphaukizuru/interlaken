@@ -29,7 +29,7 @@ CRON_TZ=America/Mexico_City
 # ── Daily tasks, 06:15 local ────────────────────────────────────────────────
 # ';' not '&&' on purpose: these are independent, and one failure must not
 # cancel the reminders that follow it.
-15 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-daily.lock bash -c 'docker compose exec -T app python manage.py expire_stale_payments; docker compose exec -T app python manage.py low_balance_alerts; docker compose exec -T app python manage.py sync_calendar; docker compose exec -T app python manage.py send_booking_reminders; docker compose exec -T app python manage.py dispatch_notifications' >> /var/log/interlaken/daily.log 2>&1
+15 6 * * * cd $COMPOSE && flock -n /tmp/interlaken-daily.lock bash -c 'docker compose exec -T app python manage.py expire_stale_payments; docker compose exec -T app python manage.py low_balance_alerts; docker compose exec -T app python manage.py sync_calendar; docker compose exec -T app python manage.py send_booking_reminders; docker compose exec -T app python manage.py dispatch_notifications; docker compose exec -T app python manage.py check_banorte' >> /var/log/interlaken/daily.log 2>&1
 
 # ── Spending digest, 18:00 local ────────────────────────────────────────────
 # Deliberately separate from the 06:15 block: the digest summarises the day's

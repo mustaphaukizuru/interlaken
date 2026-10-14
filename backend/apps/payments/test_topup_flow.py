@@ -1,15 +1,13 @@
 """
-Online cafeteria top-up flow (Prompt 10 / spec §2.2):
+Online cafeteria top-up flow (spec §2.2):
 
-    initiate → gateway redirect → signed webhook → local-ledger credit + notify.
+    initiate → Banorte checkout → settled result → local-ledger credit + notify.
 
-Per spec R1 the webhook credits the **local** ``CafeteriaBalance`` only (no Loyverse
-write). The flow is idempotent (replayed webhook is a no-op) and a failed payment
-credits nothing.
+Per spec R1 settlement credits the **local** ``CafeteriaBalance`` only (no
+Loyverse write). The flow is idempotent (a replayed result is a no-op) and a
+failed payment credits nothing. Banorte specifics (encryption, lightbox,
+result decryption) live in ``test_banorte.py``.
 """
-import hashlib
-import hmac
-import json
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -18,30 +16,22 @@ from django.urls import reverse
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory
 from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+from apps.payments.gateways.base import PaymentEvent
 from apps.payments.models import Payment
+from apps.payments.settlement import settle
 from apps.portal.models import Notification
 
 pytestmark = pytest.mark.django_db
 
-SECRET = "test-webhook-secret"
 
-
-def _sign(body: bytes) -> str:
-    return hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
-
-
-def _post_webhook(api_client, payload):
-    body = json.dumps(payload).encode()
-    return api_client.post(
-        reverse("payment-webhook"),
-        data=body,
-        content_type="application/json",
-        HTTP_X_WEBHOOK_SIGNATURE=_sign(body),
-    )
+def _settle(payment, status, tx="IK-test-1"):
+    return settle(PaymentEvent(payment_id=payment.id, status=status, transaction_id=tx,
+                               raw={"test": status}), actor_label="test")
 
 
 class TestTopUpInitiation:
-    def test_online_topup_creates_linked_payment_and_returns_redirect(self, api_client):
+    def test_online_topup_creates_linked_payment_and_returns_checkout(self, api_client):
+        """Without Banorte credentials (local dev/tests) the checkout is the mock page."""
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
 
@@ -49,12 +39,14 @@ class TestTopUpInitiation:
         resp = api_client.post(
             reverse("cafeteria-topup"),
             {"student": student.id, "amount": "200.00", "method": "online",
-             "gateway": "global_payments"},
+             "gateway": "banorte"},
             format="json",
         )
         assert resp.status_code == 201, resp.data
-        assert resp.data["redirect_url"]
-        assert resp.data["gateway"] == "global_payments"
+        assert resp.data["checkout"]["kind"] == "redirect"
+        assert resp.data["redirect_url"] == resp.data["checkout"]["url"]
+        assert "/pago/simulado" in resp.data["redirect_url"]
+        assert resp.data["gateway"] == "banorte"
 
         topup = TopUpRequest.objects.get(pk=resp.data["id"])
         assert topup.status == TopUpRequest.Status.PENDING
@@ -62,7 +54,7 @@ class TestTopUpInitiation:
         assert payment.payment_type == Payment.Type.CAFETERIA
         assert payment.status == Payment.Status.PENDING
         assert payment.related_topup_id == topup.id
-        # No credit yet — the webhook does that.
+        # No credit yet — settlement of the bank result does that.
         assert not CafeteriaTransaction.objects.filter(student=student).exists()
 
     def test_parent_cannot_topup_another_students_child(self, api_client):
@@ -83,7 +75,7 @@ class TestTopUpInitiation:
         resp = api_client.post(
             reverse("cafeteria-topup"),
             {"student": student.id, "amount": "100.00", "method": "online",
-             "gateway": "global_payments"},
+             "gateway": "banorte"},
             format="json",
         )
         assert resp.status_code == 400, resp.data
@@ -113,7 +105,7 @@ class TestTopUpInitiation:
         resp = api_client.post(
             reverse("cafeteria-topup"),
             {"student": student.id, "amount": "150.00", "method": "online",
-             "gateway": "global_payments"},
+             "gateway": "banorte"},
             format="json",
         )
         assert resp.status_code == 201, resp.data
@@ -153,13 +145,13 @@ class TestTopUpInitiation:
         student = StudentProfileFactory(parents=[parent])
         api_client.force_authenticate(user=parent)
         with patch(
-            "apps.payments.gateways.global_payments.GlobalPaymentsGateway.create_checkout",
+            "apps.payments.gateways.banorte.BanorteGateway.start_checkout",
             side_effect=RuntimeError("boom"),
         ):
             resp = api_client.post(
                 reverse("cafeteria-topup"),
                 {"student": student.id, "amount": "100.00", "method": "online",
-                 "gateway": "global_payments"},
+                 "gateway": "banorte"},
                 format="json",
             )
         assert resp.status_code == 502, resp.data
@@ -177,24 +169,20 @@ def _make_online_topup(parent, student, amount="200.00"):
     )
     payment = Payment.objects.create(
         user=parent, payment_type=Payment.Type.CAFETERIA, amount=Decimal(amount),
-        gateway=Payment.Gateway.GLOBAL_PAYMENTS, related_topup=topup,
+        gateway=Payment.Gateway.BANORTE, related_topup=topup,
         status=Payment.Status.PENDING,
     )
     return topup, payment
 
 
-class TestTopUpWebhookCredit:
-    def test_success_webhook_credits_local_ledger_and_notifies(self, api_client, settings):
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+class TestTopUpSettlementCredit:
+    def test_success_credits_local_ledger_and_notifies(self):
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         topup, payment = _make_online_topup(parent, student)
 
-        resp = _post_webhook(
-            api_client,
-            {"order_id": payment.id, "status": "CAPTURED", "id": "gp-tx-1"},
-        )
-        assert resp.status_code == 200, resp.data
+        status, body = _settle(payment, "success")
+        assert status == 200, body
 
         payment.refresh_from_db()
         topup.refresh_from_db()
@@ -210,17 +198,15 @@ class TestTopUpWebhookCredit:
             user=parent, notif_type=Notification.NotifType.PAYMENT)
         assert notes.count() == 1
 
-    def test_replayed_success_webhook_is_noop(self, api_client, settings):
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+    def test_replayed_success_is_noop(self):
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         topup, payment = _make_online_topup(parent, student)
 
-        payload = {"order_id": payment.id, "status": "CAPTURED", "id": "gp-tx-1"}
-        assert _post_webhook(api_client, payload).status_code == 200
-        replay = _post_webhook(api_client, payload)
-        assert replay.status_code == 200
-        assert replay.data["detail"] == "already_processed"
+        assert _settle(payment, "success")[0] == 200
+        status, body = _settle(payment, "success")
+        assert status == 200
+        assert body["detail"] == "already_processed"
 
         # Still exactly one credit and one notification.
         assert CafeteriaTransaction.objects.filter(
@@ -229,17 +215,12 @@ class TestTopUpWebhookCredit:
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("200.00")
         assert Notification.objects.filter(user=parent).count() == 1
 
-    def test_failed_webhook_credits_nothing(self, api_client, settings):
-        settings.GLOBAL_PAYMENTS_WEBHOOK_SECRET = SECRET
+    def test_failed_credits_nothing(self):
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         topup, payment = _make_online_topup(parent, student)
 
-        resp = _post_webhook(
-            api_client,
-            {"order_id": payment.id, "status": "DECLINED", "id": "gp-tx-2"},
-        )
-        assert resp.status_code == 200
+        assert _settle(payment, "failed", tx="IK-test-2")[0] == 200
 
         payment.refresh_from_db()
         topup.refresh_from_db()
@@ -249,8 +230,8 @@ class TestTopUpWebhookCredit:
 
     def test_credit_is_skipped_if_topup_already_finalised(self):
         # Defence in depth: if an admin already applied this top-up manually
-        # (status flipped away from PENDING) before the webhook arrives, the
-        # webhook credit must be a no-op — the reference guard alone only catches
+        # (status flipped away from PENDING) before the gateway result arrives, the
+        # settlement credit must be a no-op — the reference guard alone only catches
         # a replay of the same payment, not a separate manual credit.
         from apps.cafeteria.services import complete_online_topup
 
@@ -270,8 +251,8 @@ class TestTopUpWebhookCredit:
 
 
 class TestSandboxComplete:
-    """The DEV-only mock-checkout completion reuses the webhook path (no signature),
-    so a sandbox 'success' credits the ledger exactly like production does."""
+    """The DEV-only mock-checkout completion reuses the settlement path, so a
+    sandbox 'success' credits the ledger exactly like production does."""
 
     def test_sandbox_success_completes_and_credits(self, api_client):
         parent = ParentFactory()

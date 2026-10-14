@@ -59,3 +59,7 @@ backend/static/*
 # Local secrets handoff (VAPID) - paste into deploy/.env, never commit
 *.local.txt
 frontend/.lighthouseci/
+
+# Banorte integration kit (bank manuals, merchant certificate): never commit.
+banorte payment/
+*.cer

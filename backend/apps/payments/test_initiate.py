@@ -21,7 +21,7 @@ def test_initiate_rejects_all_unlinked_types(api_client, payment_type):
     api_client.force_authenticate(user=ParentFactory())
     resp = api_client.post(
         reverse('payment-initiate'),
-        {'amount': '150.00', 'payment_type': payment_type, 'gateway': 'global_payments'},
+        {'amount': '150.00', 'payment_type': payment_type, 'gateway': 'banorte'},
         format='json',
     )
     assert resp.status_code == 400, resp.data

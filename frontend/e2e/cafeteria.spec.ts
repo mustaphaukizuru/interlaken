@@ -3,9 +3,9 @@ import { login, portalNav, DEV_PARENT } from './helpers';
 
 /**
  * Cafeteria online top-up — the money path. Balance/transactions/top-up and the
- * hosted-payment hand-off are stubbed (page.route + a fake gateway page); auth
- * is real. We assert the app POSTs the top-up with the amount, method and the
- * chosen gateway, follows the returned redirect, and that the return page
+ * Banorte checkout hand-off are stubbed (page.route + a fake payment page); auth
+ * is real. We assert the app POSTs the top-up with the amount and method (no
+ * gateway choice: Banorte only), follows the returned redirect, and that the return page
  * (cafeteria/recarga/retorno) renders the success/failed/processing outcomes.
  */
 
@@ -39,7 +39,8 @@ async function stubCafeteria(page: Page): Promise<{ readonly topupPayload: unkno
 
   await page.route('**/api/v1/cafeteria/topup/', (route) => {
     captured.payload = route.request().postDataJSON();
-    route.fulfill({ json: { redirect_url: '/pago-simulado' } });
+    // Dev shape (no Banorte credentials): a redirect to the mock page.
+    route.fulfill({ json: { checkout: { kind: 'redirect', url: '/pago-simulado' }, redirect_url: '/pago-simulado' } });
   });
   await page.route('**/pago-simulado', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<h1>Pasarela simulada</h1>' }));
@@ -47,7 +48,7 @@ async function stubCafeteria(page: Page): Promise<{ readonly topupPayload: unkno
   return { get topupPayload() { return captured.payload; } };
 }
 
-test('an online cafeteria top-up from the Cafetería page initiates the gateway redirect', async ({ page }) => {
+test('an online cafeteria top-up from the Cafetería page opens the Banorte checkout', async ({ page }) => {
   const stub = await stubCafeteria(page);
 
   // Log in as a parent (lands on /portal) and navigate client-side via the
@@ -61,15 +62,16 @@ test('an online cafeteria top-up from the Cafetería page initiates the gateway 
   await expect(page.getByText('Test Alumno')).toBeVisible();
   await page.getByRole('button', { name: /recargar/i }).first().click(); // open top-up modal
   await page.getByPlaceholder('Ej. 200').fill('200');
-  // 3-step wizard (P1-D2): monto → método (default gateway Global Payments) → confirmar.
+  // 3-step wizard (P1-D2): monto → método (tarjeta vía Banorte) → confirmar.
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: /ir a pagar/i }).click();
 
   await page.waitForURL('**/pago-simulado');
   expect(stub.topupPayload).toMatchObject({
-    student: 3, amount: 200, method: 'online', gateway: 'global_payments',
+    student: 3, amount: 200, method: 'online',
   });
+  expect(stub.topupPayload).not.toHaveProperty('gateway');
 });
 
 test('the dashboard quick chip deep-links into the top-up modal with the amount prefilled', async ({ page }) => {
@@ -103,15 +105,15 @@ test('the dashboard quick chip deep-links into the top-up modal with the amount 
   await expect(modal).toBeVisible();
   await expect(modal.getByLabel('Monto (MXN)')).toHaveValue('200');
 
-  // Step 2: choose the OTHER gateway to prove the selection reaches the payload.
+  // Step 2 has a single online option: card through Banorte.
   await modal.getByRole('button', { name: 'Continuar' }).click();
-  await modal.getByRole('button', { name: /Banorte Pago en Línea/ }).click();
+  await expect(modal.getByText(/Pago seguro con Banorte/)).toBeVisible();
   await modal.getByRole('button', { name: 'Continuar' }).click();
   await modal.getByRole('button', { name: /ir a pagar/i }).click();
 
   await page.waitForURL('**/pago-simulado');
   expect(stub.topupPayload).toMatchObject({
-    student: 3, amount: 200, method: 'online', gateway: 'banorte',
+    student: 3, amount: 200, method: 'online',
   });
 });
 

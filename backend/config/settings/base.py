@@ -377,52 +377,41 @@ LOYVERSE_WEBHOOK_SECRET = env('LOYVERSE_WEBHOOK_SECRET', default='')
 CAFETERIA_PURCHASE_DIGEST = env.bool('CAFETERIA_PURCHASE_DIGEST', default=False)
 
 # ── PAYMENTS ──────────────────────────────────────────────
-# Which gateway a top-up defaults to when the client doesn't specify one.
-DEFAULT_PAYMENT_GATEWAY = env('DEFAULT_PAYMENT_GATEWAY', default='global_payments')
+# Banorte "Ventana de Comercio Electrónico Cifrada" is the only gateway
+# (docs/BANORTE-INTEGRATION.md). Card data never reaches this server: the
+# parent pays inside Banorte's lightbox and we decrypt the result.
 
-# Master sandbox/live switch for hosted checkout URLs. When false (default),
-# create_checkout forces sandbox URLs and ignores live merchant HPP/checkout
-# hosts that may be sitting in env — see payments/gateways/*.py.
+# Master live switch. true → every checkout is sent with mode=PRD (real money)
+# and a checkout refuses to open unless the configuration below is complete.
+# false → Payworks simulation (BANORTE_MODE) or, with no credentials at all,
+# the local /pago/simulado mock.
 PAYMENTS_LIVE = env.bool('PAYMENTS_LIVE', default=False)
 
-# Public origin of this Django API (webhook status_url in HPP session payloads).
-# SPA and API share the same origin behind Caddy; compose derives it from PORTAL_DOMAIN.
+# Public origin of this Django API (set by deploy/docker-compose.yml).
 BACKEND_URL = env('BACKEND_URL', default='')
 
-# Global Payments (Hosted Payment Page).
-# Sandbox: leave PAYMENTS_LIVE=false; empty HPP_URL → local /pago/simulado mock.
-# Live: set PAYMENTS_LIVE=true + real GLOBAL_PAYMENTS_HPP_URL + APP_ID/KEY.
-# Optional GLOBAL_PAYMENTS_SESSION_URL: POST GP-API-shaped session; otherwise
-# create_checkout assembles a query-string redirect (mock/sandbox).
-GLOBAL_PAYMENTS_APP_ID = env('GLOBAL_PAYMENTS_APP_ID', default='')
-GLOBAL_PAYMENTS_APP_KEY = env('GLOBAL_PAYMENTS_APP_KEY', default='')
-GLOBAL_PAYMENTS_ENV = env('GLOBAL_PAYMENTS_ENV', default='sandbox')
-GLOBAL_PAYMENTS_HPP_URL = env('GLOBAL_PAYMENTS_HPP_URL', default='')
-GLOBAL_PAYMENTS_SESSION_URL = env('GLOBAL_PAYMENTS_SESSION_URL', default='')
-GLOBAL_PAYMENTS_API_VERSION = env('GLOBAL_PAYMENTS_API_VERSION', default='2021-03-22')
-
-# Banorte "Pago en Línea" hosted checkout.
-# Sandbox: leave PAYMENTS_LIVE=false; empty CHECKOUT_URL → local /pago/simulado.
-# Live: set PAYMENTS_LIVE=true + real BANORTE_CHECKOUT_URL + MERCHANT_ID.
-# Optional BANORTE_SESSION_URL + BANORTE_API_KEY for provider session create.
+# Afiliación (7 digits), the Payworks *execution-only* user and its password
+# (created in MultiCobros → Usuarios), and the terminal id Banorte assigned.
 BANORTE_MERCHANT_ID = env('BANORTE_MERCHANT_ID', default='')
-BANORTE_ENV = env('BANORTE_ENV', default='sandbox')
-BANORTE_CHECKOUT_URL = env('BANORTE_CHECKOUT_URL', default='')
-BANORTE_SESSION_URL = env('BANORTE_SESSION_URL', default='')
-BANORTE_API_KEY = env('BANORTE_API_KEY', default='')
-
-# Where the hosted page returns the parent after payment (the frontend reads the
-# status). Defaults to the parent cafeteria return route on FRONTEND_URL.
-PAYMENT_RETURN_URL = env(
-    'PAYMENT_RETURN_URL',
-    default=f'{FRONTEND_URL}/portal/cafeteria/recarga/retorno',
-)
-
-# Shared secrets for verifying inbound payment webhooks (HMAC-SHA256 of the raw
-# request body, hex digest, in the X-Webhook-Signature header). Empty → the
-# webhook fails closed (rejects everything) until a secret is configured.
-GLOBAL_PAYMENTS_WEBHOOK_SECRET = env('GLOBAL_PAYMENTS_WEBHOOK_SECRET', default='')
-BANORTE_WEBHOOK_SECRET = env('BANORTE_WEBHOOK_SECRET', default='')
+BANORTE_USER = env('BANORTE_USER', default='')
+BANORTE_PASSWORD = env('BANORTE_PASSWORD', default='')
+BANORTE_TERMINAL_ID = env('BANORTE_TERMINAL_ID', default='')
+# Shown on the lightbox and the card statement context (max 25 / 40 chars).
+BANORTE_MERCHANT_NAME = env('BANORTE_MERCHANT_NAME', default='Colegio Interlaken')
+BANORTE_MERCHANT_CITY = env('BANORTE_MERCHANT_CITY', default='')
+# Payworks simulation used while PAYMENTS_LIVE=false: AUT (always approves),
+# DEC (always declines) or RND (random). PRD is ignored unless live.
+BANORTE_MODE = env('BANORTE_MODE', default='AUT')
+# Banorte's yearly merchant certificate (renewed the first week of March):
+# a path to the .cer file, or its Base64 body on one line in BANORTE_CERT.
+BANORTE_CERT_PATH = env('BANORTE_CERT_PATH', default='')
+BANORTE_CERT = env('BANORTE_CERT', default='')
+# Byte offset the Payworks credentials are pushed to inside the encrypted
+# JSON (Banorte reuses the AES keystream for its answer; see banorte_crypto).
+BANORTE_CREDENTIAL_OFFSET = env.int('BANORTE_CREDENTIAL_OFFSET', default=2048)
+BANORTE_SCRIPT_BASE = env('BANORTE_SCRIPT_BASE',
+                          default='https://multicobros.banorte.com/orquestador')
+BANORTE_LIGHTBOX_ENV = env('BANORTE_LIGHTBOX_ENV', default='pro')
 
 # ── GOOGLE CALENDAR ───────────────────────────────────────
 # Server-side calendar writes for confirmed bookings use a *service account*

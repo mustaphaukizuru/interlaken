@@ -13,6 +13,7 @@ vi.mock('@/services/api', () => ({
     getLoyverseCustomerReceipts: vi.fn(),
     bulkTopUp: vi.fn(),
   },
+  paymentsApi: { verifyBanorte: vi.fn() },
   downloadBlob: vi.fn(),
 }));
 
@@ -45,7 +46,7 @@ vi.mock('react-hot-toast', () => {
 
 import toast from 'react-hot-toast';
 import AdminCafeteria from './AdminCafeteria';
-import { cafeteriaApi } from '@/services/api';
+import { cafeteriaApi, paymentsApi } from '@/services/api';
 import { adjustmentImportApi, cafeteriaAdminApi } from '@/services/cafeteriaAdmin';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
@@ -61,13 +62,18 @@ const page = (results: unknown[]) => ok({ count: results.length, next: null, pre
 const loadRow = {
   id: 11, student_id: 3, student_name: 'Luis Pérez', student_code: 'L-003', amount: '200.00',
   method: 'online' as const, method_display: 'Pago en Línea', status: 'completed' as const, status_display: 'Completado',
-  gateway: 'global_payments', payment_status: 'success', gateway_tx_id: 'gp-11',
+  gateway: 'banorte', payment_status: 'success', gateway_tx_id: 'IK11ABCDEFGHIJ', payment_id: 91,
+  banorte: {
+    control_number: 'IK11ABCDEFGHIJ', referencia: '248233587990', codigo_aut: '214414', resultado: 'A' as const,
+    mode: 'PRD', marca_tarjeta: 'VISA', verified_at: '2026-08-08T10:05:00Z', verified_by_name: 'Dirección',
+    needs_verification: false,
+  },
   created_at: '2026-08-08T10:00:00Z', processed_at: '2026-08-08T10:01:00Z',
   pos_loaded_at: null, pos_loaded_by_name: '', needs_pos_load: true,
   pos_unload_needed_at: null, pos_unloaded_at: null, pos_unloaded_by_name: '', needs_pos_unload: false,
 };
 const unloadRow = {
-  ...loadRow, id: 22, student_name: 'Ana López', student_code: 'A-001', amount: '150.00', gateway_tx_id: 'gp-22',
+  ...loadRow, id: 22, student_name: 'Ana López', student_code: 'A-001', amount: '150.00', gateway_tx_id: 'IK22ABCDEFGHIJ',
   pos_loaded_at: '2026-08-08T11:00:00Z', needs_pos_load: false, pos_unload_needed_at: '2026-08-08T12:00:00Z', needs_pos_unload: true,
 };
 const officeRow = {
@@ -226,6 +232,23 @@ describe('AdminCafeteria POS Loyverse queues', () => {
     await openTab(/POS Loyverse/);
     expect(await screen.findByText('Sin pendientes de carga en POS')).toBeInTheDocument();
     expect(screen.getByText('Sin pendientes de quitar del POS')).toBeInTheDocument();
+  });
+
+  it('asks staff to verify an unverified Banorte approval in MultiCobros first', async () => {
+    const unverified = {
+      ...loadRow, banorte: { ...loadRow.banorte, verified_at: null, verified_by_name: '', needs_verification: true },
+    };
+    api.topups.mockImplementation(async (params) => page((params as { needs_pos?: number }).needs_pos ? [unverified] : []));
+    vi.mocked(paymentsApi.verifyBanorte).mockResolvedValue(ok({}));
+    const u = await openTab(/POS Loyverse/);
+    expect(await screen.findByText('Sin verificar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Cargado en Loyverse/i })).not.toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: /Verificar en MultiCobros/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Referencia: 248233587990/)).toBeInTheDocument();
+    await u.click(within(dialog).getByRole('button', { name: 'Sí, aparece aprobada' }));
+    await waitFor(() => expect(paymentsApi.verifyBanorte).toHaveBeenCalledWith(91));
+    expect(toastSuccess).toHaveBeenCalledWith('Operación verificada en MultiCobros.');
   });
 
   it('toasts an error when mark-loaded fails', async () => {

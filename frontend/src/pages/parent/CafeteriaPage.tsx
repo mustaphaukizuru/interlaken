@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
   Search, X, Download, Wallet,
@@ -15,13 +15,14 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Modal } from '@/components/ui/Modal';
-import { PaymentMethodPicker } from '@/components/ui/PaymentMethodPicker';
+import { BanortePaymentNotice } from '@/components/ui/BanortePaymentNotice';
 import { Pagination } from '@/components/ui/Pagination';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
-import { cafeteriaApi, downloadBlob } from '@/services/api';
-import type { CafeteriaBalance, CafeteriaTransaction } from '@/types';
+import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
+import type { CafeteriaBalance, CafeteriaTransaction, CheckoutStart } from '@/types';
+import { closeBanorteLightbox, openBanorteLightbox, type BanorteEvent } from '@/lib/banorteCheckout';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
 import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 import { SortChips, type SortOption } from '@/components/portal/SortChips';
@@ -69,7 +70,6 @@ export default function CafeteriaPage() {
   const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupMethod, setTopupMethod] = useState<'online' | 'office'>('online');
-  const [topupGateway, setTopupGateway] = useState<'global_payments' | 'banorte'>('global_payments');
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
   const [topupStep, setTopupStep] = useState<1 | 2 | 3>(1);
@@ -204,20 +204,70 @@ export default function CafeteriaPage() {
     && topupAmountNum >= TOPUP_MIN
     && topupAmountNum <= TOPUP_MAX;
 
+  const navigate = useNavigate();
+  const [paying, setPaying] = useState(false);
+
+  // Banorte lightbox: every callback goes to the backend (which decrypts the
+  // result with a key this page never sees); the return page then shows the
+  // settled outcome.
+  const payWithBanorte = async (
+    paymentId: number,
+    checkout: Extract<CheckoutStart, { kind: 'lightbox' }>,
+  ) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setPaying(false);
+      closeBanorteLightbox();
+      navigate(`/portal/cafeteria/recarga/retorno?payment_id=${paymentId}`);
+    };
+    const onEvent = async (event: BanorteEvent, response: unknown) => {
+      let status = '';
+      try {
+        ({ data: { status } } = await paymentsApi.reportBanorteResult(paymentId, event, response));
+      } catch {
+        /* the return page polls the payment either way */
+      }
+      if (done) return;
+      if (event === 'success' || event === 'cancel') return finish();
+      if (event === 'error') {
+        if (status === 'failed') {
+          done = true;
+          setPaying(false);
+          toast.error('El pago en línea no está disponible en este momento. Intente más tarde o pague en caja escolar.');
+        }
+        return; // Banorte keeps its window open on other errors
+      }
+      // Window closed without a result.
+      done = true;
+      setPaying(false);
+      void queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
+      toast('Cerraste la ventana de pago. Si completaste el pago, lo verás reflejado en unos minutos.');
+    };
+    setPaying(true);
+    try {
+      await openBanorteLightbox(checkout, (event, response) => { void onEvent(event, response); });
+    } catch (err) {
+      setPaying(false);
+      toast.error(err instanceof Error ? err.message : 'No se pudo abrir la ventana de pago de Banorte.');
+    }
+  };
+
   const topupMutation = useMutation({
-    mutationFn: () =>
-      cafeteriaApi.requestTopUp(
-        selectedStudent!,
-        topupAmountNum,
-        topupMethod,
-        topupMethod === 'online' ? topupGateway : undefined,
-      ),
+    mutationFn: () => cafeteriaApi.requestTopUp(selectedStudent!, topupAmountNum, topupMethod),
     onSuccess: ({ data }) => {
-      // Online payments hand off to the gateway's hosted page; the balance is
-      // credited later by the confirmed webhook (see the return page).
-      if (topupMethod === 'online' && data?.redirect_url) {
-        toast.success('Listo. Te redirigimos a Global Payments / Banorte para completar el pago…');
-        window.location.href = data.redirect_url;
+      if (topupMethod === 'online' && data?.checkout) {
+        const checkout = data.checkout;
+        setShowTopup(false);
+        setTopupAmount('');
+        setTopupStep(1);
+        if (checkout.kind === 'lightbox' && data.payment_id) {
+          void payWithBanorte(data.payment_id, checkout);
+        } else if (checkout.kind === 'redirect') {
+          // Local development without Banorte credentials: the mock page.
+          window.location.href = checkout.url;
+        }
         return;
       }
       toast.success(
@@ -436,9 +486,11 @@ export default function CafeteriaPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => { setSelectedStudent(b.student.id); setShowTopup(true); }}
+                  loading={paying}
+                  disabled={paying}
                   className="mt-4 min-h-[44px] w-full focus-visible:ring-2 focus-visible:ring-purple/40"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Recargar
+                  <Plus className="w-3.5 h-3.5" /> {paying ? 'Abriendo pago seguro…' : 'Recargar'}
                 </Button>
               )}
 
@@ -624,7 +676,7 @@ export default function CafeteriaPage() {
               <legend className="label">Método de pago</legend>
               <div className="grid gap-2">
                 {([
-                  ['online', 'Pago en línea con tarjeta', 'Global Payments o Banorte. El saldo se aplica en minutos.'],
+                  ['online', 'Pago en línea con tarjeta', 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
                   ['office', 'Pago en caja escolar', 'Registra la solicitud; paga en efectivo en el colegio.'],
                 ] as const).map(([v, title, desc]) => (
                   <label key={v} htmlFor={`topup-method-${v}`} className={`flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border p-3 ${topupMethod === v ? 'border-purple bg-purple/[0.04]' : 'border-line'}`}>
@@ -637,13 +689,7 @@ export default function CafeteriaPage() {
                 ))}
               </div>
             </fieldset>
-            {topupMethod === 'online' && (
-              <PaymentMethodPicker
-                value={topupGateway}
-                onChange={(v) => setTopupGateway(v as 'global_payments' | 'banorte')}
-                disabled={topupMutation.isPending}
-              />
-            )}
+            {topupMethod === 'online' && <BanortePaymentNotice />}
           </>
         )}
 
@@ -651,10 +697,10 @@ export default function CafeteriaPage() {
           <dl className="divide-y divide-line rounded-xl border border-line text-sm">
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
-            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">{topupMethod === 'online' ? `Tarjeta · ${topupGateway === 'banorte' ? 'Banorte' : 'Global Payments'}` : 'Caja escolar'}</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">{topupMethod === 'online' ? 'Tarjeta · Banorte' : 'Caja escolar'}</dd></div>
             <div className="px-4 py-3 text-xs text-muted">
               {topupMethod === 'online'
-                ? 'Al continuar se abrirá la página segura de pago. Cuando el banco confirme, verá el saldo en el portal.'
+                ? 'Al continuar se abrirá la ventana segura de Banorte. Cuando el banco confirme, verá el saldo en el portal.'
                 : 'Se registrará la solicitud. El saldo se aplica cuando el colegio reciba el pago en caja.'}
             </div>
           </dl>

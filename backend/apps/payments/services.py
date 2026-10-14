@@ -1,9 +1,12 @@
 """
 payments/services.py — checkout reuse + stale PENDING expiry.
 
-Concurrent initiate calls (double-tab, retry) must not open a second HPP
-session that can double-charge. Fresh open checkouts are reused; stale ones
-are failed before a replacement is created.
+Concurrent initiate calls (double-tab, retry) must not leave two open
+checkouts that can both be charged. A gateway whose checkout can be reopened
+reuses a fresh one; a single-use checkout (Banorte: one controlNumber per
+attempt) supersedes every open one. Stale ones are always failed before a
+replacement is created. Superseded/expired payments are *soft* failures: a late
+approval for them is still credited.
 """
 from __future__ import annotations
 
@@ -20,7 +23,7 @@ from .models import Payment
 
 logger = logging.getLogger(__name__)
 
-# Default window for considering an open HPP session still usable.
+# Default window for considering an open checkout still usable.
 DEFAULT_OPEN_CHECKOUT_MINUTES = 45
 
 
@@ -67,12 +70,13 @@ def fail_checkout_if_still_open(pk, *, reason: str, stage: str) -> bool:
 
 
 def reuse_or_clear_cafeteria_checkout(
-    student, *, amount: Decimal, gateway_name: str,
+    student, *, amount: Decimal, gateway_name: str, allow_reuse: bool = True,
 ) -> Payment | None:
     """Return a matching fresh cafeteria checkout, or clear incompatible/stale ones.
 
-    Match requires same student, amount, and gateway. A mismatched or stale
-    open checkout is failed so a new TopUpRequest + Payment can be created.
+    Match requires same student, amount, and gateway (and ``allow_reuse``). A
+    mismatched, stale or non-reusable open checkout is failed so a new
+    TopUpRequest + Payment can be created.
     """
     open_payments = list(
         _open_pending_qs()
@@ -92,18 +96,21 @@ def reuse_or_clear_cafeteria_checkout(
     reusable = None
     for payment in open_payments:
         same = (
-            payment.amount == amount
+            allow_reuse
+            and payment.amount == amount
             and payment.gateway == gateway_name
             and payment.created_at >= cutoff
         )
         if same and reusable is None:
             reusable = payment
         else:
-            reason = (
-                'checkout superseded — amount/gateway change'
-                if payment.amount != amount or payment.gateway != gateway_name
-                else 'checkout superseded — stale open session'
-            )
+            if payment.amount != amount or payment.gateway != gateway_name:
+                reason = 'checkout superseded — amount/gateway change'
+            elif not allow_reuse:
+                reason = 'checkout superseded — new single-use attempt'
+            else:
+                reason = 'checkout superseded — stale open session'
+
             if fail_checkout_if_still_open(payment.pk, reason=reason, stage='supersede'):
                 logger.info(
                     'Superseded cafeteria checkout payment=%s student=%s (%s)',

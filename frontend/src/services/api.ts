@@ -9,6 +9,7 @@
  */
 import axios from 'axios';
 import type { BulkRequest, BulkResult, ExportParams, ImportFormat, ListParams } from './dataOps';
+import type { CheckoutStart } from '@/types';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -563,13 +564,10 @@ export const cafeteriaApi = {
   ) =>
     api.patch(`/cafeteria/balance/${studentId}/budget/`, limits),
 
-  requestTopUp: (
-    studentId: number,
-    amount: number,
-    method: string,
-    gateway?: string,
-  ) =>
-    api.post('/cafeteria/topup/', { student: studentId, amount, method, gateway }),
+  /** Online answers carry `checkout` (Banorte lightbox, or the dev mock redirect). */
+  requestTopUp: (studentId: number, amount: number, method: string) =>
+    api.post<{ id: number; payment_id?: number; checkout?: CheckoutStart; redirect_url?: string }>(
+      '/cafeteria/topup/', { student: studentId, amount, method }),
 
   /** On-demand Loyverse purchase poll (parents/staff). Rate-limited server-side. */
   refreshFromLoyverse: () =>
@@ -682,6 +680,15 @@ export function downloadBlob(data: Blob, filename: string) {
 export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
+
+  /** Forward a Banorte lightbox callback; the server decrypts and decides. */
+  reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
+    api.post<{ payment_id: number; status: string; detail: string }>(
+      '/payments/banorte/result/', { payment_id: paymentId, event, response }),
+
+  /** Staff confirm the approved operation appears in MultiCobros (before the POS load). */
+  verifyBanorte: (paymentId: number) =>
+    api.post(`/payments/admin/${paymentId}/banorte-verify/`),
 
   getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/history/', { params }),

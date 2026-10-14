@@ -1,5 +1,7 @@
 # Colegio Interlaken — Cafeteria Wallet & Notifications Spec
 
+> **Update 2026-10-13: Banorte only.** Global Payments was removed and the Banorte integration was rebuilt on the real protocol (Ventana de Comercio Electrónico *Cifrada*, encrypted lightbox, no webhooks). Where this spec mentions Global Payments, HPP redirects or signed payment webhooks, `docs/BANORTE-INTEGRATION.md` is authoritative.
+
 **Generated:** 2026-07-07 · Companion to [STATUS_REPORT.md](STATUS_REPORT.md) & [DESIGN.md](DESIGN.md)
 
 **Goal:** A prepaid cafeteria "wallet" for each student, powered by **Loyverse**, where:
@@ -90,7 +92,7 @@ Parent pays on gateway ──────────────► gateway ser
 - Parent picks a child, amount, and gateway; completes payment on the hosted page; balance reflects the top-up after webhook confirmation.
 - **Failure handling:** declined/failed → `Payment=failed`, `TopUpRequest=failed`, parent notified, **no** Loyverse credit.
 - **Security:** webhook must verify the gateway signature before trusting status (see R3).
-- **Payment methods are fixed by contract: Global Payments and Banorte only.** Whatever each gateway's hosted page natively offers is fine, but the platform integrates no third method (no OXXO, SPEI-standalone, Stripe, PayPal, etc.).
+- **Payment methods are fixed by contract: Banorte only (since 2026-10-13; originally Global Payments and Banorte).** Whatever each gateway's hosted page natively offers is fine, but the platform integrates no third method (no OXXO, SPEI-standalone, Stripe, PayPal, etc.).
 
 ### F5 — Admin cafeteria console ("…and many more")
 - Roster with every student's **balance**, low-balance flag, last-synced, and Loyverse-linked state.

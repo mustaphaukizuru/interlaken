@@ -29,6 +29,16 @@ class TestSecurityHeaders:
         assert 'https://player.vimeo.com' in frame_src
         assert 'https://img.youtube.com' in img_src
 
+    def test_public_csp_allows_the_banorte_lightbox(self, api_client):
+        """checkoutV2.js loads scripts/CSS from Banorte, calls it by XHR, opens its
+        iframe and POSTs a hidden form into it: each directive must name the
+        origin or the parent's payment window silently never opens."""
+        csp = api_client.get(reverse('health')).headers.get('Content-Security-Policy', '')
+        directives = dict(d.split(' ', 1) for d in csp.split('; '))
+        for name in ('script-src', 'style-src', 'connect-src', 'frame-src', 'form-action'):
+            assert 'https://multicobros.banorte.com' in directives[name], name
+        assert "'unsafe-inline'" not in directives['script-src']
+
     def test_admin_csp_allows_alpine_but_stays_scoped(self, client):
         resp = client.get('/django-admin/login/')
         csp = resp.headers.get('Content-Security-Policy', '')

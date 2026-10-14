@@ -18,10 +18,17 @@ vi.mock('@/services/api', () => ({
     updateLowBalanceThreshold: vi.fn(),
     updateSpendLimits: vi.fn(),
   },
+  paymentsApi: { reportBanorteResult: vi.fn() },
+}));
+
+vi.mock('@/lib/banorteCheckout', () => ({
+  openBanorteLightbox: vi.fn(),
+  closeBanorteLightbox: vi.fn(),
 }));
 
 import CafeteriaPage from './CafeteriaPage';
-import { cafeteriaApi, downloadBlob } from '@/services/api';
+import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
+import { closeBanorteLightbox, openBanorteLightbox, type BanorteEvent } from '@/lib/banorteCheckout';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 
@@ -34,6 +41,11 @@ function LocationProbe() {
   return <output data-testid="location">{search}</output>;
 }
 const urlParams = () => new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+
+function PathProbe() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="path">{pathname + search}</output>;
+}
 
 // History card renders when the family has any cafeteria balance row.
 const account = {
@@ -249,5 +261,57 @@ describe('CafeteriaPage history: URL filters, sort and export (Data Ops Phase 9)
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(
       blob, expect.stringMatching(/^movimientos_cafeteria_\d{4}-\d{2}-\d{2}\.xlsx$/),
     ));
+  });
+});
+
+describe('CafeteriaPage online top-up through the Banorte lightbox', () => {
+  const lightbox = {
+    kind: 'lightbox' as const, params: 'RSA:::AES', env: 'pro', control_number: 'IK55ABCDEFGHIJ',
+    script_url: 'https://multicobros.banorte.com/orquestador/lightbox/checkoutV2.js',
+    jquery_url: 'https://multicobros.banorte.com/orquestador/resources/js/jquery-3.3.1.js',
+  };
+  let emit: (event: BanorteEvent, response: unknown) => void = () => {};
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    vi.mocked(cafeteriaApi.requestTopUp).mockResolvedValue(
+      { data: { id: 1, payment_id: 55, checkout: lightbox } } as never);
+    vi.mocked(openBanorteLightbox).mockImplementation(async (_start, onEvent) => { emit = onEvent; });
+  });
+
+  async function payOnline() {
+    const u = userEvent.setup();
+    renderWithProviders(<><CafeteriaPage /><PathProbe /></>, { route: '/portal/cafeteria?recarga=200' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText(/Pago seguro con Banorte/)).toBeInTheDocument();
+    expect(screen.queryByText(/Global Payments/)).toBeNull();
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    await u.click(screen.getByRole('button', { name: 'Ir a pagar' }));
+    await waitFor(() => expect(openBanorteLightbox).toHaveBeenCalledWith(lightbox, expect.any(Function)));
+    expect(cafeteriaApi.requestTopUp).toHaveBeenCalledWith(10, 200, 'online');
+  }
+
+  it('forwards an approval to the backend, then shows the return page', async () => {
+    vi.mocked(paymentsApi.reportBanorteResult).mockResolvedValue({ data: { status: 'success' } } as never);
+    await payOnline();
+    emit('success', { data: 'cipher', status3D: '200' });
+    await waitFor(() => expect(paymentsApi.reportBanorteResult)
+      .toHaveBeenCalledWith(55, 'success', { data: 'cipher', status3D: '200' }));
+    await waitFor(() => expect(screen.getByTestId('path'))
+      .toHaveTextContent('/portal/cafeteria/recarga/retorno?payment_id=55'));
+    expect(closeBanorteLightbox).toHaveBeenCalled();
+  });
+
+  it('stays on the page when the window is closed without a result', async () => {
+    vi.mocked(paymentsApi.reportBanorteResult).mockResolvedValue({ data: { status: 'pending' } } as never);
+    await payOnline();
+    emit('closed', { id: 0, message: 'frameClosedbyUser' });
+    await waitFor(() => expect(paymentsApi.reportBanorteResult).toHaveBeenCalledWith(55, 'closed', expect.anything()));
+    expect(screen.getByTestId('path').textContent).toBe('/portal/cafeteria');
+    expect(closeBanorteLightbox).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,10 @@ Origins map to real integrations only:
   maps      — embedded Google Maps iframe on /contacto
   video     — click-to-load institutional video (SiteSettings.video_url):
               youtube-nocookie/Vimeo player frames + the YouTube poster image
+  banorte   — the card-payment lightbox (Ventana de Comercio Electrónico):
+              checkoutV2.js + the helper scripts/CSS it loads, its XHRs, the
+              iframe it opens and the hidden form it POSTs into that iframe.
+              No unsafe-* is needed: its scripts load by src, none evals.
 
 Toggles (env): CSP_ENABLED (default on), CSP_REPORT_ONLY (default off —
 flip on for a shakedown period in production if desired).
@@ -30,6 +34,7 @@ _MAPS_EMBED = 'https://www.google.com https://maps.google.com'
 # so the feature could not work in production no matter what URL was pasted in.
 _VIDEO_FRAMES = 'https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com'
 _VIDEO_POSTERS = 'https://img.youtube.com https://i.ytimg.com'
+_BANORTE = 'https://multicobros.banorte.com'
 
 # Public SPA + API. NOTE: style-src keeps 'unsafe-inline' because React
 # components set style attributes (token-driven inline styles); script-src
@@ -37,16 +42,16 @@ _VIDEO_POSTERS = 'https://img.youtube.com https://i.ytimg.com'
 # consent-gated analytics origins.
 PUBLIC_CSP = '; '.join([
     "default-src 'self'",
-    f"script-src 'self' {_ANALYTICS}",
-    f"style-src 'self' 'unsafe-inline' {_FONT_STYLES}",
+    f"script-src 'self' {_ANALYTICS} {_BANORTE}",
+    f"style-src 'self' 'unsafe-inline' {_FONT_STYLES} {_BANORTE}",
     f"font-src 'self' {_FONT_FILES}",
     f"img-src 'self' data: blob: {_AVATARS} {_VIDEO_POSTERS}",
-    f"connect-src 'self' {_ANALYTICS} {_SENTRY}",
-    f"frame-src {_MAPS_EMBED} {_VIDEO_FRAMES}",
+    f"connect-src 'self' {_ANALYTICS} {_SENTRY} {_BANORTE}",
+    f"frame-src {_MAPS_EMBED} {_VIDEO_FRAMES} {_BANORTE}",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    f"form-action 'self' {_BANORTE}",
     "worker-src 'self'",
 ])
 
