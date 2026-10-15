@@ -57,34 +57,19 @@ test('publishing a comunicado posts it and lists it in the admin console', async
   });
 });
 
-test('a published comunicado is listed in the parent portal', async ({ page }) => {
-  // Parent side of the same story: the announcements feed is stubbed with the
-  // comunicado the admin just published (UI flow, not data plumbing).
-  await page.route('**/api/v1/portal/announcements/**', (route) => {
-    if (route.request().url().includes('mark-read')) {
-      return route.fulfill({ json: { updated: 0 } });
-    }
-    return route.fulfill({
-      json: {
-        count: 1,
-        results: [{
-          id: 101,
-          title: 'Suspensión de clases',
-          body: 'Mañana no habrá clases por mantenimiento del plantel.',
-          audience: 'all',
-          created_at: '2026-08-10T12:00:00Z',
-          comment_count: 0,
-        }],
-      },
-    });
-  });
-
+test('the parent portal no longer shows comunicados (bitácora punto 10)', async ({ page }) => {
+  // Families stopped seeing Comunicados in the portal on 2026-10-13: the menu
+  // has no entry and the old address lands on Notificaciones (the page and the
+  // admin side are kept so the school can bring it back).
   await login(page, DEV_PARENT);
-  await portalNav(page).getByRole('link', { name: 'Comunicados', exact: true }).click();
-  await expect(page).toHaveURL(/\/portal\/comunicados/);
+  await expect(portalNav(page).getByRole('link', { name: 'Comunicados', exact: true })).toHaveCount(0);
 
-  await expect(page.getByText('Suspensión de clases')).toBeVisible();
-  await expect(page.getByText('Mañana no habrá clases por mantenimiento del plantel.')).toBeVisible();
+  // Client-side navigation (a full reload would drop the in-memory session).
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/portal/comunicados');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page).toHaveURL(/\/portal\/notificaciones/);
 });
 
 test('Alumnos data ops: import with errors, valid-only commit, bulk group change, XLSX export', async ({ page }) => {
