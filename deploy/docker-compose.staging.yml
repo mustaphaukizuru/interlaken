@@ -15,11 +15,12 @@ services:
       # Every email subject is prefixed so a UAT run is never mistaken for a
       # real notice (Django EMAIL_SUBJECT_PREFIX, read in settings).
       EMAIL_SUBJECT_PREFIX: "[STAGING] "
-      # No outbound WhatsApp and sandbox payment gateways, whatever .env says.
+      # No outbound WhatsApp and only Banorte's Payworks simulation (no real
+      # charge can be sent from staging), whatever .env says.
       WHATSAPP_TOKEN: ""
       WHATSAPP_PHONE_ID: ""
-      GLOBAL_PAYMENTS_ENV: sandbox
-      BANORTE_ENV: sandbox
+      PAYMENTS_LIVE: "false"
+      BANORTE_MODE: AUT
     container_name: interlaken-staging-app
   caddy:
     container_name: interlaken-staging-caddy

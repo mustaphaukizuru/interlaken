@@ -1,182 +1,402 @@
 """
-payments/gateways/banorte.py — Banorte "Pago en Línea" hosted checkout.
+payments/gateways/banorte.py — Banorte "Ventana de Comercio Electrónico Cifrada"
+(VCE, integration manual v1.8; encryption unchanged since v1.7).
 
-Same contract as Global Payments: the parent is redirected to Banorte's hosted
-page (no card data on our servers), and Banorte notifies us server-to-server.
+Flow
+----
+1. ``start_checkout`` builds the Payworks parameters, encrypts them
+   (``banorte_crypto``), stores the AES key material on a ``BanorteCheckout`` and
+   returns a ``lightbox`` start: the browser loads Banorte's ``checkoutV2.js``
+   from multicobros.banorte.com and calls ``Payment.startPayment({Params})``.
+   The card, 3D Secure and the charge all happen inside Banorte's iframe.
+2. Banorte reports the outcome to the browser only (there is no server-to-server
+   notification). The frontend posts the raw callback to
+   ``POST /api/v1/payments/banorte/result/``; ``interpret_result`` decrypts the
+   ``data`` member with the stored key and decides on the DECRYPTED Payworks
+   result alone. The cleartext members (bnteCode, decision, …) are kept for
+   support but never trusted.
 
-Checkout modes
---------------
-1. **Local mock** (``PAYMENTS_LIVE=false``, no checkout URL): ``/pago/simulado``.
-2. **Query-string sandbox** (sandbox URL configured, no session API).
-3. **Session API** (``BANORTE_SESSION_URL`` + ``BANORTE_MERCHANT_ID`` + optional
-   ``BANORTE_API_KEY``): POST structured order payload; use provider redirect.
-
-Sandbox vs live
----------------
-- ``PAYMENTS_LIVE=false``: never redirects to a live merchant host.
-- ``PAYMENTS_LIVE=true``: requires real ``BANORTE_CHECKOUT_URL`` (or session API
-  success) **and** ``BANORTE_MERCHANT_ID``. Missing config fails closed.
+Modes
+-----
+``PAYMENTS_LIVE=true`` always sends ``mode=PRD`` (real money) and refuses to open
+a checkout without complete configuration. Otherwise ``BANORTE_MODE`` picks a
+Payworks simulation (AUT approves, DEC declines, RND random); PRD is downgraded
+to AUT so a staging box can never charge a card. With no credentials at all and
+``PAYMENTS_LIVE=false`` (local dev) the checkout falls back to the
+``/pago/simulado`` mock page.
 """
+
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
+import os
+import secrets
+import string
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlencode
 
-import requests
 from django.conf import settings
 
-from .base import BaseGateway, CheckoutSession, LiveCheckoutNotConfigured, resolve_checkout_base
+from .banorte_crypto import (
+    DEFAULT_CREDENTIAL_OFFSET,
+    BanorteCertificate,
+    BanorteCryptoError,
+    KeyMaterial,
+    build_envelope,
+    clean_text,
+    decrypt_result,
+    load_certificate,
+)
+from .base import BaseGateway, CheckoutStart, LiveCheckoutNotConfigured, PaymentEvent
 
 logger = logging.getLogger(__name__)
 
-# Default sandbox checkout endpoint; used when PAYMENTS_LIVE is false and a live
-# URL was accidentally configured (or as the sandbox fallback).
-_DEFAULT_CHECKOUT_URL = 'https://gateway.sandbox.banorte.com/pagos/checkout'
+SIMULATION_MODES = frozenset({"AUT", "DEC", "RND"})
+DEFAULT_SCRIPT_BASE = "https://multicobros.banorte.com/orquestador"
+# Where the frontend lands after the lightbox (and the mock page) finishes.
+RETURN_PATH = "/portal/cafeteria/recarga/retorno"
+
+# Payworks ``resultadoPayw`` → normalised outcome.
+_FINAL_FAILURES = frozenset({"D", "R", "N", "E"})
 
 
-def _checkout_base() -> str:
-    """Resolve the Banorte checkout base URL, honouring PAYMENTS_LIVE."""
-    return resolve_checkout_base(
-        'BANORTE_CHECKOUT_URL', _DEFAULT_CHECKOUT_URL, 'checkout real del comercio')
+@dataclass(frozen=True)
+class BanorteConfig:
+    merchant_id: str
+    user: str
+    password: str
+    terminal_id: str
+    merchant_name: str
+    merchant_city: str
+    mode: str
+    script_base: str
+    lightbox_env: str
+    credential_offset: int
+    cert_raw: str
+    cert_path: str
+
+    @classmethod
+    def from_settings(cls) -> BanorteConfig:
+        def s(name, default=""):
+            return str(getattr(settings, name, default) or default).strip()
+
+        return cls(
+            merchant_id=s("BANORTE_MERCHANT_ID"),
+            user=s("BANORTE_USER"),
+            password=str(getattr(settings, "BANORTE_PASSWORD", "") or ""),
+            terminal_id=s("BANORTE_TERMINAL_ID"),
+            merchant_name=clean_text(s("BANORTE_MERCHANT_NAME", "Colegio Interlaken"), 25),
+            merchant_city=clean_text(s("BANORTE_MERCHANT_CITY"), 40),
+            mode=s("BANORTE_MODE", "AUT").upper(),
+            script_base=s("BANORTE_SCRIPT_BASE", DEFAULT_SCRIPT_BASE).rstrip("/"),
+            lightbox_env=s("BANORTE_LIGHTBOX_ENV", "pro"),
+            credential_offset=int(
+                getattr(settings, "BANORTE_CREDENTIAL_OFFSET", DEFAULT_CREDENTIAL_OFFSET)
+            ),
+            cert_raw=str(getattr(settings, "BANORTE_CERT", "") or ""),
+            cert_path=s("BANORTE_CERT_PATH"),
+        )
+
+    def missing(self) -> list[str]:
+        """Settings a real (or simulated) Banorte checkout cannot run without."""
+        required = {
+            "BANORTE_MERCHANT_ID": self.merchant_id,
+            "BANORTE_USER": self.user,
+            "BANORTE_PASSWORD": self.password,
+            "BANORTE_TERMINAL_ID": self.terminal_id,
+            "BANORTE_MERCHANT_CITY": self.merchant_city,
+            "BANORTE_CERT o BANORTE_CERT_PATH": self.cert_raw or self.cert_path,
+        }
+        return [name for name, value in required.items() if not value]
+
+    def effective_mode(self) -> str:
+        if getattr(settings, "PAYMENTS_LIVE", False):
+            return "PRD"
+        if self.mode in SIMULATION_MODES:
+            return self.mode
+        if self.mode == "PRD":
+            logger.warning("BANORTE_MODE=PRD ignored: PAYMENTS_LIVE is false, using AUT.")
+        return "AUT"
+
+    def certificate(self) -> BanorteCertificate:
+        raw = self.cert_raw
+        if not raw and self.cert_path:
+            try:
+                raw = Path(self.cert_path).read_bytes()
+            except OSError as exc:
+                raise LiveCheckoutNotConfigured(
+                    f"No se pudo leer BANORTE_CERT_PATH ({self.cert_path})."
+                ) from exc
+        return _parse_certificate(raw if isinstance(raw, bytes) else raw.encode("utf-8"))
 
 
-def _merchant_ready() -> bool:
-    return bool((getattr(settings, 'BANORTE_MERCHANT_ID', '') or '').strip())
+@lru_cache(maxsize=4)
+def _parse_certificate(raw: bytes) -> BanorteCertificate:
+    try:
+        return load_certificate(raw)
+    except BanorteCryptoError as exc:
+        raise LiveCheckoutNotConfigured(str(exc)) from exc
+
+
+def online_payments_status(user) -> dict:
+    """Whether ``user`` may pay online right now, and whether it is a test.
+
+    Live (``PAYMENTS_LIVE=true``): everyone. Local development (``DEBUG`` or
+    ``SQLITE_LOCAL``, the same rule as the sandbox endpoint): everyone, against the mock page or the Payworks simulation. A deployed
+    server that is not live yet runs Banorte's simulation, where every card is
+    approved: opening that to families would hand out free wallet credit, so
+    only the accounts listed in ``PAYMENTS_TEST_EMAILS`` may use it.
+    """
+    if getattr(settings, "PAYMENTS_LIVE", False):
+        return {"online": True, "test_mode": False}
+    if getattr(settings, "DEBUG", False) or os.getenv("SQLITE_LOCAL"):
+        return {"online": True, "test_mode": True}
+    testers = {e.strip().lower() for e in getattr(settings, "PAYMENTS_TEST_EMAILS", []) if e}
+    email = (getattr(user, "email", "") or "").strip().lower()
+    return {"online": bool(email) and email in testers, "test_mode": True}
+
+
+def new_control_number(payment) -> str:
+    """Single-use Payworks ``controlNumber``: ``IK`` + payment id + 10 random
+    uppercase alphanumerics (≤ 30 chars, none of Banorte's forbidden characters)."""
+    alphabet = string.ascii_uppercase + string.digits
+    return f'IK{payment.pk}{"".join(secrets.choice(alphabet) for _ in range(10))}'[:30]
 
 
 class BanorteGateway(BaseGateway):
-    name = 'banorte'
-    webhook_secret_setting = 'BANORTE_WEBHOOK_SECRET'
-    # Banorte/Pago en Línea vocabulary (incl. the ISO-8583 "00" approval code).
-    SUCCESS_STATUSES = frozenset({'APPROVED', 'SUCCESS', 'PAID', 'CAPTURED', '00'})
-    FAILURE_STATUSES = frozenset({'DECLINED', 'FAILED', 'REJECTED', 'CANCELLED', 'ERROR'})
-    REFUND_STATUSES = frozenset({'REFUNDED', 'REFUND', 'RETURNED', 'CHARGEBACK', '12'})
+    name = "banorte"
+    # A controlNumber may be sent to Payworks once; every attempt is a new Payment.
+    reusable_checkout = False
 
-    def build_session_payload(self, payment, return_url: str | None = None) -> dict:
-        """Banorte-shaped checkout session / order request body."""
-        env = (
-            getattr(settings, 'BANORTE_ENV', 'sandbox')
-            if getattr(settings, 'PAYMENTS_LIVE', False)
-            else 'sandbox'
+    def start_checkout(self, payment, *, request=None, billing=None) -> CheckoutStart:
+        from ..models import BanorteCheckout
+
+        config = BanorteConfig.from_settings()
+        live = bool(getattr(settings, "PAYMENTS_LIVE", False))
+        missing = config.missing()
+        if missing:
+            if live:
+                raise LiveCheckoutNotConfigured(
+                    "PAYMENTS_LIVE=true requiere: " + ", ".join(missing)
+                )
+            return self._mock_checkout(payment)
+
+        certificate = config.certificate()
+        if certificate.is_expired():
+            # Banorte rotates the key every March; an expired certificate means
+            # the lightbox would answer AUT-10 for every parent.
+            raise LiveCheckoutNotConfigured(
+                f"El certificado de Banorte venció el {certificate.not_after:%Y-%m-%d}. "
+                "Solicite el vigente a Banorte y actualice BANORTE_CERT."
+            )
+
+        mode = config.effective_mode()
+        control_number = new_control_number(payment)
+        params = self.build_params(payment, config, mode=mode, control_number=control_number)
+        envelope, material = build_envelope(
+            params, certificate, credential_offset=config.credential_offset
         )
-        resolved = self._return_url(payment, return_url)
-        merchant_id = getattr(settings, 'BANORTE_MERCHANT_ID', '') or ''
-        backend = (getattr(settings, 'BACKEND_URL', '') or '').rstrip('/')
-        status_url = (
-            f'{backend}/api/v1/payments/webhook/banorte/' if backend else ''
+
+        BanorteCheckout.objects.create(
+            payment=payment,
+            control_number=control_number,
+            mode=mode,
+            key_material=material.serialize(),
+            cert_fingerprint=certificate.fingerprint,
         )
+        logger.info(
+            "banorte checkout opened payment=%s control=%s mode=%s",
+            payment.pk,
+            control_number,
+            mode,
+        )
+        return CheckoutStart(
+            kind="lightbox",
+            params=envelope,
+            env=config.lightbox_env,
+            script_url=f"{config.script_base}/lightbox/checkoutV2.js",
+            jquery_url=f"{config.script_base}/resources/js/jquery-3.3.1.js",
+            control_number=control_number,
+        )
+
+    @staticmethod
+    def build_params(payment, config: BanorteConfig, *, mode: str, control_number: str) -> dict:
+        """The Payworks variables (manual v1.8 p. 8). Empty values are dropped by
+        the serialiser; free text is folded to Banorte's allowed characters."""
+        topup = getattr(payment, "related_topup", None)
+        matricula = ""
+        if topup is not None:
+            matricula = getattr(topup.student, "student_id", "") or ""
         return {
-            'merchant_id': merchant_id,
-            'order_id': str(payment.id),
-            'reference': str(payment.id),
-            'amount': f'{payment.amount:.2f}',
-            'currency': payment.currency,
-            'env': env,
-            'return_url': resolved,
-            'status_url': status_url,
-            'gateway': self.name,
+            "merchantId": config.merchant_id,
+            "name": config.user,
+            "password": config.password,
+            "mode": mode,
+            "controlNumber": control_number,
+            "terminalId": config.terminal_id,
+            "amount": f"{payment.amount:.2f}",
+            "merchantName": config.merchant_name,
+            "merchantCity": config.merchant_city,
+            "lang": "ES",
+            # Searchable in MultiCobros as Referencia 1/2/3.
+            "customerRef1": f"PAGO{payment.pk}",
+            "customerRef2": clean_text(matricula, 16).replace(" ", ""),
+            "customerRef3": "CAFETERIA",
         }
 
-    def session_headers(self) -> dict:
-        merchant_id = (getattr(settings, 'BANORTE_MERCHANT_ID', '') or '').strip()
-        api_key = (getattr(settings, 'BANORTE_API_KEY', '') or '').strip()
-        sig = ''
-        if merchant_id and api_key:
-            sig = hmac.new(
-                api_key.encode(),
-                merchant_id.encode(),
-                hashlib.sha256,
-            ).hexdigest()
-        return {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-Banorte-Merchant-Id': merchant_id,
-            'Authorization': f'Bearer {api_key}' if api_key else '',
-            'X-Banorte-Signature': sig,
-        }
-
-    def create_checkout(self, payment, return_url: str | None = None) -> str:
-        live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
-        if live and not _merchant_ready():
-            raise LiveCheckoutNotConfigured(
-                'PAYMENTS_LIVE=true requiere BANORTE_MERCHANT_ID.')
-
-        session_url = (getattr(settings, 'BANORTE_SESSION_URL', '') or '').strip()
-        if session_url and _merchant_ready():
-            session = self._create_checkout_session(payment, return_url, session_url)
-            self._persist_session(payment, session)
-            return session.redirect_url
-
-        base = _checkout_base()
-        env = (
-            getattr(settings, 'BANORTE_ENV', 'sandbox')
-            if live
-            else 'sandbox'
+    @staticmethod
+    def _mock_checkout(payment) -> CheckoutStart:
+        """Local development without Banorte credentials: the /pago/simulado page."""
+        frontend = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+        query = urlencode(
+            {
+                "order_id": payment.pk,
+                "amount": f"{payment.amount:.2f}",
+                "currency": payment.currency,
+                "return_url": f"{RETURN_PATH}?payment_id={payment.pk}",
+            }
         )
-        params = {
-            'merchant_id': getattr(settings, 'BANORTE_MERCHANT_ID', ''),
-            'order_id': payment.id,
-            'reference': payment.id,
-            'amount': f'{payment.amount:.2f}',
-            'currency': payment.currency,
-            'gateway': self.name,
-            'env': env,
-        }
-        resolved = self._return_url(payment, return_url)
-        if resolved:
-            params['return_url'] = resolved
-        api_key = (getattr(settings, 'BANORTE_API_KEY', '') or '').strip()
-        if api_key:
-            material = f"{payment.id}|{params['amount']}|{payment.currency}".encode()
-            params['signature'] = hmac.new(api_key.encode(), material, hashlib.sha256).hexdigest()
-        return f'{base}?{urlencode(params)}'
+        return CheckoutStart(kind="redirect", url=f"{frontend}/pago/simulado?{query}")
 
-    def _create_checkout_session(
-        self,
-        payment,
-        return_url: str | None,
-        session_url: str,
-    ) -> CheckoutSession:
-        payload = self.build_session_payload(payment, return_url)
-        headers = {k: v for k, v in self.session_headers().items() if v}
-        try:
-            resp = requests.post(session_url, json=payload, headers=headers, timeout=20)
-        except requests.RequestException as exc:
-            logger.exception('banorte session create failed: %s', exc)
-            raise LiveCheckoutNotConfigured(
-                f'No se pudo crear la sesión Banorte: {exc}'
-            ) from exc
 
-        if resp.status_code >= 400:
-            logger.warning(
-                'banorte session create HTTP %s: %s',
-                resp.status_code,
-                resp.text[:300],
-            )
-            raise LiveCheckoutNotConfigured(
-                f'Banorte session API respondió {resp.status_code}.'
-            )
+# ── result ───────────────────────────────────────────────────
 
-        try:
-            body = resp.json()
-        except ValueError as exc:
-            raise LiveCheckoutNotConfigured(
-                'Banorte session API devolvió JSON inválido.'
-            ) from exc
+# Cleartext members of the lightbox callback worth keeping for support. They
+# are informative only: anything that decides money comes from ``data``.
+_OUTER_KEYS = (
+    "status3D",
+    "eci",
+    "decision",
+    "reasonCode",
+    "bnteCode",
+    "bnteText",
+    "id",
+    "message",
+    "numeroControl",
+)
 
-        redirect = (
-            body.get('redirect_url')
-            or body.get('checkout_url')
-            or body.get('url')
-            or ''
+_RESULT_FIELDS = {
+    # decrypted key → (BanorteCheckout field, max length)
+    "referencia": ("referencia", 20),
+    "codigoAut": ("codigo_aut", 10),
+    "resultadoAut": ("resultado_aut", 10),
+    "codigoPayw": ("codigo_payw", 12),
+    "texto": ("texto", 255),
+    "bancoEmisor": ("banco_emisor", 40),
+    "marcaTarjeta": ("marca_tarjeta", 40),
+    "tipoTarjeta": ("tipo_tarjeta", 40),
+    "fechaRspCte": ("fecha_rsp_cte", 30),
+}
+
+
+@dataclass
+class ResultOutcome:
+    event: PaymentEvent
+    fields: dict  # BanorteCheckout updates
+    anomaly: str = ""  # why a result was NOT trusted (logged + stored)
+
+
+def _short(value, limit) -> str:
+    return str(value if value is not None else "")[:limit]
+
+
+def interpret_result(checkout, browser_event: str, response: dict) -> ResultOutcome:
+    """Turn a lightbox callback into a ``PaymentEvent``.
+
+    Never raises for bad input: anything that does not decrypt and match is
+    returned as ``pending`` with an ``anomaly`` so the payment stays open for a
+    staff check instead of being credited or failed on untrusted data.
+    """
+    payment_id = checkout.payment_id
+    response = response if isinstance(response, dict) else {}
+    outer = {k: response[k] for k in _OUTER_KEYS if k in response}
+    fields = {
+        "event": _short(browser_event, 20),
+        "status_3d": _short(response.get("status3D", ""), 10),
+        "eci": _short(response.get("eci", ""), 5),
+    }
+
+    def pending(anomaly="", raw=None):
+        if anomaly:
+            fields["last_error"] = anomaly[:255]
+        return ResultOutcome(
+            PaymentEvent(payment_id, "pending", None, raw or {"banorte": outer}), fields, anomaly
         )
-        if not redirect:
-            raise LiveCheckoutNotConfigured(
-                'Banorte session API no devolvió redirect_url/checkout_url.'
+
+    data = response.get("data")
+    if not data:
+        if browser_event == "cancel":
+            return ResultOutcome(
+                PaymentEvent(payment_id, "failed", None, {"banorte": outer}, stage="cancel"), fields
             )
-        session_id = str(
-            body.get('id') or body.get('session_id') or body.get('reference') or ''
+        if browser_event == "error" and str(response.get("id")) == "4":
+            # checkoutV2.js "_auth": Banorte rejected our envelope (AUT-10 —
+            # wrong credentials, wrong or expired certificate). Nothing was charged.
+            fields["last_error"] = "Banorte rechazó la autenticación del comercio (AUT-10)."
+            return ResultOutcome(
+                PaymentEvent(
+                    payment_id, "failed", None, {"banorte": outer}, stage="create_checkout"
+                ),
+                fields,
+                fields["last_error"],
+            )
+        if browser_event == "error":
+            fields["last_error"] = _short(
+                response.get("message") or "Error en la ventana de pago.", 255
+            )
+        return pending()
+
+    if not checkout.key_material:
+        return pending("La operación ya estaba cerrada; se ignoró un resultado tardío.")
+    try:
+        material = KeyMaterial.deserialize(checkout.key_material)
+        result = decrypt_result(material, str(data))
+    except BanorteCryptoError as exc:
+        return pending(f"Resultado no confiable: {exc}")
+
+    raw = {"banorte": outer, "payworks": result}
+    if str(result.get("numeroControl", "")) != checkout.control_number:
+        return pending("Resultado no confiable: el número de control no coincide.", raw)
+    merchant_id = (getattr(settings, "BANORTE_MERCHANT_ID", "") or "").strip()
+    if merchant_id and str(result.get("idAfiliacion", "")).strip() != merchant_id:
+        return pending("Resultado no confiable: la afiliación no coincide.", raw)
+
+    code = str(result.get("resultadoPayw", "")).strip().upper()[:1]
+    fields["resultado_payw"] = code
+    for source, (target, limit) in _RESULT_FIELDS.items():
+        if result.get(source) not in (None, ""):
+            fields[target] = _short(result[source], limit)
+    reference = fields.get("referencia", "")
+
+    if code == "A":
+        if not reference.isdigit():
+            return pending("Aprobación sin referencia Payworks válida.", raw)
+        if not checkout.is_live and getattr(settings, "PAYMENTS_LIVE", False):
+            # A simulated (AUT/RND) approval must never become real wallet money.
+            return pending(
+                f"Aprobación simulada (modo {checkout.mode}) con PAYMENTS_LIVE=true.", raw
+            )
+        return ResultOutcome(
+            PaymentEvent(payment_id, "success", checkout.control_number, raw, reference=reference),
+            fields,
         )
-        return CheckoutSession(redirect_url=redirect, session_id=session_id, raw=body)
+    if code == "T":
+        return ResultOutcome(
+            PaymentEvent(
+                payment_id,
+                "failed",
+                checkout.control_number,
+                raw,
+                stage="bank_timeout",
+                reference=reference,
+            ),
+            fields,
+        )
+    if code in _FINAL_FAILURES:
+        return ResultOutcome(
+            PaymentEvent(payment_id, "failed", checkout.control_number, raw, reference=reference),
+            fields,
+        )
+    return pending(f'Resultado Payworks desconocido: {code or "vacío"}.', raw)

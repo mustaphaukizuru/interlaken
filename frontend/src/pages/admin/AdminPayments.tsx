@@ -18,7 +18,8 @@ import type { Payment } from '@/types';
 import { PAYMENT_STATUS_META, PAYMENT_STATUS_OPTIONS } from '@/lib/status/payment';
 
 const STATUS = PAYMENT_STATUS_META;
-const GATEWAYS: Record<string, string> = { global_payments: 'Global Payments', banorte: 'Banorte', sandbox: 'Sandbox' };
+// Banorte is the only gateway; Global Payments survives as a label for legacy rows.
+const GATEWAYS: Record<string, string> = { banorte: 'Banorte', global_payments: 'Global Payments (retirado)', sandbox: 'Sandbox' };
 
 const STATUS_OPTIONS = PAYMENT_STATUS_OPTIONS;
 // The API filters on real gateways only (sandbox rows carry one of them).
@@ -28,7 +29,7 @@ const GATEWAY_OPTIONS = Object.entries(GATEWAYS).filter(([value]) => value !== '
  *  Refunds and cash approvals stay in the Cafetería console (money moves in one place).
  *  Reference page of the Data Ops UI foundation: selection + "Solo seleccionados",
  *  FilterBar, column controls and the admin export endpoint through the hooks layer.
- *  Bulk actions are export-only: payment state belongs to the gateway webhook. */
+ *  Bulk actions are export-only: payment state belongs to Banorte's settled result. */
 const COLUMNS: Column<Payment>[] = [
   {
     id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted',

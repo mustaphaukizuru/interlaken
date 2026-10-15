@@ -13,7 +13,7 @@
 > - **Login works** (Google OAuth + email/password JWT, httpOnly refresh cookie); P1 security holes closed (admissions tokens, signed webhooks, token blacklist, rate limiting, audit log, medical-data encryption).
 > - **Features live:** Loyverse cafeteria wallet (balances, purchase alerts, online top-ups, admin console with adjust/refund/reconcile/exports) · tuition invoicing + reminders · visit bookings + Google Calendar + WhatsApp Tier 1/2 · legal/LFPDPPP (consent, ARCO, aviso) · SiteSettings CMS · staff analytics dashboard (`/staff`) · announcement read receipts · Ctrl+K admin search · 404 page · API docs (`/api/docs/`, staff-gated) · DB backups + runbook · Dependabot · tests/CI/Sentry · SEO/PWA.
 > - **UI/UX:** brand tokens (green/coral, teal retired), mobile-first responsive frontend, django-unfold admin.
-> - **Contract constraints:** payments = **Global Payments + Banorte only**; academics module = **out of scope**.
+> - **Contract constraints:** payments = **Banorte only** (since 2026-10-13; this report predates that and still describes both gateways below); academics module = **out of scope**.
 > - **Still pending:** cPanel go-live (SSL expired!), gateway/WABA/Loyverse credentials, client data entry in CMS, legal text review, bulk import, web-push send pipeline. See `ROADMAP.md` for the live list.
 
 ---

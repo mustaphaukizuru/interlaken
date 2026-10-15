@@ -1,201 +1,70 @@
 """
-payments/gateways/base.py — common gateway interface.
+payments/gateways/base.py — the small surface every gateway implements.
 
-Each payment provider (Global Payments HPP, Banorte Pago en Línea) implements
-this small surface so the rest of the app never touches provider specifics:
+- ``start_checkout(payment, ...) -> CheckoutStart`` — everything the browser
+  needs to take the parent's card on the provider's own page (card data never
+  touches our servers). Either a ``redirect`` URL or a ``lightbox`` the frontend
+  opens with the provider's script.
+- ``PaymentEvent`` — a provider-agnostic outcome (``success | failed |
+  refunded | pending``) that ``payments.settlement.apply_event`` turns into
+  ledger movements. Gateways normalise their own vocabulary into it.
 
-- ``create_checkout(payment) -> redirect_url`` — build the hosted-payment URL the
-  parent is sent to (card data stays on the provider's page → minimal PCI scope).
-- ``verify_webhook(request) -> WebhookEvent | None`` — authenticate an inbound
-  server-to-server notification and normalise it. Returns ``None`` when the
-  signature is missing/invalid so the view answers 401 (fails closed).
-
-Signature scheme (shared, per Prompt 03): ``HMAC-SHA256(secret, raw_body)`` as a
-hex digest sent in the ``X-Webhook-Signature`` header. Each gateway reads its own
-secret from settings, so the same verification code serves both providers.
-
-When a provider exposes a session API, subclasses POST a structured order payload
-(see ``build_session_payload`` / ``session_headers``) and return the provider's
-hosted redirect URL. Without credentials or a session URL, sandboxes fall back to
-the local ``/pago/simulado`` mock so the UX path stays exercisable.
+Banorte is the only gateway today; the seam stays so the settlement code never
+branches on provider specifics.
 """
-import hashlib
-import hmac
-import json
-import logging
-from dataclasses import dataclass, field
 
-from django.conf import settings
-
-logger = logging.getLogger(__name__)
+from dataclasses import asdict, dataclass, field
 
 
 class LiveCheckoutNotConfigured(RuntimeError):
-    """Raised when PAYMENTS_LIVE is on but no real HPP/checkout URL is set."""
+    """The gateway cannot open a real checkout (missing or expired configuration)."""
+
+
+class CheckoutInputError(ValueError):
+    """The request lacks data the gateway requires (shown to the parent as a 400)."""
 
 
 @dataclass
-class CheckoutSession:
-    """Result of creating (or assembling) a hosted-checkout session."""
+class CheckoutStart:
+    """How the browser should open the provider checkout."""
 
-    redirect_url: str
-    session_id: str = ''
-    raw: dict = field(default_factory=dict)
+    kind: str  # 'redirect' | 'lightbox'
+    url: str = ""  # redirect: where to send the browser
+    params: str = ""  # lightbox: opaque (encrypted) parameters
+    env: str = ""  # lightbox: provider environment name
+    script_url: str = ""  # lightbox: provider checkout script
+    jquery_url: str = ""  # lightbox: provider-hosted jQuery it depends on
+    control_number: str = ""  # lightbox: our single-use reference
+
+    def as_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v}
 
 
 @dataclass
-class WebhookEvent:
-    """A provider-agnostic view of a payment webhook.
+class PaymentEvent:
+    """A normalised payment outcome.
 
-    ``status`` is normalised to one of ``'success' | 'failed' | 'pending'`` so the
-    processing code never branches on provider-specific status strings.
+    ``status`` is one of ``'success' | 'failed' | 'refunded' | 'pending'``;
+    ``stage`` marks a *soft* failure (see ``Payment.SOFT_FAIL_STAGES``) that a
+    later success may still override. ``reference`` is the provider's own
+    operation number (Payworks ``referencia``), stored on ``Payment.gateway_ref``.
     """
+
     payment_id: object
     status: str
     transaction_id: str | None
     raw: dict = field(default_factory=dict)
+    stage: str = ""
+    reference: str = ""
 
 
 class BaseGateway:
-    """Base class for hosted-payment gateways."""
-
     #: machine name stored on ``Payment.gateway``
-    name: str = ''
-    #: settings attribute holding this gateway's webhook HMAC secret
-    webhook_secret_setting: str = ''
-    #: provider status strings that mean the money was captured
-    SUCCESS_STATUSES: frozenset = frozenset()
-    #: provider status strings that mean the payment failed/was declined
-    FAILURE_STATUSES: frozenset = frozenset()
-    #: provider status strings that mean a captured payment was refunded/charged back
-    REFUND_STATUSES: frozenset = frozenset()
+    name: str = ""
+    #: False when a checkout is single-use (a new attempt needs a new Payment)
+    reusable_checkout: bool = True
 
-    # ── checkout ──────────────────────────────────────────────
-    def create_checkout(self, payment, return_url: str | None = None) -> str:  # pragma: no cover - abstract
-        """Return the hosted-payment redirect URL for ``payment``.
-
-        ``return_url`` overrides where the hosted page sends the parent's browser
-        back (e.g. a per-flow return route); ``None`` falls
-        back to ``settings.PAYMENT_RETURN_URL``.
-        """
+    def start_checkout(
+        self, payment, *, request=None, billing=None
+    ) -> CheckoutStart:  # pragma: no cover
         raise NotImplementedError
-
-    def build_session_payload(self, payment, return_url: str | None = None) -> dict:
-        """Canonical order/session body for the provider HPP session API.
-
-        Subclasses override. Used by real session POSTs and by tests/docs so that
-        wiring live credentials is mostly config + HTTP, not redesign.
-        """
-        raise NotImplementedError
-
-    def session_headers(self) -> dict:
-        """HTTP headers for the provider session API (auth, version, content-type)."""
-        raise NotImplementedError
-
-    def _return_url(self, payment, return_url: str | None) -> str:
-        """Resolve the browser return URL, defaulting to ``PAYMENT_RETURN_URL``."""
-        base = return_url or getattr(settings, 'PAYMENT_RETURN_URL', '')
-        return f'{base}?payment_id={payment.id}' if base else ''
-
-    def _persist_session(self, payment, session: CheckoutSession) -> None:
-        """Store session id / raw provider response on the Payment when possible."""
-        if not getattr(payment, 'pk', None):
-            return
-        dirty = []
-        if session.session_id and getattr(payment, 'gateway_ref', '') != session.session_id:
-            payment.gateway_ref = session.session_id
-            dirty.append('gateway_ref')
-        if session.raw:
-            raw = dict(getattr(payment, 'gateway_raw', None) or {})
-            raw['checkout_session'] = session.raw
-            payment.gateway_raw = raw
-            dirty.append('gateway_raw')
-        if dirty and hasattr(payment, 'save'):
-            payment.save(update_fields=[*dirty, 'updated_at'] if hasattr(payment, 'updated_at') else dirty)
-
-    # ── webhook ───────────────────────────────────────────────
-    def verify_webhook(self, request):
-        """Return a ``WebhookEvent`` when the signature is valid, else ``None``."""
-        if not self._verify_signature(request):
-            return None
-        try:
-            return self._parse_event(request)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
-            logger.warning(f'{self.name}: unparseable webhook body: {e}')
-            return None
-
-    # ── helpers ───────────────────────────────────────────────
-    def _secret(self) -> str:
-        return getattr(settings, self.webhook_secret_setting, '') or ''
-
-    def _verify_signature(self, request) -> bool:
-        """Constant-time compare the request signature against our HMAC.
-
-        Fails closed: with no configured secret or no signature header, returns
-        ``False`` (the view then answers 401).
-        """
-        secret = self._secret()
-        signature = (
-            request.headers.get('X-Webhook-Signature')
-            or request.headers.get('X-Signature', '')
-        )
-        if not secret or not signature:
-            return False
-        expected = hmac.new(secret.encode(), request.body, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected, signature)
-
-    def _parse_event(self, request) -> WebhookEvent:
-        """Normalise the JSON body into a ``WebhookEvent``.
-
-        Uses the shared field conventions (``order_id``/``reference`` → our
-        ``Payment`` pk, ``id``/``transaction_id`` → gateway tx id); subclasses set
-        ``SUCCESS_STATUSES`` / ``FAILURE_STATUSES`` / ``REFUND_STATUSES`` to map
-        their own vocabulary. Normalised status is one of
-        ``success | failed | refunded | pending``.
-        """
-        payload = json.loads(request.body)
-        transaction_id = payload.get('id') or payload.get('transaction_id')
-        payment_id = payload.get('order_id') or payload.get('reference')
-        raw_status = (payload.get('status') or '').upper()
-
-        if raw_status in self.SUCCESS_STATUSES:
-            status = 'success'
-        elif raw_status in self.FAILURE_STATUSES:
-            status = 'failed'
-        elif raw_status in self.REFUND_STATUSES:
-            status = 'refunded'
-        else:
-            status = 'pending'
-
-        return WebhookEvent(
-            payment_id=payment_id,
-            status=status,
-            transaction_id=transaction_id,
-            raw=payload,
-        )
-
-
-def resolve_checkout_base(setting_name: str, default_sandbox_url: str, label: str) -> str:
-    """Resolve a gateway's checkout base URL, honouring ``PAYMENTS_LIVE``.
-
-    Both gateways had a byte-identical copy of this live/sandbox guard. It is the
-    rule that keeps sandbox traffic off a real merchant URL (and refuses to run
-    live against ``/pago/simulado``), so it lives in exactly one place.
-    """
-    from django.conf import settings
-
-    configured = (getattr(settings, setting_name, '') or '').strip()
-    live = bool(getattr(settings, 'PAYMENTS_LIVE', False))
-    local_mock = f'{settings.FRONTEND_URL.rstrip("/")}/pago/simulado'
-    if live:
-        if not configured or 'simulado' in configured.lower():
-            raise LiveCheckoutNotConfigured(
-                f'PAYMENTS_LIVE=true requiere {setting_name} ({label}). '
-                'No se usará /pago/simulado.')
-        return configured
-    # Sandbox mode: never hit a live merchant URL.
-    if not configured:
-        return local_mock
-    if 'sandbox' in configured.lower() or 'simulado' in configured.lower():
-        return configured
-    return default_sandbox_url

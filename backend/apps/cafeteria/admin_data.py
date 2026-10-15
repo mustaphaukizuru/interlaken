@@ -836,7 +836,12 @@ class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generic
         ).prefetch_related(
             # Explicit ordered Prefetch: the serializer takes the FIRST row as
             # "the" payment; a plain .order_by() would drop the cache (N+1).
-            models.Prefetch("payments", queryset=Payment.objects.order_by("-created_at"))
+            models.Prefetch(
+                "payments",
+                queryset=Payment.objects.select_related("banorte__verified_by").order_by(
+                    "-created_at"
+                ),
+            )
         )
 
 
@@ -885,6 +890,8 @@ def _pos_loaded_plan(topup, payload):
         raise BulkSkip("fue reembolsada; no se carga en el POS")
     if topup.pos_loaded_at is not None:
         raise BulkSkip("ya estaba marcada como cargada")
+    if payment is not None and payment.needs_bank_verification():
+        raise BulkSkip("falta verificar la operación en MultiCobros")
 
 
 def _pos_loaded_handler(topup, payload, actor):
@@ -953,7 +960,12 @@ class AdminTopUpBulkView(AdminBulkView):
         from apps.payments.models import Payment
 
         return TopUpRequest.objects.select_related("student__user").prefetch_related(
-            models.Prefetch("payments", queryset=Payment.objects.order_by("-created_at"))
+            models.Prefetch(
+                "payments",
+                queryset=Payment.objects.select_related("banorte__verified_by").order_by(
+                    "-created_at"
+                ),
+            )
         )
 
     def matching_ids(self, request, filters):

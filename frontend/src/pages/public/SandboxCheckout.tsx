@@ -3,12 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { Lock, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
 import { api } from '@/services/api';
 
-// Deliberately neutral (non-Interlaken) styling: this page stands in for the
-// BANK's hosted payment page in sandbox/dev, so it should not look like our app.
-const GATEWAY_NAME: Record<string, string> = {
-  global_payments: 'Global Payments',
-  banorte: 'Banorte Pago en Línea',
-};
+// Deliberately neutral (non-Interlaken) styling: this page stands in for
+// Banorte's payment window in local development (no merchant credentials), so
+// it should not look like our app.
 
 // Only a same-origin relative path (single leading slash) — never an absolute,
 // scheme, or protocol-relative URL — so return_url can't be used as an open
@@ -23,7 +20,6 @@ export default function SandboxCheckout() {
   const amount = params.get('amount') || '0.00';
   const currency = params.get('currency') || 'MXN';
   const returnUrl = safeReturn(params.get('return_url'));
-  const gateway = params.get('gateway') || 'global_payments';
   const [busy, setBusy] = useState<'success' | 'failed' | null>(null);
 
   async function finish(result: 'success' | 'failed') {
@@ -43,7 +39,7 @@ export default function SandboxCheckout() {
           <div className="flex items-center gap-1.5 text-xs text-white/60">
             <Lock size={13} /> Pago seguro
           </div>
-          <div className="mt-1 text-lg font-bold">{GATEWAY_NAME[gateway] ?? gateway}</div>
+          <div className="mt-1 text-lg font-bold">Banorte · Ventana de pago</div>
         </div>
 
         <div className="space-y-5 p-6">

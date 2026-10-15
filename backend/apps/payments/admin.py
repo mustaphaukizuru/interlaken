@@ -1,15 +1,15 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from .models import Payment
+from .models import BanorteCheckout, Payment
 
 
 @admin.register(Payment)
 class PaymentAdmin(ModelAdmin):
     """Read-mostly ledger of online gateway transactions (cafetería top-ups).
 
-    Payments are created only by the portal top-up flow and settled only by
-    signed gateway webhooks, so the admin must never mint or delete one by
+    Payments are created only by the portal top-up flow and settled only from
+    Banorte's decrypted checkout result, so the admin must never mint or delete one by
     hand (a hand-made row has no checkout session and credits nothing). Staff
     can still flip ``status`` for manual reconciliation; everything else is
     read-only. Day-to-day operations (refunds, top-up review, balances) live in
@@ -27,6 +27,34 @@ class PaymentAdmin(ModelAdmin):
                        'related_topup', 'completed_at', 'created_at', 'updated_at')
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BanorteCheckout)
+class BanorteCheckoutAdmin(ModelAdmin):
+    """Read-only view of every Banorte attempt (for support and certification).
+
+    The AES key material is never shown; staff verification happens in the
+    staff portal (/admin/cafeteria), which records who verified and when.
+    """
+    list_display = ('control_number', 'payment', 'mode', 'resultado_payw', 'referencia',
+                    'codigo_aut', 'verified_at', 'created_at')
+    list_filter = ('mode', 'resultado_payw')
+    search_fields = ('control_number', 'referencia', 'codigo_aut', 'payment__user__email')
+    ordering = ('-created_at',)
+    list_select_related = ('payment',)
+    exclude = ('key_material',)
+
+    def get_readonly_fields(self, request, obj=None):
+        return [f.name for f in self.model._meta.fields if f.name != 'key_material']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):

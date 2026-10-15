@@ -124,6 +124,9 @@ export interface TopUpLogEntry {
   gateway: string;
   payment_status: string;
   gateway_tx_id: string;
+  payment_id: number | null;
+  /** Banorte operation data staff match in MultiCobros (null for cash top-ups). */
+  banorte: BanorteOperation | null;
   created_at: string;
   processed_at: string | null;
   pos_loaded_at: string | null;
@@ -134,6 +137,25 @@ export interface TopUpLogEntry {
   pos_unloaded_by_name: string;
   needs_pos_unload: boolean;
 }
+
+export interface BanorteOperation {
+  control_number: string;
+  referencia: string;
+  codigo_aut: string;
+  /** Payworks resultadoPayw: A aprobada, D declinada, R rechazada, T sin respuesta, N/E no procesada. */
+  resultado: '' | 'A' | 'D' | 'R' | 'T' | 'N' | 'E';
+  /** PRD is real money; AUT/DEC/RND are Payworks simulations. */
+  mode: string;
+  marca_tarjeta: string;
+  verified_at: string | null;
+  verified_by_name: string;
+  needs_verification: boolean;
+}
+
+/** How the browser opens the checkout (`POST /cafeteria/topup/` → `checkout`). */
+export type CheckoutStart =
+  | { kind: 'redirect'; url: string }
+  | { kind: 'lightbox'; params: string; env: string; script_url: string; jquery_url: string; control_number: string };
 
 export interface BalanceAdjustment {
   id: number;

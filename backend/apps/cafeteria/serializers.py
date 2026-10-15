@@ -174,6 +174,8 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     gateway        = serializers.SerializerMethodField()
     payment_status = serializers.SerializerMethodField()
     gateway_tx_id  = serializers.SerializerMethodField()
+    payment_id     = serializers.SerializerMethodField()
+    banorte        = serializers.SerializerMethodField()
     needs_pos_load = serializers.SerializerMethodField()
     needs_pos_unload = serializers.SerializerMethodField()
     pos_loaded_by_name = serializers.CharField(
@@ -186,7 +188,7 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'student_id', 'student_name', 'student_code', 'amount',
             'method', 'method_display', 'status', 'status_display',
-            'gateway', 'payment_status', 'gateway_tx_id',
+            'gateway', 'payment_status', 'gateway_tx_id', 'payment_id', 'banorte',
             'created_at', 'processed_at',
             'pos_loaded_at', 'pos_loaded_by_name', 'needs_pos_load',
             'pos_unload_needed_at', 'pos_unloaded_at', 'pos_unloaded_by_name',
@@ -232,6 +234,28 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     def get_gateway_tx_id(self, obj):
         p = self._payment(obj)
         return (p.gateway_tx_id or '') if p else ''
+
+    def get_payment_id(self, obj):
+        p = self._payment(obj)
+        return p.pk if p else None
+
+    def get_banorte(self, obj):
+        """What staff need to find the operation in MultiCobros (or ``None``)."""
+        p = self._payment(obj)
+        checkout = p.banorte_checkout() if p else None
+        if checkout is None:
+            return None
+        return {
+            'control_number': checkout.control_number,
+            'referencia': checkout.referencia,
+            'codigo_aut': checkout.codigo_aut,
+            'resultado': checkout.resultado_payw,
+            'mode': checkout.mode,
+            'marca_tarjeta': checkout.marca_tarjeta,
+            'verified_at': checkout.verified_at,
+            'verified_by_name': checkout.verified_by.full_name if checkout.verified_by_id else '',
+            'needs_verification': checkout.needs_verification,
+        }
 
 
 class BalanceAdjustmentSerializer(serializers.ModelSerializer):

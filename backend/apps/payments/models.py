@@ -3,12 +3,17 @@ payments/models.py — online gateway transactions (cafetería top-ups).
 
 The app only sells cafetería wallet top-ups; tuition (colegiatura) and
 enrollment (inscripción) are NOT billed through the app. Rows are created by
-the top-up flow and settled by signed webhooks — never by hand in the admin.
+the top-up flow and settled from Banorte's encrypted checkout result (see
+``BanorteCheckout``), never by hand in the admin.
+
+Banorte is the only payment gateway (decision 2026-10-13).
 """
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.core.fields import EncryptedTextField
 
 
 class Payment(models.Model):
@@ -26,8 +31,10 @@ class Payment(models.Model):
         OTHER      = 'other',      'Otro'
 
     class Gateway(models.TextChoices):
-        GLOBAL_PAYMENTS = 'global_payments', 'Global Payments'
         BANORTE         = 'banorte',         'Banorte'
+        # Retired 2026-10-13: Banorte is the only gateway. The value stays so
+        # historical rows keep a readable label; nothing creates it any more.
+        GLOBAL_PAYMENTS = 'global_payments', 'Global Payments (retirado)'
 
     user          = models.ForeignKey(User, on_delete=models.SET_NULL, null=True,
                                       related_name='payments')
@@ -44,7 +51,7 @@ class Payment(models.Model):
 
     # Gateway fields
     gateway       = models.CharField(max_length=50, choices=Gateway.choices,
-                                     default=Gateway.GLOBAL_PAYMENTS)
+                                     default=Gateway.BANORTE)
     gateway_tx_id = models.CharField(max_length=255, blank=True, unique=True, null=True)
     gateway_ref   = models.CharField(max_length=255, blank=True)
     gateway_raw   = models.JSONField(default=dict, blank=True)  # Full gateway response
@@ -77,9 +84,12 @@ class Payment(models.Model):
         self.completed_at = timezone.now()
         self.save()
 
-    # Local soft-fails: HPP may still complete after expire/supersede, or never
-    # started (create_checkout). Distinct from a gateway DECLINED webhook.
-    SOFT_FAIL_STAGES = frozenset({'expire', 'supersede', 'create_checkout'})
+    # Local soft-fails: the checkout may still complete after expire/supersede,
+    # never started (create_checkout), was cancelled in the lightbox before a
+    # result (cancel), or the bank timed out (bank_timeout). Distinct from a
+    # bank DECLINED result, which is final.
+    SOFT_FAIL_STAGES = frozenset({
+        'expire', 'supersede', 'create_checkout', 'cancel', 'bank_timeout'})
 
     def mark_failed(self, error='', stage=''):
         """Mark the payment failed, preserving the error for reconciliation.
@@ -106,3 +116,88 @@ class Payment(models.Model):
             return False
         raw = self.gateway_raw if isinstance(self.gateway_raw, dict) else {}
         return raw.get('stage') in self.SOFT_FAIL_STAGES
+
+    def banorte_checkout(self):
+        """The ``BanorteCheckout`` of this payment, or ``None``."""
+        try:
+            return self.banorte
+        except ObjectDoesNotExist:
+            return None
+
+    def needs_bank_verification(self) -> bool:
+        """A real Banorte approval staff have not yet matched in MultiCobros."""
+        checkout = self.banorte_checkout()
+        return bool(checkout and checkout.needs_verification)
+
+
+class BanorteCheckout(models.Model):
+    """One Banorte "Ventana de Comercio Electrónico" (VCE) attempt for a Payment.
+
+    Holds what the encrypted flow needs server-side: the single-use control
+    number sent to Payworks and the AES key material that decrypts Banorte's
+    answer (encrypted at rest, wiped once the payment reaches a final state).
+    The decrypted Payworks result is copied into typed columns for the admin
+    and for the certification test matrix.
+
+    ``verified_at`` records a staff check of the operation in MultiCobros. The
+    result reaches us through the parent's browser and Banorte's cipher has no
+    integrity check, so a browser-reported approval is credited to the local
+    ledger but must be verified before the money is loaded into the POS.
+    """
+
+    class Result(models.TextChoices):
+        # Payworks ``resultadoPayw`` values (manual v1.7, p. 12).
+        APPROVED  = 'A', 'Aprobada'
+        DECLINED  = 'D', 'Declinada'
+        REJECTED  = 'R', 'Rechazada'
+        TIMEOUT   = 'T', 'Sin respuesta del autorizador'
+        NOT_SENT  = 'N', 'No enviada (3D Secure / Cybersource)'
+        ERROR     = 'E', 'Error interno de Banorte'
+
+    payment        = models.OneToOneField(Payment, on_delete=models.CASCADE,
+                                          related_name='banorte')
+    control_number = models.CharField(max_length=30, unique=True)
+    # AUT/DEC/RND are Payworks simulations (no money moves); PRD is real.
+    mode           = models.CharField(max_length=3)
+    key_material   = EncryptedTextField(blank=True)
+    cert_fingerprint = models.CharField(max_length=64, blank=True)
+    created_at     = models.DateTimeField(default=timezone.now)
+
+    # Last browser event and the decrypted Payworks result.
+    event          = models.CharField(max_length=20, blank=True)
+    result_at      = models.DateTimeField(null=True, blank=True)
+    resultado_payw = models.CharField(max_length=1, blank=True, choices=Result.choices)
+    referencia     = models.CharField(max_length=20, blank=True, db_index=True)
+    codigo_aut     = models.CharField(max_length=10, blank=True)
+    resultado_aut  = models.CharField(max_length=10, blank=True)
+    codigo_payw    = models.CharField(max_length=12, blank=True)
+    texto          = models.CharField(max_length=255, blank=True)
+    banco_emisor   = models.CharField(max_length=40, blank=True)
+    marca_tarjeta  = models.CharField(max_length=40, blank=True)
+    tipo_tarjeta   = models.CharField(max_length=40, blank=True)
+    fecha_rsp_cte  = models.CharField(max_length=30, blank=True)
+    status_3d      = models.CharField(max_length=10, blank=True)
+    eci            = models.CharField(max_length=5, blank=True)
+    last_error     = models.CharField(max_length=255, blank=True)
+
+    verified_at    = models.DateTimeField(null=True, blank=True)
+    verified_by    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='verified_banorte_checkouts')
+
+    class Meta:
+        verbose_name = 'Operación Banorte'
+        verbose_name_plural = 'Operaciones Banorte'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.control_number} ({self.resultado_payw or "sin resultado"})'
+
+    @property
+    def is_live(self) -> bool:
+        return self.mode == 'PRD'
+
+    @property
+    def needs_verification(self) -> bool:
+        """Approved real money that staff have not yet matched in MultiCobros."""
+        return (self.resultado_payw == self.Result.APPROVED and self.is_live
+                and self.verified_at is None)

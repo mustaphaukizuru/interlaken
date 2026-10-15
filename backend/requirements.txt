@@ -39,9 +39,9 @@ requests==2.34.2
 google-api-python-client==2.200.0
 google-auth==2.58.0
 
-# Payments: Global Payments + Banorte are custom HPP redirect + HMAC-signed
-# webhooks (see apps/payments/gateways/) — no vendor SDK dependency. (The old
-# globalpayments-api==1.0.0 pin was unused and isn't even on PyPI.)
+# Payments: Banorte "Ventana de Comercio Electrónico Cifrada" only. The RSA-OAEP
+# + PBKDF2 + AES-CTR envelope uses `cryptography` (pinned above); Banorte ships
+# no Python SDK (see apps/payments/gateways/banorte_crypto.py).
 
 # NOTE: Celery/Redis removed — scheduled jobs run via cron on the VPS
 # (deploy/crontab.example), not celery beat.

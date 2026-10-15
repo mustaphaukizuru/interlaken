@@ -217,8 +217,7 @@ updating. Skipping any one of these breaks that feature silently.
 |---|---|---|
 | **Google sign-in** | Add `https://interlaken.edu.mx/auth/google/callback/` as an authorised redirect URI | Google Cloud console → Credentials |
 | **Loyverse** | Point the receipts webhook at `https://interlaken.edu.mx/api/v1/cafeteria/loyverse/webhook/<SECRET>/` | Loyverse → Integrations → Webhooks |
-| **Global Payments** | Update the webhook and return URLs | Merchant dashboard |
-| **Banorte** | Update the webhook and return URLs | Merchant dashboard |
+| **Banorte** | Nothing to point: the lightbox needs no webhook or return URL. Put the merchant credentials and the current certificate in `.env` and run `check_banorte` (see `docs/BANORTE-INTEGRATION.md`) | VPS `deploy/.env` |
 
 Test the Loyverse webhook with a real purchase at the till. The parent's balance
 should move within seconds.

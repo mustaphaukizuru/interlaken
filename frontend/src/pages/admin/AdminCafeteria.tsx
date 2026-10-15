@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Coffee, RefreshCw, ChevronRight, ScrollText, Scale, AlertTriangle, CheckCircle2, Store,
-  Users, Receipt, ArrowLeftRight, RotateCcw, FileUp, Wallet,
+  Users, Receipt, ArrowLeftRight, RotateCcw, FileUp, Wallet, ShieldCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -28,7 +28,7 @@ import { ExportMenu } from '@/components/admin/ExportMenu';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
-import { cafeteriaApi, downloadBlob, type LoyverseCustomer } from '@/services/api';
+import { cafeteriaApi, downloadBlob, paymentsApi, type LoyverseCustomer } from '@/services/api';
 import { adjustmentImportApi, type AdminTransaction, type ReconcileRowV2, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
 import { exportFilename, idsParam, type BulkActionDef, type BulkRequest, type BulkResult, type ExportFormat, type ImportRow, type ListParams } from '@/services/dataOps';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
@@ -615,6 +615,23 @@ const studentCell = (d: TopUpLogEntry) => (
   </span>
 );
 
+/** Banorte operation as staff search it in MultiCobros: número de control,
+ *  referencia Payworks and autorización, plus whether it was verified there. */
+const banorteCell = (d: TopUpLogEntry) => {
+  const b = d.banorte;
+  if (!b) return <span className="text-subtle">{d.gateway_tx_id || '—'}</span>;
+  return (
+    <span className="block font-mono text-xs leading-5 text-ink">
+      <span className="block">Control {b.control_number}</span>
+      {b.referencia && <span className="block text-muted">Ref. {b.referencia}{b.codigo_aut ? ` · Aut. ${b.codigo_aut}` : ''}</span>}
+      {b.mode !== 'PRD' && <span className="block text-subtle">Modo prueba ({b.mode})</span>}
+      {b.needs_verification
+        ? <Badge variant="warning">Sin verificar</Badge>
+        : b.verified_at && <span className="block font-sans text-green-700">Verificada · {b.verified_by_name}</span>}
+    </span>
+  );
+};
+
 const TOPUP_COLUMNS: Column<TopUpLogEntry>[] = [
   { id: 'created_at', header: 'Fecha', sortKey: 'created_at', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.created_at) },
   { id: 'student', header: 'Alumno', sortKey: 'student', minWidth: 170, className: 'font-medium text-ink', cell: studentCell },
@@ -623,7 +640,7 @@ const TOPUP_COLUMNS: Column<TopUpLogEntry>[] = [
   { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
   { id: 'status', header: 'Estado', sortKey: 'status', cell: (d) => <Badge variant={TOPUP_STATUS[d.status]?.variant ?? 'neutral'}>{d.status_display}</Badge> },
   { id: 'pos', header: 'POS', cell: posBadge },
-  { id: 'reference', header: 'Referencia', defaultHidden: true, className: 'text-subtle text-xs font-mono', cell: (d) => d.gateway_tx_id || '—' },
+  { id: 'reference', header: 'Referencia', defaultHidden: true, minWidth: 190, cell: banorteCell },
 ];
 
 /** Plan line of a bulk apply: the MXN the processed rows will credit. */
@@ -756,7 +773,20 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
       toast.success(kind === 'load' ? 'Marcado como cargado en Loyverse POS.' : 'Marcado como quitado del POS de Loyverse.');
       void invalidateEntity(queryClient, CAF_TOPUPS);
     },
-    onError: () => toast.error('No se pudo marcar la recarga.'),
+    onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo marcar la recarga.')),
+  });
+
+  // A Banorte approval reaches us through the parent's browser: staff match it
+  // in MultiCobros before real money goes into the POS.
+  const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
+  const verify = useMutation({
+    mutationFn: (paymentId: number) => paymentsApi.verifyBanorte(paymentId),
+    onSuccess: () => {
+      toast.success('Operación verificada en MultiCobros.');
+      setVerifying(null);
+      void invalidateEntity(queryClient, CAF_TOPUPS);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo registrar la verificación.')),
   });
 
   const columns: Column<TopUpLogEntry>[] = [
@@ -767,7 +797,7 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
     { id: 'student', header: 'Alumno', className: 'font-medium text-ink', cell: studentCell },
     { id: 'amount', header: 'Monto', align: 'right', className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
     { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
-    { id: 'reference', header: 'Referencia', className: 'text-subtle text-xs font-mono', cell: (d) => d.gateway_tx_id || '—' },
+    { id: 'reference', header: 'Operación Banorte', minWidth: 190, cell: banorteCell },
   ];
 
   return (
@@ -803,7 +833,12 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
             itemLabel="recargas"
           />
         )}
-        rowActions={(d) => (
+        rowActions={(d) => (kind === 'load' && d.banorte?.needs_verification ? (
+          <Button size="sm" variant="secondary" onClick={() => setVerifying(d)}>
+            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+            Verificar en MultiCobros
+          </Button>
+        ) : (
           <Button
             size="sm"
             variant={kind === 'load' ? 'primary' : 'secondary'}
@@ -813,7 +848,7 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
             <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
             {kind === 'load' ? 'Cargado en Loyverse' : 'Quitado de Loyverse'}
           </Button>
-        )}
+        ))}
         empty={{ icon: CheckCircle2, title: emptyTitle, description: emptyText }}
       />
       <BulkConfirmDialog
@@ -826,6 +861,28 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
         filters={filters}
         execute={(body) => bulk.mutateAsync(body)}
         onDone={() => selection.onClear()}
+      />
+      <ConfirmDialog
+        open={!!verifying}
+        title="Verificar operación en MultiCobros"
+        message={verifying?.banorte && (
+          <span className="block space-y-2">
+            <span className="block">
+              En MultiCobros → Analítica → Reportes → Transacciones Payworks 2, busque el número de
+              control y confirme que aparece <strong>Aprobada</strong> por {mxn(verifying.amount)}:
+            </span>
+            <span className="block rounded-lg bg-cream px-3 py-2 font-mono text-xs leading-6 text-ink">
+              Número de control: {verifying.banorte.control_number}<br />
+              Referencia: {verifying.banorte.referencia || '—'}<br />
+              Autorización: {verifying.banorte.codigo_aut || '—'}
+            </span>
+            <span className="block">Si no aparece o el monto no coincide, no la cargue en el POS y avise a dirección.</span>
+          </span>
+        )}
+        confirmLabel="Sí, aparece aprobada"
+        loading={verify.isPending}
+        onConfirm={() => verifying?.payment_id && verify.mutate(verifying.payment_id)}
+        onClose={() => setVerifying(null)}
       />
     </Card>
   );

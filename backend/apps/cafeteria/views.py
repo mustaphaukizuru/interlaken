@@ -641,13 +641,14 @@ class LoyverseWebhookView(APIView):
 
 @method_decorator(ratelimit('cafeteria-topup', '20/m', key='ip', method='POST'), name='dispatch')
 class TopUpRequestCreateView(generics.CreateAPIView):
-    """POST /api/v1/cafeteria/topup/  ``{student, amount, method, gateway?}``
+    """POST /api/v1/cafeteria/topup/  ``{student, amount, method}``
 
     ``method=office`` records a pending request for an admin to apply at the school
     cashier (unchanged). ``method=online`` additionally creates a linked, pending
-    ``Payment(type=cafeteria)`` and returns the gateway **redirect/HPP URL** the
-    parent is sent to. The balance is only credited later, by the verified webhook
-    (spec §2.2) — never here.
+    ``Payment(type=cafeteria)`` and returns ``checkout``: the encrypted Banorte
+    lightbox parameters (or, in local dev without credentials, a ``redirect`` to
+    the mock page). The balance is only credited later, from Banorte's decrypted
+    result (``POST /payments/banorte/result/``) — never here.
     """
     serializer_class = TopUpRequestSerializer
     permission_classes = [IsParentOrAdmin]
@@ -659,7 +660,12 @@ class TopUpRequestCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         from django.db import transaction
 
-        from apps.payments.gateways import GATEWAY_CHOICES, get_gateway
+        from apps.payments.gateways import (
+            GATEWAY_CHOICES,
+            CheckoutInputError,
+            LiveCheckoutNotConfigured,
+            get_gateway,
+        )
         from apps.payments.models import Payment
         from apps.payments.services import reuse_or_clear_cafeteria_checkout
 
@@ -686,6 +692,15 @@ class TopUpRequestCreateView(generics.CreateAPIView):
 
         method = serializer.validated_data.get('method') or TopUpRequest.Method.OFFICE
         if method == TopUpRequest.Method.ONLINE:
+            from apps.payments.gateways.banorte import online_payments_status
+
+            if not online_payments_status(user)['online']:
+                return Response(
+                    error_body('El pago en línea estará disponible próximamente. '
+                               'Mientras tanto puede pagar en caja escolar.',
+                               code='online_unavailable'),
+                    status=400,
+                )
             gateway_name = (request.data.get('gateway') or '').lower() or None
             if gateway_name and gateway_name not in GATEWAY_CHOICES:
                 return Response(error_body('Pasarela de pago no válida.'), status=400)
@@ -694,7 +709,8 @@ class TopUpRequestCreateView(generics.CreateAPIView):
 
             with transaction.atomic():
                 existing = reuse_or_clear_cafeteria_checkout(
-                    student, amount=amount, gateway_name=gateway.name)
+                    student, amount=amount, gateway_name=gateway.name,
+                    allow_reuse=gateway.reusable_checkout)
                 if existing is not None:
                     payment = existing
                     topup = payment.related_topup
@@ -715,29 +731,35 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                     )
 
             data = dict(self.get_serializer(topup).data)
+            from apps.cafeteria.services import fail_online_topup
             try:
-                redirect_url = gateway.create_checkout(payment)
-            except Exception as e:
-                logger.exception(
-                    'create_checkout failed for cafeteria top-up payment=%s gateway=%s student=%s',
-                    payment.id, gateway.name, student.id,
-                )
+                checkout = gateway.start_checkout(payment, request=request)
+            except CheckoutInputError as e:
                 payment.mark_failed(e, stage='create_checkout')
-                from apps.cafeteria.services import fail_online_topup
                 fail_online_topup(payment)
-                return Response(error_body(f'No se pudo iniciar el pago: {e}'), status=502)
-
-            if not redirect_url:
-                payment.mark_failed('gateway returned no checkout URL', stage='create_checkout')
-                from apps.cafeteria.services import fail_online_topup
+                return Response(error_body(str(e)), status=400)
+            except Exception as e:
+                # Configuration detail goes to the log, not to the family.
+                if isinstance(e, LiveCheckoutNotConfigured):
+                    logger.error('Banorte checkout not configured for payment=%s: %s',
+                                 payment.id, e)
+                else:
+                    logger.exception(
+                        'start_checkout failed for cafeteria top-up payment=%s gateway=%s '
+                        'student=%s', payment.id, gateway.name, student.id)
+                payment.mark_failed(e, stage='create_checkout')
                 fail_online_topup(payment)
-                return Response(error_body('No se pudo iniciar el pago.'), status=502)
+                return Response(error_body(
+                    'El pago en línea no está disponible en este momento. '
+                    'Intente más tarde o pague en caja escolar.'), status=502)
 
             data.update({
                 'payment_id': payment.id,
                 'gateway': gateway.name,
-                'redirect_url': redirect_url,
+                'checkout': checkout.as_dict(),
             })
+            if checkout.kind == 'redirect':
+                data['redirect_url'] = checkout.url
             headers = self.get_success_headers(data)
             return Response(data, status=201, headers=headers)
 
@@ -1074,6 +1096,13 @@ class AdminMarkTopUpPosLoadedView(APIView):
         if linked is not None and linked.status == Payment.Status.REFUNDED:
             return Response(
                 error_body('Esta recarga fue reembolsada; no la cargue en el POS.'),
+                status=400,
+            )
+        if linked is not None and linked.needs_bank_verification():
+            # The approval reached us through the parent's browser; staff match
+            # it in MultiCobros before real money is loaded into the POS.
+            return Response(
+                error_body('Verifique primero la operación en MultiCobros (Banorte).'),
                 status=400,
             )
 
