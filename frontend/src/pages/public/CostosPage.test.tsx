@@ -69,12 +69,15 @@ describe('CostosPage (paquete de precios 2026)', () => {
   it('renders enrollment fees for nuevo ingreso by default and switches to reinscripción', async () => {
     renderPage();
     expect(await screen.findByText(/9,600\.00/)).toBeInTheDocument();
-    // Both nuevo-ingreso rows share the same gastos figure.
-    expect(screen.getAllByText(/Gastos administrativos: \$2,500\.00/).length).toBeGreaterThanOrEqual(1);
+    // Bitácora ref. 5: two titled columns, «Gastos administrativos» and «Inscripción».
+    expect(screen.getByRole('columnheader', { name: 'Gastos administrativos' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Inscripción' })).toBeInTheDocument();
+    expect(screen.getAllByText('$2,500.00').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/5,760\.00/)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Alumnos Interlaken/i }));
     expect(await screen.findByText(/5,760\.00/)).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Reinscripción' })).toBeInTheDocument();
     expect(screen.queryByText(/9,600\.00/)).not.toBeInTheDocument();
   });
 

@@ -26,9 +26,7 @@ const FAMILY_GROUPS: NavGroup[] = [
     heading: 'Familia',
     items: [
       { icon: LayoutDashboard, label: 'Inicio',         to: '/portal', end: true },
-      { icon: Megaphone,       label: 'Comunicados',    to: '/portal/comunicados' },
       { icon: Bell,            label: 'Notificaciones', to: '/portal/notificaciones', badgeKey: 'notificaciones' },
-      { icon: ClipboardList,   label: 'Inscripciones',  to: '/portal/inscripciones' },
     ],
   },
   {
@@ -134,7 +132,7 @@ const FAMILY_MOBILE: NavEntry[] = [
     { icon: LayoutDashboard, label: 'Inicio',       to: '/portal', end: true },
     { icon: Coffee,          label: 'Cafetería',    to: '/portal/cafeteria' },
     { icon: QrCode,          label: 'Credencial',   to: '/portal/credencial' },
-    { icon: Megaphone,       label: 'Comunicados',  to: '/portal/comunicados' },
+    { icon: Bell,            label: 'Avisos',       to: '/portal/notificaciones', badgeKey: 'notificaciones' },
     { icon: CreditCard,      label: 'Pagos',        to: '/portal/pagos' },
 ];
 

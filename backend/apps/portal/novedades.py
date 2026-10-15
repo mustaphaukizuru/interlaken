@@ -38,14 +38,10 @@ def build_feed(user, since) -> list[dict]:
     from apps.content.models import SchoolEvent
     from apps.content.pages import Page
     from apps.payments.models import Payment
-    from apps.portal.models import Announcement, AnnouncementRead
-    from apps.portal.views import audiences_for_user
 
     items: list[dict] = []
-    read_ids = set(AnnouncementRead.objects.filter(user=user).values_list('announcement_id', flat=True))
-    for a in Announcement.objects.filter(is_active=True, audience__in=audiences_for_user(user), created_at__gte=since).order_by('-created_at')[:10]:
-        items.append({'type': 'comunicado', 'title': a.title, 'text': a.body[:160], 'link': f'/portal/comunicados/{a.pk}',
-                      'at': a.created_at.isoformat(), 'unread': a.pk not in read_ids})
+    # Bitácora 10 (14/10/2026): the family portal no longer shows comunicados, so the
+    # feed does not list them either (families still get them by email/notification).
 
     today = timezone.localdate()
     for e in SchoolEvent.objects.filter(is_published=True, start_date__gte=today, start_date__lte=today + timedelta(days=14)).order_by('start_date')[:8]:
@@ -63,7 +59,7 @@ def build_feed(user, since) -> list[dict]:
         for p in (Payment.objects.filter(Q(user=user) | Q(related_topup__student__in=students), updated_at__gte=since)
                   .distinct().order_by('-updated_at')[:5]):
             items.append({'type': 'pago', 'title': f'Pago {p.get_status_display().lower()}: ${p.amount}', 'text': p.get_payment_type_display(),
-                          'link': '/portal/pagos', 'at': p.updated_at.isoformat(), 'unread': True})
+                          'link': '/portal/cafeteria', 'at': p.updated_at.isoformat(), 'unread': True})
 
     for pg in Page.objects.filter(status=Page.Status.PUBLISHED, published_at__gte=since).order_by('-published_at')[:5]:
         items.append({'type': 'sitio', 'title': f'Nueva página: {pg.title}', 'text': (pg.seo or {}).get('description', ''),

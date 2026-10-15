@@ -27,11 +27,11 @@ def test_feed_merges_sources_and_respects_since(auth_client, parent_user, admin_
     r = auth_client.get(reverse('novedades'))
     assert r.status_code == 200
     titles = [i['title'] for i in r.data['items']]
-    assert 'Junta de padres' in titles and 'Viejo' not in titles and 'Solo personal' not in titles
+    # Bitácora 10: comunicados are no longer part of the family feed.
+    assert not any(i['type'] == 'comunicado' for i in r.data['items'])
+    assert 'Junta de padres' not in titles and 'Solo personal' not in titles
     assert any(t.endswith('· Festival') for t in titles) and not any('Lejano' in t for t in titles)
     assert any(t.startswith('Consumo de') and '$35' in t for t in titles)
-    junta = next(i for i in r.data['items'] if i['title'] == 'Junta de padres')
-    assert junta['unread'] is False and junta['link'].startswith('/portal/comunicados/')
 
     since = (timezone.now() + dt.timedelta(minutes=1)).isoformat()
     r2 = auth_client.get(reverse('novedades'), {'since': since})

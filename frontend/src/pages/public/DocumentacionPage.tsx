@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, ArrowUpRight, CheckCircle, FileText, FolderOpen, Info,
+  ArrowRight, ArrowUpRight, CheckCircle, FileText, FolderOpen,
 } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import { ADMISSION_DOCS } from '@/lib/admisionesDocs';
@@ -15,7 +15,7 @@ export default function DocumentacionPage() {
     <div>
       <Seo
         title="Documentación"
-        description={`Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo ${CURRENT_CYCLE}), con enlaces a los trámites oficiales de gob.mx e INE.`}
+        description={`Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo ${CURRENT_CYCLE}), con enlaces a los trámites oficiales en gob.mx.`}
       />
 
       <section className="relative overflow-hidden bg-dark text-white">
@@ -65,15 +65,6 @@ export default function DocumentacionPage() {
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
-            <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
-            <p>
-              Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE)
-              para obtener o consultar cada documento en línea. Si tiene dudas sobre
-              algún requisito, <Link to="/contacto" className="font-medium text-green-dark underline">contáctenos</Link>.
-            </p>
           </div>
 
           <div className="mt-8 flex flex-col items-center gap-3 rounded-xl2 border border-green/25 bg-green/5 px-6 py-7 text-center">

@@ -13,7 +13,9 @@ def _png(w=600, h=400):
 
 
 @pytest.mark.django_db
-def test_upload_serve_and_delete_avatar(auth_client, parent_user, client, settings, tmp_path):
+def test_upload_serve_and_delete_avatar(admin_client, admin_user, client, settings, tmp_path):
+    # Staff manage their own photo; families cannot (bitácora 10, test_profile_lock.py).
+    auth_client, parent_user = admin_client, admin_user
     settings.MEDIA_ROOT = str(tmp_path)
     url = reverse('my-avatar')
     assert auth_client.post(url, {}, format='multipart').status_code == 400

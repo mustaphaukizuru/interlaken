@@ -56,7 +56,7 @@ def test_notify_is_delivered_inline():
     assert dispatch_pending_notifications() == 0      # cron skips it
 
 
-def test_dispatch_push_deep_links_to_comunicado(settings):
+def test_dispatch_push_opens_the_notification(settings):
     _configure_vapid(settings)
     p = ParentFactory()
     _subscribe(p)
@@ -70,7 +70,9 @@ def test_dispatch_push_deep_links_to_comunicado(settings):
     assert wp.call_count == 1
     payload = json.loads(wp.call_args.kwargs['data'])
     assert payload['title'] == 'Junta'
-    assert payload['url'] == f'/portal/comunicados/{ann.pk}'
+    # Bitácora 10: no comunicados page in the family portal; the push opens the notification.
+    n = Notification.objects.get(user=p, announcement=ann)
+    assert payload['url'] == f'/portal/notificaciones/{n.pk}'
 
 
 def test_push_toggle_off_skips_push_but_still_emails(settings, mailoutbox):
@@ -106,7 +108,8 @@ def test_admin_publish_triggers_push_first_batch(settings, api_client):
     assert resp.json()['push_enabled'] is True
     assert wp.call_count == 1                         # inline first batch
     payload = json.loads(wp.call_args.kwargs['data'])
-    assert payload['url'] == f"/portal/comunicados/{resp.json()['id']}"
+    n = Notification.objects.get(user=p, announcement_id=resp.json()['id'])
+    assert payload['url'] == f'/portal/notificaciones/{n.pk}'
 
 
 def test_audience_filtering_staff_only(settings):

@@ -174,16 +174,34 @@ export function PricingSections() {
                       </button>
                     ))}
                   </div>
-                  <ul>
-                    {fees.map((f) => (
-                      <Row
-                        key={`${f.section}-${f.modality}`}
-                        left={f.section}
-                        sub={`Gastos administrativos: ${mxn(f.gastos_administrativos)}`}
-                        right={mxn(f.cuota)}
-                      />
-                    ))}
-                  </ul>
+                  {/* Dos columnas con título (bitácora ref. 5): la familia ve qué paga en cada concepto.
+                      En teléfono los encabezados van sin mayúsculas espaciadas y con menos margen
+                      para que las tres columnas quepan en 390 px; el contenedor desplaza si aun así no caben. */}
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <caption className="sr-only">
+                      {modality === 'nuevo_ingreso' ? 'Nuevo ingreso' : 'Alumnos Interlaken'}: gastos administrativos y {modality === 'nuevo_ingreso' ? 'inscripción' : 'reinscripción'} por nivel
+                    </caption>
+                    <thead>
+                      <tr className="border-b border-ink/5 text-[11px] text-muted sm:text-xs sm:uppercase sm:tracking-wide">
+                        <th scope="col" className="px-3 py-2.5 text-left font-semibold sm:px-5">Nivel</th>
+                        <th scope="col" className="px-2 py-2.5 text-right font-semibold sm:px-3">Gastos administrativos</th>
+                        <th scope="col" className="px-3 py-2.5 text-right font-semibold sm:px-5">
+                          {modality === 'nuevo_ingreso' ? 'Inscripción' : 'Reinscripción'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fees.map((f) => (
+                        <tr key={`${f.section}-${f.modality}`} className="border-b border-ink/5 last:border-0">
+                          <th scope="row" className="px-3 py-3.5 text-left font-normal text-ink sm:px-5">{f.section}</th>
+                          <td className="whitespace-nowrap px-2 py-3.5 text-right text-ink sm:px-3">{mxn(f.gastos_administrativos)}</td>
+                          <td className="whitespace-nowrap px-3 py-3.5 text-right font-bold text-ink sm:px-5">{mxn(f.cuota)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
                 </PriceCard>
               )}
 

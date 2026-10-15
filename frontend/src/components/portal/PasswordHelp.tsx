@@ -46,8 +46,9 @@ export function PasswordHelp({ variant = 'card', email }: Props) {
         <KeyRound className="h-4 w-4 text-purple" aria-hidden="true" /> Contraseña
       </h2>
       <p className="text-sm text-muted">
-        Por seguridad, las contraseñas del portal las asigna el colegio. Si necesita que se la
-        recuerden o restablezcan, solicítelo y un administrador le enviará una nueva por el mismo medio.
+        Por seguridad, las contraseñas del portal las asigna el colegio y no se pueden cambiar
+        desde el portal. Si necesita que se la recuerden o restablezcan, solicítelo y un
+        administrador le enviará una nueva por el mismo medio.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
         {wa && (

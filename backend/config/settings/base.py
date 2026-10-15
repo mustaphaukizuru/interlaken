@@ -352,6 +352,8 @@ VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='info@interlaken.com.mx')
 CONTACT_EMAIL = env('CONTACT_EMAIL', default='info@interlaken.com.mx')          # contacto / general
 ADMISSIONS_EMAIL = env('ADMISSIONS_EMAIL', default=CONTACT_EMAIL)               # pre-registro, inscripción, visitas
 BILLING_EMAIL = env('BILLING_EMAIL', default='facturas@interlaken.com.mx')      # facturación (CFDI)
+# Buzón del formulario «Envíenos un mensaje» de /contacto (bitácora 13/10/2026, ref. 3).
+CONTACT_FORM_EMAIL = env('CONTACT_FORM_EMAIL', default='pmaya@interlaken.com.mx')
 PRIVACY_EMAIL = env('PRIVACY_EMAIL', default='privacidad@interlaken.com.mx')  # ARCO intake (docs/RETENTION.md)
 SUPPORT_EMAIL = env('SUPPORT_EMAIL', default=CONTACT_EMAIL)                     # portal access / passwords
 OPS_EMAIL = env('OPS_EMAIL', default='sistemas@interlaken.com.mx')             # delivery failures, cron alerts
