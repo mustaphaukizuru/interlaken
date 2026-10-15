@@ -343,3 +343,23 @@ describe('CafeteriaPage when card payment is not open yet', () => {
     expect(openBanorteLightbox).not.toHaveBeenCalled();
   });
 });
+
+describe('CafeteriaPage during Banorte certification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    vi.mocked(paymentsApi.getAvailability).mockResolvedValueOnce(
+      { data: { online: true, test_mode: false, certification: true } } as never);
+  });
+
+  it('warns the tester that the charge is real', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(await screen.findByText(/Certificación Banorte: cargo real a la tarjeta/)).toBeInTheDocument();
+    expect(screen.queryByText(/Modo de prueba Banorte/)).toBeNull();
+  });
+});

@@ -51,6 +51,15 @@ class Command(BaseCommand):
         problems = []
 
         self.stdout.write(f"PAYMENTS_LIVE: {live}")
+        open_to_all = bool(getattr(settings, "PAYMENTS_OPEN_TO_ALL", False))
+        testers = [e for e in getattr(settings, "PAYMENTS_TEST_EMAILS", []) if e]
+        if live and open_to_all:
+            stage = "abierto: cargos reales para todas las familias"
+        elif live:
+            stage = f"certificación: cargos reales solo para {len(testers)} cuenta(s) de prueba"
+        else:
+            stage = f"simulación: solo {len(testers)} cuenta(s) de prueba, sin cargos"
+        self.stdout.write(f"Etapa: {stage}")
         self.stdout.write(f"Modo Payworks efectivo: {config.effective_mode()}")
         self.stdout.write(f'Afiliación: {config.merchant_id or "(sin configurar)"}')
 

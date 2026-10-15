@@ -681,9 +681,10 @@ export const paymentsApi = {
   getPaymentStatus: (paymentId: number) =>
     api.get(`/payments/${paymentId}/`),
 
-  /** Whether the caller may pay by card now (and whether Banorte is in test mode). */
+  /** Whether the caller may pay by card now, and in which stage: Banorte test
+   *  mode (no charge), certification (real charge, test accounts only) or open. */
   getAvailability: () =>
-    api.get<{ online: boolean; test_mode: boolean }>('/payments/availability/'),
+    api.get<{ online: boolean; test_mode: boolean; certification?: boolean }>('/payments/availability/'),
 
   /** Forward a Banorte lightbox callback; the server decrypts and decides. */
   reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
