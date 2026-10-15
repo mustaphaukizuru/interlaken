@@ -148,10 +148,10 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
     # could POST amount=0 or a NEGATIVE value; a later admin "apply" would then
     # DEBIT the child's balance (add_points_to_customer(points<0)). Match the
     # payment-initiation floor and add a sane ceiling against fat-finger typos.
-    # Match parent UI copy: mínimo $50 · máximo $2,000 (fat-finger guard).
+    # Match parent UI copy: mínimo $20 · máximo $2,000 (fat-finger guard).
     amount = serializers.DecimalField(
         max_digits=10, decimal_places=2,
-        min_value=Decimal('50.00'), max_value=Decimal('2000.00'))
+        min_value=Decimal('20.00'), max_value=Decimal('2000.00'))
 
     class Meta:
         model = TopUpRequest

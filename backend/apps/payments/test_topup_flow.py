@@ -295,3 +295,19 @@ class TestSandboxComplete:
         assert resp.status_code == 404
         payment.refresh_from_db()
         assert payment.status == Payment.Status.PENDING
+
+
+class TestTopUpLimits:
+    """Parent UI copy: mínimo $20 · máximo $2,000."""
+
+    @pytest.mark.parametrize("amount, ok", [("20.00", True), ("19.99", False), ("2000.00", True), ("2000.01", False)])
+    def test_amount_limits(self, api_client, amount, ok):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        api_client.force_authenticate(user=parent)
+        resp = api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": student.id, "amount": amount, "method": "office"},
+            format="json",
+        )
+        assert (resp.status_code == 201) is ok, resp.data
