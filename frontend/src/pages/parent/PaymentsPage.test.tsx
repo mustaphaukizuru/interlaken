@@ -145,3 +145,19 @@ describe('PaymentsPage states', () => {
     expect(screen.queryByText('Pendiente', { selector: 'span' })).toBeNull();
   });
 });
+
+describe('PaymentsPage after bitácora punto 10', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedPayments.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [paid] } } as never);
+  });
+
+  it('keeps cafetería payments in the portal; only colegiaturas are «Próximamente»', async () => {
+    renderPage();
+    expect(await screen.findByText('Historial de pagos')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Recargar cafetería/ })).toHaveAttribute('href', '/portal/cafeteria');
+    expect(screen.getByRole('link', { name: /Colegiaturas y boletas/ }))
+      .toHaveAttribute('href', 'https://interlaken.servoescolar.mx/');
+    expect(screen.getAllByText('Próximamente')).toHaveLength(1);
+  });
+});

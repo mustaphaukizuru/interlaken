@@ -50,9 +50,9 @@ const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
 const CafeteriaPage   = lazy(() => import('./pages/parent/CafeteriaPage'));
 const CredencialPage  = lazy(() => import('./pages/parent/CredencialPage'));
 const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupReturn'));
-// Bitácora 10 (14/10/2026): Pagos shows «Próximamente»; Comunicados and Inscripciones are off the
-// family portal. Their pages stay in the codebase so they can return without a rewrite.
-const PagosProximamentePage = lazy(() => import('./pages/parent/PagosProximamentePage'));
+// Bitácora 10 (14/10/2026): Comunicados and Inscripciones are off the family portal (their pages
+// stay so they can return). Pagos keeps the cafetería payments; only colegiaturas are «Próximamente».
+const PaymentsPage = lazy(() => import('./pages/parent/PaymentsPage'));
 const NotificationsPage = lazy(() => import('./pages/parent/NotificationsPage'));
 const NotificationDetailPage = lazy(() => import('./pages/parent/NotificationDetailPage'));
 const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
@@ -182,7 +182,7 @@ export default function App() {
               <Route path="cafeteria" element={<CafeteriaPage />} />
               <Route path="credencial" element={<CredencialPage />} />
               <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
-              <Route path="pagos"     element={<PagosProximamentePage />} />
+              <Route path="pagos"     element={<PaymentsPage />} />
               <Route path="inscripciones" element={<Navigate to="/portal" replace />} />
               <Route path="comunicados" element={<Navigate to="/portal/notificaciones" replace />} />
               <Route path="comunicados/:id" element={<Navigate to="/portal/notificaciones" replace />} />
