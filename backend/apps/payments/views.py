@@ -63,7 +63,7 @@ class PaymentInitiateView(APIView):
 
 
 class PaymentAvailabilityView(APIView):
-    """GET /api/v1/payments/availability/ — ``{online, test_mode}`` for the caller.
+    """GET /api/v1/payments/availability/ — ``{online, test_mode, certification, min_amount}``.
 
     The top-up form reads it to offer (or hide) card payment; the top-up
     endpoint enforces the same rule.
@@ -71,9 +71,12 @@ class PaymentAvailabilityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from apps.cafeteria.serializers import topup_min_amount
+
         from .gateways.banorte import online_payments_status
 
-        return Response(online_payments_status(request.user))
+        return Response({**online_payments_status(request.user),
+                         'min_amount': f'{topup_min_amount(request.user):.2f}'})
 
 
 BANORTE_EVENTS = frozenset({'success', 'error', 'cancel', 'closed'})

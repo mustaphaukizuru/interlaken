@@ -140,6 +140,13 @@ def _parse_certificate(raw: bytes) -> BanorteCertificate:
         raise LiveCheckoutNotConfigured(str(exc)) from exc
 
 
+def is_payment_tester(user) -> bool:
+    """True for the accounts listed in ``PAYMENTS_TEST_EMAILS``."""
+    testers = {e.strip().lower() for e in getattr(settings, "PAYMENTS_TEST_EMAILS", []) if e}
+    email = (getattr(user, "email", "") or "").strip().lower()
+    return bool(email) and email in testers
+
+
 def online_payments_status(user) -> dict:
     """Whether ``user`` may pay online right now, and in which stage.
 
@@ -163,10 +170,8 @@ def online_payments_status(user) -> dict:
         return {"online": True, "test_mode": False, "certification": False}
     if not live and (getattr(settings, "DEBUG", False) or os.getenv("SQLITE_LOCAL")):
         return {"online": True, "test_mode": True, "certification": False}
-    testers = {e.strip().lower() for e in getattr(settings, "PAYMENTS_TEST_EMAILS", []) if e}
-    email = (getattr(user, "email", "") or "").strip().lower()
     return {
-        "online": bool(email) and email in testers,
+        "online": is_payment_tester(user),
         "test_mode": not live,
         "certification": live,
     }
