@@ -127,8 +127,10 @@ docker compose exec app python manage.py check_banorte
 ```
 
 `check_banorte` prints the mode, the missing settings and the certificate
-expiry (never the password). It fails within 30 days of expiry and runs in the
-daily cron.
+expiry (never the password). It fails within 30 days of expiry. The daily cron
+runs it with `--notify`, which emails the active admins (the VPS cannot mail
+cron output): once when a problem appears or changes, then weekly while it
+lasts.
 
 ## 4. Testing before certification (no money moves)
 
@@ -228,6 +230,12 @@ Banorte answered, or when the answer was not trustworthy (see
 `BanorteCheckout.last_error`). Pending checkouts expire after 45 minutes
 (`expire_stale_payments`). If MultiCobros shows such an operation as approved,
 credit it with a manual adjustment that cites the referencia.
+
+Every morning `banorte_pending_report` (daily cron) emails the admins the
+real-money operations of the last 26 hours that need that check: still
+pending, expired without an answer, bank timeout (Payworks `T`) or an answer
+that was not trusted. Cancellations and authentication errors are left out
+(nothing was charged). No email when there is nothing to check.
 
 ## 7. Yearly certificate rotation
 

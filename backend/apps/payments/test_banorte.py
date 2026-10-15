@@ -685,3 +685,85 @@ class TestOnlineAvailability:
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
         assert avail.data == {"online": True, "test_mode": False}
+
+
+# ── alerts to the admins ─────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestAdminAlerts:
+    def _admin(self):
+        return AdminFactory(email="direccion@interlaken.test")
+
+    def test_expiring_certificate_emails_once_then_weekly(self, banorte, mailoutbox):
+        from datetime import datetime, timedelta
+        from datetime import timezone as dt_timezone
+
+        from apps.core.models import OpsStatus
+
+        self._admin()
+        _, _, soon = _make_cert(days_valid=10)
+        banorte.BANORTE_CERT = soon.decode()
+        for _ in range(2):
+            with pytest.raises(CommandError):
+                call_command("check_banorte", "--notify", stdout=StringIO())
+        assert len(mailoutbox) == 1
+        assert "direccion@interlaken.test" in mailoutbox[0].to
+        assert "Ab12" not in mailoutbox[0].body
+
+        # A week later the unchanged problem is sent again.
+        state = OpsStatus.get("banorte_check")
+        old = datetime.now(dt_timezone.utc) - timedelta(days=8)
+        OpsStatus.set("banorte_check", {**state, "alerted_at": old.isoformat()})
+        with pytest.raises(CommandError):
+            call_command("check_banorte", "--notify", stdout=StringIO())
+        assert len(mailoutbox) == 2
+
+    def test_healthy_check_clears_the_alert(self, banorte, mailoutbox):
+        from apps.core.models import OpsStatus
+
+        self._admin()
+        OpsStatus.set("banorte_check", {"fingerprint": "x", "alerted_at": "2026-01-01T00:00:00"})
+        call_command("check_banorte", "--notify", stdout=StringIO())
+        assert OpsStatus.get("banorte_check") == {}
+        assert mailoutbox == []
+
+    def test_pending_report_lists_only_operations_to_check(self, api_client, banorte, mailoutbox):
+        self._admin()
+        banorte.PAYMENTS_LIVE = True
+        made = []
+        for _ in range(4):
+            parent, student = _family()
+            resp = _start(api_client, parent, student)
+            made.append(BanorteCheckout.objects.get(payment_id=resp.data["payment_id"]))
+        pending, cancelled, approved, expired = made
+        api_client.force_authenticate(user=cancelled.payment.user)
+        _report(api_client, cancelled.payment_id, "cancel", {})
+        api_client.force_authenticate(user=approved.payment.user)
+        _report(api_client, approved.payment_id, "success", _bank_answer(approved))
+        from apps.payments.services import fail_checkout_if_still_open
+
+        assert fail_checkout_if_still_open(expired.payment_id, reason="test", stage="expire")
+
+        out = StringIO()
+        call_command("banorte_pending_report", stdout=out)
+        text = out.getvalue()
+        assert pending.control_number in text
+        assert expired.control_number in text
+        assert cancelled.control_number not in text
+        assert approved.control_number not in text
+        reports = [m for m in mailoutbox if "por revisar en MultiCobros" in m.subject]
+        assert len(reports) == 1
+        assert "2 pago(s)" in reports[0].subject
+        assert "direccion@interlaken.test" in reports[0].to
+
+    def test_pending_report_skips_simulations_and_stays_quiet(
+        self, api_client, banorte, mailoutbox
+    ):
+        self._admin()
+        parent, student = _family()
+        _start(api_client, parent, student)  # AUT mode
+        out = StringIO()
+        call_command("banorte_pending_report", stdout=out)
+        assert "nothing to check" in out.getvalue()
+        assert mailoutbox == []
