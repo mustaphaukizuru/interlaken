@@ -150,6 +150,10 @@ lasts.
 - **`$` in the password.** Docker Compose expands `$` in `deploy/.env`. Wrap the
   value in single quotes (`BANORTE_PASSWORD='...'`) or Banorte receives a
   different password and answers AUT-10.
+- **Spaces in a value.** `deploy.sh` reads `deploy/.env` with bash, so
+  `BANORTE_MERCHANT_NAME=COLEGIO INTERLAKEN` aborts the deploy with
+  `INTERLAKEN: command not found`. Single-quote it:
+  `BANORTE_MERCHANT_NAME='COLEGIO INTERLAKEN'`, `BANORTE_MERCHANT_CITY='TLALNEPANTLA DE BAZ'`.
 - **Merchant name.** Max 25 characters and none of the forbidden characters
   (no parentheses); longer or invalid text is folded and cut.
 
