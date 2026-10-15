@@ -365,3 +365,25 @@ describe('CafeteriaPage during Banorte certification', () => {
     expect(screen.queryByText(/Modo de prueba Banorte/)).toBeNull();
   });
 });
+
+describe('CafeteriaPage top-up amounts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+  });
+
+  it('offers $20 and $50 quick amounts and accepts $20 as the minimum', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    for (const amt of [20, 50, 100, 200, 300, 500]) {
+      expect(screen.getByRole('button', { name: `$${amt}` })).toBeInTheDocument();
+    }
+    await u.click(screen.getByRole('button', { name: '$20' }));
+    expect(screen.getByLabelText('Monto (MXN)')).toHaveValue(20);
+    expect(screen.getByText(/Mínimo \$20/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
+  });
+});

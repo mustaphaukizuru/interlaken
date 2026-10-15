@@ -42,8 +42,10 @@ const TX_SORT_OPTIONS: SortOption[] = [
   { key: 'type', label: 'Tipo' },
   { key: 'balance', label: 'Saldo' },
 ];
-const TOPUP_MIN = 50;
+const TOPUP_MIN = 20;
 const TOPUP_MAX = 2000;
+// Quick amounts in the top-up form ($20 and $50 for a snack or a lunch).
+const TOPUP_PRESETS = [20, 50, 100, 200, 300, 500];
 
 const txIcon = (type: string) => {
   if (type === 'topup')   return <ArrowUpCircle className="w-4 h-4 text-green-600" />;
@@ -663,7 +665,7 @@ export default function CafeteriaPage() {
                 <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${TOPUP_MIN}.</p>
               )}
               <div className="mt-2.5 flex flex-wrap gap-2">
-                {[100, 200, 300, 500].map((amt) => (
+                {TOPUP_PRESETS.map((amt) => (
                   <button
                     key={amt}
                     type="button"

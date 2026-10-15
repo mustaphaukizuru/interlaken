@@ -457,7 +457,7 @@ class TestApplyTopUp:
         # A zero/negative top-up must be rejected at the boundary — otherwise an
         # applied negative "top-up" would DEBIT the child's balance.
         student = StudentProfileFactory()
-        for bad in (Decimal("0"), Decimal("-500"), Decimal("49.99"), Decimal("2000.01")):
+        for bad in (Decimal("0"), Decimal("-500"), Decimal("19.99"), Decimal("2000.01")):
             s = TopUpRequestSerializer(
                 data={"student": student.id, "amount": bad, "method": "office"})
             assert not s.is_valid()
@@ -466,7 +466,7 @@ class TestApplyTopUp:
     def test_serializer_accepts_amount_within_ui_bounds(self):
         student = StudentProfileFactory()
         s = TopUpRequestSerializer(
-            data={"student": student.id, "amount": Decimal("50.00"), "method": "office"})
+            data={"student": student.id, "amount": Decimal("20.00"), "method": "office"})
         assert s.is_valid(), s.errors
         s = TopUpRequestSerializer(
             data={"student": student.id, "amount": Decimal("2000.00"), "method": "office"})
