@@ -27,7 +27,8 @@ interface BanortePayment {
 }
 
 type BanorteWindow = Window & {
-  Payment?: BanortePayment;
+  /** Set by public/banorte-bridge.js (checkoutV2.js's `let Payment` is not on window). */
+  __banortePayment?: BanortePayment;
   jQuery?: { fn?: { modal?: unknown }; modal?: { close?: () => void } };
 };
 
@@ -71,13 +72,15 @@ export async function prepareBanorte(start: { script_url: string; jquery_url: st
   const w = window as BanorteWindow;
   await loadScript(start.jquery_url);
   await loadScript(start.script_url);
-  if (!w.Payment) throw new Error('La ventana de pago de Banorte no está disponible.');
+  await loadScript(`${import.meta.env.BASE_URL}banorte-bridge.js`);
+  const payment = w.__banortePayment;
+  if (!payment) throw new Error('La ventana de pago de Banorte no está disponible.');
   if (envReady !== start.env) {
-    w.Payment.setEnv(start.env);
+    payment.setEnv(start.env);
     envReady = start.env;
   }
   await waitFor(() => typeof w.jQuery?.fn?.modal === 'function', 15000);
-  return w.Payment;
+  return payment;
 }
 
 // checkoutV2.js never removes its window "message" listener after a success,

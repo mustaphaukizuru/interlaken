@@ -2,7 +2,8 @@
 
 Banorte is the only payment gateway (decision of 2026-10-13; Global Payments was
 removed). Families top up the cafetería wallet with a card inside Banorte's
-**Ventana de Comercio Electrónico Cifrada** (VCE), integration manual v1.7.
+**Ventana de Comercio Electrónico Cifrada** (VCE), integration manual v1.8
+(24 March 2026; the encryption is unchanged since v1.7).
 Card data, 3D Secure and the charge never touch our servers.
 
 This document is the reference for engineers, for whoever runs the VPS and for
@@ -92,17 +93,17 @@ Set in `deploy/.env` on the VPS (never in a local `.env`, never in chat):
 | Banorte delivers | Setting |
 |---|---|
 | Afiliación (7 digits) | `BANORTE_MERCHANT_ID` |
-| Usuario (the *execution-only* user created in MultiCobros) | `BANORTE_USER` |
-| Contraseña of that user | `BANORTE_PASSWORD` |
-| ID Terminal | `BANORTE_TERMINAL_ID` |
-| Nombre del comercio (max 25 characters) | `BANORTE_MERCHANT_NAME` |
-| Ciudad del comercio (max 40 characters) | `BANORTE_MERCHANT_CITY` |
-| Certificate `.cer` (renewed every March) | `BANORTE_CERT`: the Base64 body on one line |
+| Usuario: the **Nick of the "usuario de motor"** (manual v1.8), created by the MultiCobros administrator in Administración → Administración de usuarios → Usuarios → Usuarios de motor. Not the administrator user. | `BANORTE_USER` |
+| Contraseña of that engine user (8 to 12 characters) | `BANORTE_PASSWORD` (single-quoted if it has `$`) |
+| TERMINAL_ID, exactly as in Banorte's welcome email (for this afiliación it equals the afiliación number) | `BANORTE_TERMINAL_ID` |
+| Nombre de afiliación (max 25 characters) | `BANORTE_MERCHANT_NAME` |
+| Municipio (max 40 characters) | `BANORTE_MERCHANT_CITY` |
+| Certificate `.cer` (renewed within the first three months of each year) | `BANORTE_CERT`: the Base64 body on one line |
 
 To produce `BANORTE_CERT` from the `.cer` file:
 
 ```bash
-grep -v '^#' multicobroskeyunixbanortecom.cer | grep -v CERTIFICATE | tr -d '\r\n'
+grep -v '^#' multicobros.cer | grep -v CERTIFICATE | tr -d '\r\n'
 ```
 
 Modes:
@@ -150,15 +151,19 @@ daily cron.
 - **Merchant name.** Max 25 characters and none of the forbidden characters
   (no parentheses); longer or invalid text is folded and cut.
 
-### AUT-10 with `numeroControl: null`
+### AUT-10 (resolved 2026-10-14)
 
-Seen on 2026-10-14 with the certificate from `LlaveCifrada2025.zip` (expired
-2026-02-21) and the real credentials, both with and without the whitespace
-padding. Banorte answering without our `numeroControl` suggests it could not
-decrypt the envelope at all, which points at the RSA key (certificate) rather
-than the user or password. Ask Banorte for the certificate valid today and
-confirm the execution user is active. The integration refuses an expired
-certificate on purpose.
+Banorte answered `AUT-10, Authentication failed` with `numeroControl: null` while
+we used the certificate from `LlaveCifrada2025.zip` (expired 2026-02-21) and a
+terminal ID with a typo. With the 2026 certificate from `Llave VCE CIFRADO
+2026.zip` (CN `multicobros.unix.banorte.com`, a new key, valid until
+2027-02-09) and the terminal ID from Banorte's welcome email, `authenticateV2`
+answered HTTP 200 with a session token. That validates the envelope format,
+the credential padding, the certificate and the engine user in one call.
+
+If AUT-10 comes back: first the certificate (is it this year's?), then the
+terminal ID and afiliación against the welcome email, then the engine user's
+Nick and password (single quotes around a password with `$`).
 
 ## 5. Certification with Banorte
 
@@ -173,16 +178,19 @@ executive):
 
 | Field | Answer |
 |---|---|
-| Proveedor, Gateway o Alianza | Desarrollo propio |
-| TLS 1.2 | Sí (Caddy with Let's Encrypt, renewed automatically every 90 days) |
+| Número de afiliación / Nombre del comercio | 7069217 / COLEGIO INTERLAKEN |
+| ¿Integración a través de proveedor o gateway? | NO (desarrollo propio) |
+| Vencimiento del certificado TLS 1.2 | Let's Encrypt, renewed automatically every 90 days by Caddy; current one valid until 2026-11-19 (check with `openssl s_client` before sending) |
 | URL de página de ventas | `https://interlaken.edu.mx/portal/cafeteria` |
 | IP origen del servidor | Public IP of the Hostinger VPS |
 | Servidor web y sistema operativo | Caddy + Gunicorn in Docker on Ubuntu 24.04 (Hostinger VPS) |
 | Lenguajes y APIs | Python 3 / Django REST Framework (backend), React + TypeScript (frontend), `cryptography` library for RSA-OAEP / PBKDF2 / AES-CTR |
 | Método de cifrado / descifrado (screenshot) | `build_envelope` and `decrypt_result` in `backend/apps/payments/gateways/banorte_crypto.py` |
-| Manual utilizado | Manual de Integración Ventana de Comercio Electrónico Cifrado, Ver. 1.7 |
-| Esquema | Comercio Electrónico Ventana de comercio con 3D Secure (or "con Cybersource y 3D Secure" if contracted; see section 8) |
-| Transacciones | Venta |
+| Normatividad MIT y CIT: ¿almacena datos de tarjetas o clientes? | NO. Card data is captured only inside Banorte's window; we store the Payworks result (referencia, autorización, card brand and type), never card numbers |
+| Diagrama de esquema de conexión | The flow in section 1 of this document |
+| Manual | Manual de Integración Ventana de Comercio Electrónico Cifrado_v1.8 (already marked in form v1.3) |
+| Producto de pago | Ventana de Comercio Electrónico con 3D Secure (or "con Cybersource y 3D Secure" if contracted; see section 8) |
+| Tipos de transacciones | Venta |
 
 **Matriz de pruebas**: three transactions in `PRD` mode with real cards
 (set `PAYMENTS_LIVE=true` only for this window, small amounts):
@@ -193,8 +201,10 @@ executive):
 | Visa, Venta | Top up with a Visa | same |
 | 423 (3D Secure) | Enter a card, press Continuar, then **Cancelar** in the 3D Secure window | Payment fails without a charge; Banorte reports status 3D Secure 423 (expected in `BanorteCheckout.status_3d`; confirm on the first run) |
 
-Afiliación, número de control, referencia, monto, fecha, hora and the last 4
-digits of each card go into the matrix. All three are also in Django admin →
+The matrix (Matriz de Pruebas Ventana de Comercio Electrónico Cifrado) asks for
+afiliación, fecha y hora, monto, número de control, referencia Payworks and the
+card's **first 8 and last 2 digits**. Banorte never sends card digits to us:
+take them from the card used, or from MultiCobros (Transacciones Payworks 2). All three are also in Django admin →
 Operaciones Banorte. Refund the two real sales from MultiCobros afterwards (and
 with the cafetería "Devolver" action so the wallet matches).
 
@@ -221,16 +231,17 @@ credit it with a manual adjustment that cites the referencia.
 
 ## 7. Yearly certificate rotation
 
-Banorte renews the merchant certificate in the first week of March and the old
-one stops working. When `check_banorte` warns, or by mid-February:
+Banorte renews the merchant certificate within the first three months of each
+year and the old key stops working (proven in 2026: the 2025 key gets AUT-10).
+When `check_banorte` warns, or by mid-January:
 
-1. Ask the Banorte executive for the new `LlaveCifrada<year>.zip`.
+1. Ask the Banorte executive for the new `Llave VCE CIFRADO <year>.zip`.
 2. Replace `BANORTE_CERT` in `deploy/.env` (section 3), restart `app`, run
    `check_banorte`.
 3. Make one AUT test top-up from a staging copy, or watch the first live
    top-up's `BanorteCheckout.last_error`.
 
-The certificate delivered in `LlaveCifrada2025.zip` expired on 2026-02-21.
+Current: `Llave VCE CIFRADO 2026.zip`, valid until 2027-02-09.
 
 ## 8. Open points
 

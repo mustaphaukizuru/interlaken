@@ -1,6 +1,6 @@
 """
 payments/gateways/banorte.py — Banorte "Ventana de Comercio Electrónico Cifrada"
-(VCE, integration manual v1.7).
+(VCE, integration manual v1.8; encryption unchanged since v1.7).
 
 Flow
 ----
@@ -223,7 +223,7 @@ class BanorteGateway(BaseGateway):
 
     @staticmethod
     def build_params(payment, config: BanorteConfig, *, mode: str, control_number: str) -> dict:
-        """The Payworks variables (manual v1.7 p. 8). Empty values are dropped by
+        """The Payworks variables (manual v1.8 p. 8). Empty values are dropped by
         the serialiser; free text is folded to Banorte's allowed characters."""
         topup = getattr(payment, "related_topup", None)
         matricula = ""

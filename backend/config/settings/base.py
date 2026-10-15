@@ -390,7 +390,7 @@ PAYMENTS_LIVE = env.bool('PAYMENTS_LIVE', default=False)
 # Public origin of this Django API (set by deploy/docker-compose.yml).
 BACKEND_URL = env('BACKEND_URL', default='')
 
-# Afiliación (7 digits), the Payworks *execution-only* user and its password
+# Afiliación (7 digits), the Nick of the Payworks "usuario de motor" and its password
 # (created in MultiCobros → Usuarios), and the terminal id Banorte assigned.
 BANORTE_MERCHANT_ID = env('BANORTE_MERCHANT_ID', default='')
 BANORTE_USER = env('BANORTE_USER', default='')

@@ -1,6 +1,6 @@
 """
 payments/gateways/banorte_crypto.py — Banorte "Ventana de Comercio Electrónico
-Cifrada" (VCE) envelope, per the integration manual v1.7, Anexo B.
+Cifrada" (VCE) envelope, per the integration manual v1.8 (unchanged since v1.7), Anexo B.
 
 The checkout parameters travel to Banorte's lightbox as ONE opaque string::
 

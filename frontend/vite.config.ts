@@ -60,6 +60,9 @@ export default defineConfig(({ command }) => ({
         // NOTE 'Admin*' must not swallow public chunks: AdmissionsPage differs
         // ('Admis'), but keep an eye on future 'Admin…'-named public pages.
         globIgnores: [
+          // Only useful online (it bridges Banorte's checkout script); kept out
+          // of the precache, whose root-level entries need a /static/ rewrite.
+          'banorte-bridge.js',
           '**/assets/AreaChart-*.js',
           '**/assets/useChartEntrance-*.js',
           '**/assets/ChartsSection-*.js',
