@@ -706,6 +706,12 @@ export default function CafeteriaPage() {
                 <strong>Modo de prueba Banorte:</strong> no se realiza ningún cargo real.
               </p>
             )}
+            {topupMethod === 'online' && availability?.certification && (
+              <p className="rounded-xl border border-coral/40 bg-coral-50 px-3 py-2 text-xs text-ink">
+                <strong>Certificación Banorte: cargo real a la tarjeta.</strong> Solo cuentas de prueba
+                ven esta opción; el pago puede devolverse desde MultiCobros.
+              </p>
+            )}
             {topupMethod === 'online' && <BanortePaymentNotice />}
           </>
         )}

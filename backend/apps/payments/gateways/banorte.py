@@ -141,21 +141,35 @@ def _parse_certificate(raw: bytes) -> BanorteCertificate:
 
 
 def online_payments_status(user) -> dict:
-    """Whether ``user`` may pay online right now, and whether it is a test.
+    """Whether ``user`` may pay online right now, and in which stage.
 
-    Live (``PAYMENTS_LIVE=true``): everyone. Local development (``DEBUG`` or
-    ``SQLITE_LOCAL``, the same rule as the sandbox endpoint): everyone, against the mock page or the Payworks simulation. A deployed
-    server that is not live yet runs Banorte's simulation, where every card is
-    approved: opening that to families would hand out free wallet credit, so
-    only the accounts listed in ``PAYMENTS_TEST_EMAILS`` may use it.
+    Returns ``{online, test_mode, certification}``. Three stages, from two
+    settings (``PAYMENTS_LIVE`` = real charges, ``PAYMENTS_OPEN_TO_ALL`` = every
+    family):
+
+    - **Simulation** (``PAYMENTS_LIVE=false``): Banorte approves every card
+      without charging it, so a deployed server offers card payment only to
+      ``PAYMENTS_TEST_EMAILS`` (opening it would hand out free wallet credit).
+      Local development (``DEBUG`` or ``SQLITE_LOCAL``, the sandbox endpoint's
+      rule) offers it to everyone.
+    - **Certification** (``PAYMENTS_LIVE=true``, not open): real charges, still
+      only for ``PAYMENTS_TEST_EMAILS``. Banorte certifies an integration with
+      real (PRD) payments before production, and must not see families pay
+      before its certification letter.
+    - **Open** (both true): every family, real charges.
     """
-    if getattr(settings, "PAYMENTS_LIVE", False):
-        return {"online": True, "test_mode": False}
-    if getattr(settings, "DEBUG", False) or os.getenv("SQLITE_LOCAL"):
-        return {"online": True, "test_mode": True}
+    live = bool(getattr(settings, "PAYMENTS_LIVE", False))
+    if live and getattr(settings, "PAYMENTS_OPEN_TO_ALL", False):
+        return {"online": True, "test_mode": False, "certification": False}
+    if not live and (getattr(settings, "DEBUG", False) or os.getenv("SQLITE_LOCAL")):
+        return {"online": True, "test_mode": True, "certification": False}
     testers = {e.strip().lower() for e in getattr(settings, "PAYMENTS_TEST_EMAILS", []) if e}
     email = (getattr(user, "email", "") or "").strip().lower()
-    return {"online": bool(email) and email in testers, "test_mode": True}
+    return {
+        "online": bool(email) and email in testers,
+        "test_mode": not live,
+        "certification": live,
+    }
 
 
 def new_control_number(payment) -> str:

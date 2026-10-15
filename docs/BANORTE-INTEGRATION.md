@@ -108,12 +108,16 @@ grep -v '^#' multicobros.cer | grep -v CERTIFICATE | tr -d '\r\n'
 
 Modes:
 
-| `PAYMENTS_LIVE` | Credentials | Behaviour |
-|---|---|---|
-| `false` | empty | `/pago/simulado` mock page (local development) |
-| `false` | complete | Real Banorte lightbox, Payworks simulation `BANORTE_MODE` (AUT approves, DEC declines, RND random). No money moves. |
-| `true` | complete | `mode=PRD`, real charges |
-| `true` | incomplete or expired certificate | Top-up refuses to open (families see "no disponible") |
+| Stage | `PAYMENTS_LIVE` | `PAYMENTS_OPEN_TO_ALL` | Who sees card payment | Charges |
+|---|---|---|---|---|
+| Local development (no credentials) | `false` | – | everyone | `/pago/simulado` mock page |
+| **Simulation** | `false` | – | only `PAYMENTS_TEST_EMAILS` | none: Payworks `BANORTE_MODE` (AUT approves, DEC declines, RND random) |
+| **Certification** | `true` | `false` | only `PAYMENTS_TEST_EMAILS` (red "cargo real" banner) | real (`mode=PRD`) |
+| **Open** | `true` | `true` | every family | real (`mode=PRD`) |
+
+With `PAYMENTS_LIVE=true` and incomplete configuration or an expired
+certificate the top-up refuses to open ("no disponible"). `PAYMENTS_OPEN_TO_ALL`
+alone never opens the simulation to families.
 
 Staging always runs `PAYMENTS_LIVE=false` and `BANORTE_MODE=AUT`
 (`deploy/docker-compose.staging.yml`).
@@ -198,8 +202,11 @@ executive):
 | Producto de pago | Ventana de Comercio Electrónico con 3D Secure (or "con Cybersource y 3D Secure" if contracted; see section 8) |
 | Tipos de transacciones | Venta |
 
-**Matriz de pruebas**: three transactions in `PRD` mode with real cards
-(set `PAYMENTS_LIVE=true` only for this window, small amounts):
+**Matriz de pruebas**: three transactions in `PRD` mode with real cards, in
+the **certification** stage (`PAYMENTS_LIVE=true`, `PAYMENTS_OPEN_TO_ALL=false`,
+your account in `PAYMENTS_TEST_EMAILS`, small amounts on the test student).
+Families do not see card payment during this stage. After Banorte's
+certification letter, set `PAYMENTS_OPEN_TO_ALL=true` and restart `app`:
 
 | Row | How | Where to read the values |
 |---|---|---|

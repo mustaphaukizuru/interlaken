@@ -418,6 +418,10 @@ BANORTE_LIGHTBOX_ENV = env('BANORTE_LIGHTBOX_ENV', default='pro')
 # card approved), so only these accounts (comma-separated emails) may pay
 # online there; everyone else sees "pago en caja". Ignored once live.
 PAYMENTS_TEST_EMAILS = env.list('PAYMENTS_TEST_EMAILS', default=[])
+# With PAYMENTS_LIVE=true, card payment stays limited to PAYMENTS_TEST_EMAILS
+# (real charges: Banorte's certification payments) until this is true. Set it
+# only after Banorte's certification letter: it opens card payment to every family.
+PAYMENTS_OPEN_TO_ALL = env.bool('PAYMENTS_OPEN_TO_ALL', default=False)
 
 # ── GOOGLE CALENDAR ───────────────────────────────────────
 # Server-side calendar writes for confirmed bookings use a *service account*

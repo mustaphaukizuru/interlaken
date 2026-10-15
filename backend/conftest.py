@@ -50,6 +50,8 @@ def _test_settings(settings):
     # Same for the Banorte merchant credentials: tests that need them set their
     # own fake ones; nothing may ever build a checkout with the real afiliación.
     settings.PAYMENTS_LIVE = False
+    settings.PAYMENTS_OPEN_TO_ALL = False
+    settings.PAYMENTS_TEST_EMAILS = []
     for name in ("BANORTE_MERCHANT_ID", "BANORTE_USER", "BANORTE_PASSWORD",
                  "BANORTE_TERMINAL_ID", "BANORTE_MERCHANT_CITY", "BANORTE_CERT",
                  "BANORTE_CERT_PATH"):
