@@ -2,11 +2,10 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
-  Coffee, AlertTriangle, GraduationCap, Bell, ArrowRight, Receipt, UserCircle,
+  Coffee, AlertTriangle, GraduationCap, ArrowRight, UserCircle,
   MessageCircle, QrCode, Plus, RefreshCw,
 } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
-import { SectionCard, SectionEmpty } from '@/components/ui/SectionCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -28,18 +27,6 @@ import { LIVE } from '@/lib/live';
 // cafeteria-using family renders the trend.
 const CafeteriaTrendCard = lazy(() => import('@/components/portal/CafeteriaTrendCard'));
 const CafeteriaCategoriesCard = lazy(() => import('@/components/portal/CafeteriaCategoriesCard'));
-
-const payBadge = (s: string) => {
-  if (s === 'success' || s === 'completed') return { cls: 'badge-green', label: 'Completado' };
-  if (s === 'refunded') return { cls: 'badge-green', label: 'Devuelto' };
-  if (s === 'failed') return { cls: 'badge-pink', label: 'Fallido' };
-  if (s === 'processing') return { cls: 'badge-purple', label: 'Procesando' };
-  return { cls: 'badge-amber', label: 'Pendiente' };
-};
-
-const paymentTypeLabel: Record<string, string> = {
-  cafeteria: 'Cafetería', other: 'Otro',
-};
 
 /** Dashboard quick top-up amounts; CafeteriaPage reads `?recarga=<amount>`. */
 const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
@@ -86,7 +73,6 @@ export default function ParentDashboard() {
   const totalBalance = balances.reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const hasLowBalance = balances.some((b) => b.low);
   const hasCafeteria = balances.length > 0;
-  const unread = data?.unread_notifications ?? 0;
 
   const now = new Date(nowMs);
   const todayLine = format(now, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });
@@ -147,7 +133,7 @@ export default function ParentDashboard() {
             <EmptyState
               icon={GraduationCap}
               title="Cuenta sin alumno vinculado"
-              description="Su acceso está activo, pero el colegio aún no ha vinculado un alumno a este correo. Contacte a administración para completar el vínculo; mientras tanto puede actualizar sus datos."
+              description="Su acceso está activo, pero el colegio aún no ha vinculado un alumno a este correo. Contacte a administración para completar el vínculo."
               action={
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <Link to="/contacto" className="btn-pink inline-flex min-h-[44px] items-center justify-center gap-2 text-sm">
@@ -160,9 +146,6 @@ export default function ParentDashboard() {
               }
             />
           </div>
-          <Reveal delay={40}>
-            <AnnouncementsCard announcements={data?.announcements} unread={unread} />
-          </Reveal>
         </>
       ) : (
       <>
@@ -253,39 +236,6 @@ export default function ParentDashboard() {
       {/* Novedades since last visit (P4-11) */}
       <Reveal delay={20} className="mb-6"><NovedadesPanel /></Reveal>
 
-      {/* 4. Avisos (unread + latest) · 5. Últimos pagos */}
-      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Reveal delay={40} className="h-full">
-          <AnnouncementsCard announcements={data?.announcements} unread={unread} className="h-full" />
-        </Reveal>
-
-        <Reveal delay={110} className="h-full">
-          <SectionCard title="Últimos Pagos" action={{ to: '/portal/pagos', label: 'Ver todos' }} className="h-full">
-            {!data?.recent_payments?.length ? (
-              <SectionEmpty icon={Receipt}>Sin pagos registrados</SectionEmpty>
-            ) : (
-              <div>
-                {data.recent_payments.slice(0, 5).map((p, i) => {
-                  const b = payBadge(p.status);
-                  return (
-                    <div key={p.id} className={`flex items-center justify-between px-5 py-[13px] ${i === 0 ? '' : 'border-t border-cream'}`}>
-                      <div>
-                        <div className="text-[13.5px] font-semibold text-ink">{paymentTypeLabel[p.type] ?? p.type}</div>
-                        <div className="text-[12px] text-subtle">{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-head text-[14px] font-bold text-ink">${p.amount}</div>
-                        <span className={`${b.cls} mt-[3px]`}>{b.label}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </SectionCard>
-        </Reveal>
-      </div>
-
       {/* 6. Cafeteria spending trend + category breakdown — cafeteria families only (lazy chunks) */}
       {hasCafeteria && (
         <Reveal delay={20} className="mb-6">
@@ -360,40 +310,6 @@ function CafeteriaSaldoCard({ total, low, studentsCount }: {
         </div>
       </div>
     </div>
-  );
-}
-
-/** Avisos section: unread count chip + latest announcements. */
-function AnnouncementsCard({ announcements, unread, className }: {
-  announcements: DashboardData['announcements'];
-  unread: number;
-  className?: string;
-}) {
-  return (
-    <SectionCard title="Avisos Escolares" action={{ to: '/portal/comunicados', label: 'Ver todos' }} className={className}>
-      {unread > 0 && (
-        <div className="border-b border-cream px-5 py-2.5">
-          <span className="badge-pink">{unread} sin leer</span>
-        </div>
-      )}
-      {!announcements?.length ? (
-        <SectionEmpty icon={Bell}>Sin avisos</SectionEmpty>
-      ) : (
-        <div>
-          {announcements.slice(0, 4).map((a, i) => (
-            <Link
-              key={a.id}
-              to={`/portal/comunicados/${a.id}`}
-              className={`block px-5 py-[13px] transition hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple/30 ${i === 0 ? '' : 'border-t border-cream'}`}
-            >
-              <div className="text-[13.5px] font-semibold text-ink">{a.title}</div>
-              <div className="mt-0.5 line-clamp-2 text-[13px] text-muted">{a.body}</div>
-              <div className="mt-1 text-[12px] text-subtle">{format(new Date(a.created_at), 'd MMM', { locale: es })}</div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </SectionCard>
   );
 }
 

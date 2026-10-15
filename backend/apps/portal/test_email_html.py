@@ -9,7 +9,7 @@ pytestmark = pytest.mark.django_db
 
 
 def test_send_email_is_multipart_with_reply_to(settings):
-    settings.CONTACT_EMAIL = 'info@interlaken.com.mx'
+    settings.CONTACT_FORM_EMAIL = 'pmaya@interlaken.com.mx'  # bitácora ref. 3
     mail.outbox.clear()
     assert send_email('Hola <b>', 'Primera línea.\n\nSegunda & tercera.', ['x@test.mx'], cta_url='https://p/login')
     m = mail.outbox[0]
@@ -29,7 +29,7 @@ def test_contact_form_reply_to_is_visitor(api_client, settings):
         'name': 'Visitante', 'email': 'v@test.mx', 'subject': 'Informes', 'message': 'Hola',
     }, format='json')
     assert resp.status_code in (200, 201), resp.data
-    assert mail.outbox[-1].reply_to == ['v@test.mx'] and mail.outbox[-1].to == ['info@interlaken.com.mx']
+    assert mail.outbox[-1].reply_to == ['v@test.mx'] and mail.outbox[-1].to == ['pmaya@interlaken.com.mx']
 
 
 def test_send_test_email_command():

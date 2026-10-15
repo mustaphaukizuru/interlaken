@@ -388,7 +388,9 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
         # 'Enviar notificación push' toggle; standalone rows keep /portal.
         push_status = Notification.Delivery.SKIPPED
         if ann is None or ann.push_enabled:
-            url = f'/portal/comunicados/{ann.pk}' if ann else '/portal'
+            # Bitácora 10: the family portal no longer has a comunicados page; the push opens the
+            # notification itself, which carries the full text.
+            url = f'/portal/notificaciones/{n.pk}' if ann else '/portal'
             delivered = 0
             for target in targets:
                 delivered += send_web_push(target, n.title, n.message, url=url)

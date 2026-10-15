@@ -59,6 +59,10 @@ class MyAvatarView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        from .profile_lock import locked_response, profile_locked
+
+        if profile_locked(request.user):
+            return locked_response()
         f = request.FILES.get('file')
         if not f:
             return Response({'file': ['Seleccione una imagen.']}, status=status.HTTP_400_BAD_REQUEST)
@@ -83,6 +87,10 @@ class MyAvatarView(APIView):
         return Response(UserSerializer(user, context={'request': request}).data)
 
     def delete(self, request):
+        from .profile_lock import locked_response, profile_locked
+
+        if profile_locked(request.user):
+            return locked_response()
         user: User = request.user
         if user.avatar_file:
             name = user.avatar_file.name

@@ -15,8 +15,7 @@ import { portalApi } from '@/services/api';
 
 /** Where the notification's subject lives, when it lives somewhere. */
 function related(n: { notif_type: string; announcement: number | null }): { to: string; label: string } | null {
-  if (n.announcement) return { to: `/portal/comunicados/${n.announcement}`, label: 'Abrir el comunicado' };
-  if (n.notif_type === 'payment') return { to: '/portal/pagos', label: 'Ver mis pagos' };
+  if (n.notif_type === 'payment') return { to: '/portal/cafeteria', label: 'Ver mi cafetería' };
   if (n.notif_type === 'cafeteria') return { to: '/portal/cafeteria', label: 'Ver la cafetería' };
   return null;
 }
