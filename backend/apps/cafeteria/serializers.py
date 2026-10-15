@@ -15,6 +15,17 @@ from .models import (
     TopUpRequest,
 )
 
+# Minimum online/office top-up. Test accounts may use $1 to try the checkout.
+TOPUP_MIN_AMOUNT = Decimal('20.00')
+TOPUP_TESTER_MIN_AMOUNT = Decimal('1.00')
+
+
+def topup_min_amount(user) -> Decimal:
+    """The smallest top-up ``user`` may request."""
+    from apps.payments.gateways.banorte import is_payment_tester
+
+    return TOPUP_TESTER_MIN_AMOUNT if user is not None and is_payment_tester(user) else TOPUP_MIN_AMOUNT
+
 
 class LoyverseProfileSerializer(serializers.ModelSerializer):
     """Read-only Loyverse customer snapshot for the admin student console."""
@@ -149,9 +160,18 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
     # DEBIT the child's balance (add_points_to_customer(points<0)). Match the
     # payment-initiation floor and add a sane ceiling against fat-finger typos.
     # Match parent UI copy: mínimo $20 · máximo $2,000 (fat-finger guard).
+    # Test accounts (PAYMENTS_TEST_EMAILS) may go down to $1 to try the
+    # Banorte checkout cheaply; validate_amount applies the per-user floor.
     amount = serializers.DecimalField(
         max_digits=10, decimal_places=2,
-        min_value=Decimal('20.00'), max_value=Decimal('2000.00'))
+        min_value=TOPUP_TESTER_MIN_AMOUNT, max_value=Decimal('2000.00'))
+
+    def validate_amount(self, value):
+        request = self.context.get('request')
+        if value < topup_min_amount(getattr(request, 'user', None)):
+            raise serializers.ValidationError(
+                f'El monto mínimo por recarga es ${TOPUP_MIN_AMOUNT:.0f}.')
+        return value
 
     class Meta:
         model = TopUpRequest

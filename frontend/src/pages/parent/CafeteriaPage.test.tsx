@@ -387,3 +387,33 @@ describe('CafeteriaPage top-up amounts', () => {
     expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
   });
 });
+
+describe('CafeteriaPage $1 test top-up', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+  });
+
+  it('offers "$1 (prueba)" to test accounts only', async () => {
+    vi.mocked(paymentsApi.getAvailability).mockResolvedValueOnce(
+      { data: { online: true, test_mode: false, certification: false, min_amount: '1.00' } } as never);
+    const u = userEvent.setup();
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(await screen.findByRole('button', { name: '$1 (prueba)' }));
+    expect(screen.getByLabelText('Monto (MXN)')).toHaveValue(1);
+    expect(screen.getByText(/Mínimo \$1 /)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
+  });
+
+  it('families do not see it', async () => {
+    vi.mocked(paymentsApi.getAvailability).mockResolvedValueOnce(
+      { data: { online: true, test_mode: false, certification: false, min_amount: '20.00' } } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await screen.findByText(/Mínimo \$20 /);
+    expect(screen.queryByRole('button', { name: '$1 (prueba)' })).toBeNull();
+  });
+});

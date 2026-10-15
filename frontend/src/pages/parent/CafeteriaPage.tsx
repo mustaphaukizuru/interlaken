@@ -83,6 +83,9 @@ export default function CafeteriaPage() {
     staleTime: 60_000,
   });
   const onlineAvailable = availability?.online ?? false;
+  // Test accounts may top up $1 to try the checkout; families keep $20.
+  const topupMin = availability?.min_amount ? Number(availability.min_amount) : TOPUP_MIN;
+  const topupPresets = topupMin < TOPUP_MIN ? [1, ...TOPUP_PRESETS] : TOPUP_PRESETS;
   const topupMethod: 'online' | 'office' = onlineAvailable ? chosenMethod : 'office';
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
@@ -215,7 +218,7 @@ export default function CafeteriaPage() {
   const topupAmountNum = parseFloat(topupAmount);
   const topupAmountValid =
     Number.isFinite(topupAmountNum)
-    && topupAmountNum >= TOPUP_MIN
+    && topupAmountNum >= topupMin
     && topupAmountNum <= TOPUP_MAX;
 
   const navigate = useNavigate();
@@ -650,22 +653,22 @@ export default function CafeteriaPage() {
                 id="topup-amount"
                 type="number"
                 inputMode="decimal"
-                min={TOPUP_MIN}
+                min={topupMin}
                 max={TOPUP_MAX}
                 className="input-field min-h-[44px] text-base"
                 placeholder="Ej. 200"
                 value={topupAmount}
                 onChange={(e) => setTopupAmount(e.target.value)}
               />
-              <p className="mt-1 text-xs text-subtle">Mínimo ${TOPUP_MIN} · Máximo ${TOPUP_MAX.toLocaleString('es-MX')}</p>
+              <p className="mt-1 text-xs text-subtle">Mínimo ${topupMin} · Máximo ${TOPUP_MAX.toLocaleString('es-MX')}</p>
               {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > TOPUP_MAX && (
                 <p className="mt-1 text-xs text-coral">El monto máximo por recarga es ${TOPUP_MAX.toLocaleString('es-MX')}.</p>
               )}
-              {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > 0 && topupAmountNum < TOPUP_MIN && (
-                <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${TOPUP_MIN}.</p>
+              {topupAmount !== '' && Number.isFinite(topupAmountNum) && topupAmountNum > 0 && topupAmountNum < topupMin && (
+                <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${topupMin}.</p>
               )}
               <div className="mt-2.5 flex flex-wrap gap-2">
-                {TOPUP_PRESETS.map((amt) => (
+                {topupPresets.map((amt) => (
                   <button
                     key={amt}
                     type="button"
@@ -676,7 +679,7 @@ export default function CafeteriaPage() {
                         : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
                     }`}
                   >
-                    ${amt}
+                    {amt < TOPUP_MIN ? `$${amt} (prueba)` : `$${amt}`}
                   </button>
                 ))}
               </div>

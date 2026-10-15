@@ -661,7 +661,12 @@ class TestOnlineAvailability:
         assert not Payment.objects.exists()
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data == {"online": False, "test_mode": True, "certification": False}
+        assert avail.data | {"min_amount": None} == {
+            "min_amount": None,
+            "online": False,
+            "test_mode": True,
+            "certification": False,
+        }
 
     def test_listed_tester_can(self, api_client, deployed_not_live):
         parent, student = _family()
@@ -671,7 +676,12 @@ class TestOnlineAvailability:
         assert resp.status_code == 201, resp.data
         assert resp.data["checkout"]["kind"] == "lightbox"
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data == {"online": True, "test_mode": True, "certification": False}
+        assert avail.data | {"min_amount": None} == {
+            "min_amount": None,
+            "online": True,
+            "test_mode": True,
+            "certification": False,
+        }
 
     def test_office_top_up_is_unaffected(self, api_client, deployed_not_live):
         parent, student = _family()
@@ -683,15 +693,21 @@ class TestOnlineAvailability:
         )
         assert resp.status_code == 201, resp.data
 
-    def test_certification_stage_is_real_money_for_testers_only(self, api_client, deployed_not_live):
+    def test_certification_stage_is_real_money_for_testers_only(
+        self, api_client, deployed_not_live
+    ):
         deployed_not_live.PAYMENTS_LIVE = True
         deployed_not_live.PAYMENTS_OPEN_TO_ALL = False
         family, family_child = _family()
         resp = _start(api_client, family, family_child)
         assert resp.status_code == 400
         assert resp.data["code"] == "online_unavailable"
-        assert api_client.get(reverse("payment-availability")).data == {
-            "online": False, "test_mode": False, "certification": True}
+        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None} == {
+            "min_amount": None,
+            "online": False,
+            "test_mode": False,
+            "certification": True,
+        }
 
         tester, child = _family()
         tester.email = "probador@interlaken.test"
@@ -699,8 +715,12 @@ class TestOnlineAvailability:
         resp = _start(api_client, tester, child)
         assert resp.status_code == 201, resp.data
         assert BanorteCheckout.objects.get(payment_id=resp.data["payment_id"]).mode == "PRD"
-        assert api_client.get(reverse("payment-availability")).data == {
-            "online": True, "test_mode": False, "certification": True}
+        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None} == {
+            "min_amount": None,
+            "online": True,
+            "test_mode": False,
+            "certification": True,
+        }
 
     def test_everyone_once_open(self, api_client, deployed_not_live):
         deployed_not_live.PAYMENTS_LIVE = True
@@ -708,7 +728,12 @@ class TestOnlineAvailability:
         parent, _ = _family()
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data == {"online": True, "test_mode": False, "certification": False}
+        assert avail.data | {"min_amount": None} == {
+            "min_amount": None,
+            "online": True,
+            "test_mode": False,
+            "certification": False,
+        }
 
     def test_open_flag_alone_never_opens_the_simulation(self, api_client, deployed_not_live):
         deployed_not_live.PAYMENTS_OPEN_TO_ALL = True  # PAYMENTS_LIVE still false
@@ -797,3 +822,38 @@ class TestAdminAlerts:
         call_command("banorte_pending_report", stdout=out)
         assert "nothing to check" in out.getvalue()
         assert mailoutbox == []
+
+
+# ── $1 top-ups for test accounts ─────────────────────────────
+
+
+@pytest.mark.django_db
+class TestTesterMinimum:
+    @pytest.fixture
+    def tester_settings(self, banorte):
+        banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]
+        return banorte
+
+    def _post(self, api_client, user, student, amount):
+        api_client.force_authenticate(user=user)
+        return api_client.post(
+            reverse("cafeteria-topup"),
+            {"student": student.id, "amount": amount, "method": "office"},
+            format="json",
+        )
+
+    def test_tester_may_top_up_one_peso(self, api_client, tester_settings):
+        tester, child = _family()
+        tester.email = "probador@interlaken.test"
+        tester.save(update_fields=["email"])
+        assert self._post(api_client, tester, child, "1.00").status_code == 201
+        avail = api_client.get(reverse("payment-availability")).data
+        assert avail["min_amount"] == "1.00"
+
+    def test_families_keep_the_twenty_peso_minimum(self, api_client, tester_settings):
+        parent, child = _family()
+        resp = self._post(api_client, parent, child, "1.00")
+        assert resp.status_code == 400
+        assert "20" in str(resp.data["amount"])
+        assert self._post(api_client, parent, child, "20.00").status_code == 201
+        assert api_client.get(reverse("payment-availability")).data["min_amount"] == "20.00"
