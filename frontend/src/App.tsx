@@ -5,6 +5,7 @@ import { ToastHost } from '@/components/ui/ToastHost';
 
 import { bootstrapSession } from './services/api';
 import { useAuthStore } from './store/authStore';
+import { bindQueryCacheToUser } from './lib/queryCacheOwner';
 
 // Layouts & guards are part of the shell — keep them in the main chunk.
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
@@ -99,6 +100,8 @@ const queryClient = new QueryClient({
     queries: { retry: 1, staleTime: 1000 * 60 * 5 },
   },
 });
+// Cached data belongs to one user: empty it on every login/logout/switch.
+bindQueryCacheToUser(queryClient);
 
 /** Lightweight fallback shown while a route chunk loads. */
 function RouteFallback() {
