@@ -42,7 +42,8 @@ class ContactCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         message = serializer.save()
 
-        recipient = settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
+        recipient = (getattr(settings, 'CONTACT_FORM_EMAIL', '') or settings.CONTACT_EMAIL
+                     or settings.DEFAULT_FROM_EMAIL)
         # Reply-To is the visitor, so staff answer them with one click.
         # (lazy import: apps.portal.services imports from apps.core at module load)
         from apps.portal.services import send_email
@@ -141,8 +142,23 @@ class FacturacionRequestView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
-    FIELDS = ('name', 'email', 'phone', 'student', 'rfc', 'razon_social', 'regimen', 'cp',
-              'uso_cfdi', 'concepto', 'monto', 'fecha_pago', 'referencia', 'notes')
+    # Mismos 7 campos, todos obligatorios, que el formulario oficial del colegio
+    # (interlaken.com.mx/index-7.html). Bitácora 13/10/2026, ref. 8.
+    FIELDS = ('student', 'razon_social', 'rfc', 'cp', 'regimen', 'email', 'phone')
+    REGIMENES = (
+        'Régimen de sueldos y salarios e ingresos asimilados a salarios',
+        'Régimen simplificado de confianza',
+        'Régimen de las personas físicas con actividades empresariales y profesionales',
+        'Régimen de incorporación fiscal',
+        'Régimen general de ley personas morales',
+        'Régimen simplificado de ley personas morales',
+        'Régimen de pequeños contribuyentes',
+        'Régimen de arrendamiento',
+        'Régimen de enajenación o adquisición de bienes',
+        'Régimen intermedio de las personas físicas con actividades empresariales',
+        'Régimen simplificado de ley personas físicas',
+        'Régimen de las actividades empresariales con ingresos a través de plataformas tecnológicas.',
+    )
 
     def post(self, request):
         from apps.portal.services import send_email
@@ -151,43 +167,46 @@ class FacturacionRequestView(APIView):
 
         d = {k: str(request.data.get(k, '') or '').strip() for k in self.FIELDS}
         errors = {}
-        for k in ('name', 'email', 'rfc', 'razon_social', 'cp', 'concepto', 'monto', 'fecha_pago'):
+        for k in self.FIELDS:
             if not d[k]:
                 errors[k] = ['Requerido.']
         if d['email'] and '@' not in d['email']:
             errors['email'] = ['Correo inválido.']
         if d['rfc'] and not (12 <= len(d['rfc']) <= 13):
             errors['rfc'] = ['El RFC debe tener 12 o 13 caracteres.']
+        if d['cp'] and not (d['cp'].isdigit() and len(d['cp']) == 5):
+            errors['cp'] = ['El código postal debe tener 5 dígitos.']
+        if d['regimen'] and d['regimen'] not in self.REGIMENES:
+            errors['regimen'] = ['Seleccione un régimen fiscal de la lista.']
+        phone_digits = ''.join(ch for ch in d['phone'] if ch.isdigit())
+        if d['phone'] and len(phone_digits) != 10:
+            errors['phone'] = ['Escriba el teléfono a 10 dígitos: (00) 0000-0000.']
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
+        rfc = d['rfc'].upper()
         body = '\n'.join([
-            f'Solicitante: {d["name"]} <{d["email"]}> {d["phone"]}'.rstrip(),
-            f'Alumno: {d["student"] or "-"}',
-            '',
-            f'RFC: {d["rfc"].upper()}',
+            f'Nombre del alumno: {d["student"]}',
             f'Razón social: {d["razon_social"]}',
-            f'Régimen fiscal: {d["regimen"] or "-"}',
+            f'RFC: {rfc}',
             f'Código postal: {d["cp"]}',
-            f'Uso de CFDI: {d["uso_cfdi"] or "-"}',
-            '',
-            f'Concepto: {d["concepto"]}',
-            f'Monto: {d["monto"]}',
-            f'Fecha de pago: {d["fecha_pago"]}',
-            f'Referencia / comprobante: {d["referencia"] or "-"}',
-            '',
-            f'Notas: {d["notes"] or "-"}',
+            f'Régimen fiscal: {d["regimen"]}',
+            f'Correo para enviar facturas: {d["email"]}',
+            f'Teléfono de contacto: {d["phone"]}',
         ])
         ContactMessage.objects.create(
-            name=d['name'], email=d['email'],
-            subject=f'[Facturación] {d["rfc"].upper()} · {d["concepto"]}'[:200], message=body)
+            name=d['razon_social'][:120], email=d['email'],
+            subject=f'[Facturación] {rfc} · {d["student"]}'[:200], message=body)
         recipient = getattr(settings, 'BILLING_EMAIL', '') or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
-        send_email(f'[Facturación] Solicitud de CFDI: {d["razon_social"]}', body, [recipient],
+        send_email(f'[Facturación] Solicitud de factura: {d["razon_social"]}', body, [recipient],
                    reply_to=d['email'], html=False)
-        send_email('Recibimos su solicitud de factura - Colegio Interlaken',
-                   f'Hola {d["name"]},\n\nRecibimos su solicitud de CFDI para {d["razon_social"]} '
-                   f'({d["rfc"].upper()}). Recuerde que las facturas solo se emiten dentro del mes del pago.\n\n'
-                   f'Le responderemos desde {recipient}.\n\nColegio Interlaken',
+        send_email('Recibimos su solicitud de facturación - Colegio Interlaken',
+                   f'Recibimos su solicitud de facturación para {d["razon_social"]} ({rfc}), '
+                   f'alumno {d["student"]}.\n\n'
+                   'A partir de ahora recibirá sus facturas cada mes, 24 horas hábiles después de '
+                   'realizar sus pagos. Solo se emiten facturas del mes en curso y no es posible '
+                   'cancelar ni cambiar facturas fuera del mes en que se realizó el pago.\n\n'
+                   f'Si algún dato cambia, escríbanos a {recipient}.\n\nColegio Interlaken',
                    [d['email']], reply_to=recipient)
         return Response({'detail': 'Solicitud enviada.'}, status=status.HTTP_201_CREATED)
 

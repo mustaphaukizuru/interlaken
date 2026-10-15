@@ -50,6 +50,8 @@ const DEFAULT_MENU: MenuGroupEntry[] = [
       { label: 'Quiénes Somos', to: '/nosotros', icon: Users },
       { label: 'Modelo Educativo', to: '/modelo-educativo', icon: BookOpen },
       { label: 'Galería', to: '/galeria', icon: Camera },
+      { label: 'Calendario escolar', to: '/calendario', icon: CalendarDays },
+      { label: 'Plataformas', to: '/plataformas', icon: MonitorSmartphone },
     ],
   },
   {
@@ -70,10 +72,9 @@ const DEFAULT_MENU: MenuGroupEntry[] = [
     ],
   },
   {
-    label: 'Comunidad',
+    label: 'Pagos',
     items: [
-      { label: 'Plataformas', to: '/comunidad/plataformas', icon: MonitorSmartphone },
-      { label: 'Calendario escolar', to: '/calendario', icon: CalendarDays },
+      { label: 'Colegiaturas y cafetería', to: '/pagos', icon: CircleDollarSign },
       { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
     ],
   },
@@ -270,11 +271,14 @@ export function PublicLayout() {
 
           {/* CTA */}
           <div className="hidden lg:flex items-center gap-3">
-            <Link to="/agendar-visita" className="btn-primary text-xs px-4 py-2">
-              Agendar Visita
-            </Link>
+            <a href="https://interlaken.servoescolar.mx" target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs px-4 py-2">
+              Pagos
+            </a>
             <Link to="/login" className="btn-secondary text-xs px-4 py-2">
-              Portal
+              Cafetería
+            </Link>
+            <Link to="/agendar-visita" className="btn-primary text-xs px-4 py-2">
+              Agendar visita
             </Link>
           </div>
 
@@ -314,11 +318,14 @@ export function PublicLayout() {
             className="lg:hidden bg-white border-t border-line px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto"
           >
             <div className="flex flex-col gap-2 pb-2">
-              <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-pink justify-center min-h-[44px]">
-                Agendar Visita
-              </Link>
+              <a href="https://interlaken.servoescolar.mx" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className="btn-secondary justify-center min-h-[44px]">
+                Pagos
+              </a>
               <Link to="/login" onClick={() => setOpen(false)} className="btn-secondary justify-center min-h-[44px]">
-                Portal
+                Cafetería
+              </Link>
+              <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-pink justify-center min-h-[44px]">
+                Agendar visita
               </Link>
             </div>
 

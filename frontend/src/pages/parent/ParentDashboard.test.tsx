@@ -178,18 +178,13 @@ describe('ParentDashboard', () => {
     const saldo = await screen.findByText('Saldo Cafetería');
     const alert = screen.getByText(/Saldo bajo en cafetería/i);
     const switcher = screen.getByRole('group', { name: /Seleccionar alumno/i });
-    const avisos = screen.getByText('Avisos Escolares');
-    const pagos = screen.getByText('Últimos Pagos');
-
-    // (1) alert → (2) switcher → (3) saldo + top-up → (4) avisos → (5) pagos.
+    // (1) alert → (2) switcher → (3) saldo + top-up.
     expectBefore(alert, switcher);
     expectBefore(switcher, saldo);
-    expectBefore(saldo, avisos);
-    expectBefore(avisos, pagos);
 
-    // Avisos = unread count + latest.
-    expect(screen.getByText('3 sin leer')).toBeInTheDocument();
-    expect(screen.getByText('Junta de padres')).toBeInTheDocument();
+    // Bitácora 10 (14/10/2026): no comunicados and no payments on the family dashboard.
+    expect(screen.queryByText('Avisos Escolares')).toBeNull();
+    expect(screen.queryByText('Últimos Pagos')).toBeNull();
 
     // The tuition/colegiaturas UI must NOT resurface on the dashboard.
     expect(screen.queryByText(/colegiatura/i)).toBeNull();

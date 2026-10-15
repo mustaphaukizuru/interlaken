@@ -23,8 +23,9 @@ describe('groupNotifs', () => {
 });
 
 describe('notifDestination', () => {
-  it('deep-links comunicados first, then by type', () => {
-    expect(notifDestination(base({ announcement: 9, notif_type: 'payment' }))).toBe('/portal/comunicados/9');
+  it('opens comunicado notifications themselves (no comunicados page) and links by type', () => {
+    expect(notifDestination(base({ id: 5, announcement: 9, notif_type: 'info' }))).toBe('/portal/notificaciones/5');
+    expect(notifDestination(base({ notif_type: 'payment' }))).toBe('/portal/cafeteria');
     expect(notifDestination(base({ notif_type: 'cafeteria' }))).toBe('/portal/cafeteria');
   });
 

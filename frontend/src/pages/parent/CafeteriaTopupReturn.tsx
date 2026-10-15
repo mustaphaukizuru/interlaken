@@ -136,7 +136,7 @@ export default function CafeteriaTopupReturn() {
               <Coffee className="h-4 w-4" /> {outcome === 'failed' ? 'Intentar de nuevo' : 'Ver saldo de cafetería'}
             </Link>
             {outcome !== 'loading' && (
-              <Link to="/portal/pagos" className="btn-outline min-h-[44px] w-full text-sm">
+              <Link to="/portal/cafeteria" className="btn-outline min-h-[44px] w-full text-sm">
                 {outcome === 'success' ? 'Ver historial y descargar comprobante' : 'Ver historial de pagos'}
               </Link>
             )}

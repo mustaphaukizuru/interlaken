@@ -68,14 +68,13 @@ describe('NotificationDetailPage', () => {
     expect(markRead).not.toHaveBeenCalled();
   });
 
-  it('links to the comunicado when the notification is about one', async () => {
+  it('shows a comunicado notification without linking to the removed comunicados page', async () => {
     getNotification.mockResolvedValue({
       data: { ...notif, announcement: 12, announcement_title: 'Junta de padres' },
       } as any);
     renderPage();
-    const link = await screen.findByRole('link', { name: /Abrir el comunicado/ });
-    expect(link).toHaveAttribute('href', '/portal/comunicados/12');
-    expect(screen.getByText('Junta de padres')).toBeInTheDocument();
+    expect(await screen.findByText('Junta de padres')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Abrir el comunicado/ })).not.toBeInTheDocument();
   });
 
   it('surfaces an error state instead of a blank page', async () => {

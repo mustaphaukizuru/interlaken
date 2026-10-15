@@ -390,6 +390,13 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
+    def update(self, request, *args, **kwargs):
+        from .profile_lock import locked_response, profile_locked
+
+        if profile_locked(request.user):
+            return locked_response()
+        return super().update(request, *args, **kwargs)
+
     def get_serializer_context(self):
         # /me is the one read the frontend consumes notif_prefs from.
         context = super().get_serializer_context()

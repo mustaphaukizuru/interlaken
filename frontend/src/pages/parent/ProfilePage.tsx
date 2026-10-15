@@ -34,6 +34,9 @@ export default function ProfilePage() {
   const { get, set } = useUrlFilters();
   const tab = (['perfil', 'seguridad', 'avisos', 'privacidad'].includes(get('tab')) ? get('tab') : 'perfil') as Tab;
   const isFamily = user?.role === 'parent' || user?.role === 'student';
+  // Bitácora 10 (14/10/2026): families cannot edit their profile; the school keeps it.
+  // The server enforces the same rule on PATCH /accounts/me/ and the avatar upload.
+  const locked = isFamily;
   const { data: dash } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => (await portalApi.getDashboard()).data as import('@/types').DashboardData,
@@ -113,7 +116,7 @@ export default function ProfilePage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (firstName.trim() && lastName.trim()) mutation.mutate();
+    if (!locked && firstName.trim() && lastName.trim()) mutation.mutate();
   };
 
   return (
@@ -130,7 +133,7 @@ export default function ProfilePage() {
         </div>
 
         {tab === 'perfil' && (<>
-        <Card>
+        {!locked && <Card>
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-ink">Perfil completo al {completeness}%</p>
             <span className="text-xs text-subtle">{checks.filter((c) => c.ok).length} de {checks.length}</span>
@@ -143,9 +146,15 @@ export default function ProfilePage() {
               {checks.filter((c) => !c.ok).map((c) => <li key={c.label}>· Falta: {c.label}</li>)}
             </ul>
           )}
-        </Card>
+        </Card>}
         <Card>
-          <div className="mb-5 border-b border-line pb-5"><AvatarUpload /></div>
+          {!locked && <div className="mb-5 border-b border-line pb-5"><AvatarUpload /></div>}
+          {locked && (
+            <p className="mb-4 rounded-xl bg-cream-2 px-4 py-3 text-sm text-muted" role="note">
+              Sus datos los actualiza el colegio. ¿Algo está mal?{' '}
+              <a href={`mailto:info@interlaken.com.mx?subject=${encodeURIComponent('Corrección de mis datos en el portal')}`} className="font-semibold text-purple hover:underline">Solicite la corrección</a>.
+            </p>
+          )}
           <form onSubmit={submit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -160,23 +169,23 @@ export default function ProfilePage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="label" htmlFor="pf-first">Nombre</label>
-                <input id="pf-first" className="input-field min-h-[44px] text-base" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                <input id="pf-first" className={`input-field min-h-[44px] text-base ${locked ? 'bg-cream' : ''}`} value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={locked} />
               </div>
               <div>
                 <label className="label" htmlFor="pf-last">Apellidos</label>
-                <input id="pf-last" className="input-field min-h-[44px] text-base" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                <input id="pf-last" className={`input-field min-h-[44px] text-base ${locked ? 'bg-cream' : ''}`} value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={locked} />
               </div>
             </div>
             <div>
               <label className="label" htmlFor="pf-wa">WhatsApp</label>
-              <input id="pf-wa" type="tel" inputMode="tel" className="input-field min-h-[44px] text-base" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ej. 5512345678" />
+              <input id="pf-wa" type="tel" inputMode="tel" className={`input-field min-h-[44px] text-base ${locked ? 'bg-cream' : ''}`} value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder={locked ? 'Sin registrar' : 'Ej. 5512345678'} disabled={locked} />
               <p className="mt-1 text-xs text-subtle">Se usa para avisos y recordatorios del colegio.</p>
             </div>
-            <div className="flex justify-end pt-1">
+            {!locked && <div className="flex justify-end pt-1">
               <Button type="submit" variant="primary" loading={mutation.isPending} disabled={!dirty || !firstName.trim() || !lastName.trim()} className="min-h-[44px]">
                 <Save className="h-4 w-4" /> Guardar cambios
               </Button>
-            </div>
+            </div>}
           </form>
         </Card>
         {isFamily && (

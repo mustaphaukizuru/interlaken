@@ -9,8 +9,8 @@ from apps.core.models import ContactMessage
 pytestmark = pytest.mark.django_db
 
 PAYLOAD = {
-    'name': 'Luis Pérez', 'email': 'luis@test.mx', 'rfc': 'PELU800101AB1', 'razon_social': 'Luis Pérez',
-    'cp': '54000', 'concepto': 'Recarga cafetería', 'monto': '500', 'fecha_pago': '2026-08-10',
+    'student': 'Ana Pérez López', 'razon_social': 'Luis Pérez', 'rfc': 'PELU800101AB1', 'cp': '54000',
+    'regimen': 'Régimen simplificado de confianza', 'email': 'luis@test.mx', 'phone': '(55) 1234-5678',
 }
 
 
@@ -31,6 +31,28 @@ def test_facturacion_validation(api_client, settings):
     settings.RATELIMIT_ENABLE = False
     resp = api_client.post(reverse('facturacion-request'), {**PAYLOAD, 'rfc': 'X'}, format='json')
     assert resp.status_code == 400 and 'rfc' in resp.data
+
+
+@pytest.mark.parametrize('field, value', [
+    ('student', ''), ('razon_social', ''), ('regimen', 'Régimen inventado'),
+    ('cp', '5400'), ('phone', '55 1234'), ('email', 'sin-arroba'),
+])
+def test_facturacion_requires_the_official_seven_fields(api_client, settings, field, value):
+    settings.RATELIMIT_ENABLE = False
+    resp = api_client.post(reverse('facturacion-request'), {**PAYLOAD, field: value}, format='json')
+    assert resp.status_code == 400 and field in resp.data
+
+
+def test_facturacion_body_lists_the_seven_fields(api_client, settings):
+    settings.BILLING_EMAIL = 'facturas@interlaken.com.mx'
+    settings.RATELIMIT_ENABLE = False
+    mail.outbox.clear()
+    assert api_client.post(reverse('facturacion-request'), PAYLOAD, format='json').status_code == 201
+    body = [m for m in mail.outbox if m.to == ['facturas@interlaken.com.mx']][0].body
+    for label in ('Nombre del alumno: Ana Pérez López', 'Razón social: Luis Pérez', 'RFC: PELU800101AB1',
+                  'Código postal: 54000', 'Régimen fiscal: Régimen simplificado de confianza',
+                  'Correo para enviar facturas: luis@test.mx', 'Teléfono de contacto: (55) 1234-5678'):
+        assert label in body
 
 
 def test_inbox_list_filter_and_handle(api_client):

@@ -26,8 +26,8 @@ export const NOTIF_META: Record<Notif['notif_type'], { icon: LucideIcon; cls: st
  * lines and then did nothing when you pressed it.
  */
 export function notifDestination(n: Notif): string {
-  if (n.announcement) return `/portal/comunicados/${n.announcement}`;
-  if (n.notif_type === 'payment') return '/portal/pagos';
+  // Bitácora 10: the portal no longer shows comunicados; the notification itself carries the text.
+  if (n.notif_type === 'payment') return '/portal/cafeteria';
   if (n.notif_type === 'cafeteria') return '/portal/cafeteria';
   return `/portal/notificaciones/${n.id}`;
 }

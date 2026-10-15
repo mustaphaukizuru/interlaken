@@ -68,7 +68,9 @@ describe('ProfilePage', () => {
     });
   });
 
-  it('PATCHes name and WhatsApp when the form is dirty and saved', async () => {
+  // Staff and admins still edit their own profile; families cannot (bitácora 10).
+  it('PATCHes name and WhatsApp when the form is dirty and saved (staff)', async () => {
+    useAuthStore.setState({ user: { ...SAMPLE_USER, role: 'staff' } });
     const user = userEvent.setup();
     updateMe.mockResolvedValue({
       data: {
@@ -103,9 +105,21 @@ describe('ProfilePage', () => {
     expect(useAuthStore.getState().user?.first_name).toBe('Ana María');
   });
 
-  it('keeps Guardar disabled when the form is unchanged', () => {
+  it('keeps Guardar disabled when the form is unchanged (staff)', () => {
+    useAuthStore.setState({ user: { ...SAMPLE_USER, role: 'staff' } });
     renderPage();
     expect(screen.getByRole('button', { name: /guardar cambios/i })).toBeDisabled();
+    expect(updateMe).not.toHaveBeenCalled();
+  });
+
+  it('shows a read-only profile to families: no save, no photo upload, a correction link', () => {
+    renderPage(); // SAMPLE_USER is a parent
+    expect(screen.getByLabelText('Nombre')).toBeDisabled();
+    expect(screen.getByLabelText('Apellidos')).toBeDisabled();
+    expect(screen.getByLabelText('WhatsApp')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /guardar cambios/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Sus datos los actualiza el colegio/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Solicite la corrección/ })).toHaveAttribute('href', expect.stringContaining('mailto:info@interlaken.com.mx'));
     expect(updateMe).not.toHaveBeenCalled();
   });
 });

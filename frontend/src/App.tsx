@@ -38,6 +38,7 @@ const NivelPage       = lazy(() => import('./pages/public/NivelPage'));
 const ModeloEducativoPage = lazy(() => import('./pages/public/ModeloEducativoPage'));
 const GaleriaPage     = lazy(() => import('./pages/public/GaleriaPage'));
 const PlataformasPage = lazy(() => import('./pages/public/PlataformasPage'));
+const PagosPage = lazy(() => import('./pages/public/PagosPage'));
 const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
 
 // Auth
@@ -49,10 +50,9 @@ const ParentDashboard = lazy(() => import('./pages/parent/ParentDashboard'));
 const CafeteriaPage   = lazy(() => import('./pages/parent/CafeteriaPage'));
 const CredencialPage  = lazy(() => import('./pages/parent/CredencialPage'));
 const CafeteriaTopupReturn = lazy(() => import('./pages/parent/CafeteriaTopupReturn'));
-const PaymentsPage    = lazy(() => import('./pages/parent/PaymentsPage'));
-const ComunicadosPage = lazy(() => import('./pages/parent/ComunicadosPage'));
-const ComunicadoDetailPage = lazy(() => import('./pages/parent/ComunicadoDetailPage'));
-const InscripcionesPage = lazy(() => import('./pages/parent/InscripcionesPage'));
+// Bitácora 10 (14/10/2026): Pagos shows «Próximamente»; Comunicados and Inscripciones are off the
+// family portal. Their pages stay in the codebase so they can return without a rewrite.
+const PagosProximamentePage = lazy(() => import('./pages/parent/PagosProximamentePage'));
 const NotificationsPage = lazy(() => import('./pages/parent/NotificationsPage'));
 const NotificationDetailPage = lazy(() => import('./pages/parent/NotificationDetailPage'));
 const ProfilePage = lazy(() => import('./pages/parent/ProfilePage'));
@@ -149,7 +149,10 @@ export default function App() {
               <Route path="/modelo-educativo" element={<CmsOverride slug="modelo-educativo"><ModeloEducativoPage /></CmsOverride>} />
               <Route path="/galeria" element={<CmsOverride slug="galeria"><GaleriaPage /></CmsOverride>} />
               <Route path="/niveles/:nivel"   element={<NivelPage />} />
-              <Route path="/comunidad/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
+              {/* Bitácora 13/10/2026: la antigua Plataformas se divide en Pagos y Plataformas. */}
+              <Route path="/comunidad/plataformas" element={<Navigate to="/pagos" replace />} />
+              <Route path="/pagos" element={<PagosPage />} />
+              <Route path="/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
@@ -179,10 +182,10 @@ export default function App() {
               <Route path="cafeteria" element={<CafeteriaPage />} />
               <Route path="credencial" element={<CredencialPage />} />
               <Route path="cafeteria/recarga/retorno" element={<CafeteriaTopupReturn />} />
-              <Route path="pagos"     element={<PaymentsPage />} />
-              <Route path="inscripciones" element={<InscripcionesPage />} />
-              <Route path="comunicados" element={<ComunicadosPage />} />
-              <Route path="comunicados/:id" element={<ComunicadoDetailPage />} />
+              <Route path="pagos"     element={<PagosProximamentePage />} />
+              <Route path="inscripciones" element={<Navigate to="/portal" replace />} />
+              <Route path="comunicados" element={<Navigate to="/portal/notificaciones" replace />} />
+              <Route path="comunicados/:id" element={<Navigate to="/portal/notificaciones" replace />} />
               <Route path="perfil"    element={<ProfilePage />} />
               <Route path="notificaciones" element={<NotificationsPage />} />
               <Route path="notificaciones/:id" element={<NotificationDetailPage />} />

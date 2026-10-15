@@ -6,19 +6,38 @@ import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { contactApi } from '@/services/api';
 
-type Field = 'name' | 'email' | 'phone' | 'student' | 'rfc' | 'razon_social' | 'regimen' | 'cp' | 'uso_cfdi' | 'concepto' | 'monto' | 'fecha_pago' | 'referencia' | 'notes';
+/**
+ * Solicitud de facturación: los mismos 7 campos, todos obligatorios, que el
+ * formulario oficial del colegio (interlaken.com.mx/index-7.html).
+ * Bitácora 13/10/2026, ref. 8. El backend valida lo mismo.
+ */
+type Field = 'student' | 'razon_social' | 'rfc' | 'cp' | 'regimen' | 'email' | 'phone';
 type Form = Record<Field, string>;
-const EMPTY: Form = { name: '', email: '', phone: '', student: '', rfc: '', razon_social: '', regimen: '', cp: '', uso_cfdi: 'D10', concepto: 'Recarga de cafetería', monto: '', fecha_pago: '', referencia: '', notes: '' };
+const FIELDS: Field[] = ['student', 'razon_social', 'rfc', 'cp', 'regimen', 'email', 'phone'];
+const EMPTY: Form = { student: '', razon_social: '', rfc: '', cp: '', regimen: '', email: '', phone: '' };
 
-const USOS = [['D10', 'D10 - Pagos por servicios educativos (colegiaturas)'], ['G03', 'G03 - Gastos en general'], ['S01', 'S01 - Sin efectos fiscales']];
-const REQUIRED: Field[] = ['name', 'email', 'rfc', 'razon_social', 'cp', 'concepto', 'monto', 'fecha_pago'];
+export const REGIMENES = [
+  'Régimen de sueldos y salarios e ingresos asimilados a salarios',
+  'Régimen simplificado de confianza',
+  'Régimen de las personas físicas con actividades empresariales y profesionales',
+  'Régimen de incorporación fiscal',
+  'Régimen general de ley personas morales',
+  'Régimen simplificado de ley personas morales',
+  'Régimen de pequeños contribuyentes',
+  'Régimen de arrendamiento',
+  'Régimen de enajenación o adquisición de bienes',
+  'Régimen intermedio de las personas físicas con actividades empresariales',
+  'Régimen simplificado de ley personas físicas',
+  'Régimen de las actividades empresariales con ingresos a través de plataformas tecnológicas.',
+] as const;
 
-/** CFDI request form (BACKLOG P1-G6): emails facturación with Reply-To the requester. */
+const digits = (v: string) => v.replace(/\D/g, '');
+
 export function FacturacionForm({ billingEmail }: { billingEmail: string }) {
   const [form, setForm] = useState<Form>(EMPTY);
-  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<Field | 'general', string>>>({});
   const [done, setDone] = useState(false);
-  const set = (k: Field) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const set = (k: Field) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
     setErrors((er) => ({ ...er, [k]: undefined }));
   };
@@ -26,21 +45,25 @@ export function FacturacionForm({ billingEmail }: { billingEmail: string }) {
     mutationFn: () => contactApi.requestInvoice(form),
     onSuccess: () => setDone(true),
     onError: (err: unknown) => {
-      const data = (err as { response?: { data?: Record<string, string[]> } })?.response?.data;
+      const data = (err as { response?: { data?: Record<string, string[] | string> } })?.response?.data;
+      const next: Partial<Record<Field | 'general', string>> = {};
       if (data && typeof data === 'object') {
-        const next: Partial<Record<Field, string>> = {};
-        for (const [k, v] of Object.entries(data)) next[k as Field] = Array.isArray(v) ? v[0] : String(v);
-        setErrors(next);
-      } else {
-        setErrors({ notes: 'No se pudo enviar. Intente de nuevo o escriba a ' + billingEmail });
+        for (const [k, v] of Object.entries(data)) {
+          if ((FIELDS as string[]).includes(k)) next[k as Field] = Array.isArray(v) ? v[0] : String(v);
+        }
       }
+      if (Object.keys(next).length === 0) next.general = `No se pudo enviar. Intente de nuevo o escriba a ${billingEmail}.`;
+      setErrors(next);
     },
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const next: Partial<Record<Field, string>> = {};
-    REQUIRED.forEach((k) => { if (!form[k].trim()) next[k] = 'Requerido.'; });
-    if (form.rfc && (form.rfc.trim().length < 12 || form.rfc.trim().length > 13)) next.rfc = 'El RFC debe tener 12 o 13 caracteres.';
+    FIELDS.forEach((k) => { if (!form[k].trim()) next[k] = 'Requerido.'; });
+    const rfc = form.rfc.trim();
+    if (rfc && (rfc.length < 12 || rfc.length > 13)) next.rfc = 'El RFC debe tener 12 o 13 caracteres.';
+    if (form.cp && !/^\d{5}$/.test(form.cp.trim())) next.cp = 'El código postal debe tener 5 dígitos.';
+    if (form.phone && digits(form.phone).length !== 10) next.phone = 'Escriba el teléfono a 10 dígitos: (00) 0000-0000.';
     if (Object.keys(next).length) { setErrors(next); return; }
     send.mutate();
   };
@@ -50,54 +73,45 @@ export function FacturacionForm({ billingEmail }: { billingEmail: string }) {
       <div className="rounded-xl2 border border-green/30 bg-green/5 p-6 text-center" role="status">
         <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-dark" aria-hidden="true" />
         <p className="font-head text-lg font-bold text-ink">Solicitud enviada</p>
-        <p className="mt-1 text-sm text-muted">Le enviamos una confirmación a {form.email}. Recibirá su CFDI desde {billingEmail}.</p>
+        <p className="mt-1 text-sm text-muted">
+          Le enviamos una confirmación a {form.email}. Recibirá sus facturas cada mes desde {billingEmail},
+          24 horas hábiles después de realizar sus pagos.
+        </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-5" aria-label="Solicitud de factura">
-      <fieldset className="space-y-4">
-        <legend className="font-head text-base font-bold text-ink">Quién solicita</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Nombre" value={form.name} onChange={set('name')} error={errors.name} autoComplete="name" required />
-          <Input label="Correo" type="email" inputMode="email" autoComplete="email" value={form.email} onChange={set('email')} error={errors.email} required />
-          <Input label="Teléfono" type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} error={errors.phone} />
-          <Input label="Alumno (nombre y grado)" value={form.student} onChange={set('student')} error={errors.student} />
-        </div>
-      </fieldset>
-      <fieldset className="space-y-4">
-        <legend className="font-head text-base font-bold text-ink">Datos fiscales</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="RFC" value={form.rfc} onChange={set('rfc')} error={errors.rfc} maxLength={13} autoComplete="off" required />
-          <Input label="Razón social (como en la constancia)" value={form.razon_social} onChange={set('razon_social')} error={errors.razon_social} required />
-          <Input label="Régimen fiscal" value={form.regimen} onChange={set('regimen')} error={errors.regimen} placeholder="Ej. 605" />
-          <Input label="Código postal fiscal" inputMode="numeric" value={form.cp} onChange={set('cp')} error={errors.cp} maxLength={5} required />
-          <div className="sm:col-span-2">
-            <label className="label" htmlFor="fx-uso">Uso de CFDI</label>
-            <select id="fx-uso" className="input-field min-h-[44px]" value={form.uso_cfdi} onChange={set('uso_cfdi')}>
-              {USOS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
-        </div>
-      </fieldset>
-      <fieldset className="space-y-4">
-        <legend className="font-head text-base font-bold text-ink">Pago a facturar</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Concepto" value={form.concepto} onChange={set('concepto')} error={errors.concepto} required />
-          <Input label="Monto (MXN)" inputMode="decimal" value={form.monto} onChange={set('monto')} error={errors.monto} required />
-          <Input label="Fecha de pago" type="date" value={form.fecha_pago} onChange={set('fecha_pago')} error={errors.fecha_pago} required hint="Solo se facturan pagos del mes en curso." />
-          <Input label="Referencia o folio del comprobante" value={form.referencia} onChange={set('referencia')} error={errors.referencia} />
-        </div>
-        <div>
-          <label className="label" htmlFor="fx-notes">Notas</label>
-          <textarea id="fx-notes" className="input-field min-h-[80px]" value={form.notes} onChange={set('notes')} />
-          {errors.notes && <p className="mt-1.5 text-xs text-coral-600">{errors.notes}</p>}
-        </div>
-      </fieldset>
+    <form onSubmit={submit} noValidate className="space-y-4" aria-label="Solicitud de facturación">
+      <p className="text-xs text-muted">Todos los campos son obligatorios.</p>
+      <Input label="Nombre del alumno" value={form.student} onChange={set('student')} error={errors.student} autoComplete="off" required />
+      <Input label="Razón social" value={form.razon_social} onChange={set('razon_social')} error={errors.razon_social} hint="Tal como aparece en su constancia de situación fiscal." required />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input label="RFC" value={form.rfc} onChange={set('rfc')} error={errors.rfc} maxLength={13} autoComplete="off" autoCapitalize="characters" required />
+        <Input label="Código postal" inputMode="numeric" value={form.cp} onChange={set('cp')} error={errors.cp} maxLength={5} autoComplete="postal-code" required />
+      </div>
+      <div>
+        <label className="label" htmlFor="fx-regimen">Régimen fiscal</label>
+        <select
+          id="fx-regimen"
+          className="input-field min-h-[44px] text-base"
+          value={form.regimen}
+          onChange={set('regimen')}
+          required
+          aria-invalid={!!errors.regimen}
+          aria-describedby={errors.regimen ? 'fx-regimen-error' : undefined}
+        >
+          <option value="">Seleccione su régimen fiscal</option>
+          {REGIMENES.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        {errors.regimen && <p id="fx-regimen-error" className="mt-1.5 text-xs text-coral-600">{errors.regimen}</p>}
+      </div>
+      <Input label="Correo para enviar facturas" type="email" inputMode="email" autoComplete="email" placeholder="ejemplo@ejemplo.com" value={form.email} onChange={set('email')} error={errors.email} required />
+      <Input label="Teléfono de contacto" type="tel" inputMode="tel" autoComplete="tel" placeholder="(00) 0000-0000" value={form.phone} onChange={set('phone')} error={errors.phone} required />
+      {errors.general && <p className="text-sm text-coral-600" role="alert">{errors.general}</p>}
       <PrivacyNote />
       <Button type="submit" variant="cta" size="lg" loading={send.isPending} className="w-full justify-center">
-        <Send className="h-4 w-4" aria-hidden="true" /> Solicitar factura
+        <Send className="h-4 w-4" aria-hidden="true" /> Enviar solicitud
       </Button>
     </form>
   );

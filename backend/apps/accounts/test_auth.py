@@ -18,6 +18,7 @@ from apps.accounts.factories import (
     AdminFactory,
     ParentFactory,
     StudentProfileFactory,
+    UserFactory,
 )
 from apps.accounts.models import User
 
@@ -377,8 +378,9 @@ class TestCurrentUser:
         assert resp.data["role"] == User.Role.PARENT
         assert "notif_prefs" in resp.data
 
+    # Families cannot edit their profile (bitácora 10, see test_profile_lock.py); staff can.
     def test_patch_updates_name_and_whatsapp(self, api_client):
-        parent = ParentFactory(first_name="Ana", last_name="López", whatsapp="")
+        parent = UserFactory(role=User.Role.STAFF, first_name="Ana", last_name="López", whatsapp="")
         api_client.force_authenticate(user=parent)
         resp = api_client.patch(
             reverse("current-user"),
@@ -394,7 +396,7 @@ class TestCurrentUser:
         assert resp.data["whatsapp"] == "5522222222"
 
     def test_patch_ignores_email_and_role(self, api_client):
-        parent = ParentFactory()
+        parent = UserFactory(role=User.Role.STAFF)
         api_client.force_authenticate(user=parent)
         resp = api_client.patch(
             reverse("current-user"),
@@ -404,5 +406,5 @@ class TestCurrentUser:
         assert resp.status_code == 200, resp.data
         parent.refresh_from_db()
         assert parent.email != "attacker@evil.test"
-        assert parent.role == User.Role.PARENT
+        assert parent.role == User.Role.STAFF
         assert parent.first_name == "Ok"

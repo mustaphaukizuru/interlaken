@@ -253,10 +253,10 @@ export default function RegisterPage() {
           </p>
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
-              to="/portal/inscripciones"
+              to="/portal"
               className="btn-primary focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-2"
             >
-              Ver estado en el portal
+              Ir al portal
             </Link>
             <Link
               to="/"
