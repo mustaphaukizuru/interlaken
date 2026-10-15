@@ -20,6 +20,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
+import { useAuthStore } from '@/store/authStore';
 import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
 import type { CafeteriaBalance, CafeteriaTransaction, CheckoutStart } from '@/types';
 import { closeBanorteLightbox, openBanorteLightbox, type BanorteEvent } from '@/lib/banorteCheckout';
@@ -72,10 +73,12 @@ export default function CafeteriaPage() {
   const [chosenMethod, setTopupMethod] = useState<'online' | 'office'>('online');
   // Card payment is offered only when the server allows it for this family
   // (live, or a listed tester while Banorte runs its simulation).
+  const userId = useAuthStore((s) => s.user?.id ?? null);
   const { data: availability } = useQuery({
-    queryKey: ['payments-availability'],
+    // Per user: the answer depends on who is logged in (test accounts first).
+    queryKey: ['payments-availability', userId],
     queryFn: () => paymentsApi.getAvailability().then((r) => r.data),
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
   const onlineAvailable = availability?.online ?? false;
   const topupMethod: 'online' | 'office' = onlineAvailable ? chosenMethod : 'office';
@@ -685,22 +688,39 @@ export default function CafeteriaPage() {
               <legend className="label">Método de pago</legend>
               <div className="grid gap-2">
                 {([
-                  ['online', 'Pago en línea con tarjeta', 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
+                  ['online', 'Pago en línea con tarjeta (Banorte)', 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
                   ['office', 'Pago en caja escolar', 'Registra la solicitud; paga en efectivo en el colegio.'],
-                ] as const).filter(([v]) => v === 'office' || onlineAvailable).map(([v, title, desc]) => (
-                  <label key={v} htmlFor={`topup-method-${v}`} className={`flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border p-3 ${topupMethod === v ? 'border-purple bg-purple/[0.04]' : 'border-line'}`}>
-                    <input id={`topup-method-${v}`} type="radio" name="topup-method" className="mt-1" value={v} checked={topupMethod === v} onChange={() => setTopupMethod(v)} aria-label={title} />
-                    <span>
-                      <span className="block text-sm font-semibold text-ink">{title}</span>
-                      <span className="block text-xs text-muted">{desc}</span>
-                    </span>
-                  </label>
-                ))}
+                ] as const).map(([v, title, desc]) => {
+                  // Card payment is always shown; until Banorte opens it to this
+                  // family it is disabled and says so (instead of vanishing).
+                  const disabled = v === 'online' && !onlineAvailable;
+                  return (
+                    <label
+                      key={v}
+                      htmlFor={`topup-method-${v}`}
+                      className={`flex min-h-[56px] items-start gap-3 rounded-xl border p-3 ${
+                        disabled ? 'cursor-not-allowed border-line bg-cream/60 opacity-70'
+                          : topupMethod === v ? 'cursor-pointer border-purple bg-purple/[0.04]' : 'cursor-pointer border-line'}`}
+                    >
+                      <input id={`topup-method-${v}`} type="radio" name="topup-method" className="mt-1" value={v} checked={topupMethod === v} onChange={() => setTopupMethod(v)} aria-label={title} disabled={disabled} />
+                      <span>
+                        <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                          {title}
+                          {disabled && (
+                            <span className="rounded-full bg-amber/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber">
+                              Próximamente
+                            </span>
+                          )}
+                        </span>
+                        <span className="block text-xs text-muted">
+                          {disabled ? 'Muy pronto podrá pagar con tarjeta de crédito o débito desde el portal.' : desc}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </fieldset>
-            {!onlineAvailable && (
-              <p className="text-xs text-muted">El pago con tarjeta estará disponible próximamente.</p>
-            )}
             {topupMethod === 'online' && availability?.test_mode && (
               <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
                 <strong>Modo de prueba Banorte:</strong> no se realiza ningún cargo real.

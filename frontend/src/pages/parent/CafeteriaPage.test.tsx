@@ -335,8 +335,10 @@ describe('CafeteriaPage when card payment is not open yet', () => {
     renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
     await screen.findByRole('dialog', { name: 'Recargar cafetería' });
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
-    expect(await screen.findByText('El pago con tarjeta estará disponible próximamente.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Pago en línea con tarjeta')).toBeNull();
+    // Banorte stays visible but disabled until it opens to this family.
+    expect(await screen.findByLabelText('Pago en línea con tarjeta (Banorte)')).toBeDisabled();
+    expect(screen.getByText('Próximamente')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pago en caja escolar')).toBeChecked();
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
     await u.click(screen.getByRole('button', { name: 'Solicitar recarga' }));
     await waitFor(() => expect(cafeteriaApi.requestTopUp).toHaveBeenCalledWith(10, 200, 'office'));
