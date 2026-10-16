@@ -45,7 +45,10 @@ class CafeteriaBalanceAdmin(ModelAdmin):
     list_select_related = ('student__user',)
     # Money is mutated only by the Loyverse sync and the console service layer
     # (which writes a BalanceAdjustment audit row) — never hand-edited here.
-    readonly_fields = ('balance', 'last_synced', 'last_low_balance_alert_at')
+    # ``student`` too: repointing a wallet moves its money to another child,
+    # and the seed stamps decide what the POS mirror may credit.
+    readonly_fields = ('student', 'balance', 'last_synced', 'seeded_at',
+                       'last_low_balance_alert_at', 'last_budget_alert_at')
 
     # Operated from the staff portal (/admin/cafeteria); the Django admin is a
     # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
@@ -66,13 +69,20 @@ class CafeteriaTransactionAdmin(ModelAdmin):
                      'loyverse_receipt_id')
     date_hierarchy = 'date'
     list_select_related = ('student__user',)
-    # Ledger rows come from the Loyverse sync / top-up services; the money and
-    # provenance fields are immutable in the UI.
-    readonly_fields = ('amount', 'balance_after', 'loyverse_receipt_id', 'items', 'date')
+    # Ledger rows come from the Loyverse sync / top-up services and are
+    # immutable: retyping a row's student or type moves money (a refund of a
+    # "purchase" credits, of a "top-up" debits). Corrections go through the
+    # console's audited adjustment/refund instead.
+    readonly_fields = ('student', 'transaction_type', 'amount', 'description', 'date',
+                       'loyverse_receipt_id', 'items', 'balance_after', 'recorded_at',
+                       'applied', 'refund_of')
 
     # Operated from the staff portal (/admin/cafeteria); the Django admin is a
     # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
     def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):
@@ -92,10 +102,12 @@ class TopUpRequestAdmin(ModelAdmin):
     ordering = ('-created_at',)
     date_hierarchy = 'created_at'
     list_select_related = ('student__user',)
-    # Top-ups are created by the online flow / the staff console; the amount and
-    # gateway reference are immutable once the request exists.
+    # Top-ups are created by the online flow / the staff console. Everything
+    # that decides money is immutable here: flipping a completed online top-up
+    # to office + pending and applying it in the console credited it twice.
+    # Only ``notes`` stays editable.
     readonly_fields = (
-        'amount', 'payment_ref', 'created_at', 'processed_at',
+        'student', 'amount', 'method', 'status', 'payment_ref', 'created_at', 'processed_at',
         'pos_loaded_at', 'pos_loaded_by',
         'pos_unload_needed_at', 'pos_unloaded_at', 'pos_unloaded_by',
     )

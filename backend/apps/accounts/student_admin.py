@@ -151,6 +151,7 @@ class AdminStudentUpdateView(APIView):
             return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)
 
         before = _snapshot(profile)
+        old_loyverse_id = profile.loyverse_id or ''
         with transaction.atomic():
             user = profile.user
             user_fields = []
@@ -174,6 +175,14 @@ class AdminStudentUpdateView(APIView):
             prof_fields = list(dict.fromkeys(prof_fields))
             if prof_fields:
                 profile.save(update_fields=prof_fields)
+            if old_loyverse_id and (profile.loyverse_id or '') != old_loyverse_id:
+                # The wallet was seeded from (and is mirrored against) the OLD
+                # customer's points; left as is, the next POS mirror pass would
+                # credit the new customer's points minus this wallet as a fake
+                # "recarga". Re-seed it from the new customer instead (audited).
+                from apps.cafeteria.services import reset_wallet_seed
+                reset_wallet_seed(profile, old_loyverse_id=old_loyverse_id, actor=request.user,
+                                  context='portal: cambio de cliente Loyverse')
             changes = _changes(before, _snapshot(profile))
             if changes:
                 record('update', profile, {'via': 'portal', **changes},

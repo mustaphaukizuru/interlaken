@@ -89,6 +89,11 @@ class CafeteriaTransaction(models.Model):
     # is shown to the family but never debited. Keeps the purchase list
     # complete for pupils imported mid-year without double-charging them.
     applied             = models.BooleanField(default=True)
+    # For a POS REFUND receipt: the receipt number of the sale it reversed
+    # (Loyverse ``refund_for``). Lets the console refuse a second, local refund
+    # of a purchase the cashier already returned on the POS, and lets the poll
+    # keep a POS refund of an already-refunded purchase as history only.
+    refund_of           = models.CharField(max_length=100, blank=True, default='', db_index=True)
 
     class Meta:
         verbose_name = 'Transacción de Cafetería'
@@ -384,6 +389,12 @@ class LoyverseSyncState(models.Model):
     # ``check_sync_fresh`` and the console's Roster light read.
     last_roster_sync_at = models.DateTimeField(
         'Última sincronización del roster', null=True, blank=True)
+    # Cross-process lease for ``sync_purchases``: the cron, the admin buttons
+    # and the refresh endpoint all poll the same store-wide receipt list and
+    # advance the same cursor. A row lease (not the per-process LocMemCache)
+    # is what actually serialises them across gunicorn workers and the cron.
+    purchases_lock_until = models.DateTimeField(
+        'Sondeo de compras en curso hasta', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Estado de sincronización Loyverse'

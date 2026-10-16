@@ -41,8 +41,10 @@ def test_bulk_topup_by_group_preview_and_apply(admin_client):
     assert admin_client.post(url, {'amount': 50, 'reason': '', 'grade': '1° Primaria'}, format='json').status_code == 400
     assert admin_client.post(url, {'amount': 50, 'reason': 'Beca'}, format='json').status_code == 400
     pv = admin_client.post(url, {'amount': 50, 'reason': 'Beca', 'grade': '1° Primaria', 'group': 'A', 'preview': True}, format='json')
-    assert pv.status_code == 200 and pv.data['count'] == 2 and pv.data['total'] == '100'
-    r = admin_client.post(url, {'amount': 50, 'reason': 'Beca', 'grade': '1° Primaria', 'group': 'A'}, format='json')
+    assert pv.status_code == 200 and pv.data['count'] == 2 and pv.data['total'] == '100.00'
+    body = {'amount': 50, 'reason': 'Beca', 'grade': '1° Primaria', 'group': 'A'}
+    assert admin_client.post(url, body, format='json').status_code == 400  # no batch_id
+    r = admin_client.post(url, {**body, 'batch_id': 'test-batch-0001'}, format='json')
     assert r.status_code == 201 and r.data['credited'] == 2
     assert CafeteriaBalance.objects.get(student=a).balance == Decimal('60')
     assert CafeteriaTransaction.objects.filter(student=a, transaction_type='adjustment', description__contains='Recarga masiva').exists()

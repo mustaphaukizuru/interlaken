@@ -33,6 +33,7 @@ from apps.cafeteria.services import (
     get_all_customers,
     get_balance_from_customer,
     get_receipts,
+    pos_queue_reasons,
 )
 
 
@@ -104,7 +105,7 @@ class Command(BaseCommand):
     # ── Phase 2: reconcile balances to Loyverse total_points ────────────────
     def _reconcile_balances(self, apply):
         from apps.accounts.models import StudentProfile
-        from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
+        from apps.cafeteria.models import CafeteriaBalance
 
         self.stdout.write('\nPhase 2 — balance reconcile vs Loyverse total_points')
         try:
@@ -118,13 +119,7 @@ class Command(BaseCommand):
         # Local-only credits Loyverse can't know about yet: completed online
         # top-ups the staff has not loaded into the POS. Reconciling those
         # students would erase real money — skip and surface them instead.
-        pending_pos = set(
-            TopUpRequest.objects.filter(
-                method=TopUpRequest.Method.ONLINE,
-                status=TopUpRequest.Status.COMPLETED,
-                pos_loaded_at__isnull=True,
-            ).values_list('student_id', flat=True)
-        )
+        pending_pos = set(pos_queue_reasons())
 
         students = (StudentProfile.objects.filter(is_active=True)
                     .exclude(loyverse_id='').select_related('user').order_by('id'))
@@ -157,7 +152,7 @@ class Command(BaseCommand):
                 adjust_balance(
                     student, -drift,
                     'Reconciliación con Loyverse (compras con puntos no descontadas)',
-                    admin=None, notify=False, mirror=False,
+                    admin=None, notify=False, pos_points=remote,
                 )
 
         verb = 'reconciled' if apply else 'would reconcile'
