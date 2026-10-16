@@ -368,15 +368,23 @@ class TestAdminPermissions:
 
 class TestRefreshFromLoyverse:
     @patch("apps.cafeteria.views.sync_purchases")
-    def test_parent_can_refresh(self, mock_sync, api_client):
+    def test_admin_can_refresh(self, mock_sync, api_client):
         mock_sync.return_value = {
             "students": 2, "receipts": 1, "created": 1, "notified": 1,
         }
-        api_client.force_authenticate(user=ParentFactory())
+        api_client.force_authenticate(user=AdminFactory())
         resp = api_client.post(reverse("cafeteria-refresh"))
         assert resp.status_code == 200, resp.data
         assert resp.data["created"] == 1
         mock_sync.assert_called_once()
+
+    @patch("apps.cafeteria.views.sync_purchases")
+    def test_parent_refresh_reads_without_a_store_wide_poll(self, mock_sync, api_client):
+        api_client.force_authenticate(user=ParentFactory())
+        resp = api_client.post(reverse("cafeteria-refresh"))
+        assert resp.status_code == 200, resp.data
+        assert resp.data["created"] == 0
+        mock_sync.assert_not_called()
 
     def test_anonymous_cannot_refresh(self, api_client):
         assert api_client.post(reverse("cafeteria-refresh")).status_code in (401, 403)
@@ -1186,7 +1194,10 @@ class TestLedgerSumInvariant:
             "loy-sum", "R-SUM-1", 40,
             date=(timezone.now() + timedelta(seconds=5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))])
 
-        # Manual audited adjustment -10.
+        # Manual audited adjustment -10. The office takes the $10 off the POS
+        # too (Loyverse: 100 - 40 sale - 10 = 50, plus the online $150 still to
+        # load), or the POS mirror would credit it back.
+        mock_get.return_value = {"total_points": 50}
         services.adjust_balance(student, Decimal("-10"), "cobro duplicado")
 
         # Refund the POS purchase (+40, audited).

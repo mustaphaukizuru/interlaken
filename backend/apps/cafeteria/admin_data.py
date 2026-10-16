@@ -28,6 +28,8 @@ Tests never reach Loyverse: every remote call goes through
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import logging
 from datetime import timedelta
 from decimal import Decimal
@@ -620,14 +622,44 @@ def _max_len(limit):
     return check
 
 
-def build_adjustment_spec(*, notify: bool = True, mirror: bool = True) -> ImportSpec:
+def adjustment_reference(file_hash: str, student_pk: int) -> str:
+    """Ledger key of one ajuste masivo row: the same file (byte for byte) can
+    credit or debit each student once, however many times it is committed."""
+    return f"adjust-tx-imp-{file_hash[:24]}-{student_pk}"
+
+
+def _store_points() -> dict[str, Decimal]:
+    """Loyverse points per customer id for the debit guard: one store-wide
+    fetch (2 pages), else the profile snapshots the POS mirror refreshes."""
+    try:
+        return {
+            c.get("id"): services.get_balance_from_customer(c)
+            for c in services.get_all_customers()
+        }
+    except services.LoyverseError as exc:
+        logger.warning("ajuste masivo: Loyverse unreachable (%s); using profile snapshots", exc)
+        return dict(
+            LoyverseProfile.objects.filter(missing_since__isnull=True).values_list(
+                "loyverse_id", "total_points"
+            )
+        )
+
+
+def build_adjustment_spec(*, notify: bool = True, file_hash: str = "") -> ImportSpec:
     """``matricula, monto, motivo`` → one audited ``adjust_balance`` per row.
 
     The dry-run is the commit's own check: the student must exist, the amount
-    must be non-zero and at most $10,000, and the resulting balance must not
-    be negative (``adjust_balance`` re-checks under the row lock at commit).
-    A student appears once per file (in-file duplicates block). An identical
-    adjustment in the last 24 h is flagged as a possible re-upload.
+    must be non-zero and at most $10,000, the resulting balance must not be
+    negative and a debit must pass ``check_pos_debit`` (``adjust_balance``
+    re-checks both under the row lock at commit). A student appears once per
+    file (in-file duplicates block). An identical adjustment in the last 24 h
+    is flagged as a possible re-upload.
+
+    ``file_hash`` (sha256 of the uploaded bytes) keys every row in the ledger
+    (``adjustment_reference``): committing the same file again skips the rows
+    already applied (``omitir``) instead of doubling them. Loyverse is read once
+    per request, before any row lock, and families are notified only after the
+    import transaction commits.
     """
     cache: dict = {}
 
@@ -649,6 +681,14 @@ def build_adjustment_spec(*, notify: bool = True, mirror: bool = True) -> Import
                 ).only("student_id", "amount", "reason")
             }
         return cache["recent"]
+
+    def points_for(student):
+        if not student.loyverse_id:
+            return None
+        if "points" not in cache:
+            cache["points"] = _store_points()
+        value = cache["points"].get(student.loyverse_id)
+        return None if value is None else Decimal(str(value))
 
     def validate_row(data, row):
         if row.errors:
@@ -674,16 +714,37 @@ def build_adjustment_spec(*, notify: bool = True, mirror: bool = True) -> Import
                 f"El ajuste dejaría el saldo en ${resulting:,.2f}; no se permite un saldo "
                 f"negativo (saldo actual ${current:,.2f})."
             )
+        elif amount < 0:
+            try:
+                services.check_pos_debit(student, resulting, points_for(student))
+            except services.PosDebitBlocked as exc:
+                row.error(str(exc))
         if student.status != StudentProfile.Status.ACTIVE:
             row.warn(f"El alumno está en estado «{student.get_status_display()}».")
         motive = str(data.get("motivo") or "").strip().lower()
         if (student.pk, amount, motive) in recent():
             row.warn("Ya existe un ajuste igual en las últimas 24 h (¿archivo repetido?).")
 
+    def already_applied(data, instance):
+        if not file_hash or not data.get("alumno_id"):
+            return None
+        ref = adjustment_reference(file_hash, data["alumno_id"])
+        if CafeteriaTransaction.objects.filter(loyverse_receipt_id=ref).exists():
+            return "Ya aplicado: este mismo archivo se importó antes; la fila se omite."
+        return None
+
     def create(data, actor):
         student = StudentProfile.objects.select_related("user").get(pk=data["alumno_id"])
         return services.adjust_balance(
-            student, data["monto"], data["motivo"], admin=actor, notify=notify, mirror=mirror
+            student,
+            data["monto"],
+            data["motivo"],
+            admin=actor,
+            notify=notify,
+            reference=adjustment_reference(file_hash, student.pk) if file_hash else "",
+            # The points the dry-run checked: no network call under the import's
+            # transaction (and its row locks). adjust_balance re-checks them.
+            pos_points=points_for(student) if data["monto"] < 0 else None,
         )
 
     return ImportSpec(
@@ -714,6 +775,10 @@ def build_adjustment_spec(*, notify: bool = True, mirror: bool = True) -> Import
         ],
         dedupe_keys=[("matricula",)],
         validate_row=validate_row,
+        # Every row is new (crear); db_match only exists so skip_reason can
+        # turn a row this file already applied into "omitir".
+        db_match=lambda data: None,
+        skip_reason=already_applied,
         create=create,
         key_of=lambda data: data.get("matricula") or "",
         max_rows=ADJUSTMENT_MAX_ROWS,
@@ -724,10 +789,11 @@ ADJUSTMENT_TEMPLATE_URL = "/api/v1/cafeteria/admin/balances/import/template/"
 
 
 class AdminAdjustmentImportView(ImportView):
-    """POST .../admin/balances/import/  multipart ``file`` + ``dry_run`` + ``notify`` + ``mirror``.
+    """POST .../admin/balances/import/  multipart ``file`` + ``dry_run`` + ``notify``.
 
-    ``notify`` (default on) tells the families; ``mirror`` (default on) makes
-    the best-effort Loyverse points push of ``adjust_balance``. Cap 500 rows.
+    ``notify`` (default on) tells the families, after the import commits.
+    Re-committing the same file skips the rows it already applied. Cap 500
+    rows. (``mirror`` is no longer read: Loyverse points cannot be written.)
     """
 
     template_url = ADJUSTMENT_TEMPLATE_URL
@@ -735,8 +801,18 @@ class AdminAdjustmentImportView(ImportView):
     def get_spec(self):
         data = self.request.data
         return build_adjustment_spec(
-            notify=truthy(data.get("notify"), True), mirror=truthy(data.get("mirror"), True)
+            notify=truthy(data.get("notify"), True), file_hash=self._file_hash()
         )
+
+    def _file_hash(self) -> str:
+        upload = self.request.FILES.get("file")
+        if upload is None:
+            return ""
+        digest = hashlib.sha256()
+        for chunk in upload.chunks():
+            digest.update(chunk)
+        upload.seek(0)
+        return digest.hexdigest()
 
 
 class AdminAdjustmentTemplateView(ImportTemplateView):
@@ -1076,8 +1152,11 @@ class AdminLoyverseCustomersExportView(AdminExportMixin, AdminLoyverseCustomersV
 
 
 # ── reconciliation ────────────────────────────────────────
-def reconcile_row(student, remote=None, error=None) -> dict:
-    """Local wallet vs Loyverse points for one student (read-only, never writes)."""
+def reconcile_row(student, remote=None, error=None, pos_queue=None) -> dict:
+    """Local wallet vs Loyverse points for one student (read-only, never writes).
+
+    ``pos_queue`` is why Corregir will leave this row alone (money in transit
+    in the POS load/unload queues), or ``None``."""
     balance = _safe_balance(student)
     local = Decimal(str(balance.balance if balance is not None else 0))
     row = {
@@ -1091,6 +1170,7 @@ def reconcile_row(student, remote=None, error=None) -> dict:
         "drift": None,
         "in_sync": False,
         "error": error,
+        "pos_queue": pos_queue,
     }
     if remote is not None:
         row["drift"] = local - remote
@@ -1098,14 +1178,31 @@ def reconcile_row(student, remote=None, error=None) -> dict:
     return row
 
 
-def live_reconcile_row(student) -> dict:
+def reconcile_rows(students, points, *, error=None) -> list[dict]:
+    """Rows for ``students`` against ``points`` (customer id → points, from ONE
+    store-wide fetch). ``error`` marks every row when that fetch failed."""
+    queue = services.pos_queue_reasons([s.id for s in students])
+    rows = []
+    for student in students:
+        remote = points.get(student.loyverse_id)
+        if error:
+            row_error = error
+        elif remote is None:
+            row_error = "El cliente no existe en Loyverse."
+        else:
+            row_error = None
+        rows.append(reconcile_row(student, remote, row_error, queue.get(student.id)))
+    return rows
+
+
+def store_points() -> tuple[dict, str | None]:
+    """``({customer_id: points}, None)``, or ``({}, message)`` when Loyverse fails."""
     try:
-        remote = services.get_balance_from_customer(
-            services.get_customer_by_id(student.loyverse_id)
-        )
-    except services.LoyverseError as exc:
-        return reconcile_row(student, error=str(exc))
-    return reconcile_row(student, remote)
+        customers = services.get_all_customers()
+    except services.LoyverseError:
+        logger.exception("Reconciliation: Loyverse customer list failed")
+        return {}, "No se pudo leer Loyverse; intente de nuevo en unos minutos."
+    return {c.get("id"): services.get_balance_from_customer(c) for c in customers}, None
 
 
 def _money(value):
@@ -1124,8 +1221,9 @@ def serialize_reconcile_row(row: dict) -> dict:
 class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     """GET .../admin/reconcile/?q=&grade=&group=&ordering=&page=&page_size=&only=drift
 
-    Linked, active students: local ledger vs live Loyverse points (one read
-    per row of the page). ``total`` is the matching roster (drives the
+    Linked, active students: local ledger vs live Loyverse points. One
+    store-wide customer fetch per request (2 pages of 250), never one Loyverse
+    read per row: a 100-row page of serial reads blew the 60 s worker budget. ``total`` is the matching roster (drives the
     pager); ``count`` stays the rows returned after ``only=drift`` (which
     filters within the page, as before). ``offset``/``limit``/``has_more``
     describe the page; the legacy ``limit``/``offset`` query params were
@@ -1154,7 +1252,8 @@ class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
         limit = paginator.get_page_size(request) or paginator.page_size
         offset = (paginator.page.number - 1) * limit
         next_url, previous_url = paginator.get_next_link(), paginator.get_previous_link()
-        rows = [serialize_reconcile_row(live_reconcile_row(s)) for s in students]
+        points, error = store_points()
+        rows = [serialize_reconcile_row(r) for r in reconcile_rows(students, points, error=error)]
         if params.get("only") == "drift":
             rows = [r for r in rows if not r["in_sync"]]
         checked = len(students)
@@ -1223,51 +1322,65 @@ def params_only_drift(request) -> bool:
 RECONCILE_MAX_IDS = 50
 
 
-def _read_remote(student) -> Decimal:
-    try:
-        return services.get_balance_from_customer(services.get_customer_by_id(student.loyverse_id))
-    except services.LoyverseError as exc:
-        raise ValueError(f"No se pudo leer el saldo en Loyverse: {exc}") from None
+class _FixSnapshot:
+    """What one Corregir request decides from: every selected wallet's balance,
+    read FIRST, then Loyverse points from one store-wide fetch. The handler
+    re-reads the balance under the row lock and refuses if it moved since (a
+    purchase landed, another admin fixed it): never a delta computed from a
+    stale balance, never a Loyverse read inside the bulk transaction."""
+
+    def __init__(self, ids):
+        self.balances = dict(
+            CafeteriaBalance.objects.filter(student_id__in=ids).values_list("student_id", "balance")
+        )
+        self.points, self.error = store_points()
+
+    def remote(self, student) -> Decimal:
+        if not student.loyverse_id:
+            raise BulkSkip("no está vinculado a Loyverse")
+        if self.error:
+            raise ValueError(self.error)
+        remote = self.points.get(student.loyverse_id)
+        if remote is None:
+            raise BulkSkip("el cliente no existe en Loyverse")
+        return Decimal(str(remote))
+
+    def plan(self, student, payload):
+        remote = self.remote(student)
+        if remote < 0:
+            raise ValueError(f"Loyverse reporta un saldo negativo (${remote:.2f}); revise en el POS.")
+        reason = services.pos_queue_reasons([student.id]).get(student.id)
+        if reason:
+            raise BulkSkip(f"el alumno {reason}")
+        local = Decimal(str(self.balances.get(student.id) or 0))
+        if remote == local:
+            raise BulkSkip("ya estaba sincronizado")
+
+    def handler(self, student, payload, actor):
+        remote = self.remote(student)
+        reason = services.pos_queue_reasons([student.id]).get(student.id)
+        if reason:
+            raise BulkSkip(f"el alumno {reason}")
+        expected = self.balances.get(student.id)
+        adj = services.reconcile_to_loyverse(
+            student, remote, expected_balance=expected, admin=actor
+        )
+        if adj is None:
+            raise BulkSkip("ya estaba sincronizado")
+        local = Decimal(str(adj.balance_after)) - Decimal(str(adj.amount))
+        return {"local": str(local), "loyverse": str(remote), "delta": str(adj.amount)}
 
 
-def _fix_delta(student) -> tuple[Decimal, Decimal, Decimal]:
-    if not student.loyverse_id:
-        raise BulkSkip("no está vinculado a Loyverse")
-    remote = _read_remote(student)
-    balance = _safe_balance(student)
-    local = Decimal(str(balance.balance if balance is not None else 0))
-    delta = remote - local
-    if delta == 0:
-        raise BulkSkip("ya estaba sincronizado")
-    if remote < 0:
-        raise ValueError(f"Loyverse reporta un saldo negativo (${remote:.2f}); revise en el POS.")
-    return local, remote, delta
-
-
-def _fix_plan(student, payload):
-    _fix_delta(student)
-
-
-def _fix_handler(student, payload, actor):
-    local, remote, delta = _fix_delta(student)
-    # notify=False, mirror=False: the documented reconcile mode (the ledger is
-    # being SET TO Loyverse; pushing back is circular; not news for families).
-    services.adjust_balance(
-        student,
-        delta,
-        reason=f"Reconciliación con Loyverse (local ${local:.2f} → ${remote:.2f})",
-        admin=actor,
-        notify=False,
-        mirror=False,
-    )
-    return {"local": str(local), "loyverse": str(remote), "delta": str(delta)}
+def _fix_unbound(*_args):  # replaced per request by AdminReconcileBulkView.get_action
+    raise RuntimeError("Corregir needs a per-request snapshot")
 
 
 class AdminReconcileBulkView(AdminBulkView):
     """POST .../admin/reconcile/bulk/  ``fix`` for the selected rows only.
 
-    Each row reads Loyverse live, so the call is capped at 50 ids and "select
-    all matching" is not offered (it would be one remote read per student).
+    One store-wide Loyverse fetch per request (``_FixSnapshot``), taken after
+    the selected balances, before the bulk transaction. Capped at 50 ids and
+    "select all matching" is not offered: Corregir is a reviewed, per-row act.
     """
 
     entity = "cafeteria.reconcile"
@@ -1276,14 +1389,21 @@ class AdminReconcileBulkView(AdminBulkView):
         "fix": BulkAction(
             name="fix",
             label_es="Corregir",
-            handler=_fix_handler,
-            plan=_fix_plan,
+            handler=_fix_unbound,
+            plan=_fix_unbound,
             side_effects="none",
         )
     }
 
     def get_queryset(self):
         return StudentProfile.objects.select_related("user", "cafeteria_balance")
+
+    def get_action(self, name: str) -> BulkAction:
+        action = super().get_action(name)
+        raw = self.request.data.get("ids")
+        ids = [i for i in raw if isinstance(i, int)] if isinstance(raw, list) else []
+        snapshot = _FixSnapshot(ids)
+        return dataclasses.replace(action, handler=snapshot.handler, plan=snapshot.plan)
 
     def post(self, request):
         if request.data.get("all_matching"):

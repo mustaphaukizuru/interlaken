@@ -40,8 +40,8 @@ def test_two_students_in_one_transaction_get_distinct_references_at_insert(saves
     admin = AdminFactory()
 
     with transaction.atomic():
-        services.adjust_balance(s1, Decimal("10"), "uno", admin=admin, notify=False, mirror=False)
-        services.adjust_balance(s2, Decimal("20"), "dos", admin=admin, notify=False, mirror=False)
+        services.adjust_balance(s1, Decimal("10"), "uno", admin=admin, notify=False)
+        services.adjust_balance(s2, Decimal("20"), "dos", admin=admin, notify=False)
 
     # Exactly one save per adjustment, each an INSERT (pk None) carrying its reference.
     assert len(saves) == 2
@@ -58,8 +58,8 @@ def test_two_students_in_one_transaction_get_distinct_references_at_insert(saves
 def test_same_student_twice_keeps_the_convention(saves):
     student = StudentProfileFactory(loyverse_id="")
     CafeteriaBalance.objects.create(student=student, balance=Decimal("50"))
-    services.adjust_balance(student, Decimal("5"), "a", notify=False, mirror=False)
-    services.adjust_balance(student, Decimal("-5"), "b", notify=False, mirror=False)
+    services.adjust_balance(student, Decimal("5"), "a", notify=False)
+    services.adjust_balance(student, Decimal("-5"), "b", notify=False)
     refs = {ref for _, ref in saves}
     assert len(refs) == 2 and all(r.startswith("adjust-tx-") for r in refs)
     assert CafeteriaBalance.objects.get(student=student).balance == Decimal("50")

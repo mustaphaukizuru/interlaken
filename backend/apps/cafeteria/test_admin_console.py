@@ -33,15 +33,19 @@ def _balance(student, amount, threshold=Decimal("50")):
 
 
 class TestAdjustBalance:
-    def test_credit_is_audited_notifies_and_changes_balance(self, api_client, mailoutbox):
+    def test_credit_is_audited_notifies_and_changes_balance(
+            self, api_client, mailoutbox, django_capture_on_commit_callbacks):
         parent = ParentFactory()
         student = StudentProfileFactory(loyverse_id="", parents=[parent])
         _balance(student, 100)
 
         api_client.force_authenticate(user=AdminFactory())
-        resp = api_client.post(
-            reverse("admin-adjust", args=[student.id]),
-            {"amount": "50.00", "reason": "Cortesía dirección"}, format="json")
+        # Families are told after COMMIT (an import that rolls back must not
+        # have emailed anyone); run those callbacks here.
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = api_client.post(
+                reverse("admin-adjust", args=[student.id]),
+                {"amount": "50.00", "reason": "Cortesía dirección"}, format="json")
         assert resp.status_code == 201, resp.data
 
         cb = CafeteriaBalance.objects.get(student=student)
@@ -424,17 +428,15 @@ class TestPosUnloadQueue:
 
 
 class TestReconcile:
-    @patch("apps.cafeteria.services.get_customer_by_id")
-    def test_reconcile_flags_drift(self, mock_get, api_client):
+    @patch("apps.cafeteria.services.get_all_customers")
+    def test_reconcile_flags_drift(self, mock_all, api_client):
         in_sync = StudentProfileFactory(loyverse_id="loy-ok")
         drifted = StudentProfileFactory(loyverse_id="loy-drift")
         _balance(in_sync, 100)
         _balance(drifted, 80)
 
-        def _side(loyverse_id):
-            return {"total_points": 100 if loyverse_id == "loy-ok" else 65}
-
-        mock_get.side_effect = _side
+        mock_all.return_value = [{"id": "loy-ok", "total_points": 100},
+                                 {"id": "loy-drift", "total_points": 65}]
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(reverse("admin-reconcile"))
         assert resp.status_code == 200
@@ -445,13 +447,14 @@ class TestReconcile:
         assert drift_row["in_sync"] is False
         assert drift_row["drift"] == "15.00"  # 80 local − 65 remote
 
-    @patch("apps.cafeteria.services.get_customer_by_id")
-    def test_reconcile_only_drift_filter(self, mock_get, api_client):
+    @patch("apps.cafeteria.services.get_all_customers")
+    def test_reconcile_only_drift_filter(self, mock_all, api_client):
         s1 = StudentProfileFactory(loyverse_id="loy-1")
         s2 = StudentProfileFactory(loyverse_id="loy-2")
         _balance(s1, 100)
         _balance(s2, 40)
-        mock_get.side_effect = lambda i: {"total_points": 100 if i == "loy-1" else 10}
+        mock_all.return_value = [{"id": "loy-1", "total_points": 100},
+                                 {"id": "loy-2", "total_points": 10}]
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(reverse("admin-reconcile"), {"only": "drift"})
         assert resp.data["count"] == 1
@@ -461,12 +464,12 @@ class TestReconcile:
         api_client.force_authenticate(user=ParentFactory())
         assert api_client.get(reverse("admin-reconcile")).status_code == 403
 
-    @patch("apps.cafeteria.services.get_customer_by_id")
-    def test_reconcile_pages_with_page_size(self, mock_get, api_client):
+    @patch("apps.cafeteria.services.get_all_customers")
+    def test_reconcile_pages_with_page_size(self, mock_all, api_client):
         for i in range(3):
             s = StudentProfileFactory(loyverse_id=f"loy-{i}")
             _balance(s, 50)
-        mock_get.return_value = {"total_points": 50}
+        mock_all.return_value = [{"id": f"loy-{i}", "total_points": 50} for i in range(3)]
         api_client.force_authenticate(user=AdminFactory())
         resp = api_client.get(reverse("admin-reconcile"), {"page_size": 2})
         assert resp.status_code == 200

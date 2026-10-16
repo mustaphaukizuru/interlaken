@@ -97,8 +97,9 @@ ADJUSTMENTS_BUDGET = 2
 LOW_BALANCE_BUDGET = 2
 # count + page + unmatched-receipt counts + summary per kind + missing count.
 CUSTOMERS_BUDGET = 5
-# count + page (user, profile and balance joined); Loyverse read is mocked.
-RECONCILE_BUDGET = 2
+# count + page (user, profile and balance joined) + the two POS-queue reads
+# (pending loads, pending unloads); the one store-wide Loyverse fetch is mocked.
+RECONCILE_BUDGET = 4
 # count + rows + audit insert (each export; top-ups add the payments prefetch).
 BALANCES_EXPORT_BUDGET = 3
 TRANSACTIONS_EXPORT_BUDGET = 3
@@ -202,10 +203,11 @@ class TestCafeteriaAdminListBudgets:
     def test_reconcile(self, api_client, django_assert_num_queries, n):
         _wallets(n)
         api_client.force_authenticate(AdminFactory())
-        with patch(
-            "apps.cafeteria.services.get_customer_by_id",
-            side_effect=lambda lid: {"total_points": 10},
-        ):
+        from apps.accounts.models import StudentProfile
+
+        store = [{"id": lid, "total_points": 10}
+                 for lid in StudentProfile.objects.values_list("loyverse_id", flat=True)]
+        with patch("apps.cafeteria.services.get_all_customers", return_value=store):
             with django_assert_num_queries(RECONCILE_BUDGET):
                 resp = api_client.get(reverse("admin-reconcile"))
         assert resp.status_code == 200

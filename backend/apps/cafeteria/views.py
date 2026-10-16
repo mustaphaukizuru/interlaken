@@ -4,6 +4,7 @@ Cafeteria views: balance, transactions, top-up requests, admin sync operations.
 import hashlib
 import hmac
 import logging
+import re
 from datetime import timedelta
 from decimal import Decimal
 
@@ -16,6 +17,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -80,6 +82,17 @@ def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
             pass
         return student.parents.filter(pk=user.pk).exists()
     return False
+
+
+def _student_param(request):
+    """``?student=`` as an int, ``None`` when absent. A non-numeric value is a
+    client error (400), not an ORM ValueError surfacing as a 500."""
+    raw = str(request.query_params.get('student') or '').strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValidationError({'student': ['Debe ser el número de un alumno.']})
+    return int(raw)
 
 
 # Bound for the admin-facing preview that would otherwise grow with enrollment.
@@ -161,7 +174,7 @@ class MyTransactionsView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         params = self.request.query_params
-        student_id = params.get('student')
+        student_id = _student_param(self.request)
 
         if user.role == User.Role.STUDENT:
             try:
@@ -219,7 +232,7 @@ class MySpendingTrendView(APIView):
         # Optional per-child scoping (multi-kid families) — `students` is already
         # family-scoped, so an id outside the family yields an empty queryset
         # (no cross-family leakage).
-        student_id = request.query_params.get('student')
+        student_id = _student_param(request)
         if student_id:
             students = students.filter(id=student_id)
 
@@ -344,7 +357,7 @@ class MySpendingCategoriesView(APIView):
         else:
             students = StudentProfile.objects.none()
 
-        student_id = request.query_params.get('student')
+        student_id = _student_param(request)
         if student_id:
             students = students.filter(id=student_id)
 
@@ -424,7 +437,7 @@ class MyCardsView(APIView):
     def get(self, request):
         students = _family_students_qs(request.user)
         # Staff credencial view (BACKLOG P1-A9): an admin asks for one student.
-        student_id = request.query_params.get('student')
+        student_id = _student_param(request)
         if student_id and request.user.role == User.Role.ADMIN:
             students = StudentProfile.objects.filter(pk=student_id)
         students = students.select_related('user', 'loyverse_profile')
@@ -467,7 +480,7 @@ class MyLoyverseHistoryView(APIView):
 
     def get(self, request):
         students = _family_students_qs(request.user)
-        student_id = request.query_params.get('student')
+        student_id = _student_param(request)
         if student_id:
             students = students.filter(id=student_id)
         student = students.select_related('user').first()
@@ -774,50 +787,39 @@ class AdminApplyTopUpView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
-        topup = get_object_or_404(TopUpRequest, pk=pk)
+        from django.db import transaction
 
-        if topup.status != TopUpRequest.Status.PENDING:
-            return Response(error_body('Esta recarga ya fue procesada.'), status=400)
-
-        # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
-        # top-ups are credited exclusively by the signed gateway webhook
-        # (complete_online_topup); applying one here would double-credit once the
-        # webhook later settles the same payment — the two paths share no
-        # idempotency key.
-        if topup.method != TopUpRequest.Method.OFFICE:
-            return Response(
-                error_body('Las recargas en línea se acreditan automáticamente al '
-                          'confirmarse el pago; no se aplican manualmente.'),
-                status=400)
-
-        # Guard against a non-positive request slipping through (older rows, or a
-        # request created before the serializer floor existed): a negative amount
-        # would DEBIT the child's balance.
-        if topup.amount is None or topup.amount <= 0:
-            return Response(error_body('El monto de la recarga debe ser positivo.'),
-                            status=400)
-
-        student = topup.student
-        if not student.loyverse_id:
-            return Response(error_body('Alumno sin ID de Loyverse configurado.'), status=400)
-
+        get_object_or_404(TopUpRequest, pk=pk)
         try:
-            # Pass a stable reference so the credit writes a TOPUP ledger row and
-            # is idempotent (re-applying the same request is a no-op) — without it
-            # the balance moved with no CafeteriaTransaction, breaking the
-            # balance-equals-ledger invariant and leaving no audit trail.
-            add_points_to_customer(
-                loyverse_customer_id=student.loyverse_id,
-                points=topup.amount,
-                note=f'Recarga en caja — #{topup.id}',
-                reference=f'topup-request-{topup.id}',
-            )
-        except Exception as e:
-            return Response(error_body(str(e)), status=502)
+            with transaction.atomic():
+                # Row lock: two clicks (or two admins) serialise here, and the
+                # second sees COMPLETED instead of crediting and auditing again.
+                topup = (TopUpRequest.objects.select_for_update()
+                         .select_related('student').get(pk=pk))
+                refusal = self._refusal(topup)
+                if refusal:
+                    return Response(error_body(refusal), status=400)
+                student = topup.student
+                # Pass a stable reference so the credit writes a TOPUP ledger row and
+                # is idempotent (re-applying the same request is a no-op) — without it
+                # the balance moved with no CafeteriaTransaction, breaking the
+                # balance-equals-ledger invariant and leaving no audit trail.
+                add_points_to_customer(
+                    loyverse_customer_id=student.loyverse_id,
+                    points=topup.amount,
+                    note=f'Recarga en caja — #{topup.id}',
+                    reference=f'topup-request-{topup.id}',
+                )
+                topup.status = TopUpRequest.Status.COMPLETED
+                topup.processed_at = timezone.now()
+                topup.save(update_fields=['status', 'processed_at'])
+        except Exception:
+            # Details (a duplicate Loyverse id, a DB error) go to the log, not
+            # to the screen; nothing was credited (the atomic block rolled back).
+            logger.exception('Office top-up apply failed for top-up #%s', pk)
+            return Response(error_body('No se pudo aplicar la recarga. Intente de nuevo; '
+                                       'si persiste, avise a soporte.'), status=502)
 
-        topup.status = TopUpRequest.Status.COMPLETED
-        topup.processed_at = timezone.now()
-        topup.save(update_fields=['status', 'processed_at'])
         # Same audit row as the bulk apply (Data Ops C5: single and bulk agree).
         record('update', topup, {'status': ['pending', 'completed'], 'amount': str(topup.amount)},
                actor=request.user, context='cafeteria.topup.apply')
@@ -827,23 +829,66 @@ class AdminApplyTopUpView(APIView):
 
         return Response({'detail': 'Recarga aplicada correctamente.'})
 
+    @staticmethod
+    def _refusal(topup) -> str:
+        if topup.status != TopUpRequest.Status.PENDING:
+            return 'Esta recarga ya fue procesada.'
+        # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
+        # top-ups are credited exclusively by the signed gateway webhook
+        # (complete_online_topup); applying one here would double-credit once the
+        # webhook later settles the same payment — the two paths share no
+        # idempotency key.
+        if topup.method != TopUpRequest.Method.OFFICE:
+            return ('Las recargas en línea se acreditan automáticamente al '
+                    'confirmarse el pago; no se aplican manualmente.')
+        # Guard against a non-positive request slipping through (older rows, or a
+        # request created before the serializer floor existed): a negative amount
+        # would DEBIT the child's balance.
+        if topup.amount is None or topup.amount <= 0:
+            return 'El monto de la recarga debe ser positivo.'
+        if not topup.student.loyverse_id:
+            return 'Alumno sin ID de Loyverse configurado.'
+        return ''
 
+
+# Families never trigger the store-wide poll (it re-reads every receipt in
+# the store and advances the shared cursor); they read what the 5-minute cron
+# and the webhook already recorded.
 @method_decorator(ratelimit('cafeteria-refresh', '6/m', key='user', method='POST'), name='dispatch')
 class RefreshFromLoyverseView(APIView):
     """POST /api/v1/cafeteria/refresh/
 
-    On-demand Loyverse purchase poll so parents/staff can pull the latest POS
-    spend without waiting for cron. Rate-limited (6/min/user) to protect the
-    Loyverse API. Idempotent — safe to spam.
+    Admins: an on-demand, store-wide Loyverse purchase poll (rate-limited,
+    serialised with the cron by the ``sync_purchases`` lease). Everyone else
+    (parents, students, staff): no Loyverse call at all; the answer says when
+    the last poll ran, and the portal simply re-reads its data. Same response
+    shape either way, so the family "Actualizar" button keeps working.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        from .models import LoyverseSyncState
+
+        if request.user.role != User.Role.ADMIN:
+            state = LoyverseSyncState.objects.filter(pk=1).first()
+            last = state.last_poll_at if state else None
+            return Response({
+                'detail': 'Saldos y movimientos actualizados.',
+                'receipts': 0, 'created': 0, 'notified': 0, 'students': 0,
+                'last_poll_at': last.isoformat() if last else None,
+            })
         try:
             result = sync_purchases()
-        except Exception as e:
+        except Exception:
             logger.exception('cafeteria refresh failed')
-            return Response(error_body(str(e)), status=502)
+            return Response(error_body('No se pudo sincronizar con Loyverse. Intente de nuevo '
+                                       'en unos minutos.'), status=502)
+        if result.get('busy'):
+            return Response({
+                'detail': 'Ya hay una sincronización con Loyverse en curso; '
+                          'los datos se actualizarán en un momento.',
+                'receipts': 0, 'created': 0, 'notified': 0, 'students': 0, 'busy': True,
+            })
         return Response({
             'detail': 'Sincronización con Loyverse completada.',
             'receipts': result.get('receipts', 0),
@@ -904,8 +949,10 @@ class AdminSyncBalanceView(APIView):
                 'unmatched': purchases.get('unmatched', 0),
                 'skipped': purchases.get('skipped', 0),
             })
-        except Exception as e:
-            return Response(error_body(str(e)), status=502)
+        except Exception:
+            logger.exception('Admin sync failed for student #%s', pk)
+            return Response(error_body('No se pudo sincronizar con Loyverse. Intente de nuevo '
+                                       'en unos minutos.'), status=502)
 
 
 class AdminSyncAllView(APIView):
@@ -951,8 +998,10 @@ class AdminSyncAllView(APIView):
                 'unmatched': purchases.get('unmatched', 0),
                 'skipped': purchases.get('skipped', 0),
             })
-        except Exception as e:
-            return Response(error_body(str(e)), status=502)
+        except Exception:
+            logger.exception('Admin sync-all failed')
+            return Response(error_body('No se pudo sincronizar con Loyverse. Intente de nuevo '
+                                       'en unos minutos.'), status=502)
 
 
 # ── Admin console (Phase D) ──────────────────────────────────────────────────
@@ -1020,49 +1069,67 @@ class AdminSyncRosterView(APIView):
 
 
 class AdminReconcileFixView(APIView):
-    """POST /api/v1/cafeteria/admin/reconcile/<pk>/fix/
+    """POST /api/v1/cafeteria/admin/reconcile/<pk>/fix/  ``{expected_balance?}``
 
     Bring one student's local balance to Loyverse's points with an audited
     ADJUSTMENT. Reconciliación could only ever *show* drift, so closing a $25
     gap meant an admin re-typing the arithmetic into the manual-adjustment form
     — which is how a reconciliation turns into a second discrepancy.
 
-    The delta is recomputed here from a live Loyverse read; the client never
-    sends an amount. ``notify=False, mirror=False`` is the documented reconcile
-    mode (see adjust_balance): the local ledger is being set TO Loyverse, so
-    pushing the points back is circular, and a correction is not news a family
-    needs pushed to them.
+    The delta is recomputed under the balance row lock from a live Loyverse
+    read; the client never sends an amount. It may send ``expected_balance``
+    (the local balance on its screen): if the wallet moved since, the fix is
+    refused with 409 instead of applying a stale delta. Without it the server
+    compares against its own read taken before the Loyverse call, so a
+    purchase landing meanwhile, or a double click, can never apply twice.
+    Students with money in transit in the POS queues are refused, and so is a
+    debit that could cancel a recent local-only credit (see
+    ``services.reconcile_to_loyverse``).
     """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
+        from decimal import InvalidOperation
+
+        from .services import ReconcileConflict, reconcile_to_loyverse
+
         student = get_object_or_404(StudentProfile, pk=pk)
         if not student.loyverse_id:
             return Response(error_body('El alumno no está vinculado a Loyverse.'), status=400)
 
+        raw_expected = request.data.get('expected_balance')
+        if raw_expected not in (None, ''):
+            try:
+                expected = Decimal(str(raw_expected))
+                if not expected.is_finite():
+                    raise InvalidOperation
+            except (InvalidOperation, ValueError, TypeError):
+                return Response({'expected_balance': ['Monto no válido.']}, status=400)
+        else:
+            expected = (CafeteriaBalance.objects.filter(student=student)
+                        .values_list('balance', flat=True).first())
+
         try:
             remote = get_balance_from_customer(get_customer_by_id(student.loyverse_id))
-        except LoyverseError as exc:
-            return Response(error_body(f'No se pudo leer el saldo en Loyverse: {exc}'), status=502)
-
-        cb, _ = CafeteriaBalance.objects.get_or_create(student=student)
-        local = cb.balance or Decimal('0')
-        delta = remote - local
-        if delta == 0:
-            return Response({'detail': 'Ya estaban sincronizados.', 'adjusted': False,
-                             'balance': str(local)})
+        except LoyverseError:
+            logger.exception('Reconcile fix: Loyverse read failed for student #%s', pk)
+            return Response(error_body('No se pudo leer el saldo en Loyverse. Intente de nuevo '
+                                       'en unos minutos.'), status=502)
 
         try:
-            adjust_balance(
-                student, delta,
-                reason=f'Reconciliación con Loyverse (local ${local:.2f} → ${remote:.2f})',
-                admin=request.user, notify=False, mirror=False)
+            adj = reconcile_to_loyverse(student, remote, expected_balance=expected,
+                                        admin=request.user)
+        except ReconcileConflict as exc:
+            return Response(error_body(str(exc)), status=409)
         except ValueError as exc:
             return Response(error_body(str(exc)), status=400)
 
-        cb.refresh_from_db()
+        balance = CafeteriaBalance.objects.get(student=student).balance
+        if adj is None:
+            return Response({'detail': 'Ya estaban sincronizados.', 'adjusted': False,
+                             'balance': str(balance)})
         return Response({'detail': 'Saldo reconciliado con Loyverse.', 'adjusted': True,
-                         'delta': str(delta), 'balance': str(cb.balance)})
+                         'delta': str(adj.amount), 'balance': str(balance)})
 
 
 class AdminMarkTopUpPosLoadedView(APIView):
@@ -1353,7 +1420,7 @@ class MyStatementPdfView(APIView):
         from apps.core.pdf import simple_document_pdf
 
         user = request.user
-        student_id = request.query_params.get('student')
+        student_id = _student_param(request)
         if user.role == User.Role.ADMIN:
             qs_students = StudentProfile.objects.all()
         elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
@@ -1406,54 +1473,184 @@ class MyStatementPdfView(APIView):
         return as_download(resp, f'cafeteria-{student.student_id}-{month}.pdf')
 
 
-class AdminBulkTopUpView(APIView):
-    """POST /api/v1/cafeteria/admin/bulk-topup/ {"amount", "reason", "grade"?, "group"?, "student_ids"?} (BACKLOG P4-3).
+BULK_TOPUP_MAX_STUDENTS = 500
+BULK_TOPUP_MAX_AMOUNT = Decimal('5000')
+# Seconds of ledger work per request, then of inline notifications. Together
+# well inside gunicorn's 60 s --timeout: the client re-posts the same batch for
+# whatever is left (``remaining``), and the per-student reference makes that
+# continuation (or a retry after a dropped connection) skip who is done.
+BULK_TOPUP_LEDGER_SECONDS = 25
+BULK_TOPUP_NOTIFY_SECONDS = 40
+_BATCH_ID_RE = re.compile(r'^[A-Za-z0-9-]{8,64}$')
 
-    Credits many wallets at once (a grade-wide scholarship, a cash day), one
-    audited ``adjust_balance`` per student so every family sees its own ledger
-    row and notification. ``{"preview": true}`` only counts.
+
+def _bulk_student_ids(raw):
+    """``student_ids`` as a list of ints, or ``None`` when it is not one."""
+    if not isinstance(raw, list):
+        return None
+    out = []
+    for item in raw:
+        if isinstance(item, bool):
+            return None
+        if isinstance(item, int):
+            out.append(item)
+        elif isinstance(item, str) and item.strip().isdigit():
+            out.append(int(item.strip()))
+        else:
+            return None
+    return out
+
+
+def _queue_balance_notification(student, title, message) -> int:
+    """In-app notice now, email/push by the ``dispatch_notifications`` cron.
+
+    For the bulk top-up rows that did not fit the inline budget: one INSERT per
+    guardian instead of an SMTP round trip inside the request. Honours the
+    same category / channel preferences ``notify`` does."""
+    from apps.accounts.family import family_notify_recipients
+    from apps.accounts.models import NotificationPreference
+    from apps.portal.models import Notification
+
+    queued = 0
+    for parent in family_notify_recipients(student):
+        prefs = NotificationPreference.for_user(parent)
+        if not prefs.allows(Notification.NotifType.CAFETERIA) or not prefs.in_app_enabled:
+            continue
+        out_of_band = prefs.email_enabled or prefs.push_enabled
+        Notification.objects.create(
+            user=parent, notif_type=Notification.NotifType.CAFETERIA,
+            title=title, message=message,
+            delivered_at=None if out_of_band else timezone.now())
+        queued += 1
+    return queued
+
+
+class AdminBulkTopUpView(APIView):
+    """POST /api/v1/cafeteria/admin/bulk-topup/ (BACKLOG P4-3)
+
+    Body: ``{"amount", "reason", "grade"?, "group"?, "student_ids"?, "batch_id",
+    "preview"?}``. Credits many wallets at once (a grade-wide scholarship, a
+    cash day), one audited ``adjust_balance`` per student so every family sees
+    its own ledger row. ``{"preview": true}`` only counts.
+
+    ``batch_id`` (client-generated, required to apply) is the idempotency key:
+    each credit is stored as ``adjust-tx-bulk-<batch>-<student>``, so a retry or
+    a continuation never pays a student twice. The ledger work stops after
+    ``BULK_TOPUP_LEDGER_SECONDS``; the response then carries ``remaining`` > 0
+    and the client posts the same body again. Families are notified after the
+    ledger work (inline while time allows, queued for the notifications cron
+    after that), and a summary audit row is written for every request, even
+    one that ends early.
     """
     permission_classes = [IsAdmin]
 
     def post(self, request):
+        import time
         from decimal import InvalidOperation
 
+        from .services import AdjustmentAlreadyApplied, _notify_balance_change
+
+        started = time.monotonic()
+        data = request.data
         try:
-            amount = Decimal(str(request.data.get('amount')))
-        except (InvalidOperation, TypeError):
+            amount = Decimal(str(data.get('amount')))
+        except (InvalidOperation, TypeError, ValueError):
             return Response({'amount': ['Monto no válido.']}, status=400)
-        if amount <= 0 or amount > Decimal('5000'):
+        if not amount.is_finite():
+            return Response({'amount': ['Monto no válido.']}, status=400)
+        if amount <= 0 or amount > BULK_TOPUP_MAX_AMOUNT:
             return Response({'amount': ['Entre $1 y $5,000.']}, status=400)
-        reason = str(request.data.get('reason') or '').strip()[:200]
+        amount = amount.quantize(Decimal('0.01'))
+        reason = str(data.get('reason') or '').strip()[:200]
         if not reason:
             return Response({'reason': ['Indique el motivo.']}, status=400)
+
         qs = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE).select_related('user')
-        ids = request.data.get('student_ids')
-        if isinstance(ids, list) and ids:
-            qs = qs.filter(pk__in=ids[:500])
+        raw_ids = data.get('student_ids')
+        if raw_ids not in (None, '', []):
+            ids = _bulk_student_ids(raw_ids)
+            if ids is None:
+                return Response({'student_ids': ['Debe ser una lista de números de alumno.']},
+                                status=400)
+            if len(ids) > BULK_TOPUP_MAX_STUDENTS:
+                return Response({'student_ids': [
+                    f'Máximo {BULK_TOPUP_MAX_STUDENTS} alumnos por recarga masiva.']}, status=400)
+            qs = qs.filter(pk__in=ids)
         else:
-            grade = str(request.data.get('grade') or '').strip()
-            group = str(request.data.get('group') or '').strip()
+            grade = str(data.get('grade') or '').strip()
+            group = str(data.get('group') or '').strip()
             if not grade and not group:
                 return Response({'detail': 'Elija grado/grupo o una lista de alumnos.'}, status=400)
             if grade:
                 qs = qs.filter(grade=grade)
             if group:
                 qs = qs.filter(group__iexact=group)
-        students = list(qs.order_by('user__last_name', 'user__first_name'))
+        # Stable order: a continuation walks the same list.
+        students = list(qs.order_by('user__last_name', 'user__first_name', 'pk'))
         if not students:
             return Response({'detail': 'Ningún alumno activo coincide.'}, status=400)
-        if request.data.get('preview'):
+        if len(students) > BULK_TOPUP_MAX_STUDENTS:
+            return Response({'detail': f'Son {len(students)} alumnos; el máximo por recarga '
+                                       f'masiva es {BULK_TOPUP_MAX_STUDENTS}. Divida por grado '
+                                       f'o grupo.'}, status=400)
+        if data.get('preview'):
             return Response({'count': len(students), 'total': str(amount * len(students)),
                              'students': [{'id': s.pk, 'name': s.user.full_name, 'grade': s.grade, 'group': s.group} for s in students[:50]]})
-        done, failed = 0, []
-        for s in students:
+
+        batch = str(data.get('batch_id') or '').strip()
+        if not _BATCH_ID_RE.match(batch):
+            return Response({'batch_id': ['Falta el identificador del lote; cierre el diálogo '
+                                          'y vuelva a intentarlo.']}, status=400)
+        prefix = f'adjust-tx-bulk-{batch}-'
+        already = {
+            int(ref.rsplit('-', 1)[1])
+            for ref in CafeteriaTransaction.objects.filter(loyverse_receipt_id__startswith=prefix)
+            .values_list('loyverse_receipt_id', flat=True)
+            if ref.rsplit('-', 1)[1].isdigit()
+        }
+
+        credited, failed = [], []
+        skipped = remaining = 0
+        try:
+            for index, s in enumerate(students):
+                if s.pk in already:
+                    skipped += 1
+                    continue
+                if time.monotonic() - started > BULK_TOPUP_LEDGER_SECONDS:
+                    remaining = sum(1 for rest in students[index:] if rest.pk not in already)
+                    break
+                try:
+                    adj = adjust_balance(s, amount, f'Recarga masiva: {reason}', admin=request.user,
+                                         notify=False, reference=f'{prefix}{s.pk}')
+                    credited.append((s, adj.balance_after))
+                except AdjustmentAlreadyApplied:
+                    skipped += 1
+                except ValueError as e:
+                    failed.append({'id': s.pk, 'error': str(e)})
+        finally:
+            # Written even when the loop dies half-way (the credits that did
+            # land are committed, one transaction each).
+            record('update', request.user, {'bulk_topup': {
+                'batch_id': batch, 'amount': str(amount), 'reason': reason,
+                'students': len(students), 'count': len(credited), 'skipped': skipped,
+                'failed': len(failed), 'remaining': remaining,
+            }}, actor=request.user, context='cafeteria: recarga masiva')
+
+        notified = queued = 0
+        title = 'Ajuste de saldo en cafetería'
+        for s, balance_after in credited:
+            message = (f'Se acreditaron ${amount:.2f} al saldo de cafetería de '
+                       f'{s.user.full_name}. Motivo: Recarga masiva: {reason}. '
+                       f'Saldo actual: ${balance_after:.2f}.')
             try:
-                adjust_balance(s, amount, f'Recarga masiva: {reason}', admin=request.user)
-                done += 1
-            except ValueError as e:
-                failed.append({'id': s.pk, 'error': str(e)})
-        from apps.core.audit import record
-        record('update', request.user, {'bulk_topup': {'amount': str(amount), 'reason': reason, 'count': done, 'failed': len(failed)}},
-               actor=request.user, context='cafeteria: recarga masiva')
-        return Response({'credited': done, 'failed': failed, 'total': str(amount * done)}, status=201)
+                if time.monotonic() - started < BULK_TOPUP_NOTIFY_SECONDS:
+                    notified += _notify_balance_change(s, title, message)
+                else:
+                    queued += _queue_balance_notification(s, title, message)
+            except Exception:  # noqa: BLE001 (a notice never undoes a credit)
+                logger.exception('Bulk top-up notice failed for student #%s', s.pk)
+
+        return Response({'credited': len(credited), 'skipped': skipped, 'failed': failed,
+                         'remaining': remaining, 'batch_id': batch,
+                         'total': str(amount * len(credited)),
+                         'notified': notified, 'queued_notifications': queued}, status=201)

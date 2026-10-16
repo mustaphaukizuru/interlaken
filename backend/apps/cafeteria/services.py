@@ -12,8 +12,9 @@ Notes for maintainers:
 - Per spec **R1** the Loyverse ``total_points`` field is effectively read-only,
   so the local ``CafeteriaBalance`` row is the source of truth for credits.
   ``add_points_to_customer`` credits that row **atomically and idempotently**
-  (``select_for_update`` + a reference guard) and only *best-effort* attempts the
-  remote write. It is intentionally **not** on the money-in critical path.
+  (``select_for_update`` + a reference guard). Nothing here writes points to
+  Loyverse; a local DEBIT must instead pass ``check_pos_debit`` so the POS
+  mirror cannot credit it back.
 """
 import logging
 import re
@@ -295,6 +296,19 @@ def _parse_receipt(receipt: dict):
     return amount, items, summary, is_refund, date
 
 
+def _purchase_refunded_locally(receipt_number: str) -> bool:
+    """Was the purchase with this Loyverse receipt number already reversed
+    from the console (``refund_transaction`` writes ``refund-tx-<id>``)?"""
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    ids = CafeteriaTransaction.objects.filter(
+        loyverse_receipt_id=receipt_number,
+        transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+    ).values_list('id', flat=True)
+    return CafeteriaTransaction.objects.filter(
+        loyverse_receipt_id__in=[f'refund-tx-{pk}' for pk in ids]).exists()
+
+
 def _record_receipt(student, receipt: dict, *, apply=None):
     """Idempotently record one receipt against ``student``.
 
@@ -332,6 +346,13 @@ def _record_receipt(student, receipt: dict, *, apply=None):
             ingested = (parse_datetime(raw_ingested) if raw_ingested else None) or date
             apply = not (cb.seeded_at is not None and ingested is not None
                          and ingested <= cb.seeded_at)
+        refund_of = str(receipt.get('refund_for') or '').strip() if is_refund else ''
+        if apply and refund_of and _purchase_refunded_locally(refund_of):
+            # The office already gave this sale back from the console (a
+            # local-only credit the POS never saw); the cashier's POS refund is
+            # what finally returns the points in Loyverse. Crediting it here too
+            # would pay the family twice, so it is kept as history only.
+            apply = False
         tx, created = CafeteriaTransaction.objects.get_or_create(
             loyverse_receipt_id=receipt_id,
             defaults={
@@ -342,6 +363,7 @@ def _record_receipt(student, receipt: dict, *, apply=None):
                 'items': items,
                 'date': date or timezone.now(),
                 'applied': apply,
+                'refund_of': refund_of[:100],
             },
         )
         if not created:
@@ -712,6 +734,49 @@ def sync_purchases(*, since_days: int | None = None):
     behind the cursor. The unique receipt id makes the re-read a no-op for
     everything already recorded.
     """
+    lease = _acquire_purchases_lease()
+    if lease is None:
+        logger.info('sync_purchases: another poll holds the lease; skipped.')
+        return {'students': 0, 'receipts': 0, 'created': 0, 'notified': 0,
+                'unmatched': 0, 'skipped': 0, 'busy': True}
+    try:
+        return _sync_purchases(since_days=since_days)
+    finally:
+        _release_purchases_lease(lease)
+
+
+# Upper bound of one poll (20 pages at most, each with a 15 s read timeout and
+# retries). A worker killed mid-poll leaves the lease to expire on its own.
+PURCHASES_LEASE_SECONDS = 300
+
+
+def _acquire_purchases_lease():
+    """Take the store-wide poll lease with one conditional UPDATE (atomic on
+    every backend), so two processes can never both win it. Returns the
+    lease's expiry (its token), or ``None`` when another run holds it."""
+    from django.db.models import Q
+
+    from apps.cafeteria.models import LoyverseSyncState
+
+    LoyverseSyncState.load()
+    now = timezone.now()
+    until = now + timedelta(seconds=PURCHASES_LEASE_SECONDS)
+    won = (LoyverseSyncState.objects.filter(pk=1)
+           .filter(Q(purchases_lock_until__isnull=True) | Q(purchases_lock_until__lt=now))
+           .update(purchases_lock_until=until))
+    return until if won == 1 else None
+
+
+def _release_purchases_lease(until) -> None:
+    """Release only OUR lease: if it expired and another run took over, the
+    expiry no longer matches and theirs is left alone."""
+    from apps.cafeteria.models import LoyverseSyncState
+
+    (LoyverseSyncState.objects.filter(pk=1, purchases_lock_until=until)
+     .update(purchases_lock_until=None))
+
+
+def _sync_purchases(*, since_days: int | None = None):
     from apps.cafeteria.models import LoyverseSyncState
 
     students = _students_by_loyverse_id()
@@ -989,6 +1054,9 @@ def reverse_online_topup(payment):
             tx, reason='Reembolso del proveedor de pagos', admin=None,
             # Unload already flagged above; avoid a second save in the nested path.
             flag_pos_unload=False,
+            # The bank already returned the money: the ledger must follow even
+            # when Loyverse has not been touched yet (the flag queues that).
+            pos_guard=False,
         )
     except ValueError as exc:
         # Already refunded, or balance already spent — leave Payment.REFUNDED and
@@ -1050,9 +1118,10 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
     - is **idempotent** when ``reference`` is supplied: a ``topup`` transaction
       already recorded under that reference makes the call a no-op (guards against
       a retried webhook / cron double-apply),
-    - records a ``topup`` ``CafeteriaTransaction`` (only when ``reference`` is given),
-    - then *best-effort* attempts the remote write for the day a Loyverse write
-      path exists — a failure there never rolls back the local credit.
+    - records a ``topup`` ``CafeteriaTransaction`` (only when ``reference`` is given).
+
+    Loyverse is never written (``total_points`` is read-only); staff load the
+    credit into the POS.
 
     Returns ``{'applied': bool, 'balance': Decimal, 'reason'?: str}``.
     """
@@ -1088,27 +1157,14 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
                 amount=amount,
                 description=note,
                 loyverse_receipt_id=reference,
+                balance_after=cb.balance,
             )
         new_balance = cb.balance
 
-    # Best-effort remote write (R1: total_points is read-only on the current plan,
-    # so this is expected to be a no-op / failure — it must never undo the local credit).
-    try:
-        with _session() as session:
-            resp = session.post(
-                f'{_base_url()}/customers',
-                json={'id': loyverse_customer_id, 'total_points': float(new_balance)},
-                timeout=_TIMEOUT,
-            )
-            resp.raise_for_status()
-    # LoyverseError too: _session() raises it when the token is unset, and a
-    # best-effort mirror must never undo/500 the already-committed local credit.
-    except (LoyverseError, requests.RequestException) as e:
-        logger.warning(
-            f'Loyverse remote credit for {loyverse_customer_id} not applied '
-            f'(local ledger is source of truth per R1): {e}'
-        )
-
+    # No Loyverse write: ``total_points`` is not a writable field (spec R1), and
+    # the old best-effort push sent an ABSOLUTE balance, which would have
+    # double-counted any online top-up still waiting for its POS load had
+    # Loyverse ever accepted it. Staff load the cash into the POS themselves.
     logger.info(f'Credited {amount} to {loyverse_customer_id}. Local balance: {new_balance}')
     return {'applied': True, 'balance': new_balance}
 
@@ -1147,32 +1203,159 @@ def _audit_wallet(context, balance, *, admin=None, **metadata):
                        balance.pk, context, exc_info=True)
 
 
+class AdjustmentAlreadyApplied(ValueError):
+    """``adjust_balance`` was given a reference that is already in the ledger
+    (a retried bulk top-up, a re-uploaded ajuste masivo). Nothing was applied."""
+
+
+class PosDebitBlocked(ValueError):
+    """A local debit the POS mirror would credit straight back (see
+    ``check_pos_debit``). Nothing was applied."""
+
+
+POS_LOAD_PENDING = 'tiene una recarga en línea pendiente de cargar en el POS'
+POS_UNLOAD_PENDING = 'tiene una devolución pendiente de quitar del POS'
+
+
+def pending_pos_loads():
+    """Online top-ups credited locally that staff still have to load into the POS.
+
+    A refunded one is excluded: the pos-loaded action refuses it, so it would
+    otherwise sit in this set forever and keep its student out of the POS
+    mirror for good. Same rule as the POS load queue (``TopUpFilter.needs_pos``);
+    used by the mirror, the debit guard and reconciliation.
+    """
+    from apps.cafeteria.models import TopUpRequest
+    from apps.payments.models import Payment
+
+    return (TopUpRequest.objects.filter(
+                method=TopUpRequest.Method.ONLINE,
+                status=TopUpRequest.Status.COMPLETED,
+                pos_loaded_at__isnull=True)
+            .exclude(payments__status=Payment.Status.REFUNDED))
+
+
+def pending_pos_unloads():
+    """Refunded top-ups whose credit Loyverse still holds: staff must remove it
+    from the POS, then confirm in the unload queue (pos-unloaded)."""
+    from apps.cafeteria.models import TopUpRequest
+
+    return TopUpRequest.objects.filter(pos_unload_needed_at__isnull=False,
+                                       pos_unloaded_at__isnull=True)
+
+
+def pos_queue_reasons(student_ids=None) -> dict:
+    """``{student_id: reason}`` for students the POS mirror (and Corregir) must
+    leave alone until staff work the POS load/unload queues. In those wallets
+    Loyverse and the ledger differ on purpose, by money that is in transit."""
+    loads, unloads = pending_pos_loads(), pending_pos_unloads()
+    if student_ids is not None:
+        loads = loads.filter(student_id__in=student_ids)
+        unloads = unloads.filter(student_id__in=student_ids)
+    reasons = {sid: POS_UNLOAD_PENDING for sid in unloads.values_list('student_id', flat=True)}
+    for sid in loads.values_list('student_id', flat=True):
+        reasons.setdefault(sid, POS_LOAD_PENDING)
+    return reasons
+
+
+def _pos_queue_net(student) -> Decimal:
+    """What Loyverse will gain (+) or lose (-) for ``student`` once staff work
+    the POS queues: pending loads minus pending unloads."""
+    from django.db.models import Sum
+
+    loads = pending_pos_loads().filter(student=student).aggregate(s=Sum('amount'))['s']
+    unloads = pending_pos_unloads().filter(student=student).aggregate(s=Sum('amount'))['s']
+    return Decimal(str(loads or 0)) - Decimal(str(unloads or 0))
+
+
+def loyverse_points_for_guard(student):
+    """Best known Loyverse points for ``student``, for ``check_pos_debit``.
+
+    A live read first; if Loyverse is unreachable, the profile snapshot that
+    every mirror pass refreshes. ``None`` when the student is not linked or the
+    customer is gone from Loyverse (the mirror then has nothing to credit), or
+    when nothing at all is known.
+    """
+    from apps.cafeteria.models import LoyverseProfile
+
+    if not student.loyverse_id:
+        return None
+    try:
+        return get_balance_from_customer(get_customer_by_id(student.loyverse_id))
+    except LoyverseError as exc:
+        profile = (LoyverseProfile.objects.filter(loyverse_id=student.loyverse_id)
+                   .only('total_points', 'missing_since').first())
+        if profile is None or profile.missing_since is not None:
+            return None
+        logger.warning('Loyverse read failed for %s (%s); using the last snapshot.',
+                       student, exc)
+        return Decimal(str(profile.total_points))
+
+
+def check_pos_debit(student, new_balance, points) -> None:
+    """Refuse a local debit that ``mirror_pos_topups`` would credit straight back.
+
+    Loyverse ``total_points`` cannot be written (spec R1), so the POS keeps the
+    money a local-only debit takes away, and the 5-minute mirror reads any
+    positive "Loyverse minus local" gap as a cash recarga: the debit would be
+    undone and the family told about a recarga that never happened. The rule:
+    after the debit, the ledger must stay at or above what Loyverse will hold
+    once the POS queues are worked (``points`` plus pending loads minus pending
+    unloads). When it would not, staff remove the money in Loyverse first; the
+    debit then goes through. ``points=None`` (not linked, customer gone,
+    nothing known) skips the check.
+    """
+    if points is None:
+        return
+    points = Decimal(str(points))
+    expected = points + _pos_queue_net(student)
+    if expected > new_balance:
+        gap = expected - new_balance
+        raise PosDebitBlocked(
+            f'Loyverse tiene ${points:.2f} para este alumno y el saldo local quedaría en '
+            f'${new_balance:.2f}: la siguiente sincronización volvería a abonar ${gap:.2f} '
+            f'como recarga del POS. Quite primero ${gap:.2f} del saldo del cliente en '
+            f'Loyverse y vuelva a intentarlo.'
+        )
+
+
 def adjust_balance(student, amount, reason: str, admin=None, *,
-                   notify=True, mirror=True):
+                   notify=True, reference: str = '', pos_points=None):
     """Apply an audited manual credit/debit to a student's cafeteria balance.
 
     ``amount`` is a signed ``Decimal`` (positive = credit, negative = debit). This
     atomically updates the local ledger, records an ``ADJUSTMENT``
     ``CafeteriaTransaction`` (with running ``balance_after``) and a
-    ``BalanceAdjustment`` audit row, then notifies the guardians (outside the lock).
+    ``BalanceAdjustment`` audit row, then notifies the guardians once the
+    surrounding transaction commits (an import that rolls back must not have
+    emailed anyone).
 
-    ``notify=False`` skips the guardian notification and ``mirror=False`` skips
-    the best-effort Loyverse points push — both are used by the
-    ``repair_wallet_ledger`` reconcile, where the local ledger is being SET TO
-    Loyverse's value (mirroring back is pointless and a roster-wide adjustment
-    blast would spam every family).
+    ``reference`` (an ``adjust-tx-...`` key) makes the call idempotent: if the
+    ledger already holds it, ``AdjustmentAlreadyApplied`` is raised and nothing
+    moves. Without one a fresh ``adjust-tx-<uuid>`` is used.
+
+    A debit on a Loyverse-linked student passes ``check_pos_debit`` first.
+    ``pos_points`` lets a caller that already read Loyverse (reconcile, the
+    import's single store-wide fetch) supply the points; otherwise they are read
+    here, before the row lock. Loyverse itself is never written.
 
     Returns the created ``BalanceAdjustment``. Raises ``ValueError`` on a zero
-    amount or a debit that would overdraw the balance below zero.
+    amount, a debit below zero, a duplicate reference or a blocked POS debit.
     """
     from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
 
     amount = Decimal(str(amount)).quantize(Decimal('0.01'))
     if amount == 0:
         raise ValueError('El monto del ajuste no puede ser cero.')
+    if amount < 0 and pos_points is None:
+        # Network read OUTSIDE the row lock; the comparison happens under it.
+        pos_points = loyverse_points_for_guard(student)
 
     with transaction.atomic():
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+        if reference and CafeteriaTransaction.objects.filter(
+                loyverse_receipt_id=reference).exists():
+            raise AdjustmentAlreadyApplied(f'Este ajuste ya se aplicó ({reference}).')
         current = cb.balance or Decimal('0')
         new_balance = current + amount
         if new_balance < 0:
@@ -1180,6 +1363,8 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
                 f'El ajuste dejaría el saldo en ${new_balance:.2f}; no se permite un '
                 f'saldo negativo (saldo actual ${current:.2f}).'
             )
+        if amount < 0:
+            check_pos_debit(student, new_balance, pos_points)
 
         cb.balance = new_balance
         cb.last_synced = timezone.now()
@@ -1201,7 +1386,7 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
             transaction_type=CafeteriaTransaction.TxType.ADJUSTMENT,
             amount=amount.copy_abs(),
             description=(f'Ajuste manual: {reason}' if reason else 'Ajuste manual'),
-            loyverse_receipt_id=f'adjust-tx-{uuid4().hex}',
+            loyverse_receipt_id=reference or f'adjust-tx-{uuid4().hex}',
             balance_after=cb.balance,
         )
         adj = BalanceAdjustment.objects.create(
@@ -1214,37 +1399,144 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
             transaction=tx,
         )
 
+        if notify:
+            verb = 'acreditaron' if amount > 0 else 'descontaron'
+            title = 'Ajuste de saldo en cafetería'
+            message = (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
+                       f'{student.user.full_name}. Motivo: {reason}. '
+                       f'Saldo actual: ${cb.balance:.2f}.')
+            # After COMMIT (immediately when no transaction is open). robust:
+            # a mail failure is logged and can never undo or 500 the money.
+            transaction.on_commit(
+                lambda: _notify_balance_change(student, title, message), robust=True)
+
     _audit_wallet(
         'cafeteria.adjust', cb, admin=admin,
         reason=reason, amount=str(amount), balance_after=str(cb.balance),
         student=student.student_id,
     )
-
-    # Best-effort remote mirror (R1: expected no-op on the current Loyverse plan).
-    if mirror and student.loyverse_id:
-        try:
-            with _session() as session:
-                resp = session.post(
-                    f'{_base_url()}/customers',
-                    json={'id': student.loyverse_id, 'total_points': float(cb.balance)},
-                    timeout=_TIMEOUT,
-                )
-                resp.raise_for_status()
-        # LoyverseError too: unset token must skip the mirror, not 500 the adjustment.
-        except (LoyverseError, requests.RequestException) as e:
-            logger.warning(f'Loyverse mirror after adjustment skipped for {student}: {e}')
-
-    if notify:
-        verb = 'acreditaron' if amount > 0 else 'descontaron'
-        _notify_balance_change(
-            student,
-            'Ajuste de saldo en cafetería',
-            (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
-             f'{student.user.full_name}. Motivo: {reason}. '
-             f'Saldo actual: ${cb.balance:.2f}.'),
-        )
     logger.info(f'Balance adjustment ${amount} for {student} by {admin} — reason: {reason!r}')
     return adj
+
+
+class ReconcileConflict(ValueError):
+    """The wallet moved between the moment the admin (or the server) read it and
+    the moment Corregir took the row lock. Nothing was applied."""
+
+
+# Corregir never debits a wallet that received a local-only credit (caja
+# escolar, ajuste/recarga masiva, devolución de compra) this recently: those
+# reach the POS only when staff load them by hand, so "local above Loyverse"
+# is then usually money in transit, not an error.
+RECONCILE_LOCAL_CREDIT_DAYS = 30
+
+
+def _recent_local_credit(student, since) -> Decimal:
+    """Sum of local-only credits (never pushed to Loyverse) since ``since``."""
+    from django.db.models import Sum
+
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaTransaction
+
+    adjustments = (BalanceAdjustment.objects
+                   .filter(student=student, amount__gt=0, created_at__gte=since)
+                   .exclude(reason__startswith=RECONCILE_REASON_PREFIX)
+                   .aggregate(s=Sum('amount'))['s'])
+    office = (CafeteriaTransaction.objects
+              .filter(student=student, transaction_type=CafeteriaTransaction.TxType.TOPUP,
+                      loyverse_receipt_id__startswith='topup-request-', recorded_at__gte=since)
+              .aggregate(s=Sum('amount'))['s'])
+    return Decimal(str(adjustments or 0)) + Decimal(str(office or 0))
+
+
+RECONCILE_REASON_PREFIX = 'Reconciliación con Loyverse'
+
+
+def reconcile_to_loyverse(student, remote, *, expected_balance=None, admin=None):
+    """Corregir: set ``student``'s wallet to Loyverse's ``remote`` points.
+
+    Everything is decided under the balance row lock, from a fresh read:
+
+    - ``expected_balance`` is the balance the caller saw before reading
+      Loyverse (the admin's screen, or the server's own pre-read). If the
+      wallet moved since (a purchase landed, a double click already fixed it),
+      ``ReconcileConflict`` is raised instead of applying a stale delta.
+    - Students with money in transit in the POS queues are refused
+      (``pos_queue_reasons``): their drift is intended.
+    - A debit (local above Loyverse) is refused when the wallet received a
+      local-only credit in the last ``RECONCILE_LOCAL_CREDIT_DAYS`` days; that
+      credit may simply not be in the POS yet. A manual adjustment remains
+      available for the case where it truly must go.
+
+    Returns the ``BalanceAdjustment``, or ``None`` when already in sync.
+    """
+    from apps.cafeteria.models import CafeteriaBalance
+
+    remote = Decimal(str(remote))
+    if remote < 0:
+        raise ValueError(f'Loyverse reporta un saldo negativo (${remote:.2f}); revise en el POS.')
+    with transaction.atomic():
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+        local = cb.balance or Decimal('0')
+        if expected_balance is not None and local != Decimal(str(expected_balance)):
+            raise ReconcileConflict(
+                f'El saldo cambió mientras se revisaba (ahora ${local:.2f}); actualice la '
+                f'lista y vuelva a intentarlo.')
+        reason = pos_queue_reasons([student.id]).get(student.id)
+        if reason:
+            raise ValueError(f'No se corrige: el alumno {reason}. Atienda primero la cola del POS.')
+        delta = remote - local
+        if delta == 0:
+            return None
+        if delta < 0:
+            since = timezone.now() - timedelta(days=RECONCILE_LOCAL_CREDIT_DAYS)
+            credit = _recent_local_credit(student, since)
+            if credit > 0:
+                raise ValueError(
+                    f'No se corrige: el saldo local está ${-delta:.2f} arriba de Loyverse y en '
+                    f'los últimos {RECONCILE_LOCAL_CREDIT_DAYS} días recibió abonos locales por '
+                    f'${credit:.2f} (recarga en caja, ajuste o devolución) que quizá aún no se '
+                    f'cargan en el POS. Revise el detalle del alumno; si el descuento es '
+                    f'correcto, use un ajuste manual.')
+        # notify=False: the documented reconcile mode (the ledger is being SET
+        # TO Loyverse; a correction is not news for families). Nested atomic:
+        # the row lock taken above is kept.
+        return adjust_balance(
+            student, delta,
+            reason=f'{RECONCILE_REASON_PREFIX} (local ${local:.2f} → ${remote:.2f})',
+            admin=admin, notify=False, pos_points=remote)
+
+
+def reset_wallet_seed(student, *, old_loyverse_id: str, actor=None, context: str = '') -> bool:
+    """Forget the opening-balance seed after ``student.loyverse_id`` changed.
+
+    The wallet was seeded from (and since then compared against) the OLD
+    customer's points. Left as is, the next POS mirror pass would read the new
+    customer's points minus this wallet as a cash recarga. Clearing
+    ``last_synced``/``seeded_at`` makes the mirror treat the wallet as
+    ``unseeded`` (it never credits those) until ``sync_balances`` re-seeds it
+    from the new customer, the same path every newly linked student takes. The
+    ledger history stays; the reset is audited with the balance it had.
+    Returns True when a seeded wallet was reset.
+    """
+    from apps.cafeteria.models import CafeteriaBalance
+
+    with transaction.atomic():
+        cb = CafeteriaBalance.objects.select_for_update().filter(student=student).first()
+        if cb is None or (cb.last_synced is None and cb.seeded_at is None):
+            return False
+        before = {'balance_before': str(cb.balance), 'last_synced_before': str(cb.last_synced),
+                  'seeded_at_before': str(cb.seeded_at)}
+        cb.last_synced = cb.seeded_at = None
+        cb.save(update_fields=['last_synced', 'seeded_at'])
+    _audit_wallet(
+        context or 'cafeteria.reseed', cb, admin=actor,
+        reason='Cambio de cliente Loyverse: el saldo se volverá a sembrar desde el nuevo cliente',
+        old_loyverse_id=old_loyverse_id or '', new_loyverse_id=student.loyverse_id or '',
+        student=student.student_id, **before,
+    )
+    logger.info('Wallet seed reset for %s (Loyverse %r -> %r)',
+                student, old_loyverse_id, student.loyverse_id)
+    return True
 
 
 def _net_effect(tx) -> Decimal:
@@ -1266,7 +1558,36 @@ def _net_effect(tx) -> Decimal:
     return Decimal(str(adj.amount)) if adj else amount
 
 
-def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: bool = True):
+# A POS refund receipt this long after the sale is not taken as its reversal
+# by the legacy (pre ``refund_of``) same-amount match below.
+POS_REFUND_MATCH_DAYS = 30
+
+
+def _pos_refund_of(tx):
+    """The POS REFUND receipt that already gave ``tx`` (a purchase) back, if any.
+
+    Exact when the receipt carried Loyverse's ``refund_for`` (stored as
+    ``refund_of``). Rows recorded before that field existed fall back to a
+    same-student, same-amount POS refund dated after the sale (within
+    ``POS_REFUND_MATCH_DAYS``) that names no other sale.
+    """
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    pos_refunds = (CafeteriaTransaction.objects
+                   .filter(transaction_type=CafeteriaTransaction.TxType.REFUND,
+                           student_id=tx.student_id)
+                   .exclude(loyverse_receipt_id__startswith='refund-tx-'))
+    if tx.loyverse_receipt_id:
+        exact = pos_refunds.filter(refund_of=tx.loyverse_receipt_id).first()
+        if exact is not None:
+            return exact
+    return (pos_refunds.filter(refund_of='', amount=tx.amount, date__gte=tx.date,
+                               date__lte=tx.date + timedelta(days=POS_REFUND_MATCH_DAYS))
+            .order_by('date').first())
+
+
+def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: bool = True,
+                       pos_guard: bool = True):
     """Reverse a cafeteria transaction: undo its balance effect + refund any payment.
 
     Creates a ``REFUND`` ledger transaction that negates the original's effect on
@@ -1275,13 +1596,20 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
     audit row, and notifies the guardians. Idempotent: a second call is a no-op
     (guarded by a unique ``refund-tx-<id>`` reference).
 
+    Refused for a history-only row (``applied=False``: it never moved the
+    balance, so "giving it back" would mint money) and for a purchase the
+    cashier already returned on the POS (that REFUND receipt credited it).
+
     When reversing a POS-loaded online top-up, queues staff Loyverse unload unless
     ``flag_pos_unload`` is False (webhook path flags earlier so spent-balance
-    failures still queue unload).
+    failures still queue unload). Any other debit must pass ``check_pos_debit``
+    (``pos_guard``), or the POS mirror would credit it straight back; the
+    provider-refund webhook turns the guard off, because that money has left
+    the school's account whatever Loyverse says.
 
     Returns the created ``BalanceAdjustment``. Raises ``ValueError`` if the
-    transaction can't be refunded (already refunded, is itself a reversal, or the
-    debit would overdraw the balance).
+    transaction can't be refunded (already refunded, is itself a reversal, the
+    debit would overdraw the balance, or it is blocked as described above).
     """
     from apps.cafeteria.models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction
     from apps.payments.models import Payment
@@ -1289,11 +1617,27 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
     if tx.transaction_type in (CafeteriaTransaction.TxType.REFUND,
                                CafeteriaTransaction.TxType.ADJUSTMENT):
         raise ValueError('Solo se pueden revertir compras o recargas.')
+    if not tx.applied:
+        raise ValueError(
+            'Este movimiento es solo historial: es anterior al saldo inicial copiado de '
+            'Loyverse y nunca se descontó del saldo, así que no hay nada que devolver.')
+    if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
+        pos_refund = _pos_refund_of(tx)
+        if pos_refund is not None:
+            raise ValueError(
+                f'Esta compra ya se devolvió en el POS de Loyverse (recibo '
+                f'{pos_refund.loyverse_receipt_id}, {timezone.localtime(pos_refund.date):%d/%m/%Y}); '
+                f'devolverla otra vez abonaría dos veces. Si se trata de otra venta, '
+                f'use un ajuste manual.')
 
     student = tx.student
     reference = f'refund-tx-{tx.id}'
     effect = _net_effect(tx)      # original effect on balance
     reversal = -effect            # what the refund applies
+    # Network read OUTSIDE the row lock; compared under it, after the unload
+    # flag below is set (a flagged unload is exactly what makes it safe).
+    points = (loyverse_points_for_guard(student)
+              if pos_guard and reversal < 0 else None)
 
     with transaction.atomic():
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
@@ -1342,6 +1686,11 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
 
         if flag_pos_unload and payment is not None:
             flag_pos_unload_if_needed(getattr(payment, 'related_topup', None))
+
+        if reversal < 0:
+            # Raises (and rolls all of the above back) when Loyverse would
+            # still hold money this debit takes from the ledger.
+            check_pos_debit(student, new_balance, points)
 
     _audit_wallet(
         'cafeteria.refund', cb, admin=admin,
@@ -1494,6 +1843,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     so a simultaneous cash load cannot be misread). After crediting, local ==
     remote, so re-runs are no-ops: idempotent without needing a receipt id.
 
+    The flip side: a local DEBIT the POS never saw would look exactly like a
+    cash recarga here. Students with a refunded top-up still queued for unload
+    are skipped until staff confirm it, and every other local debit (refund,
+    negative adjustment, ajuste masivo) must pass ``check_pos_debit`` first.
+
     A positive delta is credited only once the ledger has been still for
     ``POS_MIRROR_SETTLE_SECONDS`` and does not echo a purchase just recorded
     (see ``_pos_delta_is_settled``); otherwise it is ``deferred`` to the next
@@ -1512,7 +1866,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     notifies normally.
     """
     from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
 
     full_roster = customers is None
     if full_roster:
@@ -1523,13 +1877,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         fresh = full_roster
     points_by_id = {c.get('id'): get_balance_from_customer(c) for c in customers}
 
-    pending_pos = set(
-        TopUpRequest.objects.filter(
-            method=TopUpRequest.Method.ONLINE,
-            status=TopUpRequest.Status.COMPLETED,
-            pos_loaded_at__isnull=True,
-        ).values_list('student_id', flat=True)
-    )
+    # Money in transit between ledger and POS: an online top-up not loaded yet
+    # (local above Loyverse on purpose) or a refunded top-up Loyverse still
+    # holds (Loyverse above local on purpose: crediting that gap would undo the
+    # refund). Both wait for staff to work the queue.
+    pending_pos = set(pos_queue_reasons())
 
     students = (StudentProfile.objects.filter(is_active=True)
                 .exclude(loyverse_id='').select_related('user'))
@@ -1604,7 +1956,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         f'mirror_pos_topups: {credited} credited (${total}), {in_sync} in sync, '
         f'{below} below Loyverse (${drift_total}, left to the purchase poll), '
         f'{deferred} deferred (ledger still settling), '
-        f'{skipped_pending} pending POS load, {unseeded} unseeded.')
+        f'{skipped_pending} pending POS load/unload, {unseeded} unseeded.')
     return result
 
 
@@ -1899,9 +2251,14 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
             'action': 'actualizar',
         })
         if commit:
+            previous = s.loyverse_id
             s.loyverse_id = uuid
             s.loyverse_missing_since = None
             s.save(update_fields=['loyverse_id', 'loyverse_missing_since'])
+            if previous:
+                # Repointed (overwrite=True): the wallet's seed belongs to the
+                # old customer; see reset_wallet_seed.
+                reset_wallet_seed(s, old_loyverse_id=previous, context='cafeteria.relink')
 
     report['unmatched_customer_count'] = sum(
         1 for c in customers if c.get('id') not in matched_ids)

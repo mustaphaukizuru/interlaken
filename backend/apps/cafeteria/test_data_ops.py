@@ -272,11 +272,19 @@ class TestAjusteMasivo:
         text = "matricula,monto,motivo\n09932,-40,Ajuste\n10001,-30,Excede\n"
         refused = self._post(api_client, text, dry_run="0")
         assert refused.status_code == 400
-        with patch("apps.cafeteria.services._session") as remote:
-            done = self._post(
-                api_client, text, dry_run="0", valid_only="1", notify="0", mirror="0"
-            ).json()
-        remote.assert_not_called()  # mirror=0: no Loyverse push
+        # The debit is checked against Loyverse (one store-wide read, never a
+        # write): the office already took the $40 off the POS.
+        store = [
+            {"id": a.loyverse_id, "total_points": 60},
+            {"id": b.loyverse_id, "total_points": 20},
+        ]
+        with (
+            patch("apps.cafeteria.services.get_all_customers", return_value=store) as fetch,
+            patch("apps.cafeteria.services.get_customer_by_id") as per_row,
+        ):
+            done = self._post(api_client, text, dry_run="0", valid_only="1", notify="0").json()
+        fetch.assert_called_once()
+        per_row.assert_not_called()
         assert done["counts"] == {"crear": 1, "actualizar": 0, "omitir": 0, "error": 1}
         assert CafeteriaBalance.objects.get(student=a).balance == Decimal("60.00")
         assert CafeteriaBalance.objects.get(student=b).balance == Decimal("20.00")
@@ -291,15 +299,21 @@ class TestAjusteMasivo:
             object_type="cafeteria.balanceadjustment", context="import:ajustes_cafeteria"
         ).exists()
 
-    def test_notify_default_tells_the_family_and_flags_a_reupload(self, api_client, admin):
+    def test_notify_default_tells_the_family_and_flags_a_reupload(
+        self, api_client, admin, django_capture_on_commit_callbacks
+    ):
         parent = ParentFactory()
         a = _student(student_id="09932", parents=[parent])
         _balance(a, 0)
         text = "matricula,monto,motivo\n09932,25,Beca octubre\n"
-        self._post(api_client, text, dry_run="0")
+        # Families are told after the import COMMITS.
+        with django_capture_on_commit_callbacks(execute=True):
+            self._post(api_client, text, dry_run="0")
         assert Notification.objects.filter(user=parent).count() == 1
         again = self._post(api_client, text).json()
         assert "últimas 24 h" in again["rows"][0]["warnings"][0]
+        # The very same file is now skipped, not applied twice.
+        assert again["rows"][0]["action"] == "omitir"
 
     def test_error_report_and_row_cap(self, api_client, admin):
         report = self._post(api_client, "matricula,monto,motivo\n12345,1,x\n", report="csv")
@@ -355,7 +369,7 @@ class TestTransactions:
         from apps.cafeteria.services import adjust_balance
 
         for i in range(3):
-            adjust_balance(a, Decimal("1"), f"r{i}", notify=False, mirror=False)
+            adjust_balance(a, Decimal("1"), f"r{i}", notify=False)
         resp = api_client.get(reverse("admin-adjustments"), {"student": a.id, "page_size": 2})
         assert resp.json()["count"] == 3 and len(resp.json()["results"]) == 2
 
@@ -496,11 +510,11 @@ class TestLowBalanceAndCustomers:
 
 # ── reconciliation ────────────────────────────────────────
 class TestReconcile:
-    @patch("apps.cafeteria.services.get_customer_by_id")
+    @patch("apps.cafeteria.services.get_all_customers")
     def test_paged_list_with_search(self, remote, api_client, admin):
-        remote.side_effect = lambda lid: {"total_points": 50}
         a = _student("Ana", "Alvarez")
         b = _student("Beto", "Rivera")
+        remote.return_value = [{"id": s.loyverse_id, "total_points": 50} for s in (a, b)]
         _balance(a, 50)
         _balance(b, 70)
         data = api_client.get(reverse("admin-reconcile"), {"page_size": 1}).json()
@@ -509,7 +523,7 @@ class TestReconcile:
         found = api_client.get(reverse("admin-reconcile"), {"q": "rivera"}).json()
         assert found["results"][0]["drift"] == "20.00"
 
-    @patch("apps.cafeteria.services.get_customer_by_id")
+    @patch("apps.cafeteria.services.get_all_customers")
     def test_bulk_fix_sets_local_to_loyverse_without_notifying(self, remote, api_client, admin):
         parent = ParentFactory()
         drift = StudentProfileFactory(parents=[parent])
@@ -519,7 +533,7 @@ class TestReconcile:
         _balance(ok, 50)
         _balance(negative, 10)
         points = {drift.loyverse_id: 65, ok.loyverse_id: 50, negative.loyverse_id: -5}
-        remote.side_effect = lambda lid: {"total_points": points[lid]}
+        remote.return_value = [{"id": lid, "total_points": p} for lid, p in points.items()]
         url = reverse("admin-reconcile-bulk")
         body = {"action": "fix", "ids": [drift.id, ok.id, negative.id]}
         plan = api_client.post(url, {**body, "dry_run": True}, format="json").json()
