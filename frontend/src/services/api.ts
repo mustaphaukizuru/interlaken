@@ -289,7 +289,12 @@ const sessionHeaders = (token?: string) =>
   token ? { headers: { 'X-Session-Token': token } } : {};
 
 export interface PipelineCard { id: number; child_name: string; level: string; grade_applying: string; parent_name: string; parent_email: string; parent_phone: string; status: string; submitted_at: string | null; updated_at: string; docs_verified: number; docs_required: number; missing: string[]; student: number | null }
-export interface ConvertResult { student: number; student_id?: string; already: boolean; credentials: { email: string; password: string | null; name: string }[] }
+export interface ConvertResult {
+  student: number; student_id?: string; already: boolean;
+  credentials: { email: string; password: string | null; name: string }[];
+  /** Applicant emails that belong to a non-family account (staff, admin, student): NOT linked as guardian. */
+  unlinked?: { email: string; name: string; reason: string }[];
+}
 
 export const admissionsApi = {
   /** Admissions pipeline (BACKLOG P4-1). */
