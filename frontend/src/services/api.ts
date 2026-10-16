@@ -1258,11 +1258,12 @@ export const contentApi = {
   getForm: (slug: string) => api.get<FormDefinitionPublic>(`/content/forms/${encodeURIComponent(slug)}/`),
   submitForm: (slug: string, data: Record<string, unknown>) => api.post<{ ok: boolean; message: string }>(`/content/forms/${encodeURIComponent(slug)}/submit/`, data),
   adminListForms: () => api.get<FormDefinitionAdmin[]>('/content/admin/forms/'),
+  /** One form by id (the submissions inbox deep link may point outside the current list page). */
+  adminGetForm: (id: number) => api.get<FormDefinitionAdmin>(`/content/admin/forms/${id}/`),
   adminCreateForm: (data: Partial<FormDefinitionAdmin>) => api.post<FormDefinitionAdmin>('/content/admin/forms/', data),
   adminUpdateForm: (id: number, data: Partial<FormDefinitionAdmin>) => api.patch<FormDefinitionAdmin>(`/content/admin/forms/${id}/`, data),
   adminDeleteForm: (id: number) => api.delete(`/content/admin/forms/${id}/`),
   adminFormSubmissions: (id: number, params?: { handled?: '0' | '1' }) => api.get<FormSubmission[]>(`/content/admin/forms/${id}/submissions/`, { params }),
-  adminFormSubmissionsCsv: (id: number) => api.get<Blob>(`/content/admin/forms/${id}/submissions/`, { params: { export: 'csv' }, responseType: 'blob' }),
   adminHandleSubmission: (id: number, is_handled: boolean) => api.patch<FormSubmission>(`/content/admin/form-submissions/${id}/`, { is_handled }),
   /** CMS media library (BACKLOG P3-1). */
   adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),

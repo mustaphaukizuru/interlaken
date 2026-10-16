@@ -63,16 +63,22 @@ export interface CafeteriaTransactionItem {
 }
 
 /** Loyverse customer snapshot (visits, lifetime spend, points). */
+/** Loyverse customer snapshot (cafeteria LoyverseProfileSerializer), used by the
+ *  family card (/cafeteria/cards/) and the admin student console. Declared once:
+ *  two declarations silently merged into one type. */
 export interface LoyverseProfile {
   customer_code: string;
   name: string;
   email: string;
+  phone_number: string;
   address_code: string;
+  note: string;
   first_visit: string | null;
   last_visit: string | null;
   total_visits: number;
   total_spent: string;
   total_points: string;
+  loyverse_created_at: string | null;
   synced_at: string;
 }
 
@@ -180,22 +186,6 @@ export interface ReconcileRow {
   drift: string | null;
   in_sync: boolean;
   error: string | null;
-}
-
-export interface LoyverseProfile {
-  customer_code: string;
-  name: string;
-  email: string;
-  phone_number: string;
-  address_code: string;
-  note: string;
-  first_visit: string | null;
-  last_visit: string | null;
-  total_visits: number;
-  total_spent: string;
-  total_points: string;
-  loyverse_created_at: string | null;
-  synced_at: string;
 }
 
 export interface CafeteriaStudentDetail {

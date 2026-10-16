@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Check, ClipboardList, Inbox, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -20,7 +20,8 @@ import { useRowSelection } from '@/hooks/useRowSelection';
 import {
   FORMS_ENTITY, SUBMISSIONS_ENTITY, useFormsBulk, useFormsExport, useFormsList, useSubmissionsBulk, useSubmissionsExport, useSubmissionsList,
 } from '@/hooks/queries/AdminContentQueries';
-import { invalidateEntity } from '@/hooks/queries/keys';
+import { adminKeys, invalidateEntity } from '@/hooks/queries/keys';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi, type BulkActionDef, type FormDefinitionAdmin, type FormField, type FormFieldType, type FormSubmission } from '@/services/api';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { apiFieldErrors } from '@/lib/apiErrors';
@@ -74,7 +75,15 @@ export default function AdminForms() {
   const [toDelete, setToDelete] = useState<FormDefinitionAdmin | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const inboxId = Number.parseInt(get('envios'), 10);
-  const inbox = Number.isFinite(inboxId) ? (rows ?? []).find((f) => f.id === inboxId) ?? null : null;
+  const listedInbox = Number.isFinite(inboxId) ? (rows ?? []).find((f) => f.id === inboxId) ?? null : null;
+  // ?envios=<id> deep links, filtered or paged lists: the form may not be on
+  // this page of results, so fetch it by id instead of silently not opening.
+  const inboxQuery = useQuery({
+    queryKey: adminKeys.detail(FORMS_ENTITY, inboxId),
+    queryFn: async () => (await contentApi.adminGetForm(inboxId)).data,
+    enabled: Number.isFinite(inboxId) && !listedInbox && !isLoading,
+  });
+  const inbox = listedInbox ?? inboxQuery.data ?? null;
   const openInbox = (f: FormDefinitionAdmin) => set({ envios: String(f.id) });
   const closeInbox = () => set({ envios: null, eq: null, eatendido: null, edesde: null, ehasta: null, eorden: null, epage: null });
 
@@ -168,6 +177,11 @@ export default function AdminForms() {
       </Card>
       {editing && <FormBuilderModal initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); invalidate(); }} />}
       {inbox && <SubmissionsModal form={inbox} onClose={closeInbox} />}
+      {!inbox && inboxQuery.isError && (
+        <Modal open onClose={closeInbox} title="Envíos" maxWidth={480}>
+          <ErrorState title="No se encontró ese formulario" description="Puede que se haya eliminado. Cierre y elija otro de la lista." onRetry={() => inboxQuery.refetch()} />
+        </Modal>
+      )}
       <ConfirmDialog open={!!toDelete} title="¿Eliminar formulario?" message={`Se borrarán también sus ${toDelete?.submissions_count ?? 0} envíos. Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar formulario" requireText={toDelete?.submissions_count ? 'ELIMINAR' : undefined} loading={remove.isPending} onConfirm={() => toDelete && remove.mutate(toDelete.id)} onClose={() => setToDelete(null)} />
       <BulkConfirmDialog
