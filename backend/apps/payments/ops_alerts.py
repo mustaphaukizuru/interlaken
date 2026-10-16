@@ -60,3 +60,35 @@ def email_admins(subject: str, body: str) -> int:
     if not recipients:
         return 0
     return len(recipients) if send_email(subject, body, recipients) else 0
+
+
+CONFIG_ERROR_KEY = "banorte_config_error"
+
+
+def alert_config_error(checkout, problem: str) -> int:
+    """Email the admins that Banorte rejected an operation for a merchant set-up
+    reason (AUT-10, Payworks R/E such as PAYW-3008). Once per distinct problem,
+    then weekly while it repeats. Never includes credentials.
+
+    Returns how many admins were addressed (0 = not sent or already told).
+    """
+    fingerprint = problem[:200]
+    if not should_alert(CONFIG_ERROR_KEY, fingerprint):
+        return 0
+    body = (
+        "Banorte rechazó un pago con tarjeta por un problema de configuración del "
+        "comercio, no por la tarjeta de la familia. Mientras no se corrija, los pagos "
+        "con tarjeta van a fallar.\n\n"
+        f"- Problema: {problem}\n"
+        f"- Número de control: {checkout.control_number} (pago #{checkout.payment_id}, "
+        f"modo {checkout.mode})\n\n"
+        "Qué revisar (docs/BANORTE-INTEGRATION.md, secciones 3 y 4): AUT-10 suele ser "
+        "el certificado vencido o el usuario/contraseña del motor; PAYW-3008 significa "
+        "que BANORTE_TERMINAL_ID no es una terminal de la afiliación (la terminal de "
+        "Payworks no siempre es igual a la afiliación). Ejecute "
+        "`python manage.py check_banorte` en el servidor después de corregir."
+    )
+    sent = email_admins("Interlaken: error de configuración en pagos Banorte", body)
+    if sent:
+        mark_alerted(CONFIG_ERROR_KEY, fingerprint)
+    return sent

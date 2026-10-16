@@ -222,10 +222,11 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             and obj.pos_loaded_at is None
         ):
             return False
-        # Refunded before POS load — do not ask staff to credit Loyverse.
+        # Refunded before POS load: do not ask staff to credit Loyverse. A
+        # Payworks simulation (AUT) moved no money: never load it either.
         from apps.payments.models import Payment
         p = self._payment(obj)
-        if p is not None and p.status == Payment.Status.REFUNDED:
+        if p is not None and (p.status == Payment.Status.REFUNDED or p.is_simulation()):
             return False
         return True
 
@@ -260,21 +261,39 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         return p.pk if p else None
 
     def get_banorte(self, obj):
-        """What staff need to find the operation in MultiCobros (or ``None``)."""
+        """What staff need to find the operation in MultiCobros (or ``None``).
+
+        Staff-only (admin deposit log): includes Payworks' raw answer
+        (``codigo_payw``, ``texto``) and our ``last_error``.
+        """
+        from apps.payments.multicobros import can_reconcile, review_reason
+
         p = self._payment(obj)
         checkout = p.banorte_checkout() if p else None
         if checkout is None:
             return None
         return {
             'control_number': checkout.control_number,
+            'created_at': checkout.created_at,
             'referencia': checkout.referencia,
             'codigo_aut': checkout.codigo_aut,
             'resultado': checkout.resultado_payw,
+            'resultado_label': (
+                checkout.get_resultado_payw_display() if checkout.resultado_payw else ''),
+            'codigo_payw': checkout.codigo_payw,
+            'texto': checkout.texto,
+            'last_error': checkout.last_error,
+            'status_3d': checkout.status_3d,
             'mode': checkout.mode,
+            'simulation': not checkout.is_live,
             'marca_tarjeta': checkout.marca_tarjeta,
             'verified_at': checkout.verified_at,
             'verified_by_name': checkout.verified_by.full_name if checkout.verified_by_id else '',
             'needs_verification': checkout.needs_verification,
+            'failure_reason': p.failure_reason(),
+            'failure_label': p.failure_label(),
+            'review_reason': review_reason(p, checkout) or '',
+            'can_reconcile': can_reconcile(p),
         }
 
 
@@ -330,3 +349,6 @@ class AdjustmentInputSerializer(serializers.Serializer):
 
 class RefundInputSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+    # Reversing a card top-up only moves the wallet: staff confirm they already
+    # refunded the charge in MultiCobros (Banorte). Required for real card payments.
+    bank_refund_confirmed = serializers.BooleanField(required=False, default=False)

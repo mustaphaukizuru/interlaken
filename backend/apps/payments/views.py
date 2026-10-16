@@ -36,10 +36,14 @@ from .filters import (
 from .gateways.banorte import interpret_result
 from .gateways.base import PaymentEvent
 from .models import BanorteCheckout, Payment
-from .serializers import PaymentInitiateSerializer, PaymentSerializer
+from .serializers import AdminPaymentSerializer, PaymentInitiateSerializer, PaymentSerializer
 from .settlement import settle
 
 logger = logging.getLogger(__name__)
+
+# The first meaningful value wins: a later ``onClosed`` (no 3D Secure status,
+# no error) must not blank what the earlier callback reported.
+_STICKY_CHECKOUT_FIELDS = frozenset({'status_3d', 'eci', 'last_error'})
 
 
 class PaymentInitiateView(APIView):
@@ -119,6 +123,8 @@ class BanorteResultView(APIView):
                                 status=404)
             outcome = interpret_result(checkout, event_name, response)
             for name, value in outcome.fields.items():
+                if name in _STICKY_CHECKOUT_FIELDS and (getattr(checkout, name) or not value):
+                    continue
                 setattr(checkout, name, value)
             if outcome.event.status != 'pending':
                 checkout.result_at = timezone.now()
@@ -127,6 +133,15 @@ class BanorteResultView(APIView):
         if outcome.anomaly:
             logger.warning('banorte result not trusted payment=%s control=%s user=%s: %s',
                            payment.pk, checkout.control_number, request.user.pk, outcome.anomaly)
+        if outcome.config_error:
+            logger.error('banorte merchant configuration error payment=%s control=%s: %s',
+                         payment.pk, checkout.control_number, outcome.config_error)
+            try:
+                from .ops_alerts import alert_config_error
+
+                alert_config_error(checkout, outcome.config_error)
+            except Exception:  # an alert must never fail the family's request
+                logger.exception('banorte config-error alert failed payment=%s', payment.pk)
 
         http_status, body = settle(outcome.event, actor_label='system:banorte')
 
@@ -142,35 +157,106 @@ class BanorteResultView(APIView):
 
 
 class AdminBanorteVerifyView(APIView):
-    """POST /api/v1/payments/admin/<pk>/banorte-verify/
+    """POST /api/v1/payments/admin/<pk>/banorte-verify/  ``{referencia, amount}``
 
-    Staff confirm that the approved operation appears in MultiCobros (same
-    número de control, referencia and amount). Required before an online
-    top-up may be marked as loaded into the POS.
+    Staff confirm that the approved operation appears in MultiCobros: they
+    search the número de control there and type back the referencia and the
+    amount MultiCobros shows, which must match ours. Only a credited (SUCCESS)
+    approval is verified, under a row lock. Required before an online top-up
+    may be marked as loaded into the POS. Idempotent once verified.
     """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
-        from django.shortcuts import get_object_or_404
+        from django.http import Http404
 
         from apps.core.audit import record
 
-        checkout = get_object_or_404(BanorteCheckout.objects.select_related('payment'),
-                                     payment_id=pk)
-        if checkout.resultado_payw != BanorteCheckout.Result.APPROVED:
-            return Response(error_body('Solo se verifican operaciones aprobadas.'), status=400)
-        if checkout.verified_at is None:
-            checkout.verified_at = timezone.now()
-            checkout.verified_by = request.user
-            checkout.save(update_fields=['verified_at', 'verified_by'])
-            record('update', checkout.payment,
-                   {'banorte_verified': True, 'referencia': checkout.referencia},
-                   actor=request.user, context='payments.banorte.verify')
+        from .multicobros import parse_amount
+
+        referencia = str(request.data.get('referencia', '') or '').strip()
+        amount = parse_amount(request.data.get('amount', ''))
+        with db_transaction.atomic():
+            checkout = (BanorteCheckout.objects.select_for_update()
+                        .select_related('payment', 'verified_by').filter(payment_id=pk).first())
+            if checkout is None:
+                raise Http404
+            payment = checkout.payment
+            if checkout.verified_at is None:
+                if checkout.resultado_payw != BanorteCheckout.Result.APPROVED:
+                    return Response(error_body('Solo se verifican operaciones aprobadas.'),
+                                    status=400)
+                if payment.status != Payment.Status.SUCCESS:
+                    return Response(error_body(
+                        'Solo se verifican pagos acreditados (este está '
+                        f'«{payment.get_status_display()}»).', code='not_success'), status=400)
+                if not referencia or referencia != checkout.referencia:
+                    return Response(error_body(
+                        'La referencia no coincide con la de este pago. Revise que buscó el '
+                        'número de control correcto en MultiCobros.', code='reference_mismatch'),
+                        status=400)
+                if amount is None or amount != payment.amount:
+                    return Response(error_body(
+                        f'El monto no coincide con el del pago (${payment.amount:.2f}). '
+                        'No lo cargue en el POS y avise a dirección.', code='amount_mismatch'),
+                        status=400)
+                checkout.verified_at = timezone.now()
+                checkout.verified_by = request.user
+                checkout.save(update_fields=['verified_at', 'verified_by'])
+                record('update', payment,
+                       {'banorte_verified': True, 'referencia': checkout.referencia,
+                        'amount': f'{payment.amount:.2f}'},
+                       actor=request.user, context='payments.banorte.verify')
         return Response({
             'payment_id': pk,
             'verified_at': checkout.verified_at,
             'verified_by_name': checkout.verified_by.full_name if checkout.verified_by_id else '',
         })
+
+
+class AdminBanorteReconcileView(APIView):
+    """POST /api/v1/payments/admin/<pk>/banorte-reconcile/
+
+    "Conciliar con MultiCobros" for a pending or soft-failed Banorte payment:
+
+    - ``{outcome: "approved", referencia, codigo_aut, amount, note?}``: MultiCobros
+      shows it approved. Settled as a success (credits the wallet once, marked
+      verified), so a later browser answer is a no-op.
+    - ``{outcome: "not_found", note}``: not in MultiCobros. Closed for staff; a
+      genuine late approval is still credited.
+
+    See ``payments.multicobros``.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from .multicobros import ReconcileError, reconcile_approved, reconcile_not_found
+
+        outcome = str(request.data.get('outcome', '')).strip()
+        try:
+            if outcome == 'approved':
+                result = reconcile_approved(
+                    pk,
+                    referencia=request.data.get('referencia', ''),
+                    codigo_aut=request.data.get('codigo_aut', ''),
+                    amount=request.data.get('amount', ''),
+                    note=request.data.get('note', ''),
+                    actor=request.user,
+                )
+            elif outcome == 'not_found':
+                result = reconcile_not_found(pk, note=request.data.get('note', ''),
+                                             actor=request.user)
+            else:
+                return Response(error_body('Indique el resultado de la revisión.',
+                                           code='invalid_outcome'), status=400)
+        except ReconcileError as exc:
+            return Response(error_body(str(exc), code=exc.code), status=exc.status)
+
+        payment = (Payment.objects
+                   .select_related('user', 'related_topup__student__user', 'banorte__verified_by')
+                   .get(pk=result.payment.pk))
+        return Response({'detail': result.detail,
+                         'payment': AdminPaymentSerializer(payment).data})
 
 
 def _sandbox_payments_enabled() -> bool:
@@ -213,7 +299,8 @@ class PaymentDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         from .services import payments_visible_to
-        return payments_visible_to(self.request.user)
+        return payments_visible_to(self.request.user).select_related(
+            'related_topup__student__user', 'banorte')
 
 
 # Columns the pagos tables can sort by (public key → ORM field).
@@ -232,7 +319,8 @@ def _filtered_history(request):
     """
     from .services import payments_visible_to
 
-    qs = payments_visible_to(request.user).select_related('related_topup__student__user')
+    qs = payments_visible_to(request.user).select_related(
+        'related_topup__student__user', 'banorte')
     p = request.query_params
     if p.get('status') in Payment.Status.values:
         qs = qs.filter(status=p['status'])
@@ -312,11 +400,13 @@ class AdminPaymentsView(AdminListMixin, generics.ListAPIView):
     ``?q=`` student name / matrícula (``ci09932`` too), payer email or name,
     gateway references, description; filters ``status``, ``gateway``, ``type``,
     ``student``, ``from``/``to``; ordering ``date``, ``amount``, ``status``,
-    ``gateway``, ``student`` (``-pk`` tiebreak); ``page_size`` up to 100.
-    Refunds live in the cafetería console and payment state belongs to the
-    gateway webhook, so this page is the read-only ledger view.
+    ``gateway``, ``student`` (``-pk`` tiebreak); ``page_size`` up to 100. ``q`` also matches
+    the Banorte número de control and referencia.
+    Refunds and the MultiCobros reconciliation live in the cafetería console;
+    otherwise payment state comes only from Banorte's settled result, so this
+    page is the read-only ledger view.
     """
-    serializer_class = PaymentSerializer
+    serializer_class = AdminPaymentSerializer
     search_fields = ADMIN_PAYMENT_SEARCH_FIELDS
     ordering = ADMIN_PAYMENT_ORDERING
     default_ordering = '-created_at'
@@ -324,7 +414,8 @@ class AdminPaymentsView(AdminListMixin, generics.ListAPIView):
     normalize_search_term = staticmethod(search_key)
 
     def get_queryset(self):
-        return Payment.objects.select_related('user', 'related_topup__student__user')
+        return Payment.objects.select_related(
+            'user', 'related_topup__student__user', 'banorte__verified_by')
 
 
 class AdminPaymentsExportView(AdminExportMixin, AdminPaymentsView):
@@ -344,8 +435,11 @@ class AdminPaymentsSummaryView(APIView):
         from datetime import timedelta
 
         from django.db.models import Count, Sum
+        from django.db.models.fields.json import KT
         from django.db.models.functions import TruncDate
         from django.utils import timezone
+
+        from .models import failure_reason_for
 
         try:
             days = max(7, min(int(request.query_params.get('days', 30)), 365))
@@ -362,7 +456,17 @@ class AdminPaymentsSummaryView(APIView):
             for r in (qs.filter(status=Payment.Status.SUCCESS).annotate(d=TruncDate('created_at'))
                       .values('d').annotate(t=Sum('amount'), c=Count('id')).order_by('d'))
         ]
+        # FAILED split by cause: a cancelled, expired or superseded attempt is
+        # not a bank rejection and must not inflate the "rechazados" tile.
+        failed_by_reason = {}
+        rows = (qs.filter(status=Payment.Status.FAILED)
+                .annotate(stage=KT('gateway_raw__stage'))
+                .values('stage', 'banorte__resultado_payw').annotate(c=Count('id')))
+        for r in rows:
+            reason = failure_reason_for(r['stage'], r['banorte__resultado_payw'])
+            failed_by_reason[reason] = failed_by_reason.get(reason, 0) + r['c']
         return Response({'days': days, 'since': since.isoformat(), 'by_status': by_status, 'series': series,
+                         'failed_by_reason': failed_by_reason,
                          'stuck_pending': Payment.objects.filter(
                              status__in=[Payment.Status.PENDING, Payment.Status.PROCESSING],
                              created_at__lt=timezone.now() - timedelta(hours=24)).count()})
@@ -383,11 +487,20 @@ class PaymentReceiptView(APIView):
         from .services import payments_visible_to
 
         p = get_object_or_404(payments_visible_to(request.user).select_related(
-            'user', 'related_topup__student__user'), pk=pk)
+            'user', 'related_topup__student__user', 'banorte'), pk=pk)
         if p.status not in (Payment.Status.SUCCESS, Payment.Status.REFUNDED):
             return Response({'detail': 'Solo los pagos completados tienen comprobante.'}, status=409)
         topup = p.related_topup
         student = topup.student.user.full_name if topup else ''
+        checkout = p.banorte_checkout()
+        if checkout is not None and (checkout.referencia or checkout.codigo_aut):
+            reference_lines = [
+                f'Referencia bancaria: {checkout.referencia or "-"}',
+                f'Código de autorización: {checkout.codigo_aut or "-"}',
+                f'Número de control: {checkout.control_number}',
+            ]
+        else:
+            reference_lines = [f'Referencia: {p.gateway_ref or p.gateway_tx_id or "-"}']
         lines = [
             f'Folio: {p.id}',
             f'Fecha: {fmt_dt(p.created_at)}',
@@ -399,7 +512,7 @@ class PaymentReceiptView(APIView):
             '',
             f'Monto: ${p.amount} {p.currency}',
             f'Pasarela: {p.get_gateway_display()}',
-            f'Referencia: {p.gateway_tx_id or p.gateway_ref or "-"}',
+            *reference_lines,
             '',
             'Este comprobante acredita una recarga de saldo de cafetería. No es un CFDI;',
             f'para facturación escriba a {getattr(settings, "BILLING_EMAIL", "")}.',

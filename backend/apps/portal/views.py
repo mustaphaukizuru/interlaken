@@ -67,6 +67,22 @@ def audiences_for_user(user):
     return audiences
 
 
+def _pending_topup_counts() -> dict:
+    """"Recargas por aplicar" on the admin dashboard: cash requests to apply at the
+    counter, plus real card top-ups (already credited) still to verify in
+    MultiCobros or to load into the Loyverse POS."""
+    from apps.cafeteria.models import TopUpRequest
+    from apps.payments.multicobros import online_topups_awaiting_staff
+
+    office = TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count()
+    online = online_topups_awaiting_staff().count()
+    return {
+        'pending_topups': office + online,
+        'pending_topups_office': office,
+        'pending_topups_online': online,
+    }
+
+
 class DashboardView(APIView):
     """GET /api/v1/portal/dashboard/ — Role-aware summary."""
     permission_classes = [permissions.IsAuthenticated]
@@ -145,7 +161,6 @@ class DashboardView(APIView):
 
             from apps.accounts.models import PasswordRequest
             from apps.bookings.models import Booking
-            from apps.cafeteria.models import TopUpRequest
             from apps.core.models import AuditLog, ContactMessage
 
             now = tz.localtime()
@@ -168,7 +183,7 @@ class DashboardView(APIView):
                 # leavers the office has not withdrawn yet (Vincular Loyverse).
                 'stale_links': StudentProfile.objects.filter(
                     is_active=True, loyverse_missing_since__isnull=False).count(),
-                'pending_topups': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count(),
+                **_pending_topup_counts(),
                 'visits_today': Booking.objects.filter(slot__date=now.date()).exclude(status='cancelled').count()
                 if hasattr(Booking, 'slot') else 0,
                 'open_password_requests': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),

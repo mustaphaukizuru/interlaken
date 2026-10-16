@@ -15,6 +15,8 @@ urlpatterns = [
     path('admin/summary/', views.AdminPaymentsSummaryView.as_view(), name='admin-payments-summary'),
     path('admin/<int:pk>/banorte-verify/', views.AdminBanorteVerifyView.as_view(),
          name='admin-payment-banorte-verify'),
+    path('admin/<int:pk>/banorte-reconcile/', views.AdminBanorteReconcileView.as_view(),
+         name='admin-payment-banorte-reconcile'),
     path('<int:pk>/',   views.PaymentDetailView.as_view(),    name='payment-detail'),
     path('<int:pk>/receipt/', views.PaymentReceiptView.as_view(), name='payment-receipt'),
 ]

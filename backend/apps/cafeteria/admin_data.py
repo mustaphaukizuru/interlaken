@@ -243,16 +243,19 @@ class TopUpFilter(django_filters.FilterSet):
     student = django_filters.NumberFilter(field_name="student_id")
     needs_pos = django_filters.BooleanFilter(method="filter_needs_pos", widget=BooleanWidget)
     needs_unload = django_filters.BooleanFilter(method="filter_needs_unload", widget=BooleanWidget)
+    needs_review = django_filters.BooleanFilter(method="filter_needs_review", widget=BooleanWidget)
 
     class Meta:
         model = TopUpRequest
         fields: list[str] = []
 
     def filter_needs_pos(self, qs, name, value):
-        """Paid online, credited locally, not yet loaded into the POS (refunds excluded)."""
+        """Paid online, credited locally, not yet loaded into the POS (refunds and
+        Payworks simulations excluded: a simulated approval moved no money)."""
         if not value:
             return qs
         from apps.payments.models import Payment
+        from apps.payments.multicobros import simulated_topup_ids
 
         return (
             qs.filter(
@@ -261,7 +264,19 @@ class TopUpFilter(django_filters.FilterSet):
                 pos_loaded_at__isnull=True,
             )
             .exclude(payments__status=Payment.Status.REFUNDED)
+            .exclude(pk__in=simulated_topup_ids())
             .distinct()
+        )
+
+    def filter_needs_review(self, qs, name, value):
+        """Card attempts staff must look up in MultiCobros ("Conciliar con MultiCobros")."""
+        if not value:
+            return qs
+        from apps.payments.models import Payment
+        from apps.payments.multicobros import needs_review_q
+
+        return qs.filter(
+            pk__in=Payment.objects.filter(needs_review_q()).values("related_topup_id")
         )
 
     def filter_needs_unload(self, qs, name, value):
@@ -402,6 +417,9 @@ def _pos_state(topup) -> str:
     if topup.pos_loaded_at:
         return "En POS"
     if topup.method == TopUpRequest.Method.ONLINE and topup.status == TopUpRequest.Status.COMPLETED:
+        payment = _first_payment(topup)
+        if payment is not None and payment.is_simulation():
+            return "Simulación (no cargar)"
         return "Pendiente POS"
     return ""
 
@@ -813,11 +831,12 @@ class AdminAdjustmentListView(DateRangeMixin, AdminListMixin, generics.ListAPIVi
 
 # ── top-ups log ───────────────────────────────────────────
 class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generics.ListAPIView):
-    """GET .../admin/topups/?q=&status=&method=&student=&from=&to=&needs_pos=&needs_unload=&ordering=
+    """GET .../admin/topups/?q=&status=&method=&student=&from=&to=&ordering=
+    &needs_pos=&needs_unload=&needs_review=
 
     Every ``TopUpRequest`` (office + online) with its linked gateway payment.
     ``needs_pos=1`` is the POS load queue, ``needs_unload=1`` the post-refund
-    unload queue.
+    unload queue, ``needs_review=1`` the card attempts to check in MultiCobros.
     """
 
     serializer_class = TopUpLogSerializer
@@ -890,6 +909,10 @@ def _pos_loaded_plan(topup, payload):
         raise BulkSkip("fue reembolsada; no se carga en el POS")
     if topup.pos_loaded_at is not None:
         raise BulkSkip("ya estaba marcada como cargada")
+    if payment is not None and payment.is_simulation():
+        raise BulkSkip(
+            "es una operación de simulación de Banorte (sin cargo real); no se carga en el POS"
+        )
     if payment is not None and payment.needs_bank_verification():
         raise BulkSkip("falta verificar la operación en MultiCobros")
 

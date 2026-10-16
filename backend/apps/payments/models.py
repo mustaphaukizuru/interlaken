@@ -15,6 +15,40 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.fields import EncryptedTextField
 
+# Why a FAILED payment failed, shown to staff and families instead of a bare
+# "Fallido" (keys are the API's ``failure_reason``).
+FAILURE_LABELS = {
+    'cancelled': 'Cancelado por el usuario',
+    'expired': 'Expirado',
+    'superseded': 'Reemplazado por otro intento',
+    'declined': 'Rechazado por el banco',
+    'bank_timeout': 'Sin respuesta del banco',
+    'config_error': 'Error de configuración',
+    'not_found': 'No aparece en MultiCobros',
+}
+_STAGE_REASONS = {
+    'cancel': 'cancelled',
+    'expire': 'expired',
+    'supersede': 'superseded',
+    'create_checkout': 'config_error',
+    'bank_timeout': 'bank_timeout',
+    'not_found': 'not_found',
+}
+
+
+def failure_reason_for(stage, resultado_payw) -> str:
+    """``FAILURE_LABELS`` key of a FAILED payment from its stage and Payworks result.
+
+    Local stages win; a bank answer without a stage is a decline, except
+    Payworks R (rejected: merchant set-up, e.g. PAYW-3008 unknown terminal) and
+    E (Banorte internal error), which never reached the card issuer.
+    """
+    if stage and stage in _STAGE_REASONS:
+        return _STAGE_REASONS[stage]
+    if resultado_payw in ('R', 'E'):
+        return 'config_error'
+    return 'declined'
+
 
 class Payment(models.Model):
     class Status(models.TextChoices):
@@ -45,7 +79,7 @@ class Payment(models.Model):
     description   = models.CharField(max_length=255, blank=True)
 
     # Links a cafeteria top-up payment back to its TopUpRequest (spec §2.2). The
-    # webhook uses this to credit the right student's local ledger on success.
+    # settlement uses this to credit the right student's local ledger on success.
     related_topup = models.ForeignKey('cafeteria.TopUpRequest', on_delete=models.SET_NULL,
                                       null=True, blank=True, related_name='payments')
 
@@ -86,10 +120,14 @@ class Payment(models.Model):
 
     # Local soft-fails: the checkout may still complete after expire/supersede,
     # never started (create_checkout), was cancelled in the lightbox before a
-    # result (cancel), or the bank timed out (bank_timeout). Distinct from a
-    # bank DECLINED result, which is final.
+    # result (cancel), the bank timed out (bank_timeout), or staff found no such
+    # operation in MultiCobros (not_found: closed for staff, but a genuine late
+    # approval is still credited). Distinct from a bank DECLINED result, which
+    # is final.
     SOFT_FAIL_STAGES = frozenset({
-        'expire', 'supersede', 'create_checkout', 'cancel', 'bank_timeout'})
+        'expire', 'supersede', 'create_checkout', 'cancel', 'bank_timeout', 'not_found'})
+
+    FAILURE_LABELS = FAILURE_LABELS
 
     def mark_failed(self, error='', stage=''):
         """Mark the payment failed, preserving the error for reconciliation.
@@ -109,13 +147,30 @@ class Payment(models.Model):
     def is_soft_failed(self) -> bool:
         """True when FAILED only by local expiry/supersede/checkout abort.
 
-        A soft-failed payment may still receive a late SUCCESS webhook if the
+        A soft-failed payment may still receive a late SUCCESS result if the
         parent completes an abandoned or superseded hosted-payment page.
         """
         if self.status != self.Status.FAILED:
             return False
         raw = self.gateway_raw if isinstance(self.gateway_raw, dict) else {}
         return raw.get('stage') in self.SOFT_FAIL_STAGES
+
+    def failure_stage(self) -> str:
+        raw = self.gateway_raw if isinstance(self.gateway_raw, dict) else {}
+        return str(raw.get('stage') or '')
+
+    def failure_reason(self) -> str:
+        """Key of ``FAILURE_LABELS`` for a FAILED payment, ``''`` otherwise."""
+        if self.status != self.Status.FAILED:
+            return ''
+        stage = self.failure_stage()
+        if stage in _STAGE_REASONS:
+            return _STAGE_REASONS[stage]
+        checkout = self.banorte_checkout()
+        return failure_reason_for(stage, checkout.resultado_payw if checkout else '')
+
+    def failure_label(self) -> str:
+        return self.FAILURE_LABELS.get(self.failure_reason(), '')
 
     def banorte_checkout(self):
         """The ``BanorteCheckout`` of this payment, or ``None``."""
@@ -128,6 +183,11 @@ class Payment(models.Model):
         """A real Banorte approval staff have not yet matched in MultiCobros."""
         checkout = self.banorte_checkout()
         return bool(checkout and checkout.needs_verification)
+
+    def is_simulation(self) -> bool:
+        """A Payworks simulation (AUT/DEC/RND): no money moved, never loaded into the POS."""
+        checkout = self.banorte_checkout()
+        return bool(checkout and not checkout.is_live)
 
 
 class BanorteCheckout(models.Model):
