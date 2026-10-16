@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import AdminVisitsWeek, { mondayOf, shiftWeek } from './AdminVisitsWeek';
+import AdminVisitsWeek, { localISODate, mondayOf, shiftWeek } from './AdminVisitsWeek';
+import { bookingsApi } from '@/services/api';
 
+vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/services/api', () => ({
   bookingsApi: {
     adminWeek: vi.fn().mockResolvedValue({ data: { start: '2026-08-24', end: '2026-08-30', days: [
@@ -26,5 +29,21 @@ describe('AdminVisitsWeek', () => {
     expect(screen.getAllByRole('listitem', { name: /Lun|Mar|Mié|Jue|Vie|Sáb|Dom/ })).toHaveLength(7);
     expect(screen.getByRole('button', { name: /Reprogramar/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Resultado/ })).toBeInTheDocument();
+  });
+  it('uses the local calendar date, not UTC (evening in Mexico is already tomorrow in UTC)', () => {
+    const lateEvening = new Date(2026, 7, 30, 23, 30); // Sunday 30 Aug, 23:30 local
+    expect(localISODate(lateEvening)).toBe('2026-08-30');
+    expect(mondayOf(lateEvening)).toBe('2026-08-24');
+  });
+  it('asks before «No asistió», then confirms with a toast', async () => {
+    const toast = (await import('react-hot-toast')).default;
+    vi.mocked(bookingsApi.bookingAction).mockResolvedValue({ data: {} } as never);
+    renderWithProviders(<AdminVisitsWeek />, { route: '/admin/visitas/semana' });
+    await userEvent.click(await screen.findByRole('button', { name: 'No asistió' }));
+    expect(bookingsApi.bookingAction).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: 'Marcar «No asistió»' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar «No asistió»' }));
+    await waitFor(() => expect(bookingsApi.bookingAction).toHaveBeenCalledWith(5, 'no_show'));
+    expect(toast.success).toHaveBeenCalledWith('Visita marcada como «No asistió».');
   });
 });

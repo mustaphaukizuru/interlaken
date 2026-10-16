@@ -812,7 +812,7 @@ export const bookingsApi = {
   /** Weekly calendar, reschedule and outcome (BACKLOG P4-2). */
   adminWeek: (start: string) => api.get<{ start: string; end: string; days: { date: string; slots: WeekSlot[] }[] }>('/bookings/admin/week/', { params: { start } }),
   adminReschedule: (id: number, slot: number) => api.post(`/bookings/admin/bookings/${id}/reschedule/`, { slot }),
-  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
+  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string; changed: boolean; skipped?: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
   // Public
   getAvailability: (params?: { type?: string; from?: string; to?: string }) =>
     api.get('/bookings/availability/', { params }),
