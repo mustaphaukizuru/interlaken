@@ -13,7 +13,7 @@ vi.mock('@/services/api', () => ({
     getLoyverseCustomerReceipts: vi.fn(),
     bulkTopUp: vi.fn(),
   },
-  paymentsApi: { verifyBanorte: vi.fn() },
+  paymentsApi: { verifyBanorte: vi.fn(), reconcileBanorte: vi.fn() },
   downloadBlob: vi.fn(),
 }));
 
@@ -182,6 +182,62 @@ describe('AdminCafeteria Depósitos bulk apply', () => {
   });
 });
 
+describe('AdminCafeteria Depósitos: Banorte operations', () => {
+  const expiredRow = {
+    ...loadRow, id: 44, student_name: 'Mía Soto', status: 'failed' as const, status_display: 'Fallido',
+    payment_status: 'failed', needs_pos_load: false, processed_at: null, gateway_tx_id: '',
+    banorte: {
+      ...loadRow.banorte, control_number: 'IK44XYZ', referencia: '', codigo_aut: '', resultado: '' as const,
+      verified_at: null, verified_by_name: '', needs_verification: false, failure_reason: 'expired' as const,
+      failure_label: 'Expirado', review_reason: 'expiró sin respuesta de Banorte', can_reconcile: true,
+      last_error: '', codigo_payw: '', texto: '', created_at: '2026-08-08T10:00:00Z',
+    },
+    payment_id: 94,
+  };
+
+  it('labels the failure cause, filters the review queue and reconciles from MultiCobros', async () => {
+    api.topups.mockResolvedValue(page([expiredRow]));
+    vi.mocked(paymentsApi.reconcileBanorte).mockResolvedValue(ok({ detail: 'settled', payment: {} }));
+    const u = await openTab(/Depósitos/, '/admin/cafeteria?revisar=multicobros');
+    expect(await screen.findByText('Expirado')).toBeInTheDocument();
+    expect(screen.getByText('Por revisar en MultiCobros', { selector: 'span' })).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: /Conciliar con MultiCobros el pago de Mía Soto/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('PAGO94')).toBeInTheDocument();
+    await u.type(within(dialog).getByLabelText('Referencia Payworks'), '248233587990');
+    await u.type(within(dialog).getByLabelText('Número de autorización'), '214414');
+    await u.type(within(dialog).getByLabelText('Monto en MultiCobros'), '200.00');
+    await u.click(within(dialog).getByRole('button', { name: 'Conciliar y acreditar' }));
+    await waitFor(() => expect(paymentsApi.reconcileBanorte).toHaveBeenCalledWith(94, {
+      outcome: 'approved', referencia: '248233587990', codigo_aut: '214414', amount: '200.00', note: '',
+    }));
+  });
+
+  it('closes an operation that is not in MultiCobros with a note', async () => {
+    api.topups.mockResolvedValue(page([expiredRow]));
+    vi.mocked(paymentsApi.reconcileBanorte).mockResolvedValue(ok({ detail: 'closed', payment: {} }));
+    const u = await openTab(/Depósitos/);
+    await u.click(await screen.findByRole('button', { name: /Conciliar con MultiCobros el pago de Mía Soto/ }));
+    const dialog = await screen.findByRole('dialog');
+    await u.click(within(dialog).getByRole('radio', { name: /No aparece/ }));
+    const submit = within(dialog).getByRole('button', { name: 'Marcar como no encontrada' });
+    expect(submit).toBeDisabled();
+    await u.type(within(dialog).getByLabelText('Nota'), 'Sin registro el 08/08');
+    await u.click(submit);
+    await waitFor(() => expect(paymentsApi.reconcileBanorte).toHaveBeenCalledWith(94, { outcome: 'not_found', note: 'Sin registro el 08/08' }));
+  });
+
+  it('marks simulated approvals as not to be loaded and labels the gateway', async () => {
+    api.topups.mockResolvedValue(page([{
+      ...loadRow, needs_pos_load: false, banorte: { ...loadRow.banorte, mode: 'AUT', simulation: true },
+    }]));
+    await openTab(/Depósitos/);
+    expect(await screen.findByText('Simulación (no cargar)')).toBeInTheDocument();
+    expect(screen.getByText('Banorte')).toBeInTheDocument();
+    expect(screen.queryByText('banorte')).not.toBeInTheDocument();
+  });
+});
+
 describe('AdminCafeteria Movimientos', () => {
   it('lists every student ledger and keeps refunds single-row with DEVOLVER', async () => {
     api.transactions.mockResolvedValue(page([{
@@ -198,7 +254,26 @@ describe('AdminCafeteria Movimientos', () => {
     expect(confirm).toBeDisabled();
     await u.type(within(dialog).getByPlaceholderText('DEVOLVER'), 'DEVOLVER');
     await u.click(confirm);
-    await waitFor(() => expect(cafeteriaApi.refundTransaction).toHaveBeenCalledWith(55, ''));
+    await waitFor(() => expect(cafeteriaApi.refundTransaction).toHaveBeenCalledWith(55, '', false));
+  });
+
+  it('a card top-up refund requires confirming the MultiCobros refund first', async () => {
+    api.transactions.mockResolvedValue(page([{
+      id: 56, student_id: 7, student_name: 'Luis López', student_code: '07', loyverse_code: 'ci07', type_display: 'Recarga',
+      transaction_type: 'topup', amount: '200.00', description: 'Recarga cafetería', items: [], balance_after: '200.00',
+      date: '2026-08-02T15:00:00Z', loyverse_receipt_id: 'topup-payment-91',
+    }]));
+    vi.mocked(cafeteriaApi.refundTransaction).mockResolvedValue(ok({}));
+    const u = await openTab(/Movimientos/);
+    await u.click(await screen.findByRole('button', { name: /Devolver movimiento 56/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/la devolución del cargo a la tarjeta se hace en/)).toBeInTheDocument();
+    await u.type(within(dialog).getByPlaceholderText('DEVOLVER'), 'DEVOLVER');
+    const confirm = within(dialog).getByRole('button', { name: /Procesar devolución/ });
+    expect(confirm).toBeDisabled();
+    await u.click(within(dialog).getByRole('checkbox', { name: /Ya hice la devolución del cargo en MultiCobros/ }));
+    await u.click(confirm);
+    await waitFor(() => expect(cafeteriaApi.refundTransaction).toHaveBeenCalledWith(56, '', true));
   });
 });
 
@@ -245,9 +320,15 @@ describe('AdminCafeteria POS Loyverse queues', () => {
     expect(screen.queryByRole('button', { name: /Cargado en Loyverse/i })).not.toBeInTheDocument();
     await u.click(screen.getByRole('button', { name: /Verificar en MultiCobros/i }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Referencia: 248233587990/)).toBeInTheDocument();
-    await u.click(within(dialog).getByRole('button', { name: 'Sí, aparece aprobada' }));
-    await waitFor(() => expect(paymentsApi.verifyBanorte).toHaveBeenCalledWith(91));
+    // What staff search in MultiCobros: control number, PAGO id and date.
+    expect(within(dialog).getByText('IK11ABCDEFGHIJ')).toBeInTheDocument();
+    expect(within(dialog).getByText('PAGO91')).toBeInTheDocument();
+    const confirm = within(dialog).getByRole('button', { name: 'Sí, aparece aprobada' });
+    expect(confirm).toBeDisabled();
+    await u.type(within(dialog).getByLabelText('Referencia en MultiCobros'), '248233587990');
+    await u.type(within(dialog).getByLabelText('Monto en MultiCobros'), '200');
+    await u.click(confirm);
+    await waitFor(() => expect(paymentsApi.verifyBanorte).toHaveBeenCalledWith(91, { referencia: '248233587990', amount: '200' }));
     expect(toastSuccess).toHaveBeenCalledWith('Operación verificada en MultiCobros.');
   });
 

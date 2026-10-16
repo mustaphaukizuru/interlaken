@@ -16,6 +16,8 @@ interface ConfirmDialogProps {
    * Use for irreversible operations (devoluciones, anular recarga).
    */
   requireText?: string;
+  /** Keeps the confirm button disabled (e.g. until a required checkbox is ticked). */
+  confirmDisabled?: boolean;
   loading?: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -42,6 +44,7 @@ function ConfirmDialogBody({
   message,
   confirmLabel,
   requireText,
+  confirmDisabled,
   loading,
   onConfirm,
   onClose,
@@ -80,7 +83,7 @@ function ConfirmDialogBody({
           variant="danger"
           size="sm"
           loading={loading}
-          disabled={!matched}
+          disabled={!matched || confirmDisabled}
           onClick={onConfirm}
         >
           {confirmLabel}

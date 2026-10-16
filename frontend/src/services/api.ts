@@ -69,6 +69,8 @@ export interface AdminPaymentsSummary {
   since: string;
   by_status: Record<string, { count: number; total: string }>;
   series: { date: string; total: string; count: number }[];
+  /** FAILED split by cause (`PAYMENT_FAILURE` keys). */
+  failed_by_reason?: Record<string, number>;
   stuck_pending: number;
 }
 
@@ -653,8 +655,12 @@ export const cafeteriaApi = {
   adjustBalance: (studentId: number, amount: number, reason: string) =>
     api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason }),
 
-  refundTransaction: (txId: number, reason?: string) =>
-    api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
+  /** `bankRefundConfirmed`: staff already refunded the card charge in MultiCobros
+   *  (required by the server for a real Banorte top-up). */
+  refundTransaction: (txId: number, reason?: string, bankRefundConfirmed?: boolean) =>
+    api.post(`/cafeteria/admin/refund/${txId}/`, {
+      reason, ...(bankRefundConfirmed ? { bank_refund_confirmed: true } : {}),
+    }),
 
   /** Wallet receipts of a card that has no student (staff meals). */
   getLoyverseCustomerReceipts: (loyverseId: string) =>
@@ -693,12 +699,20 @@ export const paymentsApi = {
 
   /** Forward a Banorte lightbox callback; the server decrypts and decides. */
   reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
-    api.post<{ payment_id: number; status: string; detail: string }>(
+    api.post<{ payment_id: number; status: string; failure_reason?: string; detail: string }>(
       '/payments/banorte/result/', { payment_id: paymentId, event, response }),
 
-  /** Staff confirm the approved operation appears in MultiCobros (before the POS load). */
-  verifyBanorte: (paymentId: number) =>
-    api.post(`/payments/admin/${paymentId}/banorte-verify/`),
+  /** Staff confirm the approved operation appears in MultiCobros (before the POS load):
+   *  the referencia and amount they read there must match the payment. */
+  verifyBanorte: (paymentId: number, body: { referencia: string; amount: string }) =>
+    api.post(`/payments/admin/${paymentId}/banorte-verify/`, body),
+
+  /** "Conciliar con MultiCobros" for a pending or soft-failed Banorte payment. */
+  reconcileBanorte: (paymentId: number, body:
+    | { outcome: 'approved'; referencia: string; codigo_aut: string; amount: string; note?: string }
+    | { outcome: 'not_found'; note: string }) =>
+    api.post<{ detail: 'settled' | 'closed' | 'already_processed'; payment: import('@/types').Payment }>(
+      `/payments/admin/${paymentId}/banorte-reconcile/`, body),
 
   getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/history/', { params }),

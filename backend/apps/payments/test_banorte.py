@@ -579,7 +579,11 @@ class TestVerification:
         assert blocked.status_code == 400
         assert "MultiCobros" in json.dumps(blocked.data)
 
-        ok = api_client.post(reverse("admin-payment-banorte-verify", args=[checkout.payment_id]))
+        ok = api_client.post(
+            reverse("admin-payment-banorte-verify", args=[checkout.payment_id]),
+            {"referencia": checkout.referencia, "amount": "200.00"},
+            format="json",
+        )
         assert ok.status_code == 200, ok.data
         checkout.refresh_from_db()
         assert checkout.verified_by == admin and not checkout.needs_verification
@@ -792,6 +796,10 @@ class TestAdminAlerts:
             resp = _start(api_client, parent, student)
             made.append(BanorteCheckout.objects.get(payment_id=resp.data["payment_id"]))
         pending, cancelled, approved, expired = made
+        # Past the checkout window: no longer a parent still paying.
+        Payment.objects.filter(pk=pending.payment_id).update(
+            created_at=pending.created_at - timedelta(hours=2)
+        )
         api_client.force_authenticate(user=cancelled.payment.user)
         _report(api_client, cancelled.payment_id, "cancel", {})
         api_client.force_authenticate(user=approved.payment.user)

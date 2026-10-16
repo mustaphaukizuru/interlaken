@@ -6,18 +6,71 @@ from .models import Payment
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    """A payment as the family (and the return page) sees it.
+
+    ``failure_reason``/``failure_label`` say WHY a failed payment failed
+    (cancelled, expired, declined...); ``bank_reference``/``auth_code`` are the
+    Payworks referencia and número de autorización the parent's bank statement
+    shows (``gateway_tx_id`` is only our número de control). Querysets should
+    ``select_related('banorte')``.
+    """
     student_id = serializers.IntegerField(source='related_topup.student_id', read_only=True, default=None)
     student_name = serializers.CharField(source='related_topup.student.user.full_name', read_only=True, default='')
     gateway_label = serializers.CharField(source='get_gateway_display', read_only=True)
+    failure_reason = serializers.CharField(read_only=True)
+    failure_label = serializers.CharField(read_only=True)
+    bank_reference = serializers.SerializerMethodField()
+    auth_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
         fields = [
             'id', 'payment_type', 'amount', 'currency', 'description',
-            'status', 'gateway', 'gateway_label', 'gateway_tx_id', 'gateway_ref',
+            'status', 'failure_reason', 'failure_label',
+            'gateway', 'gateway_label', 'gateway_tx_id', 'gateway_ref',
+            'bank_reference', 'auth_code',
             'student_id', 'student_name', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
+
+    def get_bank_reference(self, obj):
+        checkout = obj.banorte_checkout()
+        return (checkout.referencia if checkout else '') or obj.gateway_ref or ''
+
+    def get_auth_code(self, obj):
+        checkout = obj.banorte_checkout()
+        return checkout.codigo_aut if checkout else ''
+
+
+class AdminPaymentSerializer(PaymentSerializer):
+    """Staff ledger row: who paid, and the Banorte operation as MultiCobros shows it."""
+    payer_name = serializers.CharField(source='user.full_name', read_only=True, default='')
+    payer_email = serializers.CharField(source='user.email', read_only=True, default='')
+    control_number = serializers.SerializerMethodField()
+    mode = serializers.SerializerMethodField()
+    simulation = serializers.SerializerMethodField()
+    needs_verification = serializers.SerializerMethodField()
+
+    class Meta(PaymentSerializer.Meta):
+        fields = PaymentSerializer.Meta.fields + [
+            'payer_name', 'payer_email', 'control_number', 'mode', 'simulation',
+            'needs_verification',
+        ]
+        read_only_fields = fields
+
+    def get_control_number(self, obj):
+        checkout = obj.banorte_checkout()
+        return checkout.control_number if checkout else ''
+
+    def get_mode(self, obj):
+        checkout = obj.banorte_checkout()
+        return checkout.mode if checkout else ''
+
+    def get_simulation(self, obj):
+        return obj.is_simulation()
+
+    def get_needs_verification(self, obj):
+        return obj.needs_bank_verification()
 
 
 # Bare initiate credits nothing on SUCCESS: cafeteria needs its linked top-up

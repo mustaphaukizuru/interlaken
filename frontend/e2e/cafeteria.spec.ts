@@ -138,7 +138,7 @@ test.describe('top-up return page (cafeteria/recarga/retorno)', () => {
   test('a failed payment shows the failure state', async ({ page }) => {
     await openReturn(page, 'failed');
     await expect(page.getByRole('heading', { name: 'La recarga no se completó' })).toBeVisible();
-    await expect(page.getByText('No se realizó ningún cargo')).toBeVisible();
+    await expect(page.getByText(/Si ve un cargo en su estado de cuenta/)).toBeVisible();
   });
 
   test('a payment still processing shows the pending state after polling', async ({ page }) => {

@@ -3,6 +3,7 @@ import { AlertTriangle, CreditCard } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { StatCard } from '@/components/ui/StatCard';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { FilterBar } from '@/components/admin/FilterBar';
@@ -15,15 +16,14 @@ import { useRowSelection } from '@/hooks/useRowSelection';
 import { usePaymentsExport, usePaymentsList, usePaymentsSummary, type PaymentsListParams } from '@/hooks/queries/payments';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import type { Payment } from '@/types';
-import { PAYMENT_STATUS_META, PAYMENT_STATUS_OPTIONS } from '@/lib/status/payment';
-
-const STATUS = PAYMENT_STATUS_META;
-// Banorte is the only gateway; Global Payments survives as a label for legacy rows.
-const GATEWAYS: Record<string, string> = { banorte: 'Banorte', global_payments: 'Global Payments (retirado)', sandbox: 'Sandbox' };
+import { GATEWAY_LABELS, PAYMENT_STATUS_OPTIONS, gatewayLabel, paymentStatusMeta } from '@/lib/status/payment';
 
 const STATUS_OPTIONS = PAYMENT_STATUS_OPTIONS;
-// The API filters on real gateways only (sandbox rows carry one of them).
-const GATEWAY_OPTIONS = Object.entries(GATEWAYS).filter(([value]) => value !== 'sandbox').map(([value, label]) => ({ value, label }));
+// Banorte is the only gateway; Global Payments survives as a label for legacy rows.
+const GATEWAY_OPTIONS = Object.entries(GATEWAY_LABELS).map(([value, label]) => ({ value, label }));
+// Failures that are a real "no" from the bank or a set-up error. Cancelled,
+// expired and superseded attempts are not counted as failed payments.
+const HARD_FAILURES = ['declined', 'config_error'];
 
 /** /admin/pagos — gateway ledger: every online top-up, filters, totals, export (BACKLOG P1-D9).
  *  Refunds and cash approvals stay in the Cafetería console (money moves in one place).
@@ -41,13 +41,34 @@ const COLUMNS: Column<Payment>[] = [
       ? <Link to={`/admin/cafeteria/${p.student_id}`} className="hover:text-purple hover:underline">{p.student_name}</Link>
       : '—',
   },
-  { id: 'payer', header: 'Pagó', minWidth: 140, className: 'text-xs text-subtle', cell: (p) => p.description || '—' },
+  {
+    id: 'payer', header: 'Pagó', minWidth: 160, className: 'text-xs',
+    cell: (p) => (p.payer_name || p.payer_email ? (
+      <span className="block">
+        <span className="block text-ink">{p.payer_name || p.payer_email}</span>
+        {p.payer_name && p.payer_email && <span className="block text-subtle">{p.payer_email}</span>}
+      </span>
+    ) : '—'),
+  },
   { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, minWidth: 110, className: 'font-semibold text-ink', cell: (p) => formatMXN(p.amount) },
-  { id: 'gateway', header: 'Pasarela', sortKey: 'gateway', minWidth: 130, className: 'text-muted', cell: (p) => p.gateway_label ?? GATEWAYS[p.gateway ?? ''] ?? p.gateway },
-  { id: 'reference', header: 'Referencia', minWidth: 140, defaultHidden: true, className: 'font-mono text-xs text-subtle', cell: (p) => p.gateway_tx_id || p.gateway_ref || '—' },
+  { id: 'gateway', header: 'Pasarela', sortKey: 'gateway', minWidth: 130, className: 'text-muted', cell: (p) => p.gateway_label || gatewayLabel(p.gateway) || '—' },
+  {
+    // Número de control (what MultiCobros searches) plus the bank's referencia and autorización.
+    id: 'reference', header: 'Referencia', minWidth: 170, defaultHidden: true, className: 'font-mono text-xs text-subtle',
+    cell: (p) => (
+      <span className="block leading-5">
+        <span className="block">{p.control_number || p.gateway_tx_id || '—'}</span>
+        {p.bank_reference && <span className="block">Ref. {p.bank_reference}{p.auth_code ? ` · Aut. ${p.auth_code}` : ''}</span>}
+        {p.simulation && <span className="block font-sans">Simulación ({p.mode})</span>}
+      </span>
+    ),
+  },
   {
     id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
-    cell: (p) => <Badge variant={STATUS[p.status]?.variant ?? 'neutral'}>{STATUS[p.status]?.label ?? p.status}</Badge>,
+    cell: (p) => {
+      const meta = paymentStatusMeta(p);
+      return <Badge variant={meta.variant}>{meta.label}</Badge>;
+    },
   },
 ];
 
@@ -73,6 +94,11 @@ export default function AdminPayments() {
   const rows = data?.results ?? [];
   const count = data?.count ?? 0;
   const s = summary.data;
+  // Tiles say "…" while loading; an error shows a retry, never fake zeros.
+  const tile = (value: number | string | undefined) => (s ? value ?? 0 : '…');
+  const failedBy = s?.failed_by_reason ?? {};
+  const hardFailed = HARD_FAILURES.reduce((n, k) => n + (failedBy[k] ?? 0), 0);
+  const softFailed = Object.entries(failedBy).filter(([k]) => !HARD_FAILURES.includes(k)).reduce((n, [, v]) => n + v, 0);
   // Selection is forgotten when the filters change ("select all matching"
   // refers to the filters active when it was pressed); paging keeps it.
   const selection = useRowSelection(count, JSON.stringify(filters));
@@ -95,12 +121,24 @@ export default function AdminPayments() {
         actions={<ExportMenu filenamePrefix="pagos" selectedCount={selection.count} fetch={fetchExport} />}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard title="Cobrado (30 días)" value={s ? formatMXN(s.by_status.success?.total ?? 0) : '…'} icon={CreditCard} color="green" />
-        <StatCard title="Pagos completados" value={s?.by_status.success?.count ?? 0} icon={CreditCard} color="purple" />
-        <StatCard title="Fallidos / reembolsados" value={(s?.by_status.failed?.count ?? 0) + (s?.by_status.refunded?.count ?? 0)} icon={AlertTriangle} color="coral" />
-        <StatCard title="Pendientes > 24 h" value={s?.stuck_pending ?? 0} icon={AlertTriangle} color="amber" />
-      </div>
+      {summary.isError ? (
+        <Card className="mb-6">
+          <ErrorState title="No se pudo cargar el resumen de pagos" onRetry={() => summary.refetch()} />
+        </Card>
+      ) : (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <StatCard title="Cobrado (30 días)" value={s ? formatMXN(s.by_status.success?.total ?? 0) : '…'} icon={CreditCard} color="green" />
+          <StatCard title="Pagos completados" value={tile(s?.by_status.success?.count)} icon={CreditCard} color="purple" />
+          <StatCard
+            title="Rechazados / reembolsados"
+            value={tile(s ? hardFailed + (s.by_status.refunded?.count ?? 0) : undefined)}
+            icon={AlertTriangle}
+            color="coral"
+            subtitle={s && softFailed ? `${softFailed} cancelados, expirados o reemplazados (no cuentan)` : undefined}
+          />
+          <StatCard title="Pendientes > 24 h" value={tile(s?.stuck_pending)} icon={AlertTriangle} color="amber" />
+        </div>
+      )}
 
       {s && s.series.length > 0 && (
         <Card title="Cobros por día (30 días)" className="mb-6">

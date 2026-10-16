@@ -310,11 +310,20 @@ _RESULT_FIELDS = {
 }
 
 
+# Payworks answers that mean the merchant set-up is wrong (R: rejected, e.g.
+# PAYW-3008 "terminal no existe"; E: Banorte internal error). Nothing reached
+# the card issuer; the admins are emailed (``ops_alerts.alert_config_error``).
+_CONFIG_ERROR_CODES = frozenset({"R", "E"})
+# 3D Secure status Banorte reports when the cardholder cancels the 3DS challenge.
+STATUS_3D_CANCELLED = "423"
+
+
 @dataclass
 class ResultOutcome:
     event: PaymentEvent
     fields: dict  # BanorteCheckout updates
     anomaly: str = ""  # why a result was NOT trusted (logged + stored)
+    config_error: str = ""  # merchant set-up problem the admins must hear about
 
 
 def _short(value, limit) -> str:
@@ -346,7 +355,11 @@ def interpret_result(checkout, browser_event: str, response: dict) -> ResultOutc
 
     data = response.get("data")
     if not data:
-        if browser_event == "cancel":
+        status_3d = fields["status_3d"]
+        cancelled_3d = status_3d == STATUS_3D_CANCELLED and browser_event != "success"
+        if browser_event == "cancel" or cancelled_3d:
+            # Cancelled in the window, or in the 3D Secure challenge (status3D
+            # 423): nothing was charged. Soft, so a late approval still credits.
             return ResultOutcome(
                 PaymentEvent(payment_id, "failed", None, {"banorte": outer}, stage="cancel"), fields
             )
@@ -360,10 +373,20 @@ def interpret_result(checkout, browser_event: str, response: dict) -> ResultOutc
                 ),
                 fields,
                 fields["last_error"],
+                config_error="AUT-10: Banorte rechazó la autenticación del comercio "
+                "(credenciales, certificado o terminal).",
             )
         if browser_event == "error":
             fields["last_error"] = _short(
                 response.get("message") or "Error en la ventana de pago.", 255
+            )
+        if browser_event == "success":
+            # "Success" without the encrypted result (seen with status3D 451):
+            # nothing to trust, so it stays pending for a MultiCobros check.
+            shown = status_3d or "vacío"
+            return pending(
+                f"Banorte reportó éxito sin resultado cifrado (status3D {shown}); "
+                "revise la operación en MultiCobros."
             )
         return pending()
 
@@ -414,8 +437,15 @@ def interpret_result(checkout, browser_event: str, response: dict) -> ResultOutc
             fields,
         )
     if code in _FINAL_FAILURES:
+        config_error = ""
+        if code in _CONFIG_ERROR_CODES:
+            detail = " ".join(
+                part for part in (fields.get("codigo_payw", ""), fields.get("texto", "")) if part
+            )
+            config_error = f"Payworks {code}: {detail or 'sin detalle'}"
         return ResultOutcome(
             PaymentEvent(payment_id, "failed", checkout.control_number, raw, reference=reference),
             fields,
+            config_error=config_error,
         )
     return pending(f'Resultado Payworks desconocido: {code or "vacío"}.', raw)

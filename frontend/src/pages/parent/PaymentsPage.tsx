@@ -22,7 +22,7 @@ import { formatMXN } from '@/lib/format';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { paymentsApi, downloadBlob, type PaymentSummary } from '@/services/api';
 import type { Payment } from '@/types';
-import { PAYMENT_STATUS_META } from '@/lib/status/payment';
+import { PAYMENT_FAILURE, PAYMENT_STATUS_META } from '@/lib/status/payment';
 
 // Label + variant come from the shared map (`lib/status/payment`); the portal
 // adds an icon and a help line per status.
@@ -32,15 +32,23 @@ const STATUS_EXTRA: Record<string, { icon: typeof Clock; help?: string }> = {
                 help: 'Si pagó con tarjeta, el saldo se aplica en minutos. Si eligió pago en caja, el colegio lo aplicará al recibir el efectivo.' },
   processing: { icon: Clock,
                 help: 'La pasarela está confirmando el cargo. No vuelva a pagar; consulte en unos minutos.' },
+  // The real cause comes from `failure_reason` (see rowMeta); this is the fallback.
   failed:     { icon: XCircle,
-                help: 'El banco rechazó el cargo. Puede intentar de nuevo desde Cafetería.' },
+                help: 'La recarga no se completó. Puede intentar de nuevo desde Cafetería.' },
   refunded:   { icon: RotateCcw,
-                help: 'El colegio devolvió este pago; el saldo de cafetería se ajustó.' },
+                help: 'El colegio devolvió este pago: el cargo se reembolsó a su tarjeta y el saldo de cafetería se ajustó.' },
 };
 type PaymentStatusMeta = (typeof PAYMENT_STATUS_META)[string] & { icon: typeof Clock; help?: string };
 const statusMeta: Record<string, PaymentStatusMeta> = Object.fromEntries(
   Object.entries(PAYMENT_STATUS_META).map(([k, m]) => [k, { ...m, ...STATUS_EXTRA[k] }]),
 );
+
+/** A row's badge and help: a failed payment says why (cancelled, expired, declined...). */
+function rowMeta(p: Payment): PaymentStatusMeta {
+  const base = statusMeta[p.status] ?? statusMeta.pending;
+  const failure = p.status === 'failed' && p.failure_reason ? PAYMENT_FAILURE[p.failure_reason] : undefined;
+  return failure ? { ...base, label: failure.family, variant: failure.variant, help: failure.help } : base;
+}
 
 /** Portal sort keys; a subset of `PAYMENT_ORDERING` (apps/payments/views.py). */
 const PAYMENT_SORT_OPTIONS: SortOption[] = [
@@ -177,7 +185,7 @@ export default function PaymentsPage() {
           <>
             <div className="divide-y divide-cream">
               {payments.map((p) => {
-                const meta = statusMeta[p.status] ?? statusMeta.pending;
+                const meta = rowMeta(p);
                 const Icon = meta.icon;
                 return (
                   <div key={p.id} className="py-4 first:pt-0 last:pb-0">
@@ -193,7 +201,8 @@ export default function PaymentsPage() {
                           <p className="text-xs text-subtle">
                             {format(new Date(p.created_at), "d MMM yyyy, HH:mm", { locale: es })}
                             {p.gateway_label ? ` · ${p.gateway_label}` : ''}
-                            {p.gateway_tx_id ? ` · Ref. ${p.gateway_tx_id}` : ''}
+                            {p.bank_reference ? ` · Ref. ${p.bank_reference}` : ''}
+                            {p.auth_code ? ` · Aut. ${p.auth_code}` : ''}
                           </p>
                         </div>
                       </div>
