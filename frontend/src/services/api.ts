@@ -289,7 +289,12 @@ const sessionHeaders = (token?: string) =>
   token ? { headers: { 'X-Session-Token': token } } : {};
 
 export interface PipelineCard { id: number; child_name: string; level: string; grade_applying: string; parent_name: string; parent_email: string; parent_phone: string; status: string; submitted_at: string | null; updated_at: string; docs_verified: number; docs_required: number; missing: string[]; student: number | null }
-export interface ConvertResult { student: number; student_id?: string; already: boolean; credentials: { email: string; password: string | null; name: string }[] }
+export interface ConvertResult {
+  student: number; student_id?: string; already: boolean;
+  credentials: { email: string; password: string | null; name: string }[];
+  /** Applicant emails that belong to a non-family account (staff, admin, student): NOT linked as guardian. */
+  unlinked?: { email: string; name: string; reason: string }[];
+}
 
 export const admissionsApi = {
   /** Admissions pipeline (BACKLOG P4-1). */
@@ -812,7 +817,7 @@ export const bookingsApi = {
   /** Weekly calendar, reschedule and outcome (BACKLOG P4-2). */
   adminWeek: (start: string) => api.get<{ start: string; end: string; days: { date: string; slots: WeekSlot[] }[] }>('/bookings/admin/week/', { params: { start } }),
   adminReschedule: (id: number, slot: number) => api.post(`/bookings/admin/bookings/${id}/reschedule/`, { slot }),
-  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
+  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string; changed: boolean; skipped?: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
   // Public
   getAvailability: (params?: { type?: string; from?: string; to?: string }) =>
     api.get('/bookings/availability/', { params }),
@@ -1238,7 +1243,8 @@ export const contentApi = {
   adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
   adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string; blocks: { id: string; type: string; props: Record<string, unknown> }[] }[]>(`/content/admin/pages/${id}/versions/`),
-  adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
+  /** Restores a version INTO THE DRAFT (never publishes; publish separately). Admin only. */
+  adminRollbackPage: (id: number, version: number) => api.post<{ restored_from: number; page: CmsPageAdmin }>(`/content/admin/pages/${id}/versions/`, { version }),
   adminPageChecks: (id: number) => api.get<{ ok: boolean; issues: PageIssue[] }>(`/content/admin/pages/${id}/checks/`),
   adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),
   adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
@@ -1252,11 +1258,12 @@ export const contentApi = {
   getForm: (slug: string) => api.get<FormDefinitionPublic>(`/content/forms/${encodeURIComponent(slug)}/`),
   submitForm: (slug: string, data: Record<string, unknown>) => api.post<{ ok: boolean; message: string }>(`/content/forms/${encodeURIComponent(slug)}/submit/`, data),
   adminListForms: () => api.get<FormDefinitionAdmin[]>('/content/admin/forms/'),
+  /** One form by id (the submissions inbox deep link may point outside the current list page). */
+  adminGetForm: (id: number) => api.get<FormDefinitionAdmin>(`/content/admin/forms/${id}/`),
   adminCreateForm: (data: Partial<FormDefinitionAdmin>) => api.post<FormDefinitionAdmin>('/content/admin/forms/', data),
   adminUpdateForm: (id: number, data: Partial<FormDefinitionAdmin>) => api.patch<FormDefinitionAdmin>(`/content/admin/forms/${id}/`, data),
   adminDeleteForm: (id: number) => api.delete(`/content/admin/forms/${id}/`),
   adminFormSubmissions: (id: number, params?: { handled?: '0' | '1' }) => api.get<FormSubmission[]>(`/content/admin/forms/${id}/submissions/`, { params }),
-  adminFormSubmissionsCsv: (id: number) => api.get<Blob>(`/content/admin/forms/${id}/submissions/`, { params: { export: 'csv' }, responseType: 'blob' }),
   adminHandleSubmission: (id: number, is_handled: boolean) => api.patch<FormSubmission>(`/content/admin/form-submissions/${id}/`, { is_handled }),
   /** CMS media library (BACKLOG P3-1). */
   adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),

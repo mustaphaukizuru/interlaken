@@ -85,7 +85,8 @@ export default function AdminMedia() {
   const remove = useMutation({
     mutationFn: (id: number) => contentApi.adminDeleteMedia(id),
     onSuccess: () => { toast.success('Imagen eliminada.'); setToDelete(null); setSelected(null); invalidate(); },
-    onError: () => toast.error('No se pudo eliminar.'),
+    // 409 = still used by a page or comunicado: show the server's reason.
+    onError: (e) => { setToDelete(null); toast.error(apiErrorMessage(e, 'No se pudo eliminar.')); },
   });
 
   const uploadFiles = async (files: File[]) => {

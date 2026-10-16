@@ -62,7 +62,11 @@ export default function AdminPageEditor() {
   }, [page]);
 
   const save = useMutation({
-    mutationFn: () => contentApi.adminUpdatePage(pageId, { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }),
+    // Address and scheduling are admin-only server-side (the cron publishes on
+    // those dates with no further approval): staff never send them.
+    mutationFn: () => contentApi.adminUpdatePage(pageId, isAdmin
+      ? { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }
+      : { draft_blocks: blocks, title: meta.title, seo: meta.seo }),
     onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); },
     onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
   });
@@ -130,7 +134,8 @@ export default function AdminPageEditor() {
             <Link to={base} className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
             <Button variant="secondary" size="sm" onClick={() => setShowSeo(true)}>SEO</Button>
             <Button variant="secondary" size="sm" onClick={() => checks.mutate()} loading={checks.isPending}><ClipboardCheck size={16} aria-hidden="true" /> Revisar</Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowVersions(true)}><History size={16} aria-hidden="true" /> Versiones</Button>
+            {/* Version history and restore are admin-only endpoints (staff would get a 403). */}
+            {isAdmin && <Button variant="secondary" size="sm" onClick={() => setShowVersions(true)}><History size={16} aria-hidden="true" /> Versiones</Button>}
             <Button variant="secondary" size="sm" onClick={() => previewLink.mutate()} loading={previewLink.isPending}><Copy size={16} aria-hidden="true" /> Enlace de vista previa</Button>
             {!isAdmin && (
               <Button variant="cta" size="sm" onClick={() => review.mutate({ action: 'request' })} loading={review.isPending} disabled={!!page.review_requested_at}>
@@ -246,17 +251,33 @@ export default function AdminPageEditor() {
       </div>
 
       <AddBlockModal open={adding} onClose={() => setAdding(false)} onPick={(type) => { const b = newBlock(type); update([...blocks, b]); setSelected(b.id); setAdding(false); }} />
-      <VersionsModal open={showVersions} pageId={pageId} current={blocks} onClose={() => setShowVersions(false)} onRolledBack={() => { loadedFor.current = null; qc.invalidateQueries({ queryKey: ['admin-page', pageId] }); setShowVersions(false); }} />
+      {isAdmin && (
+        <VersionsModal
+          open={showVersions}
+          pageId={pageId}
+          current={blocks}
+          onClose={() => setShowVersions(false)}
+          onRestored={(restored) => {
+            // Reload the editor from the restored draft (drops local edits and any pending autosave).
+            loadedFor.current = null;
+            setDirty(false);
+            qc.setQueryData(['admin-page', pageId], restored);
+            qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
+            setShowVersions(false);
+          }}
+        />
+      )}
       <Modal open={showSeo} onClose={() => setShowSeo(false)} title="Título, dirección y SEO" maxWidth={520}>
         <div className="space-y-3">
           <Input label="Título de la página" value={meta.title} onChange={(e) => updateMeta({ title: e.target.value })} error={errors.title} />
-          <Input label="Dirección (slug)" value={meta.slug} onChange={(e) => updateMeta({ slug: e.target.value })} error={errors.slug} hint="Cambiarla rompe enlaces ya compartidos." />
+          <Input label="Dirección (slug)" value={meta.slug} onChange={(e) => updateMeta({ slug: e.target.value })} error={errors.slug} disabled={!isAdmin} hint={isAdmin ? 'Cambiarla rompe enlaces ya compartidos.' : 'Solo Dirección puede cambiar la dirección.'} />
           <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} hint="Máx. 60 caracteres recomendados." />
           <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!meta.seo.noindex} onChange={(e) => updateMeta({ seo: { ...meta.seo, noindex: e.target.checked } })} /> No indexar en buscadores</label>
+          {!isAdmin && <p className="text-xs text-muted">La publicación y el retiro programados los define Dirección al aprobar la página.</p>}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Publicar automáticamente el" type="datetime-local" value={toLocalInput(meta.publish_at)} onChange={(e) => updateMeta({ publish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Vacío = manual." />
-            <Input label="Retirar del sitio el" type="datetime-local" value={toLocalInput(meta.unpublish_at)} onChange={(e) => updateMeta({ unpublish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Para contenido con fecha de caducidad." />
+            <Input label="Publicar automáticamente el" disabled={!isAdmin} type="datetime-local" value={toLocalInput(meta.publish_at)} onChange={(e) => updateMeta({ publish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Vacío = manual." />
+            <Input label="Retirar del sitio el" disabled={!isAdmin} type="datetime-local" value={toLocalInput(meta.unpublish_at)} onChange={(e) => updateMeta({ unpublish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Para contenido con fecha de caducidad." />
           </div>
           <div className="flex justify-end"><Button onClick={() => setShowSeo(false)}>Listo</Button></div>
         </div>
@@ -290,17 +311,26 @@ function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClose: () =
   );
 }
 
-function VersionsModal({ open, pageId, current, onClose, onRolledBack }: { open: boolean; pageId: number; current: Block[]; onClose: () => void; onRolledBack: () => void }) {
+function VersionsModal({ open, pageId, current, onClose, onRestored }: { open: boolean; pageId: number; current: Block[]; onClose: () => void; onRestored: (page: CmsPageAdmin) => void }) {
   const [diffOf, setDiffOf] = useState<number | null>(null);
-  const { data } = useQuery({ queryKey: ['admin-page-versions', pageId], queryFn: async () => (await contentApi.adminPageVersions(pageId)).data, enabled: open });
+  const [toRestore, setToRestore] = useState<number | null>(null);
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page-versions', pageId], queryFn: async () => (await contentApi.adminPageVersions(pageId)).data, enabled: open });
   const rollback = useMutation({
     mutationFn: (version: number) => contentApi.adminRollbackPage(pageId, version),
-    onSuccess: () => { toast.success('Versión restaurada al borrador. Publique para hacerla visible.'); onRolledBack(); },
-    onError: () => toast.error('No se pudo restaurar.'),
+    onSuccess: (res) => {
+      toast.success(`Versión ${res.data.restored_from} restaurada en el borrador. El sitio no cambia hasta que la publique.`);
+      setToRestore(null);
+      onRestored(res.data.page);
+    },
+    onError: (e) => { setToRestore(null); toast.error(apiFieldErrors(e).detail || 'No se pudo restaurar.'); },
   });
   return (
     <Modal open={open} onClose={onClose} title="Versiones publicadas" maxWidth={480}>
-      {(data ?? []).length === 0 ? <p className="text-sm text-muted">Esta página aún no se ha publicado.</p> : (
+      {isError ? (
+        <ErrorState title="No se pudieron cargar las versiones" onRetry={() => refetch()} />
+      ) : isLoading ? (
+        <div className="flex justify-center py-6"><LoadingSpinner /></div>
+      ) : (data ?? []).length === 0 ? <p className="text-sm text-muted">Esta página aún no se ha publicado.</p> : (
         <ul className="divide-y divide-line" aria-label="Versiones">
           {(data ?? []).map((v) => (
             <li key={v.id} className="py-2 text-sm">
@@ -308,7 +338,7 @@ function VersionsModal({ open, pageId, current, onClose, onRolledBack }: { open:
                 <div><span className="font-semibold text-ink">Versión {v.number}</span><p className="text-xs text-subtle">{v.author_name} · {new Date(v.created_at).toLocaleString('es-MX')}</p></div>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setDiffOf(diffOf === v.number ? null : v.number)}>{diffOf === v.number ? 'Ocultar cambios' : 'Ver cambios'}</Button>
-                  <Button size="sm" variant="secondary" loading={rollback.isPending} onClick={() => rollback.mutate(v.number)}>Restaurar</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setToRestore(v.number)}>Restaurar</Button>
                 </div>
               </div>
               {diffOf === v.number && <VersionDiff lines={diffBlocks(v.blocks ?? [], current)} number={v.number} />}
@@ -316,6 +346,15 @@ function VersionsModal({ open, pageId, current, onClose, onRolledBack }: { open:
           ))}
         </ul>
       )}
+      <ConfirmDialog
+        open={toRestore !== null}
+        title={`¿Restaurar la versión ${toRestore ?? ''} en el borrador?`}
+        message="El borrador actual (incluidos los cambios sin publicar) se reemplaza por esta versión. El sitio público no cambia hasta que publique."
+        confirmLabel="Restaurar en el borrador"
+        loading={rollback.isPending}
+        onConfirm={() => toRestore !== null && rollback.mutate(toRestore)}
+        onClose={() => setToRestore(null)}
+      />
     </Modal>
   );
 }

@@ -8,11 +8,12 @@ vi.mock('@/services/AdminContentApi', () => ({
   submissionsAdminApi: { list: vi.fn(), export: vi.fn(), bulk: vi.fn() },
 }));
 vi.mock('@/services/api', () => ({
-  contentApi: { adminDeleteForm: vi.fn(), adminHandleSubmission: vi.fn(), adminCreateForm: vi.fn(), adminUpdateForm: vi.fn() },
+  contentApi: { adminDeleteForm: vi.fn(), adminHandleSubmission: vi.fn(), adminCreateForm: vi.fn(), adminUpdateForm: vi.fn(), adminGetForm: vi.fn() },
   downloadBlob: vi.fn(),
 }));
 
 import { formsAdminApi, submissionsAdminApi } from '@/services/AdminContentApi';
+import { contentApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
 import AdminForms from './AdminForms';
@@ -60,5 +61,19 @@ describe('AdminForms', () => {
     await waitFor(() => expect(submissionsAdminApi.bulk).toHaveBeenCalledWith(expect.objectContaining({
       action: 'mark_handled', all_matching: true, dry_run: true, filters: expect.objectContaining({ form: 2, handled: '0' }),
     })));
+  });
+
+  it('opens a deep-linked inbox even when the form is not on the current list page', async () => {
+    const other = { ...FORM, id: 9, title: 'Becas', slug: 'becas' };
+    vi.mocked(contentApi.adminGetForm).mockResolvedValue({ data: other } as never);
+    renderWithProviders(<AdminForms />, { route: '/admin/formularios?envios=9' });
+    expect(await screen.findByRole('dialog', { name: 'Envíos: Becas' })).toBeInTheDocument();
+    expect(contentApi.adminGetForm).toHaveBeenCalledWith(9);
+  });
+
+  it('says so when a deep-linked form no longer exists', async () => {
+    vi.mocked(contentApi.adminGetForm).mockRejectedValue({ response: { status: 404 } });
+    renderWithProviders(<AdminForms />, { route: '/admin/formularios?envios=99' });
+    expect(await screen.findByText('No se encontró ese formulario')).toBeInTheDocument();
   });
 });

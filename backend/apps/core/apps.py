@@ -7,5 +7,8 @@ class CoreConfig(AppConfig):
     verbose_name = 'Núcleo'
 
     def ready(self):
-        from . import audit
+        from . import (
+            audit,
+            checks,  # noqa: F401  (registers the deploy system checks)
+        )
         audit.connect_default_tracking()

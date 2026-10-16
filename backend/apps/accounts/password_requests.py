@@ -201,36 +201,45 @@ class PasswordRequestDetailView(APIView):
     permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
-        try:
-            req = PasswordRequest.objects.select_related('user').get(pk=pk)
-        except PasswordRequest.DoesNotExist:
-            return Response({'detail': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
-        if req.status != PasswordRequest.Status.OPEN:
-            return Response({'detail': 'La solicitud ya fue atendida.'}, status=status.HTTP_409_CONFLICT)
-
         action = request.data.get('action')
-        if action == 'reject':
-            with transaction.atomic():
+        raw_user = request.data.get('user')
+        user_pk = None
+        if action == 'resolve' and raw_user not in (None, ''):
+            try:
+                user_pk = int(raw_user)
+            except (TypeError, ValueError):
+                return Response({'user': ['Cuenta inválida.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Row lock: two admins resolving the same request at once must not
+            # both pass the OPEN check and each hand out a different password.
+            try:
+                req = PasswordRequest.objects.select_for_update().get(pk=pk)
+            except PasswordRequest.DoesNotExist:
+                return Response({'detail': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            if req.status != PasswordRequest.Status.OPEN:
+                return Response({'detail': 'La solicitud ya fue atendida.'}, status=status.HTTP_409_CONFLICT)
+
+            if action == 'reject':
                 changes = reject_request(req, request.user, request.data.get('note') or '')
                 record('update', req, {'via': 'portal', **changes}, actor=request.user,
                        context='portal: solicitud de contraseña rechazada')
-            return Response(PasswordRequestSerializer(req).data)
-        if action != 'resolve':
-            return Response({'action': ['Use "resolve" o "reject".']}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(PasswordRequestSerializer(req).data)
+            if action != 'resolve':
+                return Response({'action': ['Use "resolve" o "reject".']}, status=status.HTTP_400_BAD_REQUEST)
 
-        target = req.user
-        if target is None and request.data.get('user'):
-            target = User.objects.filter(pk=request.data['user']).first()
-        if target is None:
-            return Response({'user': ['Vincule la solicitud a una cuenta antes de resolverla.']},
-                            status=status.HTTP_400_BAD_REQUEST)
-        if target.role == User.Role.ADMIN or target.is_superuser:
-            return Response({'detail': 'No se restablecen cuentas administradoras desde aquí.'},
-                            status=status.HTTP_403_FORBIDDEN)
+            target = req.user
+            if target is None and user_pk is not None:
+                target = User.objects.filter(pk=user_pk).first()
+            if target is None:
+                return Response({'user': ['Vincule la solicitud a una cuenta antes de resolverla.']},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if target.role == User.Role.ADMIN or target.is_superuser:
+                return Response({'detail': 'No se restablecen cuentas administradoras desde aquí.'},
+                                status=status.HTTP_403_FORBIDDEN)
 
-        delivered_via = request.data.get('delivered_via') or req.channel
-        password = generate_temporary_password()
-        with transaction.atomic():
+            delivered_via = request.data.get('delivered_via') or req.channel
+            password = generate_temporary_password()
             target.set_password(password)
             target.save(update_fields=['password'])
             revoked = revoke_refresh_tokens(target)

@@ -96,7 +96,7 @@ describe('AdminAnnouncements', () => {
         show_on_site: false,
       }));
     });
-    expect(toastSuccess).toHaveBeenCalledWith('Comunicado publicado.');
+    expect(toastSuccess).toHaveBeenCalledWith('Comunicado publicado y enviado.');
   });
 
   it('shows the push toggle ON by default and posts it OFF when unchecked', async () => {
@@ -221,5 +221,48 @@ describe('AdminAnnouncements', () => {
     await user.click(screen.getByRole('button', { name: /^Exportar$/ }));
     await user.click(screen.getByRole('menuitem', { name: /Excel/ }));
     await waitFor(() => expect(exportList).toHaveBeenCalledWith(expect.objectContaining({ audience: 'staff', fmt: 'xlsx' })));
+  });
+
+  it('asks before «Activar» sends a comunicado that was never sent, then confirms with a toast', async () => {
+    const user = userEvent.setup();
+    const update = vi.mocked(portalApi.adminUpdateAnnouncement);
+    update.mockResolvedValue({ data: {} } as never);
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    const row = await screen.findByRole('row', { name: /Junta de padres/ });
+    await user.click(within(row).getByRole('button', { name: 'Activar' }));
+    expect(update).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: 'Activar comunicado' });
+    expect(dialog).toHaveTextContent('se enviará ahora a: padres');
+    await user.click(within(dialog).getByRole('button', { name: 'Activar y enviar' }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(4, { is_active: true }));
+    expect(toastSuccess).toHaveBeenCalledWith('Comunicado activado y enviado.');
+  });
+
+  it('does not offer «Enterado» or attachments, and warns past 280 characters', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText(/Enterado/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Adjuntos (máx. 10)')).not.toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'x'.repeat(300) } });
+    expect(within(dialog).getByText(/solo reciben los primeros 280/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByLabelText(/^Publicado/));
+    expect(within(dialog).getByRole('button', { name: 'Guardar borrador' })).toBeInTheDocument();
+  });
+
+  it('says «Borrador guardado» (not «publicado») for an inactive comunicado', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Borrador' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Texto.' } });
+    fireEvent.click(within(dialog).getByLabelText(/^Publicado/));
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar borrador' }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ is_active: false })));
+    expect(toastSuccess).toHaveBeenCalledWith('Borrador guardado (no se envía hasta activarlo).');
   });
 });

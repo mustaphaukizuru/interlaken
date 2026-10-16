@@ -38,3 +38,28 @@ describe('AdminNavigation redirects', () => {
     expect(within(dialog).getByText('permanente')).toBeInTheDocument();
   });
 });
+
+describe('AdminNavigation menu editor', () => {
+  it('shows an error and no «Guardar menú» when the stored menu fails to load', async () => {
+    vi.mocked(contentApi.adminGetSettings).mockRejectedValue(new Error('500'));
+    renderWithProviders(<AdminNavigation />, { route: '/admin/navegacion' });
+    expect(await screen.findByText('No se pudo cargar el menú del sitio')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Guardar menú' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/usa el menú integrado/)).not.toBeInTheDocument();
+    expect(contentApi.adminUpdateSettings).not.toHaveBeenCalled();
+  });
+
+  it('asks before resetting a custom menu to the built-in one', async () => {
+    const user = userEvent.setup();
+    vi.mocked(contentApi.adminGetSettings).mockResolvedValue({
+      data: { menu: [{ label: 'Propio', items: [{ label: 'Inicio', to: '/', icon: '' }] }] },
+    } as never);
+    vi.mocked(contentApi.adminUpdateSettings).mockResolvedValue({ data: { menu: [] } } as never);
+    renderWithProviders(<AdminNavigation />, { route: '/admin/navegacion' });
+    await user.click(await screen.findByRole('button', { name: /Volver al menú integrado/ }));
+    expect(contentApi.adminUpdateSettings).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: '¿Volver al menú integrado?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Volver al menú integrado' }));
+    expect(contentApi.adminUpdateSettings).toHaveBeenCalledWith({ menu: [] });
+  });
+});

@@ -63,3 +63,21 @@ def test_admin_target_refused(admin_client):
 def test_parent_forbidden(api_client):
     api_client.force_authenticate(user=ParentFactory())
     assert api_client.get(reverse('password-requests')).status_code == 403
+
+
+def test_non_integer_user_is_400_not_500(admin_client):
+    req = PasswordRequest.objects.create(requested_email='nobody@test.mx', channel='phone')
+    resp = admin_client.patch(reverse('password-request-detail', args=[req.pk]),
+                              {'action': 'resolve', 'user': 'abc'}, format='json')
+    assert resp.status_code == 400 and 'user' in resp.data
+    req.refresh_from_db()
+    assert req.status == PasswordRequest.Status.OPEN
+
+
+def test_resolve_links_explicit_user(admin_client):
+    parent = ParentFactory()
+    req = PasswordRequest.objects.create(requested_email='otro@test.mx', channel='phone')
+    resp = admin_client.patch(reverse('password-request-detail', args=[req.pk]),
+                              {'action': 'resolve', 'user': str(parent.pk)}, format='json')
+    assert resp.status_code == 200, resp.data
+    assert resp.data['user'] == parent.pk

@@ -201,6 +201,32 @@ class PageAdminSerializer(serializers.ModelSerializer):
                   'created_at', 'updated_at']
         read_only_fields = ['id', 'status', 'published_at', 'review_requested_at', 'review_requested_by_name', 'review_note', 'created_at', 'updated_at']
 
+    # Staff edit drafts and ask Dirección for approval; only an admin decides
+    # WHEN a page goes live or comes down (the cms_schedule cron acts on these
+    # dates with no further approval) or moves its public address.
+    ADMIN_ONLY_FIELDS = ('slug', 'publish_at', 'unpublish_at')
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if request is not None and getattr(request.user, 'role', None) != 'admin':
+            inst = self.instance
+            blocked = []
+            for field in self.ADMIN_ONLY_FIELDS:
+                if field not in attrs:
+                    continue
+                if inst is None:
+                    # Creating: staff name the new page (slug) but cannot schedule it.
+                    if field != 'slug' and attrs[field] is not None:
+                        blocked.append(field)
+                elif attrs[field] != getattr(inst, field):
+                    blocked.append(field)
+            if blocked:
+                raise PermissionDenied(
+                    'Solo Dirección puede cambiar la dirección (slug) de una página o programar '
+                    'su publicación o retiro. Solicite aprobación desde el editor.'
+                )
+        return attrs
+
     def validate_draft_blocks(self, value):
         return validate_blocks(value)
 
@@ -478,7 +504,12 @@ class PagePublishView(APIView):
 
 
 class PageVersionsView(APIView):
-    """GET versions; POST {"version": n} to roll back (copies into draft and publishes)."""
+    """GET versions; POST {"version": n} restores that version INTO THE DRAFT.
+
+    Restoring never publishes: the admin reviews the restored draft and publishes
+    it through ``PagePublishView``, so a rollback goes through the same
+    pre-publish checks as any other publication. The public page keeps showing
+    the current published version until then."""
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
@@ -491,13 +522,22 @@ class PageVersionsView(APIView):
         page = Page.objects.filter(pk=pk).first()
         if page is None:
             raise Http404
-        v = page.versions.filter(number=request.data.get('version')).first()
+        try:
+            number = int(request.data.get('version'))
+        except (TypeError, ValueError):
+            return Response({'version': ['Versión no encontrada.']}, status=status.HTTP_400_BAD_REQUEST)
+        v = page.versions.filter(number=number).first()
         if v is None:
             return Response({'version': ['Versión no encontrada.']}, status=status.HTTP_400_BAD_REQUEST)
         page.draft_blocks, page.seo = v.blocks, v.seo
-        page.save(update_fields=['draft_blocks', 'seo'])
-        nv = page.publish(request.user)
-        return Response({'restored_from': v.number, 'version': nv.number})
+        page.save(update_fields=['draft_blocks', 'seo', 'updated_at'])
+        try:
+            from apps.core.audit import record
+            record('update', page, {'draft_restored_from': v.number}, actor=request.user,
+                   context='cms.restore_version')
+        except Exception:  # noqa: BLE001
+            pass
+        return Response({'restored_from': v.number, 'page': PageAdminSerializer(page).data})
 
 
 class PageChecksView(APIView):

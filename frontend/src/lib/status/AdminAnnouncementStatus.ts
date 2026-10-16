@@ -17,6 +17,8 @@ export interface AdminAnnouncement {
   requires_ack?: boolean;
   attachments?: AnnouncementAttachment[];
   ack_count?: number;
+  /** When the notifications went out; null = not sent yet (activating sends them). */
+  fanout_at?: string | null;
   created_by_name: string;
   read_count: number;
 }

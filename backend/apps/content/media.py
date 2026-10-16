@@ -19,6 +19,7 @@ from django.db import models
 from django.http import FileResponse, Http404, HttpResponseNotModified
 from django.utils import timezone
 from rest_framework import generics, permissions, serializers, status
+from rest_framework.exceptions import APIException
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -254,6 +255,20 @@ class MediaListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateA
         return Response(MediaAssetSerializer(asset).data, status=status.HTTP_201_CREATED)
 
 
+MEDIA_IN_USE = 'se usa en una página o comunicado'
+
+
+def media_delete_guard(refs: set[int]):
+    """Shared single/bulk delete guard: an asset still referenced by a page
+    (draft, published version or SEO image) or a comunicado attachment stays."""
+    return lambda asset: MEDIA_IN_USE if asset.pk in refs else None
+
+
+class MediaInUse(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = 'media_in_use'
+
+
 class MediaDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrStaff]
     serializer_class = MediaAssetSerializer
@@ -261,6 +276,9 @@ class MediaDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     audit_context = 'cms.media'
 
     def perform_destroy(self, instance):
+        reason = media_delete_guard(referenced_media_ids())(instance)
+        if reason:
+            raise MediaInUse(f'No se puede eliminar: {reason}. Quítelo de ahí primero.')
         destroy_asset(instance)
         record('delete', instance, {'filename': [instance.filename, None]},
                actor=self.request.user, context=self.audit_context)
@@ -325,10 +343,7 @@ class MediaBulkView(AdminBulkView):
         action = super().get_action(name)
         if name == 'delete':
             refs = referenced_media_ids()  # once per request, not once per row
-            return delete_action(
-                destroy=destroy_asset,
-                guard=lambda a: 'se usa en una página o comunicado' if a.pk in refs else None,
-            )
+            return delete_action(destroy=destroy_asset, guard=media_delete_guard(refs))
         return action
 
 

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { invalidateStudents } from '@/hooks/queries/studentKeys';
 import { CheckCircle2, Merge } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -26,7 +27,7 @@ export default function AdminGuardianMerge() {
   });
   const run = useMutation({
     mutationFn: () => portalApi.guardianMerge({ keep: preview!.keep.id, drop: preview!.drop.id, confirm }),
-    onSuccess: ({ data }) => { setResult(data); setPreview(null); setConfirm(''); toast.success('Cuentas fusionadas.'); qc.invalidateQueries({ queryKey: ['admin-students'] }); },
+    onSuccess: ({ data }) => { setResult(data); setPreview(null); setConfirm(''); toast.success('Cuentas fusionadas.'); void invalidateStudents(qc); },
     onError: (e) => { const f = apiFieldErrors(e); setError(f.detail || f.confirm || 'No se pudo fusionar.'); },
   });
   const submit = (e: FormEvent) => { e.preventDefault(); load.mutate(); };

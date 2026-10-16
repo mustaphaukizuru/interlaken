@@ -15,9 +15,10 @@ class PreRegistrationAdmin(ModelAdmin):
     search_fields = ('child_first_name', 'child_last_name', 'parent_name',
                      'parent_email', 'parent_phone')
     ordering = ('-created_at',)
-    list_editable = ('status',)
     date_hierarchy = 'created_at'
-    readonly_fields = ('created_at', 'updated_at')
+    # Status changes only from the portal (admissions.services.change_status:
+    # transition table, emails and audit row), never by hand here.
+    readonly_fields = ('status', 'created_at', 'updated_at')
 
 
 @admin.register(Registration)
@@ -29,8 +30,10 @@ class RegistrationAdmin(ModelAdmin):
                      'parent1_phone', 'child_curp')
     ordering = ('-created_at',)
     date_hierarchy = 'created_at'
-    # Access tokens and consent capture are audit data — never hand-edited.
-    readonly_fields = ('access_token', 'invite_token_hash', 'invite_expires_at',
+    # Access tokens and consent capture are audit data, never hand-edited.
+    # Status moves only through the portal (transition table, outcome emails,
+    # the convert path that creates the student and logins, audit row).
+    readonly_fields = ('status', 'access_token', 'invite_token_hash', 'invite_expires_at',
                        'invite_used_at', 'session_token_hash', 'session_expires_at',
                        'privacy_notice_version', 'privacy_accepted_at',
                        'submitted_at', 'created_at', 'updated_at')

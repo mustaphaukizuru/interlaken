@@ -51,3 +51,20 @@ def test_patch_alt_and_delete_removes_files(api_client, settings, tmp_path):
     assert api_client.delete(reverse('admin-media-detail', args=[asset_id])).status_code == 204
     assert not MediaAsset.objects.filter(pk=asset_id).exists()
     assert api_client.get(f'/api/v1/content/media/{asset_id}/original/').status_code == 404
+
+
+def test_single_delete_refuses_referenced_asset(api_client, settings, tmp_path):
+    from apps.content.pages import Page
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    api_client.force_authenticate(user=AdminFactory())
+    asset_id = api_client.post(reverse('admin-media'), {'file': _png(500, 300), 'alt': 'Patio'},
+                               format='multipart').data['id']
+    page = Page.objects.create(slug='galeria', title='Galería',
+                               draft_blocks=[{'id': 'g', 'type': 'image', 'props': {'image': asset_id}}])
+    resp = api_client.delete(reverse('admin-media-detail', args=[asset_id]))
+    assert resp.status_code == 409 and 'se usa en una página o comunicado' in resp.data['detail']
+    assert MediaAsset.objects.filter(pk=asset_id).exists()
+    page.draft_blocks = []
+    page.save()
+    assert api_client.delete(reverse('admin-media-detail', args=[asset_id])).status_code == 204

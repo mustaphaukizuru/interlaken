@@ -14,6 +14,7 @@ import { StudentGuardians } from '@/components/admin/StudentGuardians';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { Badge } from '@/components/ui/Badge';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
+import { studentDetailKey } from '@/hooks/queries/studentKeys';
 import { portalApi } from '@/services/api';
 import type { StudentProfile } from '@/types';
 
@@ -26,7 +27,7 @@ export default function AdminStudentDetail({ id, embedded = false }: { id?: numb
   const params = useParams();
   const studentId = id ?? params.studentId;
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-student', studentId],
+    queryKey: studentDetailKey(studentId ?? ''),
     queryFn: async () => (await portalApi.getStudent(Number(studentId))).data as StudentProfile,
     enabled: !!studentId,
   });

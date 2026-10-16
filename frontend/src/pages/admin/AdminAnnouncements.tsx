@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-import { AttachmentsField } from '@/components/admin/AttachmentsField';
 import { toLocalInput } from '@/cms/editor/helpers';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -41,6 +40,14 @@ const BULK_ACTIONS: BulkActionDef[] = [
   { name: 'delete', label: 'Eliminar no enviados', planVerb: 'Se eliminarán', danger: true, icon: Trash2 },
 ];
 
+/** What families actually receive (portal/services.fanout_announcement): an
+ *  in-app notification plus email/push with the title and this many characters
+ *  of the message. The portal has no comunicados page any more (bitácora
+ *  punto 10), so attachments and «Enterado» never reach families. */
+const DELIVERED_CHARS = 280;
+
+const isFuture = (iso?: string | null) => !!iso && new Date(iso).getTime() > Date.now();
+
 const EMPTY = { title: '', body: '', audience: 'all', is_active: true, push_enabled: true, show_on_site: false, site_until: null as string | null, site_link: '', publish_at: null as string | null, requires_ack: false, attachments: [] as AnnouncementAttachment[] };
 const EMPTY_ALERT = { title: '', message: '', audience: 'parents', whatsapp: false };
 
@@ -55,6 +62,7 @@ export default function AdminAnnouncements() {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertForm, setAlertForm] = useState(EMPTY_ALERT);
   const [alertConfirm, setAlertConfirm] = useState(false);
+  const [toActivate, setToActivate] = useState<Announcement | null>(null);
 
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
@@ -64,7 +72,6 @@ export default function AdminAnnouncements() {
     active: get('estado') || undefined,
     audience: get('audiencia') || undefined,
     scheduled: get('programado') || undefined,
-    requires_ack: get('enterado') || undefined,
     from: get('desde') || undefined,
     to: get('hasta') || undefined,
     ordering: serializeSort(sort) || undefined,
@@ -91,7 +98,7 @@ export default function AdminAnnouncements() {
     },
     onSuccess: () => {
       void invalidate();
-      toast.success(editing ? 'Comunicado actualizado.' : 'Comunicado publicado.');
+      toast.success(saveToast(editing, form));
       setOpen(false);
     },
     onError: () => toast.error('No se pudo guardar el comunicado.'),
@@ -99,8 +106,14 @@ export default function AdminAnnouncements() {
 
   const toggleActive = useMutation({
     mutationFn: (a: Announcement) => portalApi.adminUpdateAnnouncement(a.id, { is_active: !a.is_active }),
-    onSuccess: () => { void invalidate(); },
-    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo cambiar el estado.')),
+    onSuccess: (_res, a) => {
+      void invalidate();
+      setToActivate(null);
+      if (a.is_active) toast.success('Comunicado desactivado.');
+      else if (isFuture(a.publish_at)) toast.success(`Comunicado activado: se enviará el ${formatDateTime(a.publish_at)}.`);
+      else toast.success(a.fanout_at ? 'Comunicado activado (ya se había enviado; no se reenvía).' : 'Comunicado activado y enviado.');
+    },
+    onError: (e: unknown) => { setToActivate(null); toast.error(apiErrorMessage(e, 'No se pudo cambiar el estado.')); },
   });
 
   const remove = useMutation({
@@ -194,7 +207,6 @@ export default function AdminAnnouncements() {
       id: 'reads', header: 'Leídos', sortKey: 'reads', align: 'right', minWidth: 90, className: 'tabular-nums text-muted',
       cell: (a) => <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" aria-hidden="true" /> {a.read_count} leídos</span>,
     },
-    { id: 'ack', header: 'Enterados', align: 'right', minWidth: 90, defaultHidden: true, className: 'tabular-nums text-muted', cell: (a) => (a.requires_ack ? a.ack_count ?? 0 : '—') },
     { id: 'author', header: 'Autor', minWidth: 130, defaultHidden: true, className: 'text-xs text-muted', cell: (a) => a.created_by_name || '—' },
   ];
 
@@ -237,7 +249,7 @@ export default function AdminAnnouncements() {
           selection={selection}
           rowActions={(a) => (
             <>
-              <button type="button" onClick={() => toggleActive.mutate(a)}
+              <button type="button" onClick={() => (a.is_active ? toggleActive.mutate(a) : setToActivate(a))}
                 disabled={toggleActive.isPending && toggleActive.variables?.id === a.id}
                 className="min-h-[36px] rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-cream disabled:opacity-50">
                 {toggleActive.isPending && toggleActive.variables?.id === a.id
@@ -259,7 +271,6 @@ export default function AdminAnnouncements() {
               selects={[
                 { key: 'audiencia', label: 'Dirigido a', options: AUDIENCE.map(({ value, label }) => ({ value, label })), allLabel: 'Todas las audiencias' },
                 { key: 'programado', label: 'Programación', options: [{ value: '1', label: 'Programados' }, { value: '0', label: 'Ya enviados o inmediatos' }], allLabel: 'Con o sin programación' },
-                { key: 'enterado', label: 'Enterado', options: [{ value: '1', label: 'Piden enterado' }, { value: '0', label: 'Sin enterado' }], allLabel: 'Con o sin enterado' },
               ]}
               dateRange={{ idPrefix: 'comunicados' }}
             />
@@ -281,7 +292,7 @@ export default function AdminAnnouncements() {
           empty={{
             icon: Megaphone,
             title: 'Sin comunicados',
-            description: 'Los avisos que publiques aparecerán aquí y en el portal de las familias.',
+            description: 'Los avisos que publiques aparecerán aquí. Las familias los reciben como notificación en su portal y por correo.',
             action: <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>,
           }}
         />
@@ -306,8 +317,12 @@ export default function AdminAnnouncements() {
           <Input label="Título" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Ej. Suspensión de clases" />
           <div>
             <label htmlFor="ann-body" className="label">Mensaje</label>
-            <textarea id="ann-body" className="input-field min-h-[110px] resize-none" value={form.body}
+            <textarea id="ann-body" className="input-field min-h-[110px] resize-none" value={form.body} aria-describedby="ann-body-hint"
               onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="Escribe el comunicado…" />
+            <p id="ann-body-hint" className={`mt-1 text-xs ${form.body.length > DELIVERED_CHARS ? 'text-coral-600' : 'text-subtle'}`}>
+              {form.body.length}/{DELIVERED_CHARS} caracteres.
+              {form.body.length > DELIVERED_CHARS && ` Las familias solo reciben los primeros ${DELIVERED_CHARS} en la notificación y el correo; resuma o agregue un enlace.`}
+            </p>
           </div>
           <div>
             <label htmlFor="ann-audience" className="label">Dirigido a</label>
@@ -320,8 +335,12 @@ export default function AdminAnnouncements() {
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
-            Publicado (visible en el portal)
+            Publicado (se envía a la audiencia al guardar o en la fecha programada)
           </label>
+          <p className="rounded-lg bg-cream-2 px-3 py-2 text-xs text-muted">
+            Las familias lo reciben como notificación en «Notificaciones» de su portal, por correo y, si lo activa, por push.
+            El portal ya no tiene una sección de comunicados, así que no se envían adjuntos ni se pide «Enterado».
+          </p>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={form.push_enabled} onChange={(e) => setForm((f) => ({ ...f, push_enabled: e.target.checked }))}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
@@ -338,18 +357,13 @@ export default function AdminAnnouncements() {
               <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setForm((f) => ({ ...f, site_link: e.target.value }))} placeholder="/calendario" />
             </div>
           )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setForm((f) => ({ ...f, publish_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} hint="Vacío = se envía al publicar." />
-            <label className="flex min-h-[44px] items-center gap-2 self-end text-sm text-muted">
-              <input type="checkbox" checked={form.requires_ack} onChange={(e) => setForm((f) => ({ ...f, requires_ack: e.target.checked }))} className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40" />
-              Pedir «Enterado» a cada familia
-            </label>
-          </div>
-          <AttachmentsField value={form.attachments} onChange={(attachments) => setForm((f) => ({ ...f, attachments }))} />
+          {/* «Pedir Enterado» and attachments are not offered: no family channel
+              delivers them since the portal comunicados page was retired. */}
+          <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setForm((f) => ({ ...f, publish_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} hint="Vacío = se envía al publicar." />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!form.title.trim() || !form.body.trim()}>
-              {editing ? 'Guardar' : 'Publicar'}
+              {editing ? 'Guardar' : !form.is_active ? 'Guardar borrador' : isFuture(form.publish_at) ? 'Programar' : 'Publicar'}
             </Button>
           </div>
         </div>
@@ -436,6 +450,16 @@ export default function AdminAnnouncements() {
       <DeliveryReportModal announcementId={report?.id ?? null} title={report?.title} onClose={() => setReport(null)} />
 
       <ConfirmDialog
+        open={!!toActivate}
+        onClose={() => setToActivate(null)}
+        onConfirm={() => toActivate && toggleActive.mutate(toActivate)}
+        title="Activar comunicado"
+        message={activateMessage(toActivate)}
+        confirmLabel={toActivate && !toActivate.fanout_at && !isFuture(toActivate.publish_at) ? 'Activar y enviar' : 'Activar'}
+        loading={toggleActive.isPending}
+      />
+
+      <ConfirmDialog
         open={!!toDelete}
         onClose={() => setToDelete(null)}
         onConfirm={() => toDelete && remove.mutate(toDelete.id)}
@@ -446,6 +470,21 @@ export default function AdminAnnouncements() {
       />
     </>
   );
+}
+
+function saveToast(editing: Announcement | null, form: typeof EMPTY): string {
+  if (!form.is_active) return editing ? 'Comunicado guardado como inactivo (no se envía).' : 'Borrador guardado (no se envía hasta activarlo).';
+  if (isFuture(form.publish_at)) return `Comunicado programado: se enviará el ${formatDateTime(form.publish_at)}.`;
+  if (!editing || (!editing.is_active && !editing.fanout_at)) return 'Comunicado publicado y enviado.';
+  return editing.fanout_at ? 'Comunicado actualizado (los cambios no se reenvían).' : 'Comunicado actualizado.';
+}
+
+function activateMessage(a: Announcement | null): string {
+  if (!a) return '';
+  const who = audienceMeta(a.audience).label.toLowerCase();
+  if (isFuture(a.publish_at)) return `«${a.title}» se enviará a: ${who}, el ${formatDateTime(a.publish_at)}.`;
+  if (a.fanout_at) return `«${a.title}» ya se envió el ${formatDateTime(a.fanout_at)}; activarlo no lo reenvía.`;
+  return `«${a.title}» se enviará ahora a: ${who} (notificación en el portal, correo y push si está activado). No se puede deshacer.`;
 }
 
 /** Audience-size preview: how many active accounts publish would notify. */
