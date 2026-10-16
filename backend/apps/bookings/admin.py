@@ -36,12 +36,14 @@ class BookingAdmin(ModelAdmin):
     list_filter = ('status', 'source', 'slot__visit_type')
     search_fields = ('parent_name', 'parent_email', 'parent_phone', 'child_name')
     ordering = ('-created_at',)
-    list_editable = ('status',)
     raw_id_fields = ('slot',)
     list_select_related = ('slot',)
     date_hierarchy = 'created_at'
-    # Sync/notification state is machine-managed.
-    readonly_fields = ('google_event_id', 'confirmation_sent', 'created_at', 'updated_at')
+    # Sync/notification state is machine-managed. Status is read-only here: it
+    # changes only from the portal (/admin/visitas), which applies the
+    # transition table, capacity, the confirmation email, calendar sync and
+    # the audit row. Editing it here skipped all of that.
+    readonly_fields = ('status', 'google_event_id', 'confirmation_sent', 'created_at', 'updated_at')
 
     # Operated from the staff portal (/admin/visitas); the Django admin is a
     # read-only system-of-record view. See docs/ADMIN-VS-PORTAL.md.
