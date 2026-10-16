@@ -1,9 +1,9 @@
 import { api, portalApi } from '@/services/api';
 import type { StudentProfile } from '@/types';
 import { createListHook, importApiFor, useBulk, useExport } from './dataOpsHooks';
+import { STUDENTS_ENTITY, STUDENTS_RELATED } from './studentKeys';
 
-/** Entity name for query keys and invalidation. */
-export const STUDENTS_ENTITY = 'students';
+export { STUDENTS_ENTITY, STUDENTS_RELATED, invalidateStudents, studentDetailKey } from './studentKeys';
 
 /** Roster row: the profile plus the wallet balance the admin list annotates. */
 export type RosterStudent = StudentProfile & { balance?: string | null };
@@ -30,7 +30,7 @@ export const STUDENTS_ORDERING_KEYS = ['name', 'student_id', 'grade', 'group', '
 export const useStudentsList = createListHook<RosterStudent, StudentsListParams>(STUDENTS_ENTITY, portalApi.getStudents);
 
 /** Bulk mutations refresh the roster and every cafetería view (status and sync touch wallets). */
-export const useStudentsBulk = () => useBulk(STUDENTS_ENTITY, portalApi.studentsBulk, ['cafeteria']);
+export const useStudentsBulk = () => useBulk(STUDENTS_ENTITY, portalApi.studentsBulk, STUDENTS_RELATED);
 
 export const useStudentsExport = () => useExport(STUDENTS_ENTITY, portalApi.exportStudents);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
@@ -186,6 +186,12 @@ describe('SyncHealthPanel — Sincronizar roster ahora', () => {
     expect(await screen.findByText(/El roster no se ha sincronizado desde/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Sincronizar roster ahora/ }));
+    // A dry run first: nothing is written until the admin applies the preview.
+    await waitFor(() => expect(syncRoster).toHaveBeenCalledWith(true));
+    expect(syncRoster).not.toHaveBeenCalledWith(false);
+    const dialog = await screen.findByRole('dialog', { name: 'Sincronizar roster con Loyverse' });
+    expect(within(dialog).getByRole('list', { name: 'Resumen de la vista previa' })).toHaveTextContent('1alta(s)');
+    await user.click(within(dialog).getByRole('button', { name: 'Aplicar sincronización' }));
 
     await waitFor(() => expect(syncRoster).toHaveBeenCalledWith(false));
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
@@ -202,5 +208,14 @@ describe('SyncHealthPanel — Sincronizar roster ahora', () => {
     renderWithProviders(<SyncHealthPanel />);
     await user.click(await screen.findByRole('button', { name: /Sincronizar roster ahora/ }));
     await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalledWith('No se pudo conectar con Loyverse: 401'));
+  });
+
+  it('shows an error card with retry when the health check fails (instead of nothing)', async () => {
+    const user = userEvent.setup();
+    syncHealth.mockRejectedValueOnce(new Error('500'));
+    renderWithProviders(<SyncHealthPanel />);
+    expect(await screen.findByText('No se pudo consultar el estado de la sincronización')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Reintentar/ }));
+    expect(await screen.findByText(/El roster no se ha sincronizado desde/)).toBeInTheDocument();
   });
 });

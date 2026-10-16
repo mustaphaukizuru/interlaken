@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { portalApi, type StudentWrite, type StudentStatus } from '@/services/api';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
+import { invalidateStudents } from '@/hooks/queries/studentKeys';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import type { StudentProfile } from '@/types';
 
@@ -86,8 +87,8 @@ function StudentForm({ student, onClose, onSaved, qc }: {
       return data as StudentProfile;
     },
     onSuccess: (saved) => {
-      qc.invalidateQueries({ queryKey: ['admin-students'] });
-      qc.invalidateQueries({ queryKey: ['admin-student', String(saved.id)] });
+      // Roster list + this student's file (both under ['admin', 'students', ...]).
+      void invalidateStudents(qc);
       toast.success(editing ? 'Alumno actualizado.' : 'Alumno creado.');
       onSaved?.(saved);
       onClose();

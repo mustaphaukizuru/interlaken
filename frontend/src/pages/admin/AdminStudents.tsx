@@ -20,7 +20,7 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
-  studentsImportApi, useStudentsBulk, useStudentsExport, useStudentsList,
+  STUDENTS_RELATED, studentsImportApi, useStudentsBulk, useStudentsExport, useStudentsList,
   type RosterStudent, type StudentsListParams,
 } from '@/hooks/queries/students';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
@@ -254,7 +254,7 @@ export default function AdminStudents() {
           onClose={() => setImportOpen(false)}
           title="Importar alumnos"
           entity="students"
-          related={['cafeteria']}
+          related={STUDENTS_RELATED}
           api={studentsImportApi}
           headers={IMPORT_HEADERS}
           templatePrefix="alumnos"

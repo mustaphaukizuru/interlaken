@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateStudents } from '@/hooks/queries/studentKeys';
 import { CheckCircle2, FileWarning, Mail, MessageCircle, UserPlus, KanbanSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -33,7 +34,7 @@ export default function AdminPipeline() {
   const [group, setGroup] = useState('');
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admissions-pipeline'] }); qc.invalidateQueries({ queryKey: ['badges'] }); qc.invalidateQueries({ queryKey: ['admin-students'] }); };
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admissions-pipeline'] }); qc.invalidateQueries({ queryKey: ['badges'] }); void invalidateStudents(qc); };
   const requestDocs = useMutation({
     mutationFn: (id: number) => admissionsApi.requestDocs(id),
     onSuccess: ({ data: r }) => { toast.success(`Solicitud enviada a ${r.sent_to}.`); invalidate(); },
