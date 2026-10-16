@@ -8,7 +8,10 @@ POST  /accounts/admin/staff/<pk>/reset-password/   new generated password (retur
 
 Guards: only admins; an admin cannot deactivate or demote themselves; the last
 active admin cannot be demoted/deactivated; superusers are untouchable here
-(they belong to the Django admin).
+(they belong to the Django admin). The password reset only targets non-admin
+staff: an admin who could rewrite a peer admin's password (and read it back)
+would own that account, the same rule ``admin_password`` and
+``password_requests`` enforce.
 """
 from __future__ import annotations
 
@@ -20,6 +23,7 @@ from rest_framework.views import APIView
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
+from apps.core.filtersets import parse_bool_param
 from apps.core.importing import (
     ImportCol,
     ImportSpec,
@@ -179,7 +183,11 @@ class StaffDetailView(APIView):
                 target.is_staff = role == User.Role.ADMIN
                 fields += ['role', 'is_staff']
         if 'is_active' in request.data:
-            active = bool(request.data['is_active'])
+            # bool("false") is True: parse the token, refuse anything ambiguous.
+            active = parse_bool_param(request.data['is_active'])
+            if active is None:
+                return Response({'is_active': ['Valor inválido: use true o false.']},
+                                status=status.HTTP_400_BAD_REQUEST)
             if active != target.is_active:
                 if target.pk == request.user.pk and not active:
                     return Response({'detail': 'No puede desactivar su propia cuenta.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -201,8 +209,17 @@ class StaffDetailView(APIView):
         return last_active_admin(target)
 
 
+ADMIN_RESET_REFUSED = (
+    'No se puede generar la contraseña de otra cuenta administradora: quien la '
+    'reescribe se apropiaría de esa cuenta. Cada administrador cambia su propia '
+    'contraseña desde su perfil o con el enlace de recuperación; si perdió el acceso, '
+    'un superusuario la restablece desde el panel técnico.'
+)
+
+
 class StaffResetPasswordView(APIView):
-    """Staff passwords are generated here (not via the family flow, which refuses admins)."""
+    """Non-admin staff passwords are generated here (the family flow refuses
+    staff-level accounts). Admin targets are refused: see the module docstring."""
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -215,6 +232,8 @@ class StaffResetPasswordView(APIView):
             return Response({'detail': err}, status=status.HTTP_403_FORBIDDEN)
         if target.pk == request.user.pk:
             return Response({'detail': 'Use su propio flujo de contraseña.'}, status=status.HTTP_400_BAD_REQUEST)
+        if target.role == User.Role.ADMIN:
+            return Response({'detail': ADMIN_RESET_REFUSED}, status=status.HTTP_403_FORBIDDEN)
         password = generate_temporary_password()
         with transaction.atomic():
             target.set_password(password)

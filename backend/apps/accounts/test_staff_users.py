@@ -54,3 +54,33 @@ def test_reset_password_for_staff(admin_client):
 def test_non_admin_forbidden(api_client):
     api_client.force_authenticate(user=UserFactory(role='staff'))
     assert api_client.get(reverse('admin-staff')).status_code == 403
+
+
+def test_reset_password_refuses_other_admin(admin_client):
+    c, _ = admin_client
+    other_admin = AdminFactory()
+    old_hash = other_admin.password
+    resp = c.post(reverse('admin-staff-reset', args=[other_admin.pk]), {}, format='json')
+    assert resp.status_code == 403
+    assert 'temporary_password' not in resp.data
+    other_admin.refresh_from_db()
+    assert other_admin.password == old_hash
+
+
+@pytest.mark.parametrize('raw, expected', [('false', False), ('0', False), (False, False), ('true', True)])
+def test_is_active_parses_string_booleans(admin_client, raw, expected):
+    c, _ = admin_client
+    other = UserFactory(role='staff', email='b@test.mx', is_active=not expected)
+    resp = c.patch(reverse('admin-staff-detail', args=[other.pk]), {'is_active': raw}, format='json')
+    assert resp.status_code == 200, resp.data
+    other.refresh_from_db()
+    assert other.is_active is expected
+
+
+def test_is_active_garbage_is_400(admin_client):
+    c, _ = admin_client
+    other = UserFactory(role='staff', email='g@test.mx')
+    resp = c.patch(reverse('admin-staff-detail', args=[other.pk]), {'is_active': 'quizas'}, format='json')
+    assert resp.status_code == 400
+    other.refresh_from_db()
+    assert other.is_active is True

@@ -76,4 +76,15 @@ describe('AdminStaffUsers (Data Ops Phase 3)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Importar/ }));
     expect(await screen.findByRole('dialog', { name: 'Invitar personal desde un archivo' })).toBeInTheDocument();
   });
+
+  it('offers «Contraseña» for staff rows but never for another admin', async () => {
+    const dora = { ...me, id: 4, email: 'dora@x.mx', full_name: 'Dora Paz', role: 'admin' };
+    vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 3, next: null, previous: null, results: [me, berta, dora] } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Dora Paz');
+    expect(screen.getAllByRole('button', { name: 'Generar contraseña para berta@x.mx' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Generar contraseña para dora@x.mx' })).not.toBeInTheDocument();
+    // Other row actions stay available on the admin row.
+    expect(screen.getAllByRole('button', { name: 'Desactivar dora@x.mx' }).length).toBeGreaterThan(0);
+  });
 });
