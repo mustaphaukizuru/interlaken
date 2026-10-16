@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
 import toast from 'react-hot-toast';
 import {
@@ -176,6 +176,7 @@ function SiteChromePreview({ form }: { form: SettingsForm }) {
 }
 
 export default function AdminSettings() {
+  const qc = useQueryClient();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-site-settings'],
     queryFn: async () => (await contentApi.adminGetSettings()).data as SettingsForm,
@@ -187,6 +188,10 @@ export default function AdminSettings() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const form: SettingsForm = { ...EMPTY, ...data, ...edits };
   const dirty = Object.keys(edits).length > 0;
+  // Saving sends the WHOLE form: before the real settings arrive (or when the
+  // load failed) it is only the EMPTY defaults, and a save would blank the
+  // public phone, email, address and social links.
+  const loaded = data !== undefined;
 
   // Leaving the page (tab close, reload) with pending edits would discard them
   // silently; the browser asks first.
@@ -205,6 +210,7 @@ export default function AdminSettings() {
 
   const save = useMutation({
     mutationFn: () => {
+      if (!loaded) return Promise.reject(new Error('settings-not-loaded'));
       setFieldErrors({});
       // Fields owned by other screens (menu → /admin/navegacion, school_year →
       // /admin/nuevo-ciclo) are never sent: PATCHing the fetched snapshot
@@ -214,8 +220,23 @@ export default function AdminSettings() {
       ) as Partial<SettingsForm>;
       return contentApi.adminUpdateSettings(payload);
     },
-    onSuccess: () => toast.success('Ajustes guardados. El sitio público se actualizará.'),
+    onSuccess: (res) => {
+      // The saved values become the new baseline: no stale "Cambios sin
+      // guardar" banner, no leave warning for edits that already landed.
+      const saved = res?.data as Partial<SettingsForm> | undefined;
+      if (saved && typeof saved === 'object') {
+        qc.setQueryData<SettingsForm>(['admin-site-settings'], (prev) => ({ ...EMPTY, ...prev, ...saved }));
+      }
+      setEdits({});
+      qc.invalidateQueries({ queryKey: ['admin-site-settings'] });
+      qc.invalidateQueries({ queryKey: ['site-settings'] });
+      toast.success('Ajustes guardados. El sitio público se actualizará.');
+    },
     onError: (err: unknown) => {
+      if (err instanceof Error && err.message === 'settings-not-loaded') {
+        toast.error('Espere a que carguen los ajustes antes de guardar.');
+        return;
+      }
       const next = settingsFieldErrors(err);
       if (Object.keys(next).length > 0) {
         setFieldErrors(next);
@@ -235,6 +256,8 @@ export default function AdminSettings() {
           <Button
             onClick={() => save.mutate()}
             loading={save.isPending}
+            disabled={!loaded}
+            title={loaded ? undefined : 'Disponible cuando carguen los ajustes actuales'}
             className="min-h-[44px] w-full sm:w-auto"
           >
             <Save className="h-4 w-4" /> Guardar
@@ -242,7 +265,7 @@ export default function AdminSettings() {
         }
       />
 
-      {dirty && (
+      {dirty && loaded && (
         // Sticky save: on a phone the header button scrolls out of view within
         // one swipe, and the accumulated edits are only in memory.
         <div className="sticky top-16 z-20 mb-4 flex items-center justify-between gap-3 rounded-xl border border-purple/30 bg-purple/5 px-4 py-2.5 text-sm">
@@ -252,8 +275,14 @@ export default function AdminSettings() {
           </Button>
         </div>
       )}
-      {isError ? (
-        <Card><ErrorState onRetry={() => refetch()} /></Card>
+      {isError && !loaded ? (
+        <Card>
+          <ErrorState
+            title="No se pudieron cargar los ajustes"
+            description="Para no sobrescribir los datos publicados, Guardar queda desactivado hasta que se carguen."
+            onRetry={() => refetch()}
+          />
+        </Card>
       ) : isLoading ? (
         <div className="skeleton h-64 rounded-xl2" />
       ) : (
