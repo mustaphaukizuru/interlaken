@@ -1,5 +1,5 @@
 """
-payments/multicobros.py — staff work on Banorte operations, checked in MultiCobros.
+payments/multicobros.py: staff work on Banorte operations, checked in MultiCobros.
 
 Banorte answers only through the parent's browser, so some operations end
 without a trustworthy answer: the parent closed the window after paying, the

@@ -513,3 +513,15 @@ def test_payload_is_json_serialisable(api_client, banorte):
     json.dumps(row, default=str)
     assert {"codigo_payw", "texto", "last_error", "resultado", "created_at"} <= set(row["banorte"])
     assert row["banorte"]["control_number"] == checkout.control_number
+
+
+def test_crontab_runs_payment_jobs_often_and_off_the_loyverse_lock():
+    from apps.cafeteria.test_crontab import CRONTAB, parse_crontab
+
+    entries = parse_crontab(CRONTAB.read_text(encoding="utf-8"))
+    expire = [e for e in entries if "expire_stale_payments" in e["command"]]
+    report = [e for e in entries if "banorte_pending_report" in e["command"]]
+    assert len(expire) == 1 and expire[0]["fields"][:2] == ["*/15", "*"]
+    assert len(report) == 1 and report[0]["fields"][1] == "*"  # hourly
+    for e in expire + report:
+        assert e["lock"] and "loyverse" not in e["lock"]
