@@ -26,5 +26,9 @@ export const CUSTOMER_KIND: Record<string, { label: string; variant: BadgeVarian
   other: { label: 'Otro', variant: 'neutral' },
 };
 
+/** A top-up paid with a card (ledger row `topup-payment-<id>`). */
+export const isCardTopUp = (t: { transaction_type: string; loyverse_receipt_id?: string | null }) =>
+  t.transaction_type === 'topup' && /^topup-payment-\d+$/.test(t.loyverse_receipt_id ?? '');
+
 export const options = (map: Record<string, { label: string } | string>) =>
   Object.entries(map).map(([value, m]) => ({ value, label: typeof m === 'string' ? m : m.label }));

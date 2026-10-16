@@ -177,7 +177,7 @@ describe('AdminCafeteriaStudent money actions', () => {
 
     await user.click(confirm);
     await waitFor(() => {
-      expect(refundTransaction).toHaveBeenCalledWith(55, '');
+      expect(refundTransaction).toHaveBeenCalledWith(55, '', false);
     });
     expect(toastSuccess).toHaveBeenCalledWith('Devolución procesada.');
   });

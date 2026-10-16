@@ -6,11 +6,13 @@ import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Logo from '@/components/ui/Logo';
 import { paymentsApi } from '@/services/api';
+import { PAYMENT_FAILURE } from '@/lib/status/payment';
+import type { Payment } from '@/types';
 
-type Outcome = 'loading' | 'success' | 'failed' | 'pending';
+type Outcome = 'loading' | 'success' | 'failed' | 'refunded' | 'pending';
 
-// The hosted page confirms the charge server-to-server (webhook), which can land a
-// beat after the browser redirect — so we poll the payment a few times before
+// Banorte's answer is forwarded by the payment page just before it navigates
+// here and can land a beat later, so we poll the payment a few times before
 // concluding it's still pending.
 const MAX_POLLS = 5;
 const POLL_MS = 2000;
@@ -22,7 +24,9 @@ export default function CafeteriaTopupReturn() {
   // at render (the old code set it from the effect), state only tracks polling.
   const [polledOutcome, setPolledOutcome] = useState<Outcome>('loading');
   // Details of the confirmed payment for the receipt line (BACKLOG P1-D7).
-  const [paid, setPaid] = useState<{ amount?: string; student_name?: string; gateway_tx_id?: string } | null>(null);
+  const [paid, setPaid] = useState<Pick<Payment, 'amount' | 'student_name' | 'bank_reference' | 'auth_code' | 'gateway_tx_id'> | null>(null);
+  // Why it failed (cancelled, expired, declined...): the copy must match the real cause.
+  const [failureReason, setFailureReason] = useState('');
   const outcome: Outcome = paymentId ? polledOutcome : 'failed';
 
   useEffect(() => {
@@ -34,15 +38,23 @@ export default function CafeteriaTopupReturn() {
 
     const poll = async () => {
       try {
-        const { data } = await paymentsApi.getPaymentStatus(Number(paymentId));
+        const { data } = await paymentsApi.getPaymentStatus(Number(paymentId)) as { data: Payment };
         if (!active) return;
         if (data.status === 'success') {
-          setPaid({ amount: data.amount, student_name: data.student_name, gateway_tx_id: data.gateway_tx_id });
+          setPaid({
+            amount: data.amount, student_name: data.student_name, gateway_tx_id: data.gateway_tx_id,
+            bank_reference: data.bank_reference, auth_code: data.auth_code,
+          });
           setPolledOutcome('success');
           toast.success('Pago confirmado. El colegio cargará el saldo en el POS.');
           return;
         }
-        if (data.status === 'failed' || data.status === 'refunded') {
+        if (data.status === 'refunded') {
+          setPolledOutcome('refunded');
+          return;
+        }
+        if (data.status === 'failed') {
+          setFailureReason(data.failure_reason ?? '');
           setPolledOutcome('failed');
           return;
         }
@@ -83,8 +95,18 @@ export default function CafeteriaTopupReturn() {
       icon: <XCircle className="h-10 w-10 text-coral" />,
       accent: 'bg-coral-50',
       ring: 'ring-coral/30',
-      title: 'La recarga no se completó',
-      text: 'No se realizó ningún cargo. Puede intentarlo nuevamente desde la página de cafetería.',
+      title: PAYMENT_FAILURE[failureReason]?.family
+        ? `La recarga no se completó: ${PAYMENT_FAILURE[failureReason].family.toLowerCase()}`
+        : 'La recarga no se completó',
+      text: PAYMENT_FAILURE[failureReason]?.help
+        ?? 'Puede intentarlo nuevamente desde la página de cafetería. Si ve un cargo en su estado de cuenta, avise al colegio.',
+    },
+    refunded: {
+      icon: <XCircle className="h-10 w-10 text-coral" />,
+      accent: 'bg-coral-50',
+      ring: 'ring-coral/30',
+      title: 'Pago devuelto',
+      text: 'El colegio devolvió este pago: el cargo se reembolsó a su tarjeta y el saldo de cafetería se ajustó.',
     },
     pending: {
       icon: <Clock className="h-10 w-10 text-amber" />,
@@ -125,7 +147,9 @@ export default function CafeteriaTopupReturn() {
             <dl className="mt-5 divide-y divide-line rounded-xl border border-line text-left text-sm">
               {paid.student_name && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{paid.student_name}</dd></div>}
               {paid.amount && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Recarga</dt><dd className="font-bold text-ink">{formatMXN(paid.amount)}</dd></div>}
-              {paid.gateway_tx_id && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Referencia</dt><dd className="font-mono text-xs text-ink">{paid.gateway_tx_id}</dd></div>}
+              {paid.bank_reference && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Referencia bancaria</dt><dd className="font-mono text-xs text-ink">{paid.bank_reference}</dd></div>}
+              {paid.auth_code && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Autorización</dt><dd className="font-mono text-xs text-ink">{paid.auth_code}</dd></div>}
+              {paid.gateway_tx_id && <div className="flex justify-between gap-3 px-4 py-2.5"><dt className="text-muted">Número de control</dt><dd className="font-mono text-xs text-ink">{paid.gateway_tx_id}</dd></div>}
             </dl>
           )}
           <div className="mt-7 grid gap-2">

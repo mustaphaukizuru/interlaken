@@ -21,6 +21,8 @@ import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaStudentDetail } from '@/types';
 import { DataTable } from '@/components/ui/DataTable';
 import { ExportMenu } from '@/components/admin/ExportMenu';
+import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
+import { isCardTopUp } from '@/lib/status/cafeteria';
 import { useAdjustmentsList, useTransactionsList, CAF_MONEY_VIEWS } from '@/hooks/queries/cafeteria';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { apiErrorMessage } from '@/lib/apiErrors';
@@ -58,6 +60,9 @@ export default function AdminCafeteriaStudent() {
   const [txPage, setTxPage] = useState(1);
   const [adjPage, setAdjPage] = useState(1);
   const [refundReason, setRefundReason] = useState('');
+  // A card top-up is refunded to the card in MultiCobros; here only the wallet.
+  const [bankDone, setBankDone] = useState(false);
+  const cardRefund = !!refundTx && isCardTopUp(refundTx);
 
   const { data, isLoading, isError, refetch } = useQuery<CafeteriaStudentDetail>({
     queryKey: ['admin-cafeteria-student', id],
@@ -86,11 +91,12 @@ export default function AdminCafeteriaStudent() {
   });
 
   const refundMutation = useMutation({
-    mutationFn: () => cafeteriaApi.refundTransaction(refundTx!.id, refundReason),
+    mutationFn: () => cafeteriaApi.refundTransaction(refundTx!.id, refundReason, cardRefund && bankDone),
     onSuccess: () => {
-      toast.success('Devolución procesada.');
+      toast.success(cardRefund ? 'Devolución procesada en el saldo (el cargo se devolvió en MultiCobros).' : 'Devolución procesada.');
       setRefundTx(null);
       setRefundReason('');
+      setBankDone(false);
       invalidate();
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo procesar la devolución.')),
@@ -220,7 +226,7 @@ export default function AdminCafeteriaStudent() {
               {
                 header: 'Acción', align: 'right',
                 cell: (t) => refundable(t) && (
-                  <Button size="sm" variant="ghost" onClick={() => { setRefundTx(t); setRefundReason(''); }}>
+                  <Button size="sm" variant="ghost" onClick={() => { setRefundTx(t); setRefundReason(''); setBankDone(false); }}>
                     <RotateCcw className="w-3.5 h-3.5" /> Devolver
                   </Button>
                 ),
@@ -334,6 +340,7 @@ export default function AdminCafeteriaStudent() {
         title="Confirmar devolución"
         confirmLabel="Procesar devolución"
         requireText="DEVOLVER"
+        confirmDisabled={cardRefund && !bankDone}
         loading={refundMutation.isPending}
         onClose={() => setRefundTx(null)}
         onConfirm={() => refundMutation.mutate()}
@@ -348,6 +355,7 @@ export default function AdminCafeteriaStudent() {
           )
         }
       >
+        {cardRefund && <CardRefundConfirm checked={bankDone} onChange={setBankDone} />}
         <Input
           label="Motivo (opcional)"
           maxLength={500}
