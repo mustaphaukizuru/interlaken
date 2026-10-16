@@ -1,5 +1,5 @@
 """
-core/checks.py — Django system checks for production configuration.
+core/checks.py: Django system checks for production configuration.
 
 ``manage.py check --deploy`` reports these. The email check exists because
 production once ran with the SMTP backend and no SMTP server configured: every

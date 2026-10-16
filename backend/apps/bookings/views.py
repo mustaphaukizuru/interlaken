@@ -367,7 +367,7 @@ class AdminBookingRescheduleView(APIView):
 
 
 class AdminBookingOutcomeView(APIView):
-    """POST /bookings/admin/bookings/<pk>/outcome/ {"outcome", "note"?, "update_prereg"?} — post-visit result (P4-2).
+    """POST /bookings/admin/bookings/<pk>/outcome/ {"outcome", "note"?, "update_prereg"?}: post-visit result (P4-2).
 
     Marks the visit attended through the booking transition table (no email),
     stores the outcome and, unless ``update_prereg`` is false, moves the linked
