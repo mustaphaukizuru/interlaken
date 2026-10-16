@@ -2,7 +2,7 @@
 import pytest
 from django.urls import reverse
 
-from apps.accounts.factories import AdminFactory, ParentFactory
+from apps.accounts.factories import AdminFactory, ParentFactory, UserFactory
 from apps.content.pages import Page
 
 pytestmark = pytest.mark.django_db
@@ -49,12 +49,32 @@ def test_publish_versions_rollback_and_public_cache(admin_client, api_client):
     assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').data['version'] == 2
     api_client.force_authenticate(user=None)
     assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 1
-    # rollback to v1 creates v3 with 2 blocks
+    # restoring v1 copies it into the DRAFT only: nothing is published yet
     api_client.force_authenticate(user=AdminFactory())
     rb = api_client.post(reverse('admin-page-versions', args=[page.pk]), {'version': 1}, format='json')
-    assert rb.data == {'restored_from': 1, 'version': 3}
+    assert rb.status_code == 200 and rb.data['restored_from'] == 1
+    assert len(rb.data['page']['draft_blocks']) == 2 and rb.data['page']['has_unpublished_changes']
     versions = api_client.get(reverse('admin-page-versions', args=[page.pk])).data
-    assert [v['number'] for v in versions] == [3, 2, 1]
+    assert [v['number'] for v in versions] == [2, 1]
+    api_client.force_authenticate(user=None)
+    assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 1
+    # publishing the restored draft (through the checked publish flow) creates v3
+    api_client.force_authenticate(user=AdminFactory())
+    assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').data['version'] == 3
+    api_client.force_authenticate(user=None)
+    assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 2
+
+
+def test_restore_version_rejects_bad_input_and_staff(admin_client, api_client):
+    page = Page.objects.create(slug='otra', title='Otra', draft_blocks=BLOCKS)
+    page.publish(None)
+    url = reverse('admin-page-versions', args=[page.pk])
+    api_client.force_authenticate(user=AdminFactory())
+    assert api_client.post(url, {'version': 'abc'}, format='json').status_code == 400
+    assert api_client.post(url, {'version': 99}, format='json').status_code == 400
+    api_client.force_authenticate(user=UserFactory(role='staff'))
+    assert api_client.get(url).status_code == 403
+    assert api_client.post(url, {'version': 1}, format='json').status_code == 403
 
 
 def test_preview_requires_admin_or_token(admin_client, api_client):
