@@ -5,10 +5,20 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { cafeteriaApi, type BulkTopUpPreview } from '@/services/api';
+import { cafeteriaApi, type BulkTopUpPreview, type BulkTopUpResult } from '@/services/api';
 import { GRADES } from '@/lib/grades';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { formatMXN } from '@/lib/format';
+
+/** Idempotency key of one bulk top-up: a retry or continuation with the same id never credits a student twice. */
+function newBatchId(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** The server stops after ~25 s of ledger work and reports `remaining`; post the same batch until done. */
+const MAX_BULK_ROUNDS = 25;
 
 /** Admin: credit many wallets at once by grado/grupo (BACKLOG P4-3). */
 export function BulkTopUpDialog() {
@@ -20,15 +30,31 @@ export function BulkTopUpDialog() {
   const [group, setGroup] = useState('');
   const [preview, setPreview] = useState<BulkTopUpPreview | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // New id per preview; kept across retries of the same apply (see newBatchId).
+  const [batchId, setBatchId] = useState('');
   const body = () => ({ amount: Number(amount), reason, grade: grade || undefined, group: group || undefined });
+  const apply = async () => {
+    let credited = 0;
+    let total = 0;
+    for (let round = 0; round < MAX_BULK_ROUNDS; round += 1) {
+      const { data } = await cafeteriaApi.bulkTopUp({ ...body(), batch_id: batchId });
+      const r = data as BulkTopUpResult;
+      credited += r.credited;
+      total += Number(r.total);
+      if (!r.remaining) break;
+    }
+    return { credited, total: total.toFixed(2) };
+  };
   const run = useMutation({
-    mutationFn: (isPreview: boolean) => cafeteriaApi.bulkTopUp({ ...body(), preview: isPreview }),
-    onSuccess: ({ data }, isPreview) => {
+    mutationFn: async (isPreview: boolean) => (isPreview
+      ? (await cafeteriaApi.bulkTopUp({ ...body(), preview: true })).data
+      : apply()),
+    onSuccess: (data, isPreview) => {
       setErrors({});
-      if (isPreview) { setPreview(data as BulkTopUpPreview); return; }
+      if (isPreview) { setPreview(data as BulkTopUpPreview); setBatchId(newBatchId()); return; }
       const r = data as { credited: number; total: string };
       toast.success(`${r.credited} monederos recargados (${formatMXN(r.total)}).`);
-      setOpen(false); setPreview(null); setAmount(''); setReason('');
+      setOpen(false); setPreview(null); setBatchId(''); setAmount(''); setReason('');
       for (const entity of ['cafeteria-balances', 'cafeteria-low-balance', 'cafeteria-transactions']) {
         qc.invalidateQueries({ queryKey: ['admin', entity] });
       }

@@ -378,6 +378,8 @@ export const admissionsAdminApi = {
 
 // ── CAFETERIA ─────────────────────────────────────────────
 export interface BulkTopUpPreview { count: number; total: string; students: { id: number; name: string; grade: string; group: string }[] }
+/** One apply call of a bulk top-up; `remaining` > 0 means post the same body (same `batch_id`) again. */
+export interface BulkTopUpResult { credited: number; skipped: number; remaining: number; total: string; batch_id: string; failed: { id: number; error: string }[] }
 
 /** One row of the roster-sync preview: what a commit changes on one student. */
 export interface RosterChange {
@@ -585,7 +587,7 @@ export const cafeteriaApi = {
   /** Monthly statement PDF (BACKLOG P4-3). */
   statementPdf: (student: number, month: string) => api.get('/cafeteria/statement/', { params: { student, month }, responseType: 'blob' }),
   /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
-  bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean }) => api.post('/cafeteria/admin/bulk-topup/', data),
+  bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean; batch_id?: string }) => api.post('/cafeteria/admin/bulk-topup/', data),
 
   // Admin (the lists live in services/cafeteriaAdmin.ts, admin-only chunk)
 
