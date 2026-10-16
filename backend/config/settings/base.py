@@ -244,7 +244,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Colegio Interlaken API',
     'DESCRIPTION': 'REST API del portal escolar: admisiones, cafetería, '
-                   'colegiaturas, reservas de visitas, portal y legal.',
+                   'reservas de visitas, portal y legal (colegiaturas: próximamente).',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': '/api/v1',

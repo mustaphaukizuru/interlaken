@@ -34,7 +34,11 @@ HMAC). Specifically:
   additionally require the session token (A2).
 - Bookings availability — `AvailabilitySlotSerializer` exposes no personal data;
   booking detail/cancel are now authenticated + owner-scoped (IK-HOTFIX).
-- Payment webhooks / WhatsApp webhook — HMAC-gated; return `{detail}` only.
+- WhatsApp webhook: HMAC-gated; returns `{detail}` only. (There are no payment
+  webhooks since 2026-10: Banorte VCE is the only gateway and its result reaches
+  `/payments/banorte/result/` as an encrypted payload from the authenticated
+  parent's browser, decrypted with the per-attempt key; see
+  `docs/BANORTE-INTEGRATION.md`.)
 - Contact, open-school signup — echo the caller's own submission.
 - Auth endpoints (google login/callback/token, token refresh) — return only the
   authenticated caller's own user; refresh is CSRF-gated.

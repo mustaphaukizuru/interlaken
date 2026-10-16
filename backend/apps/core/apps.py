@@ -8,4 +8,5 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         from . import audit
+        from . import checks  # noqa: F401  (registers the deploy system checks)
         audit.connect_default_tracking()
