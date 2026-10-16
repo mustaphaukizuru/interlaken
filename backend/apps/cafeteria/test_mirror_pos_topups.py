@@ -170,7 +170,8 @@ class TestLocalDebitsAreNeverRecredited:
         api_client.force_authenticate(AdminFactory())
 
         with _points(200):     # Loyverse still holds the loaded $100
-            resp = api_client.post(reverse('admin-refund', args=[tx.id]), {}, format='json')
+            resp = api_client.post(reverse('admin-refund', args=[tx.id]),
+                                   {'bank_refund_confirmed': True}, format='json')
         assert resp.status_code == 201, resp.data
         assert CafeteriaBalance.objects.get(student=s).balance == Decimal('100')
         topup.refresh_from_db()

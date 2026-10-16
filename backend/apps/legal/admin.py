@@ -1,6 +1,8 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
+from apps.admissions.models import Registration
+
 from .models import ArcoRequest, ConsentRecord, PrivacyNoticeVersion
 
 
@@ -10,7 +12,9 @@ class ArcoRequestAdmin(ModelAdmin):
                     'statutory_deadline', 'resolved_at')
     list_filter = ('request_type', 'status')
     search_fields = ('requester_email', 'details')
-    readonly_fields = ('requester', 'requester_email', 'request_type', 'details',
+    # Status is read-only: ARCO requests move through the portal (transition
+    # table, resolution note, the requester's email and the audit row).
+    readonly_fields = ('requester', 'requester_email', 'request_type', 'details', 'status',
                        'statutory_deadline', 'created_at', 'updated_at', 'resolved_at')
     ordering = ('-created_at',)
     date_hierarchy = 'created_at'
@@ -23,6 +27,29 @@ class PrivacyNoticeVersionAdmin(ModelAdmin):
     search_fields = ('version', 'title')
     ordering = ('-effective_date',)
     readonly_fields = ('created_at',)
+    # Once a version has been in force (active, or accepted by anyone) its text
+    # is legal evidence of what people agreed to: it is frozen and cannot be
+    # deleted. Publish a new version instead. «Vigente» stays editable so it
+    # can be retired when the next version goes live.
+    FROZEN_FIELDS = ('version', 'title', 'body', 'integral_notice_url', 'effective_date', 'created_at')
+
+    @staticmethod
+    def is_published(obj) -> bool:
+        return bool(obj and obj.pk and (
+            obj.is_active
+            or obj.consent_records.exists()
+            or Registration.objects.filter(privacy_notice_version=obj).exists()
+        ))
+
+    def get_readonly_fields(self, request, obj=None):
+        if self.is_published(obj):
+            return self.FROZEN_FIELDS
+        return super().get_readonly_fields(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and self.is_published(obj):
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(ConsentRecord)

@@ -156,4 +156,27 @@ describe('AdminSettings (CMS preview + density)', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  it('keeps Guardar disabled while loading and after a failed load (never PATCHes blanks)', async () => {
+    mockedGet.mockRejectedValueOnce(new Error('boom'));
+    renderPage();
+    const save = screen.getByRole('button', { name: /guardar/i });
+    expect(save).toBeDisabled();
+    expect(await screen.findByText('No se pudieron cargar los ajustes')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    expect(mockedPatch).not.toHaveBeenCalled();
+  });
+
+  it('clears the unsaved banner after a successful save', async () => {
+    mockedGet.mockResolvedValue({ data: SAMPLE } as never);
+    mockedPatch.mockResolvedValueOnce({ data: { ...SAMPLE, office_hours: 'Nuevo horario' } } as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText('WhatsApp')).toHaveValue(SAMPLE.whatsapp_number));
+    await userEvent.type(screen.getByLabelText('WhatsApp'), '9');
+    expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: /guardar/i })[0]);
+    await waitFor(() => expect(mockedPatch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText('Cambios sin guardar')).not.toBeInTheDocument());
+  });
 });

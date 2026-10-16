@@ -69,6 +69,8 @@ export interface AdminPaymentsSummary {
   since: string;
   by_status: Record<string, { count: number; total: string }>;
   series: { date: string; total: string; count: number }[];
+  /** FAILED split by cause (`PAYMENT_FAILURE` keys). */
+  failed_by_reason?: Record<string, number>;
   stuck_pending: number;
 }
 
@@ -289,7 +291,12 @@ const sessionHeaders = (token?: string) =>
   token ? { headers: { 'X-Session-Token': token } } : {};
 
 export interface PipelineCard { id: number; child_name: string; level: string; grade_applying: string; parent_name: string; parent_email: string; parent_phone: string; status: string; submitted_at: string | null; updated_at: string; docs_verified: number; docs_required: number; missing: string[]; student: number | null }
-export interface ConvertResult { student: number; student_id?: string; already: boolean; credentials: { email: string; password: string | null; name: string }[] }
+export interface ConvertResult {
+  student: number; student_id?: string; already: boolean;
+  credentials: { email: string; password: string | null; name: string }[];
+  /** Applicant emails that belong to a non-family account (staff, admin, student): NOT linked as guardian. */
+  unlinked?: { email: string; name: string; reason: string }[];
+}
 
 export const admissionsApi = {
   /** Admissions pipeline (BACKLOG P4-1). */
@@ -650,8 +657,12 @@ export const cafeteriaApi = {
   adjustBalance: (studentId: number, amount: number, reason: string) =>
     api.post(`/cafeteria/admin/adjust/${studentId}/`, { amount, reason }),
 
-  refundTransaction: (txId: number, reason?: string) =>
-    api.post(`/cafeteria/admin/refund/${txId}/`, { reason }),
+  /** `bankRefundConfirmed`: staff already refunded the card charge in MultiCobros
+   *  (required by the server for a real Banorte top-up). */
+  refundTransaction: (txId: number, reason?: string, bankRefundConfirmed?: boolean) =>
+    api.post(`/cafeteria/admin/refund/${txId}/`, {
+      reason, ...(bankRefundConfirmed ? { bank_refund_confirmed: true } : {}),
+    }),
 
   /** Wallet receipts of a card that has no student (staff meals). */
   getLoyverseCustomerReceipts: (loyverseId: string) =>
@@ -690,12 +701,20 @@ export const paymentsApi = {
 
   /** Forward a Banorte lightbox callback; the server decrypts and decides. */
   reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
-    api.post<{ payment_id: number; status: string; detail: string }>(
+    api.post<{ payment_id: number; status: string; failure_reason?: string; detail: string }>(
       '/payments/banorte/result/', { payment_id: paymentId, event, response }),
 
-  /** Staff confirm the approved operation appears in MultiCobros (before the POS load). */
-  verifyBanorte: (paymentId: number) =>
-    api.post(`/payments/admin/${paymentId}/banorte-verify/`),
+  /** Staff confirm the approved operation appears in MultiCobros (before the POS load):
+   *  the referencia and amount they read there must match the payment. */
+  verifyBanorte: (paymentId: number, body: { referencia: string; amount: string }) =>
+    api.post(`/payments/admin/${paymentId}/banorte-verify/`, body),
+
+  /** "Conciliar con MultiCobros" for a pending or soft-failed Banorte payment. */
+  reconcileBanorte: (paymentId: number, body:
+    | { outcome: 'approved'; referencia: string; codigo_aut: string; amount: string; note?: string }
+    | { outcome: 'not_found'; note: string }) =>
+    api.post<{ detail: 'settled' | 'closed' | 'already_processed'; payment: import('@/types').Payment }>(
+      `/payments/admin/${paymentId}/banorte-reconcile/`, body),
 
   getMyPayments: (params?: { page?: number; status?: string; student?: string; from?: string; to?: string; ordering?: string }) =>
     api.get('/payments/history/', { params }),
@@ -814,7 +833,7 @@ export const bookingsApi = {
   /** Weekly calendar, reschedule and outcome (BACKLOG P4-2). */
   adminWeek: (start: string) => api.get<{ start: string; end: string; days: { date: string; slots: WeekSlot[] }[] }>('/bookings/admin/week/', { params: { start } }),
   adminReschedule: (id: number, slot: number) => api.post(`/bookings/admin/bookings/${id}/reschedule/`, { slot }),
-  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
+  adminOutcome: (id: number, data: { outcome: string; note?: string }) => api.post<{ pre_registration: { id: number; status: string; changed: boolean; skipped?: string } | null }>(`/bookings/admin/bookings/${id}/outcome/`, data),
   // Public
   getAvailability: (params?: { type?: string; from?: string; to?: string }) =>
     api.get('/bookings/availability/', { params }),
@@ -1240,7 +1259,8 @@ export const contentApi = {
   adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
   adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string; blocks: { id: string; type: string; props: Record<string, unknown> }[] }[]>(`/content/admin/pages/${id}/versions/`),
-  adminRollbackPage: (id: number, version: number) => api.post(`/content/admin/pages/${id}/versions/`, { version }),
+  /** Restores a version INTO THE DRAFT (never publishes; publish separately). Admin only. */
+  adminRollbackPage: (id: number, version: number) => api.post<{ restored_from: number; page: CmsPageAdmin }>(`/content/admin/pages/${id}/versions/`, { version }),
   adminPageChecks: (id: number) => api.get<{ ok: boolean; issues: PageIssue[] }>(`/content/admin/pages/${id}/checks/`),
   adminReviewPage: (id: number, action: 'request' | 'reject', note?: string) => api.post<CmsPageAdmin>(`/content/admin/pages/${id}/review/`, { action, note }),
   adminPreviewToken: (id: number) => api.post<{ token: string; url: string }>(`/content/admin/pages/${id}/preview-token/`, {}),
@@ -1254,11 +1274,12 @@ export const contentApi = {
   getForm: (slug: string) => api.get<FormDefinitionPublic>(`/content/forms/${encodeURIComponent(slug)}/`),
   submitForm: (slug: string, data: Record<string, unknown>) => api.post<{ ok: boolean; message: string }>(`/content/forms/${encodeURIComponent(slug)}/submit/`, data),
   adminListForms: () => api.get<FormDefinitionAdmin[]>('/content/admin/forms/'),
+  /** One form by id (the submissions inbox deep link may point outside the current list page). */
+  adminGetForm: (id: number) => api.get<FormDefinitionAdmin>(`/content/admin/forms/${id}/`),
   adminCreateForm: (data: Partial<FormDefinitionAdmin>) => api.post<FormDefinitionAdmin>('/content/admin/forms/', data),
   adminUpdateForm: (id: number, data: Partial<FormDefinitionAdmin>) => api.patch<FormDefinitionAdmin>(`/content/admin/forms/${id}/`, data),
   adminDeleteForm: (id: number) => api.delete(`/content/admin/forms/${id}/`),
   adminFormSubmissions: (id: number, params?: { handled?: '0' | '1' }) => api.get<FormSubmission[]>(`/content/admin/forms/${id}/submissions/`, { params }),
-  adminFormSubmissionsCsv: (id: number) => api.get<Blob>(`/content/admin/forms/${id}/submissions/`, { params: { export: 'csv' }, responseType: 'blob' }),
   adminHandleSubmission: (id: number, is_handled: boolean) => api.patch<FormSubmission>(`/content/admin/form-submissions/${id}/`, { is_handled }),
   /** CMS media library (BACKLOG P3-1). */
   adminListMedia: (params?: { page?: number; q?: string }) => api.get('/content/admin/media/', { params }),

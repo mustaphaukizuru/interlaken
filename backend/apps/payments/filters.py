@@ -37,6 +37,8 @@ ADMIN_PAYMENT_SEARCH_FIELDS = (
     "user__last_name",
     "gateway_tx_id",
     "gateway_ref",
+    "banorte__control_number",
+    "banorte__referencia",
     "description",
 )
 

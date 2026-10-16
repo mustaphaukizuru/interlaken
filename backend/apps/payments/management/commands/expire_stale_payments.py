@@ -1,9 +1,12 @@
 """
 expire_stale_payments — fail open PENDING checkouts older than the TTL.
 
-Parents who abandon an HPP session leave PENDING rows that block reuse and
-clutter orphan reports. This command marks those sessions FAILED so a later
-initiate can open a fresh checkout. Use --dry-run to report without mutating.
+Parents who abandon the Banorte payment window leave PENDING rows that block
+reuse and clutter orphan reports. This command marks those sessions FAILED
+(soft, ``stage=expire``: a late approval is still credited, and
+``banorte_pending_report`` lists them for a MultiCobros check). Runs every
+15 minutes (deploy/crontab.example) so the 45-minute TTL is honoured within
+a quarter hour. Use --dry-run to report without mutating.
 """
 from django.core.management.base import BaseCommand
 

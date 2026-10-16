@@ -78,8 +78,10 @@ class AnnouncementAdminSerializer(serializers.ModelSerializer):
         model = Announcement
         fields = ['id', 'title', 'body', 'audience', 'is_active', 'push_enabled',
                   'show_on_site', 'site_until', 'site_link', 'publish_at', 'requires_ack', 'attachments', 'ack_count',
-                  'created_at', 'created_by_name', 'read_count']
-        read_only_fields = ['id', 'created_at', 'created_by_name', 'read_count']
+                  'fanout_at', 'created_at', 'created_by_name', 'read_count']
+        # fanout_at: when the family notifications went out (null = not sent yet);
+        # the console uses it to warn before an «Activar» that would send them.
+        read_only_fields = ['id', 'fanout_at', 'created_at', 'created_by_name', 'read_count']
 
     def get_created_by_name(self, obj):
         return obj.created_by.full_name if obj.created_by else '—'

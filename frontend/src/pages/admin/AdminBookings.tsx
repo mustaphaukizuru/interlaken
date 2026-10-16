@@ -128,11 +128,17 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
           <option value="individual">Visita individual (Agendar visita)</option>
           <option value="open_class">Puertas Abiertas (clase abierta)</option>
         </select>
-        <p className="mt-1.5 text-xs text-subtle">
-          {isOpenClass
-            ? 'Se publica en /puertas-abiertas. Use una duración igual a la ventana (ej. 09:00–11:00 y 120 min) para un solo evento por día.'
-            : 'Se publica en /agendar-visita como horarios cortos de recorrido personalizado.'}
-        </p>
+        {isOpenClass ? (
+          // /puertas-abiertas was retired from the public site (BACKLOG P0-8) and
+          // /agendar-visita only lists individual slots: nobody can book these online.
+          <p className="mt-1.5 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs text-ink" role="note">
+            <strong>Las familias no pueden reservar estos eventos en línea:</strong> la página de Puertas Abiertas se retiró del sitio
+            y «Agendar visita» solo muestra visitas individuales. Los eventos quedan en la agenda interna para organizarlos aquí.
+            Use una duración igual a la ventana (ej. 09:00 a 11:00 y 120 min) para un solo evento por día.
+          </p>
+        ) : (
+          <p className="mt-1.5 text-xs text-subtle">Se publica en /agendar-visita como horarios cortos de recorrido personalizado.</p>
+        )}
       </div>
 
       {isOpenClass && (
@@ -224,7 +230,7 @@ function SlotGenerator({ onDone }: { onDone: () => void }) {
 
       <Button type="submit" loading={mutation.isPending}>
         <CalendarPlus className="w-4 h-4" />
-        {isOpenClass ? 'Publicar eventos' : 'Generar horarios'}
+        {isOpenClass ? 'Crear eventos (sin reserva en línea)' : 'Generar horarios'}
       </Button>
     </form>
   );
@@ -773,7 +779,7 @@ export default function AdminBookings() {
     <div className="space-y-6">
       <PageHeader
         title="Visitas"
-        subtitle="Reservas de visitas individuales (/agendar-visita) y Puertas Abiertas (/puertas-abiertas), y los horarios publicados."
+        subtitle="Reservas de visitas individuales (/agendar-visita), eventos de Puertas Abiertas (solo agenda interna, sin reserva en línea) y los horarios publicados."
       />
       <div role="tablist" aria-label="Vista" className="inline-flex rounded-xl2 border border-line bg-white p-1">
         {VIEWS.map((t) => (

@@ -146,8 +146,10 @@ class TestRefund:
             balance_after=Decimal("200"))
 
         api_client.force_authenticate(user=AdminFactory())
+        # A card top-up: staff confirm the charge was refunded in MultiCobros.
         resp = api_client.post(
-            reverse("admin-refund", args=[tx.id]), {"reason": "Duplicado"}, format="json")
+            reverse("admin-refund", args=[tx.id]),
+            {"reason": "Duplicado", "bank_refund_confirmed": True}, format="json")
         assert resp.status_code == 201, resp.data
 
         # Top-up reversal debits the balance back down.

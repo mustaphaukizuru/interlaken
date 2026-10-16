@@ -33,11 +33,13 @@ Code map:
 | Gateway: configuration, checkout, result interpretation | `backend/apps/payments/gateways/banorte.py` |
 | One attempt per payment (control number, encrypted key, result) | `BanorteCheckout` in `backend/apps/payments/models.py` |
 | Money movement (idempotent, locked) | `backend/apps/payments/settlement.py` |
-| Result endpoint, staff verification endpoint | `backend/apps/payments/views.py` |
+| Result endpoint, staff verification and reconciliation endpoints | `backend/apps/payments/views.py` |
+| What needs a MultiCobros check, "Conciliar con MultiCobros" | `backend/apps/payments/multicobros.py` |
 | Lightbox loader | `frontend/src/lib/banorteCheckout.ts` |
 | Parent top-up | `frontend/src/pages/parent/CafeteriaPage.tsx` |
-| Staff verification in the POS queue | `frontend/src/pages/admin/AdminCafeteria.tsx` |
+| Staff verification (POS queue) and reconciliation (Depósitos) | `frontend/src/pages/admin/AdminCafeteria.tsx`, `frontend/src/components/admin/BanorteDialogs.tsx` |
 | Config check and certificate expiry | `manage.py check_banorte` |
+| Operations to look up in MultiCobros (hourly email) | `manage.py banorte_pending_report` |
 
 ## 2. Security design
 
@@ -65,11 +67,15 @@ someone who knows the plaintext layout. So:
   `idAfiliacion` match ours and, for an approval, carries a numeric `referencia`.
   Anything else leaves the payment pending, with the reason in
   `BanorteCheckout.last_error` and a warning in the log.
-- A simulated approval (`mode` AUT/RND) is never credited while `PAYMENTS_LIVE=true`.
+- A simulated approval (`mode` AUT/RND) is never credited while `PAYMENTS_LIVE=true`,
+  and **a simulated top-up is never loaded into the POS**: no money moved. It
+  stays out of the "Cargar en POS" queue, both "Cargado en Loyverse" actions
+  refuse it, and the admin shows it as "Simulación (no cargar)".
 - A real approval is credited to the local wallet so the family sees it, but
   **staff must verify it in MultiCobros before loading it into the POS**
   (section 6). The single and the bulk "Cargado en Loyverse" actions refuse an
-  unverified Banorte approval.
+  unverified Banorte approval. Verifying asks staff to type the referencia and
+  the amount MultiCobros shows; both must match.
 
 Other measures:
 
@@ -84,7 +90,10 @@ Other measures:
 - CSP allows `https://multicobros.banorte.com` for scripts, styles, XHR, the
   iframe and the form the lightbox posts. No `unsafe-*` was added: Banorte's
   scripts load by URL and none of them uses `eval`.
-- Configuration errors are logged, never shown to families.
+- Configuration errors are logged, never shown to families. A merchant set-up
+  error reported by Banorte (AUT-10, Payworks `R` such as PAYW-3008, Payworks
+  `E`) also emails the active admins (`ops_alerts.alert_config_error`: once per
+  distinct problem, then weekly; never credentials).
 
 ## 3. Configuration
 
@@ -95,7 +104,7 @@ Set in `deploy/.env` on the VPS (never in a local `.env`, never in chat):
 | Afiliación (7 digits) | `BANORTE_MERCHANT_ID` |
 | Usuario: the **Nick of the "usuario de motor"** (manual v1.8), created by the MultiCobros administrator in Administración → Administración de usuarios → Usuarios → Usuarios de motor. Not the administrator user. | `BANORTE_USER` |
 | Contraseña of that engine user (8 to 12 characters) | `BANORTE_PASSWORD` (single-quoted if it has `$`) |
-| TERMINAL_ID, exactly as in Banorte's welcome email (for this afiliación it equals the afiliación number) | `BANORTE_TERMINAL_ID` |
+| TERMINAL_ID, exactly as in Banorte's welcome email. The Payworks terminal ID is **not necessarily** the afiliación number; a wrong one makes Payworks answer `R` with **PAYW-3008** ("terminal no existe"), which the admins get by email | `BANORTE_TERMINAL_ID` |
 | Nombre de afiliación (max 25 characters) | `BANORTE_MERCHANT_NAME` |
 | Municipio (max 40 characters) | `BANORTE_MERCHANT_CITY` |
 | Certificate `.cer` (renewed within the first three months of each year) | `BANORTE_CERT`: the Base64 body on one line |
@@ -121,7 +130,9 @@ alone never opens the simulation to families.
 
 Accounts in `PAYMENTS_TEST_EMAILS` may top up from **$1** (a "$1 (prueba)"
 button) to try the checkout cheaply; everyone else keeps the $20 minimum,
-enforced by the server.
+enforced by the server. This depends only on the list, not on the stage: in
+the **Open** stage a listed account can still make real $1 charges, so trim
+`PAYMENTS_TEST_EMAILS` after certification if that is not wanted.
 
 Staging always runs `PAYMENTS_LIVE=false` and `BANORTE_MODE=AUT`
 (`deploy/docker-compose.staging.yml`).
@@ -139,6 +150,15 @@ expiry (never the password). It fails within 30 days of expiry. The daily cron
 runs it with `--notify`, which emails the active admins (the VPS cannot mail
 cron output): once when a problem appears or changes, then weekly while it
 lasts.
+
+Scheduled jobs (`deploy/crontab.example`; the VPS crontab must be reinstalled
+by hand after changing it):
+
+| Job | When | What |
+|---|---|---|
+| `expire_stale_payments` | every 15 minutes | fails checkouts older than `OPEN_CHECKOUT_TTL_MINUTES` (45) as a soft `expire` |
+| `banorte_pending_report` | hourly at :20 | emails the operations to look up in MultiCobros (section 6) |
+| `check_banorte --notify` | daily 06:15 | configuration and certificate expiry |
 
 ## 4. Testing before certification (no money moves)
 
@@ -216,41 +236,71 @@ certification letter, set `PAYMENTS_OPEN_TO_ALL=true` and restart `app`:
 |---|---|---|
 | MasterCard, Venta | Top up with a Mastercard | POS queue row: Control, Ref., Aut.; date and time from the payment |
 | Visa, Venta | Top up with a Visa | same |
-| 423 (3D Secure) | Enter a card, press Continuar, then **Cancelar** in the 3D Secure window | Payment fails without a charge; Banorte reports status 3D Secure 423 (expected in `BanorteCheckout.status_3d`; confirm on the first run) |
+| 423 (3D Secure) | Enter a card, press Continuar, then **Cancelar** in the 3D Secure window | Payment fails without a charge; Banorte reports status 3D Secure 423 (kept in `BanorteCheckout.status_3d`). A callback without encrypted `data` and `status3D` 423 is handled as a cancellation (soft: a later genuine approval would still be credited); the family sees "Cancelado". Confirm on the first run |
 
 The matrix (Matriz de Pruebas Ventana de Comercio Electrónico Cifrado) asks for
 afiliación, fecha y hora, monto, número de control, referencia Payworks and the
 card's **first 8 and last 2 digits**. Banorte never sends card digits to us:
 take them from the card used, or from MultiCobros (Transacciones Payworks 2). All three are also in Django admin →
-Operaciones Banorte. Refund the two real sales from MultiCobros afterwards (and
-with the cafetería "Devolver" action so the wallet matches).
+Operaciones Banorte. Refund the two real sales from MultiCobros afterwards, then
+use the cafetería "Devolver" action (confirming the MultiCobros refund) so the
+wallet matches.
 
 ## 6. Daily operation for staff
 
-Every approved online top-up appears in **Cafetería → POS Loyverse → Cargar en POS**.
+Every approved real-money online top-up appears in **Cafetería → POS Loyverse →
+Cargar en POS** (simulations never do).
 
-1. If it says **Sin verificar**, press **Verificar en MultiCobros**. In
-   MultiCobros go to Analítica → Reportes → Transacciones Payworks 2, search the
-   número de control and confirm it is *Aprobada* for the same amount. Only
-   then press "Sí, aparece aprobada".
+1. If it says **Sin verificar**, press **Verificar en MultiCobros**. The dialog
+   shows the date, the Referencia 1 (`PAGO<id>`) and the número de control. In
+   MultiCobros go to Analítica → Reportes → Transacciones Payworks 2, search it
+   and confirm it is *Aprobada*. Type the referencia and the amount MultiCobros
+   shows; the server checks both against the payment.
 2. Load the amount in the Loyverse POS and press **Cargado en Loyverse**.
-3. If the operation does not appear in MultiCobros, do not load it. Report it:
-   the wallet credit must be reversed with an adjustment.
+3. If the operation does not appear in MultiCobros, or the amount differs, do
+   not load it and tell the direction.
 
-Refunds are made in MultiCobros; then use **Devolver** on the cafetería
-movement so the wallet and the POS queue follow.
+**Refunds.** The card refund is made in MultiCobros. Then use **Devolver** on
+the cafetería movement: for a card top-up the dialog asks to confirm that the
+MultiCobros refund was already made (the server refuses it otherwise) and
+records that confirmation in the refund's reason and the audit log. "Devolver"
+only reverses the wallet and the POS queue; it never moves money on the card.
 
-A payment can stay **pending** when the parent closed the window before
-Banorte answered, or when the answer was not trustworthy (see
-`BanorteCheckout.last_error`). Pending checkouts expire after 45 minutes
-(`expire_stale_payments`). If MultiCobros shows such an operation as approved,
-credit it with a manual adjustment that cites the referencia.
+**Operations without a trustworthy answer.** A payment can stay **pending**
+when the parent closed the window before Banorte answered, or when the answer
+was not trustworthy (see `BanorteCheckout.last_error`). Pending checkouts expire
+after 45 minutes (`expire_stale_payments`, every 15 minutes), and a new attempt
+supersedes an open one. Any of these may hide a real charge. They are listed in
+**Cafetería → Depósitos**, filter **Revisión: Por revisar en MultiCobros**, and
+each has a **Conciliar con MultiCobros** button:
 
-Every morning `banorte_pending_report` (daily cron) emails the admins the
-real-money operations of the last 26 hours that need that check: still
-pending, expired without an answer, bank timeout (Payworks `T`) or an answer
-that was not trusted. Cancellations and authentication errors are left out
-(nothing was charged). No email when there is nothing to check.
+- If MultiCobros shows it **Aprobada**: choose "Aparece Aprobada" and type the
+  referencia Payworks, the número de autorización and the amount. The payment is
+  settled through the normal settlement path: the wallet is credited exactly
+  once, the operation is marked verified (it can go straight to the POS) and a
+  later answer from the parent's browser changes nothing.
+- If it does **not appear** (or appears declined): choose "No aparece" and write
+  a note. It is closed as "No aparece en MultiCobros" without moving money. If a
+  genuine approval from Banorte still arrives later, it is credited.
+
+**Never fix these with a manual balance adjustment.** The adjustment left the
+payment open, so a late answer from the browser credited the wallet a second
+time.
+
+`banorte_pending_report` runs hourly and emails the admins the real-money
+operations of the last 72 hours that need that check: pending past the 45-minute
+window, an answer that was not trusted, expired or superseded without an
+answer, or a bank timeout (Payworks `T`). Cancellations, authentication errors
+and operations already closed with "Conciliar con MultiCobros" are left out. It
+emails only when an operation appears that the previous email did not list,
+plus one reminder a day while any stays open.
+
+**Failure labels.** A failed payment says why, for staff and families:
+Cancelado por el usuario (in Banorte's window or its 3D Secure step), Expirado,
+Reemplazado por otro intento, Rechazado por el banco (Payworks `D`/`N`), Sin
+respuesta del banco (`T`), Error de configuración (`R`/`E`, AUT-10, checkout not
+opened) and No aparece en MultiCobros. The admin "Rechazados / reembolsados" tile
+does not count cancelled, expired or superseded attempts.
 
 ## 7. Yearly certificate rotation
 

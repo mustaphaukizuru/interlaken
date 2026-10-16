@@ -63,16 +63,22 @@ export interface CafeteriaTransactionItem {
 }
 
 /** Loyverse customer snapshot (visits, lifetime spend, points). */
+/** Loyverse customer snapshot (cafeteria LoyverseProfileSerializer), used by the
+ *  family card (/cafeteria/cards/) and the admin student console. Declared once:
+ *  two declarations silently merged into one type. */
 export interface LoyverseProfile {
   customer_code: string;
   name: string;
   email: string;
+  phone_number: string;
   address_code: string;
+  note: string;
   first_visit: string | null;
   last_visit: string | null;
   total_visits: number;
   total_spent: string;
   total_points: string;
+  loyverse_created_at: string | null;
   synced_at: string;
 }
 
@@ -100,7 +106,7 @@ export interface LoyverseHistoryReceipt {
 export interface CafeteriaTransaction {
   id: number;
   student_id: number;
-  transaction_type: 'purchase' | 'topup' | 'refund';
+  transaction_type: 'purchase' | 'topup' | 'refund' | 'adjustment';
   amount: string;
   description: string;
   items: CafeteriaTransactionItem[];
@@ -140,17 +146,38 @@ export interface TopUpLogEntry {
 
 export interface BanorteOperation {
   control_number: string;
+  /** When the attempt was opened (the date to look for in MultiCobros). */
+  created_at?: string;
   referencia: string;
   codigo_aut: string;
   /** Payworks resultadoPayw: A aprobada, D declinada, R rechazada, T sin respuesta, N/E no procesada. */
   resultado: '' | 'A' | 'D' | 'R' | 'T' | 'N' | 'E';
+  resultado_label?: string;
+  /** Payworks' own answer (e.g. PAYW-3008) and text, and why we did not trust an answer. */
+  codigo_payw?: string;
+  texto?: string;
+  last_error?: string;
+  status_3d?: string;
   /** PRD is real money; AUT/DEC/RND are Payworks simulations. */
   mode: string;
+  /** A Payworks simulation: no money moved, never loaded into the POS. */
+  simulation?: boolean;
   marca_tarjeta: string;
   verified_at: string | null;
   verified_by_name: string;
   needs_verification: boolean;
+  /** Why the payment failed (`PAYMENT_FAILURE` key) and its label. */
+  failure_reason?: PaymentFailureReason | '';
+  failure_label?: string;
+  /** Why staff must look it up in MultiCobros ('' when nothing to check). */
+  review_reason?: string;
+  /** Pending or soft-failed: "Conciliar con MultiCobros" applies. */
+  can_reconcile?: boolean;
 }
+
+/** Why a failed payment failed (backend `FAILURE_LABELS`). */
+export type PaymentFailureReason =
+  | 'cancelled' | 'expired' | 'superseded' | 'declined' | 'bank_timeout' | 'config_error' | 'not_found';
 
 /** How the browser opens the checkout (`POST /cafeteria/topup/` → `checkout`). */
 export type CheckoutStart =
@@ -182,22 +209,6 @@ export interface ReconcileRow {
   error: string | null;
 }
 
-export interface LoyverseProfile {
-  customer_code: string;
-  name: string;
-  email: string;
-  phone_number: string;
-  address_code: string;
-  note: string;
-  first_visit: string | null;
-  last_visit: string | null;
-  total_visits: number;
-  total_spent: string;
-  total_points: string;
-  loyverse_created_at: string | null;
-  synced_at: string;
-}
-
 export interface CafeteriaStudentDetail {
   balance: CafeteriaBalance;
   parents: Array<{ id: number; full_name: string; email: string; whatsapp: string }>;
@@ -215,14 +226,28 @@ export interface Payment {
   currency: string;
   description: string;
   status: 'pending' | 'processing' | 'success' | 'failed' | 'refunded';
+  /** Why a failed payment failed; '' unless `status` is 'failed'. */
+  failure_reason?: PaymentFailureReason | '';
+  failure_label?: string;
   gateway?: string;
   gateway_label?: string;
+  /** Our número de control (not what the bank statement shows). */
   gateway_tx_id: string;
   gateway_ref?: string;
+  /** Payworks referencia and número de autorización (the parent's bank shows these). */
+  bank_reference?: string;
+  auth_code?: string;
   student_id?: number | null;
   student_name?: string;
   created_at: string;
   updated_at: string;
+  /** Admin ledger only. */
+  payer_name?: string;
+  payer_email?: string;
+  control_number?: string;
+  mode?: string;
+  simulation?: boolean;
+  needs_verification?: boolean;
 }
 
 
@@ -300,7 +325,10 @@ export interface DashboardData {
   low_balance_count?: number;
   /** Active students whose Loyverse customer is gone (leavers to withdraw). */
   stale_links?: number;
+  /** Cash requests to apply + real card top-ups to verify or load into the POS. */
   pending_topups?: number;
+  pending_topups_office?: number;
+  pending_topups_online?: number;
   visits_today?: number;
   open_password_requests?: number;
   unhandled_messages?: number;

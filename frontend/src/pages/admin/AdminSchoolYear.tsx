@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateStudents } from '@/hooks/queries/studentKeys';
 import { ArrowRight, CalendarRange, CheckCircle2, GraduationCap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -30,7 +31,7 @@ export default function AdminSchoolYear() {
       confirm, new_cycle: cycle, reset_threshold: resetThreshold === '' ? null : Number(resetThreshold),
       ...(promoteGrades === null ? {} : { promote_grades: promoteGrades }),
     }),
-    onSuccess: ({ data: res }) => { setResult(res); setStep('done'); qc.invalidateQueries({ queryKey: ['admin-students'] }); qc.invalidateQueries({ queryKey: ['school-year-preview'] }); toast.success('Nuevo ciclo aplicado.'); },
+    onSuccess: ({ data: res }) => { setResult(res); setStep('done'); void invalidateStudents(qc); qc.invalidateQueries({ queryKey: ['school-year-preview'] }); toast.success('Nuevo ciclo aplicado.'); },
     onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.confirm || f.new_cycle || f.reset_threshold || f.detail || 'No se pudo aplicar.'); },
   });
   const newCycle = cycle || data?.suggested_cycle || '';

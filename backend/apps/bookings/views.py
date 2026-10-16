@@ -17,6 +17,7 @@ from apps.accounts.models import User
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView
 from apps.core.exporting import AdminExportMixin
+from apps.core.filtersets import parse_bool_param
 from apps.core.importing import ImportTemplateView, ImportView
 from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
@@ -319,11 +320,21 @@ class AdminBookingRescheduleView(APIView):
         booking = Booking.objects.select_related('slot').filter(pk=pk).first()
         if booking is None:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
-        slot = AvailabilitySlot.objects.filter(pk=request.data.get('slot'), is_active=True).first()
+        if booking.status == Booking.Status.ATTENDED or booking.outcome:
+            return Response({'detail': 'Esta visita ya ocurrió (asistida o con resultado): no se reprograma.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            slot_pk = int(request.data.get('slot'))
+        except (TypeError, ValueError):
+            return Response({'slot': ['Horario no válido.']}, status=status.HTTP_400_BAD_REQUEST)
+        slot = AvailabilitySlot.objects.filter(pk=slot_pk, is_active=True).first()
         if slot is None:
             return Response({'slot': ['Horario no válido.']}, status=status.HTTP_400_BAD_REQUEST)
         if slot.pk == booking.slot_id:
             return Response({'slot': ['Es el mismo horario.']}, status=status.HTTP_400_BAD_REQUEST)
+        now = timezone.localtime()
+        if (slot.date, slot.start_time) <= (now.date(), now.time()):
+            return Response({'slot': ['Ese horario ya pasó: elija uno futuro.']}, status=status.HTTP_400_BAD_REQUEST)
         # Lock the target slot while we count and move, so two admins
         # rescheduling into the last seat cannot both succeed (create_booking
         # already does this; this path did not).
@@ -356,33 +367,68 @@ class AdminBookingRescheduleView(APIView):
 
 
 class AdminBookingOutcomeView(APIView):
-    """POST /bookings/admin/bookings/<pk>/outcome/ {"outcome", "note"?, "prereg_status"?} — post-visit result (P4-2).
-    Marks the visit attended, stores the outcome and optionally moves the linked
-    pre-registro (matched by parent email) to contacted/enrolled/rejected."""
+    """POST /bookings/admin/bookings/<pk>/outcome/ {"outcome", "note"?, "update_prereg"?}: post-visit result (P4-2).
+
+    Marks the visit attended through the booking transition table (no email),
+    stores the outcome and, unless ``update_prereg`` is false, moves the linked
+    pre-registro (latest one with the parent's email) forward through
+    ``admissions.services.change_status`` (transition table + its own audit row).
+    A move the table forbids (e.g. an inscrito, or rechazado → contactado) is
+    skipped and reported, never forced."""
     permission_classes = [IsAdmin]
+
+    PREREG_TARGET = {'enrolling': 'enrolled', 'declined': 'rejected',
+                     'interested': 'contacted', 'not_now': 'contacted'}
 
     def post(self, request, pk):
         from apps.admissions.models import PreRegistration
-        booking = Booking.objects.filter(pk=pk).first()
+        from apps.admissions.services import PREREG_ENTITY, change_status
+        from apps.bookings.services.status import change_booking_status
+        from apps.core.transitions import allowed_targets, is_reverse
+
+        booking = Booking.objects.select_related('slot').filter(pk=pk).first()
         if booking is None:
             return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         outcome = str(request.data.get('outcome') or '')
         if outcome not in Booking.Outcome.values or outcome == '':
             return Response({'outcome': ['Resultado no válido.']}, status=status.HTTP_400_BAD_REQUEST)
-        booking.outcome = outcome
-        booking.outcome_note = str(request.data.get('note') or '')[:500]
-        if booking.status in (Booking.Status.CONFIRMED, Booking.Status.PENDING):
-            booking.status = Booking.Status.ATTENDED
-        booking.save(update_fields=['outcome', 'outcome_note', 'status', 'updated_at'])
-        linked = None
-        prereg = PreRegistration.objects.filter(parent_email__iexact=booking.parent_email).order_by('-created_at').first()
-        target = {'enrolling': PreRegistration.Status.ENROLLED, 'declined': PreRegistration.Status.REJECTED,
-                  'interested': PreRegistration.Status.CONTACTED, 'not_now': PreRegistration.Status.CONTACTED}.get(outcome)
-        if prereg is not None and request.data.get('update_prereg', True) and target and prereg.status != PreRegistration.Status.ENROLLED:
-            prereg.status = target
-            prereg.save(update_fields=['status', 'updated_at'])
-            linked = {'id': prereg.pk, 'status': prereg.status}
-        record('update', booking, {'outcome': outcome, 'prereg': linked}, actor=request.user, context='bookings: resultado de visita')
+        update_prereg = parse_bool_param(request.data.get('update_prereg', True))
+        if update_prereg is None:
+            return Response({'update_prereg': ['Valor inválido: use true o false.']},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if booking.status in (Booking.Status.CANCELLED, Booking.Status.NO_SHOW):
+            return Response({'detail': f'La visita está «{booking.get_status_display()}»: '
+                                       'márquela como asistida antes de registrar el resultado.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            previous = booking.status
+            if booking.status in (Booking.Status.CONFIRMED, Booking.Status.PENDING):
+                change_booking_status(booking, Booking.Status.ATTENDED, note=None, notify=False)
+            booking.outcome = outcome
+            booking.outcome_note = str(request.data.get('note') or '')[:500]
+            booking.save(update_fields=['outcome', 'outcome_note', 'updated_at'])
+
+            linked = None
+            target = self.PREREG_TARGET.get(outcome)
+            prereg = (PreRegistration.objects.select_for_update()
+                      .filter(parent_email__iexact=booking.parent_email).order_by('-created_at').first()
+                      if update_prereg and target and booking.parent_email else None)
+            if prereg is not None:
+                current = prereg.status
+                if current == target:
+                    linked = {'id': prereg.pk, 'status': current, 'changed': False}
+                elif target in allowed_targets(PREREG_ENTITY, current) and not is_reverse(PREREG_ENTITY, current, target):
+                    change_status(prereg, target, entity=PREREG_ENTITY, actor=request.user,
+                                  context=f'admissions: estado por resultado de visita #{booking.pk}')
+                    linked = {'id': prereg.pk, 'status': prereg.status, 'changed': True}
+                else:
+                    linked = {'id': prereg.pk, 'status': current, 'changed': False,
+                              'skipped': f'El pre-registro está «{prereg.get_status_display()}» y no se movió.'}
+            changes = {'outcome': outcome, 'prereg': linked}
+            if previous != booking.status:
+                changes['status'] = [previous, booking.status]
+            record('update', booking, changes, actor=request.user, context='bookings: resultado de visita')
         data = BookingSerializer(booking).data
         data['pre_registration'] = linked
         return Response(data)

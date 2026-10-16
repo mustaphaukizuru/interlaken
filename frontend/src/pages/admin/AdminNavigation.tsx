@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
@@ -60,8 +61,9 @@ export default function AdminNavigation() {
 
 function MenuEditor() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['admin-site-settings'], queryFn: async () => (await contentApi.adminGetSettings()).data as { menu?: MenuGroup[] } });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-site-settings'], queryFn: async () => (await contentApi.adminGetSettings()).data as { menu?: MenuGroup[] } });
   const [draft, setDraft] = useState<MenuGroup[] | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [customOverride, setCustomOverride] = useState<boolean | null>(null);
   const [error, setError] = useState('');
   const stored = data?.menu ?? [];
@@ -71,18 +73,36 @@ function MenuEditor() {
   const setCustom = setCustomOverride;
   const save = useMutation({
     mutationFn: (value: MenuGroup[]) => contentApi.adminUpdateSettings({ menu: value }),
-    onSuccess: () => { toast.success('Menú guardado. El sitio lo muestra en unos minutos.'); setError(''); setDraft(null); setCustomOverride(null); qc.invalidateQueries({ queryKey: ['admin-site-settings'] }); qc.invalidateQueries({ queryKey: ['site-settings'] }); },
-    onError: (e) => { const f = apiFieldErrors(e); setError(f.menu || f.detail || 'No se pudo guardar.'); },
+    onSuccess: (_res, value) => {
+      toast.success(value.length ? 'Menú guardado. El sitio lo muestra en unos minutos.' : 'El sitio vuelve a usar el menú integrado.');
+      setError(''); setDraft(null); setCustomOverride(null); setConfirmReset(false);
+      qc.setQueryData<{ menu?: MenuGroup[] }>(['admin-site-settings'], (prev) => (prev ? { ...prev, menu: value } : prev));
+      qc.invalidateQueries({ queryKey: ['admin-site-settings'] }); qc.invalidateQueries({ queryKey: ['site-settings'] });
+    },
+    onError: (e) => { const f = apiFieldErrors(e); setConfirmReset(false); setError(f.menu || f.detail || 'No se pudo guardar.'); },
   });
   const setGroup = (gi: number, patch: Partial<MenuGroup>) => setMenu((m) => m.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
   const setItem = (gi: number, ii: number, patch: Partial<MenuGroup['items'][number]>) => setGroup(gi, { items: menu[gi].items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) });
   if (isLoading) return <Card><ListSkeleton /></Card>;
+  // Without the stored menu the editor would show the built-in one and
+  // «Guardar menú» would overwrite the real custom menu: no editing until it loads.
+  if (isError && !data) {
+    return (
+      <Card>
+        <ErrorState
+          title="No se pudo cargar el menú del sitio"
+          description="Para no reemplazar el menú publicado, el editor se habilita cuando se cargue."
+          onRetry={() => refetch()}
+        />
+      </Card>
+    );
+  }
   return (
     <Card>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-head text-lg font-bold text-ink">Menú del sitio</h2>
         <div className="flex gap-2">
-          {custom && <Button size="sm" variant="ghost" onClick={() => { setCustom(false); setMenu(DEFAULT_MENU); save.mutate([]); }}><RotateCcw size={14} aria-hidden="true" /> Volver al menú integrado</Button>}
+          {custom && <Button size="sm" variant="ghost" onClick={() => setConfirmReset(true)}><RotateCcw size={14} aria-hidden="true" /> Volver al menú integrado</Button>}
           <Button size="sm" onClick={() => { setCustom(true); save.mutate(menu); }} loading={save.isPending}>Guardar menú</Button>
         </div>
       </div>
@@ -122,6 +142,15 @@ function MenuEditor() {
         ))}
         <Button type="button" size="sm" variant="secondary" onClick={() => setMenu((m) => [...m, { label: 'Nuevo grupo', items: [{ label: '', to: '/', icon: '' }] }])} disabled={menu.length >= 8}><Plus size={14} aria-hidden="true" /> Agregar grupo</Button>
       </div>
+      <ConfirmDialog
+        open={confirmReset}
+        onClose={() => setConfirmReset(false)}
+        onConfirm={() => save.mutate([])}
+        title="¿Volver al menú integrado?"
+        message="Se borra el menú personalizado y el sitio vuelve a mostrar el menú integrado. Esta acción no se puede deshacer."
+        confirmLabel="Volver al menú integrado"
+        loading={save.isPending}
+      />
     </Card>
   );
 }

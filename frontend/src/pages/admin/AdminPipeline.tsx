@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateStudents } from '@/hooks/queries/studentKeys';
 import { CheckCircle2, FileWarning, Mail, MessageCircle, UserPlus, KanbanSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -33,7 +34,7 @@ export default function AdminPipeline() {
   const [group, setGroup] = useState('');
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admissions-pipeline'] }); qc.invalidateQueries({ queryKey: ['badges'] }); qc.invalidateQueries({ queryKey: ['admin-students'] }); };
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admissions-pipeline'] }); qc.invalidateQueries({ queryKey: ['badges'] }); void invalidateStudents(qc); };
   const requestDocs = useMutation({
     mutationFn: (id: number) => admissionsApi.requestDocs(id),
     onSuccess: ({ data: r }) => { toast.success(`Solicitud enviada a ${r.sent_to}.`); invalidate(); },
@@ -41,7 +42,12 @@ export default function AdminPipeline() {
   });
   const convert = useMutation({
     mutationFn: () => admissionsApi.convert(converting!.id, { student_id: studentId || undefined, group: group || undefined }),
-    onSuccess: ({ data: r }) => { setResult(r); setErrors({}); invalidate(); toast.success(r.already ? 'Este expediente ya era alumno.' : 'Alumno y cuentas creados.'); },
+    onSuccess: ({ data: r }) => {
+      setResult(r); setErrors({}); invalidate();
+      if (r.already) toast.success('Este expediente ya era alumno.');
+      else if (r.unlinked?.length) toast.success('Alumno creado. Revise los tutores que no se vincularon.');
+      else toast.success('Alumno y cuentas creados.');
+    },
     onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.student_id || 'No se pudo convertir.'); },
   });
 
@@ -79,7 +85,8 @@ export default function AdminPipeline() {
                         {c.missing.length > 0 && c.status !== 'rejected' && c.status !== 'complete' && (
                           <Button size="sm" variant="secondary" onClick={() => requestDocs.mutate(c.id)} loading={requestDocs.isPending && requestDocs.variables === c.id}><Mail size={13} aria-hidden="true" /> Pedir documentos</Button>
                         )}
-                        {(c.status === 'approved' || c.status === 'reviewing') && !c.student && (
+                        {/* Only an approved expediente converts (the API refuses «En revisión»). */}
+                        {c.status === 'approved' && !c.student && (
                           <Button size="sm" onClick={() => { setConverting(c); setStudentId(''); setGroup(''); setResult(null); setErrors({}); }}><UserPlus size={13} aria-hidden="true" /> Convertir en alumno</Button>
                         )}
                         {c.student && <Link to={`/admin/alumnos/${c.student}`} className="btn-outline btn-sm text-xs">Ver alumno</Link>}
@@ -137,6 +144,14 @@ function ConvertSummary({ result, card, onClose }: { result: ConvertResult; card
             );
           })}
         </ul>
+      )}
+      {(result.unlinked ?? []).length > 0 && (
+        <div className="rounded-xl border border-coral/30 bg-coral-50/50 p-3 text-sm" role="alert">
+          <p className="font-semibold text-coral-dark">Tutores no vinculados</p>
+          <ul className="mt-1 space-y-1 text-xs text-ink" aria-label="Tutores no vinculados">
+            {(result.unlinked ?? []).map((u) => <li key={u.email}><strong>{u.name || u.email}</strong> ({u.email}): {u.reason}</li>)}
+          </ul>
+        </div>
       )}
       <div className="flex justify-end"><Button onClick={onClose}>Listo</Button></div>
     </div>

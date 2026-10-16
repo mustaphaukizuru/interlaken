@@ -899,7 +899,7 @@ def sync_all_balances():
 
 def _topup_reference(payment) -> str:
     """Stable idempotency key for an online top-up, stored on the ``topup``
-    transaction's unique ``loyverse_receipt_id`` so a replayed webhook is a no-op."""
+    transaction's unique ``loyverse_receipt_id`` so a replayed result is a no-op."""
     return f'topup-payment-{payment.id}'
 
 
@@ -916,7 +916,8 @@ def complete_online_topup(payment):
     - marks the ``TopUpRequest`` completed.
 
     Idempotent and safe to call more than once: the unique reference guards against
-    a retried/replayed webhook double-crediting. Returns the created
+    a retried/replayed Banorte result (or a staff MultiCobros reconciliation racing
+    it) double-crediting. Returns the created
     ``CafeteriaTransaction`` (or ``None`` if the payment isn't a linked top-up or
     was already applied).
     """
@@ -929,9 +930,9 @@ def complete_online_topup(payment):
         return None
 
     # Defence in depth against a double-credit: COMPLETED means already applied
-    # (admin or prior webhook). FAILED is allowed so a late SUCCESS after soft
-    # expire/supersede can still credit. The per-payment reference guard below
-    # catches a replay of the *same* payment.
+    # (admin or a prior settled result). FAILED is allowed so a late SUCCESS after
+    # a soft expire/supersede/cancel can still credit. The per-payment reference
+    # guard below catches a replay of the *same* payment.
     if topup.status == TopUpRequest.Status.COMPLETED:
         logger.info(f'Top-up #{topup.id} already completed — webhook credit no-op.')
         return None

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Coffee, RefreshCw, ChevronRight, ScrollText, Scale, AlertTriangle, CheckCircle2, Store,
-  Users, Receipt, ArrowLeftRight, RotateCcw, FileUp, Wallet, ShieldCheck,
+  Users, Receipt, ArrowLeftRight, RotateCcw, FileUp, Wallet, ShieldCheck, FileSearch,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -28,7 +28,9 @@ import { ExportMenu } from '@/components/admin/ExportMenu';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
-import { cafeteriaApi, downloadBlob, paymentsApi, type LoyverseCustomer } from '@/services/api';
+import { ReconcileBanorteDialog, VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
+import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
+import { cafeteriaApi, downloadBlob, type LoyverseCustomer } from '@/services/api';
 import { adjustmentImportApi, type AdminTransaction, type ReconcileRowV2, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
 import { exportFilename, idsParam, type BulkActionDef, type BulkRequest, type BulkResult, type ExportFormat, type ImportRow, type ListParams } from '@/services/dataOps';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
@@ -44,7 +46,8 @@ import { apiErrorMessage } from '@/lib/apiErrors';
 import { LIVE } from '@/lib/live';
 import { GRADES } from '@/lib/grades';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
-import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, options } from '@/lib/status/cafeteria';
+import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, isCardTopUp, options } from '@/lib/status/cafeteria';
+import { PAYMENT_FAILURE, gatewayLabel } from '@/lib/status/payment';
 import type { CafeteriaBalance, TopUpLogEntry } from '@/types';
 
 type Tab = 'roster' | 'movements' | 'deposits' | 'pos' | 'reconcile' | 'low' | 'customers';
@@ -60,7 +63,7 @@ const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
 ];
 
 /** Every per-tab URL param; switching tabs drops them all. */
-const TAB_PARAMS = ['q', 'estado', 'tipo', 'page', 'orden', 'grado', 'grupo', 'desde', 'hasta', 'metodo', 'saldo', 'vinculo', 'alumno', 'solo'];
+const TAB_PARAMS = ['q', 'estado', 'tipo', 'page', 'orden', 'grado', 'grupo', 'desde', 'hasta', 'metodo', 'saldo', 'vinculo', 'alumno', 'solo', 'revisar'];
 
 const fmtDate = (d: string | null | undefined) =>
   d ? format(new Date(d), 'd MMM yyyy, HH:mm', { locale: es }) : '—';
@@ -511,12 +514,15 @@ function MovementsTab() {
   // Refund stays single-row with type-to-confirm: it moves money back.
   const [refundTx, setRefundTx] = useState<AdminTransaction | null>(null);
   const [reason, setReason] = useState('');
+  const [bankDone, setBankDone] = useState(false);
+  const cardRefund = !!refundTx && isCardTopUp(refundTx);
   const refund = useMutation({
-    mutationFn: () => cafeteriaApi.refundTransaction(refundTx!.id, reason),
+    mutationFn: () => cafeteriaApi.refundTransaction(refundTx!.id, reason, cardRefund && bankDone),
     onSuccess: () => {
-      toast.success('Devolución procesada.');
+      toast.success(cardRefund ? 'Devolución procesada en el saldo (el cargo se devolvió en MultiCobros).' : 'Devolución procesada.');
       setRefundTx(null);
       setReason('');
+      setBankDone(false);
       void invalidateEntity(queryClient, CAF_MONEY_VIEWS[0], CAF_MONEY_VIEWS);
     },
     onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo procesar la devolución.')),
@@ -567,7 +573,7 @@ function MovementsTab() {
           />
         )}
         rowActions={(t) => (t.transaction_type === 'purchase' || t.transaction_type === 'topup') ? (
-          <Button size="sm" variant="ghost" onClick={() => { setRefundTx(t); setReason(''); }} aria-label={`Devolver movimiento ${t.id} de ${t.student_name}`}>
+          <Button size="sm" variant="ghost" onClick={() => { setRefundTx(t); setReason(''); setBankDone(false); }} aria-label={`Devolver movimiento ${t.id} de ${t.student_name}`}>
             <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Devolver
           </Button>
         ) : null}
@@ -578,6 +584,7 @@ function MovementsTab() {
         title="Confirmar devolución"
         confirmLabel="Procesar devolución"
         requireText="DEVOLVER"
+        confirmDisabled={cardRefund && !bankDone}
         loading={refund.isPending}
         onClose={() => setRefundTx(null)}
         onConfirm={() => refund.mutate()}
@@ -589,6 +596,7 @@ function MovementsTab() {
           </>
         )}
       >
+        {cardRefund && <CardRefundConfirm checked={bankDone} onChange={setBankDone} />}
         <Input label="Motivo (opcional)" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
       </ConfirmDialog>
     </Card>
@@ -606,7 +614,15 @@ const posBadge = (d: TopUpLogEntry) =>
   d.needs_pos_unload ? <Badge variant="error">Quitar del POS</Badge>
     : d.needs_pos_load ? <Badge variant="warning">Pendiente POS</Badge>
     : d.pos_loaded_at ? <Badge variant="success">En POS</Badge>
+    : d.banorte?.simulation && d.status === 'completed' ? <Badge variant="neutral">Simulación (no cargar)</Badge>
     : <span className="text-subtle">—</span>;
+
+/** Deposit status: a failed card attempt says why (cancelled, expired, declined...). */
+const topupStatusBadge = (d: TopUpLogEntry) => {
+  const failure = d.status === 'failed' && d.banorte?.failure_reason ? PAYMENT_FAILURE[d.banorte.failure_reason] : undefined;
+  if (failure) return <Badge variant={failure.variant}>{failure.label}</Badge>;
+  return <Badge variant={TOPUP_STATUS[d.status]?.variant ?? 'neutral'}>{d.status_display}</Badge>;
+};
 
 const studentCell = (d: TopUpLogEntry) => (
   <span className="block">
@@ -616,15 +632,23 @@ const studentCell = (d: TopUpLogEntry) => (
 );
 
 /** Banorte operation as staff search it in MultiCobros: número de control,
- *  referencia Payworks and autorización, plus whether it was verified there. */
+ *  referencia Payworks and autorización, Payworks' own answer and why we did
+ *  not trust one, plus whether it was verified there. */
 const banorteCell = (d: TopUpLogEntry) => {
   const b = d.banorte;
   if (!b) return <span className="text-subtle">{d.gateway_tx_id || '—'}</span>;
+  const answer = [b.codigo_payw, b.texto].filter(Boolean).join(' · ');
   return (
     <span className="block font-mono text-xs leading-5 text-ink">
       <span className="block">Control {b.control_number}</span>
+      {d.payment_id && <span className="block text-subtle">PAGO{d.payment_id}</span>}
       {b.referencia && <span className="block text-muted">Ref. {b.referencia}{b.codigo_aut ? ` · Aut. ${b.codigo_aut}` : ''}</span>}
-      {b.mode !== 'PRD' && <span className="block text-subtle">Modo prueba ({b.mode})</span>}
+      {b.resultado && b.resultado !== 'A' && (
+        <span className="block font-sans text-muted">Payworks {b.resultado}{b.resultado_label ? ` (${b.resultado_label})` : ''}{answer ? `: ${answer}` : ''}</span>
+      )}
+      {b.last_error && <span className="block font-sans text-amber" title={b.last_error}>{b.last_error}</span>}
+      {b.simulation && <span className="block font-sans text-subtle">Simulación ({b.mode}), sin cargo real</span>}
+      {b.review_reason && <Badge variant="warning">Por revisar en MultiCobros</Badge>}
       {b.needs_verification
         ? <Badge variant="warning">Sin verificar</Badge>
         : b.verified_at && <span className="block font-sans text-green-700">Verificada · {b.verified_by_name}</span>}
@@ -637,10 +661,10 @@ const TOPUP_COLUMNS: Column<TopUpLogEntry>[] = [
   { id: 'student', header: 'Alumno', sortKey: 'student', minWidth: 170, className: 'font-medium text-ink', cell: studentCell },
   { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
   { id: 'method', header: 'Método', sortKey: 'method', className: 'text-muted', cell: (d) => d.method_display },
-  { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
-  { id: 'status', header: 'Estado', sortKey: 'status', cell: (d) => <Badge variant={TOPUP_STATUS[d.status]?.variant ?? 'neutral'}>{d.status_display}</Badge> },
+  { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => gatewayLabel(d.gateway) || '—' },
+  { id: 'status', header: 'Estado', sortKey: 'status', cell: topupStatusBadge },
   { id: 'pos', header: 'POS', cell: posBadge },
-  { id: 'reference', header: 'Referencia', defaultHidden: true, minWidth: 190, cell: banorteCell },
+  { id: 'reference', header: 'Operación Banorte', minWidth: 210, cell: banorteCell },
 ];
 
 /** Plan line of a bulk apply: the MXN the processed rows will credit. */
@@ -655,6 +679,7 @@ function DepositsTab() {
   const [sort, onSort] = useUrlSort();
   const filters = clean({
     q: get('q'), status: get('estado'), method: get('metodo'), from: get('desde'), to: get('hasta'), ordering: serializeSort(sort),
+    needs_review: get('revisar') === 'multicobros' ? 1 : undefined,
   });
   const { data, isLoading, isError, refetch } = useTopUpsList({ page, ...filters });
   const count = data?.count ?? 0;
@@ -662,6 +687,7 @@ function DepositsTab() {
   const exportTopups = useTopUpsExport();
   const bulk = useTopUpsBulk();
   const [pending, setPending] = useState<{ action: BulkActionDef; ids: RowKey[] | null } | null>(null);
+  const [reconciling, setReconciling] = useState<TopUpLogEntry | null>(null);
   const fetchExport = exporter((p) => exportTopups.mutateAsync(p), filters, selection);
 
   return (
@@ -690,7 +716,10 @@ function DepositsTab() {
           <FilterBar
             search={{ placeholder: 'Alumno, matrícula o referencia de pago…', label: 'Buscar depósitos' }}
             tabs={{ paramKey: 'estado', options: options(TOPUP_STATUS), allLabel: 'Todos', label: 'Filtrar por estado' }}
-            selects={[{ key: 'metodo', label: 'Método', options: options(TOPUP_METHOD), allLabel: 'Todos los métodos' }]}
+            selects={[
+              { key: 'metodo', label: 'Método', options: options(TOPUP_METHOD), allLabel: 'Todos los métodos' },
+              { key: 'revisar', label: 'Revisión', options: [{ value: 'multicobros', label: 'Por revisar en MultiCobros' }], allLabel: 'Sin filtro de revisión' },
+            ]}
             dateRange={{ idPrefix: 'caf-dep' }}
           >
             <ExportMenu filenamePrefix="depositos_cafeteria" selectedCount={selection.count} fetch={fetchExport} />
@@ -714,6 +743,10 @@ function DepositsTab() {
           <Button size="sm" onClick={() => setPending({ action: TOPUP_ACTIONS[0], ids: [d.id] })} aria-label={`Aplicar depósito de ${d.student_name}`}>
             <Wallet className="w-3.5 h-3.5" aria-hidden="true" /> Aplicar
           </Button>
+        ) : (d.banorte?.can_reconcile && d.payment_id) ? (
+          <Button size="sm" variant="secondary" onClick={() => setReconciling(d)} aria-label={`Conciliar con MultiCobros el pago de ${d.student_name}`}>
+            <FileSearch className="w-3.5 h-3.5" aria-hidden="true" /> Conciliar con MultiCobros
+          </Button>
         ) : null}
         empty={{ icon: ScrollText, title: 'Sin depósitos registrados', description: 'No hay depósitos con esos filtros.' }}
       />
@@ -730,6 +763,7 @@ function DepositsTab() {
         onDone={() => { if (!pending?.ids) selection.onClear(); }}
         renderPlan={pending?.action.name === 'apply' ? applyTotal : undefined}
       />
+      <ReconcileBanorteDialog row={reconciling} onClose={() => setReconciling(null)} />
     </Card>
   );
 }
@@ -741,7 +775,7 @@ function PosLoadTab() {
       <PosQueue
         kind="load"
         title="Cargar en POS"
-        intro="Recargas en línea ya acreditadas en el saldo local. Cargue el monto en el POS de Loyverse y márquelo aquí para que el alumno pueda gastar."
+        intro="Recargas con tarjeta (cargo real) ya acreditadas en el saldo local. Verifíquelas en MultiCobros, cargue el monto en el POS de Loyverse y márquelo aquí para que el alumno pueda gastar. Las operaciones de simulación de Banorte no aparecen aquí: no se cargan."
         emptyTitle="Sin pendientes de carga en POS"
         emptyText="Todas las recargas en línea ya fueron marcadas como cargadas."
       />
@@ -779,15 +813,6 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
   // A Banorte approval reaches us through the parent's browser: staff match it
   // in MultiCobros before real money goes into the POS.
   const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
-  const verify = useMutation({
-    mutationFn: (paymentId: number) => paymentsApi.verifyBanorte(paymentId),
-    onSuccess: () => {
-      toast.success('Operación verificada en MultiCobros.');
-      setVerifying(null);
-      void invalidateEntity(queryClient, CAF_TOPUPS);
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo registrar la verificación.')),
-  });
 
   const columns: Column<TopUpLogEntry>[] = [
     {
@@ -796,7 +821,7 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
     },
     { id: 'student', header: 'Alumno', className: 'font-medium text-ink', cell: studentCell },
     { id: 'amount', header: 'Monto', align: 'right', className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
-    { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => d.gateway || '—' },
+    { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => gatewayLabel(d.gateway) || '—' },
     { id: 'reference', header: 'Operación Banorte', minWidth: 190, cell: banorteCell },
   ];
 
@@ -862,28 +887,7 @@ function PosQueue({ kind, title, intro, emptyTitle, emptyText }: { kind: 'load' 
         execute={(body) => bulk.mutateAsync(body)}
         onDone={() => selection.onClear()}
       />
-      <ConfirmDialog
-        open={!!verifying}
-        title="Verificar operación en MultiCobros"
-        message={verifying?.banorte && (
-          <span className="block space-y-2">
-            <span className="block">
-              En MultiCobros → Analítica → Reportes → Transacciones Payworks 2, busque el número de
-              control y confirme que aparece <strong>Aprobada</strong> por {mxn(verifying.amount)}:
-            </span>
-            <span className="block rounded-lg bg-cream px-3 py-2 font-mono text-xs leading-6 text-ink">
-              Número de control: {verifying.banorte.control_number}<br />
-              Referencia: {verifying.banorte.referencia || '—'}<br />
-              Autorización: {verifying.banorte.codigo_aut || '—'}
-            </span>
-            <span className="block">Si no aparece o el monto no coincide, no la cargue en el POS y avise a dirección.</span>
-          </span>
-        )}
-        confirmLabel="Sí, aparece aprobada"
-        loading={verify.isPending}
-        onConfirm={() => verifying?.payment_id && verify.mutate(verifying.payment_id)}
-        onClose={() => setVerifying(null)}
-      />
+      <VerifyBanorteDialog row={verifying} onClose={() => setVerifying(null)} />
     </Card>
   );
 }

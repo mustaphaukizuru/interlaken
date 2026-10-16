@@ -9,11 +9,12 @@ class PaymentAdmin(ModelAdmin):
     """Read-mostly ledger of online gateway transactions (cafetería top-ups).
 
     Payments are created only by the portal top-up flow and settled only from
-    Banorte's decrypted checkout result, so the admin must never mint or delete one by
-    hand (a hand-made row has no checkout session and credits nothing). Staff
-    can still flip ``status`` for manual reconciliation; everything else is
-    read-only. Day-to-day operations (refunds, top-up review, balances) live in
-    the staff portal (/admin/cafeteria), not here.
+    Banorte's decrypted checkout result or the staff "Conciliar con MultiCobros"
+    action, so the admin must never mint, edit or delete one by hand: flipping
+    ``status`` here moved no money, left the wallet and the top-up out of step
+    and let a late approval credit twice. Everything is read-only. Day-to-day
+    operations (MultiCobros checks, refunds, top-up review, balances) live in the
+    staff portal (/admin/cafeteria), not here.
     """
     list_display = ('user', 'amount', 'currency', 'payment_type', 'gateway',
                     'status', 'created_at')
@@ -22,7 +23,7 @@ class PaymentAdmin(ModelAdmin):
     ordering = ('-created_at',)
     date_hierarchy = 'created_at'
     list_select_related = ('user',)
-    readonly_fields = ('user', 'payment_type', 'amount', 'currency', 'description',
+    readonly_fields = ('user', 'payment_type', 'amount', 'currency', 'status', 'description',
                        'gateway', 'gateway_ref', 'gateway_raw', 'gateway_tx_id',
                        'related_topup', 'completed_at', 'created_at', 'updated_at')
 

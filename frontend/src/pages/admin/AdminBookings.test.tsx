@@ -188,11 +188,13 @@ describe('AdminBookings: horarios', () => {
     await screen.findByText('Auditorio');
     await user.selectOptions(screen.getByLabelText('Tipo de visita a publicar'), 'open_class');
     expect(screen.getByLabelText(/Nombre del evento/i)).toHaveValue('Puertas Abiertas');
+    // Open-class events are not bookable online (Puertas Abiertas page retired): the form says so.
+    expect(screen.getByRole('note')).toHaveTextContent('no pueden reservar estos eventos en línea');
     // The generator form has its own Desde/Hasta (the slot filter bar has another pair).
-    const form = screen.getByRole('button', { name: /Publicar eventos/i }).closest('form') as HTMLElement;
+    const form = screen.getByRole('button', { name: /Crear eventos/i }).closest('form') as HTMLElement;
     fireEvent.change(within(form).getByLabelText(/^Desde$/i), { target: { value: '2026-09-01' } });
     fireEvent.change(within(form).getByLabelText(/^Hasta$/i), { target: { value: '2026-09-01' } });
-    await user.click(screen.getByRole('button', { name: /Publicar eventos/i }));
+    await user.click(screen.getByRole('button', { name: /Crear eventos/i }));
     await waitFor(() => expect(api.generateSlots).toHaveBeenCalledWith(expect.objectContaining({
       visit_type: 'open_class', title: 'Puertas Abiertas', capacity: 30, interval_minutes: 120, start_date: '2026-09-01', end_date: '2026-09-01',
     })));

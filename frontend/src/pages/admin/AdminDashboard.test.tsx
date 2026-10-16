@@ -96,4 +96,15 @@ describe('AdminDashboard', () => {
 
     expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
   });
+
+  it('quick actions say what they do, and a failed analytics load shows an error with retry', async () => {
+    getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
+    getStaffAnalytics.mockRejectedValue(new Error('500'));
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    expect(await screen.findByText('No se pudieron cargar los indicadores')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Cafetería y sincronización/ })).toHaveAttribute('href', '/admin/cafeteria');
+    expect(screen.getByRole('link', { name: /Ver admisiones/ })).toHaveAttribute('href', '/admin/admisiones');
+    expect(screen.queryByText('Sincronizar Loyverse')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nueva Admisión')).not.toBeInTheDocument();
+  });
 });

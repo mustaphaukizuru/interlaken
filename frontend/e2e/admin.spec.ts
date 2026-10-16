@@ -46,7 +46,7 @@ test('publishing a comunicado posts it and lists it in the admin console', async
   await dialog.getByLabel('Mensaje').fill('Mañana no habrá clases por mantenimiento del plantel.');
   await dialog.getByRole('button', { name: 'Publicar' }).click();
 
-  await expect(page.getByText('Comunicado publicado.')).toBeVisible();
+  await expect(page.getByText('Comunicado publicado y enviado.')).toBeVisible();
   await expect(page.getByText('Suspensión de clases')).toBeVisible();
   expect(createPayload).toMatchObject({
     title: 'Suspensión de clases',

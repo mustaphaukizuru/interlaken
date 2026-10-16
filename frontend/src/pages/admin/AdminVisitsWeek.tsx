@@ -3,30 +3,39 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, ChevronLeft, ChevronRight, MessageCircle, MoveRight, ClipboardCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { BOOKINGS_ENTITY, SLOTS_ENTITY } from '@/hooks/queries/bookings';
+import { invalidateEntity } from '@/hooks/queries/keys';
 import { bookingsApi, type WeekBooking, type WeekSlot } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { BOOKING_STATUS_META, type BookingStatus } from '@/lib/status/booking';
+import { PREREG_STATUS } from '@/lib/admissionsStatus';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const OUTCOMES: [string, string][] = [['interested', 'Interesada, dar seguimiento'], ['enrolling', 'Se inscribirá'], ['not_now', 'No por ahora'], ['declined', 'No le interesó']];
 
-/** Monday of the week containing `d` (ISO date). */
+/** Local calendar date (YYYY-MM-DD). toISOString() is UTC: in Mexico it
+ *  already reads "tomorrow" from 18:00, which mislabeled today and the week. */
+export const localISODate = (d: Date): string => format(d, 'yyyy-MM-dd');
+
+/** Monday of the week containing `d` (ISO date, local time). */
 export function mondayOf(d: Date): string {
   const x = new Date(d);
   const day = (x.getDay() + 6) % 7;
   x.setDate(x.getDate() - day);
-  return x.toISOString().slice(0, 10);
+  return localISODate(x);
 }
 export function shiftWeek(iso: string, weeks: number): string {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + weeks * 7);
-  return d.toISOString().slice(0, 10);
+  return localISODate(d);
 }
 
 /** /admin/visitas/semana — weekly calendar, reschedule and post-visit outcome (BACKLOG P4-2). */
@@ -39,22 +48,35 @@ export default function AdminVisitsWeek() {
   const [outcome, setOutcome] = useState('interested');
   const [note, setNote] = useState('');
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['visits-week'] }); qc.invalidateQueries({ queryKey: ['admin-bookings'] }); qc.invalidateQueries({ queryKey: ['badges'] }); };
+  const [noShowFor, setNoShowFor] = useState<WeekBooking | null>(null);
+  // The bookings/slots lists live under ['admin', 'bookings' | 'slots', ...].
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['visits-week'] });
+    void invalidateEntity(qc, BOOKINGS_ENTITY, [SLOTS_ENTITY]);
+    qc.invalidateQueries({ queryKey: ['badges'] });
+  };
   const reschedule = useMutation({
     mutationFn: () => bookingsApi.adminReschedule(moving!.id, targetSlot!),
     onSuccess: () => { toast.success('Visita reprogramada; se avisó a la familia.'); setMoving(null); invalidate(); },
-    onError: (e) => toast.error(apiFieldErrors(e).slot || 'No se pudo reprogramar.'),
+    onError: (e) => { const f = apiFieldErrors(e); toast.error(f.slot || f.detail || 'No se pudo reprogramar.'); },
   });
   const setOutcomeM = useMutation({
     mutationFn: () => bookingsApi.adminOutcome(outcomeFor!.id, { outcome, note }),
-    onSuccess: ({ data: r }) => { toast.success(r.pre_registration ? `Resultado guardado; pre-registro → ${r.pre_registration.status}.` : 'Resultado guardado.'); setOutcomeFor(null); setNote(''); invalidate(); },
-    onError: () => toast.error('No se pudo guardar.'),
+    onSuccess: ({ data: r }) => {
+      const pr = r.pre_registration;
+      const label = pr ? (PREREG_STATUS[pr.status]?.label ?? pr.status) : '';
+      toast.success(!pr ? 'Resultado guardado.' : pr.changed ? `Resultado guardado; pre-registro → ${label}.` : pr.skipped ? `Resultado guardado. ${pr.skipped}` : `Resultado guardado; el pre-registro ya estaba en ${label}.`);
+      setOutcomeFor(null); setNote(''); invalidate();
+    },
+    onError: (e) => toast.error(apiFieldErrors(e).detail || 'No se pudo guardar.'),
   });
   const action = useMutation({
     mutationFn: ({ id, act }: { id: number; act: 'no_show' }) => bookingsApi.bookingAction(id, act),
-    onSuccess: () => invalidate(),
-    onError: () => toast.error('No se pudo actualizar.'),
+    onSuccess: () => { toast.success('Visita marcada como «No asistió».'); setNoShowFor(null); invalidate(); },
+    onError: (e) => { setNoShowFor(null); toast.error(apiFieldErrors(e).detail || 'No se pudo actualizar.'); },
   });
+  const today = localISODate(new Date());
+  const nowKey = format(new Date(), "yyyy-MM-dd'T'HH:mm");
   const allSlots: WeekSlot[] = data?.days.flatMap((d) => d.slots.map((s) => ({ ...s, date: d.date }))) ?? [];
   const weekLabel = data ? `${new Date(`${data.start}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} al ${new Date(`${data.end}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}` : '';
 
@@ -74,7 +96,7 @@ export default function AdminVisitsWeek() {
         <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
           <div className="grid grid-cols-1 gap-2 md:min-w-[980px] md:grid-cols-7" role="list" aria-label="Días de la semana">
             {data.days.map((d, i) => {
-              const isToday = d.date === new Date().toISOString().slice(0, 10);
+              const isToday = d.date === today;
               return (
                 <section key={d.date} role="listitem" className={`rounded-xl2 p-2 ${isToday ? 'bg-purple/5 ring-1 ring-purple/30' : 'bg-cream-2'}`} aria-label={`${DAY_NAMES[i]} ${d.date}`}>
                   <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">{DAY_NAMES[i]} <span className="text-ink">{Number(d.date.slice(8))}</span></h2>
@@ -95,7 +117,7 @@ export default function AdminVisitsWeek() {
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setMoving(b); setTargetSlot(null); }}><MoveRight size={11} className="mr-0.5 inline" aria-hidden="true" />Reprogramar</button>}
                                 {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
-                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" onClick={() => action.mutate({ id: b.id, act: 'no_show' })}>No asistió</button>}
+                                {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" disabled={action.isPending && action.variables?.id === b.id} onClick={() => setNoShowFor(b)}>{action.isPending && action.variables?.id === b.id ? 'Guardando…' : 'No asistió'}</button>}
                                 {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
                               </div>
                             </li>
@@ -117,12 +139,22 @@ export default function AdminVisitsWeek() {
           <label className="label" htmlFor="target-slot">Nuevo horario</label>
           <select id="target-slot" className="input-field" value={targetSlot ?? ''} onChange={(e) => setTargetSlot(Number(e.target.value) || null)}>
             <option value="">Seleccione…</option>
-            {allSlots.filter((s) => s.is_active && s.booked < s.capacity).map((s) => <option key={s.id} value={s.id}>{s.date} {s.start_time} · {s.visit_type === 'open_class' ? 'Clase abierta' : 'Individual'} · libres {s.capacity - s.booked}</option>)}
+            {allSlots.filter((s) => s.is_active && s.booked < s.capacity && `${s.date}T${s.start_time}` > nowKey).map((s) => <option key={s.id} value={s.id}>{s.date} {s.start_time} · {s.visit_type === 'open_class' ? 'Clase abierta' : 'Individual'} · libres {s.capacity - s.booked}</option>)}
           </select>
           <p className="text-xs text-subtle">¿Otra semana? Navegue a esa semana antes de abrir este diálogo.</p>
           <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setMoving(null)}>Cancelar</Button><Button onClick={() => reschedule.mutate()} loading={reschedule.isPending} disabled={!targetSlot}>Reprogramar</Button></div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!noShowFor}
+        onClose={() => setNoShowFor(null)}
+        onConfirm={() => noShowFor && action.mutate({ id: noShowFor.id, act: 'no_show' })}
+        title="Marcar «No asistió»"
+        message={`Se registrará que ${noShowFor?.parent_name ?? 'la familia'} no asistió a la visita y se liberará su lugar.`}
+        confirmLabel="Marcar «No asistió»"
+        loading={action.isPending}
+      />
 
       <Modal open={!!outcomeFor} onClose={() => setOutcomeFor(null)} title={`Resultado de la visita: ${outcomeFor?.parent_name ?? ''}`} maxWidth={480}>
         <div className="space-y-3">

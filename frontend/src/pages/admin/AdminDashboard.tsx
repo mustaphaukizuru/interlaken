@@ -22,7 +22,7 @@ export default function AdminDashboard() {
     queryFn: async () => (await portalApi.getDashboard()).data,
   });
 
-  const { data: analytics } = useQuery<AnalyticsPayload>({
+  const { data: analytics, isError: analyticsError, refetch: refetchAnalytics } = useQuery<AnalyticsPayload>({
     queryKey: ['staff-analytics', 30],
     queryFn: async () => (await portalApi.getStaffAnalytics(30)).data,
     staleTime: 60_000,
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
                 <StatCard key="a" title="Alumnos activos" value={data?.total_students ?? 0} icon={Users} color="purple" subtitle={data?.stale_links ? `${data.stale_links} por dar de baja (sin tarjeta en Loyverse)` : undefined} />,
                 <StatCard key="b" title="Saldo total cafetería" value={formatMXN(data?.cafeteria_total_balance ?? 0)} icon={Coffee} color="green" />,
                 <StatCard key="c" title="Saldos bajos" value={data?.low_balance_count ?? 0} icon={AlertTriangle} color="amber" subtitle="alumnos activos en cafetería bajo su umbral" />,
-                <StatCard key="d" title="Recargas por aplicar" value={data?.pending_topups ?? 0} icon={Coffee} color="coral" subtitle="pagos en caja" />,
+                <StatCard key="d" title="Recargas por aplicar" value={data?.pending_topups ?? 0} icon={Coffee} color="coral" subtitle={data?.pending_topups_online != null ? `${data.pending_topups_office ?? 0} en caja · ${data.pending_topups_online} con tarjeta por verificar o cargar en POS` : 'pagos en caja'} />,
                 <StatCard key="e" title="Cobrado este mes" value={formatMXN(data?.total_revenue ?? 0)} icon={CreditCard} color="green" subtitle="recargas en línea" />,
                 <StatCard key="f" title="Admisiones en cola" value={(data?.pending_preregistrations ?? 0) + (data?.pending_registrations ?? 0)} icon={ClipboardList} color="pink" subtitle={`${data?.pending_preregistrations ?? 0} pre-registros · ${data?.pending_registrations ?? 0} inscripciones`} />,
                 <StatCard key="g" title="Visitas hoy" value={data?.visits_today ?? 0} icon={CalendarClock} color="purple" />,
@@ -57,14 +57,21 @@ export default function AdminDashboard() {
 
         {/* Quick actions — green = ops, pink = admissions; no improvised solid fills */}
         <div className="mb-6 flex flex-wrap gap-3">
-          <Link to="/admin/cafeteria" className="btn-green"><RefreshCw size={16} /> Sincronizar Loyverse</Link>
-          <Link to="/admin/admisiones" className="btn-pink"><UserPlus size={16} /> Nueva Admisión</Link>
+          {/* Links, not actions: the sync runs from the Cafetería panel (with a preview),
+              and admissions start from the family's pre-registro, not from here. */}
+          <Link to="/admin/cafeteria" className="btn-green"><RefreshCw size={16} /> Cafetería y sincronización</Link>
+          <Link to="/admin/admisiones" className="btn-pink"><UserPlus size={16} /> Ver admisiones</Link>
           <Link to="/admin/alumnos" className="btn-outline"><Users size={16} /> Ver Alumnos</Link>
           <Link to="/admin/comunicados" className="btn-outline"><Bell size={16} /> Comunicados</Link>
           <Link to="/admin/contrasenas" className="btn-outline"><KeyRound size={16} /> Contraseñas</Link>
         </div>
 
         {/* Analytics — reuses the staff chart suite (real data-viz on the landing) */}
+        {analyticsError && !analytics && (
+          <div className="card mb-6">
+            <ErrorState title="No se pudieron cargar los indicadores" description="El resto del panel sigue disponible." onRetry={() => refetchAnalytics()} />
+          </div>
+        )}
         {analytics && (
           <div className="mb-6">
             <div className="mb-3 flex items-center justify-between gap-3">

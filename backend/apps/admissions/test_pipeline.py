@@ -77,3 +77,41 @@ def test_convert_creates_student_and_family(admin_client, reg, parent_user):
     assert reg.status == 'complete'
     again = admin_client.post(url, {}, format='json')
     assert again.status_code == 200 and again.data['already'] is True
+
+
+@pytest.mark.django_db
+def test_convert_requires_approved_not_reviewing(admin_client, reg):
+    reg.status = Registration.Status.REVIEWING
+    reg.save()
+    r = admin_client.post(reverse('register-convert', args=[reg.pk]), {}, format='json')
+    assert r.status_code == 400 and 'Apruebe' in r.data['detail']
+    assert not StudentProfile.objects.filter(registration=reg).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize('role', ['staff', 'admin', 'student'])
+def test_convert_never_links_non_family_accounts(admin_client, reg, role):
+    other = User.objects.create_user(email='juan@test.mx', password='x-pass-1234', first_name='Juan', role=role)
+    reg.status = Registration.Status.APPROVED
+    reg.save()
+    r = admin_client.post(reverse('register-convert', args=[reg.pk]), {}, format='json')
+    assert r.status_code == 201, r.data
+    sp = StudentProfile.objects.get(pk=r.data['student'])
+    assert not sp.parents.filter(pk=other.pk).exists()
+    assert [u['email'] for u in r.data['unlinked']] == ['juan@test.mx']
+    assert 'juan@test.mx' not in {c['email'] for c in r.data['credentials']}
+    # parent1 (no account yet) still gets a family login
+    assert sp.parents.filter(email='maria@test.mx', role='parent').exists()
+
+
+@pytest.mark.django_db
+def test_convert_integrity_race_is_409_and_rolls_back(admin_client, reg):
+    reg.status = Registration.Status.APPROVED
+    reg.save()
+    # Something else already owns the student login email the convert will create.
+    User.objects.create_user(email='269999@alumnos.interlaken.edu.mx', password=None, first_name='X', role='student')
+    r = admin_client.post(reverse('register-convert', args=[reg.pk]), {'student_id': '269999'}, format='json')
+    assert r.status_code == 409
+    reg.refresh_from_db()
+    assert reg.status == 'approved' and not StudentProfile.objects.filter(registration=reg).exists()
+    assert not User.objects.filter(email='maria@test.mx').exists()

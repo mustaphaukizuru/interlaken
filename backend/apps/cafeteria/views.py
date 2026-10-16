@@ -834,10 +834,10 @@ class AdminApplyTopUpView(APIView):
         if topup.status != TopUpRequest.Status.PENDING:
             return 'Esta recarga ya fue procesada.'
         # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
-        # top-ups are credited exclusively by the signed gateway webhook
-        # (complete_online_topup); applying one here would double-credit once the
-        # webhook later settles the same payment — the two paths share no
-        # idempotency key.
+        # top-ups are credited exclusively through payments.settlement (Banorte's
+        # decrypted result or the staff MultiCobros reconciliation, both via
+        # complete_online_topup); applying one here would double-credit once the
+        # payment settles: the two paths share no idempotency key.
         if topup.method != TopUpRequest.Method.OFFICE:
             return ('Las recargas en línea se acreditan automáticamente al '
                     'confirmarse el pago; no se aplican manualmente.')
@@ -1146,7 +1146,7 @@ class AdminMarkTopUpPosLoadedView(APIView):
         topup = get_object_or_404(
             TopUpRequest.objects.select_related(
                 'student__user', 'pos_loaded_by',
-            ).prefetch_related('payments'),
+            ),
             pk=pk,
         )
         if topup.method != TopUpRequest.Method.ONLINE:
@@ -1159,10 +1159,16 @@ class AdminMarkTopUpPosLoadedView(APIView):
                 error_body('La recarga aún no está acreditada en el saldo local.'),
                 status=400,
             )
-        linked = topup.payments.order_by('-created_at').first()
+        linked = topup.payments.select_related('banorte').order_by('-created_at').first()
         if linked is not None and linked.status == Payment.Status.REFUNDED:
             return Response(
                 error_body('Esta recarga fue reembolsada; no la cargue en el POS.'),
+                status=400,
+            )
+        if linked is not None and linked.is_simulation():
+            return Response(
+                error_body('Es una operación de simulación de Banorte (sin cargo real); '
+                           'no se carga en el POS.', code='simulation'),
                 status=400,
             )
         if linked is not None and linked.needs_bank_verification():
@@ -1298,28 +1304,53 @@ class AdminAdjustBalanceView(APIView):
 
 
 class AdminRefundView(APIView):
-    """POST /api/v1/cafeteria/admin/refund/<tx_pk>/  ``{reason?}``
+    """POST /api/v1/cafeteria/admin/refund/<tx_pk>/  ``{reason?, bank_refund_confirmed?}``
 
     Reverse a transaction: undo its balance effect, mark any linked ``Payment``
     refunded, audit it, notify parents (spec §5 / §6.11).
+
+    This only moves the wallet. For a top-up paid with a card (a real Banorte
+    charge, not a simulation) the money goes back to the card only from
+    MultiCobros, so staff must confirm (``bank_refund_confirmed``) that they
+    already did it there; the confirmation is kept in the refund's reason and
+    the audit log.
     """
     permission_classes = [IsAdmin]
 
     def post(self, request, tx_pk):
+        from apps.payments.multicobros import card_payment_for_transaction, needs_bank_refund
+
         tx = get_object_or_404(CafeteriaTransaction, pk=tx_pk)
         serializer = RefundInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        reason = serializer.validated_data.get('reason', '')
+        confirmed = serializer.validated_data.get('bank_refund_confirmed', False)
+
+        payment = card_payment_for_transaction(tx)
+        card_refund = needs_bank_refund(payment)
+        if card_refund and not confirmed:
+            return Response(error_body(
+                'Esta recarga se pagó con tarjeta. Devolver aquí solo descuenta el saldo de '
+                'cafetería: primero haga la devolución del cargo en MultiCobros (Banorte) y '
+                'confirme que ya la hizo.', code='bank_refund_required'), status=400)
+        if card_refund:
+            note = 'Cargo con tarjeta devuelto en MultiCobros (Banorte)'
+            reason = f'{reason} · {note}' if reason else note
 
         try:
-            adj = refund_transaction(
-                tx,
-                reason=serializer.validated_data.get('reason', ''),
-                admin=request.user,
-            )
+            adj = refund_transaction(tx, reason=reason, admin=request.user)
         except ValueError as e:
             return Response(error_body(str(e)), status=400)
 
-        return Response(BalanceAdjustmentSerializer(adj).data, status=201)
+        if card_refund:
+            record('update', payment,
+                   {'bank_refund_confirmed': True, 'refund_tx': tx.id,
+                    'amount': f'{payment.amount:.2f}'},
+                   actor=request.user, context='cafeteria.refund.card')
+
+        data = dict(BalanceAdjustmentSerializer(adj).data)
+        data['bank_refund_confirmed'] = bool(card_refund)
+        return Response(data, status=201)
 
 
 class AdminLoyverseCustomerReceiptsView(APIView):

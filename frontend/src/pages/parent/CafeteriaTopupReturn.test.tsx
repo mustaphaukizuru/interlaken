@@ -54,11 +54,33 @@ describe('CafeteriaTopupReturn polling', () => {
     );
   });
 
-  it('shows failed when status is failed or refunded', async () => {
+  it('says the payment was refunded, not that nothing was charged', async () => {
     getStatus.mockResolvedValue({ data: { status: 'refunded' } } as never);
     renderAt('?payment_id=9');
 
-    expect(await screen.findByText('La recarga no se completó')).toBeInTheDocument();
+    expect(await screen.findByText('Pago devuelto')).toBeInTheDocument();
+    expect(screen.queryByText(/No se realizó ningún cargo/)).not.toBeInTheDocument();
+  });
+
+  it('explains the real cause of a failure', async () => {
+    getStatus.mockResolvedValue({ data: { status: 'failed', failure_reason: 'cancelled' } } as never);
+    renderAt('?payment_id=9');
+
+    expect(await screen.findByText('La recarga no se completó: cancelado')).toBeInTheDocument();
+    expect(screen.getByText(/Se canceló el pago en la ventana de Banorte/)).toBeInTheDocument();
+    expect(screen.queryByText(/banco rechazó/)).not.toBeInTheDocument();
+  });
+
+  it('shows the bank reference and authorisation of a confirmed payment', async () => {
+    getStatus.mockResolvedValue({ data: {
+      status: 'success', amount: '200.00', student_name: 'Ana', gateway_tx_id: 'IK9ABC',
+      bank_reference: '248233587990', auth_code: '214414',
+    } } as never);
+    renderAt('?payment_id=9');
+
+    expect(await screen.findByText('248233587990')).toBeInTheDocument();
+    expect(screen.getByText('214414')).toBeInTheDocument();
+    expect(screen.getByText('Referencia bancaria')).toBeInTheDocument();
   });
 
   it('shows pending after polling is exhausted while still pending', async () => {

@@ -85,4 +85,32 @@ describe('AdminPayments (reference page)', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: /Excel/ }));
     await waitFor(() => expect(adminExport).toHaveBeenCalledWith({ status: 'failed', fmt: 'xlsx', ids: undefined }));
   });
+
+  it('shows the payer, the failure cause and labelled gateways', async () => {
+    adminList.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [
+      { ...payments[0], payer_name: 'Ana Tutor', payer_email: 'ana@example.com' },
+      { ...payments[1], failure_reason: 'cancelled', failure_label: 'Cancelado por el usuario' },
+    ] } } as never);
+    renderWithProviders(<AdminPayments />, { route: '/admin/pagos' });
+    expect(await screen.findByText('Ana Tutor')).toBeInTheDocument();
+    expect(screen.getByText('ana@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Cancelado por el usuario')).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Global Payments (retirado)' })).toBeInTheDocument();
+  });
+
+  it('does not count cancelled or expired attempts as failed payments', async () => {
+    adminSummary.mockResolvedValue({ data: {
+      days: 30, since: '2026-08-22', by_status: { failed: { count: 5, total: '0' }, refunded: { count: 1, total: '50' } },
+      failed_by_reason: { declined: 1, cancelled: 3, expired: 1 }, stuck_pending: 0, series: [],
+    } } as never);
+    renderWithProviders(<AdminPayments />, { route: '/admin/pagos' });
+    expect(await screen.findByText('4 cancelados, expirados o reemplazados (no cuentan)')).toBeInTheDocument();
+  });
+
+  it('shows an error with retry instead of zeros when the summary fails', async () => {
+    adminSummary.mockRejectedValue(new Error('boom'));
+    renderWithProviders(<AdminPayments />, { route: '/admin/pagos' });
+    expect(await screen.findByText('No se pudo cargar el resumen de pagos')).toBeInTheDocument();
+    expect(screen.queryByText('Pagos completados')).not.toBeInTheDocument();
+  });
 });

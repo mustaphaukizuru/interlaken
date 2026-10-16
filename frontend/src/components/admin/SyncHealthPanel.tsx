@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateEntity } from '@/hooks/queries/keys';
+import { STUDENTS_ENTITY, STUDENTS_RELATED } from '@/hooks/queries/studentKeys';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, ListChecks, PlugZap, RefreshCw, Scale, Timer, Users, Zap, DatabaseBackup } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
-import { cafeteriaApi, type SyncHealth } from '@/services/api';
+import { Modal } from '@/components/ui/Modal';
+import { cafeteriaApi, type RosterSyncReport, type SyncHealth } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
 
 type Tone = 'ok' | 'warn' | 'bad';
@@ -215,7 +219,7 @@ export function buildChecks(h: SyncHealth): Check[] {
  */
 export function SyncHealthPanel() {
   const queryClient = useQueryClient();
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['cafeteria-sync-health'],
     queryFn: async () => (await cafeteriaApi.syncHealth()).data,
     staleTime: 60_000,
@@ -223,9 +227,18 @@ export function SyncHealthPanel() {
 
   // The 06:07 job, on demand: for the morning the office edits Loyverse and
   // wants it in the app before tomorrow. Same server code as the cron.
+  // It writes (link + import + replay), so it runs as a dry run first and the
+  // admin applies it from the preview.
+  const [preview, setPreview] = useState<RosterSyncReport | null>(null);
+  const previewRoster = useMutation({
+    mutationFn: () => cafeteriaApi.syncRoster(true),
+    onSuccess: ({ data: r }) => setPreview(r),
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo consultar Loyverse para la vista previa.')),
+  });
   const syncRoster = useMutation({
     mutationFn: () => cafeteriaApi.syncRoster(false),
     onSuccess: ({ data: r }) => {
+      setPreview(null);
       const s = r.summary;
       toast.success(
         `Roster sincronizado: ${s.created} alta(s), ${s.updated} actualizado(s), ${s.renamed} nombre(s), `
@@ -234,18 +247,34 @@ export function SyncHealthPanel() {
         + '.',
         { duration: 8000 },
       );
-      for (const key of ['cafeteria-sync-health', 'admin-students']) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['cafeteria-sync-health'] });
       // Admin list data (Data Ops hooks layer): ['admin', <entity>, …].
-      for (const entity of ['cafeteria-balances', 'cafeteria-low-balance', 'cafeteria-customers']) {
-        queryClient.invalidateQueries({ queryKey: ['admin', entity] });
-      }
+      void invalidateEntity(queryClient, STUDENTS_ENTITY, [...STUDENTS_RELATED, 'cafeteria-customers']);
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo sincronizar el roster con Loyverse.')),
   });
 
-  if (isLoading || isError || !data) return null;
+  if (isError && !data) {
+    return (
+      <section aria-label="Estado de la sincronización" className="mb-4">
+        <div className={`flex flex-wrap items-start justify-between gap-2 rounded-xl border px-3 py-2.5 ${TONE.bad}`} role="alert">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold">No se pudo consultar el estado de la sincronización</p>
+              <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
+                No sabemos si la sincronización con Loyverse está funcionando. Reintente; si persiste, revise el servidor.
+              </p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" loading={isFetching} onClick={() => refetch()}>
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Reintentar
+          </Button>
+        </div>
+      </section>
+    );
+  }
+  if (isLoading || !data) return null;
   const checks = buildChecks(data);
   const worst: Tone = checks.some((c) => c.tone === 'bad')
     ? 'bad' : checks.some((c) => c.tone === 'warn') ? 'warn' : 'ok';
@@ -264,9 +293,9 @@ export function SyncHealthPanel() {
         <Button
           variant="secondary"
           size="sm"
-          loading={syncRoster.isPending}
-          onClick={() => syncRoster.mutate()}
-          title="Vincula, importa y actualiza grado, nombre y código desde Loyverse; lo mismo que corre cada madrugada."
+          loading={previewRoster.isPending}
+          onClick={() => previewRoster.mutate()}
+          title="Muestra primero qué cambiaría (vincular, importar y actualizar grado, nombre y código desde Loyverse) y luego lo aplica; lo mismo que corre cada madrugada."
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Sincronizar roster ahora
         </Button>
@@ -285,6 +314,13 @@ export function SyncHealthPanel() {
           );
         })}
       </ul>
+      <Modal open={!!preview} onClose={() => setPreview(null)} title="Sincronizar roster con Loyverse" maxWidth={560}>
+        {preview && <RosterPreview report={preview} />}
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={() => setPreview(null)}>Cancelar</Button>
+          <Button loading={syncRoster.isPending} onClick={() => syncRoster.mutate()}>Aplicar sincronización</Button>
+        </div>
+      </Modal>
       {worst !== 'ok' && (
         <p className="mt-2 flex items-start gap-1.5 text-[12px] text-subtle">
           <HelpCircle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -292,6 +328,37 @@ export function SyncHealthPanel() {
         </p>
       )}
     </section>
+  );
+}
+
+/** Dry-run summary shown before «Aplicar sincronización». */
+function RosterPreview({ report }: { report: RosterSyncReport }) {
+  const s = report.summary;
+  const changes = report.import?.changes ?? [];
+  const nothing = !s.created && !s.updated && !s.renamed && !s.linked;
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-muted">Vista previa: todavía no se ha escrito nada. Esto es lo que cambiaría al aplicar.</p>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Resumen de la vista previa">
+        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.created}</span><span className="text-xs text-subtle">alta(s)</span></li>
+        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.updated}</span><span className="text-xs text-subtle">actualizado(s)</span></li>
+        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.renamed}</span><span className="text-xs text-subtle">nombre(s)</span></li>
+        <li className="rounded-lg bg-cream-2 p-2 text-center"><span className="block text-lg font-bold text-ink">{s.linked}</span><span className="text-xs text-subtle">vínculo(s)</span></li>
+      </ul>
+      {s.possible_leavers > 0 && <p className="text-xs text-amber">{s.possible_leavers} alumno(s) sin grado en Loyverse (posible baja): no se dan de baja automáticamente.</p>}
+      {nothing && <p className="text-xs text-subtle">No hay cambios pendientes: el roster ya coincide con Loyverse.</p>}
+      {changes.length > 0 && (
+        <ul className="max-h-48 divide-y divide-line/60 overflow-y-auto rounded-lg border border-line text-xs" aria-label="Cambios">
+          {changes.slice(0, 50).map((c, i) => (
+            <li key={`${c.matricula}-${c.field}-${i}`} className="flex flex-wrap justify-between gap-2 px-2 py-1.5">
+              <span className="min-w-0 truncate"><strong>{c.matricula}</strong> {c.name} · {c.field}</span>
+              <span className="text-subtle">{c.before || '(vacío)'} → {c.after || '(vacío)'}</span>
+            </li>
+          ))}
+          {changes.length > 50 && <li className="px-2 py-1.5 text-subtle">… y {changes.length - 50} más.</li>}
+        </ul>
+      )}
+    </div>
   );
 }
 
