@@ -309,6 +309,16 @@ describe('CafeteriaPage online top-up through the Banorte lightbox', () => {
     expect(closeBanorteLightbox).toHaveBeenCalled();
   });
 
+  it('a 3D Secure cancel goes to the return page, not an "unavailable" error', async () => {
+    vi.mocked(paymentsApi.reportBanorteResult).mockResolvedValue(
+      { data: { status: 'failed', failure_reason: 'cancelled' } } as never);
+    await payOnline();
+    emit('error', { status3D: '423' });
+    await waitFor(() => expect(screen.getByTestId('path'))
+      .toHaveTextContent('/portal/cafeteria/recarga/retorno?payment_id=55'));
+    expect(closeBanorteLightbox).toHaveBeenCalled();
+  });
+
   it('stays on the page when the window is closed without a result', async () => {
     vi.mocked(paymentsApi.reportBanorteResult).mockResolvedValue({ data: { status: 'pending' } } as never);
     await payOnline();

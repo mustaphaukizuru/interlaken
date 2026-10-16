@@ -694,7 +694,7 @@ export const paymentsApi = {
 
   /** Forward a Banorte lightbox callback; the server decrypts and decides. */
   reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
-    api.post<{ payment_id: number; status: string; detail: string }>(
+    api.post<{ payment_id: number; status: string; failure_reason?: string; detail: string }>(
       '/payments/banorte/result/', { payment_id: paymentId, event, response }),
 
   /** Staff confirm the approved operation appears in MultiCobros (before the POS load):

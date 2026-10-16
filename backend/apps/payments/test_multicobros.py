@@ -375,7 +375,7 @@ class TestBrowserAnswers:
     def test_3ds_cancel_is_a_soft_cancel(self, api_client, opened):
         _, _, checkout = opened
         resp = _report(api_client, checkout.payment_id, "error", {"status3D": "423"})
-        assert resp.data["status"] == "failed"
+        assert resp.data["status"] == "failed" and resp.data["failure_reason"] == "cancelled"
         payment = Payment.objects.get(pk=checkout.payment_id)
         assert payment.failure_reason() == "cancelled" and payment.is_soft_failed()
 

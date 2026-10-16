@@ -241,14 +241,18 @@ export default function CafeteriaPage() {
     };
     const onEvent = async (event: BanorteEvent, response: unknown) => {
       let status = '';
+      let failureReason = '';
       try {
-        ({ data: { status } } = await paymentsApi.reportBanorteResult(paymentId, event, response));
+        ({ data: { status, failure_reason: failureReason = '' } } =
+          await paymentsApi.reportBanorteResult(paymentId, event, response));
       } catch {
         /* the return page polls the payment either way */
       }
       if (done) return;
       if (event === 'success' || event === 'cancel') return finish();
       if (event === 'error') {
+        // Cancelled in the 3D Secure step (status3D 423): the return page says so.
+        if (status === 'failed' && failureReason === 'cancelled') return finish();
         if (status === 'failed') {
           done = true;
           setPaying(false);

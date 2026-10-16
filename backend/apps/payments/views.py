@@ -153,6 +153,7 @@ class BanorteResultView(APIView):
             BanorteCheckout.objects.filter(pk=checkout.pk).update(key_material='')
 
         return Response({'payment_id': payment.pk, 'status': payment.status,
+                         'failure_reason': payment.failure_reason(),
                          'detail': body.get('detail', '')}, status=http_status)
 
 
