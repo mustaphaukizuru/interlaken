@@ -23,13 +23,14 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { paymentsApi, downloadBlob, type PaymentSummary } from '@/services/api';
 import type { Payment } from '@/types';
 import { PAYMENT_FAILURE, PAYMENT_STATUS_META } from '@/lib/status/payment';
+import { applyPhrase } from '@/lib/topupApply';
 
 // Label + variant come from the shared map (`lib/status/payment`); the portal
 // adds an icon and a help line per status.
 const STATUS_EXTRA: Record<string, { icon: typeof Clock; help?: string }> = {
   success:    { icon: CheckCircle },
   pending:    { icon: Clock,
-                help: 'Si pagó con tarjeta, el saldo se aplica en minutos. Si eligió pago en caja, el colegio lo aplicará al recibir el efectivo.' },
+                help: 'Si pagó con tarjeta, el pago se confirma en unos minutos. Si eligió pago en caja, el colegio lo aplicará al recibir el efectivo.' },
   processing: { icon: Clock,
                 help: 'La pasarela está confirmando el cargo. No vuelva a pagar; consulte en unos minutos.' },
   // The real cause comes from `failure_reason` (see rowMeta); this is the fallback.
@@ -211,6 +212,12 @@ export default function PaymentsPage() {
                         <Badge variant={meta.variant}>{meta.label}</Badge>
                       </div>
                     </div>
+                    {p.status === 'success' && p.topup?.status === 'paid' && (
+                      <p className="mt-2 flex items-center gap-1.5 pl-12 text-xs font-medium text-amber">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        Pagada, por aplicar: se sumará al saldo {applyPhrase(p.topup.apply_due_at)}
+                      </p>
+                    )}
                     {(p.status === 'success' || p.status === 'refunded') && (
                       <div className="mt-2 pl-12">
                         <button type="button" onClick={() => receipt.mutate(p.id)} disabled={receipt.isPending && receipt.variables === p.id}

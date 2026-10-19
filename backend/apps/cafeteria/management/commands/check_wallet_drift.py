@@ -44,6 +44,11 @@ class Command(BaseCommand):
             problems.append(f'{unlinked} cliente(s) de Loyverse con matrícula de alumno sin vincular')
         if parked:
             problems.append(f'{parked} recibo(s) del monedero sin alumno asignado')
+        held = int(audit.get('held_paid') or 0)
+        if held:
+            problems.append(f'{held} alumno(s) con más saldo en Loyverse que en la app y una '
+                            f'recarga en línea por aplicar que no coincide con esa diferencia '
+                            f'(revise POS Loyverse → Por aplicar)')
 
         OpsStatus.set('wallet_drift_check', {
             'at': timezone.now().isoformat(), 'problems': len(problems),

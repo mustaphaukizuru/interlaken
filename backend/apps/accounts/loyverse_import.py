@@ -33,6 +33,7 @@ def _serialize_import(report: dict) -> dict:
 
 class ImportLoyverseView(APIView):
     """Create/refresh students from Loyverse customers (admin only)."""
+    admin_area = ('alumnos', 'cafeteria')
     permission_classes = [IsAdmin]
 
     def post(self, request):

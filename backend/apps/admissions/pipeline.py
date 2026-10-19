@@ -74,6 +74,7 @@ class PipelineView(APIView):
     """GET /admissions/admin/pipeline/ — kanban of the non-terminal statuses plus
     the last ``COMPLETE_WINDOW_DAYS`` days of *complete*. ``?all=1`` lifts the
     window (the board then shows every completed registration)."""
+    admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def get(self, request):
@@ -118,6 +119,7 @@ def render_missing_docs(reg: Registration, template: str | None = None, upload_u
 
 
 class RequestDocsView(APIView):
+    admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -145,6 +147,7 @@ class ConvertView(APIView):
     staff, admin or student account would expose the child's file (medical
     data included) to it. Those are reported in ``unlinked`` for the admin to
     resolve by hand."""
+    admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -222,6 +225,7 @@ class ConvertView(APIView):
 
 class TemplatesView(APIView):
     """GET/PATCH /admissions/admin/templates/ — editable message templates (Ajustes)."""
+    admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def get(self, request):

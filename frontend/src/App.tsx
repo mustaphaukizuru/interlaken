@@ -8,7 +8,7 @@ import { useAuthStore } from './store/authStore';
 import { bindQueryCacheToUser } from './lib/queryCacheOwner';
 
 // Layouts & guards are part of the shell — keep them in the main chunk.
-import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { ConsoleAreaGuard, ProtectedRoute } from './components/layout/ProtectedRoute';
 import { PublicLayout } from './components/layout/PublicLayout';
 // PortalLayout is lazy ON PURPOSE (perf budget): it statically pulls the whole
 // authenticated chrome — Sidebar, AppHeader, NotificationsMenu (which drags in
@@ -212,8 +212,10 @@ export default function App() {
 
             {/* ── ADMIN PORTAL ────────────────────────────── */}
             <Route path="/admin" element={
-              <ProtectedRoute roles={['admin']}>
-                <PortalLayout role="admin" />
+              <ProtectedRoute roles={['admin', 'staff']}>
+                <ConsoleAreaGuard>
+                  <PortalLayout role="admin" />
+                </ConsoleAreaGuard>
               </ProtectedRoute>
             }>
               <Route index              element={<AdminDashboard />} />

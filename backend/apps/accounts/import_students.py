@@ -294,6 +294,7 @@ class StudentImport:
 
 class ImportStudentsView(ImportView):
     """POST .../admin/students/import/ — dry run by default; see the module docstring."""
+    admin_area = 'alumnos'
 
     template_url = TEMPLATE_URL
 
@@ -303,6 +304,7 @@ class ImportStudentsView(ImportView):
 
 class ImportStudentsTemplateView(ImportTemplateView):
     """GET .../admin/students/import/template/?fmt=csv|xlsx"""
+    admin_area = 'alumnos'
 
     def get_spec(self) -> ImportSpec:
         return StudentImport().spec()

@@ -48,9 +48,12 @@ TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
         "no_show": frozenset({"attended"}),
     },
     "cafeteria.topuprequest": {
-        "pending": frozenset({"completed", "failed"}),
+        # paid: card approved, waiting for its POS load (scheduled apply mode).
+        "pending": frozenset({"completed", "failed", "paid"}),
+        "paid": frozenset({"completed", "refunded"}),
         "failed": frozenset({"pending"}),
         "completed": frozenset(),
+        "refunded": frozenset(),
     },
     "legal.arcorequest": {
         "received": frozenset({"in_review", "resolved", "rejected"}),

@@ -246,10 +246,32 @@ class TopUpFilter(django_filters.FilterSet):
     needs_pos = django_filters.BooleanFilter(method="filter_needs_pos", widget=BooleanWidget)
     needs_unload = django_filters.BooleanFilter(method="filter_needs_unload", widget=BooleanWidget)
     needs_review = django_filters.BooleanFilter(method="filter_needs_review", widget=BooleanWidget)
+    needs_apply = django_filters.BooleanFilter(method="filter_needs_apply", widget=BooleanWidget)
+    applied_on = django_filters.DateFilter(method="filter_applied_on")
 
     class Meta:
         model = TopUpRequest
         fields: list[str] = []
+
+    def filter_applied_on(self, qs, name, value):
+        """Card top-ups that reached the wallet on ``value`` (school day): the
+        "Aplicadas hoy" list staff check against what they typed into the POS."""
+        if not value:
+            return qs
+        from apps.core.listing import day_end_exclusive, day_start
+
+        return qs.filter(
+            method=TopUpRequest.Method.ONLINE,
+            applied_at__gte=day_start(value),
+            applied_at__lt=day_end_exclusive(value),
+        ).exclude(applied_via=TopUpRequest.AppliedVia.INSTANT)
+
+    def filter_needs_apply(self, qs, name, value):
+        """Paid online top-ups waiting to be loaded into the POS and applied
+        (scheduled apply mode); refunded payments excluded."""
+        if not value:
+            return qs
+        return qs.filter(pk__in=services.paid_topups_pending().values("pk"))
 
     def filter_needs_pos(self, qs, name, value):
         """Paid online, credited locally, not yet loaded into the POS (refunds and
@@ -330,6 +352,8 @@ TRANSACTION_ORDERING = {
 ADJUSTMENT_ORDERING = {"date": "created_at", "amount": "amount", "kind": "kind"}
 TOPUP_ORDERING = {
     "created_at": "created_at",
+    "apply_due_at": "apply_due_at",
+    "applied_at": "applied_at",
     "amount": "amount",
     "status": "status",
     "method": "method",
@@ -405,6 +429,11 @@ TRANSACTION_EXPORT = ExportSpec(
 )
 
 
+def _loyverse_code(topup) -> str:
+    profile = getattr(topup.student, "loyverse_profile", None)
+    return (profile.customer_code if profile else "") or ""
+
+
 def _first_payment(topup):
     if not hasattr(topup, "_cached_payment"):
         topup._cached_payment = next(iter(topup.payments.all()), None)
@@ -412,6 +441,8 @@ def _first_payment(topup):
 
 
 def _pos_state(topup) -> str:
+    if topup.status == TopUpRequest.Status.PAID:
+        return "Por cargar y aplicar"
     if topup.pos_unload_needed_at and not topup.pos_unloaded_at:
         return "Quitar del POS"
     if topup.pos_unloaded_at:
@@ -451,6 +482,28 @@ TOPUP_EXPORT = ExportSpec(
         ),
         Col("pos", "POS", getter=_pos_state, width=14),
         Col("processed_at", "Procesada", width=17, fmt="datetime"),
+        Col(
+            "folio",
+            "Folio",
+            getter=lambda t: (str(_first_payment(t).pk) if _first_payment(t) else ""),
+            width=9,
+            fmt="text",
+        ),
+        Col(
+            "loyverse_code",
+            "Cliente Loyverse",
+            getter=lambda t: _loyverse_code(t),
+            width=14,
+            fmt="text",
+        ),
+        Col("apply_due_at", "Se aplica", width=17, fmt="datetime"),
+        Col("applied_at", "Aplicada", width=17, fmt="datetime"),
+        Col(
+            "applied_via",
+            "Aplicada por",
+            getter=lambda t: t.get_applied_via_display() if t.applied_via else "",
+            width=18,
+        ),
     ],
     audit_entity="cafeteria.topups",
     title="Depósitos de cafetería",
@@ -517,6 +570,7 @@ class AdminBalancesView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     matrícula and the Loyverse code (``09932`` and ``ci09932`` find the same
     wallet) and guardian emails. Default order: student name.
     """
+    admin_area = 'cafeteria'
 
     serializer_class = CafeteriaBalanceSerializer
     filterset_class = BalanceFilter
@@ -534,6 +588,7 @@ class AdminBalancesView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
 
 class AdminBalancesExportView(AdminExportMixin, AdminBalancesView):
     """GET .../admin/balances/export/?fmt=csv|xlsx|pdf&ids=&…same filters…"""
+    admin_area = 'cafeteria'
 
     export_spec = BALANCE_EXPORT
 
@@ -602,6 +657,7 @@ BALANCE_ACTIONS = {
 
 class AdminBalancesBulkView(AdminBulkView):
     """POST .../admin/balances/bulk/  actions ``sync`` and ``set_threshold`` (payload.threshold)."""
+    admin_area = 'cafeteria'
 
     entity = "cafeteria.cafeteriabalance"
     list_view_class = AdminBalancesView
@@ -813,6 +869,7 @@ class AdminAdjustmentImportView(ImportView):
     Re-committing the same file skips the rows it already applied. Cap 500
     rows. (``mirror`` is no longer read: Loyverse points cannot be written.)
     """
+    admin_area = 'cafeteria'
 
     template_url = ADJUSTMENT_TEMPLATE_URL
 
@@ -835,6 +892,7 @@ class AdminAdjustmentImportView(ImportView):
 
 class AdminAdjustmentTemplateView(ImportTemplateView):
     """GET .../admin/balances/import/template/?fmt=csv|xlsx"""
+    admin_area = 'cafeteria'
 
     spec = build_adjustment_spec()
 
@@ -867,6 +925,7 @@ class AdminTransactionListView(
     Loyverse, description and receipt id. Refunds stay a single-row action
     (``admin/refund/<tx>/``, type-to-confirm in the console).
     """
+    admin_area = 'cafeteria'
 
     serializer_class = AdminTransactionSerializer
     filterset_class = TransactionFilter
@@ -888,11 +947,13 @@ class AdminTransactionListView(
 
 
 class AdminTransactionExportView(AdminExportMixin, AdminTransactionListView):
+    admin_area = 'cafeteria'
     export_spec = TRANSACTION_EXPORT
 
 
 class AdminAdjustmentListView(DateRangeMixin, AdminListMixin, generics.ListAPIView):
     """GET .../admin/adjustments/?student=&kind=&from=&to=&ordering= (manual trail, paginated)."""
+    admin_area = 'cafeteria'
 
     serializer_class = BalanceAdjustmentSerializer
     filterset_class = AdjustmentFilter
@@ -914,6 +975,7 @@ class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generic
     ``needs_pos=1`` is the POS load queue, ``needs_unload=1`` the post-refund
     unload queue, ``needs_review=1`` the card attempts to check in MultiCobros.
     """
+    admin_area = 'cafeteria'
 
     serializer_class = TopUpLogSerializer
     filterset_class = TopUpFilter
@@ -923,11 +985,30 @@ class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generic
     search_text_fields = ("student__user__first_name", "student__user__last_name", "payment_ref")
     search_code_fields = ("student__student_id", "student__loyverse_profile__customer_code")
 
+    def search_extra(self, term):
+        # The folio on the family's comprobante (and in its WhatsApp message)
+        # is the payment id: "Folio 123" / "PAGO123" finds that top-up.
+        from apps.payments.models import Payment
+
+        raw = str(term).strip().lower()
+        if raw.strip(":#") in ("folio", "pago", ""):
+            # "folio 123" is split into two terms: the label matches anything.
+            return Q(pk__isnull=False)
+        for prefix in ("folio", "pago", "#"):
+            raw = raw.removeprefix(prefix)
+        digits = raw.strip(" :#-")
+        # Matrículas are zero-padded (09932); payment ids never start with 0.
+        if not digits.isdigit() or digits.startswith("0") or len(digits) > 9:
+            return None
+        # Subquery, not a join: a top-up with two attempts would list twice.
+        return Q(pk__in=Payment.objects.filter(pk=int(digits)).values("related_topup_id"))
+
     def get_queryset(self):
         from apps.payments.models import Payment
 
         return TopUpRequest.objects.select_related(
-            "student__user", "pos_loaded_by", "pos_unloaded_by"
+            "student__user", "student__loyverse_profile", "student__cafeteria_balance",
+            "pos_loaded_by", "pos_unloaded_by", "applied_by",
         ).prefetch_related(
             # Explicit ordered Prefetch: the serializer takes the FIRST row as
             # "the" payment; a plain .order_by() would drop the cache (N+1).
@@ -941,6 +1022,7 @@ class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generic
 
 
 class AdminTopUpExportView(AdminExportMixin, AdminTopUpLogView):
+    admin_area = 'cafeteria'
     export_spec = TOPUP_EXPORT
 
 
@@ -978,6 +1060,8 @@ def _pos_loaded_plan(topup, payload):
 
     if topup.method != TopUpRequest.Method.ONLINE:
         raise BulkSkip("no es una recarga en línea")
+    if topup.status == TopUpRequest.Status.PAID:
+        raise BulkSkip("está pagada y pendiente de aplicar: use «Aplicar (ya cargadas en POS)»")
     if topup.status != TopUpRequest.Status.COMPLETED:
         raise BulkSkip("aún no está acreditada en el saldo local")
     payment = next(iter(topup.payments.all()), None)
@@ -999,6 +1083,28 @@ def _pos_loaded_handler(topup, payload, actor):
     topup.pos_loaded_by = actor
     topup.save(update_fields=["pos_loaded_at", "pos_loaded_by"])
     return {"pos_loaded": True}
+
+
+def _apply_paid_plan(topup, payload):
+    if topup.method != TopUpRequest.Method.ONLINE or topup.status != TopUpRequest.Status.PAID:
+        raise BulkSkip("no es una recarga en línea pagada pendiente de aplicar")
+    payment = next(iter(topup.payments.all()), None)
+    if payment is None or payment.status != "success":
+        raise BulkSkip("su pago no está aprobado (o fue devuelto)")
+    if payment.needs_bank_verification():
+        raise BulkSkip("falta verificar la operación en MultiCobros")
+
+
+def _apply_paid_handler(topup, payload, actor):
+    _apply_paid_plan(topup, payload)
+    try:
+        tx, balance = services.apply_paid_topup(topup, actor=actor)
+    except services.TopUpApplyError as exc:
+        if exc.code in ("already_applied", "not_paid"):
+            raise BulkSkip(str(exc)) from exc
+        raise
+    return {"status": ["paid", "completed"], "amount": str(topup.amount),
+            "transaction": tx.pk, "balance": str(balance)}
 
 
 def _pos_unloaded_plan(topup, payload):
@@ -1040,6 +1146,13 @@ TOPUP_ACTIONS = {
             plan=_pos_unloaded_plan,
             side_effects="none",
         ),
+        BulkAction(
+            name="apply_paid",
+            label_es="Aplicar (ya cargadas en POS)",
+            handler=_apply_paid_handler,
+            plan=_apply_paid_plan,
+            side_effects="per_row",
+        ),
     )
 }
 
@@ -1050,6 +1163,7 @@ class AdminTopUpBulkView(AdminBulkView):
     ``apply`` answers with ``total``: the MXN the processed rows credit (the
     dry-run's total is what the confirm dialog shows before any money moves).
     """
+    admin_area = 'cafeteria'
 
     entity = TOPUP_ENTITY
     list_view_class = AdminTopUpLogView
@@ -1077,7 +1191,7 @@ class AdminTopUpBulkView(AdminBulkView):
         self._ids = [int(i) for i in (raw or []) if str(i).isdigit()]
         response = super().post(request)
         result = response.data
-        if result.get("action") == "apply":
+        if result.get("action") in ("apply", "apply_paid"):
             bad = {r["id"] for r in result["failed"]} | {r["id"] for r in result["skipped"]}
             done = [i for i in dict.fromkeys(self._ids) if i not in bad]
             total = TopUpRequest.objects.filter(pk__in=done).aggregate(t=Sum("amount"))["t"]
@@ -1093,6 +1207,7 @@ class AdminLowBalanceView(CodeSearchMixin, AdminListMixin, generics.ListAPIView)
     days (``services.low_balance_queryset``: same rule as the dashboard and
     the weekly alert). Lowest balance first.
     """
+    admin_area = 'cafeteria'
 
     serializer_class = CafeteriaBalanceSerializer
     filterset_class = BalanceFilter
@@ -1111,6 +1226,7 @@ class AdminLowBalanceView(CodeSearchMixin, AdminListMixin, generics.ListAPIView)
 
 
 class AdminLowBalanceExportView(AdminExportMixin, AdminLowBalanceView):
+    admin_area = 'cafeteria'
     export_spec = LOW_BALANCE_EXPORT
 
 
@@ -1126,6 +1242,7 @@ class AdminLoyverseCustomersView(CodeSearchMixin, AdminListMixin, generics.ListA
     school's own and test cards). Adds ``summary`` (cards per kind + missing)
     to the list envelope. ``page_size`` is honoured (default 50).
     """
+    admin_area = 'cafeteria'
 
     serializer_class = LoyverseCustomerSerializer
     filterset_class = CustomerFilter
@@ -1171,6 +1288,7 @@ class AdminLoyverseCustomersView(CodeSearchMixin, AdminListMixin, generics.ListA
 
 
 class AdminLoyverseCustomersExportView(AdminExportMixin, AdminLoyverseCustomersView):
+    admin_area = 'cafeteria'
     export_spec = CUSTOMER_EXPORT
 
 
@@ -1252,6 +1370,7 @@ class AdminReconcileView(CodeSearchMixin, AdminListMixin, generics.ListAPIView):
     describe the page; the legacy ``limit``/``offset`` query params were
     removed in Data Ops Phase 10 (``page``/``page_size`` only).
     """
+    admin_area = 'cafeteria'
 
     filterset_class = StudentFilter
     ordering = RECONCILE_ORDERING
@@ -1303,6 +1422,7 @@ class AdminReconcileExportView(AdminReconcileView):
     one Loyverse read per row, so a whole-roster file stays inside the
     request budget. Audited like every export.
     """
+    admin_area = 'cafeteria'
 
     throttle_classes = [SharedScopedRateThrottle]
     throttle_scope = "admin-export"
@@ -1405,6 +1525,7 @@ class AdminReconcileBulkView(AdminBulkView):
     the selected balances, before the bulk transaction. Capped at 50 ids and
     "select all matching" is not offered: Corregir is a reviewed, per-row act.
     """
+    admin_area = 'cafeteria'
 
     entity = "cafeteria.reconcile"
     max_ids = RECONCILE_MAX_IDS

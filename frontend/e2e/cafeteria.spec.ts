@@ -135,6 +135,20 @@ test.describe('top-up return page (cafeteria/recarga/retorno)', () => {
     await expect(page.getByRole('link', { name: /ver saldo de cafetería/i })).toBeVisible();
   });
 
+  test('a paid top-up waiting for the 7:30 POS load says so and offers WhatsApp', async ({ page }) => {
+    await page.route('**/api/v1/payments/55/', (route) =>
+      route.fulfill({ json: {
+        id: 55, status: 'success', amount: '200.00',
+        topup: { id: 9, status: 'paid', apply_due_at: '2030-01-07T13:30:00Z', applied_at: null },
+      } }));
+    await login(page, DEV_PARENT);
+    await page.goto('/portal/cafeteria/recarga/retorno?payment_id=55');
+    await expect(page.getByRole('heading', { name: 'Pago recibido' })).toBeVisible();
+    await expect(page.getByText('el lunes 7 de enero a las 7:30 a.m.')).toBeVisible();
+    await expect(page.getByRole('link', { name: /La necesito hoy: WhatsApp/ }))
+      .toHaveAttribute('href', /^https:\/\/wa\.me\/52\d{10}\?text=/);
+  });
+
   test('a failed payment shows the failure state', async ({ page }) => {
     await openReturn(page, 'failed');
     await expect(page.getByRole('heading', { name: 'La recarga no se completó' })).toBeVisible();

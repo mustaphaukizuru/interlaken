@@ -74,6 +74,7 @@ class PreRegistrationExportView(AdminExportMixin, PreRegistrationAdminListView):
     Same ``q``, filters (status, level, cycle, wants_visit, from, to) and
     ``ordering`` as the list, plus ``ids``.
     """
+    admin_area = 'admisiones'
 
     export_spec = PREREGISTRATION_EXPORT
 
@@ -84,5 +85,6 @@ class RegistrationExportView(AdminExportMixin, RegistrationAdminListView):
     Same ``q``, filters (status, level, cycle, documents_pending, from, to)
     and ``ordering`` as the list, plus ``ids``.
     """
+    admin_area = 'admisiones'
 
     export_spec = REGISTRATION_EXPORT

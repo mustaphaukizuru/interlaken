@@ -218,6 +218,7 @@ class ContactInboxView(AdminListMixin, generics.ListAPIView):
     message; ``?handled=1|0``; ``from`` / ``to``; ordering ``date``, ``name``,
     ``email``, ``subject``, ``handled``.
     """
+    admin_area = 'mensajes'
     serializer_class = ContactMessageAdminSerializer
     search_fields = CONTACT_SEARCH_FIELDS
     ordering = CONTACT_ORDERING
@@ -230,11 +231,13 @@ class ContactInboxView(AdminListMixin, generics.ListAPIView):
 
 class ContactInboxExportView(AdminExportMixin, ContactInboxView):
     """GET /api/v1/core/admin/contact-messages/export/?fmt=csv|xlsx|pdf (audited)."""
+    admin_area = 'mensajes'
     export_spec = CONTACT_EXPORT_SPEC
 
 
 class ContactMessageHandleView(APIView):
     """PATCH /api/v1/core/admin/contact-messages/<pk>/ {"is_handled": bool} (audited)."""
+    admin_area = 'mensajes'
     permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
@@ -271,6 +274,7 @@ def _handled_action(name: str, label_es: str, target: bool) -> BulkAction:
 
 class ContactInboxBulkView(AdminBulkView):
     """POST /api/v1/core/admin/contact-messages/bulk/ — ``mark_handled`` / ``reopen`` (C5)."""
+    admin_area = 'mensajes'
     entity = 'core.contactmessage'
     list_view_class = ContactInboxView
     actions = {

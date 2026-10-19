@@ -175,6 +175,9 @@ def _make_online_topup(parent, student, amount="200.00"):
     return topup, payment
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestTopUpSettlementCredit:
     def test_success_credits_local_ledger_and_notifies(self):
         parent = ParentFactory()
@@ -250,6 +253,9 @@ class TestTopUpSettlementCredit:
             student=student, balance__gt=0).count() == 0
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestSandboxComplete:
     """The DEV-only mock-checkout completion reuses the settlement path, so a
     sandbox 'success' credits the ledger exactly like production does."""

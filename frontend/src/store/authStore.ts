@@ -30,6 +30,10 @@ export interface User {
     cat_payment?: boolean;
     cat_info?: boolean;
   };
+  /** Admin-console areas this account may use (every one for an admin; lib/areas.ts). */
+  staff_areas?: string[];
+  /** Job title of a staff account ("Secretaría", "Recepción"...). */
+  staff_title?: string;
 }
 
 interface AuthState {

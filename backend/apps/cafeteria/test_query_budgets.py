@@ -22,8 +22,9 @@ from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
 
-# students + bulk-create missing balances + balances (user joined) + spend map.
-BALANCE_BUDGET = 4
+# students + bulk-create missing balances + balances (user joined) + spend map
+# + paid top-ups waiting for their POS load (their folios only when there are any).
+BALANCE_BUDGET = 5
 # pagination count + page rows (student/POS users joined) + payments prefetch.
 TOPUP_LOG_BUDGET = 3
 
@@ -97,9 +98,10 @@ ADJUSTMENTS_BUDGET = 2
 LOW_BALANCE_BUDGET = 2
 # count + page + unmatched-receipt counts + summary per kind + missing count.
 CUSTOMERS_BUDGET = 5
-# count + page (user, profile and balance joined) + the two POS-queue reads
-# (pending loads, pending unloads); the one store-wide Loyverse fetch is mocked.
-RECONCILE_BUDGET = 4
+# count + page (user, profile and balance joined) + the three POS-queue reads
+# (pending loads, pending unloads, paid top-ups to apply); the one store-wide
+# Loyverse fetch is mocked.
+RECONCILE_BUDGET = 5
 # count + rows + audit insert (each export; top-ups add the payments prefetch).
 BALANCES_EXPORT_BUDGET = 3
 TRANSACTIONS_EXPORT_BUDGET = 3

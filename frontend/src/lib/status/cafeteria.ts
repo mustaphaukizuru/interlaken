@@ -10,8 +10,10 @@ export const TX_TYPE: Record<string, { label: string; variant: BadgeVariant }> =
 
 export const TOPUP_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
   pending: { label: 'Pendiente', variant: 'warning' },
+  paid: { label: 'Pagada · por aplicar', variant: 'info' },
   completed: { label: 'Completado', variant: 'success' },
   failed: { label: 'Fallido', variant: 'error' },
+  refunded: { label: 'Devuelta sin aplicar', variant: 'neutral' },
 };
 
 export const TOPUP_METHOD: Record<string, string> = {

@@ -93,9 +93,40 @@ def build_spend_map(students):
     }
 
 
+def build_pending_topups_map(students) -> dict:
+    """``{student_id: [pending top-up, ...]}`` in ONE pair of queries.
+
+    The paid online top-ups a family is still waiting for (scheduled apply
+    mode): shown next to the balance with the promised load time, so a paid
+    recarga is never "lost" between the bank and the POS. ``folio`` is the
+    payment id printed on the comprobante.
+    """
+    from apps.cafeteria.services import paid_topups_pending
+    from apps.payments.models import Payment
+
+    topups = list(paid_topups_pending().filter(student__in=students)
+                  .order_by('processed_at', 'pk'))
+    if not topups:
+        return {}
+    folios = dict(Payment.objects.filter(related_topup__in=topups, status=Payment.Status.SUCCESS)
+                  .order_by('created_at', 'pk').values_list('related_topup_id', 'pk'))
+    out: dict = {}
+    for t in topups:
+        out.setdefault(t.student_id, []).append({
+            'id': t.pk,
+            'amount': f'{t.amount:.2f}',
+            'paid_at': t.processed_at.isoformat() if t.processed_at else None,
+            'apply_due_at': t.apply_due_at.isoformat() if t.apply_due_at else None,
+            'folio': folios.get(t.pk),
+        })
+    return out
+
+
 class CafeteriaBalanceSerializer(serializers.ModelSerializer):
     student = StudentProfileSerializer(read_only=True)
     is_low_balance = serializers.BooleanField(read_only=True)
+    # Paid online top-ups not applied yet (family views; see build_pending_topups_map).
+    pending_topups = serializers.SerializerMethodField()
     # Running spend for budget progress bars (F13). Two extra queries each, so
     # only computed for family views that pass ``include_spend`` in context —
     # admin balance lists (large N) keep them null and stay cheap.
@@ -106,7 +137,13 @@ class CafeteriaBalanceSerializer(serializers.ModelSerializer):
         model = CafeteriaBalance
         fields = ['id', 'student', 'balance', 'low_balance_threshold', 'last_synced',
                   'is_low_balance', 'daily_spend_limit', 'weekly_spend_limit',
-                  'today_spend', 'week_spend']
+                  'today_spend', 'week_spend', 'pending_topups']
+
+    def get_pending_topups(self, obj):
+        pending = self.context.get('pending_topups')
+        if pending is None:
+            return []
+        return pending.get(obj.student_id, [])
 
     def _spend_since(self, obj, start):
         total = (CafeteriaTransaction.objects
@@ -175,8 +212,9 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TopUpRequest
-        fields = ['id', 'student', 'amount', 'method', 'status', 'created_at', 'processed_at']
-        read_only_fields = ['status', 'created_at', 'processed_at']
+        fields = ['id', 'student', 'amount', 'method', 'status', 'created_at', 'processed_at',
+                  'apply_due_at', 'applied_at']
+        read_only_fields = ['status', 'created_at', 'processed_at', 'apply_due_at', 'applied_at']
 
 
 class TopUpLogSerializer(serializers.ModelSerializer):
@@ -202,6 +240,15 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         source='pos_loaded_by.full_name', read_only=True, default='')
     pos_unloaded_by_name = serializers.CharField(
         source='pos_unloaded_by.full_name', read_only=True, default='')
+    applied_by_name = serializers.CharField(
+        source='applied_by.full_name', read_only=True, default='')
+    applied_via_display = serializers.CharField(
+        source='get_applied_via_display', read_only=True)
+    needs_apply = serializers.SerializerMethodField()
+    apply_overdue = serializers.SerializerMethodField()
+    loyverse_code = serializers.SerializerMethodField()
+    loyverse_points = serializers.SerializerMethodField()
+    wallet_balance = serializers.SerializerMethodField()
 
     class Meta:
         model = TopUpRequest
@@ -213,7 +260,42 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'pos_loaded_at', 'pos_loaded_by_name', 'needs_pos_load',
             'pos_unload_needed_at', 'pos_unloaded_at', 'pos_unloaded_by_name',
             'needs_pos_unload',
+            'apply_due_at', 'applied_at', 'applied_via', 'applied_via_display',
+            'applied_by_name', 'needs_apply', 'apply_overdue',
+            'loyverse_code', 'loyverse_points', 'wallet_balance',
         ]
+
+    def get_needs_apply(self, obj):
+        if obj.method != TopUpRequest.Method.ONLINE or obj.status != TopUpRequest.Status.PAID:
+            return False
+        from apps.payments.models import Payment
+        p = self._payment(obj)
+        return p is not None and p.status == Payment.Status.SUCCESS
+
+    def get_apply_overdue(self, obj):
+        return bool(self.get_needs_apply(obj) and obj.apply_due_at
+                    and obj.apply_due_at <= timezone.now())
+
+    @staticmethod
+    def _related(obj, name):
+        # Reverse one-to-ones raise when absent, even after select_related.
+        try:
+            return getattr(obj.student, name)
+        except Exception:  # noqa: BLE001 — RelatedObjectDoesNotExist
+            return None
+
+    def get_loyverse_code(self, obj):
+        profile = self._related(obj, 'loyverse_profile')
+        return profile.customer_code if profile else ''
+
+    def get_loyverse_points(self, obj):
+        """Loyverse points from the last sync snapshot (the queue's "¿ya se cargó?")."""
+        profile = self._related(obj, 'loyverse_profile')
+        return f'{profile.total_points:.2f}' if profile else None
+
+    def get_wallet_balance(self, obj):
+        cb = self._related(obj, 'cafeteria_balance')
+        return f'{cb.balance:.2f}' if cb else None
 
     def get_needs_pos_load(self, obj):
         if not (

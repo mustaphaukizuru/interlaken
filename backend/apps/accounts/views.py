@@ -451,7 +451,11 @@ class StudentListView(AdminListMixin, generics.ListAPIView):
     filterset_class = StudentFilterSet
 
     def _is_admin(self):
-        return getattr(self.request.user, 'role', None) == User.Role.ADMIN
+        # The roster is the "Alumnos y familias" console area: admins, and
+        # staff accounts holding it (apps/core/areas.py).
+        from apps.core.areas import has_area
+
+        return has_area(self.request.user, 'alumnos')
 
     def get_serializer_class(self):
         return StudentRosterSerializer if self._is_admin() else StudentProfileSerializer
@@ -462,7 +466,7 @@ class StudentListView(AdminListMixin, generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == User.Role.ADMIN:
+        if self._is_admin():
             # Filters, search and ordering are applied by AdminListMixin.filter_queryset.
             return roster_queryset()
         elif user.role == User.Role.PARENT:
@@ -500,9 +504,13 @@ class StudentDetailView(generics.RetrieveAPIView):
         return Response(data)
 
     def get_queryset(self):
+        from apps.core.areas import has_area
+
         user = self.request.user
         qs = StudentProfile.objects.select_related('user', 'loyverse_profile')
-        if user.role == User.Role.ADMIN:
+        # Admins and "Alumnos y familias" staff (medical data stays masked for
+        # staff: accounts.medical).
+        if has_area(user, 'alumnos'):
             return qs
         elif user.role == User.Role.PARENT:
             return qs.filter(parents=user)

@@ -105,6 +105,7 @@ PREREG_ACTIONS = {
 
 
 class PreRegistrationBulkView(AdminBulkView):
+    admin_area = 'admisiones'
     entity = PREREG_ENTITY
     list_view_class = PreRegistrationAdminListView
     actions = PREREG_ACTIONS
@@ -177,6 +178,7 @@ REGISTRATION_ACTIONS = {
 
 
 class RegistrationBulkView(AdminBulkView):
+    admin_area = 'admisiones'
     entity = REG_ENTITY
     list_view_class = RegistrationAdminListView
     actions = REGISTRATION_ACTIONS
@@ -227,6 +229,7 @@ DOCUMENT_ACTIONS = {
 
 
 class DocumentBulkView(AdminBulkView):
+    admin_area = 'admisiones'
     entity = "admissions.registrationdocument"
     actions = DOCUMENT_ACTIONS
 

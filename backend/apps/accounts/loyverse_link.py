@@ -21,6 +21,7 @@ from apps.core.permissions import IsAdmin
 
 class LinkLoyverseView(APIView):
     """Backfill every student's ``loyverse_id`` from Loyverse (admin only)."""
+    admin_area = ('alumnos', 'cafeteria')
     permission_classes = [IsAdmin]
 
     def post(self, request):

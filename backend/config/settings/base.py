@@ -377,6 +377,23 @@ LOYVERSE_WEBHOOK_SECRET = env('LOYVERSE_WEBHOOK_SECRET', default='')
 # daily/weekly spending digest (send_spending_digest cron). Default False keeps
 # the immediate per-purchase notification behaviour.
 CAFETERIA_PURCHASE_DIGEST = env.bool('CAFETERIA_PURCHASE_DIGEST', default=False)
+# When an online (card) top-up reaches the wallet. Loyverse points cannot be
+# written by API (spec R1), so staff load every online top-up into the POS by
+# hand. ``scheduled`` (the school's rule since 2026-10-18): a paid top-up waits
+# as «pagada, por aplicar» and the wallet is credited only once the money is
+# in the POS (staff load it at CAFETERIA_TOPUP_APPLY_TIME every school day, or
+# right away when a family sends its comprobante by WhatsApp), so the portal
+# never shows money the cashier does not have. ``instant``: credit on payment
+# and load the POS afterwards (the behaviour before that date).
+CAFETERIA_TOPUP_APPLY_MODE = env('CAFETERIA_TOPUP_APPLY_MODE', default='scheduled')
+# Daily POS load time (HH:MM, school time zone) promised to families.
+CAFETERIA_TOPUP_APPLY_TIME = env('CAFETERIA_TOPUP_APPLY_TIME', default='07:30')
+# A payment made at least this many minutes before the load time on a school
+# day goes into that same morning's load; later ones wait for the next one.
+CAFETERIA_TOPUP_APPLY_CUTOFF_MINUTES = env.int('CAFETERIA_TOPUP_APPLY_CUTOFF_MINUTES', default=30)
+# School WhatsApp (10-digit Mexican number) where families send the
+# comprobante when the top-up must be applied the same day.
+CAFETERIA_TOPUP_WHATSAPP = env('CAFETERIA_TOPUP_WHATSAPP', default='5553791188')
 
 # ── PAYMENTS ──────────────────────────────────────────────
 # Banorte "Ventana de Comercio Electrónico Cifrada" is the only gateway

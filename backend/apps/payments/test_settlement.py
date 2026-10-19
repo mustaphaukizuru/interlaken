@@ -46,6 +46,9 @@ def _topup_payment(amount="200.00"):
     return student, topup, payment
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestIdempotency:
     def test_success_marks_payment_and_stores_reference(self):
         payment = PaymentFactory()
@@ -92,6 +95,9 @@ class TestIdempotency:
         assert not CafeteriaBalance.objects.filter(student=student, balance__gt=0).exists()
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestRefund:
     def test_refund_reverses_cafeteria_topup(self):
         student, topup, payment = _topup_payment()

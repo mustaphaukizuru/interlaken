@@ -121,6 +121,7 @@ class AdminSetPasswordView(APIView):
     ``temporary_password`` - the only time it is ever readable. An
     admin-supplied password is **not** echoed back.
     """
+    admin_area = 'accesos'
     permission_classes = [IsAdmin]
     # Per-admin ceiling: a legitimate front-desk reset is a handful per minute;
     # 20/min still blunts scripted mass-rewriting of every family credential.

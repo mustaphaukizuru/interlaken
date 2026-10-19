@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { mobileNavByRole, type Role } from './navConfig';
+import { mobileNavByRole, navByRole, type Role } from './navConfig';
+import { canOpen, isAdmin } from '@/lib/areas';
+import { useAuthStore } from '@/store/authStore';
 import { useBadges } from '@/hooks/useBadges';
 
 /**
@@ -22,7 +24,11 @@ function useKeyboardOpen(): boolean {
 }
 
 export default function MobileTabBar({ role }: { role: Role }) {
-  const items = mobileNavByRole[role] ?? mobileNavByRole.parent;
+  const user = useAuthStore((s) => s.user);
+  // Staff in the console: their own sections (first five), not the admin's.
+  const items = role === 'admin' && user && !isAdmin(user)
+    ? navByRole.admin.filter((item) => canOpen(user, item.to)).slice(0, 5)
+    : mobileNavByRole[role] ?? mobileNavByRole.parent;
   const keyboardOpen = useKeyboardOpen();
   const badges = useBadges();
   if (keyboardOpen) return null;

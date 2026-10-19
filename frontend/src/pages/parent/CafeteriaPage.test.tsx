@@ -427,3 +427,46 @@ describe('CafeteriaPage $1 test top-up', () => {
     expect(screen.queryByRole('button', { name: '$1 (prueba)' })).toBeNull();
   });
 });
+
+describe('CafeteriaPage scheduled application of card top-ups', () => {
+  const policy = { mode: 'scheduled', apply_time: '07:30', whatsapp: '5553791188', next_apply_at: '2030-01-07T13:30:00Z' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    vi.mocked(paymentsApi.getAvailability).mockResolvedValue(
+      { data: { online: true, test_mode: false, topup_policy: policy } } as never);
+  });
+
+  it('shows a paid top-up as «por aplicar» under the balance, with the date and WhatsApp', async () => {
+    mockedBalance.mockResolvedValue({ data: [{
+      ...account,
+      pending_topups: [{ id: 7, amount: '200.00', paid_at: '2030-01-04T22:00:00Z', apply_due_at: '2030-01-07T13:30:00Z', folio: 41 }],
+    }] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    expect(await screen.findByText(/Recarga por aplicar · \$200\.00/)).toBeInTheDocument();
+    // The balance itself is unchanged: the money is not spendable yet.
+    expect(screen.getByText('$150.00')).toBeInTheDocument();
+    expect(screen.getByText(/se sumará a su saldo el lunes 7 de enero a las 7:30 a\.m\./i)).toBeInTheDocument();
+    const wa = screen.getByRole('link', { name: /enviar comprobante por WhatsApp al 55 5379 1188/ });
+    expect(decodeURIComponent(wa.getAttribute('href') ?? '')).toContain('Folio: 41');
+  });
+
+  it('tells the family before paying when the balance will be applied', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    const u = userEvent.setup();
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(await screen.findByText(/El saldo se aplica el lunes 7 de enero a las 7:30 a\.m\./)).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m.');
+    expect(screen.getByRole('note')).toHaveTextContent('WhatsApp al 55 5379 1188');
+
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByText('Se aplica')).toBeInTheDocument();
+  });
+});

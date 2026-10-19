@@ -850,6 +850,13 @@ def sync_student_balance(student_profile) -> Decimal:
     existing = CafeteriaBalance.objects.filter(student=student_profile).first()
     if existing is not None and existing.last_synced is not None:
         return existing.balance
+    # A paid online top-up may already be typed into the POS: copying the
+    # points now would count it once here and again when it is applied.
+    # ``apply_paid_topup`` seeds such a wallet itself (points minus the load).
+    if paid_topups_pending().filter(student=student_profile).exists():
+        logger.info('Opening-balance seed for %s waits for its paid online top-up.',
+                    student_profile)
+        return existing.balance if existing is not None else Decimal('0')
 
     # Fetch the opening points BEFORE creating any row, so a failed seed leaves no
     # empty balance behind.
@@ -903,73 +910,121 @@ def _topup_reference(payment) -> str:
     return f'topup-payment-{payment.id}'
 
 
+def _credit_topup_locked(topup, payment, cb, *, via, actor=None, pos_loaded=False, now=None):
+    """Credit ``payment``'s amount to the locked wallet ``cb`` and close ``topup``.
+
+    The one place an online top-up reaches the ledger: on payment (``instant``
+    mode), when staff apply a paid top-up, or when the POS mirror finds it in
+    Loyverse. The ``topup-payment-<id>`` reference is unique, so a second
+    credit of the same payment is impossible whatever path tries it. Caller
+    holds the ``cb`` row lock inside ``transaction.atomic()``. Returns the new
+    ``CafeteriaTransaction``, or ``None`` when the reference already exists.
+    """
+    from apps.cafeteria.models import CafeteriaTransaction, TopUpRequest
+
+    now = now or timezone.now()
+    reference = _topup_reference(payment)
+    if CafeteriaTransaction.objects.filter(loyverse_receipt_id=reference).exists():
+        logger.info('Top-up %r already credited for %s: no-op.', reference, topup.student)
+        return None
+
+    amount = Decimal(str(payment.amount))
+    cb.balance = (cb.balance or Decimal('0')) + amount
+    cb.last_synced = now
+    fields = ['balance', 'last_synced']
+    if not cb.is_low_balance and cb.last_low_balance_alert_at is not None:
+        cb.last_low_balance_alert_at = None
+        fields.append('last_low_balance_alert_at')
+    cb.save(update_fields=fields)
+
+    tx = CafeteriaTransaction.objects.create(
+        student=topup.student,
+        transaction_type=CafeteriaTransaction.TxType.TOPUP,
+        amount=amount,
+        description=payment.description or f'Recarga en línea #{topup.id}',
+        loyverse_receipt_id=reference,
+        balance_after=cb.balance,
+    )
+
+    topup.status = TopUpRequest.Status.COMPLETED
+    topup.processed_at = topup.processed_at or now
+    topup.payment_ref = topup.payment_ref or payment.gateway_tx_id or str(payment.id)
+    topup.applied_at = now
+    topup.applied_by = actor
+    topup.applied_via = via
+    fields = ['status', 'processed_at', 'payment_ref', 'applied_at', 'applied_by', 'applied_via']
+    if pos_loaded and topup.pos_loaded_at is None:
+        # Applied because the money is in Loyverse: nothing left to load.
+        topup.pos_loaded_at = now
+        topup.pos_loaded_by = actor
+        fields += ['pos_loaded_at', 'pos_loaded_by']
+    topup.save(update_fields=fields)
+    return tx
+
+
 def complete_online_topup(payment):
-    """Credit the local cafeteria ledger for a confirmed online top-up (spec §2.2).
+    """Record a confirmed online top-up (spec §2.2); credit it when the mode says so.
 
     Given a **successful** cafeteria ``Payment`` linked to a ``TopUpRequest`` (via
-    ``related_topup``), this atomically:
+    ``related_topup``):
 
-    - credits the student's local ``CafeteriaBalance`` — the source of truth per
-      spec **R1** (Loyverse ``total_points`` is read-only, so we **never** write to
-      Loyverse here; the local ledger is authoritative for credit),
-    - records a ``topup`` ``CafeteriaTransaction`` with ``balance_after`` set,
-    - marks the ``TopUpRequest`` completed.
+    - ``scheduled`` mode (``schedule.apply_mode()``, the default): the top-up
+      becomes PAID with the promised ``apply_due_at``. The wallet is NOT
+      credited: Loyverse ``total_points`` is read-only (spec **R1**), so the
+      money reaches the wallet only once staff have it in the POS
+      (``apply_paid_topup`` or the POS mirror's match). The family's portal
+      balance then never shows money the cashier does not have.
+    - ``instant`` mode: credits the local ``CafeteriaBalance`` now (a ``topup``
+      ``CafeteriaTransaction`` with ``balance_after``) and marks the top-up
+      COMPLETED; staff load the POS afterwards (the "Cargar en POS" queue).
 
-    Idempotent and safe to call more than once: the unique reference guards against
-    a retried/replayed Banorte result (or a staff MultiCobros reconciliation racing
-    it) double-crediting. Returns the created
-    ``CafeteriaTransaction`` (or ``None`` if the payment isn't a linked top-up or
-    was already applied).
+    Loyverse is never written. Idempotent: COMPLETED/PAID/REFUNDED top-ups are
+    left alone and the unique ledger reference guards a replayed result.
+    Returns the created ``CafeteriaTransaction``, or ``None`` (not a linked
+    top-up, already processed, or scheduled for later).
     """
-    from django.utils import timezone as _tz
-
-    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
+    from apps.cafeteria import schedule
+    from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
 
     topup = getattr(payment, 'related_topup', None)
     if topup is None:
         return None
 
     # Defence in depth against a double-credit: COMPLETED means already applied
-    # (admin or a prior settled result). FAILED is allowed so a late SUCCESS after
-    # a soft expire/supersede/cancel can still credit. The per-payment reference
-    # guard below catches a replay of the *same* payment.
-    if topup.status == TopUpRequest.Status.COMPLETED:
-        logger.info(f'Top-up #{topup.id} already completed — webhook credit no-op.')
-        return None
+    # (admin or a prior settled result), PAID is already waiting for its POS
+    # load. FAILED is allowed so a late SUCCESS after a soft
+    # expire/supersede/cancel can still be recorded.
     if topup.status not in (TopUpRequest.Status.PENDING, TopUpRequest.Status.FAILED):
-        logger.info(f'Top-up #{topup.id} status={topup.status} — webhook credit no-op.')
+        logger.info(f'Top-up #{topup.id} status={topup.status}: payment result no-op.')
         return None
 
-    student = topup.student
-    amount = Decimal(str(payment.amount))
-    reference = _topup_reference(payment)
-
+    now = timezone.now()
     with transaction.atomic():
-        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
-
-        if CafeteriaTransaction.objects.filter(loyverse_receipt_id=reference).exists():
-            logger.info(f'Top-up {reference!r} already credited for {student} — no-op.')
+        topup = (TopUpRequest.objects.select_for_update()
+                 .select_related('student').get(pk=topup.pk))
+        if topup.status not in (TopUpRequest.Status.PENDING, TopUpRequest.Status.FAILED):
             return None
 
-        cb.balance = (cb.balance or Decimal('0')) + amount
-        cb.last_synced = _tz.now()
-        cb.save(update_fields=['balance', 'last_synced'])
+        if schedule.is_scheduled():
+            topup.status = TopUpRequest.Status.PAID
+            topup.processed_at = now
+            topup.payment_ref = payment.gateway_tx_id or str(payment.id)
+            topup.apply_due_at = schedule.next_apply_at(now)
+            topup.save(update_fields=['status', 'processed_at', 'payment_ref', 'apply_due_at'])
+            # The caller's ``related_topup`` must not keep the stale status.
+            payment.related_topup = topup
+            logger.info('Online top-up #%s paid ($%s, %s); wallet credit due %s.',
+                        topup.id, payment.amount, topup.student, topup.apply_due_at)
+            return None
 
-        tx = CafeteriaTransaction.objects.create(
-            student=student,
-            transaction_type=CafeteriaTransaction.TxType.TOPUP,
-            amount=amount,
-            description=payment.description or f'Recarga en línea #{topup.id}',
-            loyverse_receipt_id=reference,
-            balance_after=cb.balance,
-        )
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=topup.student)
+        tx = _credit_topup_locked(topup, payment, cb,
+                                  via=TopUpRequest.AppliedVia.INSTANT, now=now)
+        payment.related_topup = topup
 
-        topup.status = TopUpRequest.Status.COMPLETED
-        topup.processed_at = _tz.now()
-        topup.payment_ref = payment.gateway_tx_id or str(payment.id)
-        topup.save(update_fields=['status', 'processed_at', 'payment_ref'])
-
-    logger.info(f'Online top-up credited: ${amount} to {student} (payment #{payment.id}).')
+    if tx is not None:
+        logger.info(f'Online top-up credited: ${payment.amount} to {topup.student} '
+                    f'(payment #{payment.id}).')
     return tx
 
 
@@ -993,6 +1048,220 @@ def fail_online_topup(payment):
     topup.status = TopUpRequest.Status.FAILED
     topup.processed_at = _tz.now()
     topup.save(update_fields=['status', 'processed_at'])
+    return topup
+
+
+# ── Paid online top-ups waiting for their POS load (scheduled mode) ──────────
+
+
+class TopUpApplyError(ValueError):
+    """A paid top-up the server refuses to apply or refund. ``code`` tells the
+    console what to offer next; ``extra`` carries the numbers it shows."""
+
+    def __init__(self, message: str, *, code: str = 'invalid', status: int = 400, **extra):
+        super().__init__(message)
+        self.code = code
+        self.status = status
+        self.extra = extra
+
+
+POS_APPLY_PENDING = 'tiene una recarga en línea pagada por aplicar (cárguela en el POS)'
+
+
+def paid_topups_pending():
+    """Online top-ups paid and waiting to be loaded into the POS and applied."""
+    from apps.cafeteria.models import TopUpRequest
+    from apps.payments.models import Payment
+
+    return (TopUpRequest.objects.filter(method=TopUpRequest.Method.ONLINE,
+                                        status=TopUpRequest.Status.PAID)
+            .exclude(payments__status=Payment.Status.REFUNDED))
+
+
+def _paid_payment(topup, *, lock=False):
+    """The successful card payment behind a PAID top-up (newest first)."""
+    from apps.payments.models import Payment
+
+    qs = Payment.objects.filter(related_topup=topup, status=Payment.Status.SUCCESS)
+    if lock:
+        qs = qs.select_for_update()
+    return qs.order_by('-created_at', '-pk').first()
+
+
+def _simulation_refused(payment) -> bool:
+    """A Payworks simulation moved no money: never in a live installation."""
+    return payment.is_simulation() and getattr(settings, 'PAYMENTS_LIVE', False)
+
+
+def notify_topup_applied(topup, balance) -> int:
+    """Tell the family the money is now spendable (in-app + email). Best-effort."""
+    from apps.cafeteria.schedule import format_amount
+
+    try:
+        return _notify_balance_change(
+            topup.student, 'Recarga aplicada',
+            f'La recarga de {format_amount(topup.amount)} para {topup.student.user.full_name} '
+            f'ya está disponible en la cafetería. Saldo actual: {format_amount(balance)}.')
+    except Exception:  # noqa: BLE001 — the credit is already committed
+        logger.exception('Applied-top-up notification failed for top-up #%s', topup.pk)
+        return 0
+
+
+def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
+    """Credit a PAID online top-up once staff have loaded it into the Loyverse POS.
+
+    Before crediting, the server checks that Loyverse really holds the money:
+    the customer's points must exceed the wallet (after the POS load/unload
+    queues) by at least the amount. That keeps the rule the school asked for,
+    "the portal never shows money the cashier does not have", even when the
+    button is pressed before the load. When Loyverse cannot confirm it (a
+    purchase landed in between, Loyverse unreachable) ``force`` applies it
+    anyway with a mandatory ``note``; the top-up then joins the "Cargar en
+    POS" queue (``pos_loaded_at`` stays empty) so the POS load is still
+    tracked and the mirror leaves the student alone until it is confirmed.
+
+    Refused for: anything but PAID, a payment refunded or never approved, a
+    Payworks simulation in a live installation, and an approval not yet
+    verified in MultiCobros. Idempotent: an already applied top-up raises
+    ``TopUpApplyError(code='already_applied')`` and moves nothing.
+    Returns ``(tx, balance)``.
+    """
+    from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
+    from apps.core.audit import record
+
+    note = str(note or '').strip()[:500]
+    if force and not note:
+        raise TopUpApplyError('Escriba el motivo para aplicar sin verificar en Loyverse.',
+                              code='note_required')
+    student = topup.student
+    # Network read outside the row locks (same pattern as refund_transaction).
+    points = None if force else loyverse_points_for_guard(student)
+
+    with transaction.atomic():
+        topup = (TopUpRequest.objects.select_for_update()
+                 .select_related('student__user').get(pk=topup.pk))
+        if topup.status == TopUpRequest.Status.COMPLETED:
+            raise TopUpApplyError('Esta recarga ya está aplicada en el saldo.',
+                                  code='already_applied', status=409)
+        if topup.method != TopUpRequest.Method.ONLINE or topup.status != TopUpRequest.Status.PAID:
+            raise TopUpApplyError('Solo se aplican recargas en línea pagadas y pendientes de aplicar.',
+                                  code='not_paid', status=409)
+        # Read, not locked: settlement locks the payment before the top-up,
+        # and this path holds the top-up first.
+        payment = _paid_payment(topup)
+        if payment is None:
+            raise TopUpApplyError('El pago de esta recarga no está aprobado (o fue devuelto).',
+                                  code='no_payment', status=409)
+        if _simulation_refused(payment):
+            raise TopUpApplyError('Es una operación de simulación de Banorte (sin cargo real); '
+                                  'no se aplica.', code='simulation')
+        if payment.needs_bank_verification():
+            raise TopUpApplyError('Verifique primero la operación en MultiCobros (Banorte).',
+                                  code='needs_verification')
+
+        cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
+        amount = Decimal(str(payment.amount))
+        local = cb.balance or Decimal('0')
+        seed_opening = cb.last_synced is None and points is not None
+        if not force:
+            if points is None:
+                raise TopUpApplyError(
+                    'No se pudo leer el saldo del alumno en Loyverse para confirmar la carga. '
+                    'Intente de nuevo en unos minutos.', code='pos_unknown', status=409)
+            # A never-seeded wallet is about to be replaced by Loyverse's own
+            # figure, so only Loyverse itself has to cover the load.
+            surplus = (Decimal(str(points)) if seed_opening
+                       else Decimal(str(points)) + _pos_queue_net(student) - local)
+            if surplus < amount:
+                raise TopUpApplyError(
+                    f'Loyverse aún no muestra esta recarga: tiene ${points:.2f} para el '
+                    f'alumno y el saldo en la app es ${local:.2f}, así que '
+                    f'Loyverse debería tener al menos ${local + amount:.2f}. Cargue '
+                    f'${amount:.2f} en el POS y vuelva a intentarlo. Si ya la cargó y el '
+                    f'alumno acaba de comprar, espere un minuto.',
+                    code='pos_not_loaded', status=409,
+                    loyverse_points=f'{points:.2f}', wallet_balance=f'{local:.2f}',
+                    amount=f'{amount:.2f}')
+
+        if seed_opening:
+            # Never-seeded wallet (``sync_student_balance`` waits for this):
+            # its opening balance is what Loyverse holds besides this load.
+            cb.balance = Decimal(str(points)) - amount
+            cb.seeded_at = timezone.now()
+            cb.save(update_fields=['balance', 'seeded_at'])
+        via = TopUpRequest.AppliedVia.OVERRIDE if force else TopUpRequest.AppliedVia.STAFF
+        tx = _credit_topup_locked(topup, payment, cb, via=via, actor=actor, pos_loaded=not force)
+        if tx is None:
+            raise TopUpApplyError('Esta recarga ya está aplicada en el saldo.',
+                                  code='already_applied', status=409)
+        record('update', topup,
+               {'status': ['paid', 'completed'], 'amount': f'{amount:.2f}',
+                'applied_via': via, 'loyverse_points': None if points is None else f'{points:.2f}',
+                'note': note, 'payment': payment.pk},
+               actor=actor, context='cafeteria.topup.apply_paid')
+        balance = cb.balance
+
+    notify_topup_applied(topup, balance)
+    logger.info('Paid top-up #%s applied by %s (%s): $%s to %s.',
+                topup.pk, actor, via, amount, student)
+    return tx, balance
+
+
+def refund_paid_topup(topup, *, actor=None, note: str = '', bank_refund_confirmed: bool = False,
+                      pos_not_loaded_confirmed: bool = False):
+    """Close a PAID top-up whose card charge was returned before it was applied.
+
+    Nothing moves in the wallet (it was never credited). Staff confirm two
+    facts the server cannot check: the charge was refunded in MultiCobros
+    (only for a real charge) and the amount is not in the Loyverse POS (or
+    was removed): money left in Loyverse would otherwise be read by the POS
+    mirror as a cash recarga. The payment becomes REFUNDED and the top-up
+    REFUNDED; the family is told. Returns the top-up.
+    """
+    from apps.cafeteria.models import TopUpRequest
+    from apps.core.audit import record
+    from apps.payments.models import Payment
+    from apps.payments.multicobros import needs_bank_refund
+
+    note = str(note or '').strip()[:500]
+    if not note:
+        raise TopUpApplyError('Escriba el motivo de la devolución.', code='note_required')
+    with transaction.atomic():
+        topup = (TopUpRequest.objects.select_for_update()
+                 .select_related('student__user').get(pk=topup.pk))
+        if topup.status == TopUpRequest.Status.REFUNDED:
+            return topup
+        if topup.status != TopUpRequest.Status.PAID:
+            raise TopUpApplyError('Solo se devuelven aquí recargas pagadas que aún no se aplican. '
+                                  'Una recarga ya aplicada se devuelve desde los movimientos del alumno.',
+                                  code='not_paid', status=409)
+        payment = _paid_payment(topup, lock=True)
+        if payment is not None and needs_bank_refund(payment) and not bank_refund_confirmed:
+            raise TopUpApplyError('Primero haga la devolución del cargo en MultiCobros (Banorte) '
+                                  'y confirme que ya la hizo.', code='bank_refund_required')
+        if not pos_not_loaded_confirmed:
+            raise TopUpApplyError('Confirme que este monto no está cargado en el POS de Loyverse '
+                                  '(o que ya lo quitó).', code='pos_confirmation_required')
+        if payment is not None:
+            payment.status = Payment.Status.REFUNDED
+            payment.save(update_fields=['status', 'updated_at'])
+        topup.status = TopUpRequest.Status.REFUNDED
+        topup.notes = '\n'.join(filter(None, [topup.notes, f'Devuelta sin aplicar: {note}']))
+        topup.save(update_fields=['status', 'notes'])
+        record('update', topup,
+               {'status': ['paid', 'refunded'], 'amount': f'{topup.amount:.2f}', 'note': note,
+                'bank_refund_confirmed': bool(bank_refund_confirmed),
+                'pos_not_loaded_confirmed': True, 'payment': payment.pk if payment else None},
+               actor=actor, context='cafeteria.topup.refund_paid')
+
+    from apps.cafeteria.schedule import format_amount
+    try:
+        _notify_balance_change(
+            topup.student, 'Recarga devuelta',
+            f'Se devolvió a su tarjeta el pago de {format_amount(topup.amount)} de la recarga de '
+            f'cafetería de {topup.student.user.full_name}; no se aplicó saldo. Motivo: {note}.')
+    except Exception:  # noqa: BLE001
+        logger.exception('Refund notification failed for top-up #%s', topup.pk)
     return topup
 
 
@@ -1031,11 +1300,24 @@ def reverse_online_topup(payment):
     Idempotent (second call is a no-op via the refund-tx reference). Returns the
     ``BalanceAdjustment`` or ``None`` when there is nothing to reverse.
     """
-    from apps.cafeteria.models import CafeteriaTransaction
+    from apps.cafeteria.models import CafeteriaTransaction, TopUpRequest
 
     topup = getattr(payment, 'related_topup', None)
     if topup is None and payment.payment_type != 'cafeteria':
         return None
+
+    if topup is not None:
+        with transaction.atomic():
+            # Current state, under the lock a concurrent "Aplicar" also takes.
+            topup = TopUpRequest.objects.select_for_update().get(pk=topup.pk)
+            if topup.status == TopUpRequest.Status.PAID:
+                # Refunded before it was applied: the wallet never had it.
+                topup.status = TopUpRequest.Status.REFUNDED
+                topup.notes = '\n'.join(filter(None, [
+                    topup.notes, 'Devuelta por el proveedor antes de aplicarse']))
+                topup.save(update_fields=['status', 'notes'])
+                logger.info('Paid top-up #%s refunded before it was applied.', topup.pk)
+                return None
 
     # Flag unload even when the local reverse fails (e.g. child already spent) —
     # Loyverse may still hold residual credit that staff must clear.
@@ -1082,8 +1364,26 @@ def notify_topup_result(payment, *, success: bool) -> int:
     if topup is None:
         return 0
 
+    from apps.cafeteria.models import TopUpRequest
+    from apps.cafeteria.schedule import format_amount, format_apply_at, whatsapp_display
+
+    # Read after commit: the settlement that just ran may have moved it.
+    topup.refresh_from_db(fields=['status', 'apply_due_at'])
     student = topup.student
-    if success:
+    if success and topup.status == TopUpRequest.Status.PAID:
+        title = 'Pago de recarga recibido'
+        when = (f'el {format_apply_at(topup.apply_due_at)}' if topup.apply_due_at
+                else 'el siguiente día hábil a las 7:30 a.m.')
+        urgent = (f' Si necesita que se aplique de inmediato, para que su hijo(a) use el saldo '
+                  f'el mismo día, mande un mensaje por WhatsApp al {whatsapp_display()} con el '
+                  f'comprobante de pago y le ayudamos.') if whatsapp_display() else ''
+        # ``when`` ends in "a.m.": no second period.
+        message = (
+            f'Recibimos su pago de {format_amount(payment.amount)} para la cafetería de '
+            f'{student.user.full_name}. El saldo se actualizará {when}{urgent} '
+            f'Folio: {payment.id}.'
+        )
+    elif success:
         title = 'Recarga de cafetería exitosa'
         message = (
             f'Se registró el pago de ${payment.amount:.2f} para el saldo de '
@@ -1245,17 +1545,30 @@ def pending_pos_unloads():
                                        pos_unloaded_at__isnull=True)
 
 
-def pos_queue_reasons(student_ids=None) -> dict:
+def pos_queue_reasons(student_ids=None, *, include_paid: bool = True) -> dict:
     """``{student_id: reason}`` for students the POS mirror (and Corregir) must
     leave alone until staff work the POS load/unload queues. In those wallets
-    Loyverse and the ledger differ on purpose, by money that is in transit."""
+    Loyverse and the ledger differ on purpose, by money that is in transit.
+
+    A PAID online top-up (scheduled mode) counts too: once staff type it into
+    the POS, Loyverse is above the wallet by exactly that amount until it is
+    applied, and Corregir must not credit it a second time as a
+    "reconciliación". The POS mirror passes ``include_paid=False`` because it
+    is the one place that settles those gaps (``_match_paid_topups``).
+    """
     loads, unloads = pending_pos_loads(), pending_pos_unloads()
+    paid = paid_topups_pending() if include_paid else None
     if student_ids is not None:
         loads = loads.filter(student_id__in=student_ids)
         unloads = unloads.filter(student_id__in=student_ids)
+        if paid is not None:
+            paid = paid.filter(student_id__in=student_ids)
     reasons = {sid: POS_UNLOAD_PENDING for sid in unloads.values_list('student_id', flat=True)}
     for sid in loads.values_list('student_id', flat=True):
         reasons.setdefault(sid, POS_LOAD_PENDING)
+    if paid is not None:
+        for sid in paid.values_list('student_id', flat=True):
+            reasons.setdefault(sid, POS_APPLY_PENDING)
     return reasons
 
 
@@ -1810,7 +2123,10 @@ def _record_wallet_audit(customers, result, now) -> dict:
         'profiles_missing': profiles.get('missing', 0),
         'at': now.isoformat(),
         'compared': (result['credited'] + result['in_sync'] + result['below']
-                     + result['deferred'] + result['skipped_pending']),
+                     + result['deferred'] + result['skipped_pending']
+                     + result.get('applied_paid_students', 0) + result.get('held_paid', 0)),
+        'applied_paid': result.get('applied_paid', 0),
+        'held_paid': result.get('held_paid', 0),
         'in_sync': result['in_sync'],
         'credited': result['credited'],
         'drifting': result['below'],
@@ -1867,7 +2183,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     notifies normally.
     """
     from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction
+    from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 
     full_roster = customers is None
     if full_roster:
@@ -1881,14 +2197,18 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     # Money in transit between ledger and POS: an online top-up not loaded yet
     # (local above Loyverse on purpose) or a refunded top-up Loyverse still
     # holds (Loyverse above local on purpose: crediting that gap would undo the
-    # refund). Both wait for staff to work the queue.
-    pending_pos = set(pos_queue_reasons())
+    # refund). Both wait for staff to work the queue. Paid top-ups waiting to
+    # be applied are NOT skipped: this pass is what applies them.
+    pending_pos = set(pos_queue_reasons(include_paid=False))
+    paid_by_student = _paid_topups_by_student()
 
     students = (StudentProfile.objects.filter(is_active=True)
                 .exclude(loyverse_id='').select_related('user'))
     credited = skipped_pending = in_sync = below = unseeded = deferred = 0
-    total = drift_total = Decimal('0')
+    applied_paid = held_paid = applied_paid_students = 0
+    total = drift_total = applied_paid_total = Decimal('0')
     stamp: list[int] = []
+    applied_notices: list = []
     now = timezone.now()
 
     for student in students:
@@ -1899,7 +2219,16 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
             skipped_pending += 1
             stamp.append(student.id)
             continue
+        paid = paid_by_student.get(student.id)
         with transaction.atomic():
+            if paid:
+                # Lock order everywhere: top-up rows, then the wallet
+                # (apply_paid_topup, the bulk action and settlement agree).
+                still = set(TopUpRequest.objects.select_for_update()
+                            .filter(pk__in=[t.pk for t, _ in paid],
+                                    status=TopUpRequest.Status.PAID)
+                            .values_list('pk', flat=True))
+                paid = [(t, p) for t, p in paid if t.pk in still]
             cb = (CafeteriaBalance.objects.select_for_update()
                   .filter(student=student).first())
             if cb is None or cb.last_synced is None:
@@ -1918,6 +2247,21 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
             if not _pos_delta_is_settled(student, delta, now, fresh=fresh):
                 deferred += 1
                 stamp.append(student.id)
+                continue
+            if paid:
+                # Staff typed paid online top-ups into the POS: apply exactly
+                # those, linked to their payments. A gap that matches no
+                # combination of them is held for staff (never credited as a
+                # cash recarga: it may be one of them loaded with a typo).
+                applied = _apply_matched_paid_locked(student, cb, paid, delta, now)
+                stamp.append(student.id)
+                if applied is None:
+                    held_paid += 1
+                    continue
+                applied_paid += len(applied)
+                applied_paid_students += 1
+                applied_paid_total += delta
+                applied_notices.extend((topup, cb.balance) for topup in applied)
                 continue
             cb.balance = (cb.balance or Decimal('0')) + delta
             cb.last_synced = now
@@ -1947,9 +2291,16 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     if stamp:
         CafeteriaBalance.objects.filter(student_id__in=stamp).update(last_synced=now)
 
+    if notify:
+        for topup, balance in applied_notices:
+            notify_topup_applied(topup, balance)
+
     result = {'credited': credited, 'total': total, 'in_sync': in_sync, 'below': below,
               'deferred': deferred, 'drift_total': drift_total,
-              'skipped_pending': skipped_pending, 'unseeded': unseeded}
+              'skipped_pending': skipped_pending, 'unseeded': unseeded,
+              'applied_paid': applied_paid, 'applied_paid_total': applied_paid_total,
+              'applied_paid_students': applied_paid_students,
+              'held_paid': held_paid}
     if full_roster:
         result['audit'] = _record_wallet_audit(customers, result, now)
 
@@ -1957,8 +2308,80 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         f'mirror_pos_topups: {credited} credited (${total}), {in_sync} in sync, '
         f'{below} below Loyverse (${drift_total}, left to the purchase poll), '
         f'{deferred} deferred (ledger still settling), '
+        f'{applied_paid} paid online top-up(s) applied (${applied_paid_total}), '
+        f'{held_paid} held (gap matches no paid top-up), '
         f'{skipped_pending} pending POS load/unload, {unseeded} unseeded.')
     return result
+
+
+# A family never has more than a handful of paid top-ups waiting; past this
+# many only the oldest are considered for a match (2**12 sums at most).
+PAID_MATCH_MAX = 12
+
+
+def _paid_topups_by_student(student_ids=None) -> dict:
+    """``{student_id: [(topup, payment), ...]}`` oldest first, for the PAID
+    online top-ups the POS mirror may apply (simulations excluded when live)."""
+    from apps.payments.models import Payment
+
+    topups = paid_topups_pending().order_by('processed_at', 'pk')
+    if student_ids is not None:
+        topups = topups.filter(student_id__in=student_ids)
+    topups = list(topups)
+    if not topups:
+        return {}
+    payments: dict = {}
+    for p in (Payment.objects.filter(related_topup_id__in=[t.pk for t in topups],
+                                     status=Payment.Status.SUCCESS)
+              .select_related('banorte').order_by('created_at', 'pk')):
+        payments[p.related_topup_id] = p      # newest wins
+    out: dict = {}
+    for topup in topups:
+        payment = payments.get(topup.pk)
+        if payment is None or _simulation_refused(payment):
+            continue
+        out.setdefault(topup.student_id, []).append((topup, payment))
+    return out
+
+
+def _match_paid_topups(entries, delta):
+    """The fewest, oldest ``(topup, payment)`` entries whose amounts add up to
+    exactly ``delta``, or ``None``."""
+    from itertools import combinations
+
+    entries = entries[:PAID_MATCH_MAX]
+    for size in range(1, len(entries) + 1):
+        for combo in combinations(entries, size):
+            if sum((Decimal(str(p.amount)) for _, p in combo), Decimal('0')) == delta:
+                return list(combo)
+    return None
+
+
+def _apply_matched_paid_locked(student, cb, entries, delta, now):
+    """Apply the paid top-ups that explain a positive Loyverse gap. The caller
+    holds the locks (those top-up rows, then ``cb``) and passed only top-ups
+    still PAID. Returns the applied top-ups, or ``None`` when no combination
+    of them adds up to exactly ``delta``."""
+    from apps.cafeteria.models import TopUpRequest
+    from apps.core.audit import record
+
+    match = _match_paid_topups(entries, delta)
+    if match is None:
+        logger.warning('POS gap of $%s for %s matches no paid online top-up; held for staff.',
+                       delta, student)
+        return None
+    applied = []
+    for topup, payment in match:
+        topup.student = student
+        if _credit_topup_locked(topup, payment, cb, via=TopUpRequest.AppliedVia.POS_SYNC,
+                                pos_loaded=True, now=now) is not None:
+            record('update', topup,
+                   {'status': ['paid', 'completed'], 'amount': f'{payment.amount:.2f}',
+                    'applied_via': TopUpRequest.AppliedVia.POS_SYNC,
+                    'loyverse_gap': f'{delta:.2f}', 'payment': payment.pk},
+                   actor=None, context='cafeteria.topup.apply_paid')
+            applied.append(topup)
+    return applied
 
 
 # ── Phantom POS credits (the 2026-09-23 drift) ───────────────────────────────

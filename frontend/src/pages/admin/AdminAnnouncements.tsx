@@ -22,6 +22,7 @@ import { useRowSelection } from '@/hooks/useRowSelection';
 import { ANNOUNCEMENTS_ENTITY, useAnnouncementsBulk, useAnnouncementsExport, useAnnouncementsList } from '@/hooks/queries/AdminContentQueries';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useAuthStore } from '@/store/authStore';
 import { portalApi, type AnnouncementAttachment, type BulkActionDef } from '@/services/api';
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { apiErrorMessage } from '@/lib/apiErrors';
@@ -60,6 +61,9 @@ export default function AdminAnnouncements() {
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
   const [report, setReport] = useState<Announcement | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
+  // The emergency broadcast (every family, every channel) is admin-only;
+  // Comunicados staff write regular notices.
+  const canBroadcast = useAuthStore((s) => s.user?.role === 'admin');
   const [alertForm, setAlertForm] = useState(EMPTY_ALERT);
   const [alertConfirm, setAlertConfirm] = useState(false);
   const [toActivate, setToActivate] = useState<Announcement | null>(null);
@@ -161,7 +165,7 @@ export default function AdminAnnouncements() {
     // state consumed (deleted) right after, so the composer state cannot be
     // derived from it and the setState cannot cascade.
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (wantsAlert) setAlertOpen(true);
+    if (wantsAlert && canBroadcast) setAlertOpen(true);
     else openNew();
     /* eslint-enable react-hooks/set-state-in-effect */
     setSearchParams((prev) => {
@@ -218,9 +222,11 @@ export default function AdminAnnouncements() {
         actions={(
           <div className="flex flex-wrap gap-2">
             <ExportMenu formats={['csv', 'xlsx']} filenamePrefix="comunicados" selectedCount={selection.count} fetch={fetchExport} />
-            <Button variant="danger" onClick={openAlert}>
-              <Siren className="h-4 w-4" aria-hidden="true" /> Aviso urgente
-            </Button>
+            {canBroadcast && (
+              <Button variant="danger" onClick={openAlert}>
+                <Siren className="h-4 w-4" aria-hidden="true" /> Aviso urgente
+              </Button>
+            )}
             <Button onClick={openNew}><Plus className="h-4 w-4" /> Nuevo comunicado</Button>
           </div>
         )}

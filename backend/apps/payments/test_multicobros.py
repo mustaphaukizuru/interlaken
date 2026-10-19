@@ -72,6 +72,9 @@ def _approve(api_client, payment_id, **extra):
 # ── Conciliar con MultiCobros ────────────────────────────────
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestReconcileApproved:
     def test_expired_payment_is_credited_once_verified_and_a_late_answer_is_a_no_op(
         self, api_client, banorte
@@ -156,6 +159,9 @@ class TestReconcileApproved:
         assert api_client.post(url, {"outcome": "not_found", "note": "x"}).status_code == 403
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestReconcileNotFound:
     def test_closes_it_but_a_genuine_late_approval_still_credits(self, api_client, banorte):
         checkout = _open(api_client, banorte)
@@ -287,6 +293,9 @@ class TestVerify:
 # ── simulations never reach the POS ──────────────────────────
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestSimulationStaysOutOfThePos:
     def test_aut_approval_is_not_loaded(self, api_client, banorte):
         from apps.cafeteria.admin_data import _pos_loaded_plan
@@ -330,6 +339,9 @@ class TestSimulationStaysOutOfThePos:
 # ── refunds of card top-ups ──────────────────────────────────
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestCardRefund:
     def _credited(self, api_client, settings_, live=True):
         checkout = _open(api_client, settings_, live=live)

@@ -36,6 +36,12 @@ CRON_TZ=America/Mexico_City
 # to look up in MultiCobros. It only emails when one is new since the last
 # email, plus a daily reminder while any stays open.
 20 * * * * cd $COMPOSE && flock -n /tmp/interlaken-payments-report.lock docker compose exec -T app python manage.py banorte_pending_report >> /var/log/interlaken/payments.log 2>&1
+# School days 07:05, then hourly at :40 until 14:40: tell the admins (in the
+# portal and by email) which paid card top-ups to type into the POS at the
+# 07:30 load, and remind them while one is past the time promised to the
+# family. The 5-minute mirror applies each one as soon as Loyverse shows it.
+5 7 * * 1-5 cd $COMPOSE && flock -w 120 /tmp/interlaken-topup-report.lock docker compose exec -T app python manage.py topup_apply_report >> /var/log/interlaken/payments.log 2>&1
+40 8-14 * * 1-5 cd $COMPOSE && flock -w 120 /tmp/interlaken-topup-report.lock docker compose exec -T app python manage.py topup_apply_report >> /var/log/interlaken/payments.log 2>&1
 
 # ── Daily tasks, 06:15 local ────────────────────────────────────────────────
 # ';' not '&&' on purpose: these are independent, and one failure must not

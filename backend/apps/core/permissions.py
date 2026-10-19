@@ -13,7 +13,8 @@ each with its exact original rule (no behaviour change):
   role admin, or the Django ``is_staff`` flag (a ``staff`` role without the flag
   does not count); it lets school users past the applicant token gate.
 
-Staff-role granularity (BACKLOG P1-H1) will extend this file.
+Staff-role granularity (BACKLOG P1-H1): ``IsAdmin`` also admits a staff account
+for the endpoints of the console areas it holds (``apps/core/areas.py``).
 """
 
 from rest_framework import permissions
@@ -56,11 +57,28 @@ class IsStaffOrAdmin(permissions.BasePermission):
 
 
 class IsAdmin(permissions.BasePermission):
-    """Authenticated users with ``role == 'admin'`` only."""
+    """The admin console: ``role == 'admin'``, plus staff accounts holding the
+    endpoint's area.
+
+    An endpoint opts in with ``admin_area`` (key or tuple of keys; any request)
+    and/or ``admin_area_read`` (safe methods only). Without either it stays
+    admin-only. See ``apps/core/areas.py``.
+    """
 
     def has_permission(self, request, view):
+        from .areas import as_tuple, has_area
+
         user = request.user
-        return _authenticated(user) and _role(user) == ADMIN
+        if not _authenticated(user):
+            return False
+        if _role(user) == ADMIN:
+            return True
+        if _role(user) != STAFF:
+            return False
+        areas = as_tuple(getattr(view, "admin_area", None))
+        if request.method in permissions.SAFE_METHODS:
+            areas += as_tuple(getattr(view, "admin_area_read", None))
+        return bool(areas) and has_area(user, *areas)
 
 
 class IsParentOrAdmin(permissions.BasePermission):

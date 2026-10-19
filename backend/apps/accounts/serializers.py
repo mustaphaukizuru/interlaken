@@ -26,9 +26,16 @@ class UserSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        from apps.core.areas import AREAS, user_areas
+
         from .avatar import avatar_url
         data['avatar'] = avatar_url(instance)
         data['has_custom_avatar'] = bool(instance.avatar_file)
+        # Console areas this account may use right now (every one for an
+        # admin); the SPA only hides what the API already refuses.
+        granted = user_areas(instance)
+        data['staff_areas'] = [key for key in AREAS if key in granted]
+        data['staff_title'] = instance.staff_title
         return data
 
     def get_has_usable_password(self, obj):

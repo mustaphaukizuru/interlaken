@@ -224,11 +224,13 @@ def build_spec() -> ImportSpec:
 
 
 class PreRegistrationImportTemplateView(ImportTemplateView):
+    admin_area = 'admisiones'
     def get_spec(self):
         return build_spec()
 
 
 class PreRegistrationImportView(ImportView):
+    admin_area = 'admisiones'
     template_url = "/api/v1/admissions/admin/pre-registrations/import/template/"
 
     def get_spec(self):

@@ -107,6 +107,9 @@ class TestExpireStalePayments:
         assert "DRY RUN" in out.getvalue()
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestFinalizedPaymentNeverClobbered:
     """A checkout snapshotted as stale must NOT be failed if it finalized since.
 
@@ -200,6 +203,9 @@ class TestFinalizedPaymentNeverClobbered:
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("150.00")
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestLateSuccessAfterSoftFail:
     """Parents who finish a checkout after expire/supersede must still be credited."""
 

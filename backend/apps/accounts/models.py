@@ -53,6 +53,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     # WhatsApp
     whatsapp    = models.CharField(max_length=20, blank=True)
 
+    # Staff accounts (role=staff): the admin-console areas they may use
+    # (keys of apps.core.areas.AREAS; empty = no console, as teachers) and the
+    # job title shown in Personal ("Secretaría", "Recepción", "Cafetería"...).
+    # Admins use every area whatever this says.
+    staff_areas = models.JSONField('Áreas de la consola', default=list, blank=True)
+    staff_title = models.CharField('Puesto', max_length=60, blank=True)
+
     objects = UserManager()
 
     USERNAME_FIELD  = 'email'

@@ -6,14 +6,9 @@ import Logo from '@/components/ui/Logo';
 import { SCHOOL_YEARS, SITE_NAME } from '@/lib/siteMeta';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
+import { homePath } from '@/lib/areas';
+import type { User } from '@/types';
 import toast from 'react-hot-toast';
-
-const ROLE_PATHS: Record<string, string> = {
-  parent: '/portal',
-  student: '/portal', // student == family login (shared account) → the family portal
-  admin: '/admin',
-  staff: '/staff',
-};
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -25,7 +20,8 @@ export default function LoginPage() {
   const fromPath = from?.pathname && from.pathname.startsWith('/') && from.pathname !== '/login'
     ? `${from.pathname}${from.search ?? ''}`
     : null;
-  const homeFor = (role: string) => fromPath ?? ROLE_PATHS[role] ?? '/portal';
+  // Families → /portal, admins → /admin, staff → their console area (or /staff).
+  const homeFor = (who: Pick<User, 'role' | 'staff_areas'>) => fromPath ?? homePath(who);
   const { setAuth, setUser, isAuthenticated, user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +51,7 @@ export default function LoginPage() {
         const { data } = await authApi.me();
         if (cancelled) return;
         setUser(data);
-        navigate(homeFor(data.role), { replace: true });
+        navigate(homeFor(data), { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
@@ -70,7 +66,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(homeFor(user.role), { replace: true });
+      navigate(homeFor(user), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user, navigate, fromPath]);
@@ -107,7 +103,7 @@ export default function LoginPage() {
       useAuthStore.getState().setAccess(access);
       const { data: me } = await authApi.me();
       setAuth(me, access);
-      navigate(homeFor(me.role), { replace: true });
+      navigate(homeFor(me), { replace: true });
     } catch (err) {
       const body = (err as { response?: { data?: { totp_required?: boolean; detail?: string } } })?.response?.data;
       if (body?.totp_required) {

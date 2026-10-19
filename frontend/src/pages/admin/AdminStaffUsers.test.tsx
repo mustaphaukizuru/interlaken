@@ -88,3 +88,51 @@ describe('AdminStaffUsers (Data Ops Phase 3)', () => {
     expect(screen.getAllByRole('button', { name: 'Desactivar dora@x.mx' }).length).toBeGreaterThan(0);
   });
 });
+
+describe('AdminStaffUsers: puesto y áreas de la consola', () => {
+  it('shows each account’s puesto and areas', async () => {
+    vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [
+      me, { ...berta, staff_title: 'Recepción', staff_areas: ['visitas', 'mensajes'] },
+    ] } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    expect(await screen.findByText('Recepción')).toBeInTheDocument();
+    expect(screen.getByText('Visitas y agenda')).toBeInTheDocument();
+    expect(screen.getByText('Todas las áreas')).toBeInTheDocument(); // the admin row
+  });
+
+  it('invites a cafeteria cashier with only the Cafetería area', async () => {
+    vi.mocked(portalApi.inviteStaff).mockResolvedValue({ data: { ...berta, id: 9, temporary_password: 'Tmp-123456' } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await screen.findByText('Berta Zea');
+    await userEvent.click(screen.getAllByRole('button', { name: /Invitar/ })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Invitar al personal' });
+    await userEvent.type(within(dialog).getByLabelText('Correo'), 'caja@x.mx');
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Caja');
+    // Secretaría is the default puesto; switch to Cafetería.
+    expect(within(dialog).getByLabelText('Admisiones')).toBeChecked();
+    await userEvent.selectOptions(within(dialog).getByLabelText('Puesto'), 'cafeteria');
+    expect(within(dialog).getByLabelText('Admisiones')).not.toBeChecked();
+    expect(within(dialog).getByLabelText('Cafetería y pagos')).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Crear cuenta/ }));
+    await waitFor(() => expect(portalApi.inviteStaff).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'caja@x.mx', role: 'staff', staff_title: 'Cafetería', staff_areas: ['cafeteria'],
+    })));
+  });
+
+  it('edits the areas of a staff account from «Acceso»', async () => {
+    vi.mocked(portalApi.updateStaff).mockResolvedValue({ data: berta } as never);
+    vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [
+      me, { ...berta, staff_title: 'Recepción', staff_areas: ['visitas', 'mensajes'] },
+    ] } } as never);
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Puesto y áreas de berta@x.mx' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Puesto y áreas de la consola' });
+    expect(within(dialog).getByLabelText('Puesto')).toHaveValue('recepcion');
+    await userEvent.click(within(dialog).getByLabelText('Comunicados y calendario'));
+    expect(within(dialog).getByLabelText('Puesto')).toHaveValue('custom');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar acceso' }));
+    await waitFor(() => expect(portalApi.updateStaff).toHaveBeenCalledWith(2, {
+      staff_title: 'Recepción', staff_areas: ['visitas', 'mensajes', 'comunicados'],
+    }));
+  });
+});

@@ -41,9 +41,11 @@ EXPECTED = {
         "no_show": {"attended"},
     },
     "cafeteria.topuprequest": {
-        "pending": {"completed", "failed"},
+        "pending": {"completed", "failed", "paid"},
+        "paid": {"completed", "refunded"},
         "failed": {"pending"},
         "completed": set(),
+        "refunded": set(),
     },
     "legal.arcorequest": {
         "received": {"in_review", "resolved", "rejected"},
@@ -80,7 +82,7 @@ def test_student_status_is_free_among_its_four_states():
 def test_terminal_states():
     assert TERMINAL["admissions.preregistration"] == {"enrolled"}
     assert TERMINAL["admissions.registration"] == {"draft", "complete"}
-    assert TERMINAL["cafeteria.topuprequest"] == {"completed"}
+    assert TERMINAL["cafeteria.topuprequest"] == {"completed", "refunded"}
     assert TERMINAL["accounts.passwordrequest"] == {"resolved", "rejected"}
 
 

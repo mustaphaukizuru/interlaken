@@ -115,15 +115,31 @@ class TopUpRequest(models.Model):
     """
     When a parent requests a balance top-up.
     Admin applies it to Loyverse via the admin panel or portal.
+
+    Online lifecycle with ``CAFETERIA_TOPUP_APPLY_MODE='scheduled'`` (default
+    since 2026-10-18): PENDING (checkout open) → PAID when Banorte approves
+    (money received, wallet untouched, ``apply_due_at`` promised to the
+    family) → COMPLETED once the amount is in the Loyverse POS and the wallet
+    is credited (``applied_at``/``applied_via``). A PAID top-up refunded to
+    the card before it was applied ends REFUNDED. In ``instant`` mode a paid
+    top-up goes straight to COMPLETED and staff load the POS afterwards.
     """
     class Status(models.TextChoices):
         PENDING   = 'pending',   'Pendiente'
+        PAID      = 'paid',      'Pagada · por aplicar'
         COMPLETED = 'completed', 'Completado'
         FAILED    = 'failed',    'Fallido'
+        REFUNDED  = 'refunded',  'Devuelta sin aplicar'
 
     class Method(models.TextChoices):
         ONLINE = 'online', 'Pago en Línea'
         OFFICE = 'office', 'Caja Escolar'
+
+    class AppliedVia(models.TextChoices):
+        INSTANT  = 'instant',  'Al confirmarse el pago'
+        STAFF    = 'staff',    'Personal (cargada en POS)'
+        POS_SYNC = 'pos_sync', 'Detectada en Loyverse'
+        OVERRIDE = 'override', 'Personal, sin verificar en Loyverse'
 
     # PROTECT: top-up requests are part of the money trail.
     student      = models.ForeignKey(
@@ -164,6 +180,23 @@ class TopUpRequest(models.Model):
         related_name='pos_unloaded_topups',
     )
 
+    # Scheduled application (see the class docstring). ``apply_due_at`` is the
+    # POS load the family was promised when the payment was confirmed;
+    # ``applied_at`` is when the wallet was actually credited.
+    apply_due_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='POS load promised to the family for this paid online top-up.',
+    )
+    applied_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When the amount reached the cafeteria wallet.',
+    )
+    applied_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='applied_topups',
+    )
+    applied_via = models.CharField(max_length=10, choices=AppliedVia.choices, blank=True)
+
     class Meta:
         verbose_name = 'Solicitud de Recarga'
         verbose_name_plural = 'Solicitudes de Recarga'
@@ -179,6 +212,8 @@ class TopUpRequest(models.Model):
             ),
             # Depósitos log filtered by status, newest first (Data Ops Phase 1).
             models.Index(fields=['status', '-created_at'], name='caf_topup_status_created'),
+            # "Por aplicar" queue (paid online top-ups by promised load time).
+            models.Index(fields=['status', 'apply_due_at'], name='caf_topup_apply_queue'),
         ]
         constraints = [
             # A top-up is money in; zero or negative amounts are refused by the views

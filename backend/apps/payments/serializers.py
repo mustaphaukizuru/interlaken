@@ -21,6 +21,9 @@ class PaymentSerializer(serializers.ModelSerializer):
     failure_label = serializers.CharField(read_only=True)
     bank_reference = serializers.SerializerMethodField()
     auth_code = serializers.SerializerMethodField()
+    # The cafetería top-up this payment pays for: ``status`` ``paid`` means
+    # received and waiting for its POS load, due at ``apply_due_at``.
+    topup = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -29,9 +32,20 @@ class PaymentSerializer(serializers.ModelSerializer):
             'status', 'failure_reason', 'failure_label',
             'gateway', 'gateway_label', 'gateway_tx_id', 'gateway_ref',
             'bank_reference', 'auth_code',
-            'student_id', 'student_name', 'created_at', 'updated_at',
+            'student_id', 'student_name', 'topup', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
+
+    def get_topup(self, obj):
+        topup = obj.related_topup
+        if topup is None:
+            return None
+        return {
+            'id': topup.pk,
+            'status': topup.status,
+            'apply_due_at': topup.apply_due_at,
+            'applied_at': topup.applied_at,
+        }
 
     def get_bank_reference(self, obj):
         checkout = obj.banorte_checkout()
