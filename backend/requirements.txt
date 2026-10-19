@@ -1,19 +1,19 @@
 # Core
-Django==6.1.1
-djangorestframework==3.18.1
+Django==6.1.2
+djangorestframework==3.18.3
 djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 django-environ==0.14.0
-django-filter==26.1
+django-filter==26.2
 drf-spectacular==0.30.0
 # At-rest encryption for sensitive fields (medical data — IK-LEGAL B4).
-cryptography==50.0.1
+cryptography==50.0.2
 
 # Database — Postgres only (managed Postgres in production, SQLite locally).
 psycopg2-binary==2.9.13
 
 # Auth (Google OAuth is hand-rolled in apps/accounts/views.py; JWT via simplejwt)
-PyJWT==2.14.0
+PyJWT==2.15.1
 
 # Storage & Files
 # Pillow: avatar cropping (apps/accounts/avatar.py) and CMS media variants
@@ -26,7 +26,7 @@ openpyxl==3.1.5
 # container disk is ephemeral. S3-compatible; works with Supabase Storage. Inert
 # unless AWS_STORAGE_BUCKET_NAME is set (falls back to local disk in dev/CI).
 django-storages==1.14.6
-boto3==1.43.97
+boto3==1.43.114
 
 # Web push notifications (VAPID) — inert until VAPID_* env keys are set.
 pywebpush==2.5.0
@@ -36,8 +36,8 @@ requests==2.34.2
 
 # Google Calendar (service-account writes for confirmed bookings — Prompt 13).
 # Fail-soft: bookings never depend on these being importable/configured.
-google-api-python-client==2.200.0
-google-auth==2.58.0
+google-api-python-client==2.201.0
+google-auth==2.62.0
 
 # Payments: Banorte "Ventana de Comercio Electrónico Cifrada" only. The RSA-OAEP
 # + PBKDF2 + AES-CTR envelope uses `cryptography` (pinned above); Banorte ships
@@ -59,10 +59,10 @@ gunicorn==26.2.0
 whitenoise==6.12.0
 
 # Monitoring (no-op unless SENTRY_DSN is configured)
-sentry-sdk==2.69.2
+sentry-sdk==2.72.0
 
 # Admin skin (IK-ADMIN). 0.103.0 supports Django 5.x/6.x.
-django-unfold==0.107.0
+django-unfold==0.110.0
 
 # Dev
 pytest-django==4.14.0
