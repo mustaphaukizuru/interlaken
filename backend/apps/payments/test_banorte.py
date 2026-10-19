@@ -414,6 +414,9 @@ def opened(api_client, banorte):
 
 
 @pytest.mark.django_db
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestResult:
     def test_approval_credits_the_ledger_and_wipes_the_key(self, api_client, opened):
         parent, student, checkout = opened
@@ -556,6 +559,9 @@ class TestResult:
 
 
 @pytest.mark.django_db
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestVerification:
     @pytest.fixture
     def live_approved(self, api_client, banorte):
@@ -665,8 +671,9 @@ class TestOnlineAvailability:
         assert not Payment.objects.exists()
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data | {"min_amount": None} == {
+        assert avail.data | {"min_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "topup_policy": None,
             "online": False,
             "test_mode": True,
             "certification": False,
@@ -680,8 +687,9 @@ class TestOnlineAvailability:
         assert resp.status_code == 201, resp.data
         assert resp.data["checkout"]["kind"] == "lightbox"
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data | {"min_amount": None} == {
+        assert avail.data | {"min_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "topup_policy": None,
             "online": True,
             "test_mode": True,
             "certification": False,
@@ -706,8 +714,9 @@ class TestOnlineAvailability:
         resp = _start(api_client, family, family_child)
         assert resp.status_code == 400
         assert resp.data["code"] == "online_unavailable"
-        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None} == {
+        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "topup_policy": None,
             "online": False,
             "test_mode": False,
             "certification": True,
@@ -719,8 +728,9 @@ class TestOnlineAvailability:
         resp = _start(api_client, tester, child)
         assert resp.status_code == 201, resp.data
         assert BanorteCheckout.objects.get(payment_id=resp.data["payment_id"]).mode == "PRD"
-        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None} == {
+        assert api_client.get(reverse("payment-availability")).data | {"min_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "topup_policy": None,
             "online": True,
             "test_mode": False,
             "certification": True,
@@ -732,8 +742,9 @@ class TestOnlineAvailability:
         parent, _ = _family()
         api_client.force_authenticate(user=parent)
         avail = api_client.get(reverse("payment-availability"))
-        assert avail.data | {"min_amount": None} == {
+        assert avail.data | {"min_amount": None, "topup_policy": None} == {
             "min_amount": None,
+            "topup_policy": None,
             "online": True,
             "test_mode": False,
             "certification": False,

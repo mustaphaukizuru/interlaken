@@ -25,6 +25,9 @@ import { portalApi } from '@/services/api';
 import { announcementsAdminApi } from '@/services/AdminContentApi';
 import { stubViewport } from '@/test/viewport';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { useAuthStore } from '@/store/authStore';
+
+const ADMIN = { id: 1, email: 'a@x.mx', first_name: 'A', last_name: 'B', full_name: 'A B', role: 'admin' as const, avatar: '', whatsapp: '' };
 
 const list = vi.mocked(announcementsAdminApi.list);
 const bulk = vi.mocked(announcementsAdminApi.bulk);
@@ -48,6 +51,7 @@ const SAMPLE = {
 
 describe('AdminAnnouncements', () => {
   beforeEach(() => {
+    useAuthStore.setState({ user: ADMIN, accessToken: 't', isAuthenticated: true });
     vi.clearAllMocks();
     stubViewport(1280);
     list.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [SAMPLE] } } as never);
@@ -264,5 +268,13 @@ describe('AdminAnnouncements', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Guardar borrador' }));
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ is_active: false })));
     expect(toastSuccess).toHaveBeenCalledWith('Borrador guardado (no se envía hasta activarlo).');
+  });
+
+  it('Comunicados staff write notices but never the emergency broadcast', async () => {
+    useAuthStore.setState({ user: { ...ADMIN, role: 'staff', staff_areas: ['comunicados'] }, accessToken: 't', isAuthenticated: true });
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados?emergencia=1' });
+    expect(await screen.findByRole('button', { name: /Nuevo comunicado/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aviso urgente/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Aviso urgente/ })).not.toBeInTheDocument();
   });
 });

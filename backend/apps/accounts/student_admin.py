@@ -104,6 +104,7 @@ def _snapshot(profile: StudentProfile) -> dict:
 
 class AdminStudentCreateView(APIView):
     """POST /api/v1/accounts/admin/students/ — create a student (admin)."""
+    admin_area = 'alumnos'
     permission_classes = [IsAdmin]
 
     def post(self, request):
@@ -137,6 +138,7 @@ class AdminStudentCreateView(APIView):
 
 class AdminStudentUpdateView(APIView):
     """PATCH /api/v1/accounts/admin/students/<pk>/ — edit identity/profile (admin)."""
+    admin_area = 'alumnos'
     permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
@@ -293,6 +295,7 @@ class AdminStudentBulkView(AdminBulkView):
     ``sync_loyverse`` (seed the opening balance of linked, never-seeded
     students). There is no delete: ``withdrawn`` is the archive.
     """
+    admin_area = 'alumnos'
     entity = STUDENT_ENTITY
     actions = STUDENT_BULK_ACTIONS
 

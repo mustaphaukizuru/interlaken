@@ -31,6 +31,9 @@ export interface StaffUser {
   last_login: string | null;
   date_joined: string;
   has_password: boolean;
+  /** Job title and console areas of a staff account (empty for an admin: it has all). */
+  staff_title?: string;
+  staff_areas?: string[];
 }
 
 export interface PasswordRequest {
@@ -225,11 +228,19 @@ api.interceptors.response.use(
 export async function bootstrapSession(): Promise<boolean> {
   try {
     useAuthStore.getState().setAccess(await coalescedRefresh());
-    return true;
   } catch {
     useAuthStore.getState().logout();
     return false;
   }
+  // The persisted user can be stale (an admin changed this account's role or
+  // console areas): refresh it, best-effort. The API enforces access anyway.
+  try {
+    const { data } = await api.get('/accounts/me/');
+    if (data && typeof data === 'object' && 'role' in data) useAuthStore.getState().setUser(data);
+  } catch {
+    /* keep the persisted user; the next request re-checks */
+  }
+  return true;
 }
 
 // ── AUTH ──────────────────────────────────────────────────
@@ -697,7 +708,10 @@ export const paymentsApi = {
   /** Whether the caller may pay by card now, and in which stage: Banorte test
    *  mode (no charge), certification (real charge, test accounts only) or open. */
   getAvailability: () =>
-    api.get<{ online: boolean; test_mode: boolean; certification?: boolean; min_amount?: string }>('/payments/availability/'),
+    api.get<{
+      online: boolean; test_mode: boolean; certification?: boolean; min_amount?: string;
+      topup_policy?: import('@/types').TopUpPolicy;
+    }>('/payments/availability/'),
 
   /** Forward a Banorte lightbox callback; the server decrypts and decides. */
   reportBanorteResult: (paymentId: number, event: 'success' | 'error' | 'cancel' | 'closed', response: unknown) =>
@@ -1090,9 +1104,9 @@ export const portalApi = {
   exportStaff: (params: ExportParams) =>
     api.get<Blob>('/accounts/admin/staff/export/', { params, responseType: 'blob' }),
   staffBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/staff/bulk/', body),
-  inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role'] }) =>
+  inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role']; staff_title?: string; staff_areas?: string[] }) =>
     api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
-  updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name'>>) =>
+  updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name' | 'staff_title' | 'staff_areas'>>) =>
     api.patch<StaffUser>(`/accounts/admin/staff/${id}/`, data),
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),

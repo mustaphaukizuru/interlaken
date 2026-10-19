@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   Coffee, AlertTriangle, GraduationCap, ArrowRight, UserCircle,
-  MessageCircle, QrCode, Plus, RefreshCw,
+  MessageCircle, QrCode, Plus, RefreshCw, Clock,
 } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -71,6 +71,7 @@ export default function ParentDashboard() {
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
   const balances = data?.cafeteria_balances ?? [];
   const totalBalance = balances.reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
+  const totalPending = balances.reduce((s, b) => s + parseFloat(b.pending_topups || '0'), 0);
   const hasLowBalance = balances.some((b) => b.low);
   const hasCafeteria = balances.length > 0;
 
@@ -195,7 +196,7 @@ export default function ParentDashboard() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-[18px]">
         <Reveal className="sm:col-span-2" delay={0}>
           {hasCafeteria ? (
-            <CafeteriaSaldoCard total={totalBalance} low={!!hasLowBalance} studentsCount={balances.length} />
+            <CafeteriaSaldoCard total={totalBalance} pending={totalPending} low={!!hasLowBalance} studentsCount={balances.length} />
           ) : (
             <div className="card h-full">
               <EmptyState
@@ -269,8 +270,8 @@ export default function ParentDashboard() {
  * into CafeteriaPage with `?recarga=<monto>` so its top-up modal opens with the
  * amount prefilled (no payment logic here).
  */
-function CafeteriaSaldoCard({ total, low, studentsCount }: {
-  total: number; low: boolean; studentsCount: number;
+function CafeteriaSaldoCard({ total, pending = 0, low, studentsCount }: {
+  total: number; pending?: number; low: boolean; studentsCount: number;
 }) {
   return (
     <div className="card flex h-full flex-col gap-5">
@@ -282,6 +283,14 @@ function CafeteriaSaldoCard({ total, low, studentsCount }: {
           </p>
           {studentsCount > 1 && (
             <p className="mt-0.5 text-[12px] text-subtle">Suma de {studentsCount} alumnos</p>
+          )}
+          {pending > 0 && (
+            <Link
+              to="/portal/cafeteria"
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded text-[12.5px] font-semibold text-amber hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            >
+              <Clock size={13} aria-hidden="true" /> ${pending.toFixed(2)} pagado, por aplicar (7:30 a.m.)
+            </Link>
           )}
         </div>
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${low ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-dark'}`}>

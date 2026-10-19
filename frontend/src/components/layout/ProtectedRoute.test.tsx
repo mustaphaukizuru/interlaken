@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
+import { ConsoleAreaGuard } from './ConsoleAreaGuard';
 import { useAuthStore, type User } from '@/store/authStore';
 
 const adminUser: User = {
@@ -110,5 +111,49 @@ describe('ProtectedRoute', () => {
     renderAt('/staff');
     expect(screen.getByText('LOGIN PAGE')).toBeInTheDocument();
     expect(screen.queryByText('STAFF DASHBOARD')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConsoleAreaGuard (staff with console areas)', () => {
+  const staff = (areas: string[]): User => ({ ...adminUser, id: 7, role: 'staff', staff_areas: areas });
+
+  function renderConsole(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/staff" element={<div>STAFF DASHBOARD</div>} />
+          <Route path="/admin/*" element={<ConsoleAreaGuard><Routes>
+            <Route path="cafeteria" element={<div>CAFETERIA</div>} />
+            <Route path="alumnos" element={<div>ALUMNOS</div>} />
+            <Route path="usuarios" element={<div>USUARIOS</div>} />
+          </Routes></ConsoleAreaGuard>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it('opens a section of the account’s areas', () => {
+    useAuthStore.setState({ user: staff(['cafeteria']), accessToken: 't', isAuthenticated: true });
+    renderConsole('/admin/cafeteria');
+    expect(screen.getByText('CAFETERIA')).toBeInTheDocument();
+  });
+
+  it('sends a section outside its areas to its own first section', () => {
+    useAuthStore.setState({ user: staff(['cafeteria']), accessToken: 't', isAuthenticated: true });
+    renderConsole('/admin/usuarios');
+    expect(screen.getByText('CAFETERIA')).toBeInTheDocument();
+    expect(screen.queryByText('USUARIOS')).not.toBeInTheDocument();
+  });
+
+  it('sends staff without areas to the staff dashboard', () => {
+    useAuthStore.setState({ user: staff([]), accessToken: 't', isAuthenticated: true });
+    renderConsole('/admin/alumnos');
+    expect(screen.getByText('STAFF DASHBOARD')).toBeInTheDocument();
+  });
+
+  it('lets an admin through', () => {
+    useAuthStore.setState({ user: adminUser, accessToken: 't', isAuthenticated: true });
+    renderConsole('/admin/usuarios');
+    expect(screen.getByText('USUARIOS')).toBeInTheDocument();
   });
 });

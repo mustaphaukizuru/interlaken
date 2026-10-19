@@ -213,6 +213,7 @@ CALENDAR_ORDERING = {
 
 class AdminCalendarView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/content/admin/calendar/ (admin, Data Ops list contract)."""
+    admin_area = 'comunicados'
 
     serializer_class = SchoolEventSerializer
     search_fields = ("title", "description")
@@ -230,6 +231,7 @@ class AdminCalendarView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPI
 
 class AdminCalendarDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     """PATCH/DELETE /api/v1/content/admin/calendar/<pk>/ (admin)."""
+    admin_area = 'comunicados'
 
     permission_classes = [IsAdmin]
     serializer_class = SchoolEventSerializer
@@ -258,6 +260,7 @@ CALENDAR_EXPORT = ExportSpec(
 
 class AdminCalendarExportView(AdminExportMixin, AdminCalendarView):
     """GET /api/v1/content/admin/calendar/export/?fmt=csv|xlsx|pdf&…list filters…"""
+    admin_area = 'comunicados'
 
     http_method_names = ["get", "head", "options"]
 
@@ -270,6 +273,7 @@ def _calendar_changed(*_args):
 
 class AdminCalendarBulkView(AdminBulkView):
     """POST /api/v1/content/admin/calendar/bulk/ — publish, unpublish, delete."""
+    admin_area = 'comunicados'
 
     entity = "content.schoolevent"
     list_view_class = AdminCalendarView
@@ -411,12 +415,14 @@ CALENDAR_IMPORT = ImportSpec(
 
 class AdminCalendarImportTemplateView(ImportTemplateView):
     """GET /api/v1/content/admin/calendar/import/template/?fmt=csv|xlsx"""
+    admin_area = 'comunicados'
 
     spec = CALENDAR_IMPORT
 
 
 class AdminCalendarImportView(ImportView):
     """POST /api/v1/content/admin/calendar/import/ (dry_run, report, valid_only)."""
+    admin_area = 'comunicados'
 
     spec = CALENDAR_IMPORT
     template_url = "/api/v1/content/admin/calendar/import/template/"

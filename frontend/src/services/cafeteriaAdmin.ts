@@ -52,6 +52,15 @@ const blob = (url: string) => (params: ExportParams) => api.get<Blob>(url, { par
 const bulk = <R extends BulkResult = BulkResult>(url: string) => (body: BulkRequest) => api.post<R>(url, body);
 
 export const cafeteriaAdminApi = {
+  /** Paid card top-up loaded into the POS: credit the wallet once Loyverse shows it
+   *  (`force` + `note` skips that check and leaves it in "Cargar en POS"). */
+  applyPaidTopUp: (topupId: number, body: { force?: boolean; note?: string } = {}) =>
+    api.post<{ id: number; status: string; balance: string; detail: string }>(
+      `${BASE}/topup/${topupId}/apply-paid/`, body),
+  /** Paid card top-up refunded in MultiCobros before it was applied. */
+  refundPaidTopUp: (topupId: number, body: { note: string; bank_refund_confirmed: boolean; pos_not_loaded_confirmed: boolean }) =>
+    api.post<{ id: number; status: string; detail: string }>(
+      `${BASE}/topup/${topupId}/refund-paid/`, body),
   // Saldos
   balances: (params: ListParams) => api.get(`${BASE}/balances/`, { params }),
   exportBalances: blob(`${BASE}/balances/export/`),

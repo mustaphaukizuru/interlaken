@@ -21,9 +21,31 @@ Parent          Our SPA                 Our API                       Banorte
   |  card + 3DS inside Banorte's iframe ---------------------------->   charge
   |             <- onSuccess(response{data: AES(result)}) <---------------
   |             POST /payments/banorte/result/ -> decrypt data with stored key
-  |                                              settle (credit ledger, notify)
+  |                                              settle (top-up PAID, notify)
   |             -> /portal/cafeteria/recarga/retorno (shows the outcome)
+  ...
+Staff, 07:30 ->  type the amount into the student's Loyverse customer
+  |             mirror_pos_topups (5 min / webhook) sees exactly that gap
+  |                                              -> credit ledger, top-up COMPLETED, notify
 ```
+
+**When the money reaches the wallet** (`CAFETERIA_TOPUP_APPLY_MODE`, default
+`scheduled`, the school's rule since 2026-10-18). Loyverse points cannot be
+written by API, so an approved card top-up does not touch the balance: it waits
+as **Pagada · por aplicar** (`TopUpRequest.Status.PAID`) with the load time the
+family was promised (`apply_due_at`: the next school day at
+`CAFETERIA_TOPUP_APPLY_TIME`, 07:30; weekends, LFT statutory holidays and
+school-wide "Suspensión de clases"/"Vacaciones" calendar entries are skipped;
+a payment at least `CAFETERIA_TOPUP_APPLY_CUTOFF_MINUTES` before 07:30 on a
+school day joins that same load). The family sees it under the balance as
+"Recarga por aplicar" with the date, the folio (payment id) and a WhatsApp
+button to `CAFETERIA_TOPUP_WHATSAPP` for same-day requests. The wallet is
+credited once staff have typed it into the POS: the POS mirror applies it when
+Loyverse shows exactly that amount, or staff press **Aplicar** (the server
+first checks Loyverse holds it). Both use the same `topup-payment-<id>` ledger
+key, so it is credited once. `instant` restores the previous behaviour (credit
+on payment, load the POS afterwards). Code: `backend/apps/cafeteria/schedule.py`
+and `apply_paid_topup` / `mirror_pos_topups` in `backend/apps/cafeteria/services.py`.
 
 Code map:
 
@@ -38,6 +60,8 @@ Code map:
 | Lightbox loader | `frontend/src/lib/banorteCheckout.ts` |
 | Parent top-up | `frontend/src/pages/parent/CafeteriaPage.tsx` |
 | Staff verification (POS queue) and reconciliation (Depósitos) | `frontend/src/pages/admin/AdminCafeteria.tsx`, `frontend/src/components/admin/BanorteDialogs.tsx` |
+| "Por aplicar" queue (apply / refund a paid top-up) | `frontend/src/components/admin/PaidTopUpQueue.tsx` |
+| Paid top-ups to load into the POS (07:05 + hourly notice) | `manage.py topup_apply_report` |
 | Config check and certificate expiry | `manage.py check_banorte` |
 | Operations to look up in MultiCobros (hourly email) | `manage.py banorte_pending_report` |
 
@@ -248,17 +272,43 @@ wallet matches.
 
 ## 6. Daily operation for staff
 
-Every approved real-money online top-up appears in **Cafetería → POS Loyverse →
-Cargar en POS** (simulations never do).
+**Every school day at 07:30.** Paid card top-ups are listed in **Cafetería →
+POS Loyverse → Por aplicar (carga de las 7:30)**, oldest promise first, with
+the student's Loyverse customer code, the amount and the folio. At 07:05 (and
+hourly until 14:40 while something is overdue) every admin gets the same list
+as a portal notification and by email (`topup_apply_report`).
 
-1. If it says **Sin verificar**, press **Verificar en MultiCobros**. The dialog
-   shows the date, the Referencia 1 (`PAGO<id>`) and the número de control. In
-   MultiCobros go to Analítica → Reportes → Transacciones Payworks 2, search it
-   and confirm it is *Aprobada*. Type the referencia and the amount MultiCobros
-   shows; the server checks both against the payment.
-2. Load the amount in the Loyverse POS and press **Cargado en Loyverse**.
+1. If a row says **Sin verificar**, press **Verificar en MultiCobros**. The
+   dialog shows the date, the Referencia 1 (`PAGO<id>`) and the número de
+   control. In MultiCobros go to Analítica → Reportes → Transacciones Payworks
+   2, search it and confirm it is *Aprobada*. Type the referencia and the amount
+   MultiCobros shows; the server checks both against the payment.
+2. Type the amount into the student's customer in the Loyverse POS. Within a
+   few minutes the app sees it and applies it by itself (the row disappears and
+   the family is told the money is available). Or press **Aplicar**: the server
+   checks that Loyverse holds the money before crediting it. If Loyverse does not
+   show it yet (a purchase landed in between, or it was not loaded), the dialog
+   says so with both numbers; **Aplicar sin verificar** requires a reason and
+   leaves the top-up in **Cargar en POS** until it is marked loaded.
 3. If the operation does not appear in MultiCobros, or the amount differs, do
    not load it and tell the direction.
+4. **Same-day requests.** A family that needs the money today sends its
+   comprobante by WhatsApp. Search the folio in Depósitos (`folio 123` or just
+   `123`), load it in Loyverse right away and it applies within minutes.
+5. **Refund before it was applied.** Refund the charge in MultiCobros, then
+   press **Devolver** in "Por aplicar": confirm the MultiCobros refund and that
+   the amount is not in the POS (or was removed). The wallet does not move.
+
+The mirror never credits a Loyverse gap as a cash recarga while a student has
+a paid top-up waiting: an exact match (one or several of their paid top-ups) is
+applied, anything else is held and counted in the 07:35 wallet check
+(`check_wallet_drift`). "Corregir" in Reconciliación is refused for those
+students until the top-up is applied.
+
+**Cargar en POS** keeps the card top-ups that are in the wallet but not yet in
+Loyverse: those credited on payment (`instant` mode, or before 2026-10-18) and
+those applied without the Loyverse check. Load them and press **Cargado en
+Loyverse** (simulations never appear there).
 
 **Refunds.** The card refund is made in MultiCobros. Then use **Devolver** on
 the cafetería movement: for a card top-up the dialog asks to confirm that the
@@ -276,12 +326,13 @@ each has a **Conciliar con MultiCobros** button:
 
 - If MultiCobros shows it **Aprobada**: choose "Aparece Aprobada" and type the
   referencia Payworks, the número de autorización and the amount. The payment is
-  settled through the normal settlement path: the wallet is credited exactly
-  once, the operation is marked verified (it can go straight to the POS) and a
-  later answer from the parent's browser changes nothing.
+  settled through the normal settlement path: the payment is recorded exactly
+  once (the top-up becomes "Por aplicar", or is credited in `instant` mode), the
+  operation is marked verified (it can go straight to the POS) and a later
+  answer from the parent's browser changes nothing.
 - If it does **not appear** (or appears declined): choose "No aparece" and write
   a note. It is closed as "No aparece en MultiCobros" without moving money. If a
-  genuine approval from Banorte still arrives later, it is credited.
+  genuine approval from Banorte still arrives later, it is recorded as paid.
 
 **Never fix these with a manual balance adjustment.** The adjustment left the
 payment open, so a late answer from the browser credited the wallet a second

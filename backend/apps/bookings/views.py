@@ -94,6 +94,8 @@ class AvailabilityView(APIView):
     GET  /api/v1/bookings/availability/?type=&from=&to=  — public: open slots.
     POST /api/v1/bookings/availability/                  — admin: generate slots.
     """
+    admin_area = 'visitas'
+
     def get_permissions(self):
         if self.request.method == 'POST':
             return [IsAdmin()]
@@ -242,6 +244,7 @@ class AdminBookingsView(AdminListMixin, generics.ListAPIView):
     ``date, status, parent, child, created_at, attendees`` with a ``-pk``
     tiebreak; ``page`` / ``page_size`` (≤ 100). Two queries whatever the page.
     """
+    admin_area = 'visitas'
     serializer_class = BookingSerializer
     search_fields = data_ops.BOOKING_SEARCH_FIELDS
     ordering = data_ops.BOOKING_ORDERING
@@ -256,6 +259,7 @@ class AdminBookingsExportView(AdminExportMixin, AdminBookingsView):
     """GET /api/v1/bookings/admin/bookings/export/?fmt=csv|xlsx|pdf&ids=… — the
     Visitas list as a file: same filters, ``q`` and ``ordering`` as the list
     (it IS the list view), capped (10,000 / PDF 1,000 → 413) and audited."""
+    admin_area = 'visitas'
     export_spec = data_ops.BOOKING_EXPORT
 
 
@@ -265,6 +269,7 @@ class AdminBookingBulkView(AdminBulkView):
     goes through ``change_booking_status`` (transition table, capacity by
     ``num_attendees`` under a slot lock, confirmation email unless
     ``payload.notify`` is false, calendar sync) and gets its own audit row."""
+    admin_area = 'visitas'
     entity = 'bookings.booking'
     list_view_class = AdminBookingsView
     actions = data_ops.BOOKING_BULK_ACTIONS
@@ -281,6 +286,7 @@ class AdminBookingActionView(APIView):
     only reopens to pending; attended ↔ no-show needs a note), a capacity
     check by ``num_attendees`` under a slot lock when the move claims seats,
     and one audit row per change."""
+    admin_area = 'visitas'
     permission_classes = [IsAdmin]
 
     ACTIONS = {
@@ -314,6 +320,7 @@ class AdminBookingActionView(APIView):
 class AdminBookingRescheduleView(APIView):
     """POST /bookings/admin/bookings/<pk>/reschedule/ {"slot": id} — move a visit to another slot (P4-2).
     Checks capacity, keeps the old slot as rescheduled_from, re-syncs the calendar and emails the family."""
+    admin_area = 'visitas'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -375,6 +382,7 @@ class AdminBookingOutcomeView(APIView):
     ``admissions.services.change_status`` (transition table + its own audit row).
     A move the table forbids (e.g. an inscrito, or rechazado → contactado) is
     skipped and reported, never forced."""
+    admin_area = 'visitas'
     permission_classes = [IsAdmin]
 
     PREREG_TARGET = {'enrolling': 'enrolled', 'declined': 'rejected',
@@ -436,6 +444,7 @@ class AdminBookingOutcomeView(APIView):
 
 class AdminWeekView(APIView):
     """GET /bookings/admin/week/?start=YYYY-MM-DD — 7 days of slots with their bookings (P4-2 calendar)."""
+    admin_area = 'visitas'
     permission_classes = [IsAdmin]
 
     def get(self, request):
@@ -474,6 +483,7 @@ class AdminSlotListView(AdminListMixin, generics.ListAPIView):
     ``from``/``to`` via ``SlotFilterSet``; ordering keys ``date, start, type,
     capacity, booked`` (``booked`` is the annotated attendee total) with a
     ``-pk`` tiebreak; ``page`` / ``page_size``. One query per page + count."""
+    admin_area = 'visitas'
     serializer_class = AdminSlotSerializer
     search_fields = data_ops.SLOT_SEARCH_FIELDS
     ordering = data_ops.SLOT_ORDERING
@@ -486,6 +496,7 @@ class AdminSlotListView(AdminListMixin, generics.ListAPIView):
 
 class AdminSlotExportView(AdminExportMixin, AdminSlotListView):
     """GET /api/v1/bookings/admin/slots/export/?fmt=csv|xlsx|pdf&ids=…"""
+    admin_area = 'visitas'
     export_spec = data_ops.SLOT_EXPORT
 
 
@@ -493,6 +504,7 @@ class AdminSlotBulkView(AdminBulkView):
     """POST /api/v1/bookings/admin/slots/bulk/ — activate / deactivate / delete.
     A slot with any booking (even cancelled) is never deleted: it is reported
     as skipped with the reason (deactivate it instead)."""
+    admin_area = 'visitas'
     entity = 'bookings.availabilityslot'
     list_view_class = AdminSlotListView
     actions = data_ops.SLOT_BULK_ACTIONS
@@ -500,6 +512,7 @@ class AdminSlotBulkView(AdminBulkView):
 
 class AdminSlotImportTemplateView(ImportTemplateView):
     """GET /api/v1/bookings/admin/slots/import/template/?fmt=csv|xlsx"""
+    admin_area = 'visitas'
     spec = data_ops.SLOT_IMPORT
 
 
@@ -508,6 +521,7 @@ class AdminSlotImportView(ImportView):
     ``tipo, fecha (DD/MM/AAAA), inicio (HH:MM), fin, cupo, lugar`` (+ ``titulo``);
     ``dry_run=1`` (default) previews, ``report=csv|xlsx`` returns the annotated
     file, ``dry_run=0`` commits (``valid_only=1`` to skip error rows)."""
+    admin_area = 'visitas'
     spec = data_ops.SLOT_IMPORT
     template_url = '/api/v1/bookings/admin/slots/import/template/'
 
@@ -517,6 +531,7 @@ class AdminSlotDetailView(generics.RetrieveUpdateDestroyAPIView):
     location, title, is_active) or delete a slot. Deleting is refused when any
     booking references the slot (CASCADE would erase that history); deactivate
     instead."""
+    admin_area = 'visitas'
     queryset = AvailabilitySlot.objects.all()
     serializer_class = AdminSlotSerializer
     permission_classes = [IsAdmin]

@@ -171,6 +171,8 @@ Most is reuse. Additions:
   > **Decision — adopt a local ledger + reconcile (do NOT credit Loyverse on top-up):**
   > 1. Treat the DB as the **source of truth** for prepaid balance. `CafeteriaBalance.balance` is credited on a confirmed top-up (Prompt 10) via a `CafeteriaTransaction(type=topup)`; **no** call to Loyverse to add points.
   > 2. Keep syncing **purchases** *out* of Loyverse (`sync_purchases`, Prompt 09) — each processed receipt **debits** the local balance. Reads from Loyverse stay authoritative for *spend*; the DB stays authoritative for *credit*.
+  >
+  > **Update 2026-10-18 (school decision): credit only what the POS has.** Crediting on payment (step 1) left a window where the portal showed money the cashier did not have yet. With `CAFETERIA_TOPUP_APPLY_MODE=scheduled` (default) a confirmed card top-up becomes `PAID` and the ledger is credited only after staff type it into the POS (07:30 every school day, or on a WhatsApp same-day request): `mirror_pos_topups` applies a gap that matches the student's paid top-ups exactly, and the staff "Aplicar" action checks Loyverse first. Same `topup-payment-<id>` reference on every path. See `docs/BANORTE-INTEGRATION.md` §1 and §6.
   > 3. Add a **reconciliation** report (Prompt 11 / §5 `admin/reconcile`) to flag drift between the local ledger and Loyverse. If the store later enables a Loyverse plan/flow that supports crediting (e.g. a redemption/store-credit API), revisit crediting Loyverse directly.
 
   > ### Convergence rules (2026-09-23 audit, after the POS-mirror went live)

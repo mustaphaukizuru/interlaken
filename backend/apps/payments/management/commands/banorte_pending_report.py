@@ -103,8 +103,9 @@ class Command(BaseCommand):
             + "\n".join(rows)
             + "\n\nCiérrelas en el portal: Cafetería → Depósitos, filtro «Por revisar en "
             "MultiCobros», botón «Conciliar con MultiCobros». Si MultiCobros la muestra "
-            "APROBADA, capture la referencia, la autorización y el monto: el saldo se "
-            "acredita una sola vez y queda verificada. Si no aparece, márquela como «No "
+            "APROBADA, capture la referencia, la autorización y el monto: el pago se "
+            "registra una sola vez, queda verificado y la recarga pasa a «Por aplicar» "
+            "hasta cargarla en el POS. Si no aparece, márquela como «No "
             "aparece en MultiCobros» con una nota. No use un ajuste manual de saldo: si "
             "después llega la respuesta del banco, el saldo se acreditaría dos veces."
         )

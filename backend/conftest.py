@@ -119,3 +119,11 @@ def auth_client(api_client, parent_user):
 def admin_client(api_client, admin_user):
     api_client.force_authenticate(user=admin_user)
     return api_client
+
+
+@pytest.fixture
+def instant_topups(settings):
+    """Card top-ups credited on payment (``CAFETERIA_TOPUP_APPLY_MODE='instant'``),
+    for tests written against that flow. The default, ``scheduled`` (credit only
+    once the POS load is confirmed), is what production runs."""
+    settings.CAFETERIA_TOPUP_APPLY_MODE = 'instant'

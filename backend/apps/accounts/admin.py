@@ -1,11 +1,35 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from unfold.admin import ModelAdmin, StackedInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
+from unfold.widgets import UnfoldAdminCheckboxSelectMultipleWidget
+
+from apps.core.areas import AREAS, clean_areas
 
 from .models import ParentProfile, StudentProfile, User
+
+
+class StaffAreasFormMixin(forms.Form):
+    """``staff_areas`` as checkboxes instead of raw JSON (apps/core/areas.py)."""
+
+    staff_areas = forms.MultipleChoiceField(
+        label='Áreas de la consola',
+        choices=[(key, label) for key, (label, _) in AREAS.items()],
+        required=False,
+        widget=UnfoldAdminCheckboxSelectMultipleWidget,
+        help_text='Solo para el rol Personal: las secciones de la consola que puede usar. '
+                  'Un Administrador usa todas.',
+    )
+
+    def clean_staff_areas(self):
+        return clean_areas(self.cleaned_data.get('staff_areas') or [])
+
+
+class InterlakenUserChangeForm(StaffAreasFormMixin, UserChangeForm):
+    pass
 
 
 class LoyverseProfileInline(StackedInline):
@@ -31,11 +55,12 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
-    form = UserChangeForm
+    form = InterlakenUserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
-    list_display = ('email', 'full_name', 'role', 'is_active', 'date_joined')
-    list_filter = ('role', 'is_active', 'is_staff')
+    list_display = ('email', 'full_name', 'role', 'staff_title', 'is_superuser', 'is_active',
+                    'date_joined')
+    list_filter = ('role', 'is_active', 'is_staff', 'is_superuser')
     search_fields = ('email', 'first_name', 'last_name')
     ordering = ('-date_joined',)
     date_hierarchy = 'date_joined'
@@ -44,6 +69,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         (None, {'fields': ('email', 'password')}),
         ('Información personal', {'fields': ('first_name', 'last_name', 'avatar', 'whatsapp')}),
         ('Permisos', {'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Personal: puesto y áreas de la consola', {'fields': ('staff_title', 'staff_areas')}),
         ('Fechas', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (

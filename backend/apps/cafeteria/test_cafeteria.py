@@ -1153,6 +1153,9 @@ class TestRepairWalletLedger:
         assert CafeteriaBalance.objects.get(student=student).balance == Decimal("300")
 
 
+# Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
+# scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
+@pytest.mark.usefixtures("instant_topups")
 class TestLedgerSumInvariant:
     """The books must balance: opening seed + Σ(signed ledger effects) == balance.
 

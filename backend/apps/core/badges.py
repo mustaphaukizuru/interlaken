@@ -52,10 +52,14 @@ def portal_badges(user) -> dict:
 
 def _compute_badges(user) -> dict:
     from apps.accounts.models import PasswordRequest, User
+    from apps.core.areas import user_areas
     from apps.portal.models import Notification
 
     out = {'notificaciones': Notification.objects.filter(user=user, is_read=False).count()}
-    if getattr(user, 'role', None) != User.Role.ADMIN:
+    # Admins get every work queue; a staff account only those of its console
+    # areas (apps/core/areas.py), so nobody is shown a count they cannot open.
+    areas = user_areas(user)
+    if not areas:
         return out
     from apps.admissions.models import PreRegistration, Registration
     from apps.bookings.models import Booking
@@ -64,17 +68,25 @@ def _compute_badges(user) -> dict:
     from apps.legal.models import ArcoRequest
     from apps.payments.multicobros import online_topups_awaiting_staff
 
-    out.update({
-        'admisiones': PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
-        + Registration.objects.filter(status=Registration.Status.SUBMITTED).count(),
-        'visitas': Booking.objects.filter(status=Booking.Status.PENDING).count(),
-        # Cash requests to apply, plus real card top-ups still to verify in
-        # MultiCobros or to load into the POS (those are already COMPLETED).
-        'cafeteria': TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count()
-        + online_topups_awaiting_staff().count(),
-        'contrasenas': PasswordRequest.objects.filter(status=PasswordRequest.Status.OPEN).count(),
-        'mensajes': unhandled_contact_messages(None),
-        'formularios': FormSubmission.objects.filter(is_handled=False).count(),
-        'arco': ArcoRequest.objects.filter(status__in=('received', 'in_review')).count(),
-    })
+    counters = {
+        'admisiones': ('admisiones', lambda: (
+            PreRegistration.objects.filter(status=PreRegistration.Status.PENDING).count()
+            + Registration.objects.filter(status=Registration.Status.SUBMITTED).count())),
+        'visitas': ('visitas', lambda: Booking.objects.filter(status=Booking.Status.PENDING).count()),
+        # Cash requests to apply, plus real card top-ups still to load into
+        # the POS and apply, or to verify in MultiCobros.
+        'cafeteria': ('cafeteria', lambda: (
+            TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
+                                        method=TopUpRequest.Method.OFFICE).count()
+            + online_topups_awaiting_staff().count())),
+        'contrasenas': ('accesos', lambda: PasswordRequest.objects.filter(
+            status=PasswordRequest.Status.OPEN).count()),
+        'mensajes': ('mensajes', lambda: unhandled_contact_messages(None)),
+        'formularios': ('mensajes', lambda: FormSubmission.objects.filter(is_handled=False).count()),
+    }
+    for badge, (area, count) in counters.items():
+        if area in areas:
+            out[badge] = count()
+    if getattr(user, 'role', None) == User.Role.ADMIN:
+        out['arco'] = ArcoRequest.objects.filter(status__in=('received', 'in_review')).count()
     return out

@@ -31,6 +31,11 @@ urlpatterns = [
          name='admin-topup-pos-loaded'),
     path('admin/topup/<int:pk>/pos-unloaded/', views.AdminMarkTopUpPosUnloadedView.as_view(),
          name='admin-topup-pos-unloaded'),
+    # Paid online top-ups waiting for their POS load (scheduled apply mode).
+    path('admin/topup/<int:pk>/apply-paid/', views.AdminApplyPaidTopUpView.as_view(),
+         name='admin-topup-apply-paid'),
+    path('admin/topup/<int:pk>/refund-paid/', views.AdminRefundPaidTopUpView.as_view(),
+         name='admin-topup-refund-paid'),
     path('admin/sync/<int:pk>/',         views.AdminSyncBalanceView.as_view(),    name='admin-sync-balance'),
     path('admin/sync-all/',              views.AdminSyncAllView.as_view(),        name='admin-sync-all'),
     path('admin/reconcile/<int:pk>/fix/', views.AdminReconcileFixView.as_view(),  name='admin-reconcile-fix'),

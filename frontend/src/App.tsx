@@ -212,7 +212,8 @@ export default function App() {
 
             {/* ── ADMIN PORTAL ────────────────────────────── */}
             <Route path="/admin" element={
-              <ProtectedRoute roles={['admin']}>
+              <ProtectedRoute roles={['admin', 'staff']}>
+                {/* Staff see only their console areas: ConsoleAreaGuard inside PortalLayout. */}
                 <PortalLayout role="admin" />
               </ProtectedRoute>
             }>

@@ -3,8 +3,9 @@ import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown } from 'lucide-react';
-import { navGroupsByRole, type Role } from './navConfig';
+import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, BarChart3, LayoutDashboard } from 'lucide-react';
+import { navGroupsByRole, type NavGroup, type Role } from './navConfig';
+import { canOpen, consoleHome } from '@/lib/areas';
 import { useBadges } from '@/hooks/useBadges';
 import { Avatar } from '@/components/ui/Avatar';
 
@@ -34,7 +35,21 @@ function readCollapsed(): boolean {
 export default function Sidebar({ role, open = false, onNavigate }: SidebarProps) {
   const { user } = useAuthStore();
   const badges = useBadges();
-  const groups = navGroupsByRole[role] ?? navGroupsByRole.parent;
+  // Staff in the console see only the sections of their areas (lib/areas.ts),
+  // and a way between the console and their staff dashboard.
+  const home = consoleHome(user);
+  const bridge: NavGroup[] = user?.role !== 'staff' || !home ? [] : role === 'admin'
+    ? [{ heading: 'Personal', items: [{ icon: BarChart3, label: 'Analítica', to: '/staff', end: true }] }]
+    : role === 'staff'
+      ? [{ heading: 'Consola', items: [{ icon: LayoutDashboard, label: user.staff_title || 'Mi consola', to: home }] }]
+      : [];
+  const groups = [
+    ...(role === 'staff' ? bridge : []),
+    ...(navGroupsByRole[role] ?? navGroupsByRole.parent)
+      .map((g) => ({ ...g, items: g.items.filter((item) => canOpen(user, item.to)) }))
+      .filter((g) => g.items.length > 0),
+    ...(role === 'admin' ? bridge : []),
+  ];
   const asideRef = useRef<HTMLElement>(null);
   const touchX = useRef<number | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);

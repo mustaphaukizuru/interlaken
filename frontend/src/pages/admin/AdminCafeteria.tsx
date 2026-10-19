@@ -30,6 +30,8 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
 import { ReconcileBanorteDialog, VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
 import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
+import { AppliedTodayList, ApplyPaidDialog, PaidTopUpQueue } from '@/components/admin/PaidTopUpQueue';
+import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
 import { cafeteriaApi, downloadBlob, type LoyverseCustomer } from '@/services/api';
 import { adjustmentImportApi, type AdminTransaction, type ReconcileRowV2, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
 import { exportFilename, idsParam, type BulkActionDef, type BulkRequest, type BulkResult, type ExportFormat, type ImportRow, type ListParams } from '@/services/dataOps';
@@ -608,10 +610,12 @@ const TOPUP_ACTIONS: BulkActionDef[] = [
   { name: 'apply', label: 'Aplicar', planVerb: 'Se aplicarán' },
   { name: 'pos_loaded', label: 'Cargadas en POS', planVerb: 'Se marcarán como cargadas en el POS' },
   { name: 'pos_unloaded', label: 'Quitadas del POS', planVerb: 'Se marcarán como quitadas del POS' },
+  APPLY_PAID_ACTION,
 ];
 
 const posBadge = (d: TopUpLogEntry) =>
-  d.needs_pos_unload ? <Badge variant="error">Quitar del POS</Badge>
+  d.needs_apply ? <Badge variant={d.apply_overdue ? 'error' : 'warning'}>{d.apply_overdue ? 'Por aplicar (vencida)' : 'Por cargar y aplicar'}</Badge>
+    : d.needs_pos_unload ? <Badge variant="error">Quitar del POS</Badge>
     : d.needs_pos_load ? <Badge variant="warning">Pendiente POS</Badge>
     : d.pos_loaded_at ? <Badge variant="success">En POS</Badge>
     : d.banorte?.simulation && d.status === 'completed' ? <Badge variant="neutral">Simulación (no cargar)</Badge>
@@ -688,6 +692,7 @@ function DepositsTab() {
   const bulk = useTopUpsBulk();
   const [pending, setPending] = useState<{ action: BulkActionDef; ids: RowKey[] | null } | null>(null);
   const [reconciling, setReconciling] = useState<TopUpLogEntry | null>(null);
+  const [applyingPaid, setApplyingPaid] = useState<TopUpLogEntry | null>(null);
   const fetchExport = exporter((p) => exportTopups.mutateAsync(p), filters, selection);
 
   return (
@@ -743,6 +748,10 @@ function DepositsTab() {
           <Button size="sm" onClick={() => setPending({ action: TOPUP_ACTIONS[0], ids: [d.id] })} aria-label={`Aplicar depósito de ${d.student_name}`}>
             <Wallet className="w-3.5 h-3.5" aria-hidden="true" /> Aplicar
           </Button>
+        ) : (d.needs_apply && !d.banorte?.needs_verification) ? (
+          <Button size="sm" onClick={() => setApplyingPaid(d)} aria-label={`Aplicar la recarga pagada de ${d.student_name}`}>
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Aplicar
+          </Button>
         ) : (d.banorte?.can_reconcile && d.payment_id) ? (
           <Button size="sm" variant="secondary" onClick={() => setReconciling(d)} aria-label={`Conciliar con MultiCobros el pago de ${d.student_name}`}>
             <FileSearch className="w-3.5 h-3.5" aria-hidden="true" /> Conciliar con MultiCobros
@@ -761,9 +770,10 @@ function DepositsTab() {
         filters={filters}
         execute={(body) => bulk.mutateAsync(body)}
         onDone={() => { if (!pending?.ids) selection.onClear(); }}
-        renderPlan={pending?.action.name === 'apply' ? applyTotal : undefined}
+        renderPlan={pending?.action.name === 'apply' || pending?.action.name === 'apply_paid' ? applyTotal : undefined}
       />
       <ReconcileBanorteDialog row={reconciling} onClose={() => setReconciling(null)} />
+      <ApplyPaidDialog row={applyingPaid} onClose={() => setApplyingPaid(null)} />
     </Card>
   );
 }
@@ -772,10 +782,12 @@ function DepositsTab() {
 function PosLoadTab() {
   return (
     <div className="space-y-6">
+      <PaidTopUpQueue />
+      <AppliedTodayList />
       <PosQueue
         kind="load"
         title="Cargar en POS"
-        intro="Recargas con tarjeta (cargo real) ya acreditadas en el saldo local. Verifíquelas en MultiCobros, cargue el monto en el POS de Loyverse y márquelo aquí para que el alumno pueda gastar. Las operaciones de simulación de Banorte no aparecen aquí: no se cargan."
+        intro="Recargas con tarjeta (cargo real) que ya están en el saldo local pero aún no en Loyverse: las acreditadas al confirmarse el pago (modo anterior) y las aplicadas sin la confirmación de Loyverse. Verifíquelas en MultiCobros, cargue el monto en el POS de Loyverse y márquelo aquí para que el alumno pueda gastar. Las operaciones de simulación de Banorte no aparecen aquí: no se cargan."
         emptyTitle="Sin pendientes de carga en POS"
         emptyText="Todas las recargas en línea ya fueron marcadas como cargadas."
       />

@@ -300,14 +300,15 @@ def reconcile_not_found(payment_id, *, note: str, actor) -> ReconcileResult:
 
 
 def online_topups_awaiting_staff():
-    """Real-money (PRD) online top-ups credited locally that staff still have to
-    verify in MultiCobros and/or load into the Loyverse POS."""
+    """Real-money (PRD) online top-ups staff still have to work: paid and waiting
+    to be loaded into the Loyverse POS and applied (scheduled mode), or credited
+    locally and still to verify in MultiCobros and/or load into the POS."""
     from apps.cafeteria.models import TopUpRequest
 
     return TopUpRequest.objects.filter(
+        Q(status=TopUpRequest.Status.PAID)
+        | Q(status=TopUpRequest.Status.COMPLETED, pos_loaded_at__isnull=True),
         method=TopUpRequest.Method.ONLINE,
-        status=TopUpRequest.Status.COMPLETED,
-        pos_loaded_at__isnull=True,
         payments__status=Payment.Status.SUCCESS,
         payments__banorte__mode="PRD",
     ).distinct()

@@ -42,6 +42,7 @@ from .serializers import (
     RefundInputSerializer,
     SpendLimitsSerializer,
     TopUpRequestSerializer,
+    build_pending_topups_map,
     build_spend_map,
 )
 from .services import (
@@ -117,7 +118,8 @@ class MyBalanceView(APIView):
                 return Response(error_body('Perfil de alumno no encontrado.'), status=404)
             balance, _ = CafeteriaBalance.objects.get_or_create(student=profile)
             return Response(CafeteriaBalanceSerializer(
-                balance, context={'include_spend': True}).data)
+                balance, context={'include_spend': True,
+                                  'pending_topups': build_pending_topups_map([profile])}).data)
 
         if user.role == User.Role.ADMIN:
             # Admin wide view: skip the per-student spend aggregates so a
@@ -148,6 +150,7 @@ class MyBalanceView(APIView):
         context = {'include_spend': include_spend}
         if include_spend:
             context['spend_map'] = build_spend_map(students)
+            context['pending_topups'] = build_pending_topups_map(students)
         return Response(CafeteriaBalanceSerializer(
             balances, many=True, context=context).data)
 
@@ -436,9 +439,12 @@ class MyCardsView(APIView):
 
     def get(self, request):
         students = _family_students_qs(request.user)
-        # Staff credencial view (BACKLOG P1-A9): an admin asks for one student.
+        # Staff credencial view (BACKLOG P1-A9): the console asks for one
+        # student (admins, and staff with the Alumnos or Cafetería area).
+        from apps.core.areas import has_area
+
         student_id = _student_param(request)
-        if student_id and request.user.role == User.Role.ADMIN:
+        if student_id and has_area(request.user, 'alumnos', 'cafeteria'):
             students = StudentProfile.objects.filter(pk=student_id)
         students = students.select_related('user', 'loyverse_profile')
         # One INSERT for whatever is missing, then one fetch: the previous
@@ -784,6 +790,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
 
 class AdminApplyTopUpView(APIView):
     """POST /api/v1/cafeteria/admin/topup/<pk>/apply/"""
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -831,6 +838,9 @@ class AdminApplyTopUpView(APIView):
 
     @staticmethod
     def _refusal(topup) -> str:
+        if topup.status == TopUpRequest.Status.PAID:
+            return ('Esta recarga en línea está pagada y pendiente de aplicar: se aplica desde '
+                    'POS Loyverse → «Por aplicar» después de cargarla en el POS.')
         if topup.status != TopUpRequest.Status.PENDING:
             return 'Esta recarga ya fue procesada.'
         # Only OFFICE (cash-at-the-counter) top-ups are applied manually. ONLINE
@@ -911,6 +921,7 @@ class AdminSyncBalanceView(APIView):
        comparison the button answers "did something run?" instead of the
        question actually being asked, "is this wallet right?".
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -961,6 +972,7 @@ class AdminSyncAllView(APIView):
     Seeds any missing opening balances AND polls Loyverse receipts so purchases
     + parent alerts catch up immediately (not just on the next cron tick).
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request):
@@ -1015,6 +1027,7 @@ class AdminSyncHealthView(APIView):
     behind root access to a server. Cached briefly so opening the page does not
     probe Loyverse on every render.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
     CACHE_KEY = 'cafeteria:sync-health'
     CACHE_TTL = 60
@@ -1046,6 +1059,7 @@ class AdminSyncRosterView(APIView):
     customer fetch plus a few hundred row updates, well inside the 60 s
     request budget. ``dry_run`` previews the report without writing.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
     throttle_classes = [SharedScopedRateThrottle]
     throttle_scope = 'admin-bulk'
@@ -1086,6 +1100,7 @@ class AdminReconcileFixView(APIView):
     debit that could cancel a recent local-only credit (see
     ``services.reconcile_to_loyverse``).
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -1138,6 +1153,7 @@ class AdminMarkTopUpPosLoadedView(APIView):
     Staff marks an online completed top-up as loaded into Loyverse POS.
     Idempotent when already marked. Rejects office/pending/failed/refunded rows.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -1152,6 +1168,12 @@ class AdminMarkTopUpPosLoadedView(APIView):
         if topup.method != TopUpRequest.Method.ONLINE:
             return Response(
                 error_body('Solo las recargas en línea requieren carga en el POS.'),
+                status=400,
+            )
+        if topup.status == TopUpRequest.Status.PAID:
+            return Response(
+                error_body('Esta recarga está pagada y pendiente de aplicar: cárguela en el POS '
+                           'y use «Aplicar» en la cola «Por aplicar».', code='use_apply'),
                 status=400,
             )
         if topup.status != TopUpRequest.Status.COMPLETED:
@@ -1197,12 +1219,90 @@ class AdminMarkTopUpPosLoadedView(APIView):
         })
 
 
+def _apply_error_response(exc):
+    """A ``TopUpApplyError`` as the console reads it: message, code and numbers."""
+    body = error_body(str(exc), code=exc.code)
+    body.update(exc.extra)
+    return Response(body, status=exc.status)
+
+
+class AdminApplyPaidTopUpView(APIView):
+    """POST /api/v1/cafeteria/admin/topup/<pk>/apply-paid/  ``{force?, note?}``
+
+    "Aplicar": staff loaded a paid online top-up into the Loyverse POS; credit
+    the wallet now. The server confirms Loyverse holds the money first
+    (``services.apply_paid_topup``); ``force`` with a ``note`` applies it
+    without that confirmation and leaves it in the "Cargar en POS" queue.
+    """
+    admin_area = 'cafeteria'
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from apps.core.flags import truthy
+
+        from .services import TopUpApplyError, apply_paid_topup
+
+        topup = get_object_or_404(TopUpRequest.objects.select_related('student__user'), pk=pk)
+        force = truthy(request.data.get('force', False))
+        note = str(request.data.get('note', '') or '')
+        try:
+            tx, balance = apply_paid_topup(topup, actor=request.user, force=force, note=note)
+        except TopUpApplyError as exc:
+            return _apply_error_response(exc)
+        except LoyverseError:
+            logger.exception('Apply paid top-up #%s: Loyverse read failed', pk)
+            return Response(error_body('No se pudo consultar Loyverse. Intente de nuevo en unos '
+                                       'minutos.', code='pos_unknown'), status=502)
+        topup.refresh_from_db()
+        return Response({
+            'id': topup.id,
+            'status': topup.status,
+            'applied_at': topup.applied_at,
+            'applied_via': topup.applied_via,
+            'pos_loaded_at': topup.pos_loaded_at,
+            'transaction_id': tx.id,
+            'balance': str(balance),
+            'detail': ('Recarga aplicada sin verificar en Loyverse; quedó en «Cargar en POS».'
+                       if force else 'Recarga aplicada: ya está disponible para el alumno.'),
+        })
+
+
+class AdminRefundPaidTopUpView(APIView):
+    """POST /api/v1/cafeteria/admin/topup/<pk>/refund-paid/
+    ``{note, bank_refund_confirmed, pos_not_loaded_confirmed}``
+
+    "Devolver pago" for a paid online top-up that was never applied: staff
+    refunded the card in MultiCobros and confirm the amount is not in the POS.
+    The wallet does not move (``services.refund_paid_topup``).
+    """
+    admin_area = 'cafeteria'
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from apps.core.flags import truthy
+
+        from .services import TopUpApplyError, refund_paid_topup
+
+        topup = get_object_or_404(TopUpRequest.objects.select_related('student__user'), pk=pk)
+        try:
+            topup = refund_paid_topup(
+                topup, actor=request.user, note=str(request.data.get('note', '') or ''),
+                bank_refund_confirmed=truthy(request.data.get('bank_refund_confirmed', False)),
+                pos_not_loaded_confirmed=truthy(request.data.get('pos_not_loaded_confirmed', False)),
+            )
+        except TopUpApplyError as exc:
+            return _apply_error_response(exc)
+        return Response({'id': topup.id, 'status': topup.status,
+                         'detail': 'Pago devuelto; la recarga no se aplicó.'})
+
+
 class AdminMarkTopUpPosUnloadedView(APIView):
     """POST /api/v1/cafeteria/admin/topup/<pk>/pos-unloaded/
 
     Staff confirms a refunded online top-up was removed from Loyverse POS.
     Idempotent when already marked. Rejects rows not queued for unload.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -1245,6 +1345,7 @@ class AdminStudentDetailView(APIView):
     ``?ledger=0`` omits the two capped lists: the console pages them through
     ``admin/transactions/?student=`` and ``admin/adjustments/?student=``.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
@@ -1269,7 +1370,9 @@ class AdminStudentDetailView(APIView):
         loyverse = getattr(student, 'loyverse_profile', None)
 
         return Response({
-            'balance': CafeteriaBalanceSerializer(balance).data,
+            # pending_topups: paid card top-ups still to load into the POS.
+            'balance': CafeteriaBalanceSerializer(
+                balance, context={'pending_topups': build_pending_topups_map([student])}).data,
             'parents': parents,
             'transactions': CafeteriaTransactionSerializer(transactions, many=True).data,
             'adjustments': BalanceAdjustmentSerializer(adjustments, many=True).data,
@@ -1283,6 +1386,7 @@ class AdminAdjustBalanceView(APIView):
     Audited manual credit (+) or debit (−) to a student's balance. Writes a
     ``BalanceAdjustment`` and an ``ADJUSTMENT`` ledger row, then notifies parents.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, student_pk):
@@ -1315,6 +1419,7 @@ class AdminRefundView(APIView):
     already did it there; the confirmation is kept in the refund's reason and
     the audit log.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, tx_pk):
@@ -1360,6 +1465,7 @@ class AdminLoyverseCustomerReceiptsView(APIView):
     ``UnmatchedReceipt`` rows, newest first, with a line-item summary. For a
     pupil's card the ledger lives on the student console instead.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def get(self, request, loyverse_id):
@@ -1413,6 +1519,7 @@ class AdminExportStudentView(APIView):
     Audited like every export (``record_export``, entity
     ``cafeteria.student_statement``; Data Ops Phase 10).
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
@@ -1573,6 +1680,7 @@ class AdminBulkTopUpView(APIView):
     after that), and a summary audit row is written for every request, even
     one that ends early.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request):

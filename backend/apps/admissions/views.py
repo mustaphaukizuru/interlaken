@@ -57,9 +57,13 @@ logger = logging.getLogger(__name__)
 def _is_staff(request):
     """True for authenticated staff/admin users (JWT), who bypass the token gate.
 
-    The rule lives in ``apps.core.permissions.is_admin_or_django_staff``.
+    The rule lives in ``apps.core.permissions.is_admin_or_django_staff``; a
+    staff account with the ``admisiones`` console area counts too.
     """
-    return is_admin_or_django_staff(getattr(request, 'user', None))
+    from apps.core.areas import has_area
+
+    user = getattr(request, 'user', None)
+    return is_admin_or_django_staff(user) or has_area(user, 'admisiones')
 
 
 def _session_token(request):
@@ -126,6 +130,7 @@ class PreRegistrationAdminListView(PreRegistrationListConfig, generics.ListAPIVi
 class PreRegistrationListCreateView(PreRegistrationListConfig, generics.ListCreateAPIView):
     """POST /api/v1/admissions/pre-register/ — Public, no auth.
     GET — Admin-only paginated list for the Admisiones console."""
+    admin_area = 'admisiones'
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -178,6 +183,7 @@ class PreRegistrationDetailView(generics.UpdateAPIView):
     (``apps.core.transitions``); undoing a decision (contacted/rejected →
     pending) needs ``note`` in the body. Every change is audited.
     """
+    admin_area = 'admisiones'
     queryset = PreRegistration.objects.all()
     serializer_class = PreRegistrationStatusSerializer
     permission_classes = [IsAdmin]
@@ -208,6 +214,7 @@ class PreRegistrationInviteView(APIView):
     (fail-soft). Idempotent: re-inviting the same pre-registration refreshes the
     token on the existing draft rather than spawning duplicates.
     """
+    admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -262,6 +269,7 @@ class RegistrationAdminListView(RegistrationListConfig, generics.ListAPIView):
 class RegistrationListCreateView(RegistrationListConfig, generics.ListCreateAPIView):
     """POST /api/v1/admissions/register/ — Start a registration (no auth).
     GET — Admin-only paginated list for the Inscripciones console."""
+    admin_area = 'admisiones'
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -320,6 +328,7 @@ class RegistrationStatusView(generics.UpdateAPIView):
     notes; every change is audited. On an approve/reject the applicant is
     emailed the outcome (fail-soft) unless ``notify`` is false.
     """
+    admin_area = 'admisiones'
     queryset = Registration.objects.all()
     serializer_class = RegistrationStatusSerializer
     permission_classes = [IsAdmin]
@@ -365,6 +374,7 @@ class DocumentListView(APIView):
 class DocumentsLinkView(APIView):
     """POST /api/v1/admissions/register/<pk>/documents-link/ — admin issues a
     fresh single-use link to the standalone documents page and emails it."""
+    admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -388,6 +398,7 @@ class DocumentsLinkView(APIView):
 class DocumentVerifyView(generics.UpdateAPIView):
     """PATCH /api/v1/admissions/documents/<pk>/verify/ — admin approves/rejects
     (with note) or clears verification. A rejection emails the family (fail-soft)."""
+    admin_area = 'admisiones'
     queryset = RegistrationDocument.objects.all()
     serializer_class = DocumentVerifySerializer
     permission_classes = [IsAdmin]

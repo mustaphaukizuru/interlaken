@@ -112,7 +112,9 @@ function ReconcileForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
       : { outcome, note: note.trim() }),
     onSuccess: ({ data }) => {
       if (data.detail === 'already_processed') toast.success('Ya estaba conciliada.');
-      else if (outcome === 'approved') toast.success(`Pago conciliado: se acreditaron ${mxn(row.amount)} a ${row.student_name}.`);
+      else if (outcome === 'approved' && data.payment?.topup?.status === 'paid') {
+        toast.success(`Pago conciliado: ${mxn(row.amount)} de ${row.student_name} quedó en «Por aplicar». Cárguelo en el POS.`);
+      } else if (outcome === 'approved') toast.success(`Pago conciliado: se acreditaron ${mxn(row.amount)} a ${row.student_name}.`);
       else toast.success('Marcada como «No aparece en MultiCobros».');
       onClose();
       void invalidate();
@@ -156,15 +158,16 @@ function ReconcileForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
           <Input label="Monto en MultiCobros" inputMode="decimal" autoComplete="off" required value={amount} onChange={(e) => setAmount(e.target.value)} />
           <Input label="Nota (opcional)" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
           <p className="text-xs text-muted">
-            Se acreditarán {mxn(row.amount)} al saldo de {row.student_name} una sola vez y la operación quedará verificada.
-            Si después llega la respuesta de Banorte, no se acredita de nuevo.
+            El pago de {mxn(row.amount)} de {row.student_name} queda registrado una sola vez y la operación verificada;
+            la recarga pasa a «Por aplicar» y llega al saldo cuando se carga en el POS. Si después llega la respuesta
+            de Banorte, no cambia nada.
           </p>
         </>
       ) : (
         <>
           <Input label="Nota" required maxLength={500} placeholder="Qué buscó y qué encontró en MultiCobros" value={note} onChange={(e) => setNote(e.target.value)} />
           <p className="text-xs text-muted">
-            Se cierra como «No aparece en MultiCobros» sin mover saldo. Si más tarde llega una aprobación real de Banorte, se acreditará.
+            Se cierra como «No aparece en MultiCobros» sin mover saldo. Si más tarde llega una aprobación real de Banorte, se registrará como pagada.
           </p>
         </>
       )}

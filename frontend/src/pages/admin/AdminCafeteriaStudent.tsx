@@ -172,6 +172,20 @@ export default function AdminCafeteriaStudent() {
         </Card>
       </div>
 
+      {/* Paid card top-ups not in the balance yet (scheduled POS load). */}
+      {!!balance.pending_topups?.length && (
+        <div role="note" className="flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.07] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <strong>Recargas pagadas por aplicar:</strong>{' '}
+            {balance.pending_topups.map((t) => `$${parseFloat(t.amount).toFixed(2)} (folio ${t.folio ?? '—'})`).join(', ')}.
+            {' '}Aún no están en el saldo: se aplican al cargarlas en el POS de Loyverse.
+          </p>
+          <Link to="/admin/cafeteria?tab=pos" className="shrink-0 text-sm font-semibold text-purple hover:underline">
+            Ir a «Por aplicar» →
+          </Link>
+        </div>
+      )}
+
       {/* Loyverse customer snapshot — full visit history + lifetime spend */}
       {loyverse && (
         <Card>

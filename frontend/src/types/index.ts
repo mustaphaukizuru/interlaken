@@ -14,6 +14,10 @@ export interface User {
     in_app_enabled: boolean;
     push_enabled: boolean;
   };
+  /** Admin-console areas this account may use (every one for an admin; lib/areas.ts). */
+  staff_areas?: string[];
+  /** Job title of a staff account ("Secretaría", "Recepción"...). */
+  staff_title?: string;
 }
 
 export interface StudentProfile {
@@ -53,6 +57,29 @@ export interface CafeteriaBalance {
   /** Running spend for budget progress (family views only; null otherwise). */
   today_spend?: string | null;
   week_spend?: string | null;
+  /** Paid card top-ups not in the balance yet (family views; empty otherwise). */
+  pending_topups?: PendingTopUp[];
+}
+
+/** A paid card top-up waiting for the school's POS load (scheduled apply mode). */
+export interface PendingTopUp {
+  id: number;
+  amount: string;
+  paid_at: string | null;
+  /** The POS load promised to the family (next school day, 07:30). */
+  apply_due_at: string | null;
+  /** Payment id: the folio on the comprobante and in the WhatsApp message. */
+  folio: number | null;
+}
+
+/** When a card top-up reaches the wallet (GET /payments/availability/). */
+export interface TopUpPolicy {
+  mode: 'scheduled' | 'instant';
+  apply_time: string;
+  /** School WhatsApp, 10 digits ('' when not configured). */
+  whatsapp: string;
+  /** When a payment made right now would be applied (null in instant mode). */
+  next_apply_at: string | null;
 }
 
 export interface CafeteriaTransactionItem {
@@ -125,7 +152,7 @@ export interface TopUpLogEntry {
   amount: string;
   method: 'online' | 'office';
   method_display: string;
-  status: 'pending' | 'completed' | 'failed';
+  status: 'pending' | 'paid' | 'completed' | 'failed' | 'refunded';
   status_display: string;
   gateway: string;
   payment_status: string;
@@ -142,6 +169,20 @@ export interface TopUpLogEntry {
   pos_unloaded_at: string | null;
   pos_unloaded_by_name: string;
   needs_pos_unload: boolean;
+  /** Scheduled apply: the POS load promised to the family and when it reached the wallet. */
+  apply_due_at?: string | null;
+  applied_at?: string | null;
+  applied_via?: '' | 'instant' | 'staff' | 'pos_sync' | 'override';
+  applied_via_display?: string;
+  applied_by_name?: string;
+  /** Paid, waiting to be loaded into the POS and applied. */
+  needs_apply?: boolean;
+  /** Past the time promised to the family. */
+  apply_overdue?: boolean;
+  /** Loyverse customer code and points (last sync) next to the wallet balance. */
+  loyverse_code?: string;
+  loyverse_points?: string | null;
+  wallet_balance?: string | null;
 }
 
 export interface BanorteOperation {
@@ -239,6 +280,13 @@ export interface Payment {
   auth_code?: string;
   student_id?: number | null;
   student_name?: string;
+  /** The cafetería top-up it pays for: `paid` = received, waiting for the POS load. */
+  topup?: {
+    id: number;
+    status: 'pending' | 'paid' | 'completed' | 'failed' | 'refunded';
+    apply_due_at: string | null;
+    applied_at: string | null;
+  } | null;
   created_at: string;
   updated_at: string;
   /** Admin ledger only. */
@@ -306,7 +354,8 @@ export interface Booking {
 export interface DashboardData {
   children_count?: number;
   children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;
-  cafeteria_balances?: Array<{ student_name: string; balance: string; low: boolean; last_synced: string }>;
+  /** `pending_topups`: paid card top-ups not applied yet (school's 7:30 POS load). */
+  cafeteria_balances?: Array<{ student_name: string; balance: string; low: boolean; last_synced: string; pending_topups?: string }>;
   recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
   /** True when the family account has no linked StudentProfile yet. */
   needs_family_link?: boolean;

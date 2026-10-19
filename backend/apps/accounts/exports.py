@@ -63,6 +63,7 @@ STUDENTS_EXPORT = ExportSpec(
 
 class AdminStudentExportView(AdminExportMixin, StudentListView):
     """GET /api/v1/accounts/admin/students/export/ — admin only, audited, throttled."""
+    admin_area = 'alumnos'
 
     permission_classes = [IsAdmin]
     export_spec = STUDENTS_EXPORT

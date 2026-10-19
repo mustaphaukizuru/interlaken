@@ -2,6 +2,7 @@
 Portal views: role-aware dashboard, announcements, notifications.
 """
 import logging
+from decimal import Decimal
 
 import django_filters
 from django.db.models import Count, Exists, OuterRef, Q, Subquery, Sum
@@ -74,7 +75,9 @@ def _pending_topup_counts() -> dict:
     from apps.cafeteria.models import TopUpRequest
     from apps.payments.multicobros import online_topups_awaiting_staff
 
-    office = TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING).count()
+    # An online PENDING row is a family still inside Banorte's window.
+    office = TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
+                                         method=TopUpRequest.Method.OFFICE).count()
     online = online_topups_awaiting_staff().count()
     return {
         'pending_topups': office + online,
@@ -109,6 +112,14 @@ class DashboardView(APIView):
             students = family_students
             balances = (CafeteriaBalance.objects.filter(student__in=students)
                         .select_related('student__user', 'student__loyverse_profile'))
+            # Paid card top-ups the school has not loaded into the POS yet:
+            # the hero card must not look like the payment vanished.
+            from apps.cafeteria.serializers import build_pending_topups_map
+            pending = build_pending_topups_map(students) if students else {}
+            pending_total = {
+                sid: f"{sum((Decimal(t['amount']) for t in rows), Decimal('0')):.2f}"
+                for sid, rows in pending.items()
+            }
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
             recent_payments = (
@@ -137,6 +148,7 @@ class DashboardView(APIView):
                         'balance': str(b.balance),
                         'low': b.is_low_balance,
                         'last_synced': b.last_synced,
+                        'pending_topups': pending_total.get(b.student_id, '0.00'),
                     }
                     for b in balances
                 ],
@@ -367,6 +379,7 @@ class AnnouncementAdminListCreateView(AdminListMixin, generics.ListCreateAPIView
     ``scheduled``, ``requires_ack``, ``from``/``to``; ordering keys in
     ``ANNOUNCEMENT_ORDERING``.
     POST — compose a new audience-targeted comunicado (author = current admin)."""
+    admin_area = 'comunicados'
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [IsAdmin]
     search_fields = ('title', 'body')
@@ -394,6 +407,7 @@ class AnnouncementAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     Activation goes through the ``portal.announcement`` transition table; a
     comunicado that already reached the families (``fanout_at``) cannot be
     deleted, only deactivated (its delivery history stays auditable)."""
+    admin_area = 'comunicados'
     serializer_class = AnnouncementAdminSerializer
     permission_classes = [IsAdmin]
     http_method_names = ['get', 'patch', 'delete']
@@ -466,6 +480,7 @@ class AnnouncementBulkView(AdminBulkView):
     """POST /api/v1/portal/admin/announcements/bulk/ — ``activate`` (first
     activation fans out), ``deactivate`` (archive), ``delete`` (never fanned
     out only), ``duplicate`` (inactive draft copy)."""
+    admin_area = 'comunicados'
     entity = ANNOUNCEMENT_ENTITY
     list_view_class = AnnouncementAdminListCreateView
     actions = {
@@ -501,6 +516,7 @@ ANNOUNCEMENT_EXPORT = ExportSpec(
 
 class AnnouncementAdminExportView(AdminExportMixin, AnnouncementAdminListCreateView):
     """GET /api/v1/portal/admin/announcements/export/?fmt=csv|xlsx&…list filters…"""
+    admin_area = 'comunicados'
     http_method_names = ['get', 'head', 'options']
     export_formats = ('csv', 'xlsx')
     export_spec = ANNOUNCEMENT_EXPORT
@@ -523,6 +539,7 @@ DELIVERY_EXPORT_COLUMNS = [
 class AnnouncementDeliveryExportView(APIView):
     """GET /api/v1/portal/admin/announcements/<pk>/delivery/export/?fmt=csv|xlsx —
     one row per recipient: read, acknowledged and per-channel status (audited)."""
+    admin_area = 'comunicados'
     permission_classes = [IsAdmin]
     throttle_classes = [SharedScopedRateThrottle]
     throttle_scope = 'admin-export'
@@ -653,6 +670,7 @@ class AnnouncementRecipientCountView(APIView):
     would notify. Reuses the exact role mapping the fan-out uses
     (``_audience_roles``) so the number matches what publish will do.
     """
+    admin_area = 'comunicados'
     permission_classes = [IsAdmin]
 
     def get(self, request):
@@ -702,6 +720,7 @@ class AnnouncementDeliveryView(APIView):
     BACKLOG P1-C6: shows admins how many recipients got the comunicado by
     in-app/email/push, who failed, and lets them retry after fixing SMTP.
     """
+    admin_area = 'comunicados'
     permission_classes = [IsAdmin]
 
     def _qs(self, pk):

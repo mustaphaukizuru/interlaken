@@ -163,8 +163,10 @@ def payments_visible_to(user):
     from django.db.models import Q
 
     from apps.accounts.models import StudentProfile, User
+    from apps.core.areas import has_area
 
-    if getattr(user, 'role', None) == User.Role.ADMIN:
+    # Admins, and "Cafetería y pagos" staff (receipts from the admin ledger).
+    if has_area(user, 'cafeteria'):
         return Payment.objects.all()
 
     # Resolve the family's student ids once — filtering on id lists keeps the

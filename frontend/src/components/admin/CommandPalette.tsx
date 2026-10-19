@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { bookingsApi, portalApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { canOpen } from '@/lib/areas';
 import type { Booking, StudentProfile } from '@/types';
 
 interface Item {
@@ -59,9 +60,13 @@ const STAFF_ACTIONS: Item[] = [
   { key: 's-medios', group: 'Ir a', icon: Download, title: 'Biblioteca de medios', detail: 'Imágenes del sitio', to: '/staff/contenido/medios' },
   { key: 's-perfil', group: 'Ir a', icon: Settings, title: 'Mi perfil', detail: 'Seguridad y avisos', to: '/portal/perfil' },
 ];
-export function actionsForRole(role: string | undefined): Item[] {
+export function actionsForRole(role: string | undefined, user?: Parameters<typeof canOpen>[0]): Item[] {
   if (role === 'admin') return ACTIONS;
-  if (role === 'staff') return STAFF_ACTIONS;
+  if (role === 'staff') {
+    // A staff account with console areas also jumps to its own sections.
+    const console = user ? ACTIONS.filter((a) => a.to?.startsWith('/admin/') && canOpen(user, a.to)) : [];
+    return [...console, ...STAFF_ACTIONS];
+  }
   return FAMILY_ACTIONS;
 }
 
@@ -124,9 +129,10 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const q = useDebounced(query.trim());
-  const role = useAuthStore((st) => st.user?.role);
+  const user = useAuthStore((st) => st.user);
+  const role = user?.role;
   const isAdmin = role === 'admin';
-  const roleActions = actionsForRole(role);
+  const roleActions = actionsForRole(role, user);
   // Global search (students, bookings) is admin-only; families/staff get navigation actions.
   const enabled = isAdmin && q.length >= 2;
 

@@ -4,10 +4,8 @@ import { Dropdown } from '@/components/ui/Dropdown';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import { Avatar } from '@/components/ui/Avatar';
+import { homePath } from '@/lib/areas';
 
-const HOME: Record<string, string> = {
-  admin: '/admin', staff: '/staff', student: '/portal', parent: '/portal',
-};
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',
 };
@@ -16,7 +14,7 @@ const ROLE_LABEL: Record<string, string> = {
 export function AccountMenu() {
   const { user } = useAuthStore();
   const role = user?.role ?? 'parent';
-  const home = HOME[role] ?? '/portal';
+  const home = homePath(user);
 
   return (
     <Dropdown
@@ -34,7 +32,7 @@ export function AccountMenu() {
             <div className="text-[13px] font-semibold text-ink">
               {user?.first_name} {user?.last_name}
             </div>
-            <div className="text-[12px] text-subtle">{ROLE_LABEL[role] ?? role}</div>
+            <div className="text-[12px] text-subtle">{(role === 'staff' && user?.staff_title) || (ROLE_LABEL[role] ?? role)}</div>
           </div>
           <Avatar user={user} size={36} rounded="rounded-[10px]" />
           <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />

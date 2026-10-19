@@ -77,7 +77,9 @@ def test_ordering_whitelists_match_the_console_sort_keys():
         "threshold",
     }
     assert set(admin_data.TRANSACTION_ORDERING) == {"date", "amount", "type", "balance", "student"}
-    assert set(admin_data.TOPUP_ORDERING) == {"created_at", "amount", "status", "method", "student"}
+    assert set(admin_data.TOPUP_ORDERING) == {
+        "created_at", "apply_due_at", "applied_at", "amount", "status", "method", "student",
+    }
     assert set(admin_data.CUSTOMER_ORDERING) == {
         "name",
         "code",

@@ -19,6 +19,7 @@ import { BanortePaymentNotice } from '@/components/ui/BanortePaymentNotice';
 import { Pagination } from '@/components/ui/Pagination';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard';
+import { PendingTopUps } from '@/components/portal/PendingTopUps';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { useAuthStore } from '@/store/authStore';
 import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
@@ -32,6 +33,7 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
+import { applyNotice, applyPhrase, DEFAULT_WHATSAPP, isScheduled, sentence } from '@/lib/topupApply';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TX_TYPES = ['purchase', 'topup', 'refund'] as const;
@@ -87,6 +89,11 @@ export default function CafeteriaPage() {
   const topupMin = availability?.min_amount ? Number(availability.min_amount) : TOPUP_MIN;
   const topupPresets = topupMin < TOPUP_MIN ? [1, ...TOPUP_PRESETS] : TOPUP_PRESETS;
   const topupMethod: 'online' | 'office' = onlineAvailable ? chosenMethod : 'office';
+  // Card top-ups reach the balance at the school's next POS load (7:30 on
+  // school days) unless the server says they are credited on payment.
+  const policy = availability?.topup_policy;
+  const scheduled = isScheduled(policy);
+  const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
   const [topupStep, setTopupStep] = useState<1 | 2 | 3>(1);
@@ -264,7 +271,9 @@ export default function CafeteriaPage() {
       done = true;
       setPaying(false);
       void queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
-      toast('Cerraste la ventana de pago. Si completaste el pago, lo verás reflejado en unos minutos.');
+      toast(scheduled
+        ? 'Cerraste la ventana de pago. Si completaste el pago, aparecerá como «Recarga por aplicar» en unos minutos.'
+        : 'Cerraste la ventana de pago. Si completaste el pago, lo verás reflejado en unos minutos.');
     };
     setPaying(true);
     try {
@@ -420,9 +429,9 @@ export default function CafeteriaPage() {
         <div>
           <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
           <p className="mt-1 text-fluid-sm text-muted">
-            Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo
-            aparece aquí al confirmar el pago; el colegio lo carga en el POS para
-            compras en cafetería.
+            {scheduled
+              ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo cuando el colegio la carga en la caja de cafetería (días hábiles, 7:30 a.m.).'
+              : 'Consulte el saldo y los movimientos. Tras una recarga en línea, el saldo aparece aquí al confirmar el pago; el colegio lo carga en el POS para compras en cafetería.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
@@ -495,6 +504,8 @@ export default function CafeteriaPage() {
                   Actualizado<br />{b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
                 </p>
               </div>
+
+              <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} />
 
               {notLinked && (
                 <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
@@ -697,7 +708,9 @@ export default function CafeteriaPage() {
               <legend className="label">Método de pago</legend>
               <div className="grid gap-2">
                 {([
-                  ['online', 'Pago en línea con tarjeta (Banorte)', 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
+                  ['online', 'Pago en línea con tarjeta (Banorte)', scheduled
+                    ? sentence(`Pago seguro con Banorte. El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
+                    : 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
                   ['office', 'Pago en caja escolar', 'Registra la solicitud; paga en efectivo en el colegio.'],
                 ] as const).map(([v, title, desc]) => {
                   // Card payment is always shown; until Banorte opens it to this
@@ -741,6 +754,11 @@ export default function CafeteriaPage() {
                 ven esta opción; el pago puede devolverse desde MultiCobros.
               </p>
             )}
+            {topupMethod === 'online' && scheduled && (
+              <p role="note" className="rounded-xl border border-amber/40 bg-amber/[0.07] px-3 py-2.5 text-xs leading-relaxed text-ink">
+                {applyNotice(policy)}
+              </p>
+            )}
             {topupMethod === 'online' && <BanortePaymentNotice />}
           </>
         )}
@@ -750,9 +768,14 @@ export default function CafeteriaPage() {
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">{topupMethod === 'online' ? 'Tarjeta · Banorte' : 'Caja escolar'}</dd></div>
+            {topupMethod === 'online' && scheduled && (
+              <div className="flex justify-between gap-3 px-4 py-3"><dt className="whitespace-nowrap text-muted">Se aplica</dt><dd className="text-right font-medium text-ink">{applyPhrase(policy?.next_apply_at)}</dd></div>
+            )}
             <div className="px-4 py-3 text-xs text-muted">
               {topupMethod === 'online'
-                ? 'Al continuar se abrirá la ventana segura de Banorte. Cuando el banco confirme, verá el saldo en el portal.'
+                ? (scheduled
+                  ? `Al continuar se abrirá la ventana segura de Banorte. ${applyNotice(policy)}`
+                  : 'Al continuar se abrirá la ventana segura de Banorte. Cuando el banco confirme, verá el saldo en el portal.')
                 : 'Se registrará la solicitud. El saldo se aplica cuando el colegio reciba el pago en caja.'}
             </div>
           </dl>

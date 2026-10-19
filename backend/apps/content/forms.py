@@ -311,6 +311,7 @@ FORM_ORDERING = {
 class FormListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAPIView):
     """GET/POST /content/admin/forms/ — Data Ops list contract (``q`` title/slug,
     ``published``, ordering keys in ``FORM_ORDERING``)."""
+    admin_area_read = 'mensajes'
     serializer_class = FormDefinitionSerializer
     search_fields = ('title', 'slug')
     ordering = FORM_ORDERING
@@ -323,6 +324,7 @@ class FormListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAP
 
 
 class FormDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
+    admin_area_read = 'mensajes'
     permission_classes = [IsAdmin]
     serializer_class = FormDefinitionSerializer
     audit_context = 'cms.form'
@@ -352,6 +354,8 @@ class FormExportView(AdminExportMixin, FormListCreateView):
     """GET /content/admin/forms/export/?fmt=csv|xlsx|pdf"""
     http_method_names = ['get', 'head', 'options']
     export_spec = FORM_EXPORT
+    # The form catalogue is readable from the inbox, its export is admin-only.
+    admin_area_read = None
 
 
 def _form_delete_guard(form) -> str | None:
@@ -398,6 +402,7 @@ class FormSubmissionsView(AdminListMixin, generics.ListAPIView):
     ``q`` searches every answer (``search_text``), ``handled=0|1``, ``from``/``to``,
     ordering ``date|handled|page``. ``?form=<id>`` works too (bulk all_matching).
     """
+    admin_area = 'mensajes'
     serializer_class = FormSubmissionSerializer
     search_fields = ('search_text',)
     ordering = SUBMISSION_ORDERING
@@ -431,6 +436,7 @@ def _submission_value(key):
 class FormSubmissionsExportView(AdminExportMixin, FormSubmissionsView):
     """GET /content/admin/forms/<pk>/submissions/export/?fmt=csv|xlsx|pdf — one
     column per form field, same filters as the inbox (replaces ``?export=csv``)."""
+    admin_area = 'mensajes'
     http_method_names = ['get', 'head', 'options']
 
     def get_export_spec(self):
@@ -463,6 +469,7 @@ def _handled_action(name, label_es, value, skip_reason):
 class FormSubmissionBulkView(AdminBulkView):
     """POST /content/admin/form-submissions/bulk/ — ``mark_handled``, ``reopen``,
     ``delete``. For ``all_matching`` the filters carry ``form``."""
+    admin_area = 'mensajes'
     entity = 'content.formsubmission'
     list_view_class = FormSubmissionsView
     actions = {
@@ -475,6 +482,7 @@ class FormSubmissionBulkView(AdminBulkView):
 
 
 class FormSubmissionDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
+    admin_area = 'mensajes'
     permission_classes = [IsAdmin]
     serializer_class = FormSubmissionSerializer
     audit_context = 'cms.form-submission'

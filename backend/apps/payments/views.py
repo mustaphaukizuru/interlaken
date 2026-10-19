@@ -67,7 +67,8 @@ class PaymentInitiateView(APIView):
 
 
 class PaymentAvailabilityView(APIView):
-    """GET /api/v1/payments/availability/ — ``{online, test_mode, certification, min_amount}``.
+    """GET /api/v1/payments/availability/ — ``{online, test_mode, certification, min_amount,
+    topup_policy}``.
 
     The top-up form reads it to offer (or hide) card payment; the top-up
     endpoint enforces the same rule.
@@ -75,12 +76,16 @@ class PaymentAvailabilityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from apps.cafeteria.schedule import policy
         from apps.cafeteria.serializers import topup_min_amount
 
         from .gateways.banorte import online_payments_status
 
         return Response({**online_payments_status(request.user),
-                         'min_amount': f'{topup_min_amount(request.user):.2f}'})
+                         'min_amount': f'{topup_min_amount(request.user):.2f}',
+                         # When a card top-up reaches the wallet (scheduled POS
+                         # load) and the WhatsApp for same-day requests.
+                         'topup_policy': policy()})
 
 
 BANORTE_EVENTS = frozenset({'success', 'error', 'cancel', 'closed'})
@@ -166,6 +171,7 @@ class AdminBanorteVerifyView(APIView):
     approval is verified, under a row lock. Required before an online top-up
     may be marked as loaded into the POS. Idempotent once verified.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -228,6 +234,7 @@ class AdminBanorteReconcileView(APIView):
 
     See ``payments.multicobros``.
     """
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -407,6 +414,7 @@ class AdminPaymentsView(AdminListMixin, generics.ListAPIView):
     otherwise payment state comes only from Banorte's settled result, so this
     page is the read-only ledger view.
     """
+    admin_area = 'cafeteria'
     serializer_class = AdminPaymentSerializer
     search_fields = ADMIN_PAYMENT_SEARCH_FIELDS
     ordering = ADMIN_PAYMENT_ORDERING
@@ -425,11 +433,13 @@ class AdminPaymentsExportView(AdminExportMixin, AdminPaymentsView):
     Same filters, ``q`` and ``ordering`` as the list (subclass, never
     duplicated), ``?ids=`` for the selected rows, audited via ``record_export``.
     """
+    admin_area = 'cafeteria'
     export_spec = PAYMENT_EXPORT_SPEC
 
 
 class AdminPaymentsSummaryView(APIView):
     """GET /api/v1/payments/admin/summary/?days=30 — totals by status and per-day series."""
+    admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
 
     def get(self, request):
@@ -502,10 +512,22 @@ class PaymentReceiptView(APIView):
             ]
         else:
             reference_lines = [f'Referencia: {p.gateway_ref or p.gateway_tx_id or "-"}']
+        apply_lines = []
+        if topup is not None and p.status == Payment.Status.SUCCESS:
+            from apps.cafeteria.models import TopUpRequest
+            from apps.cafeteria.schedule import format_apply_at
+
+            # The family sends this by WhatsApp to ask for a same-day load:
+            # staff must see at a glance whether it is still waiting.
+            if topup.status == TopUpRequest.Status.PAID and topup.apply_due_at:
+                apply_lines = [f'Saldo: por aplicar ({format_apply_at(topup.apply_due_at)})']
+            elif topup.applied_at:
+                apply_lines = [f'Saldo: aplicado el {fmt_dt(topup.applied_at)}']
         lines = [
             f'Folio: {p.id}',
             f'Fecha: {fmt_dt(p.created_at)}',
             f'Estado: {p.get_status_display()}',
+            *apply_lines,
             '',
             f'Concepto: {p.description or p.get_payment_type_display()}',
             f'Alumno: {student or "-"}',

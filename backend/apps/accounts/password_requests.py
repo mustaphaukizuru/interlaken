@@ -93,6 +93,7 @@ class PasswordRequestListCreateView(AdminListMixin, generics.ListAPIView):
     """GET (list contract: ``q`` over requested email / requester / linked account,
     ``ordering``, ``status``/``estado``, ``channel``/``canal``, ``from``/``to``) and
     POST (log a request). The page also carries ``open_count`` for the tab badge."""
+    admin_area = 'accesos'
 
     serializer_class = PasswordRequestSerializer
     search_fields = ('requested_email', 'requester_name', 'user__email', 'user__first_name',
@@ -151,6 +152,7 @@ def reject_request(req: PasswordRequest, actor, note: str = '') -> dict:
 
 class PasswordRequestExportView(AdminExportMixin, PasswordRequestListCreateView):
     """GET /accounts/admin/password-requests/export/?fmt=csv|xlsx|pdf — audited."""
+    admin_area = 'accesos'
 
     http_method_names = ['get', 'head', 'options']  # never the inherited POST
     export_spec = ExportSpec(
@@ -182,6 +184,7 @@ class PasswordRequestBulkView(AdminBulkView):
 
     ``resolve`` stays single-row on purpose: it generates a password that must be
     shown once and delivered to one family."""
+    admin_area = 'accesos'
 
     entity = ENTITY
     list_view_class = PasswordRequestListCreateView
@@ -198,6 +201,7 @@ class PasswordRequestBulkView(AdminBulkView):
 
 
 class PasswordRequestDetailView(APIView):
+    admin_area = 'accesos'
     permission_classes = [IsAdmin]
 
     def patch(self, request, pk):

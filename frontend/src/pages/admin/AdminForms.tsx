@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Check, ClipboardList, Inbox, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useAuthStore } from '@/store/authStore';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -72,6 +73,9 @@ export default function AdminForms() {
   const selection = useRowSelection(count, JSON.stringify(filters));
 
   const [editing, setEditing] = useState<Partial<FormDefinitionAdmin> | null>(null);
+  // Staff with the Mensajes area answer submissions; building, editing,
+  // deleting and exporting forms stays with admins (the API refuses it).
+  const canEdit = useAuthStore((s) => s.user?.role === 'admin');
   const [toDelete, setToDelete] = useState<FormDefinitionAdmin | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const inboxId = Number.parseInt(get('envios'), 10);
@@ -120,10 +124,12 @@ export default function AdminForms() {
     <>
       <PageHeader title="Formularios" subtitle="Cree formularios para el sitio, elija el buzón que recibe cada envío y atienda las respuestas."
         actions={(
-          <div className="flex flex-wrap gap-2">
-            <ExportMenu filenamePrefix="formularios" selectedCount={selection.count} fetch={fetchExport} />
-            <Button onClick={() => setEditing(EMPTY)}><Plus size={16} aria-hidden="true" /> Nuevo formulario</Button>
-          </div>
+          canEdit ? (
+            <div className="flex flex-wrap gap-2">
+              <ExportMenu filenamePrefix="formularios" selectedCount={selection.count} fetch={fetchExport} />
+              <Button onClick={() => setEditing(EMPTY)}><Plus size={16} aria-hidden="true" /> Nuevo formulario</Button>
+            </div>
+          ) : null
         )} />
       <Card title={`${count.toLocaleString('es-MX')} formularios`}>
         <DataTable<FormDefinitionAdmin>
@@ -144,12 +150,16 @@ export default function AdminForms() {
           onRetry={() => refetch()}
           columnControls
           resizable
-          selection={selection}
+          selection={canEdit ? selection : undefined}
           rowActions={(f) => (
             <>
               <Button size="sm" variant={f.pending_count ? 'primary' : 'secondary'} onClick={() => openInbox(f)}><Inbox size={14} aria-hidden="true" /> Envíos{f.pending_count ? ` (${f.pending_count})` : ''}</Button>
-              <Button size="sm" variant="secondary" onClick={() => setEditing(f)} aria-label={`Editar ${f.title}`}><Pencil size={14} aria-hidden="true" /></Button>
-              <Button size="sm" variant="ghost" onClick={() => setToDelete(f)} aria-label={`Eliminar ${f.title}`}><Trash2 size={14} aria-hidden="true" /></Button>
+              {canEdit && (
+                <>
+                  <Button size="sm" variant="secondary" onClick={() => setEditing(f)} aria-label={`Editar ${f.title}`}><Pencil size={14} aria-hidden="true" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => setToDelete(f)} aria-label={`Eliminar ${f.title}`}><Trash2 size={14} aria-hidden="true" /></Button>
+                </>
+              )}
             </>
           )}
           toolbar={(
@@ -158,7 +168,7 @@ export default function AdminForms() {
               tabs={{ paramKey: 'publicado', options: PUBLISHED_OPTIONS, allLabel: 'Todos', label: 'Filtrar por publicación' }}
             />
           )}
-          bulkBar={(
+          bulkBar={canEdit && (
             <BulkActionBar
               count={selection.count}
               allMatching={selection.allMatching}

@@ -20,6 +20,7 @@ from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.areas import AREAS, PUESTOS, clean_areas
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
@@ -49,11 +50,52 @@ class StaffUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'is_active',
-                  'is_superuser', 'last_login', 'date_joined', 'has_password']
+                  'is_superuser', 'last_login', 'date_joined', 'has_password',
+                  'staff_title', 'staff_areas']
         read_only_fields = fields
 
     def get_has_password(self, u):
         return u.has_usable_password()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Stored areas only matter for role staff; an admin uses every area.
+        if instance.role != User.Role.STAFF:
+            data['staff_areas'] = []
+        return data
+
+
+def parse_staff_access(data, *, role, current_title='', current_areas=None):
+    """``(title, areas, errors)`` from a create/edit body.
+
+    ``staff_areas`` is a list of area keys; ``puesto`` (secretaria, recepcion,
+    cafeteria) fills both from the preset, and an explicit ``staff_title`` or
+    ``staff_areas`` in the same body wins. An admin keeps no stored areas: it
+    uses all of them.
+    """
+    errors = {}
+    title = current_title
+    areas = list(current_areas or [])
+    puesto = str(data.get('puesto') or '').strip().lower()
+    if puesto:
+        if puesto not in PUESTOS:
+            errors['puesto'] = ['Puesto desconocido.']
+        else:
+            title, areas = PUESTOS[puesto][0], list(PUESTOS[puesto][1])
+    if 'staff_title' in data:
+        title = str(data.get('staff_title') or '').strip()[:60]
+    if 'staff_areas' in data:
+        raw = data.get('staff_areas')
+        if not isinstance(raw, (list, tuple)):
+            errors['staff_areas'] = ['Envíe una lista de áreas.']
+        else:
+            try:
+                areas = clean_areas(raw)
+            except ValueError as exc:
+                errors['staff_areas'] = [str(exc)]
+    if role != User.Role.STAFF:
+        areas = []
+    return title, areas, errors
 
 
 STAFF_ORDERING = {
@@ -97,7 +139,7 @@ class StaffListCreateView(AdminListMixin, generics.ListAPIView):
         first = (request.data.get('first_name') or '').strip()
         last = (request.data.get('last_name') or '').strip()
         role = request.data.get('role') or User.Role.STAFF
-        errors = {}
+        title, areas, errors = parse_staff_access(request.data, role=role)
         if not email or '@' not in email:
             errors['email'] = ['Correo inválido.']
         elif User.objects.filter(email__iexact=email).exists():
@@ -112,9 +154,11 @@ class StaffListCreateView(AdminListMixin, generics.ListAPIView):
         password = generate_temporary_password()
         with transaction.atomic():
             user = User.objects.create_user(email=email, password=password, first_name=first, last_name=last,
-                                            role=role, is_staff=(role == User.Role.ADMIN))
-            record('create', user, {'via': 'portal', 'role': role}, actor=request.user,
-                   context='portal: alta de personal')
+                                            role=role, is_staff=(role == User.Role.ADMIN),
+                                            staff_title=title, staff_areas=areas)
+            record('create', user, {'via': 'portal', 'role': role, 'staff_title': title,
+                                    'staff_areas': areas},
+                   actor=request.user, context='portal: alta de personal')
         data = StaffUserSerializer(user).data
         data['temporary_password'] = password  # shown once
         return Response(data, status=status.HTTP_201_CREATED)
@@ -134,6 +178,11 @@ class StaffExportView(AdminExportMixin, StaffListCreateView):
             Col('name', 'Nombre', lambda u: u.full_name, width=28),
             Col('email', 'Correo', width=32),
             Col('role', 'Rol', lambda u: u.get_role_display(), width=14),
+            Col('staff_title', 'Puesto', width=16),
+            Col('staff_areas', 'Áreas de la consola', lambda u: (
+                'Todas' if u.role == User.Role.ADMIN else
+                ', '.join(AREAS[a][0] for a in AREAS if a in (u.staff_areas or [])) or '—'),
+                width=40),
             Col('is_active', 'Activo', width=8, fmt='bool'),
             Col('is_superuser', 'Superusuario', width=8, fmt='bool'),
             Col('has_password', 'Contraseña asignada', lambda u: u.has_usable_password(),
@@ -182,6 +231,20 @@ class StaffDetailView(APIView):
                 target.role = role
                 target.is_staff = role == User.Role.ADMIN
                 fields += ['role', 'is_staff']
+        if 'role' in fields or any(k in request.data for k in ('puesto', 'staff_title', 'staff_areas')):
+            title, areas, errors = parse_staff_access(
+                request.data, role=target.role, current_title=target.staff_title,
+                current_areas=target.staff_areas)
+            if errors:
+                return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+            if title != target.staff_title:
+                changes['staff_title'] = {'from': target.staff_title, 'to': title}
+                target.staff_title = title
+                fields.append('staff_title')
+            if areas != list(target.staff_areas or []):
+                changes['staff_areas'] = {'from': list(target.staff_areas or []), 'to': areas}
+                target.staff_areas = areas
+                fields.append('staff_areas')
         if 'is_active' in request.data:
             # bool("false") is True: parse the token, refuse anything ambiguous.
             active = parse_bool_param(request.data['is_active'])
@@ -341,10 +404,13 @@ class StaffImport:
         if User.objects.filter(email__iexact=email).exists():
             raise ValueError('Ese correo ya está registrado.')
         role = data.get('rol') or User.Role.STAFF
+        title, areas = '', []
+        if role == User.Role.STAFF and data.get('puesto'):
+            title, areas = PUESTOS[data['puesto']][0], list(PUESTOS[data['puesto']][1])
         return User.objects.create_user(
             email=email, password=None, first_name=data['nombre'],
             last_name=data.get('apellidos') or '', role=role,
-            is_staff=(role == User.Role.ADMIN),
+            is_staff=(role == User.Role.ADMIN), staff_title=title, staff_areas=areas,
         )
 
     def spec(self) -> ImportSpec:
@@ -360,6 +426,12 @@ class StaffImport:
                     [(User.Role.STAFF, 'Personal'), (User.Role.ADMIN, 'Administrador')],
                     aliases={'admin': User.Role.ADMIN, 'maestro': User.Role.STAFF}),
                     example='staff'),
+                # Optional: gives a staff account the preset console areas.
+                ImportCol('puesto', ('cargo',), parse=parse_choice(
+                    [(key, label) for key, (label, _) in PUESTOS.items()],
+                    aliases={'secretaría': 'secretaria', 'recepción': 'recepcion',
+                             'cafetería': 'cafeteria'}),
+                    example='secretaria'),
             ],
             dedupe_keys=[('correo',)],
             key_of=lambda d: d.get('correo') or '',

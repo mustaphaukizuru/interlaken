@@ -16,8 +16,8 @@ from apps.portal.models import Announcement, AnnouncementRead, Notification
 pytestmark = pytest.mark.django_db
 
 # students + balances + recent payments + announcements
-# + unread-notifications count.
-DASHBOARD_BUDGET = 5
+# + unread-notifications count + paid top-ups waiting for the POS load.
+DASHBOARD_BUDGET = 6
 # pagination count + annotated page rows (created_by joined, read_count_ann).
 ADMIN_ANNOUNCEMENTS_BUDGET = 2
 

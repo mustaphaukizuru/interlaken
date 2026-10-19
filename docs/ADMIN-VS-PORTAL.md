@@ -4,7 +4,7 @@ Two back-offices exist and they must not overlap. The rule:
 
 | | **Portal staff console** (`/admin/*`, React) | **Django admin** (`/django-admin/` backend, Unfold; moved off `/admin/` on 2026-09-23 so it can never shadow the console) |
 |---|---|---|
-| **Audience** | School staff (`role = admin`): secretaría, dirección, cafetería | Superusers / technical operator only |
+| **Audience** | School staff: admins (`role = admin`, everything) and staff accounts limited to their console areas (`role = staff` + `staff_areas`: secretaría, recepción, cafetería; §5) | Superusers / technical operator only |
 | **Purpose** | Day-to-day operations on people and money | System of record: auth, permissions, CMS content, legal records, raw ledgers |
 | **Style** | Guided workflows, validation, audit context, Spanish UX | Raw model tables; read-mostly |
 | **Creates data?** | Yes (students, families, adjustments, announcements, slots) | Only auth/config/content. Never people or money |
@@ -53,3 +53,33 @@ The app sells **cafetería wallet top-ups only**. Colegiatura (tuition) and insc
 - `payments.Payment.Type` is `cafeteria` | `other` (legacy rows of the retired types were folded into `other` by `payments.0004`).
 - Django admin `Pagos en línea` is read-only (no add/delete): payments are minted by the top-up flow and settled by signed webhooks only.
 - The public **Costos** page (content app) remains: it publishes the school's price list; it does not charge anything.
+
+## 5. Staff accounts and console areas (2026-10-18)
+
+The console is no longer all-or-nothing. A **super administrator** (Django
+superuser + `role = admin`; `manage.py grant_superadmin <email>`, audited, never
+handles passwords) and every **admin** see everything. A **staff** account
+(`role = staff`) sees only the areas in `User.staff_areas`, set in
+**Usuarios → Invitar / Acceso** (or in the Django admin user page):
+
+| Area (`key`) | Console sections | Puestos that include it |
+|---|---|---|
+| Alumnos y familias (`alumnos`) | `/admin/alumnos` (roster, file, tutores, imports, Loyverse link) | Secretaría |
+| Accesos de familias (`accesos`) | `/admin/contrasenas`, family temporary passwords | Secretaría |
+| Admisiones (`admisiones`) | `/admin/admisiones`, pipeline | Secretaría |
+| Visitas y agenda (`visitas`) | `/admin/visitas`, agenda semanal, slot generation | Secretaría, Recepción |
+| Mensajes y formularios (`mensajes`) | `/admin/mensajes`, form submissions (forms are read-only) | Secretaría, Recepción |
+| Comunicados y calendario (`comunicados`) | `/admin/comunicados` (no emergency broadcast), `/admin/calendario` | Secretaría |
+| Cafetería y pagos (`cafeteria`) | `/admin/cafeteria`, `/admin/pagos` | Cafetería |
+
+Always admin-only: Dashboard, Usuarios, Ajustes, site content (páginas,
+navegación, medios, testimonios, form builder), Auditoría, ARCO, Nuevo ciclo,
+Fusionar cuentas, emergency broadcast. Medical data stays masked for staff.
+
+Enforcement is server side: each console endpoint declares `admin_area` (or
+`admin_area_read` for read-only access) and `core.permissions.IsAdmin` admits a
+staff account only there (`apps/core/areas.py`). `apps/core/test_areas.py` fails
+the build when an admin endpoint has neither an area nor a place in its
+`ADMIN_ONLY` list, so every new endpoint is a decision. The SPA mirrors the map
+in `frontend/src/lib/areas.ts` to hide menus and route a staff account to its
+first section; it never grants anything the API refuses.

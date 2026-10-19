@@ -86,6 +86,7 @@ def sort_guardians(guardians: list[dict], ordering) -> list[dict]:
 
 class StudentGuardiansView(APIView):
     """List linked guardians or link a guardian by email (admin only)."""
+    admin_area = 'alumnos'
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
@@ -205,6 +206,7 @@ class StudentGuardianDetailView(APIView):
     (unique), whatsapp, phone, relationship. Never touches the password (AE5)
     and refuses to edit admin/staff accounts. Audited with the field diff.
     """
+    admin_area = 'alumnos'
     permission_classes = [IsAdmin]
 
     EDITABLE = ('first_name', 'last_name', 'email', 'whatsapp', 'phone', 'relationship')
