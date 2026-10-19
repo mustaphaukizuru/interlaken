@@ -1,3 +1,4 @@
+import { ConsoleAreaGuard } from './ConsoleAreaGuard';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAppBadge } from '@/hooks/useAppBadge';
 import { useBadges } from '@/hooks/useBadges';
@@ -78,6 +79,12 @@ export function useMobileNav() {
 }
 
 export function PortalLayout({ role }: Props) {
+  // Staff accounts in the admin console: only the sections of their areas.
+  if (role === 'admin') return <ConsoleAreaGuard><PortalShell role={role} /></ConsoleAreaGuard>;
+  return <PortalShell role={role} />;
+}
+
+function PortalShell({ role }: Props) {
   useIdleLogout(role === 'admin' || role === 'staff');
   const badges = useBadges();
   useAppBadge(badges.notificaciones);

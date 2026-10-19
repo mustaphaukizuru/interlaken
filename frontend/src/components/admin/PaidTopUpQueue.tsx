@@ -16,9 +16,8 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
-import { cafeteriaApi } from '@/services/api';
 import { idsParam, type BulkResult, type ExportFormat } from '@/services/dataOps';
-import type { TopUpBulkResult } from '@/services/cafeteriaAdmin';
+import { cafeteriaAdminApi, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { CAF_MONEY_VIEWS, CAF_TOPUPS, useTopUpsBulk, useTopUpsExport, useTopUpsList } from '@/hooks/queries/cafeteria';
@@ -303,7 +302,7 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
   const [force, setForce] = useState(false);
   const [note, setNote] = useState('');
   const apply = useMutation({
-    mutationFn: () => cafeteriaApi.applyPaidTopUp(row.id, force ? { force: true, note: note.trim() } : {}),
+    mutationFn: () => cafeteriaAdminApi.applyPaidTopUp(row.id, force ? { force: true, note: note.trim() } : {}),
     onSuccess: ({ data }) => {
       toast.success(data.detail || 'Recarga aplicada.');
       onClose();
@@ -392,7 +391,7 @@ function RefundPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => v
   const [bankDone, setBankDone] = useState(false);
   const [notInPos, setNotInPos] = useState(false);
   const refund = useMutation({
-    mutationFn: () => cafeteriaApi.refundPaidTopUp(row.id, {
+    mutationFn: () => cafeteriaAdminApi.refundPaidTopUp(row.id, {
       note: note.trim(), bank_refund_confirmed: bankDone, pos_not_loaded_confirmed: notInPos,
     }),
     onSuccess: () => {

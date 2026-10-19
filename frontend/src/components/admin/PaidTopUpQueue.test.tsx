@@ -3,13 +3,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
-  cafeteriaApi: { applyPaidTopUp: vi.fn(), refundPaidTopUp: vi.fn() },
   paymentsApi: { verifyBanorte: vi.fn() },
   downloadBlob: vi.fn(),
 }));
 
 vi.mock('@/services/cafeteriaAdmin', () => ({
-  cafeteriaAdminApi: { topups: vi.fn(), exportTopups: vi.fn(), bulkTopups: vi.fn() },
+  cafeteriaAdminApi: {
+    topups: vi.fn(), exportTopups: vi.fn(), bulkTopups: vi.fn(),
+    applyPaidTopUp: vi.fn(), refundPaidTopUp: vi.fn(),
+  },
 }));
 
 vi.mock('react-hot-toast', () => {
@@ -19,14 +21,13 @@ vi.mock('react-hot-toast', () => {
 
 import toast from 'react-hot-toast';
 import { PaidTopUpQueue } from './PaidTopUpQueue';
-import { cafeteriaApi } from '@/services/api';
 import { cafeteriaAdminApi } from '@/services/cafeteriaAdmin';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
 
 const api = vi.mocked(cafeteriaAdminApi);
-const applyPaid = vi.mocked(cafeteriaApi.applyPaidTopUp);
-const refundPaid = vi.mocked(cafeteriaApi.refundPaidTopUp);
+const applyPaid = vi.mocked(cafeteriaAdminApi.applyPaidTopUp);
+const refundPaid = vi.mocked(cafeteriaAdminApi.refundPaidTopUp);
 const ok = (data: unknown) => ({ data }) as never;
 
 const row = {

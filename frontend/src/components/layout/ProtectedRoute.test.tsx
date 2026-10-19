@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { ConsoleAreaGuard, ProtectedRoute } from './ProtectedRoute';
+import { ProtectedRoute } from './ProtectedRoute';
+import { ConsoleAreaGuard } from './ConsoleAreaGuard';
 import { useAuthStore, type User } from '@/store/authStore';
 
 const adminUser: User = {

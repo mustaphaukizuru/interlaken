@@ -660,15 +660,6 @@ export const cafeteriaApi = {
 
   markTopUpPosUnloaded: (topupId: number) =>
     api.post(`/cafeteria/admin/topup/${topupId}/pos-unloaded/`),
-  /** Paid card top-up loaded into the POS: credit the wallet once Loyverse shows it
-   *  (`force` + `note` skips that check and leaves it in "Cargar en POS"). */
-  applyPaidTopUp: (topupId: number, body: { force?: boolean; note?: string } = {}) =>
-    api.post<{ id: number; status: string; balance: string; detail: string }>(
-      `/cafeteria/admin/topup/${topupId}/apply-paid/`, body),
-  /** Paid card top-up refunded in MultiCobros before it was applied. */
-  refundPaidTopUp: (topupId: number, body: { note: string; bank_refund_confirmed: boolean; pos_not_loaded_confirmed: boolean }) =>
-    api.post<{ id: number; status: string; detail: string }>(
-      `/cafeteria/admin/topup/${topupId}/refund-paid/`, body),
 
   /** `ledger: 0` omits the capped lists; the console pages them via admin/transactions + admin/adjustments. */
   getStudentDetail: (studentId: number, params?: { ledger?: 0 | 1 }) =>
