@@ -25,7 +25,7 @@ import { portalApi, type StaffUser } from '@/services/api';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
 import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
 import { StaffAccessFields, StaffAccessModal, StaffAccessSummary, type StaffAccess } from '@/components/admin/StaffAccessFields';
-import { PUESTOS } from '@/lib/areas';
+import { PUESTOS } from '@/lib/areaCatalog';
 
 const ROLE: Record<string, string> = { admin: 'Administrador', staff: 'Personal' };
 const ROLE_OPTIONS = Object.entries(ROLE).map(([value, label]) => ({ value, label }));

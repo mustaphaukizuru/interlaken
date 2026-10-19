@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { areasOf, canOpen, consoleHome, hasConsole, homePath, PUESTOS } from './areas';
+import { areasOf, canOpen, consoleHome, hasConsole, homePath } from './areas';
+import { PUESTOS } from './areaCatalog';
 
 const admin = { role: 'admin' as const };
 const secretaria = { role: 'staff' as const, staff_areas: PUESTOS[0].areas };

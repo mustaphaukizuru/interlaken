@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { portalApi, type StaffUser } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
-import { AREA_LABEL, AREAS, PUESTOS, type AreaKey } from '@/lib/areas';
+import { AREA_LABEL, AREAS, PUESTOS } from '@/lib/areaCatalog';
+import type { AreaKey } from '@/lib/areas';
 
 export interface StaffAccess {
   staff_title: string;

@@ -4,30 +4,15 @@
  * `role=admin` uses the whole console. A `role=staff` account uses only the
  * areas in `user.staff_areas` (the API sends the effective list: every area for
  * an admin). The API refuses everything else; this file only decides what the
- * console shows and where a staff account lands.
+ * console shows and where a staff account lands. Kept small: every page loads it
+ * through the route guard (labels and puestos live in lib/areaCatalog.ts).
  */
 import type { User } from '@/types';
 
 export type AreaKey = 'alumnos' | 'accesos' | 'admisiones' | 'visitas' | 'mensajes' | 'comunicados' | 'cafeteria';
 
-export const AREAS: { key: AreaKey; label: string; description: string }[] = [
-  { key: 'alumnos', label: 'Alumnos y familias', description: 'Expedientes, tutores, altas e importaciones, vínculo con Loyverse.' },
-  { key: 'accesos', label: 'Accesos de familias', description: 'Solicitudes de contraseña y contraseñas temporales de padres y alumnos.' },
-  { key: 'admisiones', label: 'Admisiones', description: 'Pre-registros, inscripciones, documentos y embudo.' },
-  { key: 'visitas', label: 'Visitas y agenda', description: 'Citas, horarios disponibles y agenda semanal.' },
-  { key: 'mensajes', label: 'Mensajes y formularios', description: 'Bandeja de contacto y respuestas de formularios del sitio.' },
-  { key: 'comunicados', label: 'Comunicados y calendario', description: 'Comunicados a familias y calendario escolar.' },
-  { key: 'cafeteria', label: 'Cafetería y pagos', description: 'Saldos, depósitos, carga en POS, reconciliación y pagos con tarjeta.' },
-];
-
-export const AREA_LABEL: Record<AreaKey, string> = Object.fromEntries(AREAS.map((a) => [a.key, a.label])) as Record<AreaKey, string>;
-
-/** Ready-made puestos for the staff form ("Personalizado" = any mix). */
-export const PUESTOS: { key: 'secretaria' | 'recepcion' | 'cafeteria'; label: string; areas: AreaKey[] }[] = [
-  { key: 'secretaria', label: 'Secretaría', areas: ['alumnos', 'accesos', 'admisiones', 'visitas', 'mensajes', 'comunicados'] },
-  { key: 'recepcion', label: 'Recepción', areas: ['visitas', 'mensajes'] },
-  { key: 'cafeteria', label: 'Cafetería', areas: ['cafeteria'] },
-];
+/** Area keys in console order (labels and puestos: lib/areaCatalog.ts). */
+export const AREA_KEYS: readonly AreaKey[] = ['alumnos', 'accesos', 'admisiones', 'visitas', 'mensajes', 'comunicados', 'cafeteria'];
 
 /**
  * Console sections by path prefix and the areas that open them. A section not
@@ -53,9 +38,9 @@ export const isAdmin = (user: Who) => user?.role === 'admin';
 
 export function areasOf(user: Who): Set<AreaKey> {
   if (!user) return new Set();
-  if (user.role === 'admin') return new Set(AREAS.map((a) => a.key));
+  if (user.role === 'admin') return new Set(AREA_KEYS);
   if (user.role !== 'staff') return new Set();
-  const known = new Set<string>(AREAS.map((a) => a.key));
+  const known = new Set<string>(AREA_KEYS);
   return new Set((user.staff_areas ?? []).filter((a): a is AreaKey => known.has(a)));
 }
 
