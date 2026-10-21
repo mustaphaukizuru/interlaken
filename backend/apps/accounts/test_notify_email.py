@@ -11,7 +11,6 @@ from django.core import mail
 from django.utils import timezone
 
 from apps.accounts.factories import ParentFactory, StudentProfileFactory, StudentUserFactory
-from apps.accounts.notify_email import make_token
 from apps.accounts.recipients import email_recipients
 from apps.portal.services import notify
 
