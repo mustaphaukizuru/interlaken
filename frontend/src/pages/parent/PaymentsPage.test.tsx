@@ -48,6 +48,13 @@ describe('PaymentsPage URL params, sort, date range and export (Data Ops Phase 9
     mockedPayments.mockResolvedValue({ data: { count: 1, results: [paid] } } as never);
   });
 
+  it('offers cafetería only: no «Colegiaturas y boletas» card (owner, 2026-10-20)', async () => {
+    renderPage('/portal/pagos');
+    expect(await screen.findByText('Recargar cafetería', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByText(/Colegiaturas y boletas/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/servoescolar/i)).not.toBeInTheDocument();
+  });
+
   it('sends estado/alumno/desde/hasta/orden/page from the URL to the API', async () => {
     renderPage('/portal/pagos?estado=success&alumno=7&desde=2026-09-01&hasta=2026-09-15&orden=amount&page=2');
     await waitFor(() => expect(mockedPayments).toHaveBeenCalledWith({
@@ -152,12 +159,11 @@ describe('PaymentsPage after bitácora punto 10', () => {
     mockedPayments.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [paid] } } as never);
   });
 
-  it('keeps cafetería payments in the portal; only colegiaturas are «Próximamente»', async () => {
+  it('keeps cafetería payments in the portal and no colegiaturas card', async () => {
     renderPage();
     expect(await screen.findByText('Historial de pagos')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Recargar cafetería/ })).toHaveAttribute('href', '/portal/cafeteria');
-    expect(screen.getByRole('link', { name: /Colegiaturas y boletas/ }))
-      .toHaveAttribute('href', 'https://interlaken.servoescolar.mx/');
-    expect(screen.getAllByText('Próximamente')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: /Colegiaturas y boletas/ })).toBeNull();
+    expect(screen.queryByText('Próximamente')).toBeNull();
   });
 });

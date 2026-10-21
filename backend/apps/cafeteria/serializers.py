@@ -15,16 +15,14 @@ from .models import (
     TopUpRequest,
 )
 
-# Minimum online/office top-up. Test accounts may use $1 to try the checkout.
+# Minimum top-up. The $1 test amount used during Banorte certification was
+# removed on 2026-10-20 (owner: "everything is working"): $20 for everyone.
 TOPUP_MIN_AMOUNT = Decimal('20.00')
-TOPUP_TESTER_MIN_AMOUNT = Decimal('1.00')
 
 
 def topup_min_amount(user) -> Decimal:
     """The smallest top-up ``user`` may request."""
-    from apps.payments.gateways.banorte import is_payment_tester
-
-    return TOPUP_TESTER_MIN_AMOUNT if user is not None and is_payment_tester(user) else TOPUP_MIN_AMOUNT
+    return TOPUP_MIN_AMOUNT
 
 
 class LoyverseProfileSerializer(serializers.ModelSerializer):
@@ -201,7 +199,7 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
     # Banorte checkout cheaply; validate_amount applies the per-user floor.
     amount = serializers.DecimalField(
         max_digits=10, decimal_places=2,
-        min_value=TOPUP_TESTER_MIN_AMOUNT, max_value=Decimal('2000.00'))
+        min_value=TOPUP_MIN_AMOUNT, max_value=Decimal('2000.00'))
 
     def validate_amount(self, value):
         request = self.context.get('request')
@@ -246,6 +244,7 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         source='get_applied_via_display', read_only=True)
     needs_apply = serializers.SerializerMethodField()
     apply_overdue = serializers.SerializerMethodField()
+    payer = serializers.SerializerMethodField()
     loyverse_code = serializers.SerializerMethodField()
     loyverse_points = serializers.SerializerMethodField()
     wallet_balance = serializers.SerializerMethodField()
@@ -262,8 +261,23 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'needs_pos_unload',
             'apply_due_at', 'applied_at', 'applied_via', 'applied_via_display',
             'applied_by_name', 'needs_apply', 'apply_overdue',
-            'loyverse_code', 'loyverse_points', 'wallet_balance',
+            'loyverse_code', 'loyverse_points', 'wallet_balance', 'payer',
         ]
+
+    def get_payer(self, obj):
+        """The account that paid a card top-up, and when (``None`` for cash)."""
+        p = self._payment(obj)
+        if p is None or p.user_id is None:
+            return None
+        user = p.user
+        checkout = p.banorte_checkout()
+        return {
+            'name': user.full_name,
+            'email': user.email,
+            'phone': user.whatsapp,
+            'paid_at': p.completed_at or p.created_at,
+            'card_brand': checkout.marca_tarjeta if checkout else '',
+        }
 
     def get_needs_apply(self, obj):
         if obj.method != TopUpRequest.Method.ONLINE or obj.status != TopUpRequest.Status.PAID:

@@ -710,13 +710,22 @@ class TopUpRequestCreateView(generics.CreateAPIView):
             )
 
         method = serializer.validated_data.get('method') or TopUpRequest.Method.OFFICE
+        # Families pay by card only (owner, 2026-10-20): "pago en caja escolar"
+        # requests are gone from the portal. Cash is still taken at the
+        # cafetería POS, and staff may still register an office top-up.
+        if method == TopUpRequest.Method.OFFICE and user.role != User.Role.ADMIN:
+            return Response(
+                error_body('Recargue con tarjeta Visa o Mastercard desde el portal, o en efectivo '
+                           'directamente en la caja de cafetería.', code='office_not_available'),
+                status=400,
+            )
         if method == TopUpRequest.Method.ONLINE:
             from apps.payments.gateways.banorte import online_payments_status
 
             if not online_payments_status(user)['online']:
                 return Response(
                     error_body('El pago en línea estará disponible próximamente. '
-                               'Mientras tanto puede pagar en caja escolar.',
+                               'Mientras tanto puede recargar en efectivo en la caja de cafetería.',
                                code='online_unavailable'),
                     status=400,
                 )
@@ -770,7 +779,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
                 fail_online_topup(payment)
                 return Response(error_body(
                     'El pago en línea no está disponible en este momento. '
-                    'Intente más tarde o pague en caja escolar.'), status=502)
+                    'Intente más tarde o recargue en efectivo en la caja de cafetería.'), status=502)
 
             data.update({
                 'payment_id': payment.id,

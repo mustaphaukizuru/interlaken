@@ -579,3 +579,27 @@ class TestAppliedToday:
         assert rows[by_sync.pk]['applied_via'] == 'pos_sync'
         assert rows[by_sync.pk]['applied_via_display'] == 'Detectada en Loyverse'
         assert waiting.pk not in rows
+
+
+class TestWhoPaid:
+    """Owner, 2026-10-20: "how do I know which parents paid yesterday?"."""
+
+    def test_dashboard_counts_paid_topups_and_their_total(self, api_client):
+        paid_topup('200.00', checkout='PRD', balance=0)
+        api_client.force_authenticate(user=AdminFactory())
+        r = api_client.get('/api/v1/portal/dashboard/')
+        assert r.status_code == 200
+        assert r.data['paid_topups_to_apply'] == 1
+        assert r.data['paid_topups_to_apply_total'] == '200.00'
+
+    def test_queue_rows_carry_the_payer(self, api_client):
+        student, topup, payment = paid_topup('150.00', balance=0)
+        parent = student.parents.first()
+        parent.whatsapp = '5512345678'
+        parent.save(update_fields=['whatsapp'])
+        api_client.force_authenticate(user=AdminFactory())
+        row = api_client.get(reverse('admin-topups'), {'needs_apply': 1}).data['results'][0]
+        assert row['payer']['email'] == parent.email
+        assert row['payer']['name'] == parent.full_name
+        assert row['payer']['phone'] == '5512345678'
+        assert row['payer']['paid_at']

@@ -179,6 +179,8 @@ export interface TopUpLogEntry {
   needs_apply?: boolean;
   /** Past the time promised to the family. */
   apply_overdue?: boolean;
+  /** Who paid a card top-up (null for cash). */
+  payer?: { name: string; email: string; phone: string; paid_at: string; card_brand: string } | null;
   /** Loyverse customer code and points (last sync) next to the wallet balance. */
   loyverse_code?: string;
   loyverse_points?: string | null;
@@ -378,6 +380,9 @@ export interface DashboardData {
   pending_topups?: number;
   pending_topups_office?: number;
   pending_topups_online?: number;
+  /** Paid card top-ups waiting for the 07:30 POS load, and their total. */
+  paid_topups_to_apply?: number;
+  paid_topups_to_apply_total?: string;
   visits_today?: number;
   open_password_requests?: number;
   unhandled_messages?: number;

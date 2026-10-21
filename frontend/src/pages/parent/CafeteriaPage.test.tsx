@@ -290,7 +290,11 @@ describe('CafeteriaPage online top-up through the Banorte lightbox', () => {
     renderWithProviders(<><CafeteriaPage /><PathProbe /></>, { route: '/portal/cafeteria?recarga=200' });
     await screen.findByRole('dialog', { name: 'Recargar cafetería' });
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
-    expect(screen.getByText(/Pago seguro con Banorte/)).toBeInTheDocument();
+    // Owner, 2026-10-20: one method, Visa y Mastercard, no Amex, no cash request.
+    expect(screen.getByText('Pago en línea con tarjeta (Visa y Mastercard)')).toBeInTheDocument();
+    expect(screen.getByText('No se acepta American Express.')).toBeInTheDocument();
+    expect(screen.queryByText('Pago en caja escolar')).toBeNull();
+    expect(screen.queryByText('Tarjeta de crédito o débito')).toBeNull();
     expect(screen.queryByText(/Global Payments/)).toBeNull();
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
     await u.click(screen.getByRole('button', { name: 'Ir a pagar' }));
@@ -339,20 +343,16 @@ describe('CafeteriaPage when card payment is not open yet', () => {
       { data: { online: false, test_mode: true } } as never);
   });
 
-  it('offers only the school cashier and requests an office top-up', async () => {
-    vi.mocked(cafeteriaApi.requestTopUp).mockResolvedValue({ data: { id: 2 } } as never);
+  it('says card payment is coming and never offers a cash request', async () => {
     const u = userEvent.setup();
     renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
     await screen.findByRole('dialog', { name: 'Recargar cafetería' });
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
-    // Banorte stays visible but disabled until it opens to this family.
-    expect(await screen.findByLabelText('Pago en línea con tarjeta (Banorte)')).toBeDisabled();
-    expect(screen.getByText('Próximamente')).toBeInTheDocument();
-    expect(screen.getByLabelText('Pago en caja escolar')).toBeChecked();
-    await u.click(screen.getByRole('button', { name: 'Continuar' }));
-    await u.click(screen.getByRole('button', { name: 'Solicitar recarga' }));
-    await waitFor(() => expect(cafeteriaApi.requestTopUp).toHaveBeenCalledWith(10, 200, 'office'));
-    expect(openBanorteLightbox).not.toHaveBeenCalled();
+    expect(await screen.findByText('Próximamente')).toBeInTheDocument();
+    expect(screen.getByText(/recargue en efectivo en la caja de cafetería/)).toBeInTheDocument();
+    expect(screen.queryByText('Pago en caja escolar')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled();
+    expect(cafeteriaApi.requestTopUp).not.toHaveBeenCalled();
   });
 });
 
@@ -406,16 +406,14 @@ describe('CafeteriaPage $1 test top-up', () => {
     mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
   });
 
-  it('offers "$1 (prueba)" to test accounts only', async () => {
+  it('the $1 test amount is gone for everyone: the minimum is $20', async () => {
     vi.mocked(paymentsApi.getAvailability).mockResolvedValueOnce(
       { data: { online: true, test_mode: false, certification: false, min_amount: '1.00' } } as never);
-    const u = userEvent.setup();
     renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100' });
     await screen.findByRole('dialog', { name: 'Recargar cafetería' });
-    await u.click(await screen.findByRole('button', { name: '$1 (prueba)' }));
-    expect(screen.getByLabelText('Monto (MXN)')).toHaveValue(1);
-    expect(screen.getByText(/Mínimo \$1 /)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
+    await screen.findByText(/Mínimo \$20 /);
+    expect(screen.queryByRole('button', { name: /\(prueba\)/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '$1' })).toBeNull();
   });
 
   it('families do not see it', async () => {

@@ -22,6 +22,8 @@ FAILURE_LABELS = {
     'expired': 'Expirado',
     'superseded': 'Reemplazado por otro intento',
     'declined': 'Rechazado por el banco',
+    # The school's afiliación accepts Visa and Mastercard only (no Amex).
+    'card_not_accepted': 'Tarjeta no aceptada (American Express)',
     'bank_timeout': 'Sin respuesta del banco',
     'config_error': 'Error de configuración',
     'not_found': 'No aparece en MultiCobros',
@@ -34,6 +36,12 @@ _STAGE_REASONS = {
     'bank_timeout': 'bank_timeout',
     'not_found': 'not_found',
 }
+
+
+def is_amex(brand) -> bool:
+    """Payworks ``marcaTarjeta`` of an American Express card."""
+    brand = str(brand or '').upper().replace(' ', '')
+    return 'AMEX' in brand or 'AMERICAN' in brand
 
 
 def failure_reason_for(stage, resultado_payw) -> str:
@@ -167,7 +175,11 @@ class Payment(models.Model):
         if stage in _STAGE_REASONS:
             return _STAGE_REASONS[stage]
         checkout = self.banorte_checkout()
-        return failure_reason_for(stage, checkout.resultado_payw if checkout else '')
+        reason = failure_reason_for(stage, checkout.resultado_payw if checkout else '')
+        if reason in ('declined', 'config_error') and checkout is not None \
+                and is_amex(checkout.marca_tarjeta):
+            return 'card_not_accepted'
+        return reason
 
     def failure_label(self) -> str:
         return self.FAILURE_LABELS.get(self.failure_reason(), '')

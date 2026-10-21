@@ -81,6 +81,17 @@ export function PaidTopUpQueue() {
       ),
     },
     {
+      id: 'payer', header: 'Pagó', minWidth: 190,
+      cell: (d) => (d.payer ? (
+        <span className="block text-xs">
+          <span className="block font-medium text-ink">{d.payer.name || d.payer.email}</span>
+          <span className="block text-subtle">{d.payer.email}</span>
+          {d.payer.phone && <span className="block text-subtle">{d.payer.phone}</span>}
+          {d.payer.card_brand && <span className="block text-subtle">{d.payer.card_brand}</span>}
+        </span>
+      ) : <span className="text-xs text-subtle">—</span>),
+    },
+    {
       id: 'loyverse', header: 'Cliente Loyverse', className: 'font-mono text-xs text-ink',
       cell: (d) => d.loyverse_code || <span className="font-sans text-subtle">—</span>,
     },

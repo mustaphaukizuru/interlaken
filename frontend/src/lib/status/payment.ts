@@ -37,13 +37,17 @@ export const PAYMENT_FAILURE: Record<string, { label: string; variant: BadgeVari
     label: 'Rechazado por el banco', variant: 'error', family: 'Rechazado por el banco',
     help: 'El banco rechazó el cargo. Puede intentar con otra tarjeta desde Cafetería.',
   },
+  card_not_accepted: {
+    label: 'Tarjeta no aceptada (American Express)', variant: 'error', family: 'Tarjeta no aceptada',
+    help: 'El colegio solo acepta tarjetas Visa y Mastercard; American Express no se acepta. Intente con otra tarjeta desde Cafetería; no se hizo ningún cargo.',
+  },
   bank_timeout: {
     label: 'Sin respuesta del banco', variant: 'warning', family: 'Sin respuesta del banco',
     help: 'El banco emisor no respondió a tiempo. Si ve el cargo en su estado de cuenta, avise al colegio: lo revisamos con Banorte.',
   },
   config_error: {
     label: 'Error de configuración', variant: 'error', family: 'Error de configuración',
-    help: 'El pago en línea tuvo un problema técnico del colegio; no se hizo ningún cargo. Intente más tarde o pague en caja escolar.',
+    help: 'El pago en línea tuvo un problema técnico del colegio; no se hizo ningún cargo. Intente más tarde o recargue en efectivo en la caja de cafetería.',
   },
   not_found: {
     label: 'No aparece en MultiCobros', variant: 'neutral', family: 'No completado',

@@ -44,6 +44,7 @@ const row = {
   pos_unload_needed_at: null, pos_unloaded_at: null, pos_unloaded_by_name: '', needs_pos_unload: false,
   apply_due_at: '2026-10-19T13:30:00Z', applied_at: null, applied_via: '' as const, applied_by_name: '',
   needs_apply: true, apply_overdue: true, loyverse_code: 'ci09938', loyverse_points: '50.00', wallet_balance: '50.00',
+  payer: { name: 'Ana Pérez', email: 'ana@familia.mx', phone: '5512345678', paid_at: '2026-10-19T03:00:00Z', card_brand: 'VISA' },
 };
 
 function axiosError(status: number, data: unknown) {
@@ -64,6 +65,10 @@ describe('PaidTopUpQueue («Por aplicar»)', () => {
     expect(screen.getAllByText('ci09938').length).toBeGreaterThan(0);
     expect(screen.getByText('1 vencida')).toBeInTheDocument();
     expect(screen.getAllByText('Vencida').length).toBeGreaterThan(0);
+    // Who paid (owner, 2026-10-20).
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.getByText('ana@familia.mx')).toBeInTheDocument();
+    expect(screen.getByText('5512345678')).toBeInTheDocument();
   });
 
   it('applies after the server confirms Loyverse has it', async () => {

@@ -74,6 +74,14 @@ describe('AdminDashboard', () => {
     );
   });
 
+  it('links the paid card top-ups straight to the 07:30 list', async () => {
+    getDashboard.mockResolvedValue({ data: { ...DASHBOARD, paid_topups_to_apply: 3, paid_topups_to_apply_total: '450.00' } } as never);
+    renderWithProviders(<AdminDashboard />);
+    const link = await screen.findByRole('link', { name: /3 recargas con tarjeta por aplicar/ });
+    expect(link).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
+    expect(link).toHaveTextContent('$450.00');
+  });
+
   it('shows announcements empty state when there are none', async () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
 

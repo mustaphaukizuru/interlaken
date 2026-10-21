@@ -496,6 +496,28 @@ TOPUP_EXPORT = ExportSpec(
             width=14,
             fmt="text",
         ),
+        Col(
+            "payer_name",
+            "Pagó",
+            getter=lambda t: (_first_payment(t).user.full_name
+                              if _first_payment(t) and _first_payment(t).user_id else ""),
+            width=24,
+        ),
+        Col(
+            "payer_email",
+            "Correo de quien pagó",
+            getter=lambda t: (_first_payment(t).user.email
+                              if _first_payment(t) and _first_payment(t).user_id else ""),
+            width=28,
+        ),
+        Col(
+            "payer_phone",
+            "Teléfono",
+            getter=lambda t: (_first_payment(t).user.whatsapp
+                              if _first_payment(t) and _first_payment(t).user_id else ""),
+            width=14,
+            fmt="text",
+        ),
         Col("apply_due_at", "Se aplica", width=17, fmt="datetime"),
         Col("applied_at", "Aplicada", width=17, fmt="datetime"),
         Col(
@@ -1014,7 +1036,7 @@ class AdminTopUpLogView(DateRangeMixin, CodeSearchMixin, AdminListMixin, generic
             # "the" payment; a plain .order_by() would drop the cache (N+1).
             models.Prefetch(
                 "payments",
-                queryset=Payment.objects.select_related("banorte__verified_by").order_by(
+                queryset=Payment.objects.select_related("banorte__verified_by", "user").order_by(
                     "-created_at"
                 ),
             )

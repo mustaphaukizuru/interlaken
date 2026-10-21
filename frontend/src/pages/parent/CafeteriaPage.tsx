@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Coffee, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
+  Coffee, CreditCard, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
   Search, X, Download, Wallet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -74,7 +74,6 @@ export default function CafeteriaPage() {
   const childId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
-  const [chosenMethod, setTopupMethod] = useState<'online' | 'office'>('online');
   // Card payment is offered only when the server allows it for this family
   // (live, or a listed tester while Banorte runs its simulation).
   const userId = useAuthStore((s) => s.user?.id ?? null);
@@ -86,9 +85,10 @@ export default function CafeteriaPage() {
   });
   const onlineAvailable = availability?.online ?? false;
   // Test accounts may top up $1 to try the checkout; families keep $20.
-  const topupMin = availability?.min_amount ? Number(availability.min_amount) : TOPUP_MIN;
-  const topupPresets = topupMin < TOPUP_MIN ? [1, ...TOPUP_PRESETS] : TOPUP_PRESETS;
-  const topupMethod: 'online' | 'office' = onlineAvailable ? chosenMethod : 'office';
+  const topupMin = Math.max(Number(availability?.min_amount ?? TOPUP_MIN) || TOPUP_MIN, TOPUP_MIN);
+  const topupPresets = TOPUP_PRESETS;
+  // Families pay by card only; there is no "pago en caja escolar" request.
+  const topupMethod = 'online' as const;
   // Card top-ups reach the balance at the school's next POS load (7:30 on
   // school days) unless the server says they are credited on payment.
   const policy = availability?.topup_policy;
@@ -263,7 +263,7 @@ export default function CafeteriaPage() {
         if (status === 'failed') {
           done = true;
           setPaying(false);
-          toast.error('El pago en línea no está disponible en este momento. Intente más tarde o pague en caja escolar.');
+          toast.error('El pago en línea no está disponible en este momento. Intente más tarde o recargue en efectivo en la caja de cafetería.');
         }
         return; // Banorte keeps its window open on other errors
       }
@@ -287,7 +287,7 @@ export default function CafeteriaPage() {
   const topupMutation = useMutation({
     mutationFn: () => cafeteriaApi.requestTopUp(selectedStudent!, topupAmountNum, topupMethod),
     onSuccess: ({ data }) => {
-      if (topupMethod === 'online' && data?.checkout) {
+      if (data?.checkout) {
         const checkout = data.checkout;
         setShowTopup(false);
         setTopupAmount('');
@@ -300,13 +300,7 @@ export default function CafeteriaPage() {
         }
         return;
       }
-      toast.success(
-        'Solicitud de recarga enviada. Paga en caja escolar y el colegio aplicará el saldo.',
-      );
-      setShowTopup(false);
-      setTopupAmount('');
-      setTopupStep(1);
-      queryClient.invalidateQueries({ queryKey: ['cafeteria-balances'] });
+      toast.error('No se pudo abrir el pago con tarjeta. Intente de nuevo.');
     },
     onError: (err) => toast.error(topupErrorMessage(err)),
   });
@@ -694,7 +688,7 @@ export default function CafeteriaPage() {
                         : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
                     }`}
                   >
-                    {amt < TOPUP_MIN ? `$${amt} (prueba)` : `$${amt}`}
+                    ${amt}
                   </button>
                 ))}
               </div>
@@ -704,62 +698,52 @@ export default function CafeteriaPage() {
 
         {topupStep === 2 && (
           <>
-            <fieldset>
-              <legend className="label">Método de pago</legend>
-              <div className="grid gap-2">
-                {([
-                  ['online', 'Pago en línea con tarjeta (Banorte)', scheduled
-                    ? sentence(`Pago seguro con Banorte. El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
-                    : 'Pago seguro con Banorte. El saldo se aplica en minutos.'],
-                  ['office', 'Pago en caja escolar', 'Registra la solicitud; paga en efectivo en el colegio.'],
-                ] as const).map(([v, title, desc]) => {
-                  // Card payment is always shown; until Banorte opens it to this
-                  // family it is disabled and says so (instead of vanishing).
-                  const disabled = v === 'online' && !onlineAvailable;
-                  return (
-                    <label
-                      key={v}
-                      htmlFor={`topup-method-${v}`}
-                      className={`flex min-h-[56px] items-start gap-3 rounded-xl border p-3 ${
-                        disabled ? 'cursor-not-allowed border-line bg-cream/60 opacity-70'
-                          : topupMethod === v ? 'cursor-pointer border-purple bg-purple/[0.04]' : 'cursor-pointer border-line'}`}
-                    >
-                      <input id={`topup-method-${v}`} type="radio" name="topup-method" className="mt-1" value={v} checked={topupMethod === v} onChange={() => setTopupMethod(v)} aria-label={title} disabled={disabled} />
-                      <span>
-                        <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
-                          {title}
-                          {disabled && (
-                            <span className="rounded-full bg-amber/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber">
-                              Próximamente
-                            </span>
-                          )}
-                        </span>
-                        <span className="block text-xs text-muted">
-                          {disabled ? 'Muy pronto podrá pagar con tarjeta de crédito o débito desde el portal.' : desc}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </fieldset>
-            {topupMethod === 'online' && availability?.test_mode && (
+            {/* Card is the only method for families (owner, 2026-10-20): cash
+                recargas are made directly at the cafetería POS. */}
+            <p className="label">Método de pago</p>
+            <div
+              className={`flex min-h-[56px] items-start gap-3 rounded-xl border p-3 ${
+                onlineAvailable ? 'border-purple bg-purple/[0.04]' : 'border-line bg-cream/60 opacity-70'}`}
+            >
+              <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-purple" aria-hidden="true" />
+              <span>
+                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                  Pago en línea con tarjeta (Visa y Mastercard)
+                  {!onlineAvailable && (
+                    <span className="rounded-full bg-amber/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber">
+                      Próximamente
+                    </span>
+                  )}
+                </span>
+                <span className="block text-xs text-muted">
+                  {!onlineAvailable
+                    ? 'Muy pronto podrá pagar con tarjeta desde el portal. Mientras tanto, recargue en efectivo en la caja de cafetería.'
+                    : scheduled
+                      ? sentence(`El saldo se aplica ${applyPhrase(policy?.next_apply_at)}`)
+                      : 'El saldo se aplica en minutos.'}
+                </span>
+                {onlineAvailable && (
+                  <span className="mt-1 block text-xs font-semibold text-coral">No se acepta American Express.</span>
+                )}
+              </span>
+            </div>
+            {onlineAvailable && availability?.test_mode && (
               <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink">
                 <strong>Modo de prueba Banorte:</strong> no se realiza ningún cargo real.
               </p>
             )}
-            {topupMethod === 'online' && availability?.certification && (
+            {onlineAvailable && availability?.certification && (
               <p className="rounded-xl border border-coral/40 bg-coral-50 px-3 py-2 text-xs text-ink">
                 <strong>Certificación Banorte: cargo real a la tarjeta.</strong> Solo cuentas de prueba
                 ven esta opción; el pago puede devolverse desde MultiCobros.
               </p>
             )}
-            {topupMethod === 'online' && scheduled && (
+            {onlineAvailable && scheduled && (
               <p role="note" className="rounded-xl border border-amber/40 bg-amber/[0.07] px-3 py-2.5 text-xs leading-relaxed text-ink">
                 {applyNotice(policy)}
               </p>
             )}
-            {topupMethod === 'online' && <BanortePaymentNotice />}
+            {onlineAvailable && <BanortePaymentNotice />}
           </>
         )}
 
@@ -767,16 +751,14 @@ export default function CafeteriaPage() {
           <dl className="divide-y divide-line rounded-xl border border-line text-sm">
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
-            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">{topupMethod === 'online' ? 'Tarjeta · Banorte' : 'Caja escolar'}</dd></div>
-            {topupMethod === 'online' && scheduled && (
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>
+            {scheduled && (
               <div className="flex justify-between gap-3 px-4 py-3"><dt className="whitespace-nowrap text-muted">Se aplica</dt><dd className="text-right font-medium text-ink">{applyPhrase(policy?.next_apply_at)}</dd></div>
             )}
             <div className="px-4 py-3 text-xs text-muted">
-              {topupMethod === 'online'
-                ? (scheduled
-                  ? `Al continuar se abrirá la ventana segura de Banorte. ${applyNotice(policy)}`
-                  : 'Al continuar se abrirá la ventana segura de Banorte. Cuando el banco confirme, verá el saldo en el portal.')
-                : 'Se registrará la solicitud. El saldo se aplica cuando el colegio reciba el pago en caja.'}
+              {scheduled
+                ? `Al continuar se abrirá la ventana segura de Banorte. No se acepta American Express. ${applyNotice(policy)}`
+                : 'Al continuar se abrirá la ventana segura de Banorte. No se acepta American Express. Cuando el banco confirme, verá el saldo en el portal.'}
             </div>
           </dl>
         )}
@@ -791,7 +773,7 @@ export default function CafeteriaPage() {
             <Button
               variant="primary"
               onClick={() => setTopupStep((s) => (s + 1) as 1 | 2 | 3)}
-              disabled={topupStep === 1 && (!topupAmountValid || !selectedStudent)}
+              disabled={(topupStep === 1 && (!topupAmountValid || !selectedStudent)) || (topupStep === 2 && !onlineAvailable)}
               className="min-h-[44px] flex-1"
             >
               Continuar
@@ -801,10 +783,10 @@ export default function CafeteriaPage() {
               variant="primary"
               loading={topupMutation.isPending}
               onClick={() => topupMutation.mutate()}
-              disabled={!topupAmountValid || !selectedStudent}
+              disabled={!topupAmountValid || !selectedStudent || !onlineAvailable}
               className="min-h-[44px] flex-1"
             >
-              {topupMethod === 'online' ? 'Ir a pagar' : 'Solicitar recarga'}
+              Ir a pagar
             </Button>
           )}
         </div>

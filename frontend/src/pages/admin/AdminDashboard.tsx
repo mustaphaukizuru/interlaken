@@ -35,6 +35,25 @@ export default function AdminDashboard() {
         {isError ? (
           <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
         ) : (
+          <>
+          {/* "Who paid yesterday?" (owner, 2026-10-20): straight to the 07:30 list. */}
+          {!!data?.paid_topups_to_apply && (
+            <Link
+              to="/admin/cafeteria?tab=pos"
+              className="mb-4 flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span className="flex items-center gap-2.5">
+                <Coffee className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
+                <span>
+                  <strong>{data.paid_topups_to_apply} recarga{data.paid_topups_to_apply === 1 ? '' : 's'} con tarjeta por aplicar</strong>
+                  {' '}({formatMXN(data.paid_topups_to_apply_total ?? 0)}). Cárguelas en Loyverse a las 7:30.
+                </span>
+              </span>
+              <span className="flex items-center gap-1 text-sm font-semibold text-purple">
+                Ver quién pagó <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </Link>
+          )}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-[18px] lg:grid-cols-3 xl:grid-cols-4">
             {isLoading ? (
               [0, 1, 2, 3, 4, 5, 6, 7].map(i => <div key={i} className="skeleton h-[148px]" />)
@@ -53,6 +72,7 @@ export default function AdminDashboard() {
               ))
             )}
           </div>
+          </>
         )}
 
         {/* Quick actions — green = ops, pink = admissions; no improvised solid fills */}

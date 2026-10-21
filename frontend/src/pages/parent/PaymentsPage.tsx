@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, ArrowUpRight, RotateCcw, Wallet, CalendarDays, FileText } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Coffee, ArrowRight, RotateCcw, Wallet, CalendarDays, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -62,9 +62,8 @@ const PAYMENT_SORT_OPTIONS: SortOption[] = [
 const dmy = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split('-').reverse().join('/') : iso);
 
 /** Pagos is the cafetería wallet's money view: summary, filterable history, export.
- *  Top-ups are paid in Cafetería (Banorte card or school cashier). Colegiaturas are
- *  not paid in the portal yet (bitácora punto 10): a «Próximamente» card points to
- *  ServoEscolar meanwhile, without hiding the cafetería payments. */
+ *  Top-ups are paid by card in Cafetería. The «Colegiaturas y boletas» card was
+ *  removed on 2026-10-20 at the owner's request: the page is cafetería only. */
 export default function PaymentsPage() {
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
@@ -121,7 +120,7 @@ export default function PaymentsPage() {
 
       <SummaryTiles summary={summary.data} loading={summary.isLoading} />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+      <div className="mb-6">
         <ActionCard
           to="/portal/cafeteria"
           icon={Coffee}
@@ -129,7 +128,6 @@ export default function PaymentsPage() {
           desc="Agrega saldo a la cuenta de cafetería de tus hijos."
           gradient="from-green to-green-dark"
         />
-        <ColegiaturasCard />
       </div>
 
       <Card title="Historial de pagos">
@@ -265,35 +263,6 @@ function SummaryTiles({ summary, loading }: { summary?: PaymentSummary; loading:
         </div>
       ))}
     </div>
-  );
-}
-
-/** Colegiaturas are paid in ServoEscolar until the portal takes them. */
-export function ColegiaturasCard() {
-  return (
-    <a
-      href="https://interlaken.servoescolar.mx/"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="hover-lift group flex items-center gap-4 rounded-xl2 border border-line bg-white p-5 shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
-    >
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple/10 text-purple">
-        <CreditCard className="h-6 w-6" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="font-head text-base font-bold text-ink">Colegiaturas y boletas</span>
-          <span className="rounded-full bg-amber/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber">
-            Próximamente
-          </span>
-        </span>
-        <span className="mt-0.5 block text-sm text-muted">
-          Pronto en el portal. Mientras tanto, pague en interlaken.servoescolar.mx.
-        </span>
-      </span>
-      <ArrowUpRight className="h-5 w-5 shrink-0 text-subtle transition group-hover:text-purple" aria-hidden="true" />
-      <span className="sr-only"> (se abre en otra pestaña)</span>
-    </a>
   );
 }
 

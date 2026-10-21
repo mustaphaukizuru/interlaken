@@ -76,13 +76,23 @@ def _pending_topup_counts() -> dict:
     from apps.payments.multicobros import online_topups_awaiting_staff
 
     # An online PENDING row is a family still inside Banorte's window.
+    from django.db.models import Sum
+
     office = TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
                                          method=TopUpRequest.Method.OFFICE).count()
     online = online_topups_awaiting_staff().count()
+    # "Who paid?" (owner, 2026-10-20): paid card top-ups to load at 07:30,
+    # with their total, for the dashboard banner that links to the queue.
+    paid = TopUpRequest.objects.filter(
+        pk__in=online_topups_awaiting_staff().filter(
+            status=TopUpRequest.Status.PAID).values('pk'))
+    paid_total = paid.aggregate(s=Sum('amount'))['s'] or 0
     return {
         'pending_topups': office + online,
         'pending_topups_office': office,
         'pending_topups_online': online,
+        'paid_topups_to_apply': paid.count(),
+        'paid_topups_to_apply_total': f'{paid_total:.2f}',
     }
 
 
