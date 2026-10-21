@@ -83,7 +83,9 @@ class TestTopUpInitiation:
         assert not TopUpRequest.objects.filter(student=student).exists()
         assert not Payment.objects.filter(user=parent, payment_type=Payment.Type.CAFETERIA).exists()
 
-    def test_office_topup_creates_no_payment(self, api_client):
+    def test_families_cannot_request_a_cash_desk_topup(self, api_client):
+        """Owner, 2026-10-20: «Pago en caja escolar» is gone; cash is loaded at
+        the cafeteria POS, so a family request creates nothing."""
         parent = ParentFactory()
         student = StudentProfileFactory(parents=[parent])
         api_client.force_authenticate(user=parent)
@@ -92,9 +94,8 @@ class TestTopUpInitiation:
             {"student": student.id, "amount": "100.00", "method": "office"},
             format="json",
         )
-        assert resp.status_code == 201, resp.data
-        assert "redirect_url" not in resp.data
-        assert not Payment.objects.filter(related_topup_id=resp.data["id"]).exists()
+        assert resp.status_code == 400, resp.data
+        assert not TopUpRequest.objects.filter(student=student).exists()
 
     def test_student_self_guardian_can_topup_own_balance(self, api_client):
         """Loyverse family login: role=student, linked on student.parents."""
@@ -121,7 +122,7 @@ class TestTopUpInitiation:
         api_client.force_authenticate(user=student.user)
         resp = api_client.post(
             reverse("cafeteria-topup"),
-            {"student": student.id, "amount": "100.00", "method": "office"},
+            {"student": student.id, "amount": "100.00", "method": "online"},
             format="json",
         )
         assert resp.status_code == 201, resp.data
@@ -134,7 +135,7 @@ class TestTopUpInitiation:
         api_client.force_authenticate(user=student.user)
         resp = api_client.post(
             reverse("cafeteria-topup"),
-            {"student": other.id, "amount": "100.00", "method": "office"},
+            {"student": other.id, "amount": "100.00", "method": "online"},
             format="json",
         )
         assert resp.status_code == 403
@@ -313,7 +314,7 @@ class TestTopUpLimits:
         api_client.force_authenticate(user=parent)
         resp = api_client.post(
             reverse("cafeteria-topup"),
-            {"student": student.id, "amount": amount, "method": "office"},
+            {"student": student.id, "amount": amount, "method": "online"},
             format="json",
         )
         assert (resp.status_code == 201) is ok, resp.data
