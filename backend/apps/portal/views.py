@@ -72,11 +72,11 @@ def _pending_topup_counts() -> dict:
     """"Recargas por aplicar" on the admin dashboard: cash requests to apply at the
     counter, plus real card top-ups (already credited) still to verify in
     MultiCobros or to load into the Loyverse POS."""
-    from apps.cafeteria.models import TopUpRequest
-    from apps.payments.multicobros import online_topups_awaiting_staff
-
     # An online PENDING row is a family still inside Banorte's window.
     from django.db.models import Sum
+
+    from apps.cafeteria.models import TopUpRequest
+    from apps.payments.multicobros import online_topups_awaiting_staff
 
     office = TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
                                          method=TopUpRequest.Method.OFFICE).count()

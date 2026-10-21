@@ -88,6 +88,33 @@ class PaymentAvailabilityView(APIView):
                          'topup_policy': policy()})
 
 
+class BillingProfileView(APIView):
+    """GET/PUT /api/v1/payments/billing-profile/ — the caller's saved cardholder data.
+
+    Pre-fills the top-up wizard's "Titular de la tarjeta" step (Banorte /
+    Cybersource requires it on every card payment). Only the account itself
+    reads or writes it; ``states`` lists Banorte's 32 two-letter codes.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .billing import STATES, BillingProfile
+
+        profile = BillingProfile.objects.filter(user=request.user).first()
+        return Response({
+            'data': profile.as_dict() if profile else {},
+            'states': [{'code': code, 'name': name} for code, name in STATES.items()],
+        })
+
+    def put(self, request):
+        from .billing import BillingProfile, CardholderSerializer
+
+        holder = CardholderSerializer(data=request.data)
+        holder.is_valid(raise_exception=True)
+        BillingProfile.remember(request.user, dict(holder.validated_data))
+        return Response({'data': BillingProfile.objects.get(user=request.user).as_dict()})
+
+
 BANORTE_EVENTS = frozenset({'success', 'error', 'cancel', 'closed'})
 
 

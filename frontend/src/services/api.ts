@@ -585,9 +585,10 @@ export const cafeteriaApi = {
     api.patch(`/cafeteria/balance/${studentId}/budget/`, limits),
 
   /** Online answers carry `checkout` (Banorte lightbox, or the dev mock redirect). */
-  requestTopUp: (studentId: number, amount: number, method: string) =>
+  requestTopUp: (studentId: number, amount: number, method: string,
+    extra: { billing?: Record<string, string>; remember_billing?: boolean } = {}) =>
     api.post<{ id: number; payment_id?: number; checkout?: CheckoutStart; redirect_url?: string }>(
-      '/cafeteria/topup/', { student: studentId, amount, method }),
+      '/cafeteria/topup/', { student: studentId, amount, method, ...extra }),
 
   /** On-demand Loyverse purchase poll (parents/staff). Rate-limited server-side. */
   refreshFromLoyverse: () =>
@@ -707,6 +708,9 @@ export const paymentsApi = {
 
   /** Whether the caller may pay by card now, and in which stage: Banorte test
    *  mode (no charge), certification (real charge, test accounts only) or open. */
+  /** Saved cardholder data (Banorte requires it on every card payment) and the state codes. */
+  getBillingProfile: () =>
+    api.get<{ data: Partial<Record<string, string>>; states: { code: string; name: string }[] }>('/payments/billing-profile/'),
   getAvailability: () =>
     api.get<{
       online: boolean; test_mode: boolean; certification?: boolean; min_amount?: string;

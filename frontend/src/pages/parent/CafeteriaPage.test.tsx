@@ -21,6 +21,12 @@ vi.mock('@/services/api', () => ({
   paymentsApi: {
     reportBanorteResult: vi.fn(),
     getAvailability: vi.fn().mockResolvedValue({ data: { online: true, test_mode: false } }),
+    // Saved «Titular de la tarjeta» (Banorte requires it on every card payment).
+    getBillingProfile: vi.fn().mockResolvedValue({ data: { data: {
+      first_name: 'Ana', last_name: 'Pérez', street: 'Hidalgo', street_number: '12', street_number_2: '',
+      colonia: 'Centro', municipio: 'Tlalnepantla', city: 'Tlalnepantla', state: 'EM',
+      postal_code: '54000', phone: '5512345678', email: 'ana@familia.mx',
+    }, states: [] } }),
   },
 }));
 
@@ -297,9 +303,14 @@ describe('CafeteriaPage online top-up through the Banorte lightbox', () => {
     expect(screen.queryByText('Tarjeta de crédito o débito')).toBeNull();
     expect(screen.queryByText(/Global Payments/)).toBeNull();
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(await screen.findByDisplayValue('Centro')).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
     await u.click(screen.getByRole('button', { name: 'Ir a pagar' }));
     await waitFor(() => expect(openBanorteLightbox).toHaveBeenCalledWith(lightbox, expect.any(Function)));
-    expect(cafeteriaApi.requestTopUp).toHaveBeenCalledWith(10, 200, 'online');
+    expect(cafeteriaApi.requestTopUp).toHaveBeenCalledWith(10, 200, 'online', {
+      billing: expect.objectContaining({ state: 'EM', postal_code: '54000', colonia: 'Centro' }),
+      remember_billing: true,
+    });
   }
 
   it('forwards an approval to the backend, then shows the return page', async () => {
@@ -465,6 +476,35 @@ describe('CafeteriaPage scheduled application of card top-ups', () => {
     expect(screen.getByRole('note')).toHaveTextContent('WhatsApp al 55 5379 1188');
 
     await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    await screen.findByDisplayValue('Centro');
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Se aplica')).toBeInTheDocument();
+  });
+});
+
+describe('CafeteriaPage «Titular de la tarjeta» (Banorte requires it)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+  });
+
+  it('blocks the payment until the cardholder data is complete and says what is missing', async () => {
+    vi.mocked(paymentsApi.getBillingProfile).mockResolvedValueOnce({ data: { data: {}, states: [] } } as never);
+    const u = userEvent.setup();
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+    await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    await u.click(await screen.findByRole('button', { name: 'Continuar' }));
+
+    expect(await screen.findByLabelText('Colonia')).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Continuar' }));
+    // Still on the same step, with the reasons next to each field.
+    expect(screen.getByLabelText('Colonia')).toBeInTheDocument();
+    expect(screen.getByText('Elija el estado.')).toBeInTheDocument();
+    expect(screen.getByText('Código postal de 5 dígitos.')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Estado de México' })).toHaveValue('EM');
+    expect(screen.getByRole('option', { name: 'Ciudad de México' })).toHaveValue('DF');
   });
 });

@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path('initiate/',   views.PaymentInitiateView.as_view(),  name='payment-initiate'),
     path('availability/', views.PaymentAvailabilityView.as_view(), name='payment-availability'),
+    path('billing-profile/', views.BillingProfileView.as_view(), name='payment-billing-profile'),
     path('banorte/result/', views.BanorteResultView.as_view(), name='payment-banorte-result'),
     path('sandbox/complete/', views.SandboxCompleteView.as_view(), name='payment-sandbox-complete'),
     path('history/',    views.PaymentHistoryView.as_view(),   name='payment-history'),

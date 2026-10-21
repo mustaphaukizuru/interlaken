@@ -40,6 +40,13 @@ async function stubCafeteria(page: Page): Promise<{ readonly topupPayload: unkno
   // Card payment open for this family (live, or a listed tester).
   await page.route('**/api/v1/payments/availability/', (route) =>
     route.fulfill({ json: { online: true, test_mode: false } }));
+  // Saved «Titular de la tarjeta» (Banorte requires it on every card payment).
+  await page.route('**/api/v1/payments/billing-profile/', (route) =>
+    route.fulfill({ json: { data: {
+      first_name: 'Ana', last_name: 'Pérez', street: 'Hidalgo', street_number: '12', street_number_2: '',
+      colonia: 'Centro', municipio: 'Tlalnepantla', city: 'Tlalnepantla', state: 'EM',
+      postal_code: '54000', phone: '5512345678', email: 'ana@familia.mx',
+    }, states: [] } }));
   await page.route('**/api/v1/cafeteria/topup/', (route) => {
     captured.payload = route.request().postDataJSON();
     // Dev shape (no Banorte credentials): a redirect to the mock page.
@@ -67,6 +74,8 @@ test('an online cafeteria top-up from the Cafetería page opens the Banorte chec
   await page.getByPlaceholder('Ej. 200').fill('200');
   // 3-step wizard (P1-D2): monto → método (tarjeta vía Banorte) → confirmar.
   await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByLabel('Colonia')).toHaveValue('Centro');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: /ir a pagar/i }).click();
 
@@ -111,6 +120,7 @@ test('the dashboard quick chip deep-links into the top-up modal with the amount 
   // Step 2 has a single online option: card through Banorte.
   await modal.getByRole('button', { name: 'Continuar' }).click();
   await expect(modal.getByText(/Pago seguro con Banorte/)).toBeVisible();
+  await expect(modal.getByLabel('Colonia')).toHaveValue('Centro');
   await modal.getByRole('button', { name: 'Continuar' }).click();
   await modal.getByRole('button', { name: /ir a pagar/i }).click();
 

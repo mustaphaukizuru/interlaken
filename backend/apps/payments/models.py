@@ -273,3 +273,7 @@ class BanorteCheckout(models.Model):
         """Approved real money that staff have not yet matched in MultiCobros."""
         return (self.resultado_payw == self.Result.APPROVED and self.is_live
                 and self.verified_at is None)
+
+
+# Cardholder data for Banorte/Cybersource lives in payments/billing.py.
+from .billing import BillingProfile  # noqa: E402,F401

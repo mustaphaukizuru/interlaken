@@ -49,7 +49,13 @@ from .banorte_crypto import (
     decrypt_result,
     load_certificate,
 )
-from .base import BaseGateway, CheckoutStart, LiveCheckoutNotConfigured, PaymentEvent
+from .base import (
+    BaseGateway,
+    CheckoutInputError,
+    CheckoutStart,
+    LiveCheckoutNotConfigured,
+    PaymentEvent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,8 +218,17 @@ class BanorteGateway(BaseGateway):
             )
 
         mode = config.effective_mode()
+        if mode == "PRD" and not billing:
+            # Cybersource screens every real charge and Banorte requires the
+            # cardholder's data (manual v1.8): without it the charge fails.
+            raise CheckoutInputError(
+                "Faltan los datos del titular de la tarjeta. Vuelva a abrir la recarga "
+                "y complete el paso «Titular de la tarjeta»."
+            )
         control_number = new_control_number(payment)
-        params = self.build_params(payment, config, mode=mode, control_number=control_number)
+        ip = (request.META.get("REMOTE_ADDR", "") if request is not None else "") or ""
+        params = self.build_params(payment, config, mode=mode, control_number=control_number,
+                                   billing=billing, ip=ip)
         envelope, material = build_envelope(
             params, certificate, credential_offset=config.credential_offset
         )
@@ -241,9 +256,13 @@ class BanorteGateway(BaseGateway):
         )
 
     @staticmethod
-    def build_params(payment, config: BanorteConfig, *, mode: str, control_number: str) -> dict:
-        """The Payworks variables (manual v1.8 p. 8). Empty values are dropped by
-        the serialiser; free text is folded to Banorte's allowed characters."""
+    def build_params(payment, config: BanorteConfig, *, mode: str, control_number: str,
+                     billing: dict | None = None, ip: str = "") -> dict:
+        """The Payworks variables (manual v1.8 p. 8), plus the cardholder's
+        ``billTo*`` data Cybersource requires when the family gave it. Empty
+        values are dropped by the serialiser; free text is folded to Banorte's
+        allowed characters."""
+        from ..billing import billto_params
         topup = getattr(payment, "related_topup", None)
         matricula = ""
         if topup is not None:
@@ -263,6 +282,7 @@ class BanorteGateway(BaseGateway):
             "customerRef1": f"PAGO{payment.pk}",
             "customerRef2": clean_text(matricula, 16).replace(" ", ""),
             "customerRef3": "CAFETERIA",
+            **(billto_params(billing, ip=ip) if billing else {}),
         }
 
     @staticmethod

@@ -735,6 +735,25 @@ class TopUpRequestCreateView(generics.CreateAPIView):
             gateway = get_gateway(gateway_name)
             amount = serializer.validated_data['amount']
 
+            # Cardholder data Banorte/Cybersource requires (owner, 2026-10-20:
+            # "Estado" arrived null). Validated before anything is created;
+            # remembered (encrypted) to pre-fill the next top-up.
+            billing = None
+            if request.data.get('billing') not in (None, ''):
+                from apps.core.flags import truthy
+                from apps.payments.billing import BillingProfile, CardholderSerializer
+
+                holder = CardholderSerializer(data=request.data.get('billing'))
+                if not holder.is_valid():
+                    return Response(
+                        {**error_body('Revise los datos del titular de la tarjeta.',
+                                      code='billing_invalid'),
+                         'billing': holder.errors},
+                        status=400)
+                billing = dict(holder.validated_data)
+                if truthy(request.data.get('remember_billing', True)):
+                    BillingProfile.remember(user, billing)
+
             with transaction.atomic():
                 existing = reuse_or_clear_cafeteria_checkout(
                     student, amount=amount, gateway_name=gateway.name,
@@ -761,7 +780,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
             data = dict(self.get_serializer(topup).data)
             from apps.cafeteria.services import fail_online_topup
             try:
-                checkout = gateway.start_checkout(payment, request=request)
+                checkout = gateway.start_checkout(payment, request=request, billing=billing)
             except CheckoutInputError as e:
                 payment.mark_failed(e, stage='create_checkout')
                 fail_online_topup(payment)

@@ -268,13 +268,21 @@ def _family(loyverse=True):
     return parent, student
 
 
-def _start(api_client, parent, student, amount="200.00"):
+# A complete cardholder, as the wizard's "Titular de la tarjeta" step sends it.
+BILLING = {
+    "first_name": "Ana María", "last_name": "Núñez Peña", "street": "Av. Hidalgo #12",
+    "street_number": "197", "street_number_2": "", "colonia": "Narvarte",
+    "municipio": "Benito Juárez", "city": "Ciudad de México", "state": "df",
+    "postal_code": "03 020", "phone": "(55) 1234-5678", "email": "Ana@Example.mx",
+}
+
+
+def _start(api_client, parent, student, amount="200.00", billing=BILLING):
     api_client.force_authenticate(user=parent)
-    return api_client.post(
-        reverse("cafeteria-topup"),
-        {"student": student.id, "amount": amount, "method": "online"},
-        format="json",
-    )
+    body = {"student": student.id, "amount": amount, "method": "online"}
+    if billing is not None:
+        body["billing"] = billing
+    return api_client.post(reverse("cafeteria-topup"), body, format="json")
 
 
 @pytest.mark.django_db
@@ -695,7 +703,8 @@ class TestOnlineAvailability:
             "certification": False,
         }
 
-    def test_office_top_up_is_unaffected(self, api_client, deployed_not_live):
+    def test_families_no_longer_request_cash_top_ups(self, api_client, deployed_not_live):
+        """Owner, 2026-10-20: card only in the portal; cash goes to the cafetería POS."""
         parent, student = _family()
         api_client.force_authenticate(user=parent)
         resp = api_client.post(
@@ -703,7 +712,7 @@ class TestOnlineAvailability:
             {"student": student.id, "amount": "100.00", "method": "office"},
             format="json",
         )
-        assert resp.status_code == 201, resp.data
+        assert resp.status_code == 400 and resp.data["code"] == "office_not_available"
 
     def test_certification_stage_is_real_money_for_testers_only(
         self, api_client, deployed_not_live
@@ -847,32 +856,96 @@ class TestAdminAlerts:
 
 
 @pytest.mark.django_db
-class TestTesterMinimum:
-    @pytest.fixture
-    def tester_settings(self, banorte):
-        banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]
-        return banorte
+class TestTwentyPesoMinimum:
+    """The $1 test amount was removed on 2026-10-20: $20 for everyone, testers too."""
 
     def _post(self, api_client, user, student, amount):
         api_client.force_authenticate(user=user)
         return api_client.post(
             reverse("cafeteria-topup"),
-            {"student": student.id, "amount": amount, "method": "office"},
+            {"student": student.id, "amount": amount, "method": "online", "billing": BILLING},
             format="json",
         )
 
-    def test_tester_may_top_up_one_peso(self, api_client, tester_settings):
+    def test_nobody_tops_up_below_twenty(self, api_client, banorte):
+        banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]
         tester, child = _family()
         tester.email = "probador@interlaken.test"
         tester.save(update_fields=["email"])
-        assert self._post(api_client, tester, child, "1.00").status_code == 201
-        avail = api_client.get(reverse("payment-availability")).data
-        assert avail["min_amount"] == "1.00"
-
-    def test_families_keep_the_twenty_peso_minimum(self, api_client, tester_settings):
-        parent, child = _family()
-        resp = self._post(api_client, parent, child, "1.00")
-        assert resp.status_code == 400
-        assert "20" in str(resp.data["amount"])
-        assert self._post(api_client, parent, child, "20.00").status_code == 201
+        resp = self._post(api_client, tester, child, "1.00")
+        assert resp.status_code == 400 and "20" in str(resp.data["amount"])
         assert api_client.get(reverse("payment-availability")).data["min_amount"] == "20.00"
+        assert self._post(api_client, tester, child, "20.00").status_code == 201
+
+
+# ── cardholder data for Cybersource (owner, 2026-10-20: "Estado" was null) ──
+@pytest.mark.django_db
+class TestCardholderData:
+    def test_billto_fields_reach_banorte_clean_and_complete(self, api_client, banorte, cert_bundle):
+        parent, student = _family()
+        resp = _start(api_client, parent, student)
+        assert resp.status_code == 201, resp.data
+        key, _, _ = cert_bundle
+        _, plaintext = _decrypt_envelope(key, resp.data["checkout"]["params"])
+        params = json.loads(plaintext)
+        assert params["billToState"] == "DF"                 # uppercase, 2 letters
+        assert params["billToCountry"] == "MX"
+        assert params["billToFirstName"] == "Ana Maria"       # accents folded
+        assert params["billToLastName"] == "Nunez Pena"
+        assert params["billToStreet"] == "Av. Hidalgo 12"     # '#' is forbidden
+        assert params["billToStreetNumber"] == "197"
+        assert params["billToStreet2Col"] == "Narvarte"
+        assert params["billToStreet2Del"] == "Benito Juarez"
+        assert params["billToCity"] == "Ciudad de Mexico"
+        assert params["billToPostalCode"] == "03020"
+        assert params["billToPhoneNumber"] == "5512345678"
+        assert params["billToEmail"] == "ana@example.mx"
+        assert params["billToIpAddress"]
+        assert "billToStreetNumbe2" not in params             # optional and empty: not sent
+
+    def test_real_money_without_cardholder_is_refused_before_banorte(self, api_client, banorte):
+        banorte.PAYMENTS_LIVE = True
+        parent, student = _family()
+        resp = _start(api_client, parent, student, billing=None)
+        assert resp.status_code == 400
+        assert "titular de la tarjeta" in resp.data["detail"]
+        assert not BanorteCheckout.objects.exists()
+
+    @pytest.mark.parametrize("field, value", [
+        ("state", "XX"), ("state", "Ciudad de México"), ("postal_code", "123"),
+        ("phone", "55-12"), ("email", "no-es-correo"), ("street", "###"),
+    ])
+    def test_invalid_cardholder_data_is_refused_with_field_errors(self, api_client, banorte, field, value):
+        parent, student = _family()
+        resp = _start(api_client, parent, student, billing={**BILLING, field: value})
+        assert resp.status_code == 400
+        assert resp.data["code"] == "billing_invalid" and field in resp.data["billing"]
+        assert not Payment.objects.exists()
+
+    def test_the_data_is_remembered_encrypted_and_only_for_its_owner(self, api_client, banorte):
+        from apps.payments.billing import BillingProfile
+
+        parent, student = _family()
+        _start(api_client, parent, student)
+        profile = BillingProfile.objects.get(user=parent)
+        with connection.cursor() as cur:
+            cur.execute("SELECT data FROM payments_billingprofile WHERE id = %s", [profile.pk])
+            stored = cur.fetchone()[0]
+        assert "Narvarte" not in stored                       # encrypted at rest
+
+        r = api_client.get(reverse("payment-billing-profile"))
+        assert r.data["data"]["colonia"] == "Narvarte" and r.data["data"]["state"] == "DF"
+        assert len(r.data["states"]) == 32
+
+        stranger = ParentFactory()
+        api_client.force_authenticate(user=stranger)
+        assert api_client.get(reverse("payment-billing-profile")).data["data"] == {}
+
+    def test_billing_profile_can_be_saved_directly(self, api_client):
+        parent = ParentFactory()
+        api_client.force_authenticate(user=parent)
+        r = api_client.put(reverse("payment-billing-profile"), BILLING, format="json")
+        assert r.status_code == 200 and r.data["data"]["postal_code"] == "03020"
+        bad = api_client.put(reverse("payment-billing-profile"), {**BILLING, "state": "ZZ"}, format="json")
+        assert bad.status_code == 400
+

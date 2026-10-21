@@ -20,6 +20,8 @@ import { Pagination } from '@/components/ui/Pagination';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard';
 import { PendingTopUps } from '@/components/portal/PendingTopUps';
+import { CardholderStep } from '@/components/portal/CardholderStep';
+import { EMPTY_CARDHOLDER, cardholderErrors, type Cardholder } from '@/lib/cardholder';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { useAuthStore } from '@/store/authStore';
 import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
@@ -45,6 +47,8 @@ const TX_SORT_OPTIONS: SortOption[] = [
   { key: 'balance', label: 'Saldo' },
 ];
 const TOPUP_MIN = 20;
+/** Wizard: alumno y monto → método → titular de la tarjeta → revisar. */
+type Step = 1 | 2 | 3 | 4;
 const TOPUP_MAX = 2000;
 // Quick amounts in the top-up form ($20 and $50 for a snack or a lunch).
 const TOPUP_PRESETS = [20, 50, 100, 200, 300, 500];
@@ -96,8 +100,28 @@ export default function CafeteriaPage() {
   const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   // Recarga wizard step (BACKLOG P1-D1): 1 alumno+monto, 2 método, 3 revisión.
-  const [topupStep, setTopupStep] = useState<1 | 2 | 3>(1);
   const [showTopup, setShowTopup] = useState(false);
+  const [topupStep, setTopupStep] = useState<Step>(1);
+  // «Titular de la tarjeta» (Banorte/Cybersource requires it, owner 2026-10-20):
+  // the family's saved data, else their account, until they edit it.
+  const [cardholderDraft, setCardholderDraft] = useState<Cardholder | null>(null);
+  const [rememberCardholder, setRememberCardholder] = useState(true);
+  const [cardholderTouched, setCardholderTouched] = useState(false);
+  const me = useAuthStore((s) => s.user);
+  const { data: billingProfile } = useQuery({
+    queryKey: ['billing-profile', userId],
+    queryFn: () => paymentsApi.getBillingProfile().then((r) => r.data),
+    enabled: showTopup,
+    staleTime: 5 * 60_000,
+  });
+  const cardholder: Cardholder = cardholderDraft ?? {
+    ...EMPTY_CARDHOLDER,
+    first_name: me?.first_name ?? '',
+    last_name: me?.last_name ?? '',
+    email: me?.email ?? '',
+    ...(billingProfile?.data ?? {}),
+  };
+  const cardholderReady = Object.keys(cardholderErrors(cardholder)).length === 0;
   const [thresholdStudent, setThresholdStudent] = useState<CafeteriaBalance | null>(null);
   const [thresholdValue, setThresholdValue] = useState('');
   const [budgetStudent, setBudgetStudent] = useState<CafeteriaBalance | null>(null);
@@ -285,7 +309,9 @@ export default function CafeteriaPage() {
   };
 
   const topupMutation = useMutation({
-    mutationFn: () => cafeteriaApi.requestTopUp(selectedStudent!, topupAmountNum, topupMethod),
+    mutationFn: () => cafeteriaApi.requestTopUp(selectedStudent!, topupAmountNum, topupMethod, {
+      billing: { ...cardholder }, remember_billing: rememberCardholder,
+    }),
     onSuccess: ({ data }) => {
       if (data?.checkout) {
         const checkout = data.checkout;
@@ -302,7 +328,11 @@ export default function CafeteriaPage() {
       }
       toast.error('No se pudo abrir el pago con tarjeta. Intente de nuevo.');
     },
-    onError: (err) => toast.error(topupErrorMessage(err)),
+    onError: (err) => {
+      toast.error(topupErrorMessage(err));
+      // The server found a problem in the cardholder data: back to that step.
+      if (fieldErrorsOrNull(err)?.billing) { setCardholderTouched(true); setTopupStep(3); }
+    },
   });
 
   // Family-set low-balance alert threshold (#12).
@@ -626,8 +656,8 @@ export default function CafeteriaPage() {
         maxWidth={520}
       >
         <ol className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide" aria-label="Pasos">
-          {(['Alumno y monto', 'Método de pago', 'Revisar'] as const).map((label, i) => {
-            const n = (i + 1) as 1 | 2 | 3;
+          {(['Alumno y monto', 'Método de pago', 'Titular de la tarjeta', 'Revisar'] as const).map((label, i) => {
+            const n = (i + 1) as Step;
             const state = n < topupStep ? 'done' : n === topupStep ? 'current' : 'todo';
             return (
               <li key={label} className="flex items-center gap-2" aria-current={state === 'current' ? 'step' : undefined}>
@@ -748,10 +778,22 @@ export default function CafeteriaPage() {
         )}
 
         {topupStep === 3 && (
+          <CardholderStep
+            value={cardholder}
+            onChange={setCardholderDraft}
+            remember={rememberCardholder}
+            onRemember={setRememberCardholder}
+            states={billingProfile?.states}
+            touched={cardholderTouched}
+          />
+        )}
+
+        {topupStep === 4 && (
           <dl className="divide-y divide-line rounded-xl border border-line text-sm">
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Alumno</dt><dd className="font-medium text-ink">{(balances ?? []).find((b) => b.student.id === selectedStudent)?.student.user.full_name ?? '—'}</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Monto</dt><dd className="font-bold text-ink">${topupAmountNum.toFixed(2)} MXN</dd></div>
             <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Método</dt><dd className="font-medium text-ink">Tarjeta Visa o Mastercard</dd></div>
+            <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted">Titular</dt><dd className="text-right font-medium text-ink">{`${cardholder.first_name} ${cardholder.last_name}`.trim()} · CP {cardholder.postal_code}</dd></div>
             {scheduled && (
               <div className="flex justify-between gap-3 px-4 py-3"><dt className="whitespace-nowrap text-muted">Se aplica</dt><dd className="text-right font-medium text-ink">{applyPhrase(policy?.next_apply_at)}</dd></div>
             )}
@@ -765,14 +807,17 @@ export default function CafeteriaPage() {
 
         <div className="sticky bottom-0 -mx-1 flex flex-col gap-2 bg-white pt-2 sm:flex-row">
           {topupStep > 1 ? (
-            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as 1 | 2 | 3)} className="min-h-[44px] flex-1">Atrás</Button>
+            <Button variant="secondary" onClick={() => setTopupStep((s) => (s - 1) as Step)} className="min-h-[44px] flex-1">Atrás</Button>
           ) : (
             <Button variant="secondary" onClick={() => { setShowTopup(false); setTopupAmount(''); setTopupStep(1); }} className="min-h-[44px] flex-1">Cancelar</Button>
           )}
-          {topupStep < 3 ? (
+          {topupStep < 4 ? (
             <Button
               variant="primary"
-              onClick={() => setTopupStep((s) => (s + 1) as 1 | 2 | 3)}
+              onClick={() => {
+                if (topupStep === 3 && !cardholderReady) { setCardholderTouched(true); return; }
+                setTopupStep((s) => (s + 1) as Step);
+              }}
               disabled={(topupStep === 1 && (!topupAmountValid || !selectedStudent)) || (topupStep === 2 && !onlineAvailable)}
               className="min-h-[44px] flex-1"
             >
@@ -783,7 +828,7 @@ export default function CafeteriaPage() {
               variant="primary"
               loading={topupMutation.isPending}
               onClick={() => topupMutation.mutate()}
-              disabled={!topupAmountValid || !selectedStudent || !onlineAvailable}
+              disabled={!topupAmountValid || !selectedStudent || !onlineAvailable || !cardholderReady}
               className="min-h-[44px] flex-1"
             >
               Ir a pagar
