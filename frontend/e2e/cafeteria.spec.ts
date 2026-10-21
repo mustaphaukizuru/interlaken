@@ -117,9 +117,13 @@ test('the dashboard quick chip deep-links into the top-up modal with the amount 
   await expect(modal).toBeVisible();
   await expect(modal.getByLabel('Monto (MXN)')).toHaveValue('200');
 
-  // Step 2 has a single online option: card through Banorte.
+  // Step 2 has a single option, card only (owner, 2026-10-20): Visa and
+  // Mastercard, American Express marked as not accepted.
   await modal.getByRole('button', { name: 'Continuar' }).click();
-  await expect(modal.getByText(/Pago seguro con Banorte/)).toBeVisible();
+  await expect(modal.getByText('Pago en línea con tarjeta (Visa y Mastercard)')).toBeVisible();
+  await expect(modal.getByText('No se acepta American Express.')).toBeVisible();
+  // Step 3, «Titular de la tarjeta», prefilled from the saved data.
+  await modal.getByRole('button', { name: 'Continuar' }).click();
   await expect(modal.getByLabel('Colonia')).toHaveValue('Centro');
   await modal.getByRole('button', { name: 'Continuar' }).click();
   await modal.getByRole('button', { name: /ir a pagar/i }).click();
