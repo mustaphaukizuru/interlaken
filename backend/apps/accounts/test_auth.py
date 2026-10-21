@@ -408,3 +408,37 @@ class TestCurrentUser:
         assert parent.email != "attacker@evil.test"
         assert parent.role == User.Role.STAFF
         assert parent.first_name == "Ok"
+
+
+class TestGoogleLongAvatar:
+    """2026-10-20: colegio@ (and anyone whose Google photo URL is long) got a
+    500 on login: the picture URL overflowed the 200-character avatar column."""
+
+    LONG = "https://lh3.googleusercontent.com/a/" + "A" * 400 + "=s96-c"
+
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_long_photo_url_never_breaks_the_login(self, mock_post, mock_get, api_client):
+        ParentFactory(email="nuevo@test.mx")
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(200, {**_VERIFIED_USERINFO, "picture": self.LONG})
+
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse("google-callback"), {"code": "abc", "state": state})
+
+        assert resp.status_code == 302 and "/login?login=ok" in resp["Location"]
+        assert User.objects.get(email="nuevo@test.mx").avatar == self.LONG
+
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_an_absurd_photo_url_is_dropped_not_fatal(self, mock_post, mock_get, api_client):
+        ParentFactory(email="nuevo@test.mx")
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(
+            200, {**_VERIFIED_USERINFO, "picture": "https://x/" + "B" * 5000})
+
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse("google-callback"), {"code": "abc", "state": state})
+
+        assert resp.status_code == 302 and "/login?login=ok" in resp["Location"]
+        assert User.objects.get(email="nuevo@test.mx").avatar == ""

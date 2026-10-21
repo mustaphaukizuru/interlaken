@@ -38,7 +38,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100)
     last_name  = models.CharField(max_length=100)
     role       = models.CharField(max_length=20, choices=Role.choices, default=Role.PARENT)
-    avatar     = models.URLField(blank=True)          # Google profile picture
+    # Google profile picture. Google's photo URLs exceed URLField's default
+    # 200 characters (2026-10-20: every such login crashed with a 500).
+    avatar     = models.URLField(max_length=1000, blank=True)
     avatar_file = models.FileField(upload_to='avatars/', blank=True, null=True)  # uploaded photo (P1-F2), 256px WebP
 
     # Status

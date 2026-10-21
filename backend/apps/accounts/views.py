@@ -80,6 +80,16 @@ class GoogleLoginView(APIView):
         return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{params}')
 
 
+def _google_avatar(url) -> str:
+    """The Google picture URL if it is a web URL that fits the column,
+    else ''. A profile photo must never be able to break a login."""
+    url = str(url or '').strip()
+    max_len = User._meta.get_field('avatar').max_length
+    if not url.startswith(('https://', 'http://')) or len(url) > max_len:
+        return ''
+    return url
+
+
 def _email_is_verified(info: dict) -> bool:
     """Google returns email_verified as a bool (userinfo) or occasionally the
     string 'true' (some ID-token encodings). Treat anything else as unverified —
@@ -169,7 +179,7 @@ class GoogleCallbackView(APIView):
         email = userinfo.get('email')
         first_name = userinfo.get('given_name', '')
         last_name = userinfo.get('family_name', '')
-        avatar = userinfo.get('picture', '')
+        avatar = _google_avatar(userinfo.get('picture'))
 
         if not email:
             return redirect(f'{settings.FRONTEND_URL}/login?error=no_email')
@@ -242,7 +252,7 @@ class GoogleTokenView(APIView):
             'first_name': payload.get('given_name', ''),
             'last_name': payload.get('family_name', ''),
             'google_id': payload.get('sub', ''),
-            'avatar': payload.get('picture', ''),
+            'avatar': _google_avatar(payload.get('picture')),
             'role': User.Role.PARENT,
         })
         if user is None:
@@ -255,7 +265,7 @@ class GoogleTokenView(APIView):
 
         # Refresh google_id / avatar for returning users.
         google_id = payload.get('sub', '')
-        avatar = payload.get('picture', '')
+        avatar = _google_avatar(payload.get('picture'))
         dirty = []
         if google_id and user.google_id != google_id:
             user.google_id = google_id
