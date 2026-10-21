@@ -888,12 +888,15 @@ def sync_all_balances():
     """
     from apps.accounts.models import StudentProfile
 
-    students = StudentProfile.objects.filter(
-        is_active=True
-    ).exclude(loyverse_id='')
+    linked = StudentProfile.objects.filter(is_active=True).exclude(loyverse_id='')
+    # Already-seeded wallets are a no-op in ``sync_student_balance``; skipping
+    # them here saves one database round trip per student (387 of them made
+    # «Sincronizar todos» outlive the 60 s worker timeout, 2026-10-20).
+    unseeded = linked.exclude(cafeteria_balance__last_synced__isnull=False)
+    already = linked.count() - unseeded.count()
 
-    seeded, failed = 0, 0
-    for student in students:
+    seeded, failed = already, 0
+    for student in unseeded:
         try:
             sync_student_balance(student)
             seeded += 1
@@ -2204,6 +2207,13 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
 
     students = (StudentProfile.objects.filter(is_active=True)
                 .exclude(loyverse_id='').select_related('user'))
+    # One unlocked read of every wallet. Most students are in sync or below
+    # Loyverse (a purchase the poll will record) and need no lock; only a
+    # positive gap or a paid top-up opens a transaction, where it is re-read
+    # under ``select_for_update``. A row lock and commit per student (four
+    # round trips to the database, x387) outlived the 60 s worker timeout.
+    wallets = {cb.student_id: cb for cb in CafeteriaBalance.objects.filter(
+        student__in=students).only('student_id', 'balance', 'last_synced')}
     credited = skipped_pending = in_sync = below = unseeded = deferred = 0
     applied_paid = held_paid = applied_paid_students = 0
     total = drift_total = applied_paid_total = Decimal('0')
@@ -2220,6 +2230,22 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
             stamp.append(student.id)
             continue
         paid = paid_by_student.get(student.id)
+        seen = wallets.get(student.id)
+        if seen is None or seen.last_synced is None:
+            unseeded += 1              # sync_balances seeds these from Loyverse
+            continue
+        if not paid:
+            # Nothing to credit without a positive gap: classify it unlocked.
+            # A gap that turns positive meanwhile waits for the next pass.
+            seen_delta = Decimal(str(remote)) - Decimal(str(seen.balance or 0))
+            if seen_delta <= 0:
+                if seen_delta == 0:
+                    in_sync += 1
+                else:
+                    below += 1
+                    drift_total += seen_delta
+                stamp.append(student.id)
+                continue
         with transaction.atomic():
             if paid:
                 # Lock order everywhere: top-up rows, then the wallet

@@ -282,3 +282,38 @@ class TestLocalDebitsAreNeverRecredited:
         assert CafeteriaBalance.objects.get(student=s).balance == Decimal('0')
         r = mirror_pos_topups(customers=[customer('u1', 100)], fresh=True)
         assert r['credited'] == 0 and r['skipped_pending'] == 1
+
+
+@pytest.mark.django_db
+class TestSyncAllStaysFast:
+    """2026-10-20: «Sincronizar todos» outlived the 60 s worker timeout. A row
+    lock and commit per student (x387, remote database) was the cost; the
+    query count must not grow with the roster when nothing is credited."""
+
+    def _roster(self, n, start=0):
+        for i in range(start, start + n):
+            seeded(StudentProfileFactory(loyverse_id=f'r{i}'), 100 if i % 2 else 150)
+        return [customer(f'r{i}', 100) for i in range(start + n)]
+
+    def _queries(self, customers):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = mirror_pos_topups(customers=customers, notify=False)
+        return len(ctx.captured_queries), r
+
+    def test_query_count_does_not_grow_with_in_sync_or_below_students(self):
+        small, r = self._queries(self._roster(4))
+        assert r['in_sync'] == 2 and r['below'] == 2 and r['credited'] == 0
+        large, r = self._queries(self._roster(20, start=4))
+        assert r['in_sync'] + r['below'] == 24
+        assert large == small
+
+    def test_seed_skips_already_seeded_students(self):
+        from apps.cafeteria.services import sync_all_balances
+
+        self._roster(5)
+        with patch('apps.cafeteria.services.get_customer_by_id') as remote:
+            assert sync_all_balances() == {'synced': 5, 'failed': 0}
+        remote.assert_not_called()
