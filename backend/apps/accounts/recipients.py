@@ -40,15 +40,20 @@ def delivery_users(user) -> list[User]:
     return unique
 
 
-def email_recipients(user) -> list[str]:
-    """Real mailboxes for ``user``: own (unless synthetic) + guardians'."""
+def mailboxes_of(users) -> list[str]:
+    """Real mailboxes of ``users`` (own address unless synthetic, plus a
+    confirmed personal ``notify_email``), deduplicated, order kept."""
     out, seen = [], set()
-    for u in delivery_users(user):
-        addr = (getattr(u, 'email', '') or '').strip()
-        if not addr or is_synthetic_email(addr):
-            continue
-        key = addr.lower()
-        if key not in seen:
-            seen.add(key)
-            out.append(addr)
+    for u in users:
+        for addr in getattr(u, 'mailboxes', None) or []:
+            key = addr.lower()
+            if key not in seen:
+                seen.add(key)
+                out.append(addr)
     return out
+
+
+def email_recipients(user) -> list[str]:
+    """Real mailboxes for ``user``: own (unless synthetic) + guardians', each
+    with its confirmed personal address."""
+    return mailboxes_of(delivery_users(user))

@@ -9,6 +9,7 @@ from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
 from .merge import GuardianMergePreviewView, GuardianMergeView
+from .notify_email import NotifyEmailVerifyView, NotifyEmailView
 from .password_requests import (
     PasswordRequestBulkView,
     PasswordRequestDetailView,
@@ -84,6 +85,9 @@ urlpatterns = [
     path('me/totp/enable/',  TotpEnableView.as_view(),            name='totp-enable'),
     path('me/totp/disable/', TotpDisableView.as_view(),           name='totp-disable'),
     path('me/avatar/',       MyAvatarView.as_view(),              name='my-avatar'),
+    # Personal email for notifications, confirmed by a signed link (owner, 2026-10-20).
+    path('me/notify-email/',  NotifyEmailView.as_view(),          name='my-notify-email'),
+    path('me/notify-email/verify/', NotifyEmailVerifyView.as_view(), name='my-notify-email-verify'),
     path('avatar/<int:user_id>/<str:token>/', AvatarServeView.as_view(), name='avatar-serve'),
     # No self-service password reset/change (school policy): see admin-set-password.
     path('notification-preferences/', password_views.NotificationPreferenceView.as_view(), name='notification-preferences'),

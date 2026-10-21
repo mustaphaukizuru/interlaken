@@ -15,6 +15,7 @@ import { AvatarUpload } from '@/components/portal/AvatarUpload';
 import { SecurityPanel } from '@/components/portal/SecurityPanel';
 import { authApi } from '@/services/api';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
+import { NotifyEmailCard } from '@/components/portal/NotifyEmailCard';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador', staff: 'Personal', student: 'Alumno', parent: 'Padre/Tutor',
@@ -234,7 +235,8 @@ export default function ProfilePage() {
         </Card>
         </>)}
 
-        {tab === 'avisos' && (
+        {tab === 'avisos' && (<>
+        <NotifyEmailCard accountEmail={user?.email} />
         <Card>
           <div className="mb-3 flex items-center gap-2">
             <Bell className="h-4 w-4 text-purple" />
@@ -277,7 +279,7 @@ export default function ProfilePage() {
             </Button>
           </div>
         </Card>
-        )}
+        </>)}
 
         {tab === 'privacidad' && (
         <Card>

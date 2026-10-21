@@ -62,6 +62,27 @@ class User(AbstractBaseUser, PermissionsMixin):
     staff_areas = models.JSONField('Áreas de la consola', default=list, blank=True)
     staff_title = models.CharField('Puesto', max_length=60, blank=True)
 
+    # A personal address that also receives this account's emails (family
+    # logins are usually the student's school address). Used only once the
+    # owner confirmed it from the link (apps/accounts/notify_email.py).
+    notify_email = models.EmailField('Correo para avisos', blank=True)
+    notify_email_verified_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def mailboxes(self) -> list[str]:
+        """Where this account's emails go: its own address (unless synthetic)
+        and its confirmed personal address."""
+        from .recipients import is_synthetic_email
+
+        out = []
+        own = (self.email or '').strip()
+        if own and not is_synthetic_email(own):
+            out.append(own)
+        extra = (self.notify_email or '').strip()
+        if extra and self.notify_email_verified_at and extra.lower() not in {a.lower() for a in out}:
+            out.append(extra)
+        return out
+
     objects = UserManager()
 
     USERNAME_FIELD  = 'email'

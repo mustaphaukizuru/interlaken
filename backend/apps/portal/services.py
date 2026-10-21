@@ -123,13 +123,12 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
 
     # A student's notification must reach the student's real mailbox (if any)
     # AND every linked guardian; synthetic importer addresses are skipped.
-    from apps.accounts.recipients import delivery_users, email_recipients, is_synthetic_email
+    from apps.accounts.recipients import delivery_users, email_recipients, mailboxes_of
 
     targets = delivery_users(user) if fanout else [user]
     email_status = Notification.Delivery.SKIPPED
     if want_email:
-        recipients = email_recipients(user) if fanout else (
-            [user.email] if getattr(user, 'email', '') and not is_synthetic_email(user.email) else [])
+        recipients = email_recipients(user) if fanout else mailboxes_of([user])
         if recipients:
             ok = send_email(subject=title, message=message, recipients=recipients)
             email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
@@ -354,7 +353,7 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     if not pending:
         return 0
 
-    from apps.accounts.recipients import delivery_users, is_synthetic_email
+    from apps.accounts.recipients import delivery_users, mailboxes_of
 
     max_attempts = getattr(settings, 'NOTIFICATION_MAX_ATTEMPTS', 3)
     sent, handled_ids, retry_ids, failures = 0, [], [], []
@@ -375,11 +374,7 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
                 user=target, announcement=ann).exists():
                 continue
             targets.append(target)
-        emails = []
-        for target in targets:
-            addr = (getattr(target, 'email', '') or '').strip()
-            if addr and not is_synthetic_email(addr) and addr.lower() not in {e.lower() for e in emails}:
-                emails.append(addr)
+        emails = mailboxes_of(targets)
         email_status = Notification.Delivery.SKIPPED
         if emails:
             ok = send_email(subject=n.title, message=n.message, recipients=emails)

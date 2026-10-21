@@ -19,6 +19,9 @@ import type { CheckoutStart } from '@/types';
 // `exportFilename`, `validateImportFile`, …) from '@/services/dataOps'.
 export type * from './dataOps';
 
+/** «Correo para avisos»: a personal address confirmed by a signed link. */
+export interface NotifyEmailState { email: string; verified: boolean; sent?: boolean }
+
 export interface StaffUser {
   id: number;
   email: string;
@@ -261,6 +264,10 @@ export const authApi = {
   /** Profile photo (BACKLOG P1-F2). */
   uploadAvatar: (blob: Blob) => { const fd = new FormData(); fd.append('file', blob, 'avatar.webp'); return api.post('/accounts/me/avatar/', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); },
   deleteAvatar: () => api.delete('/accounts/me/avatar/'),
+  getNotifyEmail: () => api.get<NotifyEmailState>('/accounts/me/notify-email/'),
+  setNotifyEmail: (email: string) => api.put<NotifyEmailState>('/accounts/me/notify-email/', { email }),
+  deleteNotifyEmail: () => api.delete<NotifyEmailState>('/accounts/me/notify-email/'),
+  verifyNotifyEmail: (token: string) => api.post<NotifyEmailState>('/accounts/me/notify-email/verify/', { token }),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
   updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>
