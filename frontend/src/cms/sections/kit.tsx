@@ -76,9 +76,7 @@ export const asList = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : 
 /* ── Lazy components (motion wrapping: ./motion, so pages without framer do not ship it) ── */
 
 /** A section component from a lazily loaded chunk (below-the-fold sections keep the first paint light). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazySection(load: () => Promise<Record<string, unknown>>, name: string, minHeight = '40vh'): ComponentType<any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const L = lazy(async () => ({ default: (await load())[name] as ComponentType<any> }));
   const Wrapped = (props: Record<string, unknown>) => <Suspense fallback={<div style={{ minHeight }} />}><L {...props} /></Suspense>;
   Wrapped.displayName = `lazySection(${name})`;

@@ -4,7 +4,7 @@
  * registers its own section types with its own defaults.
  */
 import { Fragment } from 'react';
-import { Coffee, Info, Tablet, type LucideIcon } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { PlatformCard } from '@/components/public/PlatformCard';
@@ -14,8 +14,6 @@ import { asList, CmsAnchor, f, Lines } from './kit';
 import type { FieldSpec } from '../blocks/registry';
 
 // Icons these pages used that the curated CMS set does not include yet.
-const EXTRA_ICONS: Record<string, LucideIcon> = { Coffee, Tablet };
-const iconOf = (name: unknown): LucideIcon => (typeof name === 'string' && EXTRA_ICONS[name]) || cmsIcon(name);
 
 /* ── Portada ────────────────────────────────────────────────────────────── */
 export interface HeroProps { label?: string; title?: string; subtitle?: string; image?: number | string }
@@ -109,7 +107,7 @@ export function PlatformsView(p: PlatformsProps) {
       <div className={`grid grid-cols-1 gap-5 ${cols}`}>
         {asList<PlatformItem>(p.items).map((it, i) => (
           <Reveal key={i} delay={i * 80}>
-            <PlatformCard p={{ name: t(it.name), desc: t(it.text), href: (it.href ?? '').trim(), icon: iconOf(it.icon), cta: t(it.cta) }} />
+            <PlatformCard p={{ name: t(it.name), desc: t(it.text), href: (it.href ?? '').trim(), icon: cmsIcon(it.icon), cta: t(it.cta) }} />
           </Reveal>
         ))}
       </div>

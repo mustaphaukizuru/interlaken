@@ -7,7 +7,8 @@ import { blockSpec, withDefaults } from '../blocks/registry';
 import { CMS_ICONS, ICON_OPTIONS } from '../icons';
 import { COLOR_OPTIONS } from '../runtime';
 
-type Props = { block: Block; onChange: (props: Record<string, unknown>) => void };
+/** `field` names the top-level prop that changed (undo groups consecutive edits of one field). */
+type Props = { block: Block; onChange: (props: Record<string, unknown>, field: string) => void };
 
 /** Property form generated from the block registry (CMS-PLAN: editor form = schema). */
 export function BlockForm({ block, onChange }: Props) {
@@ -16,7 +17,7 @@ export function BlockForm({ block, onChange }: Props) {
   if (spec.fields.length === 0) return <p className="text-sm text-muted">Este bloque se llena automáticamente con los datos del colegio.</p>;
   // Show what the site shows: a prop added in a later release still displays its default.
   const props = withDefaults(spec, block.props);
-  const set = (key: string, value: unknown) => onChange({ ...props, [key]: value });
+  const set = (key: string, value: unknown) => onChange({ ...props, [key]: value }, key);
   return (
     <div className="space-y-4">
       {spec.fields.map((f) => <Field key={f.key} spec={f} value={props[f.key]} onChange={(v) => set(f.key, v)} idPrefix={block.id} />)}

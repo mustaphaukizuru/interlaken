@@ -231,8 +231,10 @@ export const sections = [
     },
   }),
   section({
-    type: 'testimonials', label: 'Inicio · Testimonios', description: 'Testimonios publicados en Testimonios (automático; se oculta si no hay).',
-    component: lazySection(below, 'HomeTestimonials', '0'), fields: [], defaults: {},
+    type: 'testimonials', label: 'Inicio · Testimonios', description: 'Testimonios publicados en Testimonios (automático; se oculta si no hay). Aquí, la etiqueta, el título y cuántos mostrar.',
+    component: lazySection(below, 'HomeTestimonials', '0'),
+    fields: [f.text('eyebrow', 'Etiqueta superior'), f.text('title', 'Título'), f.number('limit', 'Cuántos testimonios mostrar')],
+    defaults: { eyebrow: 'Comunidad', title: 'Lo que dicen las familias', limit: 3 },
   }),
   section({
     type: 'gallery', label: 'Inicio · Franja de galería', description: 'Mosaico de fotos que lleva a la galería.',

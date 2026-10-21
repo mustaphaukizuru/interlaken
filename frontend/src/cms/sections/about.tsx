@@ -3,7 +3,7 @@
  * hero is the shared page.hero; every other section is the original markup
  * of AboutPage with its copy, photos, icons and colours as props.
  */
-import { ArrowRight, Award, Eye, Globe2, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Award } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
@@ -17,8 +17,6 @@ import './page';
 const section = sectionsOf('about');
 
 // Icons this page used that the curated CMS set does not include yet.
-const EXTRA_ICONS: Record<string, LucideIcon> = { Eye, Globe2 };
-const iconOf = (name: unknown): LucideIcon => (typeof name === 'string' && EXTRA_ICONS[name]) || cmsIcon(name);
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   (e.target as HTMLImageElement).style.display = 'none';
@@ -47,7 +45,7 @@ function AboutMissionView(p: MissionProps) {
             )}
             {asList<CardItem>(p.items).map((it, i) => {
               const color = cmsColor(it.color);
-              const Icon = iconOf(it.icon);
+              const Icon = cmsIcon(it.icon);
               return (
                 <div key={i} className={`${i === 0 ? 'mt-6' : 'mt-5'} flex gap-4`}>
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl" style={{ background: `color-mix(in srgb, ${color} 10%, transparent)` }}>
@@ -124,7 +122,7 @@ function AboutValuesView(p: CardsProps) {
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {asList<CardItem>(p.items).map((v, i) => {
           const color = cmsColor(v.color);
-          const Icon = iconOf(v.icon);
+          const Icon = cmsIcon(v.icon);
           return (
             <Reveal key={i} delay={i * 70}>
               <div className="card hover-lift h-full">
@@ -194,7 +192,7 @@ function AboutCredentialsView(p: CardsProps) {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {asList<CardItem>(p.items).map((c, i) => {
           const color = cmsColor(c.color);
-          const Icon = iconOf(c.icon);
+          const Icon = cmsIcon(c.icon);
           return (
             <Reveal key={i} delay={i * 90}>
               <div className="card hover-lift flex h-full flex-col gap-[18px]">

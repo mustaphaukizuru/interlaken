@@ -19,3 +19,11 @@ export function imageSrcSet(ref: unknown, opts: { full?: boolean } = {}): string
   if (typeof ref === 'string') return assetSrcSet(ref, opts);
   return undefined;
 }
+
+/** Absolute URL for social previews (og:image): crawlers need the full origin. */
+export function absoluteImageUrl(ref: unknown, origin: string): string | undefined {
+  if (typeof ref === 'number' && ref > 0) return `${origin}/api/v1/content/media/${ref}/lg/`;
+  if (typeof ref === 'string' && ref.startsWith('/')) return `${origin}${ref}`;
+  if (typeof ref === 'string' && ref.startsWith('https://')) return ref;
+  return undefined;
+}

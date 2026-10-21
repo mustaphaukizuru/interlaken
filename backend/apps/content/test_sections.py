@@ -67,3 +67,10 @@ def test_checks_accept_site_photos_skip_hidden_and_flag_hidden_locked(admin_user
     assert not any(c in ('missing_image', 'missing_alt') for c, _b in codes)
     if locked:
         assert ('locked_hidden', 'l') in codes
+
+
+@pytest.mark.django_db
+def test_checks_warn_when_the_social_image_was_deleted():
+    page = Page.objects.create(slug='redes', title='Redes', seo={'description': 'ok', 'og_image': 999},
+                               draft_blocks=[{'id': 'h', 'type': 'home.hero', 'props': {'title': 'Hola'}}])
+    assert 'missing_og_image' in [i['code'] for i in run_checks(page)]

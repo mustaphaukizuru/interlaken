@@ -1209,7 +1209,7 @@ export interface CmsPageAdmin {
   template: 'home' | 'level' | 'simple' | 'landing';
   status: 'draft' | 'published';
   draft_blocks: { id: string; type: string; props: Record<string, unknown>; hidden?: boolean }[];
-  seo: { title?: string; description?: string; og_image?: string; noindex?: boolean };
+  seo: { title?: string; description?: string; og_image?: number | string; noindex?: boolean };
   published_version_number: number | null;
   has_unpublished_changes: boolean;
   published_at: string | null;

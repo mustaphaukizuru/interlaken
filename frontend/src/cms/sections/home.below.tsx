@@ -259,7 +259,8 @@ function HomeStrengthsView(p: { eyebrow?: string; title?: string; items?: Streng
 }
 
 /* ── Testimonios (BACKLOG P2-15): the band disappears with no quotes ───── */
-function HomeTestimonialsView() {
+function HomeTestimonialsView(p: { eyebrow?: string; title?: string; limit?: number }) {
+  const t = useTokens();
   const { data } = useQuery({
     queryKey: ['testimonials'],
     queryFn: async () => (await contentApi.getTestimonials()).data as unknown[],
@@ -267,7 +268,7 @@ function HomeTestimonialsView() {
     retry: false,
   });
   if ((data ?? []).length === 0) return null;
-  return <Section bg="cream"><Testimonials /></Section>;
+  return <Section bg="cream"><Testimonials eyebrow={t(p.eyebrow)} title={t(p.title)} limit={typeof p.limit === 'number' && p.limit > 0 ? p.limit : 3} /></Section>;
 }
 
 /* ── Galería (franja) ───────────────────────────────────────────────────── */

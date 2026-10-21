@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ChevronLeft, Copy, ExternalLink, Eye, EyeOff, History, Lock, Monitor, Plus, RotateCcw, Search, Smartphone, Tablet, Trash2, Upload, XCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, ClipboardPaste, Copy, ExternalLink, Eye, EyeOff, History, Lock, Monitor, Plus, Redo2, RotateCcw, Search, Smartphone, Tablet, Trash2, Undo2, Upload, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cmsPagePath } from '@/cms/slugPaths';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -15,7 +15,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { BlockRenderer } from '@/cms/BlockRenderer';
-import { allSections as allSectionSpecs, GROUP_LABELS, loadAllGroups } from '@/cms/sections';
+import { allSections as allSectionSpecs, GROUP_LABELS, loadAllGroups, templateFor } from '@/cms/sections';
+import { MediaPicker } from '@/components/admin/MediaPicker';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { cmsBase, diffBlocks, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
@@ -24,6 +25,17 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertica
 import type { PageIssue } from '@/services/api';
 
 type Device = 'mobile' | 'tablet' | 'desktop';
+
+/** Copy/paste of sections between pages (and tabs) goes through localStorage. */
+const CLIPBOARD_KEY = 'cms-clipboard';
+function readClipboard(): Block | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLIPBOARD_KEY) ?? 'null') as Block | null;
+    return v && typeof v.type === 'string' && v.props && typeof v.props === 'object' ? v : null;
+  } catch {
+    return null;
+  }
+}
 const DEVICE_WIDTH: Record<Device, number | undefined> = { mobile: 390, tablet: 820, desktop: undefined };
 
 /** /admin/contenido/:id — split-view block editor (BACKLOG P3-4). */
@@ -53,6 +65,14 @@ export default function AdminPageEditor() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const loadedFor = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const propsRef = useRef<HTMLDivElement>(null);
+  // Where the last selection came from: the list scrolls the preview, a click in the preview scrolls the form.
+  const selectSource = useRef<'list' | 'preview'>('list');
+  // Undo/redo over the draft blocks. Consecutive edits of the same field are one
+  // step (typing a title is not one step per keystroke); any other action starts a new one.
+  const [history, setHistory] = useState<{ past: Block[][]; future: Block[][] }>({ past: [], future: [] });
+  const lastEdit = useRef('');
+  const [clip, setClip] = useState<Block | null>(() => readClipboard());
   const [confirmReset, setConfirmReset] = useState(false);
   // Every page's designed sections, so any section renders and can be added here.
   const [sectionsReady, setSectionsReady] = useState(false);
@@ -62,6 +82,8 @@ export default function AdminPageEditor() {
     if (page && loadedFor.current !== page.id) {
       loadedFor.current = page.id;
       setBlocks(page.draft_blocks ?? []);
+      setHistory({ past: [], future: [] });
+      lastEdit.current = '';
       setMeta({ title: page.title, slug: page.slug, seo: page.seo ?? {}, publish_at: page.publish_at ?? null, unpublish_at: page.unpublish_at ?? null });
       setDirty(false);
     }
@@ -120,7 +142,42 @@ export default function AdminPageEditor() {
     onError: () => toast.error('No se pudo generar el enlace.'),
   });
 
-  const update = (next: Block[]) => { setBlocks(next); setDirty(true); };
+  const update = (next: Block[], key = '') => {
+    const sameField = key !== '' && key === lastEdit.current;
+    lastEdit.current = key;
+    setHistory((h) => (sameField ? { past: h.past, future: [] } : { past: [...h.past.slice(-49), blocks], future: [] }));
+    setBlocks(next); setDirty(true);
+  };
+  const undo = () => {
+    const prev = history.past[history.past.length - 1];
+    if (!prev) return;
+    setHistory({ past: history.past.slice(0, -1), future: [...history.future, blocks] });
+    lastEdit.current = '';
+    setBlocks(prev); setDirty(true);
+  };
+  const redo = () => {
+    const next = history.future[history.future.length - 1];
+    if (!next) return;
+    setHistory({ past: [...history.past, blocks], future: history.future.slice(0, -1) });
+    lastEdit.current = '';
+    setBlocks(next); setDirty(true);
+  };
+  const historyActions = useRef({ undo, redo });
+  useEffect(() => { historyActions.current = { undo, redo }; });
+  const copyBlock = (b: Block) => {
+    try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(b)); } catch { /* private mode: the copy lives only in this tab */ }
+    setClip(b);
+    toast.success('Sección copiada. Puede pegarla en esta u otra página con «Pegar».');
+  };
+  const pasteBlock = () => {
+    if (!clip || !blockSpec(clip.type)) { toast.error('No hay una sección copiada.'); return; }
+    const b: Block = { id: newBlockId(), type: clip.type, props: JSON.parse(JSON.stringify(clip.props)) };
+    const at = selectedIdx >= 0 ? selectedIdx + 1 : blocks.length;
+    update([...blocks.slice(0, at), b, ...blocks.slice(at)]);
+    selectSource.current = 'list';
+    setSelected(b.id);
+  };
+  const selectFromPreview = (id: string) => { selectSource.current = 'preview'; setSelected(id); };
   const updateMeta = (patch: Partial<typeof meta>) => { setMeta((m) => ({ ...m, ...patch })); setDirty(true); };
   const selectedBlock = useMemo(() => blocks.find((b) => b.id === selected) ?? null, [blocks, selected]);
   const selectedIdx = blocks.findIndex((b) => b.id === selected);
@@ -128,11 +185,42 @@ export default function AdminPageEditor() {
   const toggleHidden = (b: Block) => update(blocks.map((x) => (x.id === b.id ? { ...x, hidden: !x.hidden } : x)));
   const resetBlock = (b: Block) => { const props = originalProps(meta.slug || page?.slug || '', b); if (props) update(blocks.map((x) => (x.id === b.id ? { ...x, props } : x))); };
 
-  // Selecting a block in the list brings it into view in the preview.
+  // Selecting in the list brings the block into view in the preview; clicking in the preview brings up its form.
   useEffect(() => {
     if (!selected) return;
-    previewRef.current?.querySelector(`[data-block-id="${CSS.escape(selected)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (selectSource.current === 'preview') propsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    else previewRef.current?.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(selected)}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   }, [selected]);
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) outside text fields, which keep their own undo.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); historyActions.current.undo(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); historyActions.current.redo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // A section copied in another tab or page shows up here.
+  useEffect(() => {
+    const refresh = () => setClip(readClipboard());
+    window.addEventListener('focus', refresh);
+    window.addEventListener('storage', refresh);
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('storage', refresh); };
+  }, []);
+
+  // Leaving with an unsaved draft (autosave pending or failed) asks first.
+  useEffect(() => {
+    if (!dirty && !save.isPending) return;
+    const onLeave = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onLeave);
+    return () => window.removeEventListener('beforeunload', onLeave);
+  }, [dirty, save.isPending]);
 
   if (!Number.isFinite(pageId)) return <ErrorState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
@@ -213,7 +301,12 @@ export default function AdminPageEditor() {
           <div className="card">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="font-head text-sm font-bold uppercase tracking-wide text-subtle">Bloques</h2>
-              <Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus size={14} aria-hidden="true" /> Agregar</Button>
+              <div className="flex items-center gap-1">
+                <button type="button" aria-label="Deshacer (Ctrl+Z)" title="Deshacer (Ctrl+Z)" disabled={history.past.length === 0} onClick={undo} className="rounded p-1.5 text-subtle hover:text-ink disabled:opacity-30"><Undo2 size={15} /></button>
+                <button type="button" aria-label="Rehacer (Ctrl+Shift+Z)" title="Rehacer (Ctrl+Shift+Z)" disabled={history.future.length === 0} onClick={redo} className="rounded p-1.5 text-subtle hover:text-ink disabled:opacity-30"><Redo2 size={15} /></button>
+                {clip && blockSpec(clip.type) && <Button size="sm" variant="ghost" onClick={pasteBlock} title={`Pegar: ${blockSpec(clip.type)?.label ?? clip.type}`}><ClipboardPaste size={14} aria-hidden="true" /> Pegar</Button>}
+                <Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus size={14} aria-hidden="true" /> Agregar</Button>
+              </div>
             </div>
             {blocks.length === 0 ? <p className="text-sm text-muted">La página está vacía. Agregue el primer bloque.</p> : (
               <ol className="space-y-1">
@@ -248,20 +341,21 @@ export default function AdminPageEditor() {
             )}
           </div>
 
-          <div className="card">
+          <div className="card scroll-mt-24" ref={propsRef}>
             {selectedBlock ? (
               <>
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="font-head text-sm font-bold uppercase tracking-wide text-subtle">{blockSpec(selectedBlock.type)?.label ?? selectedBlock.type}</h2>
                   <div className="flex items-center gap-3">
                     {originalProps(page.slug, selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => resetBlock(selectedBlock)} title="Vuelve a los textos e imágenes originales de esta sección">Restablecer</button>}
+                    {!isLocked(selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => copyBlock(selectedBlock)} title="Copiar para pegar en otra página">Copiar</button>}
                     {!isLocked(selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => update([...blocks.slice(0, selectedIdx + 1), { ...selectedBlock, id: newBlockId(), props: JSON.parse(JSON.stringify(selectedBlock.props)) }, ...blocks.slice(selectedIdx + 1)])}>Duplicar</button>}
                   </div>
                 </div>
                 <p className="mb-3 text-xs text-muted">{blockSpec(selectedBlock.type)?.description}</p>
                 {selectedBlock.hidden && <p className="mb-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink">Este bloque está oculto: se conserva aquí pero no aparece en el sitio.</p>}
                 {(errors.blocks || errors.draft_blocks) && <p className="mb-2 text-sm text-coral-600">{errors.blocks || errors.draft_blocks}</p>}
-                <BlockForm block={selectedBlock} onChange={(props) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)))} />
+                <BlockForm block={selectedBlock} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
               </>
             ) : <p className="text-sm text-muted">Seleccione un bloque en la lista o haga clic en la vista previa para editarlo.</p>}
           </div>
@@ -279,7 +373,7 @@ export default function AdminPageEditor() {
           </div>
           <div className="overflow-x-auto rounded-2xl border border-line bg-cream-2 p-3">
             <div ref={previewRef} className="mx-auto overflow-hidden rounded-xl bg-white shadow-card" style={{ width: DEVICE_WIDTH[device] ?? '100%', maxWidth: '100%' }}>
-              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <BlockRenderer blocks={blocks} editing selectedId={selected} onSelect={setSelected} />}
+              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <BlockRenderer blocks={blocks} editing selectedId={selected} onSelect={selectFromPreview} />}
             </div>
           </div>
         </section>
@@ -306,8 +400,9 @@ export default function AdminPageEditor() {
         <div className="space-y-3">
           <Input label="Título de la página" value={meta.title} onChange={(e) => updateMeta({ title: e.target.value })} error={errors.title} />
           <Input label="Dirección (slug)" value={meta.slug} onChange={(e) => updateMeta({ slug: e.target.value })} error={errors.slug} disabled={!isAdmin} hint={isAdmin ? 'Cambiarla rompe enlaces ya compartidos.' : 'Solo Dirección puede cambiar la dirección.'} />
-          <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} hint="Máx. 60 caracteres recomendados." />
-          <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
+          <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} placeholder={templateFor(page.slug)?.seo.title ?? ''} hint="Máx. 60 caracteres recomendados. Vacío = el título actual del sitio." />
+          <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} placeholder={templateFor(page.slug)?.seo.description ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
+          <MediaPicker label="Imagen al compartir (WhatsApp, Facebook)" value={meta.seo.og_image ?? null} onChange={(id) => updateMeta({ seo: { ...meta.seo, og_image: id ?? undefined } })} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!meta.seo.noindex} onChange={(e) => updateMeta({ seo: { ...meta.seo, noindex: e.target.checked } })} /> No indexar en buscadores</label>
           {!isAdmin && <p className="text-xs text-muted">La publicación y el retiro programados los define Dirección al aprobar la página.</p>}
           <div className="grid gap-3 sm:grid-cols-2">

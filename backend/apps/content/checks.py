@@ -113,6 +113,9 @@ def run_checks(page: Page) -> list[dict]:
         err('broken_link', f'Enlace roto: {h} (no existe ninguna página ni redirección).', bid)
 
     seo = page.seo or {}
+    og = seo.get('og_image')
+    if isinstance(og, int) and not isinstance(og, bool) and not MediaAsset.objects.filter(pk=og).exists():
+        warn('missing_og_image', 'La imagen para compartir ya no existe en la biblioteca; se usará la imagen general del sitio.')
     if not (seo.get('description') or '').strip():
         warn('seo_description', 'Falta la descripción SEO (aparece en Google).')
     elif len(seo['description']) > 160:

@@ -3,7 +3,7 @@
  * (docs/CMS-COMPLETION-PLAN.md). The original markup of ModeloEducativoPage
  * with its copy, photo, pillars and level links as props.
  */
-import { ArrowRight, BookOpenCheck, Globe2, type LucideIcon } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Reveal } from '@/components/ui/Reveal';
 import { cmsIcon } from '../icons';
 import { imageSrc, imageSrcSet, useTokens, type CmsLink } from '../runtime';
@@ -12,8 +12,6 @@ import { asList, CmsAnchor, defineModule, f, Lines, sectionsOf } from './kit';
 const section = sectionsOf('modelo');
 
 // Icons this page used that the curated CMS set does not include yet.
-const EXTRA_ICONS: Record<string, LucideIcon> = { BookOpenCheck, Globe2 };
-const iconOf = (name: unknown): LucideIcon => (typeof name === 'string' && EXTRA_ICONS[name]) || cmsIcon(name);
 
 /* ── Portada ────────────────────────────────────────────────────────────── */
 function ModeloHeroView(p: { label?: string; title?: string; subtitle?: string; image?: number | string }) {
@@ -48,7 +46,7 @@ function ModeloPillarsView(p: PillarsProps) {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {asList<Pillar>(p.items).map((it, i) => {
-            const Icon = iconOf(it.icon);
+            const Icon = cmsIcon(it.icon);
             return (
               <Reveal key={i}>
                 <div className="h-full rounded-xl2 border border-ink/10 bg-cream-2 p-6">

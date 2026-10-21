@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight, CalendarDays, CircleDollarSign, Clock, GraduationCap, Info,
+  ArrowRight, CircleDollarSign, Clock, GraduationCap, Info,
   ShieldCheck, Sparkles, Wallet,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';

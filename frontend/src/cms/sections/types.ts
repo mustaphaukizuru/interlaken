@@ -4,7 +4,6 @@ import type { Block, BlockSpec } from '../blocks/registry';
 /** A designed section: one real section of a public page, its markup and its editable props. */
 export interface SectionSpec extends BlockSpec {
   group: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   component: ComponentType<any>;
   defaults: Record<string, unknown>;
 }

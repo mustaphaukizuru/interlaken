@@ -6,6 +6,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { contentApi } from '@/services/api';
 import { BlockRenderer } from './BlockRenderer';
 import { CmsMediaProvider } from './runtime';
+import { absoluteImageUrl } from './media';
+import { SITE_URL } from '@/lib/siteMeta';
 import { usePublishedPage } from './published';
 import { CMS_SLUG_PATHS } from './slugPaths';
 import { Seo } from '@/components/seo/Seo';
@@ -38,7 +40,9 @@ export default function CmsOrNotFound() {
   if (!data) return <NotFoundPage />;
   return (
     <div>
-      <Seo title={data.seo?.title || data.title} description={data.seo?.description || ''} />
+      <Seo title={data.seo?.title || data.title} description={data.seo?.description || undefined} image={absoluteImageUrl(data.seo?.og_image, SITE_URL)}>
+        {data.seo?.noindex && <meta name="robots" content="noindex" />}
+      </Seo>
       <CmsMediaProvider media={data.media}>
         <BlockRenderer blocks={data.blocks} />
       </CmsMediaProvider>

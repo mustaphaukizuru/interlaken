@@ -5,6 +5,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { contentApi } from '@/services/api';
 import { BlockRenderer } from './BlockRenderer';
 import { CmsMediaProvider } from './runtime';
+import { absoluteImageUrl } from './media';
+import { SITE_URL } from '@/lib/siteMeta';
 import type { CmsPagePayload } from './published';
 
 export { BlockRenderer, applySnippets, mediaSrcSet } from './BlockRenderer';
@@ -28,7 +30,9 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
   if (isError || !data) return null;
   return (
     <div>
-      <Seo title={data.seo?.title || data.title} description={data.seo?.description || ''} />
+      <Seo title={data.seo?.title || data.title} description={data.seo?.description || undefined} image={absoluteImageUrl(data.seo?.og_image, SITE_URL)}>
+        {data.seo?.noindex && <meta name="robots" content="noindex" />}
+      </Seo>
       {preview && <div className="sticky top-0 z-40 bg-amber px-4 py-2 text-center text-xs font-bold text-white">Vista previa del borrador: lo que ve aquí aún no está publicado.</div>}
       <CmsMediaProvider media={data.media}>
         <BlockRenderer blocks={data.blocks} />

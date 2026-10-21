@@ -52,11 +52,11 @@ function AdmHeroView(p: HeroProps) {
 }
 
 /* ── Testimonios (BACKLOG P2-15) ────────────────────────────────────────── */
-function AdmTestimonialsView(p: { title?: string }) {
+function AdmTestimonialsView(p: { eyebrow?: string; title?: string; limit?: number }) {
   const t = useTokens();
   return (
     <Section bg="white">
-      <Testimonials title={t(p.title)} />
+      <Testimonials eyebrow={t(p.eyebrow)} title={t(p.title)} limit={typeof p.limit === 'number' && p.limit > 0 ? p.limit : 3} />
     </Section>
   );
 }
@@ -537,10 +537,10 @@ export const sections = [
     },
   }),
   section({
-    type: 'testimonials', label: 'Admisiones · Testimonios', description: 'Testimonios publicados en Testimonios (automático; se oculta si no hay). Aquí solo el título.',
+    type: 'testimonials', label: 'Admisiones · Testimonios', description: 'Testimonios publicados en Testimonios (automático; se oculta si no hay). Aquí, la etiqueta, el título y cuántos mostrar.',
     component: AdmTestimonialsView,
-    fields: [f.text('title', 'Título')],
-    defaults: { title: 'Familias que ya son Interlaken' },
+    fields: [f.text('eyebrow', 'Etiqueta superior'), f.text('title', 'Título'), f.number('limit', 'Cuántos testimonios mostrar')],
+    defaults: { eyebrow: 'Comunidad', title: 'Familias que ya son Interlaken', limit: 3 },
   }),
   section({
     type: 'sep', label: 'Admisiones · Incorporación SEP', description: 'Franja con las claves de incorporación SEP de cada nivel. Las claves se editan en Ajustes.',

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 import { contentApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import AdminPageEditor from './AdminPageEditor';
+import { loadAllGroups } from '@/cms/sections';
 
 const BLOCKS = [{ id: 'a', type: 'rich_text', props: { html: '<p>Hola</p>' } }];
 const PAGE = {
@@ -40,6 +41,10 @@ function renderEditor(base = '/admin') {
     { route: `${base}/contenido/7` },
   );
 }
+
+// The editor imports every page's section modules before it renders: do that
+// cold import once here, outside the per-test timeouts.
+beforeAll(async () => { await loadAllGroups(); }, 60_000);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -97,5 +102,39 @@ describe('AdminPageEditor versions', () => {
     expect(payload).not.toHaveProperty('slug');
     expect(payload).not.toHaveProperty('publish_at');
     expect(payload).not.toHaveProperty('unpublish_at');
+  });
+});
+
+describe('AdminPageEditor designed sections (CMS-COMPLETION-PLAN)', () => {
+  beforeEach(() => {
+    vi.mocked(contentApi.adminUpdatePage).mockImplementation(async (_id, data) => ({ data: { ...PAGE, ...data } }) as never);
+    localStorage.removeItem('cms-clipboard');
+  });
+
+  it('hides a block without deleting it, and undo brings it back', async () => {
+    renderEditor();
+    const hide = await screen.findByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 });
+    await userEvent.click(hide);
+    await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
+    expect(vi.mocked(contentApi.adminUpdatePage).mock.calls.slice(-1)[0][1].draft_blocks).toEqual([{ ...BLOCKS[0], hidden: true }]);
+    await userEvent.click(screen.getByRole('button', { name: /Deshacer/ }));
+    expect(await screen.findByRole('button', { name: 'Ocultar del sitio' })).toBeInTheDocument();
+  });
+
+  it('copies a section and pastes it as a new block', async () => {
+    renderEditor();
+    await userEvent.click(await screen.findByRole('button', { name: /^1\. Texto/ }, { timeout: 8000 }));
+    await userEvent.click(screen.getByRole('button', { name: 'Copiar' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Pegar/ }));
+    expect(screen.getByRole('button', { name: /^2\. Texto/ })).toBeInTheDocument();
+  });
+
+  it('offers the current design on an old generic draft that was never published', async () => {
+    vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: { ...PAGE, status: 'draft', published_version_number: null } } as never);
+    renderEditor();
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar el diseño actual' }, { timeout: 8000 }));
+    // Nosotros starts with its photo hero, then its designed sections.
+    expect(await screen.findByRole('button', { name: /^1\. Portada con foto/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Diseño original/ })).toBeInTheDocument();
   });
 });

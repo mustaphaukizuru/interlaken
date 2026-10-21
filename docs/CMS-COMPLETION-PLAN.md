@@ -122,6 +122,26 @@ wizards, not public information), `/pago/simulado` (sandbox), portal pages.
   end-to-end personalise, edit, hide, publish, see it live, reset to original, republish.
 - Entry chunk 118.4 kB to 96.6 kB (the generic renderer no longer ships with every page).
 
+### Added after the first pass
+
+- Editor: undo/redo (buttons and Ctrl+Z / Ctrl+Shift+Z; one step per field edit),
+  copy a section and paste it on any page («Copiar» / «Pegar», works across tabs),
+  a warning before leaving with an unsaved draft, and the selected section scrolls
+  into view (preview click opens its form, list click shows it in the preview).
+- SEO: a share image per page (WhatsApp/Facebook) from the media library, the
+  current titles shown as placeholders, and «No indexar» now emits `robots noindex`.
+- Server-rendered head (`apps/core/spa.py`): for a route with a published CMS page,
+  Django writes the page's SEO title, description and share image into the HTML
+  (social crawlers never run the app) and skips the static first-paint shell,
+  which mirrors the built-in hero and would flash the old headline.
+- Testimonios sections: label, title and how many to show are editable.
+- Pre-publish check warns when the share image was deleted from the library.
+
+Kept in code on purpose: form field labels and validation messages, the FAQ search and
+filter controls, the gallery counter and «Ampliar» label, the calendar level filter
+(interface wording, not school information), and the official privacy-notice text
+(versioned in `legal` for consent records).
+
 ### How the school edits a page
 
 1. Contenido (`/admin/contenido`): «Páginas del sitio» lists every public page.

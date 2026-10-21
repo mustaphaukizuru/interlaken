@@ -41,6 +41,7 @@ from apps.core.permissions import IsAdmin, IsAdminOrStaff
 from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, tri_state
 
 PAGE_CACHE = 'cms:page:{slug}'
+HEAD_CACHE = 'cms:head:{slug}'
 PREVIEW_SALT = 'cms-preview'
 PREVIEW_MAX_AGE = 7 * 24 * 3600   # shareable approval links last a week (P3-10)
 
@@ -191,6 +192,7 @@ class Page(models.Model):
             self.publish_at = None
             self.save(update_fields=['published_version', 'status', 'published_at', 'review_requested_at', 'review_requested_by', 'review_note', 'publish_at'])
         cache.delete(PAGE_CACHE.format(slug=self.slug))
+        cache.delete(HEAD_CACHE.format(slug=self.slug))
         cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
@@ -203,6 +205,7 @@ class Page(models.Model):
         self.status = self.Status.DRAFT
         self.save(update_fields=['status'])
         cache.delete(PAGE_CACHE.format(slug=self.slug))
+        cache.delete(HEAD_CACHE.format(slug=self.slug))
         cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
@@ -294,6 +297,38 @@ class PageAdminSerializer(serializers.ModelSerializer):
             return True
         return json.dumps(p.draft_blocks, sort_keys=True) != json.dumps(p.published_version.blocks, sort_keys=True) \
             or json.dumps(p.seo, sort_keys=True) != json.dumps(p.published_version.seo, sort_keys=True)
+
+
+def published_head(path: str) -> dict | None:
+    """SEO of the published CMS page served at `path`, for the server-rendered <head>.
+
+    None when no published page lives there. Cached 5 min and busted on
+    publish/unpublish, so the SPA catch-all costs no query per request.
+    """
+    from .navigation import SITE, SLUG_PATHS
+
+    path = '/' + path.strip('/') if path.strip('/') else '/'
+    by_path = {p: s for s, p in SLUG_PATHS.items()}
+    slug = by_path.get(path) or (path[1:] if path.count('/') == 1 and len(path) > 1 else None)
+    if not slug:
+        return None
+    key = HEAD_CACHE.format(slug=slug)
+    head = cache.get(key)
+    if head is None:
+        page = Page.objects.select_related('published_version').filter(slug=slug, status=Page.Status.PUBLISHED).first()
+        if page is None or (page.unpublish_at and page.unpublish_at <= timezone.now()):
+            head = {}
+        else:
+            seo = (page.published_version.seo if page.published_version else page.seo) or {}
+            og = seo.get('og_image')
+            head = {
+                'title': (seo.get('title') or '').strip(),
+                'description': (seo.get('description') or '').strip(),
+                'image': f'{SITE}/api/v1/content/media/{og}/lg/' if isinstance(og, int) and not isinstance(og, bool) else '',
+                'noindex': bool(seo.get('noindex')),
+            }
+        cache.set(key, head, 300)
+    return head or None
 
 
 def _media_meta(blocks) -> dict:

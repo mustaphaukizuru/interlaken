@@ -33,3 +33,36 @@ def test_spa_index_injects_shell_only_for_known_routes(client, settings, tmp_pat
         spa._shells.cache_clear()
         spa._index_html.cache_clear()
         engines._engines.clear()
+
+
+def test_apply_head_rewrites_title_description_image_and_noindex():
+    html = ('<html><head><title>Colegio Interlaken</title>'
+            '<meta name="description" content="x" /><meta property="og:title" content="x" />'
+            '<meta property="og:description" content="x" /><meta property="og:image" content="old.png" />'
+            '<meta property="og:image:width" content="1200" /><meta name="twitter:image" content="old.png" />'
+            '</head><body></body></html>')
+    out = spa.apply_head(html, {'title': 'Verano & más', 'description': 'Curso "de" verano', 'image': 'https://s/api/v1/content/media/3/lg/', 'noindex': True})
+    assert '<title>Verano &amp; más · Colegio Interlaken</title>' in out
+    assert '<meta name="description" content="Curso &quot;de&quot; verano" />' in out
+    assert '<meta property="og:image" content="https://s/api/v1/content/media/3/lg/" />' in out
+    assert '<meta property="og:image:width" content="1200" />' in out          # untouched
+    assert '<meta name="robots" content="noindex" />' in out
+    assert spa.apply_head(html, {'title': '', 'description': '', 'image': ''}) == html
+
+
+@pytest.mark.django_db
+def test_published_cms_page_skips_the_stale_shell_and_sets_its_head(admin_user):
+    from django.core.cache import cache
+
+    from apps.content.pages import Page, published_head
+
+    cache.clear()
+    assert published_head('/nosotros') is None
+    page = Page.objects.create(slug='nosotros', title='Nosotros', seo={'title': 'Quiénes somos', 'og_image': 5},
+                               draft_blocks=[{'id': 'h', 'type': 'home.hero', 'props': {'title': 'Hola'}}])
+    page.publish(admin_user)
+    head = published_head('/nosotros/')
+    assert head['title'] == 'Quiénes somos' and head['image'].endswith('/api/v1/content/media/5/lg/')
+    assert published_head('/niveles/primaria') is None          # nested paths map through SLUG_PATHS only
+    page.unpublish(admin_user)
+    assert published_head('/nosotros') is None                  # cache busted on unpublish

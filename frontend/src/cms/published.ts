@@ -12,7 +12,7 @@ export interface CmsPagePayload {
   title: string;
   template: string;
   blocks: Block[];
-  seo: { title?: string; description?: string; og_image?: string; noindex?: boolean };
+  seo: { title?: string; description?: string; og_image?: number | string; noindex?: boolean };
   published_at: string | null;
   /** Alt text and sizes of the library images the blocks use. */
   media?: Record<string, { alt?: string; width?: number | null; height?: number | null }>;
