@@ -11,6 +11,7 @@ import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { AmexNotAccepted } from '@/components/ui/AmexNotAccepted';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -753,7 +754,7 @@ export default function CafeteriaPage() {
                       : 'El saldo se aplica en minutos.'}
                 </span>
                 {onlineAvailable && (
-                  <span className="mt-1 block text-xs font-semibold text-coral">No se acepta American Express.</span>
+                  <AmexNotAccepted className="mt-1.5" />
                 )}
               </span>
             </div>
