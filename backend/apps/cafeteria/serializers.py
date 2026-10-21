@@ -15,14 +15,18 @@ from .models import (
     TopUpRequest,
 )
 
-# Minimum top-up. The $1 test amount used during Banorte certification was
-# removed on 2026-10-20 (owner: "everything is working"): $20 for everyone.
+# Minimum top-up: $20 for families. The accounts in PAYMENTS_TEST_EMAILS may
+# use $1 to test the real Banorte checkout (owner, 2026-10-21: families never
+# see it; it comes back only for the test accounts).
 TOPUP_MIN_AMOUNT = Decimal('20.00')
+TOPUP_TESTER_MIN_AMOUNT = Decimal('1.00')
 
 
 def topup_min_amount(user) -> Decimal:
     """The smallest top-up ``user`` may request."""
-    return TOPUP_MIN_AMOUNT
+    from apps.payments.gateways.banorte import is_payment_tester
+
+    return TOPUP_TESTER_MIN_AMOUNT if user is not None and is_payment_tester(user) else TOPUP_MIN_AMOUNT
 
 
 class LoyverseProfileSerializer(serializers.ModelSerializer):
@@ -199,7 +203,7 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
     # Banorte checkout cheaply; validate_amount applies the per-user floor.
     amount = serializers.DecimalField(
         max_digits=10, decimal_places=2,
-        min_value=TOPUP_MIN_AMOUNT, max_value=Decimal('2000.00'))
+        min_value=TOPUP_TESTER_MIN_AMOUNT, max_value=Decimal('2000.00'))
 
     def validate_amount(self, value):
         request = self.context.get('request')

@@ -417,14 +417,16 @@ describe('CafeteriaPage $1 test top-up', () => {
     mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
   });
 
-  it('the $1 test amount is gone for everyone: the minimum is $20', async () => {
+  it('offers "$1 (prueba)" to test accounts only (owner, 2026-10-21)', async () => {
     vi.mocked(paymentsApi.getAvailability).mockResolvedValueOnce(
       { data: { online: true, test_mode: false, certification: false, min_amount: '1.00' } } as never);
+    const u = userEvent.setup();
     renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100' });
     await screen.findByRole('dialog', { name: 'Recargar cafetería' });
-    await screen.findByText(/Mínimo \$20 /);
-    expect(screen.queryByRole('button', { name: /\(prueba\)/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: '$1' })).toBeNull();
+    await u.click(await screen.findByRole('button', { name: '$1 (prueba)' }));
+    expect(screen.getByLabelText('Monto (MXN)')).toHaveValue(1);
+    expect(screen.getByText(/Mínimo \$1 /)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled();
   });
 
   it('families do not see it', async () => {

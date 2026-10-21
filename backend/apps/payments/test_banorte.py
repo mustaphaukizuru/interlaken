@@ -856,8 +856,9 @@ class TestAdminAlerts:
 
 
 @pytest.mark.django_db
-class TestTwentyPesoMinimum:
-    """The $1 test amount was removed on 2026-10-20: $20 for everyone, testers too."""
+class TestTesterOnePeso:
+    """$20 minimum for families; the PAYMENTS_TEST_EMAILS accounts may pay $1 to
+    test the real checkout (owner, 2026-10-21)."""
 
     def _post(self, api_client, user, student, amount):
         api_client.force_authenticate(user=user)
@@ -867,15 +868,21 @@ class TestTwentyPesoMinimum:
             format="json",
         )
 
-    def test_nobody_tops_up_below_twenty(self, api_client, banorte):
+    def test_tester_may_top_up_one_peso(self, api_client, banorte):
         banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]
         tester, child = _family()
         tester.email = "probador@interlaken.test"
         tester.save(update_fields=["email"])
-        resp = self._post(api_client, tester, child, "1.00")
+        assert self._post(api_client, tester, child, "1.00").status_code == 201
+        assert api_client.get(reverse("payment-availability")).data["min_amount"] == "1.00"
+
+    def test_families_keep_the_twenty_peso_minimum(self, api_client, banorte):
+        banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]
+        parent, child = _family()
+        resp = self._post(api_client, parent, child, "1.00")
         assert resp.status_code == 400 and "20" in str(resp.data["amount"])
         assert api_client.get(reverse("payment-availability")).data["min_amount"] == "20.00"
-        assert self._post(api_client, tester, child, "20.00").status_code == 201
+        assert self._post(api_client, parent, child, "20.00").status_code == 201
 
 
 # ── cardholder data for Cybersource (owner, 2026-10-20: "Estado" was null) ──
