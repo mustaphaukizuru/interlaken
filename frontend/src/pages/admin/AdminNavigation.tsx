@@ -26,6 +26,7 @@ import { contentApi, type BulkActionDef, type SiteRedirect } from '@/services/ap
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
+import { resolveChrome, type SiteChrome } from '@/lib/siteChrome';
 import { apiFieldErrors } from '@/lib/apiErrors';
 
 const ICON_OPTIONS = ['Users', 'BookOpen', 'Camera', 'Blocks', 'Pencil', 'GraduationCap', 'ClipboardList', 'FileText', 'CircleDollarSign', 'UserPlus', 'CalendarDays', 'MonitorSmartphone', 'Receipt', 'Phone', 'Mail', 'MapPin'];
@@ -53,9 +54,68 @@ export default function AdminNavigation() {
       <PageHeader title="Navegación" subtitle="El menú del encabezado, el pie de página y el menú móvil se editan aquí una sola vez. Las redirecciones evitan enlaces rotos al renombrar páginas." />
       <div className="space-y-6">
         <MenuEditor />
+        <ChromeEditor />
         <RedirectsPanel />
       </div>
     </>
+  );
+}
+
+/** Header buttons, footer copy and the phone CTA bar (SiteSettings.chrome). Blank = built-in text. */
+function ChromeEditor() {
+  const qc = useQueryClient();
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-site-settings'], queryFn: async () => (await contentApi.adminGetSettings()).data as { chrome?: Partial<SiteChrome> } });
+  const [draft, setDraft] = useState<SiteChrome | null>(null);
+  const [error, setError] = useState('');
+  const value = draft ?? resolveChrome(data?.chrome);
+  const set = (patch: Partial<SiteChrome>) => setDraft({ ...value, ...patch });
+  const setButton = (i: number, patch: Partial<SiteChrome['header_buttons'][number]>) => set({ header_buttons: value.header_buttons.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
+  const save = useMutation({
+    mutationFn: (chrome: Partial<SiteChrome>) => contentApi.adminUpdateSettings({ chrome }),
+    onSuccess: (_res, chrome) => {
+      toast.success('Encabezado y pie de página guardados. El sitio los muestra en unos minutos.');
+      setError(''); setDraft(null);
+      qc.setQueryData<{ chrome?: Partial<SiteChrome> }>(['admin-site-settings'], (prev) => (prev ? { ...prev, chrome } : prev));
+      qc.invalidateQueries({ queryKey: ['admin-site-settings'] }); qc.invalidateQueries({ queryKey: ['site-settings'] });
+    },
+    onError: (e) => { const f = apiFieldErrors(e); setError(f.chrome || f.detail || 'No se pudo guardar.'); },
+  });
+  if (isLoading) return <Card><ListSkeleton /></Card>;
+  if (isError && !data) return <Card><ErrorState title="No se pudo cargar el encabezado y pie de página" onRetry={() => refetch()} /></Card>;
+  return (
+    <Card title="Encabezado, pie de página y barra móvil">
+      <form className="space-y-5" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(value); }}>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-semibold text-ink">Botones del encabezado (también en el menú móvil)</legend>
+          {value.header_buttons.map((b, i) => (
+            <div key={i} className="grid items-end gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
+              <Input label="Texto" value={b.label} onChange={(e) => setButton(i, { label: e.target.value })} />
+              <Input label="Enlace" value={b.href} onChange={(e) => setButton(i, { href: e.target.value })} placeholder="/agendar-visita o https://…" />
+              <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={!!b.primary} onChange={(e) => setButton(i, { primary: e.target.checked })} /> Destacado</label>
+              <Button type="button" size="sm" variant="ghost" aria-label={`Quitar botón ${b.label}`} onClick={() => set({ header_buttons: value.header_buttons.filter((_, j) => j !== i) })}><Trash2 size={14} aria-hidden="true" /></Button>
+            </div>
+          ))}
+          {value.header_buttons.length < 4 && (
+            <Button type="button" size="sm" variant="secondary" onClick={() => set({ header_buttons: [...value.header_buttons, { label: '', href: '' }] })}><Plus size={14} aria-hidden="true" /> Agregar botón</Button>
+          )}
+        </fieldset>
+        <div>
+          <label className="label" htmlFor="chrome-tagline">Texto del pie de página</label>
+          <textarea id="chrome-tagline" className="input-field" rows={2} value={value.footer_tagline} onChange={(e) => set({ footer_tagline: e.target.value })} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input label="Derechos reservados" value={value.footer_copyright} onChange={(e) => set({ footer_copyright: e.target.value })} hint="{{anio}} se reemplaza por el año en curso." />
+          <Input label="Nota legal del pie" value={value.footer_note} onChange={(e) => set({ footer_note: e.target.value })} />
+          <Input label="Botón de la barra móvil" value={value.sticky_label} onChange={(e) => set({ sticky_label: e.target.value })} />
+          <Input label="Enlace de la barra móvil" value={value.sticky_href} onChange={(e) => set({ sticky_href: e.target.value })} />
+        </div>
+        {error && <p className="text-sm text-coral-600" role="alert">{error}</p>}
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={() => save.mutate({})} disabled={save.isPending}><RotateCcw size={14} aria-hidden="true" /> Restablecer textos originales</Button>
+          <Button type="submit" loading={save.isPending} disabled={!draft}>Guardar</Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ChevronLeft, Copy, ExternalLink, Eye, History, Monitor, Plus, Smartphone, Tablet, Trash2, Upload, XCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, Copy, ExternalLink, Eye, EyeOff, History, Lock, Monitor, Plus, RotateCcw, Search, Smartphone, Tablet, Trash2, Upload, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cmsPagePath } from '@/cms/slugPaths';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -14,10 +14,11 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
-import { BlockRenderer } from '@/cms/CmsPage';
+import { BlockRenderer } from '@/cms/BlockRenderer';
+import { allSections as allSectionSpecs, GROUP_LABELS, loadAllGroups } from '@/cms/sections';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
-import { cmsBase, diffBlocks, moveBlock, newBlock, newBlockId, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
+import { cmsBase, diffBlocks, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
 import { useAuthStore } from '@/store/authStore';
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertical, Send } from 'lucide-react';
 import type { PageIssue } from '@/services/api';
@@ -51,6 +52,11 @@ export default function AdminPageEditor() {
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const loadedFor = useRef<number | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  // Every page's designed sections, so any section renders and can be added here.
+  const [sectionsReady, setSectionsReady] = useState(false);
+  useEffect(() => { let alive = true; void loadAllGroups().then(() => { if (alive) setSectionsReady(true); }); return () => { alive = false; }; }, []);
 
   useEffect(() => {
     if (page && loadedFor.current !== page.id) {
@@ -118,10 +124,21 @@ export default function AdminPageEditor() {
   const updateMeta = (patch: Partial<typeof meta>) => { setMeta((m) => ({ ...m, ...patch })); setDirty(true); };
   const selectedBlock = useMemo(() => blocks.find((b) => b.id === selected) ?? null, [blocks, selected]);
   const selectedIdx = blocks.findIndex((b) => b.id === selected);
+  const isLocked = (b: Block) => !!blockSpec(b.type)?.locked;
+  const toggleHidden = (b: Block) => update(blocks.map((x) => (x.id === b.id ? { ...x, hidden: !x.hidden } : x)));
+  const resetBlock = (b: Block) => { const props = originalProps(meta.slug || page?.slug || '', b); if (props) update(blocks.map((x) => (x.id === b.id ? { ...x, props } : x))); };
+
+  // Selecting a block in the list brings it into view in the preview.
+  useEffect(() => {
+    if (!selected) return;
+    previewRef.current?.querySelector(`[data-block-id="${CSS.escape(selected)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selected]);
 
   if (!Number.isFinite(pageId)) return <ErrorState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
-  if (isLoading || !page) return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
+  if (isLoading || !page || !sectionsReady) return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
+  const original = originalBlocks(page.slug);
+  const legacy = isLegacyDraft(page.slug, blocks, !!page.published_version_number);
   const st = pageStatusLabel({ status: page.status, has_unpublished_changes: page.has_unpublished_changes || dirty, review_requested_at: page.review_requested_at });
 
   return (
@@ -133,6 +150,7 @@ export default function AdminPageEditor() {
           <div className="flex flex-wrap items-center gap-2">
             <Link to={base} className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
             <Button variant="secondary" size="sm" onClick={() => setShowSeo(true)}>SEO</Button>
+            {original && <Button variant="secondary" size="sm" onClick={() => setConfirmReset(true)}><RotateCcw size={16} aria-hidden="true" /> Diseño original</Button>}
             <Button variant="secondary" size="sm" onClick={() => checks.mutate()} loading={checks.isPending}><ClipboardCheck size={16} aria-hidden="true" /> Revisar</Button>
             {/* Version history and restore are admin-only endpoints (staff would get a 403). */}
             {isAdmin && <Button variant="secondary" size="sm" onClick={() => setShowVersions(true)}><History size={16} aria-hidden="true" /> Versiones</Button>}
@@ -167,6 +185,12 @@ export default function AdminPageEditor() {
         {meta.publish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se publica {new Date(meta.publish_at).toLocaleString('es-MX')}</span>}
         {meta.unpublish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se retira {new Date(meta.unpublish_at).toLocaleString('es-MX')}</span>}
       </p>
+      {legacy && original && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-sm" role="status">
+          <p className="text-ink">Este borrador se creó con bloques genéricos y no se parece a la página actual del sitio. Cargue el diseño actual para editar la página tal como se ve hoy.</p>
+          <Button size="sm" onClick={() => { update(original); setSelected(null); }}>Cargar el diseño actual</Button>
+        </div>
+      )}
       {issues && issues.length > 0 && (
         <div className="mb-4 rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
           <div className="mb-2 flex items-center justify-between">
@@ -206,11 +230,18 @@ export default function AdminPageEditor() {
                   >
                     <span className="cursor-grab text-subtle" aria-hidden="true" title="Arrastre para reordenar"><GripVertical size={14} /></span>
                     <button type="button" className="flex-1 truncate text-left font-medium" onClick={() => setSelected(b.id)} aria-current={selected === b.id ? 'true' : undefined}>
-                      {i + 1}. {blockSpec(b.type)?.label ?? b.type}
+                      <span className={b.hidden ? 'text-subtle line-through' : undefined}>{i + 1}. {blockSpec(b.type)?.label ?? b.type}</span>
                     </button>
                     <button type="button" aria-label="Subir" disabled={i === 0} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => update(moveBlock(blocks, i, i - 1))}><ArrowUp size={14} /></button>
                     <button type="button" aria-label="Bajar" disabled={i === blocks.length - 1} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => update(moveBlock(blocks, i, i + 1))}><ArrowDown size={14} /></button>
-                    <button type="button" aria-label="Eliminar bloque" className="rounded p-1 text-subtle hover:text-coral-600" onClick={() => { update(blocks.filter((x) => x.id !== b.id)); if (selected === b.id) setSelected(null); }}><Trash2 size={14} /></button>
+                    {isLocked(b) ? (
+                      <span className="rounded p-1 text-subtle" title="Sección con formulario o datos del sistema: se puede mover, no ocultar ni eliminar." aria-label="Sección fija"><Lock size={14} /></span>
+                    ) : (
+                      <>
+                        <button type="button" aria-label={b.hidden ? 'Mostrar en el sitio' : 'Ocultar del sitio'} aria-pressed={!!b.hidden} title={b.hidden ? 'Oculto: no aparece en el sitio' : 'Ocultar sin eliminar'} className={`rounded p-1 hover:text-ink ${b.hidden ? 'text-amber' : 'text-subtle'}`} onClick={() => toggleHidden(b)}>{b.hidden ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                        <button type="button" aria-label="Eliminar bloque" className="rounded p-1 text-subtle hover:text-coral-600" onClick={() => { update(blocks.filter((x) => x.id !== b.id)); if (selected === b.id) setSelected(null); }}><Trash2 size={14} /></button>
+                      </>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -222,9 +253,13 @@ export default function AdminPageEditor() {
               <>
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="font-head text-sm font-bold uppercase tracking-wide text-subtle">{blockSpec(selectedBlock.type)?.label ?? selectedBlock.type}</h2>
-                  <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => update([...blocks.slice(0, selectedIdx + 1), { ...selectedBlock, id: newBlockId() }, ...blocks.slice(selectedIdx + 1)])}>Duplicar</button>
+                  <div className="flex items-center gap-3">
+                    {originalProps(page.slug, selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => resetBlock(selectedBlock)} title="Vuelve a los textos e imágenes originales de esta sección">Restablecer</button>}
+                    {!isLocked(selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => update([...blocks.slice(0, selectedIdx + 1), { ...selectedBlock, id: newBlockId(), props: JSON.parse(JSON.stringify(selectedBlock.props)) }, ...blocks.slice(selectedIdx + 1)])}>Duplicar</button>}
+                  </div>
                 </div>
                 <p className="mb-3 text-xs text-muted">{blockSpec(selectedBlock.type)?.description}</p>
+                {selectedBlock.hidden && <p className="mb-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink">Este bloque está oculto: se conserva aquí pero no aparece en el sitio.</p>}
                 {(errors.blocks || errors.draft_blocks) && <p className="mb-2 text-sm text-coral-600">{errors.blocks || errors.draft_blocks}</p>}
                 <BlockForm block={selectedBlock} onChange={(props) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)))} />
               </>
@@ -243,8 +278,8 @@ export default function AdminPageEditor() {
             </div>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-line bg-cream-2 p-3">
-            <div className="mx-auto overflow-hidden rounded-xl bg-white shadow-card" style={{ width: DEVICE_WIDTH[device] ?? '100%', maxWidth: '100%' }}>
-              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <BlockRenderer blocks={blocks} editing onSelect={setSelected} />}
+            <div ref={previewRef} className="mx-auto overflow-hidden rounded-xl bg-white shadow-card" style={{ width: DEVICE_WIDTH[device] ?? '100%', maxWidth: '100%' }}>
+              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <BlockRenderer blocks={blocks} editing selectedId={selected} onSelect={setSelected} />}
             </div>
           </div>
         </section>
@@ -288,6 +323,8 @@ export default function AdminPageEditor() {
           <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setRejecting(false)}>Cancelar</Button><Button onClick={() => review.mutate({ action: 'reject', note: rejectNote })} loading={review.isPending} disabled={!rejectNote.trim()}>Enviar</Button></div>
         </div>
       </Modal>
+      <ConfirmDialog open={confirmReset} title="¿Volver al diseño original?" message="El borrador se reemplaza por el contenido original de la página (textos, fotos y secciones). Lo publicado no cambia hasta que publique, y las versiones anteriores se conservan."
+        confirmLabel="Restablecer borrador" onConfirm={() => { if (original) update(original); setSelected(null); setConfirmReset(false); }} onClose={() => setConfirmReset(false)} />
       <ConfirmDialog open={confirmUnpublish} title="¿Retirar la página del sitio?" message="Las visitas verán un 404 hasta volver a publicarla. El borrador se conserva."
         confirmLabel="Retirar página" loading={publish.isPending} onConfirm={() => publish.mutate('unpublish')} onClose={() => setConfirmUnpublish(false)} />
     </div>
@@ -295,18 +332,44 @@ export default function AdminPageEditor() {
 }
 
 function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (type: string) => void }) {
+  const [q, setQ] = useState('');
+  const needle = q.trim().toLowerCase();
+  const match = (b: { label: string; description: string }) => !needle || `${b.label} ${b.description}`.toLowerCase().includes(needle);
+  // Locked sections carry a form or the booking widget: one per page, never added twice.
+  const sections = allSectionSpecs().filter((b) => !b.locked && match(b));
+  const groups = Object.entries(GROUP_LABELS)
+    .map(([key, label]) => ({ key, label, items: sections.filter((b) => b.group === key) }))
+    .filter((g) => g.items.length > 0);
+  const generic = BLOCKS.filter(match);
+  const card = (b: { type: string; label: string; description: string }) => (
+    <li key={b.type}>
+      <button type="button" onClick={() => onPick(b.type)} className="w-full rounded-xl border border-line p-3 text-left hover:border-purple hover:bg-purple/5">
+        <span className="block font-semibold text-ink">{b.label}</span>
+        <span className="block text-xs text-muted">{b.description}</span>
+      </button>
+    </li>
+  );
   return (
-    <Modal open={open} onClose={onClose} title="Agregar bloque" maxWidth={640}>
-      <ul className="grid gap-2 sm:grid-cols-2" aria-label="Tipos de bloque">
-        {BLOCKS.map((b) => (
-          <li key={b.type}>
-            <button type="button" onClick={() => onPick(b.type)} className="w-full rounded-xl border border-line p-3 text-left hover:border-purple hover:bg-purple/5">
-              <span className="block font-semibold text-ink">{b.label}</span>
-              <span className="block text-xs text-muted">{b.description}</span>
-            </button>
-          </li>
+    <Modal open={open} onClose={onClose} title="Agregar bloque" maxWidth={720}>
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+        <input className="input-field pl-9" placeholder="Buscar bloque…" aria-label="Buscar bloque" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="max-h-[65vh] space-y-5 overflow-y-auto">
+        {generic.length > 0 && (
+          <section>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">Bloques generales</h3>
+            <ul className="grid gap-2 sm:grid-cols-2" aria-label="Bloques generales">{generic.map(card)}</ul>
+          </section>
+        )}
+        {groups.map((g) => (
+          <section key={g.key}>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">Secciones de {g.label}</h3>
+            <ul className="grid gap-2 sm:grid-cols-2" aria-label={`Secciones de ${g.label}`}>{g.items.map(card)}</ul>
+          </section>
         ))}
-      </ul>
+        {generic.length === 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted">Ningún bloque coincide con la búsqueda.</p>}
+      </div>
     </Modal>
   );
 }

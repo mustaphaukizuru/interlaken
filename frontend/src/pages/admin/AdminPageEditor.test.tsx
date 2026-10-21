@@ -51,7 +51,8 @@ describe('AdminPageEditor versions', () => {
   it('hides «Versiones» from staff (admin-only endpoint)', async () => {
     role = 'staff';
     renderEditor('/staff');
-    await screen.findByRole('button', { name: /Revisar/ });
+    // The editor loads every page's section modules first (cold import in tests).
+    await screen.findByRole('button', { name: /Revisar/ }, { timeout: 8000 });
     expect(screen.queryByRole('button', { name: /Versiones/ })).not.toBeInTheDocument();
     expect(contentApi.adminPageVersions).not.toHaveBeenCalled();
   });
@@ -64,7 +65,7 @@ describe('AdminPageEditor versions', () => {
       data: { restored_from: 1, page: { ...PAGE, has_unpublished_changes: true } },
     } as never);
     renderEditor();
-    await userEvent.click(await screen.findByRole('button', { name: /Versiones/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Versiones/ }, { timeout: 8000 }));
     await userEvent.click(await screen.findByRole('button', { name: 'Restaurar' }));
     expect(contentApi.adminRollbackPage).not.toHaveBeenCalled();
     const dialog = await screen.findByRole('dialog', { name: /Restaurar la versión 1 en el borrador/ });
@@ -77,7 +78,7 @@ describe('AdminPageEditor versions', () => {
   it('shows an error (not "aún no se ha publicado") when versions fail to load', async () => {
     vi.mocked(contentApi.adminPageVersions).mockRejectedValue(new Error('403'));
     renderEditor();
-    await userEvent.click(await screen.findByRole('button', { name: /Versiones/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Versiones/ }, { timeout: 8000 }));
     expect(await screen.findByText('No se pudieron cargar las versiones')).toBeInTheDocument();
     expect(screen.queryByText('Esta página aún no se ha publicado.')).not.toBeInTheDocument();
   });

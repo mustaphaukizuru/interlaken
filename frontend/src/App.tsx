@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastHost } from '@/components/ui/ToastHost';
@@ -24,23 +24,31 @@ import { AnalyticsListener } from './components/analytics/AnalyticsListener';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Public pages — route-level code splitting (each becomes its own chunk).
-const HomePage        = lazy(() => import('./pages/public/HomePage'));
-const AboutPage       = lazy(() => import('./pages/public/AboutPage'));
-const AdmissionsPage  = lazy(() => import('./pages/public/AdmissionsPage'));
-const DocumentacionPage = lazy(() => import('./pages/public/DocumentacionPage'));
-const CostosPage      = lazy(() => import('./pages/public/CostosPage'));
-const PreRegisterPage = lazy(() => import('./pages/public/PreRegisterPage'));
+// cmsRoute starts the published-CMS lookup in parallel with the chunk download
+// (cms/published.ts), so an edited page costs no extra round trip.
+const cmsRoute = <T extends ComponentType>(slug: string | (() => string | undefined), load: () => Promise<{ default: T }>) =>
+  lazy(() => {
+    const s = typeof slug === 'function' ? slug() : slug;
+    if (s) prefetchPublishedPage(s);
+    return load();
+  });
+const HomePage        = cmsRoute('inicio', () => import('./pages/public/HomePage'));
+const AboutPage       = cmsRoute('nosotros', () => import('./pages/public/AboutPage'));
+const AdmissionsPage  = cmsRoute('admisiones', () => import('./pages/public/AdmissionsPage'));
+const DocumentacionPage = cmsRoute('documentacion', () => import('./pages/public/DocumentacionPage'));
+const CostosPage      = cmsRoute('costos', () => import('./pages/public/CostosPage'));
+const PreRegisterPage = cmsRoute('pre-registro', () => import('./pages/public/PreRegisterPage'));
 const RegisterPage    = lazy(() => import('./pages/public/RegisterPage'));
-const BookVisitPage   = lazy(() => import('./pages/public/BookVisitPage'));
-const ContactPage     = lazy(() => import('./pages/public/ContactPage'));
-const AvisoPrivacidadPage = lazy(() => import('./pages/public/AvisoPrivacidadPage'));
-const NotFoundPage    = lazy(() => import('./pages/public/NotFoundPage'));
-const NivelPage       = lazy(() => import('./pages/public/NivelPage'));
-const ModeloEducativoPage = lazy(() => import('./pages/public/ModeloEducativoPage'));
-const GaleriaPage     = lazy(() => import('./pages/public/GaleriaPage'));
-const PlataformasPage = lazy(() => import('./pages/public/PlataformasPage'));
-const PagosPage = lazy(() => import('./pages/public/PagosPage'));
-const FacturacionPage = lazy(() => import('./pages/public/FacturacionPage'));
+const BookVisitPage   = cmsRoute('agendar-visita', () => import('./pages/public/BookVisitPage'));
+const ContactPage     = cmsRoute('contacto', () => import('./pages/public/ContactPage'));
+const AvisoPrivacidadPage = cmsRoute('aviso-de-privacidad', () => import('./pages/public/AvisoPrivacidadPage'));
+const NotFoundPage    = cmsRoute('no-encontrada', () => import('./pages/public/NotFoundPage'));
+const NivelPage       = cmsRoute(() => window.location.pathname.split('/')[2], () => import('./pages/public/NivelPage'));
+const ModeloEducativoPage = cmsRoute('modelo-educativo', () => import('./pages/public/ModeloEducativoPage'));
+const GaleriaPage     = cmsRoute('galeria', () => import('./pages/public/GaleriaPage'));
+const PlataformasPage = cmsRoute('plataformas', () => import('./pages/public/PlataformasPage'));
+const PagosPage = cmsRoute('pagos', () => import('./pages/public/PagosPage'));
+const FacturacionPage = cmsRoute('facturacion', () => import('./pages/public/FacturacionPage'));
 
 // Auth
 const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
@@ -73,10 +81,10 @@ const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminStudentDetail = lazy(() => import('./pages/admin/AdminStudentDetail'));
 const AdminBookings   = lazy(() => import('./pages/admin/AdminBookings'));
 const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
-import { CmsOverride } from './cms/CmsOverride';
+import { prefetchPublishedPage } from './cms/published';
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
-const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
+const CalendarioPage = cmsRoute('calendario', () => import('./pages/public/CalendarioPage'));
 const AdminVisitsWeek = lazy(() => import('./pages/admin/AdminVisitsWeek'));
 const AdminPipeline = lazy(() => import('./pages/admin/AdminPipeline'));
 const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
@@ -135,27 +143,27 @@ export default function App() {
           <Routes>
             {/* ── PUBLIC SITE ─────────────────────────────── */}
             <Route element={<PublicLayout />}>
-              <Route path="/" element={<CmsOverride slug="inicio"><HomePage /></CmsOverride>} />
-              <Route path="/nosotros" element={<CmsOverride slug="nosotros"><AboutPage /></CmsOverride>} />
-              <Route path="/admisiones" element={<CmsOverride slug="admisiones"><AdmissionsPage /></CmsOverride>} />
-              <Route path="/admisiones/documentacion" element={<CmsOverride slug="documentacion"><DocumentacionPage /></CmsOverride>} />
-              <Route path="/admisiones/costos" element={<CmsOverride slug="costos"><CostosPage /></CmsOverride>} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/nosotros" element={<AboutPage />} />
+              <Route path="/admisiones" element={<AdmissionsPage />} />
+              <Route path="/admisiones/documentacion" element={<DocumentacionPage />} />
+              <Route path="/admisiones/costos" element={<CostosPage />} />
               <Route path="/pre-registro"  element={<PreRegisterPage />} />
               <Route path="/inscripcion"   element={<RegisterPage />} />
               <Route path="/inscripcion/documentos" element={<DocumentsUploadPage />} />
               {/* Puertas Abiertas is admin-only now (bookings console); public URL redirects. */}
               <Route path="/puertas-abiertas" element={<Navigate to="/agendar-visita" replace />} />
               <Route path="/agendar-visita" element={<BookVisitPage />} />
-              <Route path="/contacto" element={<CmsOverride slug="contacto"><ContactPage /></CmsOverride>} />
+              <Route path="/contacto" element={<ContactPage />} />
               <Route path="/aviso-de-privacidad" element={<AvisoPrivacidadPage />} />
               {/* IA confirmada por el cliente (menú 2026-07) */}
-              <Route path="/modelo-educativo" element={<CmsOverride slug="modelo-educativo"><ModeloEducativoPage /></CmsOverride>} />
-              <Route path="/galeria" element={<CmsOverride slug="galeria"><GaleriaPage /></CmsOverride>} />
+              <Route path="/modelo-educativo" element={<ModeloEducativoPage />} />
+              <Route path="/galeria" element={<GaleriaPage />} />
               <Route path="/niveles/:nivel"   element={<NivelPage />} />
               {/* Bitácora 13/10/2026: la antigua Plataformas se divide en Pagos y Plataformas. */}
               <Route path="/comunidad/plataformas" element={<Navigate to="/pagos" replace />} />
               <Route path="/pagos" element={<PagosPage />} />
-              <Route path="/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
+              <Route path="/plataformas" element={<PlataformasPage />} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}

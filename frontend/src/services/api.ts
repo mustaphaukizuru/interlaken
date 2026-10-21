@@ -1208,7 +1208,7 @@ export interface CmsPageAdmin {
   title: string;
   template: 'home' | 'level' | 'simple' | 'landing';
   status: 'draft' | 'published';
-  draft_blocks: { id: string; type: string; props: Record<string, unknown> }[];
+  draft_blocks: { id: string; type: string; props: Record<string, unknown>; hidden?: boolean }[];
   seo: { title?: string; description?: string; og_image?: string; noindex?: boolean };
   published_version_number: number | null;
   has_unpublished_changes: boolean;
@@ -1266,7 +1266,7 @@ export const contentApi = {
   /** CMS pages (BACKLOG P3-3). */
   getPage: (slug: string) => api.get(`/content/pages/${encodeURIComponent(slug)}/`),
   getPagePreviewBySlug: (_slug: string, token: string) => api.get('/content/pages/preview/', { params: { token } }),
-  adminListPages: () => api.get('/content/admin/pages/'),
+  adminListPages: (params?: { page_size?: number; q?: string }) => api.get('/content/admin/pages/', { params }),
   adminGetPage: (id: number) => api.get<CmsPageAdmin>(`/content/admin/pages/${id}/`),
   adminCreatePage: (data: Partial<CmsPageAdmin>) => api.post<CmsPageAdmin>('/content/admin/pages/', data),
   adminUpdatePage: (id: number, data: Partial<CmsPageAdmin>) => api.patch<CmsPageAdmin>(`/content/admin/pages/${id}/`, data),

@@ -1,11 +1,16 @@
 import { blockSpec, type Block } from '../blocks/registry';
 import type { CmsPageAdmin } from '@/services/api';
+import { sectionSpec, templateFor } from '../sections';
+import { templateBlocks } from '../sections/types';
 
 export const newBlockId = () => `b_${Math.random().toString(36).slice(2, 10)}`;
 
-/** A fresh block with empty props shaped by the registry, so forms render controlled inputs. */
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+/** A fresh block: a designed section starts with its defaults, a generic block with empty props shaped by the registry. */
 export function newBlock(type: string): Block {
   const spec = blockSpec(type);
+  if (spec?.defaults) return { id: newBlockId(), type, props: clone(spec.defaults) };
   const props: Record<string, unknown> = {};
   for (const f of spec?.fields ?? []) {
     if (f.kind === 'items' || f.kind === 'images') props[f.key] = [];
@@ -65,4 +70,30 @@ export function diffBlocks(before: Block[], after: Block[]): BlockDiffLine[] {
   });
   before.forEach((b) => { if (!afterIds.has(b.id)) lines.push({ kind: 'removed', type: b.type, id: b.id, summary: summarize(b) }); });
   return lines;
+}
+
+/** The page's original design as a fresh draft (cms/sections templates), or null for custom pages. */
+export function originalBlocks(slug: string): Block[] | null {
+  const t = templateFor(slug);
+  return t ? templateBlocks(t, sectionSpec) : null;
+}
+
+/** Original props of one block: its entry in the page template when the id matches, else the section defaults. */
+export function originalProps(slug: string, block: Block): Record<string, unknown> | null {
+  const fromTemplate = originalBlocks(slug)?.find((b) => b.id === block.id && b.type === block.type);
+  if (fromTemplate) return fromTemplate.props;
+  const spec = blockSpec(block.type);
+  return spec?.defaults ? clone(spec.defaults) : null;
+}
+
+/** A draft written before designed sections existed (generic blocks only, e.g. from the old seed_cms). */
+export function isLegacyDraft(slug: string, blocks: Block[], everPublished: boolean): boolean {
+  return !everPublished && !!templateFor(slug) && blocks.length > 0 && !blocks.some((b) => b.type.includes('.'));
+}
+
+/** Page.template for a public page created from its design template. */
+export function pageKindFor(slug: string): CmsPageAdmin['template'] {
+  if (slug === 'inicio') return 'home';
+  if (['preescolar', 'primaria', 'secundaria'].includes(slug)) return 'level';
+  return 'simple';
 }

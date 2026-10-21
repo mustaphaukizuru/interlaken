@@ -26,6 +26,7 @@ import { apiFieldErrors } from '@/lib/apiErrors';
 import { cmsBase, pageStatusLabel, slugify } from '@/cms/editor/helpers';
 import { formatDateTime } from '@/lib/format';
 import { useAuthStore } from '@/store/authStore';
+import { SitePagesPanel } from '@/components/admin/SitePagesPanel';
 
 const TEMPLATES: { value: CmsPageAdmin['template']; label: string }[] = [
   { value: 'simple', label: 'Página sencilla' },
@@ -107,14 +108,15 @@ export default function AdminPages() {
 
   return (
     <>
-      <PageHeader title="Páginas del sitio" subtitle="Cree y edite páginas con bloques. Los cambios se publican cuando usted lo decida."
+      <PageHeader title="Páginas del sitio" subtitle="Edite cualquier página pública o cree páginas nuevas. Los cambios se publican cuando usted lo decida."
         actions={(
           <div className="flex flex-wrap gap-2">
             {isAdmin && <ExportMenu filenamePrefix="paginas" selectedCount={selection.count} fetch={fetchExport} />}
             <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" /> Nueva página</Button>
           </div>
         )} />
-      <Card title={`${count.toLocaleString('es-MX')} páginas`}>
+      <div className="mb-6"><SitePagesPanel base={base} /></div>
+      <Card title={`Borradores y páginas publicadas (${count.toLocaleString('es-MX')})`}>
         <DataTable<CmsPageAdmin>
           tableId="cms-pages"
           columns={columns}

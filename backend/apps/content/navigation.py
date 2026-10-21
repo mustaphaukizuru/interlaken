@@ -44,7 +44,14 @@ SLUG_PATHS = {
     'documentacion': '/admisiones/documentacion',
     'costos': '/admisiones/costos',
     'plataformas': '/plataformas',
+    'preescolar': '/niveles/preescolar',
+    'primaria': '/niveles/primaria',
+    'secundaria': '/niveles/secundaria',
+    'facturacion': '/comunidad/facturacion',
 }
+
+# CMS pages that are not destinations of their own (the 404 page content).
+UNLISTED_SLUGS = {'no-encontrada'}
 
 
 def page_path(slug: str) -> str:
@@ -60,6 +67,47 @@ STATIC_ROUTES = [
     ('/contacto', 'monthly', '0.6'), ('/calendario', 'weekly', '0.6'), ('/pagos', 'monthly', '0.5'), ('/plataformas', 'monthly', '0.4'),
     ('/comunidad/facturacion', 'monthly', '0.3'), ('/aviso-de-privacidad', 'yearly', '0.2'),
 ]
+
+
+CHROME_TEXT = {'footer_tagline': 300, 'footer_copyright': 200, 'footer_note': 200, 'sticky_label': 40}
+
+
+def _valid_href(v: str) -> bool:
+    return v.startswith('/') or v.startswith('https://') or v.startswith('mailto:') or v.startswith('tel:')
+
+
+def validate_chrome(chrome) -> dict:
+    """SiteSettings.chrome: header buttons, footer text, mobile CTA. Empty values = built-in copy."""
+    if not isinstance(chrome, dict):
+        raise serializers.ValidationError('Debe ser un objeto.')
+    out: dict = {}
+    for key, limit in CHROME_TEXT.items():
+        v = str(chrome.get(key) or '').strip()
+        if len(v) > limit:
+            raise serializers.ValidationError(f'"{key}": máximo {limit} caracteres.')
+        if v:
+            out[key] = v
+    href = str(chrome.get('sticky_href') or '').strip()
+    if href:
+        if not _valid_href(href):
+            raise serializers.ValidationError('El enlace de la barra móvil debe empezar con / o https://.')
+        out['sticky_href'] = href[:300]
+    buttons = chrome.get('header_buttons') or []
+    if not isinstance(buttons, list) or len(buttons) > 4:
+        raise serializers.ValidationError('Máximo 4 botones en el encabezado.')
+    clean = []
+    for b in buttons:
+        label, to = str((b or {}).get('label') or '').strip(), str((b or {}).get('href') or '').strip()
+        if not label and not to:
+            continue
+        if not label or len(label) > 30:
+            raise serializers.ValidationError('Cada botón necesita un texto (máx. 30 caracteres).')
+        if not _valid_href(to):
+            raise serializers.ValidationError(f'Botón "{label}": el enlace debe empezar con / o https://.')
+        clean.append({'label': label, 'href': to[:300], 'primary': bool((b or {}).get('primary'))})
+    if clean:
+        out['header_buttons'] = clean
+    return out
 
 
 def validate_menu(menu) -> list[dict]:
@@ -301,7 +349,7 @@ def build_sitemap() -> str:
     redirected = set(Redirect.objects.values_list('from_path', flat=True))
     rows = [(p, f, pr, None) for p, f, pr in STATIC_ROUTES if p not in redirected]
     for page in Page.objects.filter(status=Page.Status.PUBLISHED):
-        if (page.seo or {}).get('noindex') or (page.unpublish_at and page.unpublish_at <= timezone.now()):
+        if page.slug in UNLISTED_SLUGS or (page.seo or {}).get('noindex') or (page.unpublish_at and page.unpublish_at <= timezone.now()):
             continue
         path = page_path(page.slug)
         if any(r[0] == path for r in rows) or path in redirected:

@@ -12,6 +12,7 @@ import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { isExternalHref, resolveChrome, type ChromeButton } from '@/lib/siteChrome';
 import { WA_MESSAGES } from '@/lib/whatsapp';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
@@ -81,6 +82,14 @@ const DEFAULT_MENU: MenuGroupEntry[] = [
 ];
 
 
+
+/** A header/footer button from SiteSettings.chrome: external URLs open in a new tab. */
+function ChromeLink({ button, className, onClick }: { button: ChromeButton; className: string; onClick?: () => void }) {
+  if (isExternalHref(button.href)) {
+    return <a href={button.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{button.label}</a>;
+  }
+  return <Link to={button.href} onClick={onClick} className={className}>{button.label}</Link>;
+}
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
  *  focus, outside-click dismissal). One per grupo del menú del cliente. */
@@ -166,6 +175,7 @@ export function PublicLayout() {
   const [footerOpen, setFooterOpen] = useState<string | null>(null);
   const { pathname } = useLocation();
   const settings = useSiteSettings();
+  const chrome = resolveChrome(settings.chrome);
   const MENU = resolveMenu(settings.menu, DEFAULT_MENU);
   /** El pie refleja los mismos grupos del menú; Portal/Aviso van en la barra inferior. */
   const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
@@ -271,15 +281,9 @@ export function PublicLayout() {
 
           {/* CTA */}
           <div className="hidden lg:flex items-center gap-3">
-            <a href="https://interlaken.servoescolar.mx" target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs px-4 py-2">
-              Pagos
-            </a>
-            <Link to="/login" className="btn-secondary text-xs px-4 py-2">
-              Cafetería
-            </Link>
-            <Link to="/agendar-visita" className="btn-primary text-xs px-4 py-2">
-              Agendar visita
-            </Link>
+            {chrome.header_buttons.map((b) => (
+              <ChromeLink key={b.label + b.href} button={b} className={`${b.primary ? 'btn-primary' : 'btn-secondary'} text-xs px-4 py-2`} />
+            ))}
           </div>
 
           {/* Mobile: tap-to-call + burger (the phone strip above is desktop-only) */}
@@ -318,15 +322,9 @@ export function PublicLayout() {
             className="lg:hidden bg-white border-t border-line px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto"
           >
             <div className="flex flex-col gap-2 pb-2">
-              <a href="https://interlaken.servoescolar.mx" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className="btn-secondary justify-center min-h-[44px]">
-                Pagos
-              </a>
-              <Link to="/login" onClick={() => setOpen(false)} className="btn-secondary justify-center min-h-[44px]">
-                Cafetería
-              </Link>
-              <Link to="/agendar-visita" onClick={() => setOpen(false)} className="btn-pink justify-center min-h-[44px]">
-                Agendar visita
-              </Link>
+              {chrome.header_buttons.map((b) => (
+                <ChromeLink key={b.label + b.href} button={b} onClick={() => setOpen(false)} className={`${b.primary ? 'btn-pink' : 'btn-secondary'} justify-center min-h-[44px]`} />
+              ))}
             </div>
 
             <NavLink
@@ -396,9 +394,7 @@ export function PublicLayout() {
           WhatsApp (secondary, hidden when no number is configured). */}
       {showStickyCta && (
         <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-stretch gap-2 md:hidden">
-          <Link to="/agendar-visita" className="btn-pink min-w-0 flex-1 justify-center shadow-lg">
-            Agendar visita
-          </Link>
+          <ChromeLink button={{ label: chrome.sticky_label, href: chrome.sticky_href }} className="btn-pink min-w-0 flex-1 justify-center shadow-lg" />
           {settings.whatsapp_number && (
             <a
               href={waHref(settings.whatsapp_number, WA_MESSAGES.visit)}
@@ -430,10 +426,7 @@ export function PublicLayout() {
             <div className="mb-3">
               <Logo variant="horizontal" size={52} theme="dark" />
             </div>
-            <p className="text-xs leading-relaxed">
-              Educación bilingüe de excelencia para el desarrollo integral de sus hijos.
-              Tlalnepantla, Estado de México.
-            </p>
+            <p className="text-xs leading-relaxed">{chrome.footer_tagline}</p>
           </div>
 
           {/* Mobile (&lt;md): accordion link groups — desktop: open grid */}
@@ -543,10 +536,10 @@ export function PublicLayout() {
         </div>
         <div className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
-            <span>© {new Date().getFullYear()} Colegio Interlaken · Todos los derechos reservados</span>
+            <span>{chrome.footer_copyright}</span>
             <div className="flex items-center gap-4">
               <Link to="/aviso-de-privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
-              <span className="text-white/70">Reconocimiento de validez oficial · SEP</span>
+              <span className="text-white/70">{chrome.footer_note}</span>
             </div>
           </div>
         </div>

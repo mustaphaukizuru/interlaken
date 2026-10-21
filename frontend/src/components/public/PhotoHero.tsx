@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { assetSrcSet } from '@/lib/images';
+import { imageSrc, imageSrcSet } from '@/cms/media';
 
 interface Props {
   /** Eyebrow above the title, e.g. "Comunidad". */
@@ -7,8 +7,8 @@ interface Props {
   labelClass?: string;
   title: ReactNode;
   subtitle?: ReactNode;
-  /** `/assets/*.webp`; the 480/960 variants are picked up automatically. */
-  image: string;
+  /** `/assets/*.webp` (480/960 variants picked up automatically) or a CMS media-library id. */
+  image: string | number;
   /** Focal point for object-position, e.g. "center 30%". */
   focus?: string;
   /** How much the photo shows through the dark scrim. */
@@ -34,8 +34,8 @@ export function PhotoHero({
   return (
     <section className={`relative overflow-hidden bg-dark text-white ${className}`.trim()}>
       <img
-        src={image}
-        srcSet={assetSrcSet(image, { full: true })}
+        src={imageSrc(image)}
+        srcSet={imageSrcSet(image, { full: true })}
         sizes="100vw"
         alt=""
         width={1600}

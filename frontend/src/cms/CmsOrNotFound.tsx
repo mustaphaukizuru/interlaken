@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import NotFoundPage from '@/pages/public/NotFoundPage';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { contentApi } from '@/services/api';
-import { BlockRenderer, type CmsPagePayload } from './CmsPage';
+import { BlockRenderer } from './BlockRenderer';
+import { CmsMediaProvider } from './runtime';
+import { usePublishedPage } from './published';
 import { CMS_SLUG_PATHS } from './slugPaths';
 import { Seo } from '@/components/seo/Seo';
 
@@ -24,25 +26,22 @@ export default function CmsOrNotFound() {
   });
   const target = redirects?.[key];
   useEffect(() => { if (target) contentApi.hitRedirect(key).catch(() => undefined); }, [target, key]);
-  const { data, isLoading } = useQuery({
-    queryKey: ['cms-page', slug, null],
-    queryFn: async () => (await contentApi.getPage(slug)).data as CmsPagePayload,
-    enabled: !!slug && !slug.includes('/') && !loadingRedirects && !target,
-    retry: false,
-    staleTime: 60_000,
-  });
+  const lookup = !!slug && !slug.includes('/') && !loadingRedirects && !target;
+  const { data, isLoading } = usePublishedPage(lookup ? slug : undefined);
   if (target) {
     if (target.to.startsWith('http')) { window.location.replace(target.to); return null; }
     return <Navigate to={target.to} replace />;
   }
   const canonical = CMS_SLUG_PATHS[slug];
   if (canonical && canonical !== key) return <Navigate to={canonical} replace />;
-  if (isLoading || loadingRedirects) return <div className="flex min-h-[50vh] items-center justify-center"><LoadingSpinner /></div>;
+  if (loadingRedirects || (lookup && isLoading)) return <div className="flex min-h-[50vh] items-center justify-center"><LoadingSpinner /></div>;
   if (!data) return <NotFoundPage />;
   return (
     <div>
       <Seo title={data.seo?.title || data.title} description={data.seo?.description || ''} />
-      <BlockRenderer blocks={data.blocks} />
+      <CmsMediaProvider media={data.media}>
+        <BlockRenderer blocks={data.blocks} />
+      </CmsMediaProvider>
     </div>
   );
 }
