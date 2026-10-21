@@ -151,6 +151,21 @@ describe('PaymentsPage states', () => {
     expect(await screen.findByText('Completado', { selector: 'span' })).toBeInTheDocument();
     expect(screen.queryByText('Pendiente', { selector: 'span' })).toBeNull();
   });
+
+  it('says «Pagada · por aplicar» until the top-up reaches the wallet (owner, 2026-10-20)', async () => {
+    mockedPayments.mockResolvedValue({
+      data: { results: [{
+        id: 1, status: 'success', payment_type: 'cafeteria',
+        amount: '200.00', currency: 'MXN', created_at: '2026-10-20T12:00:00Z',
+        topup: { status: 'paid', apply_due_at: '2026-10-21T13:30:00Z' },
+      }] },
+    } as never);
+
+    renderPage();
+
+    expect(await screen.findByText('Pagada · por aplicar', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByText('Completado', { selector: 'span' })).toBeNull();
+  });
 });
 
 describe('PaymentsPage after bitácora punto 10', () => {

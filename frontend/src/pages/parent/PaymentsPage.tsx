@@ -23,6 +23,7 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { paymentsApi, downloadBlob, type PaymentSummary } from '@/services/api';
 import type { Payment } from '@/types';
 import { PAYMENT_FAILURE, PAYMENT_STATUS_META } from '@/lib/status/payment';
+import { TOPUP_STATUS } from '@/lib/status/cafeteria';
 import { applyPhrase } from '@/lib/topupApply';
 
 // Label + variant come from the shared map (`lib/status/payment`); the portal
@@ -30,7 +31,7 @@ import { applyPhrase } from '@/lib/topupApply';
 const STATUS_EXTRA: Record<string, { icon: typeof Clock; help?: string }> = {
   success:    { icon: CheckCircle },
   pending:    { icon: Clock,
-                help: 'Si pagó con tarjeta, el pago se confirma en unos minutos. Si eligió pago en caja, el colegio lo aplicará al recibir el efectivo.' },
+                help: 'El pago con tarjeta aún no se confirma. Si ya pagó, se confirma en unos minutos.' },
   processing: { icon: Clock,
                 help: 'La pasarela está confirmando el cargo. No vuelva a pagar; consulte en unos minutos.' },
   // The real cause comes from `failure_reason` (see rowMeta); this is the fallback.
@@ -48,7 +49,13 @@ const statusMeta: Record<string, PaymentStatusMeta> = Object.fromEntries(
 function rowMeta(p: Payment): PaymentStatusMeta {
   const base = statusMeta[p.status] ?? statusMeta.pending;
   const failure = p.status === 'failed' && p.failure_reason ? PAYMENT_FAILURE[p.failure_reason] : undefined;
-  return failure ? { ...base, label: failure.family, variant: failure.variant, help: failure.help } : base;
+  if (failure) return { ...base, label: failure.family, variant: failure.variant, help: failure.help };
+  // Owner, 2026-10-20: paid → «Pagada · por aplicar» → loaded in Loyverse →
+  // «Completado». A charged card whose top-up is not applied yet is not done.
+  if (p.status === 'success' && p.topup?.status === 'paid') {
+    return { ...base, label: TOPUP_STATUS.paid.label, variant: TOPUP_STATUS.paid.variant, icon: Clock };
+  }
+  return base;
 }
 
 /** Portal sort keys; a subset of `PAYMENT_ORDERING` (apps/payments/views.py). */
