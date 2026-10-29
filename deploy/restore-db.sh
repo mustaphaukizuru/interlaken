@@ -26,6 +26,18 @@ psql_cmd() {
   fi
 }
 
+# backup-db.sh dumps --schema=public only, so the dump has no CREATE EXTENSION for
+# the extensions installed IN public (core/migrations/0004_pg_extensions.py).
+# Objects in the dump need them (immutable_unaccent, gin_trgm_ops indexes): without
+# this a fresh database fails on "public.unaccent does not exist", and a live
+# restore fails on DROP SCHEMA public (the extensions still depend on it). The
+# dump's --clean drops every dependent first, so plain DROP EXTENSION is enough.
+dump_sql() {
+  gunzip -c "$1" | sed \
+    -e 's/^DROP SCHEMA IF EXISTS public;$/DROP EXTENSION IF EXISTS unaccent, pg_trgm;\n&/' \
+    -e 's/^CREATE SCHEMA public;$/&\nCREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;\nCREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;/'
+}
+
 counts() {
   psql_cmd -d "$1" -At -c "select 'users', count(*) from accounts_user union all select 'students', count(*) from accounts_studentprofile union all select 'ledger', count(*) from cafeteria_cafeteriatransaction union all select 'pages', count(*) from content_page;"
 }
@@ -35,7 +47,7 @@ if [[ "$mode" == "--into-live" ]]; then
   read -r -p "Escriba RESTAURAR para continuar: " ok
   [[ "$ok" == "RESTAURAR" ]] || { echo "Cancelado."; exit 1; }
   docker compose stop app >/dev/null
-  gunzip -c "$dump" | psql_cmd -d "$DB_NAME" >/dev/null
+  dump_sql "$dump" | psql_cmd -d "$DB_NAME" >/dev/null
   docker compose start app >/dev/null
   echo "Restaurado. Conteos:"; counts "$DB_NAME"
   exit 0
@@ -44,8 +56,17 @@ fi
 scratch="${DB_NAME}_restore_$(date +%Y%m%d%H%M%S)"
 echo "Simulacro: restaurando $dump en $scratch (la base viva no se toca)"
 psql_cmd -d postgres -c "create database \"$scratch\";" >/dev/null
-trap 'psql_cmd -d postgres -c "drop database if exists \"$scratch\";" >/dev/null; echo "Base de prueba eliminada."' EXIT
-gunzip -c "$dump" | psql_cmd -d "$scratch" >/dev/null
+# WITH (FORCE): the Supabase pooler keeps its server connection to the scratch
+# database open after psql exits, so a plain DROP fails and copies pile up.
+drop_scratch() {
+  for _ in 1 2 3; do
+    psql_cmd -d postgres -c "drop database if exists \"$scratch\" with (force);" >/dev/null && { echo "Base de prueba eliminada."; return 0; }
+    sleep 10
+  done
+  echo "AVISO: no se pudo eliminar $scratch; bórrela a mano." >&2
+}
+trap drop_scratch EXIT
+dump_sql "$dump" | psql_cmd -d "$scratch" >/dev/null
 echo "OK: el respaldo se restaura. Conteos en la copia:"
 counts "$scratch"
 echo "Conteos en la base viva (para comparar):"
