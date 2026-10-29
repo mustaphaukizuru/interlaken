@@ -75,13 +75,27 @@ describe('LoginPage email/password submit', () => {
   });
 
   it('shows an error message on invalid credentials', async () => {
-    mockedPost.mockRejectedValueOnce(new Error('401'));
+    mockedPost.mockRejectedValueOnce({ response: { status: 401, data: { detail: 'No active account' } } });
 
     renderLogin();
     await fillAndSubmit();
 
     expect(await screen.findByText(/credenciales incorrectas/i)).toBeInTheDocument();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it.each([
+    ['no response (offline / DNS down)', new Error('Network Error'), /no hay conexión con el servidor/i],
+    ['a server error', { response: { status: 502, data: {} } }, /el servicio no está disponible/i],
+    ['a lockout', { response: { status: 429, data: {} } }, /demasiados intentos/i],
+  ])('does not blame the password on %s', async (_label, error, message) => {
+    mockedPost.mockRejectedValueOnce(error);
+
+    renderLogin();
+    await fillAndSubmit();
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText(/credenciales incorrectas/i)).not.toBeInTheDocument();
   });
 
   it('has no self-service reset; points families to WhatsApp or email', () => {

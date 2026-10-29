@@ -105,10 +105,18 @@ export default function LoginPage() {
       setAuth(me, access);
       navigate(homeFor(me), { replace: true });
     } catch (err) {
-      const body = (err as { response?: { data?: { totp_required?: boolean; detail?: string } } })?.response?.data;
+      const response = (err as { response?: { status?: number; data?: { totp_required?: boolean; detail?: string } } })?.response;
+      const body = response?.data;
       if (body?.totp_required) {
         setNeedsTotp(true);
         setFormError(totp ? (body.detail ?? 'Código incorrecto.') : null);
+      } else if (!response) {
+        // No answer at all (offline, DNS down): not a password problem.
+        setFormError('No hay conexión con el servidor. Revise su internet e intente de nuevo.');
+      } else if (response.status === 429) {
+        setFormError('Demasiados intentos. Espere unos minutos e intente de nuevo.');
+      } else if ((response.status ?? 0) >= 500) {
+        setFormError('El servicio no está disponible en este momento. Intente más tarde.');
       } else {
         setFormError('Credenciales incorrectas o cuenta sin contraseña. Use Google si su cuenta es institucional.');
       }
