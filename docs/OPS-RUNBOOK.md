@@ -22,15 +22,23 @@ Activación, una sola vez:
 
 `https://interlaken.edu.mx/healthz` responde 200 cuando base de datos y caché contestan, 503 si no.
 
-- Monitor externo: UptimeRobot (gratis) → HTTP(s) → URL anterior, intervalo 5 min, alerta por correo a `sistemas@` y WhatsApp/SMS si lo contrata. Registre también `https://interlaken.edu.mx/` (tipo *keyword*, palabra "Interlaken") para detectar un frontend roto con backend sano.
+- Monitor externo (activo desde 29-10-2026): `.github/workflows/uptime.yml` corre en GitHub cada 10 min, fuera del VPS, y revisa que `interlaken.edu.mx` y `www` apunten al VPS (DNS), que `/healthz` diga `ok`, que `/login` cargue y que el certificado TLS dure más de 14 días. Tres fallas seguidas abren un issue con la etiqueta `site-down` (GitHub avisa por correo al dueño del repositorio); al recuperarse, el issue se cierra solo con un comentario. Nació de la caída del 23-10-2026: alguien cambió los registros A en Akky y nadie lo supo hasta que las familias no pudieron entrar. Si se quiere además WhatsApp/SMS, UptimeRobot sobre la misma URL sigue siendo opción.
+- GitHub pausa los workflows programados de un repositorio público tras 60 días sin commits: si el repo queda quieto tanto tiempo, reactive *Uptime* y *Database backup* en la pestaña Actions.
 - Monitor interno: el cron de cafetería avisa por correo si la sincronización con Loyverse lleva 30 min sin correr (deploy/crontab.example).
+- Webhook de Loyverse: `check_loyverse_webhook` (cada hora, solo lectura) confirma que el webhook de recibos con la URL secreta siga **ENABLED** y nombra cualquier otro webhook que apunte a este dominio (la raíz responde 403 y la ruta sin la clave 401: solo pueden fallar). Avisa por correo una vez por problema, semanal mientras siga. La clave nunca aparece en el correo ni en el log.
 - Métricas de negocio: `/admin` muestra colas (admisiones, recargas, contraseñas, mensajes, formularios, ARCO); `/staff` la analítica.
 - El admin técnico de Django (Unfold) vive en `/django-admin/` desde el 23-09-2026. Antes compartía `/admin/` con la consola React: recargar `/admin/cafeteria` mandaba al login de Django y esas páginas recibían la política de seguridad estricta que bloquea la foto de Google del usuario.
 
 ## 3. Respaldos y simulacro de restauración
 
-- Respaldo diario 03:00 (`backup-db.sh`, retención 30 días en `/var/backups/interlaken`) y copia fuera del servidor según DEPLOY_HOSTINGER_VPS.md.
-- **Simulacro mensual** (cron, primer domingo 04:00): `restore-db.sh <último dump>` restaura en una base temporal, imprime conteos (usuarios, alumnos, movimientos, páginas) y la borra. Si falla, el correo del cron lo dice: un respaldo que no restaura no es respaldo.
+- Respaldo diario 02:30 (`backup-db.sh`, retención 30 días en `/var/backups/interlaken`).
+- Copia fuera del servidor: `.github/workflows/db-backup.yml`, diario, 30 días como artifact de GitHub, **cifrada con GPG** a `deploy/backup-public-key.asc`. El repositorio es público y cualquier usuario de GitHub puede descargar sus artifacts, así que el job cifra antes de subir y se niega a subir un archivo que siga siendo gzip legible. La llave privada **no está en GitHub**: la guarda el administrador (gestor de contraseñas) y hay una copia en el VPS en `/root/.interlaken-backup-PRIVATE-key.asc` (solo root). Sin ella las copias de GitHub no sirven; no la pegue en chats ni correos. Para usar una copia de GitHub:
+  ```bash
+  gpg --import interlaken-backup-PRIVATE-key.asc      # una sola vez por máquina
+  gpg --decrypt interlaken-db-AAAAMMDD-HHMMSS.sql.gz.gpg > db.sql.gz
+  ./restore-db.sh db.sql.gz                           # simulacro; --into-live para la real
+  ```
+- **Simulacro mensual** (cron, primer domingo 04:00): `restore-db.sh <último dump>` restaura en una base temporal, imprime conteos (usuarios, alumnos, movimientos, páginas) y la borra. Cada corrida se registra en la app (`record_restore_drill`): si falla, correo inmediato a los administradores; si deja de correr más de 40 días, `check_backup_fresh` avisa una vez. Un respaldo que no restaura no es respaldo: del 04-10 al 29-10-2026 fallaba en silencio porque el dump (solo esquema `public`) no trae las extensiones `unaccent` y `pg_trgm`; `restore-db.sh` ahora las recrea alrededor del esquema, y borra la base temporal con `WITH (FORCE)` porque el pooler de Supabase deja una conexión abierta.
 - Restauración real (pérdida de datos, migración fallida):
   ```bash
   cd /opt/interlaken/deploy
@@ -52,13 +60,17 @@ Activación, una sola vez:
 | Cambios hechos en Loyverse (grado, nombre, código) no aparecen en la app; luz *Roster* en rojo | el `sync_roster` de las 06:07 no corrió (crontab viejo o sin reinstalar) | `/admin/cafeteria` → Sincronizar roster ahora; en el servidor `crontab -l` debe mostrar `7 6 * * *` con `flock -w 900`; si no, reinstale el crontab (§7c) |
 | Push no llega en iPhone | app no instalada en pantalla de inicio | pedir instalar (InstallHint) y activar avisos en Mi perfil |
 | Certificado TLS | Caddy sin email o puerto 80 cerrado | `docker compose logs caddy`, `ACME_EMAIL` en .env, firewalld 80/443 |
+| Issue `site-down` con "DNS: … resolves to …" | registros A cambiados en Akky (23-10-2026 apuntaron al hosting compartido de Hostinger) | en akky.mx los registros `@` y `www` deben ser A 93.188.162.163. El panel DNS de Hostinger no cuenta (los nameservers son de Akky). Nunca aceptar el "cambie su DNS a 212.1.209.25" que muestra el plan de hosting web de Hostinger |
+| Correo "revisar el webhook de Loyverse" | Loyverse desactivó el webhook tras entregas fallidas, o alguien creó uno a mano | en Loyverse active el webhook de `receipts` que termina en `/loyverse/webhook/…/` y borre los demás de este dominio. No cree webhooks a mano: la URL correcta lleva la clave secreta del servidor |
 
 ## 5. Calendario de operación
 
 | Cuándo | Qué |
 |---|---|
 | Cada 5 min | sync Loyverse, `cms_schedule` (páginas y comunicados programados) |
-| Diario 03:00 / 06:15 | respaldo DB / recordatorios, alertas de saldo, pagos vencidos, despacho de notificaciones |
+| Cada 10 min (GitHub) | `uptime.yml`: DNS, `/healthz`, `/login`, certificado |
+| Cada hora :50 | `check_loyverse_webhook` |
+| Diario 02:30 / 06:15 | respaldo DB (VPS y GitHub cifrado) / recordatorios, alertas de saldo, pagos vencidos, despacho de notificaciones |
 | Diario 05:42 / 06:07 | `sync_purchases --since-days 7` (repaso de recibos) / `sync_roster` (roster desde Loyverse: altas, grado, nombre, código; ver §7b) |
 | Semanal dom 05:00 | `purge_retention --apply` |
 | Mensual 1er dom 04:00 | `restore-db.sh` (simulacro) |

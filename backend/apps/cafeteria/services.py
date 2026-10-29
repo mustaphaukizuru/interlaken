@@ -87,6 +87,11 @@ def _get(endpoint, params=None):
         raise LoyverseError(str(e)) from e
 
 
+def get_webhooks() -> list:
+    """The merchant's webhooks as Loyverse lists them (read-only; check_loyverse_webhook)."""
+    return _get('/webhooks').get('webhooks', [])
+
+
 def get_customer_by_id(loyverse_customer_id: str) -> dict:
     """Fetch a single customer from Loyverse by their ID."""
     return _get(f'/customers/{loyverse_customer_id}')
