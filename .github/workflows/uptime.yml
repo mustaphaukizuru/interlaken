@@ -1,0 +1,109 @@
+name: Uptime (interlaken.edu.mx)
+
+# External watchdog: runs on GitHub, not on the VPS, so it still speaks when the
+# box, its DNS or its certificate is what failed. Born from 2026-10-23, when the
+# domain's A records were pointed at another server and nobody knew until
+# families could not log in.
+#
+# Every 10 minutes it checks, from the outside:
+#   * DNS: the apex and www resolve to the VPS (EXPECTED_IP);
+#   * HTTPS: /healthz answers {"status":"ok"} (app + database + cache) and
+#     /login serves the portal;
+#   * TLS: the certificate is valid for at least 14 more days.
+# A check must fail three times in a row (about a minute apart) before it counts,
+# so one slow response does not page anybody.
+#
+# Alerting: on the first failure it opens an issue labeled `site-down`, which
+# emails the repository owner; while that issue is open it stays quiet. When
+# every check passes again it comments the recovery and closes the issue.
+#
+# GitHub pauses scheduled workflows of a public repository after 60 days without
+# commits. If the repo goes quiet that long, re-enable it from the Actions tab.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+
+env:
+  DOMAIN: interlaken.edu.mx
+  EXPECTED_IP: 93.188.162.163
+  ISSUE_TITLE: 'Site down: interlaken.edu.mx'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check DNS, HTTPS and certificate
+        id: probe
+        run: |
+          set -uo pipefail
+          checks() {
+            local problems=()
+            for host in "$DOMAIN" "www.$DOMAIN"; do
+              ip=$(dig +short A "$host" @8.8.8.8 | grep -E '^[0-9.]+$' | sort | paste -sd, -)
+              [ "$ip" = "$EXPECTED_IP" ] || problems+=("DNS: $host resolves to '${ip:-nothing}', expected $EXPECTED_IP")
+            done
+            body=$(curl -sS --max-time 20 "https://$DOMAIN/healthz" 2>&1) || true
+            echo "$body" | grep -q '"status": *"ok"' || problems+=("HTTPS: /healthz did not answer ok: ${body:0:200}")
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$DOMAIN/login") || true
+            [ "$code" = "200" ] || problems+=("HTTPS: /login answered HTTP $code")
+            if ! echo | openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" 2>/dev/null \
+                 | openssl x509 -noout -checkend $((14 * 86400)) >/dev/null 2>&1; then
+              problems+=("TLS: certificate missing, invalid or expiring within 14 days")
+            fi
+            printf '%s\n' "${problems[@]}"
+          }
+          for attempt in 1 2 3; do
+            result=$(checks)
+            [ -z "$result" ] && break
+            echo "attempt $attempt failed:"; echo "$result"
+            [ "$attempt" -lt 3 ] && sleep 45
+          done
+          if [ -z "$result" ]; then
+            echo "all checks passed"; echo "down=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "down=true" >> "$GITHUB_OUTPUT"
+            { echo 'problems<<EOF'; echo "$result"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open the alert issue
+        if: steps.probe.outputs.down == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBLEMS: ${{ steps.probe.outputs.problems }}
+        run: |
+          gh label create site-down --repo "$GITHUB_REPOSITORY" --color B60205 \
+            --description "Uptime watchdog: production is failing" 2>/dev/null || true
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label site-down \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            echo "already alerted in #$open"; exit 0
+          fi
+          printf '%s\n\n%s\n\n%s\n%s\n' \
+            "@${{ github.repository_owner }} the uptime watchdog sees production failing (3 attempts in a row):" \
+            "$(echo "$PROBLEMS" | sed 's/^/- /')" \
+            "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            "This issue closes itself when every check passes again." > body.md
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" \
+            --label site-down --body-file body.md
+          exit 1
+
+      - name: Close the alert issue on recovery
+        if: steps.probe.outputs.down == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label site-down \
+                       --json number --jq '.[].number'); do
+            gh issue close "$n" --repo "$GITHUB_REPOSITORY" \
+              --comment "Recovered: every check passed at $(date -u '+%Y-%m-%d %H:%M UTC')."
+          done
