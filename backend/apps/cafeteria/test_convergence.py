@@ -168,6 +168,16 @@ class TestRosterAudit:
         assert s.loyverse_missing_since is None
         assert r['audit']['stale_links'] == 0
 
+    def test_parked_receipts_of_staff_cards_are_told_apart_from_a_pupils(self):
+        S.record_receipts([receipt('p1', 'staff-card', 12), receipt('p2', 'unknown', 8)], students={})
+        staff = customer('staff-card', 0, name='ZP-Cocina', email='cocina@interlaken.com.mx')
+
+        with patch('apps.cafeteria.services.get_all_customers', return_value=[staff]):
+            r = S.mirror_pos_topups()
+
+        assert r['audit']['unmatched_receipts'] == 2
+        assert r['audit']['unmatched_receipts_student'] == 1
+
     def test_a_partial_webhook_payload_never_flags_anyone(self):
         s = StudentProfileFactory(loyverse_id='u1')
         seeded(s, 10)
@@ -415,6 +425,30 @@ class TestDailyDriftAlarm:
         subject, body, recipients = send.call_args.args[:3]
         assert set(recipients) == {a1.email, a2.email}
         assert '123.00' in body and '36' in body and 'Vincular Loyverse' in body
+
+    def test_staff_cards_parked_receipts_alone_are_not_an_alarm(self):
+        OpsStatus.set('wallet_audit', {'compared': 351, 'drifting': 0, 'drift_total': '0',
+                                       'stale_links': 0, 'unlinked_students': 0,
+                                       'unmatched_receipts': 90, 'unmatched_receipts_student': 0})
+        AdminFactory()
+        with patch('apps.portal.services.send_email') as send:
+            out = StringIO()
+            call_command('check_wallet_drift', stdout=out)
+        send.assert_not_called()
+        assert 'converged' in out.getvalue()
+
+    def test_the_same_problems_are_emailed_once_and_a_change_is_emailed_again(self):
+        audit = {'compared': 351, 'drifting': 0, 'drift_total': '0', 'stale_links': 35,
+                 'unlinked_students': 0, 'unmatched_receipts': 90, 'unmatched_receipts_student': 0}
+        OpsStatus.set('wallet_audit', audit)
+        AdminFactory()
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('check_wallet_drift', stdout=StringIO())
+            call_command('check_wallet_drift', stdout=StringIO())
+            assert send.call_count == 1
+            OpsStatus.set('wallet_audit', {**audit, 'drifting': 1, 'drift_total': '-20.00'})
+            call_command('check_wallet_drift', stdout=StringIO())
+        assert send.call_count == 2
 
 
 @pytest.mark.django_db

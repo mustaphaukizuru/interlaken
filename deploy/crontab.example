@@ -16,8 +16,12 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 COMPOSE=/opt/interlaken/deploy
 
-# A stock Ubuntu VPS runs on UTC, so "6 AM" here would fire at midnight local
-# time. Pin the zone rather than doing the arithmetic by hand twice a year.
+# Every hour below is Mexico City time. Ubuntu's cron (3.0pl1) IGNORES the
+# CRON_TZ line and reads the HOST clock, so the host must run on that zone:
+#   sudo timedatectl set-timezone America/Mexico_City && sudo systemctl restart cron
+# Until 2026-10-29 it ran on UTC and every job fired six hours early (the 07:05
+# top-up report at 01:05, the 18:00 digest at noon); deploy.sh now warns. The
+# line stays for crons that do honour it (cronie).
 CRON_TZ=America/Mexico_City
 
 # ── Cafeteria sync, every 5 minutes ─────────────────────────────────────────

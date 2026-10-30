@@ -61,9 +61,12 @@ Activación, una sola vez:
 | Push no llega en iPhone | app no instalada en pantalla de inicio | pedir instalar (InstallHint) y activar avisos en Mi perfil |
 | Certificado TLS | Caddy sin email o puerto 80 cerrado | `docker compose logs caddy`, `ACME_EMAIL` en .env, firewalld 80/443 |
 | Issue `site-down` con "DNS: … resolves to …" | registros A cambiados en Akky (23-10-2026 apuntaron al hosting compartido de Hostinger) | en akky.mx los registros `@` y `www` deben ser A 93.188.162.163. El panel DNS de Hostinger no cuenta (los nameservers son de Akky). Nunca aceptar el "cambie su DNS a 212.1.209.25" que muestra el plan de hosting web de Hostinger |
+| Los avisos programados llegan a otra hora (el reporte de las 07:05 a la 01:05, el resumen de las 18:00 al mediodía) | el reloj del servidor no está en hora de México: el cron de Ubuntu ignora `CRON_TZ` y usa el del sistema (así estuvo hasta el 29-10-2026) | `sudo timedatectl set-timezone America/Mexico_City && sudo systemctl restart cron`; `deploy.sh` avisa si vuelve a pasar |
 | Correo "revisar el webhook de Loyverse" | Loyverse desactivó el webhook tras entregas fallidas, o alguien creó uno a mano | en Loyverse active el webhook de `receipts` que termina en `/loyverse/webhook/…/` y borre los demás de este dominio. No cree webhooks a mano: la URL correcta lleva la clave secreta del servidor |
 
 ## 5. Calendario de operación
+
+Horas de la Ciudad de México (el reloj del servidor debe estar en esa zona, ver §4).
 
 | Cuándo | Qué |
 |---|---|

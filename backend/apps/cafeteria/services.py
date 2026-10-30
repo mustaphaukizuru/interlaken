@@ -2099,7 +2099,7 @@ def _record_wallet_audit(customers, result, now) -> dict:
     from django.db.models import Sum
 
     from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import UnmatchedReceipt
+    from apps.cafeteria.models import LoyverseProfile, UnmatchedReceipt
     from apps.core.models import OpsStatus
 
     remote_ids = {c.get('id') for c in customers if c.get('id')}
@@ -2145,6 +2145,11 @@ def _record_wallet_audit(customers, result, now) -> dict:
         'unlinked_customers': len(unlinked),
         'unlinked_students': sum(1 for c in unlinked if _is_loyverse_student(c)),
         'unmatched_receipts': pending.count(),
+        # Staff and test cards spend points too and never resolve to a pupil;
+        # only the rest can be a student's lost purchase (the daily alarm).
+        'unmatched_receipts_student': pending.exclude(customer_id__in=LoyverseProfile.objects.filter(
+            kind__in=[LoyverseProfile.Kind.STAFF, LoyverseProfile.Kind.TEST],
+        ).values('loyverse_id')).count(),
         'unmatched_points': str(pending.aggregate(s=Sum('points'))['s'] or Decimal('0')),
     }
     OpsStatus.set('wallet_audit', audit)
