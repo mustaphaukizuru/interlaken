@@ -21,7 +21,7 @@ test.describe('Authentication', () => {
     await page.goto('/login');
     // Use a throwaway address, NOT the real E2E admin — repeated failures would
     // trip django-axes and lock the account the other tests log in with.
-    await page.getByPlaceholder('correo@interlaken.edu.mx').fill('nobody@interlaken.test');
+    await page.getByPlaceholder('correo@interlaken.com.mx').fill('nobody@interlaken.test');
     await page.getByPlaceholder('••••••••').fill('wrong-password');
     await page.getByRole('button', { name: /ingresar/i }).click();
 

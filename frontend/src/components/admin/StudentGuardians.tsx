@@ -104,7 +104,7 @@ export function StudentGuardians({ studentId }: Props) {
       } else if (body.guardian?.is_self) {
         toast.success('Cuenta familiar del alumno vinculada.');
       } else if (body.created_user) {
-        toast.success('Tutor creado y vinculado. Puede activar su cuenta con «Olvidé mi contraseña».');
+        toast.success('Tutor creado y vinculado. Para darle acceso use «Restablecer contraseña» en su fila.');
       } else {
         toast.success('Tutor vinculado al alumno.');
       }

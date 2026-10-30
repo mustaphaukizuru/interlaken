@@ -85,6 +85,61 @@ class TestCheckBackupFresh:
 
 
 @pytest.mark.django_db
+class TestRestoreDrillReporting:
+    """The monthly drill failed unseen from 2026-10-04: now it reports every run."""
+
+    def _fresh_backup(self):
+        OpsStatus.set('backup', {'ok': True, 'at': timezone.now().isoformat()})
+
+    def test_a_good_drill_is_recorded_quietly(self):
+        AdminFactory()
+        with patch('apps.portal.services.send_email') as send:
+            call_command('record_restore_drill', '--ok', '--dump', 'db-2026-11-01-0230.sql.gz',
+                         '--detail', 'users 391, students 387', stdout=StringIO())
+        send.assert_not_called()
+        m = OpsStatus.get('restore_drill')
+        assert m['ok'] is True and m['dump'] == 'db-2026-11-01-0230.sql.gz' and m['at']
+
+    def test_a_failed_drill_emails_every_active_admin_at_once(self):
+        a1, a2 = AdminFactory(), AdminFactory()
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('record_restore_drill', '--failed', '--dump', 'db-x.sql.gz',
+                         '--detail', 'la restauración se detuvo (código 3)', stdout=StringIO())
+        assert set(send.call_args.args[2]) == {a1.email, a2.email}
+        assert 'falló' in send.call_args.args[0]
+        assert 'código 3' in send.call_args.args[1]
+        assert OpsStatus.get('restore_drill')['ok'] is False
+
+    def test_no_drill_yet_does_not_alert(self):
+        self._fresh_backup()
+        AdminFactory()
+        out = StringIO()
+        with patch('apps.portal.services.send_email') as send:
+            call_command('check_backup_fresh', stdout=out)
+        send.assert_not_called()
+        assert 'none recorded yet' in out.getvalue()
+
+    def test_a_drill_that_stopped_running_alerts_once(self):
+        self._fresh_backup()
+        OpsStatus.set('restore_drill', {'ok': True, 'at': (timezone.now() - timedelta(days=50)).isoformat()})
+        AdminFactory()
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('check_backup_fresh', stdout=StringIO())
+            call_command('check_backup_fresh', stdout=StringIO())
+        send.assert_called_once()
+        assert 'dejó de correr' in send.call_args.args[0]
+
+    def test_a_recent_drill_clears_the_alert(self):
+        self._fresh_backup()
+        OpsStatus.set('restore_drill_check', {'stale': True, 'alerted_at': timezone.now().isoformat()})
+        OpsStatus.set('restore_drill', {'ok': True, 'at': timezone.now().isoformat()})
+        with patch('apps.portal.services.send_email') as send:
+            call_command('check_backup_fresh', stdout=StringIO())
+        send.assert_not_called()
+        assert OpsStatus.get('restore_drill_check') == {'stale': False}
+
+
+@pytest.mark.django_db
 class TestOffsiteBackup:
     def test_is_a_clear_no_op_without_object_storage(self, settings):
         settings.AWS_STORAGE_BUCKET_NAME = ''

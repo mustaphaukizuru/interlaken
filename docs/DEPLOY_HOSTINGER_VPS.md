@@ -231,6 +231,7 @@ on the private network — and Actions fired the "every five minutes" sync
 roughly hourly anyway).
 
 ```bash
+sudo timedatectl set-timezone America/Mexico_City && sudo systemctl restart cron  # cron reads the HOST clock
 sudo mkdir -p /var/log/interlaken /var/backups/interlaken
 crontab /opt/interlaken/deploy/crontab.example   # the file IS the crontab: install it whole
 crontab -l | grep -c manage.py                   # sanity: the number of app jobs installed

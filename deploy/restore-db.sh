@@ -54,8 +54,7 @@ if [[ "$mode" == "--into-live" ]]; then
 fi
 
 scratch="${DB_NAME}_restore_$(date +%Y%m%d%H%M%S)"
-echo "Simulacro: restaurando $dump en $scratch (la base viva no se toca)"
-psql_cmd -d postgres -c "create database \"$scratch\";" >/dev/null
+copy_counts=""
 # WITH (FORCE): the Supabase pooler keeps its server connection to the scratch
 # database open after psql exits, so a plain DROP fails and copies pile up.
 drop_scratch() {
@@ -64,10 +63,28 @@ drop_scratch() {
     sleep 10
   done
   echo "AVISO: no se pudo eliminar $scratch; bórrela a mano." >&2
+  return 1
 }
-trap drop_scratch EXIT
+# Every drill reports in (record_restore_drill): a failure emails the admins at
+# once, instead of sitting in a log nobody reads (it failed unseen for a month).
+finish_drill() {
+  local rc=$? detail flag=--ok
+  detail=$(echo "$copy_counts" | tr '|\n' ' ,' | sed 's/, *$//')
+  drop_scratch || detail="${detail:+$detail; }no se pudo eliminar la copia $scratch"
+  if [[ $rc -ne 0 ]]; then
+    flag=--failed
+    detail="la restauración se detuvo (código $rc)"
+  fi
+  docker compose exec -T app python manage.py record_restore_drill "$flag" \
+    --dump "$(basename "$dump")" --detail "$detail" </dev/null \
+    || echo "AVISO: no se pudo registrar el resultado del simulacro en la app." >&2
+}
+trap finish_drill EXIT
+echo "Simulacro: restaurando $dump en $scratch (la base viva no se toca)"
+psql_cmd -d postgres -c "create database \"$scratch\";" >/dev/null
 dump_sql "$dump" | psql_cmd -d "$scratch" >/dev/null
+copy_counts=$(counts "$scratch")
 echo "OK: el respaldo se restaura. Conteos en la copia:"
-counts "$scratch"
+echo "$copy_counts"
 echo "Conteos en la base viva (para comparar):"
 counts "$DB_NAME" || true

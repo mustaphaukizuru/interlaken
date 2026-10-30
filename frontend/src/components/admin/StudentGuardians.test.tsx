@@ -122,7 +122,7 @@ describe('StudentGuardians', () => {
       });
     });
     expect(toastSuccess).toHaveBeenCalledWith(
-      'Tutor creado y vinculado. Puede activar su cuenta con «Olvidé mi contraseña».',
+      'Tutor creado y vinculado. Para darle acceso use «Restablecer contraseña» en su fila.',
     );
 
     linkGuardian.mockRejectedValueOnce({
