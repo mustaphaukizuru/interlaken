@@ -37,7 +37,7 @@ function renderLogin(entry = '/login') {
 
 async function fillAndSubmit() {
   const user = userEvent.setup();
-  await user.type(screen.getByPlaceholderText('correo@interlaken.edu.mx'), 'parent@test.mx');
+  await user.type(screen.getByPlaceholderText('correo@interlaken.com.mx'), 'parent@test.mx');
   await user.type(screen.getByPlaceholderText('••••••••'), 's3cret');
   await user.click(screen.getByRole('button', { name: /ingresar/i }));
 }
@@ -132,7 +132,7 @@ describe('LoginPage Google OAuth return (?login=ok)', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent(/completando acceso con google/i);
     expect(screen.getByRole('button', { name: /continuar con google/i })).toBeDisabled();
-    expect(screen.getByPlaceholderText('correo@interlaken.edu.mx')).toBeDisabled();
+    expect(screen.getByPlaceholderText('correo@interlaken.com.mx')).toBeDisabled();
     expect(screen.getByRole('button', { name: /completando/i })).toBeDisabled();
 
     resolveBootstrap(true);

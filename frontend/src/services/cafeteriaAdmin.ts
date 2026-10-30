@@ -86,10 +86,10 @@ export const cafeteriaAdminApi = {
   bulkReconcile: bulk(`${BASE}/reconcile/bulk/`),
 };
 
-/** Options of the ajuste masivo commit ("Notificar a las familias", "Reflejar en Loyverse"). */
+/** Options of the ajuste masivo commit ("Notificar a las familias"). Loyverse
+ *  points cannot be written, so there is no "reflect in Loyverse" option. */
 export interface AdjustmentImportFlags {
   notify: boolean;
-  mirror: boolean;
 }
 
 /** The C4 endpoints of the ajuste masivo, posting the chosen flags with the file. */
@@ -99,7 +99,6 @@ export function adjustmentImportApi(flags: AdjustmentImportFlags): ImportApi {
     upload: (file, opts) => {
       const body = importFormData(file, opts);
       body.append('notify', flags.notify ? '1' : '0');
-      body.append('mirror', flags.mirror ? '1' : '0');
       return api.post<ImportReport | Blob>(`${BASE}/balances/import/`, body, {
         responseType: opts.report ? 'blob' : 'json',
         headers: { 'Content-Type': 'multipart/form-data' },

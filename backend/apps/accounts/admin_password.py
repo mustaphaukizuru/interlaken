@@ -136,8 +136,9 @@ class AdminSetPasswordView(APIView):
                 {'detail': 'No se puede restablecer la contraseña de una cuenta '
                            'administradora desde aquí: un administrador que reescribe '
                            'la contraseña de otro se apropiaría de esa cuenta. '
-                           'Cada administrador cambia su propia contraseña desde su '
-                           'perfil o con el enlace de recuperación.'},
+                           'Un administrador con correo del colegio entra con '
+                           '«Continuar con Google»; si perdió el acceso, un '
+                           'superusuario restablece su contraseña desde el panel técnico.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 

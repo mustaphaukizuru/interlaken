@@ -198,9 +198,8 @@ const ADJUSTMENT_COLUMNS: Column<ImportRow>[] = [
 /** "Ajuste masivo": matricula, monto, motivo → one audited adjustment per row (C4). */
 function AdjustmentImport({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [notify, setNotify] = useState(true);
-  const [mirror, setMirror] = useState(true);
-  // Rebuilt when a box is ticked, so the commit posts the flags on screen.
-  const api = useMemo(() => adjustmentImportApi({ notify, mirror }), [notify, mirror]);
+  // Rebuilt when the box is ticked, so the commit posts the flag on screen.
+  const api = useMemo(() => adjustmentImportApi({ notify }), [notify]);
   return (
     <ImportDialog
       open={open}
@@ -222,10 +221,10 @@ function AdjustmentImport({ open, onClose }: { open: boolean; onClose: () => voi
             <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
             Notificar a las familias
           </label>
-          <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
-            <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={mirror} onChange={(e) => setMirror(e.target.checked)} />
-            Reflejar el saldo en Loyverse
-          </label>
+          <p className="text-xs text-muted">
+            La app no cambia los puntos en Loyverse (su API no lo permite): haga los mismos ajustes en el POS para que
+            los alumnos puedan usarlos.
+          </p>
         </div>
       )}
     />

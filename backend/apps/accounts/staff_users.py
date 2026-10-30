@@ -274,9 +274,9 @@ class StaffDetailView(APIView):
 
 ADMIN_RESET_REFUSED = (
     'No se puede generar la contraseña de otra cuenta administradora: quien la '
-    'reescribe se apropiaría de esa cuenta. Cada administrador cambia su propia '
-    'contraseña desde su perfil o con el enlace de recuperación; si perdió el acceso, '
-    'un superusuario la restablece desde el panel técnico.'
+    'reescribe se apropiaría de esa cuenta. Un administrador con correo del colegio '
+    'entra con «Continuar con Google»; si perdió el acceso, un superusuario restablece '
+    'su contraseña desde el panel técnico.'
 )
 
 
