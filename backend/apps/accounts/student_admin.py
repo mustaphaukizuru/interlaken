@@ -14,18 +14,20 @@ from __future__ import annotations
 
 from django.db import transaction
 from rest_framework import serializers, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
+from apps.core.flags import truthy
 from apps.core.permissions import IsAdmin
 from apps.core.transitions import assert_transition
 
 from .import_students import STUDENT_EMAIL_DOMAIN
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer
+from .student_delete import DELETE_CONFIRMATION, delete_student, deletion_blocker
 
 EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id', 'status',
                     'birth_date', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
@@ -249,6 +251,16 @@ def _apply_sync(profile, payload, actor):
     return {'seeded_balance': str(balance), 'via': 'portal-bulk'}
 
 
+def _plan_delete(profile, payload):
+    blocker = deletion_blocker(profile)
+    if blocker:
+        raise BulkSkip(blocker)
+
+
+def _apply_delete(profile, payload, actor):
+    return {'deleted': delete_student(profile), 'via': 'portal-bulk'}
+
+
 _plan_grade, _apply_grade = _field_action('grade', 'grado')
 _plan_group, _apply_group = _field_action('group', 'grupo')
 
@@ -264,18 +276,23 @@ STUDENT_BULK_ACTIONS = {
         # that were never seeded (sync_student_balance); a no-op otherwise.
         BulkAction('sync_loyverse', 'Sincronizar con Loyverse', handler=_apply_sync,
                    plan=_plan_sync, side_effects='per_row'),
+        # Only for a record with nothing to keep (see student_delete); the rest
+        # come back as skipped with the reason, and "withdrawn" is their archive.
+        BulkAction('delete', 'Eliminar definitivamente', handler=_apply_delete,
+                   plan=_plan_delete, side_effects='none', audit_action='delete'),
     )
 }
 
 
 def withdrawal_warnings(ids) -> list[dict]:
-    """Students in ``ids`` whose wallet still holds money (C5: archiving a student
-    surfaces the balance so the office refunds or transfers it first)."""
-    from apps.cafeteria.models import CafeteriaBalance
+    """Students in ``ids`` whose wallet still holds money or who have a paid top-up
+    waiting for the POS (C5: archiving a student surfaces both, so the office
+    refunds or loads them first)."""
+    from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
 
     rows = (CafeteriaBalance.objects.filter(student_id__in=list(ids), balance__gt=0)
             .select_related('student__user').order_by('-balance', 'student_id'))
-    return [{
+    warnings = [{
         'id': cb.student_id,
         'name': cb.student.user.full_name,
         'student_id': cb.student.student_id,
@@ -283,6 +300,17 @@ def withdrawal_warnings(ids) -> list[dict]:
         'message': f'{cb.student.user.full_name} ({cb.student.student_id}) tiene '
                    f'${cb.balance:,.2f} de saldo en cafetería.',
     } for cb in rows]
+    paid = (TopUpRequest.objects.filter(student_id__in=list(ids), status=TopUpRequest.Status.PAID)
+            .select_related('student__user').order_by('student_id', 'pk'))
+    warnings += [{
+        'id': f'topup-{t.pk}',
+        'name': t.student.user.full_name,
+        'student_id': t.student.student_id,
+        'balance': str(t.amount),
+        'message': f'{t.student.user.full_name} ({t.student.student_id}) tiene una recarga '
+                   f'pagada de ${t.amount:,.2f} por aplicar en Loyverse.',
+    } for t in paid]
+    return warnings
 
 
 class AdminStudentBulkView(AdminBulkView):
@@ -293,7 +321,8 @@ class AdminStudentBulkView(AdminBulkView):
     withdrawal lists the students that still hold a wallet balance under
     ``warnings``), ``grade`` / ``group`` (``{"value": "..."}``) and
     ``sync_loyverse`` (seed the opening balance of linked, never-seeded
-    students). There is no delete: ``withdrawn`` is the archive.
+    students) and ``delete`` (admins only, ``{"confirm": "ELIMINAR"}`` on the
+    commit; refuses anyone with something to keep, whose archive is ``withdrawn``).
     """
     admin_area = 'alumnos'
     entity = STUDENT_ENTITY
@@ -320,6 +349,12 @@ class AdminStudentBulkView(AdminBulkView):
         data = request.data if isinstance(request.data, dict) else {}
         payload = data.get('payload') if isinstance(data.get('payload'), dict) else {}
         action = str(data.get('action') or '')
+        if action == 'delete':
+            # The roster area is enough to archive; only an admin may erase.
+            if request.user.role != User.Role.ADMIN:
+                raise PermissionDenied('Solo un administrador puede eliminar alumnos.')
+            if not truthy(data.get('dry_run', False)) and payload.get('confirm') != DELETE_CONFIRMATION:
+                raise ValidationError({'confirm': [f'Escriba {DELETE_CONFIRMATION} para confirmar.']})
         if action == 'group' and _value(payload):
             payload['value'] = _value(payload).upper()
         self.validate_payload(action, payload)

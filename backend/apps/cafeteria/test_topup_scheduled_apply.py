@@ -20,7 +20,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
+from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory, UserFactory
 from apps.cafeteria import schedule
 from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from apps.cafeteria.services import (
@@ -474,6 +474,21 @@ class TestApplyReport:
 
         call_command('topup_apply_report', stdout=StringIO())
         assert Notification.objects.filter(user=admin).count() == 1   # unchanged list
+
+    def test_the_cafeteria_cashier_is_told_too_and_other_staff_are_not(self):
+        admin = AdminFactory()
+        cashier = UserFactory(role='staff', staff_areas=['cafeteria'], staff_title='Cafetería')
+        office = UserFactory(role='staff', staff_areas=['visitas', 'mensajes'])
+        _, topup, _ = paid_topup(balance=0)
+        TopUpRequest.objects.filter(pk=topup.pk).update(
+            apply_due_at=timezone.now() - timedelta(hours=1))
+
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('topup_apply_report', stdout=StringIO())
+
+        assert set(send.call_args.args[2]) == {admin.email, cashier.email}
+        assert Notification.objects.filter(user=cashier).exists()
+        assert not Notification.objects.filter(user=office).exists()
 
     def test_silent_when_nothing_is_due(self):
         admin = AdminFactory()

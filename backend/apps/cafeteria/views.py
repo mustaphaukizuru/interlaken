@@ -698,6 +698,14 @@ class TopUpRequestCreateView(generics.CreateAPIView):
         if not _can_manage_student_cafeteria(user, student):
             return Response(error_body('No autorizado para este alumno.'), status=403)
 
+        # A student who left has no POS to spend it at: the money would be stranded.
+        if not student.is_active:
+            return Response(
+                error_body('Este alumno ya no está activo; no se puede recargar su saldo. '
+                           'Contacte al colegio.', code='student_inactive'),
+                status=400,
+            )
+
         # Online/office top-ups only make sense once the student is on Loyverse —
         # office apply and POS load both require loyverse_id downstream.
         if not (student.loyverse_id or '').strip():

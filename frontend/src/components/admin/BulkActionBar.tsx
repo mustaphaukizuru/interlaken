@@ -69,7 +69,7 @@ export function BulkActionBar({
           const Icon = a.icon;
           return (
             <button
-              key={a.name}
+              key={a.key ?? a.name}
               type="button"
               disabled={busy}
               onClick={() => onAction?.(a)}
@@ -95,7 +95,7 @@ export function BulkActionBar({
                   const Icon = a.icon;
                   return (
                     <button
-                      key={a.name}
+                      key={a.key ?? a.name}
                       role="menuitem"
                       type="button"
                       onClick={() => { close(); onAction?.(a); }}

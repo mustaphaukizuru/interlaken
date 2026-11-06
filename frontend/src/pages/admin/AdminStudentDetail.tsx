@@ -1,21 +1,28 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import StudentCard from '@/components/portal/StudentCard';
 import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaCard } from '@/types';
 import { Printer } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Coffee, Pencil } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Coffee, Pencil, RotateCcw, Trash2, UserMinus } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
+import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { DELETE_ACTION, REACTIVATE_ACTION, WITHDRAW_ACTION, studentPlanNote } from '@/components/admin/studentActions';
 import { Badge } from '@/components/ui/Badge';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { studentDetailKey } from '@/hooks/queries/studentKeys';
+import { useStudentsBulk } from '@/hooks/queries/students';
+import { isAdmin } from '@/lib/areas';
+import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
+import type { BulkActionDef } from '@/services/api';
 import type { StudentProfile } from '@/types';
 
 /**
@@ -23,7 +30,7 @@ import type { StudentProfile } from '@/types';
  * cafetería shortcut. (The app does not bill tuition, so there is no ledger.)
  */
 /** Full page at /admin/alumnos/:id, or embedded as the right pane of the 2xl two-pane roster (BACKLOG P1-B10). */
-export default function AdminStudentDetail({ id, embedded = false }: { id?: number; embedded?: boolean } = {}) {
+export default function AdminStudentDetail({ id, embedded = false, onDeleted }: { id?: number; embedded?: boolean; onDeleted?: () => void } = {}) {
   const params = useParams();
   const studentId = id ?? params.studentId;
   const { data, isLoading, isError, refetch } = useQuery({
@@ -45,7 +52,7 @@ export default function AdminStudentDetail({ id, embedded = false }: { id?: numb
       ) : isError || !data ? (
         <ErrorState onRetry={() => refetch()} />
       ) : (
-        <StudentDetailBody student={data} />
+        <StudentDetailBody student={data} onDeleted={onDeleted} />
       )}
     </>
   );
@@ -92,12 +99,42 @@ function Field({ label, value }: { label: string; value?: string | number | null
   );
 }
 
-function StudentDetailBody({ student }: { student: StudentProfile }) {
+function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; onDeleted?: () => void }) {
   const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('datos');
+  const [confirming, setConfirming] = useState<BulkActionDef | null>(null);
+  const canDelete = isAdmin(useAuthStore((s) => s.user));
+  const bulk = useStudentsBulk();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const archived = student.is_active === false;
+  const lifecycle = archived ? REACTIVATE_ACTION : WITHDRAW_ACTION;
+  const LifecycleIcon = archived ? RotateCcw : UserMinus;
   return (
     <>
       <StudentFormModal open={editOpen} onClose={() => setEditOpen(false)} student={student} />
+      <BulkConfirmDialog
+        open={!!confirming}
+        onClose={() => setConfirming(null)}
+        action={confirming}
+        payload={confirming?.payload}
+        entityLabel="alumnos"
+        gender="m"
+        ids={[student.id]}
+        subject={student.user.full_name}
+        execute={(body) => bulk.mutateAsync(body)}
+        renderPlan={studentPlanNote(confirming)}
+        onDone={(r) => {
+          if (confirming?.name === 'delete' && r.ok > 0) {
+            toast.success('Alumno eliminado.');
+            setConfirming(null);
+            if (onDeleted) onDeleted();
+            else navigate('/admin/alumnos');
+          } else {
+            void qc.invalidateQueries({ queryKey: studentDetailKey(student.id) });
+          }
+        }}
+      />
       <PageHeader
         title={student.user.full_name}
         subtitle={`Matrícula ${student.student_id} · ${student.grade}${student.group ? ` ${student.group}` : ''}`}
@@ -109,6 +146,14 @@ function StudentDetailBody({ student }: { student: StudentProfile }) {
             <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline">
               <Coffee size={16} aria-hidden="true" /> Cafetería
             </Link>
+            <button type="button" className="btn-outline" onClick={() => setConfirming(lifecycle)}>
+              <LifecycleIcon size={16} aria-hidden="true" /> {lifecycle.label}
+            </button>
+            {canDelete && (
+              <button type="button" className="btn-outline" onClick={() => setConfirming(DELETE_ACTION)}>
+                <Trash2 size={16} aria-hidden="true" /> Eliminar
+              </button>
+            )}
           </>
         )}
       />

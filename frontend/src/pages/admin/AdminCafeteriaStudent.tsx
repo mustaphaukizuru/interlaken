@@ -329,7 +329,8 @@ export default function AdminCafeteriaStudent() {
             placeholder="Ej. Reembolso de cortesía, corrección…"
           />
           <p className="text-xs text-muted">
-            Este movimiento queda registrado en la auditoría y se notifica a los tutores.
+            Este movimiento queda registrado en la auditoría y se notifica a los tutores. La app no
+            cambia los puntos en Loyverse: haga el mismo ajuste en el POS para que el alumno pueda usarlo.
           </p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={() => setShowAdjust(false)}>

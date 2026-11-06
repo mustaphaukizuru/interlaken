@@ -68,6 +68,9 @@ const txLabel = (type: string) => {
 
 type TypeFilter = '' | 'purchase' | 'topup' | 'refund';
 
+/** A child on the POS who still attends: the server refuses a top-up for anyone else. */
+const canTopUp = (b: CafeteriaBalance) => !!b.student.loyverse_id && b.student.is_active !== false;
+
 function topupErrorMessage(err: unknown): string {
   const fields = fieldErrorsOrNull(err);
   if (!fields) return 'No fue posible procesar la recarga. Intente nuevamente.';
@@ -236,8 +239,8 @@ export default function CafeteriaPage() {
     }, { replace: true });
     const amount = Number(raw);
     const target =
-      balances.find((b) => b.student.id === childId && !!b.student.loyverse_id)
-      ?? balances.find((b) => !!b.student.loyverse_id);
+      balances.find((b) => b.student.id === childId && canTopUp(b))
+      ?? balances.find(canTopUp);
     if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) return;
     // Suppressed: one-shot URL command — the param is external navigation
     // state consumed (deleted) right above, so the modal state cannot be
@@ -448,7 +451,7 @@ export default function CafeteriaPage() {
 
   // Only offer the "Recargar saldo" shortcut when some child is actually
   // linked to Loyverse (otherwise there is no top-up section to jump to).
-  const anyLinked = (balances ?? []).some((b) => !!b.student.loyverse_id);
+  const anyLinked = (balances ?? []).some(canTopUp);
 
   return (
     <div className="space-y-6">
@@ -501,6 +504,7 @@ export default function CafeteriaPage() {
           const isLow = typeof b.is_low_balance === 'boolean'
             ? b.is_low_balance
             : parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
+          const left = b.student.is_active === false;
           const notLinked = !b.student.loyverse_id;
           const bal = parseFloat(b.balance);
           const isSelected = childId === b.student.id;
@@ -534,13 +538,17 @@ export default function CafeteriaPage() {
 
               <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} />
 
-              {notLinked && (
+              {left ? (
+                <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
+                  Este alumno ya no está activo en el colegio. Para aclarar su saldo, contacta al colegio.
+                </p>
+              ) : notLinked && (
                 <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">
                   Este alumno aún no está vinculado a cafetería/Loyverse. Contacta al colegio para activar el servicio.
                 </p>
               )}
 
-              {!notLinked && (
+              {canTopUp(b) && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -682,7 +690,7 @@ export default function CafeteriaPage() {
                 value={selectedStudent ?? ''}
                 onChange={(e) => setSelectedStudent(Number(e.target.value) || null)}
               >
-                {(balances ?? []).filter((b) => !!b.student.loyverse_id).map((b) => (
+                {(balances ?? []).filter(canTopUp).map((b) => (
                   <option key={b.student.id} value={b.student.id}>
                     {b.student.user.full_name} · saldo ${parseFloat(b.balance).toFixed(2)}
                   </option>

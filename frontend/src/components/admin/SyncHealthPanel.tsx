@@ -78,7 +78,7 @@ export function buildChecks(h: SyncHealth): Check[] {
   // Stale links and unlinked pupils need a person; parked receipts on their
   // own are usually staff or test cards and only get mentioned.
   const rosterIssues: string[] = [];
-  if (stale > 0) rosterIssues.push(`${stale} enlace(s) obsoleto(s)`);
+  if (stale > 0) rosterIssues.push(`${stale} alumno(s) sin cliente en Loyverse`);
   if (newKids > 0) rosterIssues.push(`${newKids} alumno(s) nuevo(s) en Loyverse sin vincular`);
   const rosterLabel = rosterIssues.length > 0 && parked > 0
     ? [...rosterIssues, `${parked} recibo(s) sin alumno`] : rosterIssues;
@@ -189,9 +189,9 @@ export function buildChecks(h: SyncHealth): Check[] {
             ? ` ${audit.profiles_total} tarjeta(s) sincronizadas, ${audit.profiles_staff ?? 0} de personal.`
             : '')
           + (parked > 0 ? ` ${parked} recibo(s) de tarjetas sin alumno.` : '')
-        : 'Los enlaces obsoletos son alumnos cuyo cliente ya no existe en Loyverse (bajas): '
-          + 'Alumnos → Vincular Loyverse → Dar de baja. Los alumnos nuevos se vinculan solos cada '
-          + 'madrugada y sus recibos pendientes se aplican en ese momento.',
+        : 'Un alumno sin cliente en Loyverse ya no puede comprar en cafetería: en Alumnos, el aviso '
+          + '«Revisarlos» los lista para eliminarlos o darlos de baja. Los alumnos nuevos se vinculan '
+          + 'solos cada madrugada y sus recibos pendientes se aplican en ese momento.',
     },
     {
       key: 'backup',

@@ -54,12 +54,29 @@ export default function AdminDashboard() {
               </span>
             </Link>
           )}
+          {!!data?.stale_links && (
+            <Link
+              to="/admin/alumnos?vinculado=missing"
+              className="mb-4 flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span className="flex items-center gap-2.5">
+                <Users className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
+                <span>
+                  <strong>{data.stale_links} alumno{data.stale_links === 1 ? '' : 's'} sin cliente en Loyverse.</strong>
+                  {' '}Probablemente ya no estudian aquí.
+                </span>
+              </span>
+              <span className="flex items-center gap-1 text-sm font-semibold text-purple">
+                Revisarlos <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </Link>
+          )}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-[18px] lg:grid-cols-3 xl:grid-cols-4">
             {isLoading ? (
               [0, 1, 2, 3, 4, 5, 6, 7].map(i => <div key={i} className="skeleton h-[148px]" />)
             ) : (
               [
-                <StatCard key="a" title="Alumnos activos" value={data?.total_students ?? 0} icon={Users} color="purple" subtitle={data?.stale_links ? `${data.stale_links} por dar de baja (sin tarjeta en Loyverse)` : undefined} />,
+                <StatCard key="a" title="Alumnos activos" value={data?.total_students ?? 0} icon={Users} color="purple" subtitle={data?.stale_links ? `${data.stale_links} sin cliente en Loyverse` : undefined} />,
                 <StatCard key="b" title="Saldo total cafetería" value={formatMXN(data?.cafeteria_total_balance ?? 0)} icon={Coffee} color="green" />,
                 <StatCard key="c" title="Saldos bajos" value={data?.low_balance_count ?? 0} icon={AlertTriangle} color="amber" subtitle="alumnos activos en cafetería bajo su umbral" />,
                 <StatCard key="d" title="Recargas por aplicar" value={data?.pending_topups ?? 0} icon={Coffee} color="coral" subtitle={data?.pending_topups_online != null ? `${data.pending_topups_office ?? 0} en caja · ${data.pending_topups_online} con tarjeta por verificar o cargar en POS` : 'pagos en caja'} />,

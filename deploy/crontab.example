@@ -16,8 +16,12 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 COMPOSE=/opt/interlaken/deploy
 
-# A stock Ubuntu VPS runs on UTC, so "6 AM" here would fire at midnight local
-# time. Pin the zone rather than doing the arithmetic by hand twice a year.
+# Every hour below is Mexico City time. Ubuntu's cron (3.0pl1) IGNORES the
+# CRON_TZ line and reads the HOST clock, so the host must run on that zone:
+#   sudo timedatectl set-timezone America/Mexico_City && sudo systemctl restart cron
+# Until 2026-10-29 it ran on UTC and every job fired six hours early (the 07:05
+# top-up report at 01:05, the 18:00 digest at noon); deploy.sh now warns. The
+# line stays for crons that do honour it (cronie).
 CRON_TZ=America/Mexico_City
 
 # ── Cafeteria sync, every 5 minutes ─────────────────────────────────────────
@@ -81,6 +85,14 @@ CRON_TZ=America/Mexico_City
 # `mail`): it emails every active admin once per outage and lights the panel.
 */30 * * * * cd $COMPOSE && docker compose exec -T app python manage.py check_sync_fresh >> /var/log/interlaken/loyverse.log 2>&1
 
+# Loyverse switches a webhook off after repeated failed deliveries (October 2026:
+# a DNS outage, then hand-made replacements without the secret) and only emails
+# the merchant account. Hourly, read-only: is the receipts webhook on our secret
+# URL still ENABLED, and is anything else aimed at this domain? Emails the admins
+# once per distinct problem (weekly while it lasts); the 5-minute poll above
+# keeps balances right meanwhile, just slower.
+50 * * * * cd $COMPOSE && docker compose exec -T app python manage.py check_loyverse_webhook >> /var/log/interlaken/loyverse.log 2>&1
+
 # ── Nightly database backup, 02:30 (see backup-db.sh) ──────────────────────
 # Dumps whichever database DB_HOST names (the managed Postgres today). If this
 # stops, the only other copy is the off-site one backup-db.sh uploads itself.
@@ -94,6 +106,8 @@ CRON_TZ=America/Mexico_City
 
 # The off-box copy (Supabase S3) is done by backup-db.sh itself right after the
 # dump; it is a no-op until AWS_STORAGE_BUCKET_NAME + keys are set in .env.
+# A second, independent off-site copy is .github/workflows/db-backup.yml
+# (GPG-encrypted to deploy/backup-public-key.asc; the repo is public).
 
 # ── Log rotation so the files above cannot fill the disk ────────────────────
 0 3 * * 0 find /var/log/interlaken -name '*.log' -size +50M -exec truncate -s 0 {} \;

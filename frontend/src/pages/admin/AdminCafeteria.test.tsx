@@ -154,7 +154,7 @@ describe('AdminCafeteria Saldos (DataTable v2 + server filters)', () => {
     await waitFor(() => expect(api.bulkBalances).toHaveBeenLastCalledWith(expect.objectContaining({ dry_run: false, ids: [1] })));
   });
 
-  it('ajuste masivo posts the notify/mirror flags the person chose', async () => {
+  it('ajuste masivo posts the notify flag the person chose', async () => {
     const upload = vi.fn().mockResolvedValue(ok({ dry_run: true, total_rows: 1, counts: { crear: 1, actualizar: 0, omitir: 0, error: 0 }, rows: [
       { line: 2, key: '09932', action: 'crear', errors: [], warnings: [], data: { alumno: 'Ana Alvarez', monto: '50.00', saldo_actual: '10.00', saldo_resultante: '60.00' } },
     ] }));
@@ -163,7 +163,7 @@ describe('AdminCafeteria Saldos (DataTable v2 + server filters)', () => {
     renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria' });
     await u.click(await screen.findByRole('button', { name: /Ajuste masivo/ }));
     await u.click(screen.getByLabelText('Notificar a las familias'));
-    expect(adjustmentImportApi).toHaveBeenLastCalledWith({ notify: false, mirror: true });
+    expect(adjustmentImportApi).toHaveBeenLastCalledWith({ notify: false });
     const file = new File(['matricula,monto,motivo\n09932,50,Beca\n'], 'ajustes.csv', { type: 'text/csv' });
     const dialog = screen.getByRole('dialog');
     await u.upload(dialog.querySelector('input[type="file"]') as HTMLInputElement, file);

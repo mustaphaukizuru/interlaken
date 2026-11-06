@@ -234,7 +234,7 @@ export default function LoginPage() {
                     
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="correo@interlaken.edu.mx"
+                    placeholder="correo@interlaken.com.mx"
                     disabled={oauthBootstrapping}
                     aria-invalid={formError ? true : undefined}
                     aria-describedby={formError ? 'login-error' : undefined}

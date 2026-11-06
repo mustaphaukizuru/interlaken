@@ -141,7 +141,7 @@ function StudentForm({ student, onClose, onSaved, qc }: {
           value={form.email ?? ''}
           onChange={(e) => set('email', e.target.value)}
           error={errors.email}
-          hint="Vacío = acceso con matrícula@alumnos.interlaken.edu.mx. La contraseña la asigna un administrador."
+          hint="Escriba el correo escolar (ci…@interlaken.com.mx): con él la familia entra con Google y recibe los avisos. Vacío = una dirección interna sin buzón."
         />
         <fieldset className="space-y-4 rounded-xl border border-line p-4">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">Datos personales</legend>

@@ -96,7 +96,7 @@ describe('AdminContactInbox', () => {
     await waitFor(() => expect(confirm).toHaveFocus());
     await user.keyboard('{Enter}');
     await waitFor(() => expect(bulk).toHaveBeenLastCalledWith({ action: 'mark_handled', ids: [1], all_matching: false, filters: undefined, payload: {}, dry_run: false }));
-    expect(await within(dialog).findByRole('status')).toHaveTextContent('1 mensajes procesados');
+    expect(await within(dialog).findByRole('status')).toHaveTextContent('1 mensaje procesado');
   });
 
   it('"select all matching" sends the API filters to the bulk endpoint', async () => {
