@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 
 vi.mock('@/services/api', () => ({
   portalApi: {
     getStudent: vi.fn(),
+    studentsBulk: vi.fn(),
   },
 }));
+
+vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock('@/components/admin/StudentGuardians', () => ({
   StudentGuardians: ({ studentId }: { studentId: number }) => (
@@ -18,6 +21,7 @@ vi.mock('@/components/admin/StudentGuardians', () => ({
 import AdminStudentDetail from './AdminStudentDetail';
 import { portalApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { useAuthStore } from '@/store/authStore';
 
 const getStudent = vi.mocked(portalApi.getStudent);
 
@@ -100,5 +104,75 @@ describe('AdminStudentDetail', () => {
         '/admin/cafeteria/7',
       );
     });
+  });
+});
+
+describe('AdminStudentDetail: archiving and removing', () => {
+  const bulk = vi.mocked(portalApi.studentsBulk);
+  const openFile = (student: unknown = STUDENT) => {
+    getStudent.mockResolvedValue({ data: student } as never);
+    return renderWithProviders(
+      <Routes>
+        <Route path="/admin/alumnos/:studentId" element={<AdminStudentDetail />} />
+        <Route path="/admin/alumnos" element={<div>Listado</div>} />
+      </Routes>,
+      { route: '/admin/alumnos/7' },
+    );
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: { id: 1, email: 'x@x.mx', role: 'admin' } as never });
+    bulk.mockImplementation(async (body) => ({
+      data: { action: body.action, requested: 1, ok: 1, failed: [], skipped: [], dry_run: !!body.dry_run },
+    }) as never);
+  });
+
+  it('deletes after the typed confirmation and returns to the list', async () => {
+    const user = userEvent.setup();
+    openFile();
+    await user.click(await screen.findByRole('button', { name: 'Eliminar' }));
+    const dialog = await screen.findByRole('dialog', { name: /Eliminar definitivamente: Luis/ });
+    await user.type(await within(dialog).findByLabelText(/Escriba ELIMINAR/), 'ELIMINAR');
+    await user.click(within(dialog).getByRole('button', { name: /Eliminar definitivamente \(1\)/ }));
+
+    expect(await screen.findByText('Listado')).toBeInTheDocument();
+    expect(bulk).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: 'delete', ids: [7], dry_run: false, payload: { confirm: 'ELIMINAR' },
+    }));
+  });
+
+  it('stays on the file when the server refuses, with the reason on screen', async () => {
+    bulk.mockImplementation(async (body) => ({
+      data: {
+        action: body.action, requested: 1, ok: 0, failed: [], dry_run: !!body.dry_run,
+        skipped: [{ id: 7, reason: 'ya inició sesión en el portal' }],
+      },
+    }) as never);
+    const user = userEvent.setup();
+    openFile();
+    await user.click(await screen.findByRole('button', { name: 'Eliminar' }));
+    const dialog = await screen.findByRole('dialog', { name: /Eliminar definitivamente/ });
+
+    expect(await within(dialog).findByText(/1 porque ya inició sesión en el portal/)).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/Escriba ELIMINAR/)).toBeNull();
+    expect(within(dialog).getByRole('button', { name: /Eliminar definitivamente \(0\)/ })).toBeDisabled();
+  });
+
+  it('offers Dar de baja to an active student and Reactivar to an archived one', async () => {
+    const user = userEvent.setup();
+    openFile({ ...STUDENT, status: 'withdrawn', is_active: false });
+    await user.click(await screen.findByRole('button', { name: 'Reactivar' }));
+    expect(screen.queryByRole('button', { name: 'Dar de baja' })).toBeNull();
+    await waitFor(() => expect(bulk).toHaveBeenCalledWith({
+      action: 'status', ids: [7], all_matching: false, filters: undefined, payload: { value: 'active' }, dry_run: true,
+    }));
+  });
+
+  it('does not offer the delete to staff', async () => {
+    useAuthStore.setState({ user: { id: 2, email: 's@x.mx', role: 'staff', staff_areas: ['alumnos'] } as never });
+    openFile();
+    expect(await screen.findByRole('button', { name: 'Dar de baja' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Eliminar' })).toBeNull();
   });
 });

@@ -109,13 +109,15 @@ function LinkLoyverseBody({ onClose, onLinked }: {
     setBajaBusy(true);
     try {
       const { data } = await portalApi.bulkStudents({ ids: [...selected], action: 'status', value: 'withdrawn' });
-      toast.success(`${data.updated} alumno(s) dados de baja.`);
+      const notDone = (data.failed?.length ?? 0) + (data.skipped?.length ?? 0);
+      if (notDone > 0) toast.error(`${data.updated} dado(s) de baja; ${notDone} no se pudieron aplicar.`);
+      else toast.success(`${data.updated} alumno(s) dados de baja.`);
       setConfirmBaja(false);
       setSelected(new Set());
       onLinked?.();
       retry();
-    } catch {
-      toast.error('No se pudo aplicar la baja.');
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'No se pudo aplicar la baja.'));
     } finally {
       setBajaBusy(false);
     }
@@ -236,7 +238,7 @@ function LinkLoyverseBody({ onClose, onLinked }: {
           <div className="flex items-center justify-between gap-2 pt-1">
             {report.linked === 0 ? (
               <p className="flex items-center gap-1.5 text-sm text-green-dark">
-                <CheckCircle2 className="h-4 w-4" /> Todo al día — nada por vincular.
+                <CheckCircle2 className="h-4 w-4" /> Nada por vincular.
               </p>
             ) : <span />}
             <div className="flex gap-2">

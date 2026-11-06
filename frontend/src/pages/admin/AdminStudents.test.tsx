@@ -21,6 +21,7 @@ import AdminStudents from './AdminStudents';
 import { api, portalApi, downloadBlob } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
+import { useAuthStore } from '@/store/authStore';
 
 const mockedStudents = vi.mocked(portalApi.getStudents);
 
@@ -34,9 +35,14 @@ describe('AdminStudents states', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('shows an error state (not "Sin alumnos") and recovers on retry', async () => {
-    mockedStudents
-      .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce({ data: { results: [], count: 0 } } as never);
+    // The leavers notice runs its own query: only the roster itself fails here.
+    let roster = 0;
+    mockedStudents.mockImplementation(async (params) => {
+      if (params?.linked === 'missing') return { data: { results: [], count: 0 } } as never;
+      roster += 1;
+      if (roster === 1) throw new Error('network down');
+      return { data: { results: [], count: 0 } } as never;
+    });
 
     renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
 
@@ -47,7 +53,7 @@ describe('AdminStudents states', () => {
 
     expect(await screen.findByText('Sin alumnos')).toBeInTheDocument();
     expect(screen.queryByText('No se pudo cargar la información')).toBeNull();
-    expect(mockedStudents).toHaveBeenCalledTimes(2);
+    expect(roster).toBe(2);
   });
 });
 
@@ -72,7 +78,7 @@ describe('AdminStudents URL-synced filters', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent('/admin/alumnos?q=ana'));
     await waitFor(() =>
-      expect(mockedStudents).toHaveBeenCalledWith({ page: 1, q: 'ana' }));
+      expect(mockedStudents).toHaveBeenCalledWith({ page: 1, q: 'ana', status: 'active' }));
   });
 
   it('mounting from a URL with filters restores the state', async () => {
@@ -87,7 +93,7 @@ describe('AdminStudents URL-synced filters', () => {
     // Input restored from ?q=, and the query fires with the URL's filter+page.
     expect(screen.getByLabelText('Buscar alumnos')).toHaveValue('garcia');
     await waitFor(() =>
-      expect(mockedStudents).toHaveBeenCalledWith({ page: 3, q: 'garcia' }));
+      expect(mockedStudents).toHaveBeenCalledWith({ page: 3, q: 'garcia', status: 'active' }));
 
     // Active-filter chip row appears with the search chip.
     expect(await screen.findByLabelText('Filtros activos')).toBeInTheDocument();
@@ -206,6 +212,123 @@ describe('AdminStudents on DataTable v2 (Data Ops Phase 3)', () => {
     await user.keyboard('{Enter}');
     await waitFor(() => expect(bulk).toHaveBeenLastCalledWith({ action: 'status', ids: [5, 6], all_matching: false, filters: undefined, payload: { value: 'withdrawn' }, dry_run: false }));
     expect(await screen.findByText(/procesados/)).toBeInTheDocument();
+  });
+
+  describe('adding, archiving and removing students', () => {
+    const asRole = (role: 'admin' | 'staff') => useAuthStore.setState({ user: { id: 1, email: 'x@x.mx', role, staff_areas: ['alumnos'] } as never });
+    const rosterWithLeavers = (leavers: number) => mockedStudents.mockImplementation(async (params) => {
+      if (params?.linked === 'missing') return { data: { count: leavers, next: null, previous: null, results: leavers ? [ana, beto] : [] } } as never;
+      return { data: { count: 2, next: null, previous: null, results: [ana, beto] } } as never;
+    });
+    const planAndCommit = () => vi.mocked(portalApi.studentsBulk).mockImplementation(async (body) => ({
+      data: {
+        action: body.action, requested: 2, ok: 1, failed: [], dry_run: !!body.dry_run,
+        skipped: [{ id: 5, reason: 'todavía tiene saldo en cafetería' }],
+      },
+    }) as never);
+
+    beforeEach(() => asRole('admin'));
+
+    it('opens on the active students and keeps that URL clean', async () => {
+      rosterWithLeavers(0);
+      renderWithProviders(<><AdminStudents /><LocationProbe /></>, { route: '/admin/alumnos' });
+      await screen.findByText('Ana López');
+      expect(mockedStudents).toHaveBeenCalledWith({ page: 1, status: 'active' });
+      expect(screen.getByRole('tab', { name: 'Activo' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByLabelText('Filtros activos')).toBeNull();
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Todos' }));
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('estado=todos'));
+      await waitFor(() => expect(mockedStudents).toHaveBeenLastCalledWith({ page: 1 }));
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Activo' }));
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/admin\/alumnos$/));
+    });
+
+    it('shows nothing about leavers when there are none', async () => {
+      rosterWithLeavers(0);
+      renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+      await screen.findByText('Ana López');
+      expect(screen.queryByRole('link', { name: /sin cliente|ya no tienen? cliente/i })).toBeNull();
+    });
+
+    it('the notice leads to the leavers, and "select all" then erases who it can', async () => {
+      rosterWithLeavers(35);
+      planAndCommit();
+      const user = userEvent.setup();
+      renderWithProviders(<><AdminStudents /><LocationProbe /></>, { route: '/admin/alumnos' });
+
+      await user.click(await screen.findByRole('link', { name: /35 alumnos.*ya no tienen cliente en Loyverse/ }));
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('vinculado=missing'));
+      await waitFor(() => expect(mockedStudents).toHaveBeenCalledWith({ page: 1, status: 'active', linked: 'missing' }));
+
+      await user.click(await screen.findByRole('button', { name: /Seleccionar los 35/ }));
+      const bar = await screen.findByRole('region', { name: 'Acciones en lote' });
+      await user.click(within(bar).getByRole('button', { name: 'Eliminar definitivamente' }));
+
+      // The plan says who is kept and why, and points to the baja for them.
+      const dialog = await screen.findByRole('dialog', { name: /Eliminar definitivamente/ });
+      expect(await within(dialog).findByText(/1 porque todavía tiene saldo en cafetería/)).toBeInTheDocument();
+      expect(within(dialog).getByText(/A quienes se omiten use «Dar de baja»/)).toBeInTheDocument();
+      expect(vi.mocked(portalApi.studentsBulk)).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'delete', all_matching: true, dry_run: true, filters: expect.objectContaining({ linked: 'missing', status: 'active' }),
+      }));
+
+      // Nothing runs until the word is typed.
+      const confirm = within(dialog).getByRole('button', { name: /Eliminar definitivamente \(1\)/ });
+      expect(confirm).toBeDisabled();
+      await user.type(within(dialog).getByLabelText(/Escriba ELIMINAR/), 'eliminar');
+      expect(confirm).toBeDisabled();
+      await user.clear(within(dialog).getByLabelText(/Escriba ELIMINAR/));
+      await user.type(within(dialog).getByLabelText(/Escriba ELIMINAR/), 'ELIMINAR');
+      await user.click(confirm);
+      await waitFor(() => expect(vi.mocked(portalApi.studentsBulk)).toHaveBeenLastCalledWith(expect.objectContaining({
+        action: 'delete', dry_run: false, payload: { confirm: 'ELIMINAR' },
+      })));
+    });
+
+    it('one row can be archived, and only an archived row offers Reactivar', async () => {
+      mockedStudents.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [ana, { ...beto, status: 'withdrawn', is_active: false }] } } as never);
+      vi.mocked(portalApi.studentsBulk).mockImplementation(async (body) => ({
+        data: { action: 'status', requested: 1, ok: 1, failed: [], skipped: [], dry_run: !!body.dry_run },
+      }) as never);
+      const user = userEvent.setup();
+      renderWithProviders(<AdminStudents />, { route: '/admin/alumnos?estado=todos' });
+      await screen.findByText('Ana López');
+
+      expect(screen.queryByRole('button', { name: 'Reactivar a Ana López' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Dar de baja a Beto Ruiz' })).toBeNull();
+
+      await user.click(screen.getByRole('button', { name: 'Dar de baja a Ana López' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Dar de baja: Ana López' });
+      expect(await within(dialog).findByText(/se puede reactivar/)).toBeInTheDocument();
+      expect(vi.mocked(portalApi.studentsBulk)).toHaveBeenCalledWith({
+        action: 'status', ids: [5], all_matching: false, filters: undefined, payload: { value: 'withdrawn' }, dry_run: true,
+      });
+      await user.click(within(dialog).getByRole('button', { name: /Dar de baja \(1\)/ }));
+      await waitFor(() => expect(vi.mocked(portalApi.studentsBulk)).toHaveBeenLastCalledWith(expect.objectContaining({ ids: [5], dry_run: false })));
+    });
+
+    it('a staff account can archive but is not offered the delete', async () => {
+      asRole('staff');
+      rosterWithLeavers(0);
+      const user = userEvent.setup();
+      renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+      await screen.findByText('Ana López');
+
+      expect(screen.getByRole('button', { name: 'Dar de baja a Ana López' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Eliminar a Ana López' })).toBeNull();
+      await user.click(screen.getByRole('checkbox', { name: 'Seleccionar Ana López' }));
+      const bar = await screen.findByRole('region', { name: 'Acciones en lote' });
+      expect(within(bar).getByRole('button', { name: 'Dar de baja' })).toBeInTheDocument();
+      expect(within(bar).queryByRole('button', { name: 'Eliminar definitivamente' })).toBeNull();
+    });
+
+    it('flags a student whose customer is gone', async () => {
+      mockedStudents.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [{ ...ana, loyverse_missing_since: '2026-09-23T00:00:00Z' }] } } as never);
+      renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+      expect(await screen.findByText('Sin cliente en Loyverse')).toBeInTheDocument();
+    });
   });
 
   it('opens the generic ImportDialog with the students template', async () => {

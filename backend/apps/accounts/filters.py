@@ -78,6 +78,8 @@ class StudentFilterSet(django_filters.FilterSet):
         return qs.filter(group__iexact=value.strip()[:5]) if value else qs
 
     def filter_linked(self, qs, name, value):
+        if value == "missing":  # customer deleted in Loyverse: a leaver nobody archived yet
+            return qs.filter(is_active=True, loyverse_missing_since__isnull=False)
         flag = _yes_no(value)
         if flag is True:
             return qs.exclude(loyverse_id="")

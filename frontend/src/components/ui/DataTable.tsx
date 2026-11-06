@@ -75,6 +75,8 @@ interface Props<Row> {
   columnControls?: boolean;
   /** First data column stays visible while scrolling sideways (≥ md). */
   pinFirstColumn?: boolean;
+  /** The row actions stay visible at the right edge while scrolling sideways (≥ lg). */
+  pinActions?: boolean;
   /** Pointer-drag column widths, persisted per table (≥ md). */
   resizable?: boolean;
   onRowClick?: (row: Row) => void;
@@ -106,7 +108,7 @@ const MIN_WIDTH = 56;
 export function DataTable<Row>({
   columns, rows, rowKey, sort, onSort, page, count = 0, onPage, pageSize = ADMIN_PAGE_SIZE, itemLabel = 'resultados',
   isLoading, isError, onRetry, empty, rowClassName, wrapClassName = '',
-  tableId, selection, toolbar, bulkBar, columnControls = false, pinFirstColumn = false, resizable = false,
+  tableId, selection, toolbar, bulkBar, columnControls = false, pinFirstColumn = false, pinActions = false, resizable = false,
   onRowClick, stickyHeader = true, rowActions, rowLabel, caption,
 }: Props<Row>) {
   const cols = useMemo(
@@ -220,6 +222,7 @@ export function DataTable<Row>({
             'admin-table',
             prefs.density === 'dense' ? 'admin-table--dense' : '',
             pinFirstColumn ? 'admin-table--pin-first' : '',
+            pinActions ? 'admin-table--pin-actions' : '',
             stickyHeader ? '' : 'admin-table--static',
             onRowClick ? 'admin-table--clickable' : '',
           ].filter(Boolean).join(' ')}
@@ -362,7 +365,7 @@ export function DataTable<Row>({
     <>
       {hasToolbar && (
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">{toolbar}</div>
+          <div className="min-w-0 flex-1 basis-full md:basis-0">{toolbar}</div>
           {columnControls && (
             <ColumnControls
               className="ml-auto"

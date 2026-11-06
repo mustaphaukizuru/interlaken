@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+
 vi.mock('@/services/api', () => ({
   portalApi: {
     linkLoyverse: vi.fn(),
@@ -11,6 +13,7 @@ vi.mock('@/services/api', () => ({
 
 import { LinkLoyverseModal } from './LinkLoyverseModal';
 import { portalApi } from '@/services/api';
+import toast from 'react-hot-toast';
 
 const linkLoyverse = vi.mocked(portalApi.linkLoyverse);
 const bulkStudents = vi.mocked(portalApi.bulkStudents);
@@ -115,5 +118,34 @@ describe('LinkLoyverseModal — posible baja (customer kept, grade code removed)
     await waitFor(() => expect(bulkStudents).toHaveBeenCalledWith({
       ids: [21, 11], action: 'status', value: 'withdrawn',
     }));
+  });
+});
+
+describe('LinkLoyverseModal: when a baja does not go through', () => {
+  const pickAllAndConfirm = async () => {
+    const user = userEvent.setup();
+    render(<LinkLoyverseModal open onClose={() => {}} />);
+    await screen.findByText('Sara Isabella Duran Castillo');
+    await user.click(screen.getByRole('checkbox', { name: /Seleccionar todos/ }));
+    await user.click(screen.getByRole('button', { name: /Dar de baja \(2\)/ }));
+    await user.click(await screen.findByRole('button', { name: /Dar de baja a 2/ }));
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    linkLoyverse.mockResolvedValue({ data: report } as never);
+  });
+
+  it("shows the server's own message", async () => {
+    bulkStudents.mockRejectedValueOnce({ isAxiosError: true, response: { status: 403, data: { detail: 'No tiene permiso para esta acción.' } } });
+    await pickAllAndConfirm();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No tiene permiso para esta acción.'));
+  });
+
+  it('says so when only part of the selection was applied', async () => {
+    bulkStudents.mockResolvedValueOnce({ data: { updated: 1, failed: [{ id: 12, error: 'x' }], skipped: [] } } as never);
+    await pickAllAndConfirm();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('1 dado(s) de baja; 1 no se pudieron aplicar.'));
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

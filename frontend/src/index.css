@@ -255,6 +255,16 @@
     .admin-table--pin-first tbody tr.admin-table__row--selected td.admin-table__select,
     .admin-table--pin-first tbody tr.admin-table__row--selected td.admin-table__pin { @apply bg-brand-50; }
   }
+  @media (min-width: 1024px) {
+    .admin-table--pin-actions thead th.admin-table__actions,
+    .admin-table--pin-actions tbody td.admin-table__actions {
+      position: sticky; right: 0; z-index: 5; @apply bg-white;
+      box-shadow: inset 1px 0 0 theme('colors.line');
+    }
+    .admin-table--pin-actions thead th.admin-table__actions { z-index: 15; @apply bg-cream-2; }
+    .admin-table--pin-actions tbody tr:hover td.admin-table__actions { @apply bg-cream; }
+    .admin-table--pin-actions tbody tr.admin-table__row--selected td.admin-table__actions { @apply bg-brand-50; }
+  }
 
   /* Mobile (<768px): dense tables that ship no bespoke card list collapse into
      stacked cards. Scoped with :not(.hidden) so tables that already pair a

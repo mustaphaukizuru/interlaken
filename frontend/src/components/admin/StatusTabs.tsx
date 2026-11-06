@@ -13,6 +13,8 @@ export interface StatusTabsProps {
   options: StatusTabOption[];
   /** Label of the "no filter" tab; `null` hides it (one option is always active). */
   allLabel?: string | null;
+  /** The tab that is on while the URL has no value (it keeps the URL clean when picked). */
+  defaultValue?: string;
   allCount?: number;
   /** Accessible name of the tab list. */
   label?: string;
@@ -24,13 +26,13 @@ export interface StatusTabsProps {
  * · Confirmadas …". Selecting a tab resets the page. Arrow keys move between
  * tabs (roving focus), matching the WAI tabs pattern the console already uses.
  */
-export function StatusTabs({ paramKey = 'estado', options, allLabel = 'Todos', allCount, label = 'Filtrar por estado', className = '' }: StatusTabsProps) {
+export function StatusTabs({ paramKey = 'estado', options, allLabel = 'Todos', defaultValue = '', allCount, label = 'Filtrar por estado', className = '' }: StatusTabsProps) {
   const { get, set } = useUrlFilters();
-  const active = get(paramKey);
+  const active = get(paramKey) || defaultValue;
   const listRef = useRef<HTMLDivElement>(null);
   const tabs: StatusTabOption[] = allLabel === null ? options : [{ value: '', label: allLabel, count: allCount }, ...options];
 
-  const select = (value: string) => set({ [paramKey]: value || null, page: null });
+  const select = (value: string) => set({ [paramKey]: value && value !== defaultValue ? value : null, page: null });
 
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     const keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
