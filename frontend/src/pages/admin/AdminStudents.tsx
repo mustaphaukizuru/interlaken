@@ -425,7 +425,7 @@ export default function AdminStudents() {
                 itemLabel="alumnos"
                 gender="m"
                 actions={bulkActions}
-                inline={4}
+                inline={5}
                 onAction={startBulk}
                 busy={bulk.isPending}
                 exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="alumnos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
