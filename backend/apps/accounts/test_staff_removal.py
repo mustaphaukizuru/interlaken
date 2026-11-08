@@ -84,10 +84,15 @@ class TestDelete:
 
         assert resp.data["outcomes"] == {"erased": 1}, resp.data
         assert not User.objects.filter(pk=pk).exists()
-        row = AuditLog.objects.get(action="delete", object_type="accounts.user", object_id=str(pk),
-                                   changes__bulk="delete")
+        row = AuditLog.objects.get(
+            action="delete", object_type="accounts.user", object_id=str(pk), changes__bulk="delete"
+        )
         assert row.actor == admin
-        assert row.changes["deleted"] == {"email": "nueva@x.mx", "name": "Nueva Cuenta", "role": "staff"}
+        assert row.changes["deleted"] == {
+            "email": "nueva@x.mx",
+            "name": "Nueva Cuenta",
+            "role": "staff",
+        }
 
     @pytest.mark.parametrize("history", ["signed_in", "acted"])
     def test_an_account_with_history_is_archived(self, me, history):
@@ -158,8 +163,11 @@ class TestEdit:
         client, _ = me
         t = teacher(email="old@x.mx")
 
-        resp = client.patch(self.url(t), {"first_name": "Laura", "last_name": "Mtz", "email": " Nueva@X.mx "},
-                            format="json")
+        resp = client.patch(
+            self.url(t),
+            {"first_name": "Laura", "last_name": "Mtz", "email": " Nueva@X.mx "},
+            format="json",
+        )
 
         assert resp.status_code == 200, resp.data
         t.refresh_from_db()
@@ -180,7 +188,9 @@ class TestEdit:
 
     def test_a_name_cannot_be_blank(self, me):
         client, _ = me
-        assert client.patch(self.url(teacher()), {"first_name": " "}, format="json").status_code == 400
+        assert (
+            client.patch(self.url(teacher()), {"first_name": " "}, format="json").status_code == 400
+        )
 
 
 class TestActivity:
@@ -213,7 +223,10 @@ class TestActivity:
 
     def test_a_family_account_is_not_found_here(self, me):
         client, _ = me
-        assert client.get(reverse("admin-staff-activity", args=[ParentFactory().id])).status_code == 404
+        assert (
+            client.get(reverse("admin-staff-activity", args=[ParentFactory().id])).status_code
+            == 404
+        )
 
 
 class TestNoSessionForADeactivatedAccount:

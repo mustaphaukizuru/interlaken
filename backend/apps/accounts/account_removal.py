@@ -13,6 +13,7 @@ The "nothing to keep" test fails closed: it asks Django what a delete of the
 login would touch, and anything outside ``DISPOSABLE`` (a model added next
 year included) counts as history.
 """
+
 from django.contrib.admin.utils import NestedObjects
 from django.db import DEFAULT_DB_ALIAS
 from django.db.models import QuerySet
@@ -23,16 +24,18 @@ from apps.core.bulk import BulkSkip
 from .admin_password import revoke_refresh_tokens
 
 # What an erase may take with it: the account and its own settings and inbox.
-DISPOSABLE = frozenset({
-    'accounts.user',
-    'accounts.studentprofile',
-    'accounts.studentprofile_parents',
-    'accounts.notificationpreference',
-    'cafeteria.loyverseprofile',
-    'portal.notification',
-    'portal.pushsubscription',
-    'portal.announcementread',
-})
+DISPOSABLE = frozenset(
+    {
+        "accounts.user",
+        "accounts.studentprofile",
+        "accounts.studentprofile_parents",
+        "accounts.notificationpreference",
+        "cafeteria.loyverseprofile",
+        "portal.notification",
+        "portal.pushsubscription",
+        "portal.announcementread",
+    }
+)
 
 
 def has_history(user, *, keep_allowed=None) -> bool:
@@ -59,24 +62,27 @@ def has_history(user, *, keep_allowed=None) -> bool:
 def archive_account(user) -> dict:
     """Hide ``user``, block their sign-in and end their sessions. Returns the audit changes."""
     if user.archived_at is not None:
-        raise BulkSkip('ya está archivado')
+        raise BulkSkip("ya está archivado")
     was_active = user.is_active
     user.archived_at = timezone.now()
     user.is_active = False
-    user.save(update_fields=['archived_at', 'is_active'])
-    return {'archived': [False, True], 'is_active': [was_active, False],
-            'sessions_revoked': revoke_refresh_tokens(user)}
+    user.save(update_fields=["archived_at", "is_active"])
+    return {
+        "archived": [False, True],
+        "is_active": [was_active, False],
+        "sessions_revoked": revoke_refresh_tokens(user),
+    }
 
 
 def restore_account(user, *, reactivate: bool) -> dict:
     """Bring ``user`` back to the lists; staff may sign in again, students wait for Reactivar."""
     if user.archived_at is None:
-        raise BulkSkip('no está archivado')
+        raise BulkSkip("no está archivado")
     user.archived_at = None
-    fields, changes = ['archived_at'], {'archived': [True, False]}
+    fields, changes = ["archived_at"], {"archived": [True, False]}
     if reactivate and not user.is_active:
         user.is_active = True
-        fields.append('is_active')
-        changes['is_active'] = [False, True]
+        fields.append("is_active")
+        changes["is_active"] = [False, True]
     user.save(update_fields=fields)
     return changes
