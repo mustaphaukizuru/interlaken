@@ -174,6 +174,8 @@ export interface BulkResult {
   skipped: BulkSkip[];
   dry_run: boolean;
   warnings?: BulkWarning[];
+  /** Rows per outcome when an action ends differently per row: `{erased: 16, archived: 19}`. */
+  outcomes?: Record<string, number>;
 }
 
 export type BulkFetcher = (body: BulkRequest) => Promise<AxiosResponse<BulkResult>>;

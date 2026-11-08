@@ -109,4 +109,19 @@ describe('BulkConfirmDialog', () => {
     );
     expect(await screen.findByText('Total: 300.00')).toBeInTheDocument();
   });
+
+  it('a destructive action opens on Cancelar, so a stray Enter never runs it', async () => {
+    const execute = vi.fn(async (body: BulkRequest) => ({ ...plan, skipped: [], requested: 2, ok: 2, dry_run: !!body.dry_run }));
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <BulkConfirmDialog open onClose={onClose} entityLabel="alumnos" ids={[1, 2]}
+        action={{ name: 'delete', label: 'Eliminar', planVerb: 'Eliminar afecta a', danger: true, payload: { confirm: 'ELIMINAR' } }} execute={execute} />,
+    );
+    await screen.findByRole('button', { name: 'Eliminar (2)' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancelar' })).toHaveFocus());
+    await user.keyboard('{Enter}');
+    expect(onClose).toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledTimes(1); // only the dry run
+  });
 });

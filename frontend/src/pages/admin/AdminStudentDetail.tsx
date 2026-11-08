@@ -6,7 +6,7 @@ import { cafeteriaApi } from '@/services/api';
 import type { CafeteriaCard } from '@/types';
 import { Printer } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Coffee, Pencil, RotateCcw, Trash2, UserMinus } from 'lucide-react';
+import { Archive, ArrowLeft, Coffee, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -14,7 +14,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
-import { DELETE_ACTION, REACTIVATE_ACTION, WITHDRAW_ACTION, studentPlanNote } from '@/components/admin/studentActions';
+import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
+import { AuditTimeline } from '@/components/admin/AuditTimeline';
 import { Badge } from '@/components/ui/Badge';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { studentDetailKey } from '@/hooks/queries/studentKeys';
@@ -26,8 +27,9 @@ import type { BulkActionDef } from '@/services/api';
 import type { StudentProfile } from '@/types';
 
 /**
- * /admin/alumnos/:studentId — student file: identity, guardians and the
- * cafetería shortcut. (The app does not bill tuition, so there is no ledger.)
+ * /admin/alumnos/:studentId — student file: identity, guardians, the cafetería
+ * shortcut and the Historial of changes, with Archivar / Restaurar and (admins)
+ * Eliminar. (The app does not bill tuition, so there is no ledger.)
  */
 /** Full page at /admin/alumnos/:id, or embedded as the right pane of the 2xl two-pane roster (BACKLOG P1-B10). */
 export default function AdminStudentDetail({ id, embedded = false, onDeleted }: { id?: number; embedded?: boolean; onDeleted?: () => void } = {}) {
@@ -83,12 +85,32 @@ function CredencialCard({ studentId }: { studentId: number }) {
   );
 }
 
-type Tab = 'datos' | 'tutores' | 'cafeteria';
-const TABS: { key: Tab; label: string }[] = [
+type Tab = 'datos' | 'tutores' | 'cafeteria' | 'historial';
+// `short` keeps the four tabs on one phone-width row.
+const TABS: { key: Tab; label: string; short?: string }[] = [
   { key: 'datos', label: 'Datos' },
   { key: 'tutores', label: 'Tutores' },
-  { key: 'cafeteria', label: 'Cafetería y credencial' },
+  { key: 'cafeteria', label: 'Cafetería y credencial', short: 'Cafetería' },
+  { key: 'historial', label: 'Historial' },
 ];
+
+const DANGER_OUTLINE =
+  'btn-outline border-coral-600 text-coral-700 hover:border-coral-700 hover:bg-coral-50 hover:text-coral-700';
+
+/** Who changed this file and when (Auditoría rows for the file and its login). */
+function StudentHistory({ studentId }: { studentId: number }) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: [...studentDetailKey(studentId), 'history'],
+    queryFn: async () => (await portalApi.getStudentHistory(studentId)).data,
+  });
+  return (
+    <Card title="Historial de cambios">
+      {isLoading ? <LoadingSpinner /> : isError || !data ? <ErrorState onRetry={() => refetch()} /> : (
+        <AuditTimeline entries={data} empty="Este expediente no tiene cambios registrados todavía." />
+      )}
+    </Card>
+  );
+}
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -107,9 +129,10 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
   const bulk = useStudentsBulk();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const archived = student.is_active === false;
-  const lifecycle = archived ? REACTIVATE_ACTION : WITHDRAW_ACTION;
-  const LifecycleIcon = archived ? RotateCcw : UserMinus;
+  const archived = !!student.archived_at;
+  const ArchiveIcon = ARCHIVE_ACTION.icon!;
+  const RestoreIcon = RESTORE_ACTION.icon!;
+  const DeleteIcon = DELETE_ACTION.icon!;
   return (
     <>
       <StudentFormModal open={editOpen} onClose={() => setEditOpen(false)} student={student} />
@@ -123,16 +146,17 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
         ids={[student.id]}
         subject={student.user.full_name}
         execute={(body) => bulk.mutateAsync(body)}
-        renderPlan={studentPlanNote(confirming)}
+        renderPlan={removalPlanNote(confirming)}
         onDone={(r) => {
-          if (confirming?.name === 'delete' && r.ok > 0) {
+          if (r.outcomes?.erased) {
+            // The file is gone: leave the page (or close the two-pane panel).
             toast.success('Alumno eliminado.');
             setConfirming(null);
             if (onDeleted) onDeleted();
             else navigate('/admin/alumnos');
-          } else {
-            void qc.invalidateQueries({ queryKey: studentDetailKey(student.id) });
+            return;
           }
+          void qc.invalidateQueries({ queryKey: studentDetailKey(student.id) });
         }}
       />
       <PageHeader
@@ -146,23 +170,41 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
             <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline">
               <Coffee size={16} aria-hidden="true" /> Cafetería
             </Link>
-            <button type="button" className="btn-outline" onClick={() => setConfirming(lifecycle)}>
-              <LifecycleIcon size={16} aria-hidden="true" /> {lifecycle.label}
-            </button>
+            {/* An archived file offers Restaurar in its banner, next to the explanation. */}
+            {!archived && (
+              <button type="button" className="btn-outline" onClick={() => setConfirming(ARCHIVE_ACTION)}>
+                <ArchiveIcon size={16} aria-hidden="true" /> {ARCHIVE_ACTION.label}
+              </button>
+            )}
             {canDelete && (
-              <button type="button" className="btn-outline" onClick={() => setConfirming(DELETE_ACTION)}>
-                <Trash2 size={16} aria-hidden="true" /> Eliminar
+              <button type="button" className={DANGER_OUTLINE} onClick={() => setConfirming(DELETE_ACTION)}>
+                <DeleteIcon size={16} aria-hidden="true" /> Eliminar
               </button>
             )}
           </>
         )}
       />
 
+      {archived && (
+        <div role="status" className="mb-4 flex flex-col gap-3 rounded-xl2 border border-line bg-cream-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2.5 text-sm text-ink">
+            <Archive className="mt-0.5 h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
+            <span>
+              <strong>Archivado el {new Date(student.archived_at!).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}.</strong>{' '}
+              No aparece en las listas ni puede entrar al portal; su historial y su saldo se conservan.
+            </span>
+          </p>
+          <button type="button" className="btn-outline min-h-[44px] shrink-0 sm:min-h-[40px]" onClick={() => setConfirming(RESTORE_ACTION)}>
+            <RestoreIcon size={16} aria-hidden="true" /> Restaurar
+          </button>
+        </div>
+      )}
+
       <div role="tablist" aria-label="Secciones del expediente" className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-cream-2 p-1">
         {TABS.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
-            className={`min-h-[40px] whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
-            {t.label}
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} aria-label={t.label}
+            className={`min-h-[44px] whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors sm:min-h-[40px] sm:px-4 ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
+            {t.short ? <><span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span></> : t.label}
           </button>
         ))}
       </div>
@@ -227,6 +269,8 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
       </>)}
 
       {tab === 'tutores' && <StudentGuardians studentId={student.id} />}
+
+      {tab === 'historial' && <StudentHistory studentId={student.id} />}
 
       {tab === 'cafeteria' && (
         <div className="space-y-6">

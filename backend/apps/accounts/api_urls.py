@@ -25,6 +25,7 @@ from .security import (
     TotpSetupView,
 )
 from .staff_users import (
+    StaffActivityView,
     StaffBulkView,
     StaffDetailView,
     StaffExportView,
@@ -33,7 +34,12 @@ from .staff_users import (
     StaffListCreateView,
     StaffResetPasswordView,
 )
-from .student_admin import AdminStudentBulkView, AdminStudentCreateView, AdminStudentUpdateView
+from .student_admin import (
+    AdminStudentBulkView,
+    AdminStudentCreateView,
+    AdminStudentHistoryView,
+    AdminStudentUpdateView,
+)
 
 urlpatterns = [
     # Data Ops (C3/C4/C5): export, import and bulk on the roster.
@@ -51,6 +57,8 @@ urlpatterns = [
     path('admin/school-year/run/', SchoolYearRunView.as_view(), name='school-year-run'),
     path('admin/students/bulk/', AdminStudentBulkView.as_view(), name='admin-student-bulk'),
     path('admin/students/<int:pk>/', AdminStudentUpdateView.as_view(), name='admin-student-update'),
+    path('admin/students/<int:pk>/history/', AdminStudentHistoryView.as_view(),
+         name='admin-student-history'),
     path('admin/students/<int:pk>/guardians/', StudentGuardiansView.as_view(),
          name='student-guardians'),
     path('admin/students/<int:pk>/guardians/<int:user_id>/',
@@ -68,6 +76,7 @@ urlpatterns = [
          name='admin-staff-import-template'),
     path('admin/staff/<int:pk>/', StaffDetailView.as_view(), name='admin-staff-detail'),
     path('admin/staff/<int:pk>/reset-password/', StaffResetPasswordView.as_view(), name='admin-staff-reset'),
+    path('admin/staff/<int:pk>/activity/', StaffActivityView.as_view(), name='admin-staff-activity'),
     # Password request inbox (families ask by WhatsApp/email; admins resolve here).
     path('admin/password-requests/', PasswordRequestListCreateView.as_view(), name='password-requests'),
     path('admin/password-requests/export/', PasswordRequestExportView.as_view(),

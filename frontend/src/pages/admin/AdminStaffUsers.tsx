@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserCog, Plus, KeyRound, Copy, Check, FileUp, UserX, UserCheck, ShieldCheck } from 'lucide-react';
+import { Fragment, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { UserCog, Plus, KeyRound, Copy, Check, FileUp, UserX, UserCheck, ShieldCheck, Pencil, History } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -16,6 +17,12 @@ import { FilterBar } from '@/components/admin/FilterBar';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
+import { RowActionsMenu, type RowMenuItem } from '@/components/admin/RowActionsMenu';
+import { AuditTimeline } from '@/components/admin/AuditTimeline';
+import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { adminKeys } from '@/hooks/queries/keys';
@@ -29,23 +36,25 @@ import { PUESTOS } from '@/lib/areaCatalog';
 
 const ROLE: Record<string, string> = { admin: 'Administrador', staff: 'Personal' };
 const ROLE_OPTIONS = Object.entries(ROLE).map(([value, label]) => ({ value, label }));
-const ACTIVE_TABS = [
-  { value: '1', label: 'Activas' },
-  { value: '0', label: 'Inactivas' },
-];
+/** Archived accounts are off every other tab; this one lists only them, with Restaurar. */
+const ARCHIVED = 'archivadas';
 const IMPORT_HEADERS = [{ key: 'correo', required: true }, { key: 'nombre', required: true }, { key: 'apellidos' }, { key: 'rol' }, { key: 'puesto' }];
-const BULK_ACTIONS: BulkActionDef[] = [
-  { name: 'deactivate', label: 'Desactivar', danger: true, icon: UserX, planVerb: 'Se desactivarán' },
-  { name: 'reactivate', label: 'Reactivar', icon: UserCheck, planVerb: 'Se reactivarán' },
-];
-const ROW_ACTION =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
+const DEACTIVATE: BulkActionDef = { name: 'deactivate', label: 'Desactivar', danger: true, icon: UserX, planVerb: 'Se desactivarán' };
+const REACTIVATE: BulkActionDef = { name: 'reactivate', label: 'Reactivar', icon: UserCheck, planVerb: 'Se reactivarán' };
+const ROW_ACTION_BASE =
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[36px]';
+const ROW_ACTION = `${ROW_ACTION_BASE} text-purple hover:bg-cream-2`;
+// One color class each: with both, Tailwind's own order (not the class string) picks the winner.
+const ROW_ACTION_DANGER = `${ROW_ACTION_BASE} text-coral-700 hover:bg-coral-50`;
 
 /**
  * /admin/usuarios — staff accounts on the Data Ops UI foundation (BACKLOG P1-H1):
  * search, rol/activo filters in the URL, sort on every column, selection with
- * bulk deactivate/reactivate (per-row guards on the server), export of the view,
- * import = invite many. No delete: deactivation is the archive.
+ * bulk deactivate / reactivate / archive / restore / delete (per-row guards on
+ * the server), export of the view, import = invite many. Each row edits name and
+ * email, and its activity panel shows the account's last actions in Auditoría.
+ * Archivar takes an account off the list (Archivadas, Restaurar); Eliminar
+ * erases an account never used and archives the rest.
  */
 export default function AdminStaffUsers() {
   const qc = useQueryClient();
@@ -56,7 +65,10 @@ export default function AdminStaffUsers() {
   const [toReset, setToReset] = useState<StaffUser | null>(null);
   const [toAccess, setToAccess] = useState<StaffUser | null>(null);
   const [revealed, setRevealed] = useState<{ user: StaffUser; password: string } | null>(null);
-  const [confirming, setConfirming] = useState<BulkActionDef | null>(null);
+  const [confirming, setConfirming] = useState<{ action: BulkActionDef; one?: StaffUser } | null>(null);
+  const [toEdit, setToEdit] = useState<StaffUser | null>(null);
+  const [toView, setToView] = useState<StaffUser | null>(null);
+  const isLg = useMediaQuery('(min-width: 1024px)');
 
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
@@ -68,6 +80,15 @@ export default function AdminStaffUsers() {
     ordering: serializeSort(sort) || undefined,
   };
   const { data, isLoading, isError, refetch } = useStaffList({ page, ...filters });
+  const { data: archivedList } = useStaffList({ page: 1, page_size: 1, active: ARCHIVED });
+  const archivedCount = archivedList?.count ?? 0;
+  const viewingArchived = filters.active === ARCHIVED;
+  const activeTabs = [
+    { value: '1', label: 'Activas' },
+    { value: '0', label: 'Inactivas' },
+    { value: ARCHIVED, label: 'Archivadas', count: archivedCount },
+  ];
+  const bulkActions = viewingArchived ? [RESTORE_ACTION, DELETE_ACTION] : [DEACTIVATE, REACTIVATE, ARCHIVE_ACTION, DELETE_ACTION];
   const exportStaff = useStaffExport();
   const bulk = useStaffBulk();
   const rows = data?.results;
@@ -95,8 +116,15 @@ export default function AdminStaffUsers() {
     {
       id: 'name', header: 'Nombre', sortKey: 'name', hideable: false, minWidth: 180,
       cell: (u) => (
-        <span className="flex flex-wrap items-center gap-1.5 font-medium text-ink">
-          {u.full_name || u.email}
+        <span className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setToView(u)}
+            className="rounded text-left font-medium text-ink hover:text-purple hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+            aria-label={`Ver la cuenta y la actividad de ${u.full_name || u.email}`}
+          >
+            {u.full_name || u.email}
+          </button>
           {u.id === me?.id && <span className="text-xs font-normal text-subtle">(usted)</span>}
           {u.is_superuser && <Badge variant="warning">Superusuario</Badge>}
         </span>
@@ -126,7 +154,9 @@ export default function AdminStaffUsers() {
     },
     {
       id: 'is_active', header: 'Estado', sortKey: 'is_active', minWidth: 100,
-      cell: (u) => <Badge variant={u.is_active ? 'success' : 'neutral'}>{u.is_active ? 'Activa' : 'Inactiva'}</Badge>,
+      cell: (u) => (u.archived_at
+        ? <Badge variant="neutral">Archivada</Badge>
+        : <Badge variant={u.is_active ? 'success' : 'neutral'}>{u.is_active ? 'Activa' : 'Inactiva'}</Badge>),
     },
     {
       id: 'last_login', header: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'text-xs text-subtle',
@@ -143,6 +173,26 @@ export default function AdminStaffUsers() {
   ];
 
   const anyFilter = !!(filters.q || filters.role || filters.active);
+  const managed = (u: StaffUser) => !u.is_superuser && u.id !== me?.id;
+  const menuItems = (u: StaffUser): RowMenuItem[] => {
+    const items: RowMenuItem[] = [{ key: 'activity', label: 'Ver actividad', icon: History, onSelect: () => setToView(u) }];
+    if (!managed(u)) return items;
+    if (u.archived_at) {
+      items.push({ key: 'restore', label: 'Restaurar', icon: RESTORE_ACTION.icon, onSelect: () => setConfirming({ action: RESTORE_ACTION, one: u }) });
+    } else {
+      // Admin passwords are never generated by a peer admin (the API refuses with 403):
+      // each admin uses their own password flow, a superuser restores lost access.
+      if (u.role !== 'admin') {
+        items.push({ key: 'password', label: 'Generar contraseña', icon: KeyRound, onSelect: () => setToReset(u) });
+      }
+      items.push(
+        { key: 'toggle', label: u.is_active ? 'Desactivar' : 'Reactivar', icon: u.is_active ? UserX : UserCheck, onSelect: () => setToToggle(u) },
+        { key: 'archive', label: 'Archivar', icon: ARCHIVE_ACTION.icon, onSelect: () => setConfirming({ action: ARCHIVE_ACTION, one: u }) },
+      );
+    }
+    items.push({ key: 'delete', label: 'Eliminar', icon: DELETE_ACTION.icon, danger: true, onSelect: () => setConfirming({ action: DELETE_ACTION, one: u }) });
+    return items;
+  };
 
   return (
     <>
@@ -159,7 +209,7 @@ export default function AdminStaffUsers() {
           </div>
         )}
       />
-      <Card title={`${count.toLocaleString('es-MX')} cuentas`}>
+      <Card title={`${count.toLocaleString('es-MX')} ${count === 1 ? 'cuenta' : 'cuentas'}`}>
         <DataTable<StaffUser>
           tableId="staff"
           columns={columns}
@@ -180,29 +230,41 @@ export default function AdminStaffUsers() {
           columnControls
           pinFirstColumn
           selection={selection}
-          rowActions={(u) => (u.is_superuser || u.id === me?.id ? null : (
+          pinActions
+          rowActions={(u) => (
             <>
-              {u.role === 'staff' && (
-                <button type="button" className={ROW_ACTION} onClick={() => setToAccess(u)} aria-label={`Puesto y áreas de ${u.email}`}>
-                  <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Acceso
-                </button>
+              {managed(u) && !u.archived_at && (
+                <>
+                  <button type="button" className={ROW_ACTION} onClick={() => setToEdit(u)} aria-label={`Editar ${u.email}`}>
+                    <Pencil className="h-4 w-4" aria-hidden="true" /> Editar
+                  </button>
+                  {u.role === 'staff' && (
+                    <button type="button" className={ROW_ACTION} onClick={() => setToAccess(u)} aria-label={`Puesto y áreas de ${u.email}`}>
+                      <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Acceso
+                    </button>
+                  )}
+                </>
               )}
-              {/* Admin passwords are never generated by a peer admin (the API refuses with 403):
-                  each admin uses their own password flow, a superuser restores lost access. */}
-              {u.role !== 'admin' && (
-                <button type="button" className={ROW_ACTION} onClick={() => setToReset(u)} aria-label={`Generar contraseña para ${u.email}`}>
-                  <KeyRound className="h-4 w-4" aria-hidden="true" /> Contraseña
-                </button>
-              )}
-              <button type="button" className={ROW_ACTION} onClick={() => setToToggle(u)} aria-label={`${u.is_active ? 'Desactivar' : 'Reactivar'} ${u.email}`}>
-                {u.is_active ? 'Desactivar' : 'Reactivar'}
-              </button>
+              {isLg ? (
+                <RowActionsMenu label={`Más acciones para ${u.email}`} items={menuItems(u)} />
+              ) : menuItems(u).map((it) => {
+                const Icon = it.icon!;
+                return (
+                  <Fragment key={it.key}>
+                    {it.danger && <div role="separator" className="my-0.5 h-px bg-line" />}
+                    <button type="button" onClick={it.onSelect} aria-label={`${it.label} ${u.email}`}
+                      className={`${it.danger ? ROW_ACTION_DANGER : ROW_ACTION} w-full justify-start`}>
+                      <Icon className="h-4 w-4" aria-hidden="true" /> {it.label}
+                    </button>
+                  </Fragment>
+                );
+              })}
             </>
-          ))}
+          )}
           toolbar={(
             <FilterBar
               search={{ placeholder: 'Buscar por nombre o correo…', label: 'Buscar usuarios' }}
-              tabs={{ paramKey: 'activo', options: ACTIVE_TABS, allLabel: 'Todas', label: 'Filtrar por estado' }}
+              tabs={{ paramKey: 'activo', options: activeTabs, allLabel: 'Todas', label: 'Filtrar por estado' }}
               selects={[{ key: 'rol', label: 'Rol', options: ROLE_OPTIONS, allLabel: 'Todos los roles' }]}
             />
           )}
@@ -214,16 +276,19 @@ export default function AdminStaffUsers() {
               onSelectAllMatching={selection.onSelectAllMatching}
               onClear={selection.onClear}
               itemLabel="cuentas"
-              actions={BULK_ACTIONS}
-              onAction={setConfirming}
+              actions={bulkActions}
+              inline={4}
+              onAction={(action) => setConfirming({ action })}
               busy={bulk.isPending}
               exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="usuarios" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
             />
           )}
           empty={{
             icon: UserCog,
-            title: anyFilter ? 'Sin resultados' : 'Sin cuentas',
-            description: anyFilter ? 'Ninguna cuenta coincide con los filtros.' : 'Invite al personal para que aparezca aquí.',
+            title: viewingArchived ? 'No hay cuentas archivadas' : anyFilter ? 'Sin resultados' : 'Sin cuentas',
+            description: viewingArchived
+              ? 'Las cuentas que archive aparecerán aquí, con la opción de restaurarlas.'
+              : anyFilter ? 'Ninguna cuenta coincide con los filtros.' : 'Invite al personal para que aparezca aquí.',
             action: anyFilter ? undefined : <Button size="sm" onClick={() => setInviteOpen(true)}><Plus size={14} aria-hidden="true" /> Invitar</Button>,
           }}
         />
@@ -243,14 +308,19 @@ export default function AdminStaffUsers() {
       <BulkConfirmDialog
         open={!!confirming}
         onClose={() => setConfirming(null)}
-        action={confirming}
+        action={confirming?.action ?? null}
+        payload={confirming?.action.payload}
         entityLabel="cuentas"
-        ids={selection.ids}
-        allMatching={selection.allMatching}
+        ids={confirming?.one ? [confirming.one.id] : selection.ids}
+        allMatching={confirming?.one ? false : selection.allMatching}
+        subject={confirming?.one?.email}
         filters={filters}
         execute={(body) => bulk.mutateAsync(body)}
+        renderPlan={removalPlanNote(confirming?.action, 'staff')}
         onDone={(r) => { if (!r.failed.length) selection.onClear(); }}
       />
+      <EditStaffModal user={toEdit} onClose={() => setToEdit(null)} onSaved={invalidate} />
+      <StaffActivityModal user={toView} onClose={() => setToView(null)} />
 
       <ConfirmDialog
         open={!!toToggle}
@@ -334,3 +404,87 @@ function RevealModal({ data, onClose }: { data: { user: StaffUser; password: str
     </Modal>
   );
 }
+
+/** Name and email; the email is also the address the person signs in with through Google. */
+function EditStaffModal({ user, onClose, onSaved }: { user: StaffUser | null; onClose: () => void; onSaved: () => void }) {
+  return (
+    <Modal open={!!user} onClose={onClose} title="Editar cuenta" maxWidth={480}>
+      {user && <EditStaffForm key={user.id} user={user} onClose={onClose} onSaved={onSaved} />}
+    </Modal>
+  );
+}
+
+function EditStaffForm({ user, onClose, onSaved }: { user: StaffUser; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ first_name: user.first_name, last_name: user.last_name, email: user.email });
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const save = useMutation({
+    mutationFn: () => portalApi.updateStaff(user.id, form),
+    onSuccess: () => { onSaved(); toast.success('Cuenta actualizada.'); onClose(); },
+    onError: (e: unknown) => {
+      const f = fieldErrorsOrNull(e);
+      if (f && Object.keys(f).length) setErrors(f);
+      else toast.error(apiErrorMessage(e, 'No se pudo guardar.'));
+    },
+  });
+  const field = (k: keyof typeof form) => ({
+    value: form[k],
+    error: errors[k],
+    onChange: (e: { target: { value: string } }) => { setForm({ ...form, [k]: e.target.value }); setErrors({ ...errors, [k]: undefined }); },
+  });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!form.first_name.trim()) { setErrors({ first_name: 'Requerido.' }); return; }
+    save.mutate();
+  };
+  return (
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input label="Nombre" autoComplete="off" required {...field('first_name')} />
+        <Input label="Apellidos" autoComplete="off" {...field('last_name')} />
+      </div>
+      <Input label="Correo" type="email" inputMode="email" autoComplete="off" required hint="También es el correo con el que entra con «Continuar con Google»." {...field('email')} />
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+        <Button type="submit" loading={save.isPending} className="min-h-[44px]">Guardar cambios</Button>
+      </div>
+    </form>
+  );
+}
+
+const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Nunca');
+
+/** The account at a glance and what it did lately (Auditoría rows where it is the actor). */
+function StaffActivityModal({ user, onClose }: { user: StaffUser | null; onClose: () => void }) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin', STAFF_ENTITY, 'activity', user?.id],
+    queryFn: async () => (await portalApi.getStaffActivity(user!.id)).data,
+    enabled: !!user,
+  });
+  const u = data?.user ?? user;
+  return (
+    <Modal open={!!user} onClose={onClose} title={u?.full_name || u?.email || 'Cuenta'} maxWidth={560}>
+      {u && (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-cream-2 p-4 text-sm">
+          <div className="col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Correo</dt><dd className="mt-0.5 break-all text-ink">{u.email}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Rol</dt><dd className="mt-0.5 text-ink">{ROLE[u.role] ?? u.role}{u.staff_title ? ` · ${u.staff_title}` : ''}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Estado</dt><dd className="mt-0.5 text-ink">{u.archived_at ? 'Archivada' : u.is_active ? 'Activa' : 'Inactiva'}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Último acceso</dt><dd className="mt-0.5 text-ink">{fmtDate(u.last_login)}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-subtle">Alta</dt><dd className="mt-0.5 text-ink">{fmtDate(u.date_joined)}</dd></div>
+        </dl>
+      )}
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-head text-sm font-semibold text-ink">Actividad reciente</h3>
+        {data && data.total_actions > 0 && <span className="text-xs text-subtle">{data.total_actions.toLocaleString('es-MX')} {data.total_actions === 1 ? 'acción' : 'acciones'} en total</span>}
+      </div>
+      {isLoading ? <LoadingSpinner /> : isError || !data ? <ErrorState onRetry={() => refetch()} /> : (
+        <AuditTimeline entries={data.recent} showActor={false} empty="Esta cuenta todavía no ha hecho cambios en el portal." />
+      )}
+      {data && data.total_actions > data.recent.length && u && (
+        <Link to={`/admin/auditoria?actor=${encodeURIComponent(u.email)}`} onClick={onClose} className="inline-flex text-sm font-semibold text-purple hover:underline">
+          Ver todas en Auditoría
+        </Link>
+      )}
+    </Modal>
+  );
+}
+

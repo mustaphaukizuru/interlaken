@@ -197,6 +197,9 @@ class GoogleCallbackView(APIView):
             # Invite-only: admin must pre-create / link the parent (or allowlist
             # the domain via GOOGLE_AUTO_CREATE_DOMAINS).
             return redirect(f'{settings.FRONTEND_URL}/login?error=not_invited')
+        if not user.is_active:
+            # Deactivated or archived: the password path already refuses it.
+            return redirect(f'{settings.FRONTEND_URL}/login?error=inactive')
 
         # Refresh google_id / avatar for returning users.
         updated = False
@@ -260,6 +263,12 @@ class GoogleTokenView(APIView):
                 error_body('No hay una cuenta registrada con este correo. '
                            'Pida al colegio que lo invite o vincule como tutor.',
                            code='not_invited'),
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not user.is_active:
+            return Response(
+                error_body('Esta cuenta está desactivada. Si cree que es un error, contacte al colegio.',
+                           code='inactive'),
                 status=status.HTTP_403_FORBIDDEN,
             )
 

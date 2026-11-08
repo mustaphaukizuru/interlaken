@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/services/api', () => ({
-  portalApi: { createStudent: vi.fn(), updateStudent: vi.fn() },
+  portalApi: { createStudent: vi.fn(), updateStudent: vi.fn(), studentsBulk: vi.fn() },
 }));
 
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -46,5 +46,27 @@ describe('StudentFormModal', () => {
     await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');
     await userEvent.click(screen.getByRole('button', { name: /crear alumno/i }));
     expect(await screen.findByText('Ya existe un alumno con esa matrícula.')).toBeInTheDocument();
+  });
+
+  it('points to the archived file that already holds the matrícula and restores it', async () => {
+    createStudent.mockRejectedValueOnce({ response: { status: 400, data: {
+      student_id: ['Ya existe un alumno con esa matrícula.'],
+      existing: { id: 41, name: 'Beto Ruiz', student_id: 'B2', status: 'withdrawn', archived: true },
+    } } });
+    vi.mocked(portalApi.studentsBulk).mockResolvedValue({ data: { ok: 1 } } as never);
+    const onClose = vi.fn();
+    renderWithProviders(<StudentFormModal open onClose={onClose} />);
+    await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Beto');
+    await userEvent.type(screen.getByLabelText(/apellidos/i), 'Ruiz');
+    await userEvent.type(screen.getByLabelText(/matrícula/i), 'b2');
+    await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');
+    await userEvent.click(screen.getByRole('button', { name: /crear alumno/i }));
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent('La matrícula B2 ya pertenece a Beto Ruiz, que está archivado.');
+    expect(screen.getByRole('link', { name: 'Abrir expediente' })).toHaveAttribute('href', '/admin/alumnos/41');
+    await userEvent.click(screen.getByRole('button', { name: 'Restaurar a Beto' }));
+    await waitFor(() => expect(portalApi.studentsBulk).toHaveBeenCalledWith(expect.objectContaining({ action: 'restore', ids: [41], dry_run: false })));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

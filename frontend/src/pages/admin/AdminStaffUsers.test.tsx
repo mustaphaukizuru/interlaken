@@ -10,6 +10,7 @@ vi.mock('@/services/api', () => ({
     exportStaff: vi.fn(),
     staffBulk: vi.fn(),
     updateStaff: vi.fn(),
+    getStaffActivity: vi.fn(),
     resetStaffPassword: vi.fn(),
     inviteStaff: vi.fn(),
   },
@@ -77,15 +78,19 @@ describe('AdminStaffUsers (Data Ops Phase 3)', () => {
     expect(await screen.findByRole('dialog', { name: 'Invitar personal desde un archivo' })).toBeInTheDocument();
   });
 
-  it('offers «Contraseña» for staff rows but never for another admin', async () => {
+  it('offers «Generar contraseña» for staff rows but never for another admin', async () => {
     const dora = { ...me, id: 4, email: 'dora@x.mx', full_name: 'Dora Paz', role: 'admin' };
     vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 3, next: null, previous: null, results: [me, berta, dora] } } as never);
+    const user = userEvent.setup();
     renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
     await screen.findByText('Dora Paz');
-    expect(screen.getAllByRole('button', { name: 'Generar contraseña para berta@x.mx' }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: 'Generar contraseña para dora@x.mx' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Más acciones para berta@x.mx' }));
+    expect(screen.getByRole('menuitem', { name: 'Generar contraseña' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Más acciones para dora@x.mx' }));
+    expect(screen.queryByRole('menuitem', { name: 'Generar contraseña' })).not.toBeInTheDocument();
     // Other row actions stay available on the admin row.
-    expect(screen.getAllByRole('button', { name: 'Desactivar dora@x.mx' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('menuitem', { name: 'Desactivar' })).toBeInTheDocument();
   });
 });
 
@@ -134,5 +139,64 @@ describe('AdminStaffUsers: puesto y áreas de la consola', () => {
     await waitFor(() => expect(portalApi.updateStaff).toHaveBeenCalledWith(2, {
       staff_title: 'Recepción', staff_areas: ['visitas', 'mensajes', 'comunicados'],
     }));
+  });
+});
+
+describe('AdminStaffUsers: edit, activity, archive and delete', () => {
+  it('Editar saves the name and the email, and shows a server error next to the field', async () => {
+    vi.mocked(portalApi.updateStaff)
+      .mockRejectedValueOnce({ response: { status: 400, data: { email: ['Ya existe una cuenta con ese correo.'] } } })
+      .mockResolvedValueOnce({ data: berta } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await user.click(await screen.findByRole('button', { name: 'Editar berta@x.mx' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar cuenta' });
+    const email = within(dialog).getByLabelText(/Correo/);
+    await user.clear(email);
+    await user.type(email, 'yo@x.mx');
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+    expect(await within(dialog).findByText('Ya existe una cuenta con ese correo.')).toBeInTheDocument();
+
+    await user.clear(email);
+    await user.type(email, 'berta.zea@x.mx');
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(portalApi.updateStaff).toHaveBeenLastCalledWith(2, expect.objectContaining({ email: 'berta.zea@x.mx' })));
+  });
+
+  it('the name opens the account with its recent activity', async () => {
+    vi.mocked(portalApi.getStaffActivity).mockResolvedValue({ data: {
+      user: { ...berta, last_login: '2026-11-07T15:00:00Z' }, total_actions: 1,
+      recent: [{ id: 5, actor: 2, actor_label: 'berta@x.mx', action: 'update', action_display: 'Modificación', object_type: 'accounts.studentprofile', object_id: '7', context: '', changes: { group: ['A', 'B'] }, created_at: '2026-11-07T16:00:00Z' }],
+    } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await user.click(await screen.findByRole('button', { name: 'Ver la cuenta y la actividad de Berta Zea' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Berta Zea' });
+    expect(await within(dialog).findByText('Grupo: A → B')).toBeInTheDocument();
+    expect(within(dialog).getByText('1 acción en total')).toBeInTheDocument();
+    expect(portalApi.getStaffActivity).toHaveBeenCalledWith(2);
+  });
+
+  it('the Archivadas tab lists archived accounts', async () => {
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await userEvent.click(await screen.findByRole('tab', { name: /Archivadas/ }));
+    await waitFor(() => expect(portalApi.listStaff).toHaveBeenLastCalledWith(expect.objectContaining({ active: 'archivadas' })));
+  });
+
+  it('Eliminar opens on Cancelar and sends the confirmation with the commit', async () => {
+    vi.mocked(portalApi.staffBulk).mockImplementation(async (body) => ({
+      data: { action: body.action, requested: 1, ok: 1, failed: [], skipped: [], dry_run: !!body.dry_run, outcomes: { erased: 1 } },
+    }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
+    await user.click(await screen.findByRole('button', { name: 'Más acciones para berta@x.mx' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Eliminar' }));
+    const dialog = await screen.findByRole('dialog', { name: /Eliminar: berta@x.mx/ });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus());
+    expect(within(dialog).getByText(/se eliminará por completo|se eliminarán por completo/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Eliminar (1)' }));
+    await waitFor(() => expect(portalApi.staffBulk).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: 'delete', ids: [2], dry_run: false, payload: { confirm: 'ELIMINAR' },
+    })));
   });
 });

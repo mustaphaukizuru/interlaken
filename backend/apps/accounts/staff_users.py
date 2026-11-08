@@ -1,10 +1,12 @@
 """
 accounts/staff_users.py — portal staff-user management (BACKLOG P1-H1, AF-4 gap 3).
 
-GET   /accounts/admin/staff/            list admin + staff accounts
+GET   /accounts/admin/staff/            list admin + staff accounts (archived ones: ?activo=archivadas)
 POST  /accounts/admin/staff/            invite: create with a generated password (returned once)
-PATCH /accounts/admin/staff/<pk>/       role / active / name
+PATCH /accounts/admin/staff/<pk>/       role / active / name / email
 POST  /accounts/admin/staff/<pk>/reset-password/   new generated password (returned once)
+GET   /accounts/admin/staff/<pk>/activity/         the account and its last actions in Auditoría
+POST  /accounts/admin/staff/bulk/       deactivate / reactivate / archive / restore / delete
 
 Guards: only admins; an admin cannot deactivate or demote themselves; the last
 active admin cannot be demoted/deactivated; superusers are untouchable here
@@ -15,8 +17,11 @@ would own that account, the same rule ``admin_password`` and
 """
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from rest_framework import generics, serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -36,6 +41,7 @@ from apps.core.importing import (
 from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin
 
+from .account_removal import archive_account, has_history, restore_account
 from .admin_password import generate_temporary_password, revoke_refresh_tokens
 from .filters import StaffFilterSet
 from .models import User
@@ -51,7 +57,7 @@ class StaffUserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'is_active',
                   'is_superuser', 'last_login', 'date_joined', 'has_password',
-                  'staff_title', 'staff_areas']
+                  'staff_title', 'staff_areas', 'archived_at']
         read_only_fields = fields
 
     def get_has_password(self, u):
@@ -214,10 +220,27 @@ class StaffDetailView(APIView):
         for k in ('first_name', 'last_name'):
             if k in request.data:
                 v = (request.data.get(k) or '').strip()
+                if k == 'first_name' and not v:
+                    return Response({'first_name': ['Requerido.']}, status=status.HTTP_400_BAD_REQUEST)
                 if v != getattr(target, k):
                     changes[k] = {'from': getattr(target, k), 'to': v}
                     setattr(target, k, v)
                     fields.append(k)
+        if 'email' in request.data:
+            # The address is also the Google sign-in: from now on the person
+            # enters with the new one, never with the old.
+            email = (request.data.get('email') or '').strip().lower()
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                return Response({'email': ['Correo inválido.']}, status=status.HTTP_400_BAD_REQUEST)
+            if email != target.email.lower():
+                if User.objects.filter(email__iexact=email).exclude(pk=target.pk).exists():
+                    return Response({'email': ['Ese correo ya está registrado.']},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                changes['email'] = {'from': target.email, 'to': email}
+                target.email = email
+                fields.append('email')
         if 'role' in request.data:
             role = request.data['role']
             if role not in STAFF_ROLES:
@@ -337,13 +360,94 @@ def _set_active_action(name: str, label: str, *, active: bool, actor) -> BulkAct
                       side_effects='per_row' if not active else 'none')
 
 
+# ── bulk: archive / restore / delete (owner, 2026-11-08) ────
+STAFF_DELETE_CONFIRMATION = 'ELIMINAR'
+
+
+def _leave_guard(target, actor):
+    """Archiving or deleting: the same people deactivation may touch."""
+    reason = _guard_target(None, target)
+    if reason:
+        raise BulkSkip(reason)
+    if target.pk == actor.pk:
+        raise BulkSkip('es su propia cuenta')
+    if target.role == User.Role.ADMIN and target.is_active and last_active_admin(target):
+        raise ValueError('Debe quedar al menos un administrador activo.')
+
+
+def staff_keep_reason(target) -> str | None:
+    """Why an account must be archived rather than erased (None: nothing to keep)."""
+    if target.last_login is not None:
+        return 'ya inició sesión'
+    if has_history(target):
+        return 'tiene actividad registrada'
+    return None
+
+
+def _archive_action(actor) -> BulkAction:
+    def plan(target, payload):
+        _leave_guard(target, actor)
+        if target.archived_at is not None:
+            raise BulkSkip('ya está archivada')
+        return 'archived'
+
+    def handler(target, payload, by):
+        plan(target, payload)
+        return {'outcome': 'archived', **archive_account(target), 'via': 'portal-bulk'}
+
+    return BulkAction('archive', 'Archivar', handler=handler, plan=plan, side_effects='per_row')
+
+
+def _restore_action(actor) -> BulkAction:
+    def plan(target, payload):
+        reason = _guard_target(None, target)
+        if reason:
+            raise BulkSkip(reason)
+        if target.archived_at is None:
+            raise BulkSkip('no está archivada')
+        return 'restored'
+
+    def handler(target, payload, by):
+        plan(target, payload)
+        return {'outcome': 'restored', **restore_account(target, reactivate=True), 'via': 'portal-bulk'}
+
+    return BulkAction('restore', 'Restaurar', handler=handler, plan=plan, side_effects='none')
+
+
+def _delete_action(actor) -> BulkAction:
+    def plan(target, payload):
+        _leave_guard(target, actor)
+        if staff_keep_reason(target) is None:
+            return 'erased'
+        if target.archived_at is not None:
+            raise BulkSkip('ya está archivada')
+        return 'archived'
+
+    def handler(target, payload, by):
+        if plan(target, payload) == 'archived':
+            return {'outcome': 'archived', 'reason': staff_keep_reason(target),
+                    **archive_account(target), 'via': 'portal-bulk'}
+        deleted = {'email': target.email, 'name': target.full_name, 'role': target.role}
+        pk = target.pk
+        target.delete()
+        target.pk = pk  # Django clears it; the audit row still names the account
+        return {'outcome': 'erased', 'deleted': deleted, 'via': 'portal-bulk'}
+
+    return BulkAction('delete', 'Eliminar', handler=handler, plan=plan,
+                      side_effects='none', audit_action='delete')
+
+
 class StaffBulkView(AdminBulkView):
-    """POST /accounts/admin/staff/bulk/ — ``deactivate`` / ``reactivate``.
+    """POST /accounts/admin/staff/bulk/ — ``deactivate`` / ``reactivate`` /
+    ``archive`` / ``restore`` / ``delete``.
 
     Per-row guards (the same as the single PATCH): superusers and non-staff
-    accounts are skipped, nobody deactivates their own account, and the last
-    active admin cannot be deactivated. There is no delete: deactivation is the
-    archive. Deactivating revokes the account's refresh tokens.
+    accounts are skipped, nobody deactivates, archives or deletes their own
+    account, and the last active admin stays. Archive hides the account and
+    blocks sign-in with its history intact; delete erases an account with
+    nothing to keep and archives the rest (``outcomes`` counts both); its
+    commit carries ``{"confirm": "ELIMINAR"}``. Deactivating, archiving and
+    deleting revoke the account's refresh tokens.
     """
 
     entity = 'accounts.user'
@@ -359,8 +463,82 @@ class StaffBulkView(AdminBulkView):
         self.actions = {
             'deactivate': _set_active_action('deactivate', 'Desactivar', active=False, actor=actor),
             'reactivate': _set_active_action('reactivate', 'Reactivar', active=True, actor=actor),
+            'archive': _archive_action(actor),
+            'restore': _restore_action(actor),
+            'delete': _delete_action(actor),
         }
         return super().get_action(name)
+
+    def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        payload = data.get('payload') if isinstance(data.get('payload'), dict) else {}
+        if (data.get('action') == 'delete' and not parse_bool_param(data.get('dry_run', False))
+                and payload.get('confirm') != STAFF_DELETE_CONFIRMATION):
+            raise ValidationError({'confirm': ['Confirme la eliminación.']})
+        return super().post(request)
+
+
+class StaffActivityView(APIView):
+    """GET /accounts/admin/staff/<pk>/activity/ — the account and its last 20 actions in Auditoría."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        from apps.core.models import AuditLog
+        from apps.core.serializers import AuditLogSerializer
+
+        target = User.objects.filter(pk=pk, role__in=STAFF_ROLES).first()
+        if target is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        actions = AuditLog.objects.filter(actor=target)
+        recent = list(actions.select_related('actor').order_by('-created_at', '-pk')[:20])
+        labels = _object_labels(recent)
+        data = AuditLogSerializer(recent, many=True).data
+        for row, entry in zip(data, recent, strict=True):
+            row['object_label'] = labels.get((entry.object_type, str(entry.object_id)), '')
+        return Response({
+            'user': StaffUserSerializer(target).data,
+            'total_actions': actions.count(),
+            'recent': data,
+        })
+
+
+# What an activity row is about, as the office reads it (other types read "Tipo #id").
+_OBJECT_TYPES = {
+    'accounts.studentprofile': 'Alumno',
+    'accounts.user': 'Cuenta',
+    'accounts.parentprofile': 'Tutor',
+    'payments.payment': 'Pago',
+    'cafeteria.cafeteriabalance': 'Saldo de cafetería',
+    'cafeteria.cafeteriatransaction': 'Movimiento de cafetería',
+    'admissions.registration': 'Inscripción',
+    'bookings.booking': 'Visita',
+}
+
+
+def _object_labels(rows) -> dict[tuple[str, str], str]:
+    """``(object_type, object_id) → label`` for activity rows, in two queries.
+
+    A student's file and its login both read as the student's name, so the
+    timeline can fold the rows one action wrote about the same person.
+    """
+    from .models import StudentProfile
+
+    ids: dict[str, set[int]] = {'accounts.studentprofile': set(), 'accounts.user': set()}
+    for r in rows:
+        if r.object_type in ids and str(r.object_id).isdigit():
+            ids[r.object_type].add(int(r.object_id))
+    labels: dict[tuple[str, str], str] = {}
+    for p in StudentProfile.objects.filter(pk__in=ids['accounts.studentprofile']).select_related('user'):
+        labels[('accounts.studentprofile', str(p.pk))] = p.user.full_name or p.student_id
+    for u in User.objects.filter(pk__in=ids['accounts.user']).select_related('student_profile'):
+        is_student = hasattr(u, 'student_profile')
+        labels[('accounts.user', str(u.pk))] = u.full_name if is_student and u.full_name else (u.full_name or u.email)
+    for r in rows:
+        key = (r.object_type, str(r.object_id))
+        if key not in labels:
+            kind = _OBJECT_TYPES.get(r.object_type)
+            labels[key] = f'{kind} #{r.object_id}' if kind else ''
+    return labels
 
 
 # ── import: invite many (Data Ops C4) ──────────────────────

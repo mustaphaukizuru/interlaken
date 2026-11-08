@@ -59,11 +59,12 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     age = serializers.ReadOnlyField()
     loyverse_code = serializers.SerializerMethodField()
+    archived_at = serializers.DateTimeField(source='user.archived_at', read_only=True)
 
     class Meta:
         model = StudentProfile
         fields = ['id', 'user', 'student_id', 'loyverse_code', 'grade', 'group', 'loyverse_id',
-                  'enrollment_date', 'is_active', 'status',
+                  'enrollment_date', 'is_active', 'status', 'archived_at',
                   'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
                   'blood_type', 'allergies', 'medical_notes']
 
