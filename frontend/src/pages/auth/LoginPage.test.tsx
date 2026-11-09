@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // Mock the API module so no real HTTP happens and we can drive both paths.
 vi.mock('@/hooks/useSiteSettings', () => ({
@@ -41,6 +41,22 @@ async function fillAndSubmit() {
   await user.type(screen.getByPlaceholderText('••••••••'), 's3cret');
   await user.click(screen.getByRole('button', { name: /ingresar/i }));
 }
+
+describe('LoginPage and old «correo para avisos» links', () => {
+  it('a signed-out visitor from an old link goes to the public confirmation, not the form', () => {
+    useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { from: { pathname: '/portal/perfil', search: '?tab=avisos&verificar_correo=old-tok' } } }]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/confirmar-correo" element={<div>confirmar</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('confirmar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ingresar/i })).toBeNull();
+  });
+});
 
 describe('LoginPage email/password submit', () => {
   beforeEach(() => {

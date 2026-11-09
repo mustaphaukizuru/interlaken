@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -54,6 +55,17 @@ describe('NotifyEmailCard («Correo para avisos», owner 2026-10-20)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('a link sent before 2026-11-08 opened signed in goes to the public confirmation', () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/portal/perfil" element={<NotifyEmailCard />} />
+        <Route path="/confirmar-correo" element={<div>confirmar</div>} />
+      </Routes>,
+      { route: '/portal/perfil?tab=avisos&verificar_correo=old-tok' },
+    );
+    expect(screen.getByText('confirmar')).toBeInTheDocument();
   });
 
   it('removes a confirmed address', async () => {

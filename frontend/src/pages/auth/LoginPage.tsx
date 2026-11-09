@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { api, authApi, bootstrapSession } from '@/services/api';
 import Logo from '@/components/ui/Logo';
@@ -127,6 +127,11 @@ export default function LoginPage() {
   };
 
   const alertMsg = formError ?? oauthMessage;
+
+  // «Correo para avisos» links sent before 2026-11-08 open the profile page and land here
+  // signed out. Confirming needs no sign-in now: go straight to the public page.
+  const legacyToken = new URLSearchParams(from?.search ?? '').get('verificar_correo');
+  if (legacyToken) return <Navigate to={`/confirmar-correo?token=${encodeURIComponent(legacyToken)}`} replace />;
 
   return (
     <div className="flex min-h-screen flex-col">

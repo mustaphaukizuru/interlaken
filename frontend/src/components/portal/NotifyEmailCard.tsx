@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -40,6 +41,11 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
     onSuccess: ({ data: next }) => { store(next); toast.success('Ya no se enviarán avisos a ese correo.'); },
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
+  // A link sent before 2026-11-08 opened signed in: confirm on the public page (it names the account).
+  const [params] = useSearchParams();
+  const legacyToken = params.get('verificar_correo');
+  if (legacyToken) return <Navigate to={`/confirmar-correo?token=${encodeURIComponent(legacyToken)}`} replace />;
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (draft.trim()) save.mutate(draft.trim());

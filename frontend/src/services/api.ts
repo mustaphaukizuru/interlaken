@@ -283,9 +283,6 @@ export const authApi = {
   getNotifyEmail: () => api.get<NotifyEmailState>('/accounts/me/notify-email/'),
   setNotifyEmail: (email: string) => api.put<NotifyEmailState>('/accounts/me/notify-email/', { email }),
   deleteNotifyEmail: () => api.delete<NotifyEmailState>('/accounts/me/notify-email/'),
-  /** Public: the link's token is the proof; works signed out or in any account. */
-  previewNotifyEmailLink: (token: string) => api.get<NotifyEmailLink>('/accounts/notify-email/confirm/', { params: { token } }),
-  confirmNotifyEmailLink: (token: string) => api.post<NotifyEmailLink & Partial<NotifyEmailState>>('/accounts/notify-email/confirm/', { token }),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
   updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>

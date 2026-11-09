@@ -1,11 +1,20 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Clock, Info, Loader2, MailCheck, RefreshCw } from 'lucide-react';
+// Icons and button styles the main bundle does not share: importing the ErrorBoundary's ones
+// (AlertTriangle, RefreshCw, <Button>) split them out of it and grew every page's download.
+import { CheckCircle2, CircleAlert, Clock, Info, MailCheck, RotateCw } from 'lucide-react';
 import { Seo } from '@/components/seo/Seo';
 import Logo from '@/components/ui/Logo';
-import { Button } from '@/components/ui/Button';
-import { authApi, type NotifyEmailLink } from '@/services/api';
+import { api, type NotifyEmailLink } from '@/services/api';
+
+/** Public calls, kept in this lazy page so the shared API chunk every page loads does not grow. */
+export const notifyEmailLinkApi = {
+  /** What the link confirms; changes nothing. */
+  preview: (token: string) => api.get<NotifyEmailLink>('/accounts/notify-email/confirm/', { params: { token } }),
+  /** The click: the signed token is the proof, no session needed. */
+  confirm: (token: string) => api.post<NotifyEmailLink>('/accounts/notify-email/confirm/', { token }),
+};
 
 const fmtExpiry = (iso?: string | null) => {
   if (!iso) return '';
@@ -99,7 +108,7 @@ function Outcome({ link }: { link: NotifyEmailLink }) {
   const copy = {
     expired: { tone: 'warning' as const, icon: <Clock size={28} />, title: 'El enlace venció' },
     superseded: { tone: 'brand' as const, icon: <Info size={28} />, title: 'Este enlace ya no se usa' },
-    invalid: { tone: 'danger' as const, icon: <AlertTriangle size={28} />, title: 'El enlace no es válido' },
+    invalid: { tone: 'danger' as const, icon: <CircleAlert size={28} />, title: 'El enlace no es válido' },
     ready: { tone: 'brand' as const, icon: <MailCheck size={28} />, title: '' },
   }[link.state];
   return (
@@ -128,12 +137,12 @@ export default function ConfirmNotifyEmailPage() {
   const token = params.get('token') ?? '';
   const preview = useQuery({
     queryKey: ['notify-email-link', token],
-    queryFn: () => authApi.previewNotifyEmailLink(token).then((r) => r.data),
+    queryFn: () => notifyEmailLinkApi.preview(token).then((r) => r.data),
     enabled: !!token,
     retry: 1,
   });
   const confirm = useMutation({
-    mutationFn: () => authApi.confirmNotifyEmailLink(token).then((r) => r.data),
+    mutationFn: () => notifyEmailLinkApi.confirm(token).then((r) => r.data),
   });
 
   if (!token) return <Shell><Outcome link={{ state: 'invalid' }} /></Shell>;
@@ -141,7 +150,7 @@ export default function ConfirmNotifyEmailPage() {
     return (
       <Shell>
         <div className="flex flex-col items-center gap-3 py-8 text-sm text-muted" role="status">
-          <Loader2 className="h-6 w-6 animate-spin text-purple" aria-hidden="true" />
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-purple/25 border-t-purple" aria-hidden="true" />
           Revisando el enlace…
         </div>
       </Shell>
@@ -151,12 +160,12 @@ export default function ConfirmNotifyEmailPage() {
     return (
       <Shell>
         <div className="text-center" role="alert">
-          <Badge tone="danger"><AlertTriangle size={28} /></Badge>
+          <Badge tone="danger"><CircleAlert size={28} /></Badge>
           <h1 className="mt-5 font-head text-fluid-xl font-extrabold text-ink">No pudimos revisar el enlace</h1>
           <p className="mt-2 text-[15px] text-muted">Revise su conexión e inténtelo de nuevo.</p>
-          <Button variant="secondary" onClick={() => preview.refetch()} className="mt-6 min-h-[44px]">
-            <RefreshCw size={16} aria-hidden="true" /> Reintentar
-          </Button>
+          <button type="button" onClick={() => preview.refetch()} className="btn-outline mt-6 min-h-[44px]">
+            <RotateCw size={16} aria-hidden="true" /> Reintentar
+          </button>
         </div>
       </Shell>
     );
@@ -187,15 +196,15 @@ export default function ConfirmNotifyEmailPage() {
       {confirm.isError && !linkOf(confirm.error) && (
         <p className="mt-4 text-center text-sm text-coral-dark" role="alert">No se pudo confirmar. Inténtelo de nuevo.</p>
       )}
-      <Button
-        variant="primary"
-        size="lg"
+      <button
+        type="button"
         onClick={() => confirm.mutate()}
-        loading={confirm.isPending}
-        className="mt-6 min-h-[48px] w-full"
+        disabled={confirm.isPending}
+        aria-busy={confirm.isPending}
+        className="btn-primary mt-6 min-h-[48px] w-full disabled:cursor-wait disabled:opacity-70"
       >
-        Confirmar correo
-      </Button>
+        {confirm.isPending ? 'Confirmando…' : 'Confirmar correo'}
+      </button>
       <p className="mt-4 text-center text-[13px] leading-relaxed text-subtle">
         No necesita iniciar sesión. Esto solo agrega una copia de los avisos: no crea una cuenta ni da acceso al portal.
         ¿No lo pidió? Cierre esta página; sin su confirmación no recibirá ningún aviso.
