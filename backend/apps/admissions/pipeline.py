@@ -44,13 +44,27 @@ STATUS_ORDER = [Registration.Status.SUBMITTED, Registration.Status.REVIEWING, Re
 
 
 def checklist(reg: Registration) -> dict:
-    have = {d.doc_type: d for d in reg.documents.all()}
+    """Required documents by state. The newest upload of each type decides it
+    (a re-upload replaces a rejected one); a rejected document is still owed,
+    so «Pedir documentos» asks for it again, marked «por corregir»."""
+    have: dict = {}
+    for d in reg.documents.all():
+        current = have.get(d.doc_type)
+        if current is None or (d.uploaded_at, d.pk) > (current.uploaded_at, current.pk):
+            have[d.doc_type] = d
     items = []
     for dt in REQUIRED_DOCS:
         d = have.get(dt)
-        state = 'missing' if d is None else ('verified' if d.is_verified else 'uploaded')
+        if d is None:
+            state = 'missing'
+        elif d.status == RegistrationDocument.Review.REJECTED:
+            state = 'rejected'
+        else:
+            state = 'verified' if d.is_verified else 'uploaded'
         items.append({'doc_type': dt, 'label': RegistrationDocument.DocType(dt).label, 'state': state})
-    return {'items': items, 'missing': [i['label'] for i in items if i['state'] == 'missing'],
+    missing = [i['label'] if i['state'] == 'missing' else f"{i['label']} (por corregir)"
+               for i in items if i['state'] in ('missing', 'rejected')]
+    return {'items': items, 'missing': missing,
             'verified': sum(1 for i in items if i['state'] == 'verified'), 'required': len(REQUIRED_DOCS)}
 
 
@@ -153,8 +167,14 @@ class ConvertView(APIView):
     def post(self, request, pk):
         from apps.accounts.import_students import STUDENT_EMAIL_DOMAIN
         from apps.accounts.models import ParentProfile, StudentProfile, User
+        from apps.core.matricula import normalize_matricula
+
         get_object_or_404(Registration, pk=pk)
-        student_id_in = str(request.data.get('student_id') or '').strip()
+        # Spelled like every other matrícula input: «ci09932» is stored as «09932».
+        student_id_in = normalize_matricula(str(request.data.get('student_id') or ''))
+        if len(student_id_in) > StudentProfile._meta.get_field('student_id').max_length:
+            return Response({'student_id': ['La matrícula es demasiado larga.']},
+                            status=status.HTTP_400_BAD_REQUEST)
         grade_in = str(request.data.get('grade') or '').strip()
         group = str(request.data.get('group') or '').strip()[:5]
         credentials, unlinked = [], []

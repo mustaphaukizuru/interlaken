@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
-import { admissionsAdminApi } from '@/services/api';
+import { admissionsAdminApi, api } from '@/services/api';
 import type { BulkActionDef } from '@/services/dataOps';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { REG_ENTITY, registrationDetailKey, useDocumentBulk } from '@/hooks/queries/admissions';
@@ -346,7 +346,16 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
   // Editable controls seeded from the loaded registration on mount (the parent
   // remounts this block per registration id) — no sync effect needed.
   const [status, setStatus] = useState(registration.status);
-  const [notes, setNotes] = useState(registration.admin_notes ?? '');
+  // «Notas internas» come from the staff-only review endpoint (the applicant
+  // detail never carries them). `null` = untouched: a save sends the notes
+  // only when they were edited, so it never blanks a colleague's notes.
+  const review = useQuery({
+    queryKey: [...registrationDetailKey(registration.id), 'review'],
+    queryFn: async () => (await api.get(`/admissions/register/${registration.id}/status/`)).data as { admin_notes: string },
+  });
+  const savedNotes = review.data?.admin_notes ?? '';
+  const [notes, setNotes] = useState<string | null>(null);
+  const notesEdited = notes !== null && notes !== savedNotes;
   const [reason, setReason] = useState('');
   const [notify, setNotify] = useState(true);
   // Only the moves the transition table allows (the server enforces it too);
@@ -364,7 +373,7 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
     mutationFn: () =>
       admissionsAdminApi.updateRegistrationStatus(registration.id, {
         status,
-        admin_notes: notes,
+        ...(notesEdited ? { admin_notes: notes } : {}),
         ...(needsReason ? { note: reason.trim() } : {}),
         ...(emailsFamily && !notify ? { notify: false } : {}),
       }),
@@ -393,8 +402,16 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
       )}
       <div>
         <label htmlFor="reg-notes" className="label">Notas internas</label>
-        <textarea id="reg-notes" className="input-field min-h-[72px] resize-none" value={notes}
+        {/* Read-only until the saved notes arrive: typing over a box that has
+            not loaded them yet would replace them on save. */}
+        <textarea id="reg-notes" className="input-field min-h-[72px] resize-none" value={notes ?? savedNotes}
+          disabled={!review.isSuccess} aria-describedby={review.isError ? 'reg-notes-error' : undefined}
           onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones de admisiones (no visibles para la familia)…" />
+        {review.isError && (
+          <p id="reg-notes-error" className="mt-1 text-xs text-coral-700">
+            No se pudieron cargar las notas guardadas; se conservan sin cambios al guardar.
+          </p>
+        )}
       </div>
       {emailsFamily ? (
         <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">

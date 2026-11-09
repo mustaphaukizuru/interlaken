@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
-  api: { post: vi.fn() },
+  api: { post: vi.fn(), get: vi.fn() },
   admissionsAdminApi: {
     getRegistration: vi.fn(),
     updateRegistrationStatus: vi.fn(),
@@ -27,6 +27,7 @@ const verifyDocument = vi.mocked(admissionsAdminApi.verifyDocument);
 const downloadDocument = vi.mocked(admissionsAdminApi.downloadDocument);
 const toastSuccess = vi.mocked(toast.success);
 const apiPost = vi.mocked(api.post);
+const apiGet = vi.mocked(api.get);
 const toastError = vi.mocked(toast.error);
 
 const DOC = {
@@ -87,6 +88,8 @@ describe('RegistrationReviewModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRegistration.mockResolvedValue({ data: baseReg } as never);
+    // The staff-only review endpoint carries «Notas internas».
+    apiGet.mockResolvedValue({ data: { id: 9, status: 'submitted', admin_notes: '' } } as never);
     updateStatus.mockResolvedValue({ data: {} } as never);
     verifyDocument.mockResolvedValue({ data: {} } as never);
     createObjectURL = vi.fn(() => 'blob:acta');
@@ -205,6 +208,7 @@ describe('RegistrationReviewModal', () => {
     fireEvent.change(screen.getByLabelText(/Estado de la revisión/i), {
       target: { value: 'approved' },
     });
+    await waitFor(() => expect(screen.getByLabelText(/Notas internas/i)).toBeEnabled());
     fireEvent.change(screen.getByLabelText(/Notas internas/i), {
       target: { value: 'Expediente completo' },
     });
@@ -245,7 +249,7 @@ describe('RegistrationReviewModal', () => {
     fireEvent.change(screen.getByLabelText(/Motivo del cambio/i), { target: { value: 'Falta firma' } });
     await userEvent.click(save);
     await waitFor(() => {
-      expect(updateStatus).toHaveBeenCalledWith(9, { status: 'reviewing', admin_notes: '', note: 'Falta firma' });
+      expect(updateStatus).toHaveBeenCalledWith(9, { status: 'reviewing', note: 'Falta firma' });
     });
   });
 
@@ -255,8 +259,34 @@ describe('RegistrationReviewModal', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Notificar a la familia/i }));
     await userEvent.click(screen.getByRole('button', { name: /Guardar revisión/i }));
     await waitFor(() => {
-      expect(updateStatus).toHaveBeenCalledWith(9, { status: 'approved', admin_notes: '', notify: false });
+      expect(updateStatus).toHaveBeenCalledWith(9, { status: 'approved', notify: false });
     });
+  });
+
+  // Launch review #5: the box started empty (the applicant detail has no notes),
+  // and every «Guardar revisión» sent admin_notes: '' over a colleague's notes.
+  it('shows the saved internal notes and keeps them when only the status changes', async () => {
+    apiGet.mockResolvedValue({ data: { id: 9, status: 'submitted', admin_notes: 'Llamar el lunes' } } as never);
+    renderModal();
+    expect(await screen.findByDisplayValue('Llamar el lunes')).toBeInTheDocument();
+    expect(apiGet).toHaveBeenCalledWith('/admissions/register/9/status/');
+
+    fireEvent.change(screen.getByLabelText(/Estado de la revisión/i), { target: { value: 'approved' } });
+    await userEvent.click(screen.getByRole('button', { name: /Guardar revisión/i }));
+
+    await waitFor(() => expect(updateStatus).toHaveBeenCalled());
+    expect(updateStatus.mock.calls[0][1]).not.toHaveProperty('admin_notes');
+  });
+
+  it('does not let the notes be typed over (nor sent) when they could not be loaded', async () => {
+    apiGet.mockRejectedValue(new Error('down'));
+    renderModal();
+    expect(await screen.findByText(/No se pudieron cargar las notas guardadas/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Notas internas/i)).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: /Guardar revisión/i }));
+    await waitFor(() => expect(updateStatus).toHaveBeenCalled());
+    expect(updateStatus.mock.calls[0][1]).not.toHaveProperty('admin_notes');
   });
 
   it('bulk-rejects the selected documents with a note through the documents bulk endpoint', async () => {
