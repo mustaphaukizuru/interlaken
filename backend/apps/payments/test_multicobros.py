@@ -24,6 +24,7 @@ from apps.payments.models import BanorteCheckout, Payment
 from apps.payments.multicobros import needs_review_q, review_reason
 from apps.payments.services import fail_checkout_if_still_open
 from apps.payments.test_banorte import _bank_answer, _family, _report, _start
+from apps.portal.models import Notification
 
 # The Banorte fixtures (fake configuration, certificate, an opened checkout).
 banorte = tb.banorte
@@ -185,10 +186,29 @@ class TestReconcileNotFound:
 
         checkout.refresh_from_db()
         assert checkout.key_material
+        # An expired attempt was never announced to the family: nothing to close.
+        assert not Notification.objects.filter(user=payment.user).exists()
         api_client.force_authenticate(user=payment.user)
         _report(api_client, payment.pk, "success", _bank_answer(checkout))
         assert Payment.objects.get(pk=payment.pk).status == Payment.Status.SUCCESS
         assert _balance(student) == Decimal("200.00")
+
+    def test_a_bank_timeout_family_is_told_when_nothing_was_charged(self, api_client, banorte):
+        checkout = _open(api_client, banorte)
+        parent = checkout.payment.user
+        _report(api_client, checkout.payment_id, "success",
+                _bank_answer(checkout, resultadoPayw="T", codigoAut=None))
+        payment = Payment.objects.get(pk=checkout.payment_id)
+        assert payment.failure_stage() == "bank_timeout"
+        assert list(Notification.objects.filter(user=parent).values_list("title", flat=True)) == [
+            "Pago de recarga sin confirmar"]
+
+        resp = _reconcile(api_client, payment.pk, outcome="not_found", note="No aparece en MC")
+
+        assert resp.status_code == 200, resp.data
+        closed = Notification.objects.get(user=parent, title="Pago de recarga no realizado")
+        assert "no se realizó ningún cargo" in closed.message
+        assert f"folio {payment.pk}" in closed.message
 
 
 # ── what needs a MultiCobros check ───────────────────────────

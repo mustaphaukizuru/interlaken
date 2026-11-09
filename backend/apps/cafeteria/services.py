@@ -1438,6 +1438,22 @@ def notify_topup_result(payment, *, success: bool) -> int:
         )
         tone, highlight = 'success', ('Monto pagado', format_amount(payment.amount))
         details.append(('Referencia', str(payment.gateway_tx_id or payment.id)))
+    elif payment.is_soft_failed():
+        # The bank did not confirm (Payworks T, "sin respuesta del banco"): the
+        # card may have been charged, and staff look it up in MultiCobros. "No
+        # charge, try again" invited a second payment for the same recarga.
+        title = 'Pago de recarga sin confirmar'
+        message = (
+            f'El banco no confirmó el pago de {format_amount(payment.amount)} para la cafetería '
+            f'de {name}. No vuelva a pagar: el colegio revisará la operación con Banorte y le '
+            f'avisará. Si el cargo se realizó, la recarga se registrará sin que usted tenga '
+            f'que hacer nada. Folio: {payment.id}.'
+        )
+        tone, highlight = 'warning', ('Monto', format_amount(payment.amount))
+        details += [('Estado', 'Pendiente de confirmar con el banco'), ('Folio', str(payment.id))]
+        intro = (f'El banco no confirmó su pago para la cafetería de '
+                 f'{student.user.first_name or name}. No vuelva a pagar: el colegio revisará '
+                 f'la operación con Banorte y le avisará.')
     else:
         title = 'Recarga de cafetería no completada'
         message = (
@@ -1454,6 +1470,38 @@ def notify_topup_result(payment, *, success: bool) -> int:
         notify(parent, Notification.NotifType.PAYMENT, title, message, fanout=False,
                details=details, highlight=highlight, tone=tone, cta_label=cta_label,
                url='/portal/cafeteria' if cta_label else None, intro=intro)
+        notified += 1
+    return notified
+
+
+def notify_topup_not_charged(payment) -> int:
+    """Close the loop of «Pago de recarga sin confirmar»: staff looked the
+    operation up in MultiCobros and found no charge, so the family may pay
+    again. Best-effort; call after the transaction committed. Returns the
+    number of guardians notified."""
+    from apps.accounts.family import family_notify_recipients
+    from apps.cafeteria.schedule import format_amount
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    topup = getattr(payment, 'related_topup', None)
+    if topup is None:
+        return 0
+    student = topup.student
+    name = student.user.full_name
+    amount = format_amount(payment.amount)
+    message = (f'Revisamos con Banorte el pago de {amount} para la cafetería de {name} '
+               f'(folio {payment.id}): no se realizó ningún cargo a su tarjeta. Puede volver '
+               f'a intentarlo desde el portal.')
+    notified = 0
+    for parent in family_notify_recipients(student):
+        notify(parent, Notification.NotifType.PAYMENT, 'Pago de recarga no realizado', message,
+               fanout=False, tone='neutral', cta_label='Intentar de nuevo',
+               url='/portal/cafeteria',
+               details=[('Alumno', name), ('Monto', amount),
+                        ('Cargo', 'No se realizó ningún cargo'), ('Folio', str(payment.id))],
+               intro=(f'Revisamos con Banorte su pago para la cafetería de '
+                      f'{student.user.first_name or name}: no se realizó ningún cargo.'))
         notified += 1
     return notified
 
