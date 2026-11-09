@@ -128,6 +128,10 @@ class TestReconcileApproved:
         "extra,code",
         [
             ({"amount": "150.00"}, "amount_mismatch"),
+            # Decimal parses these; comparing an sNaN used to raise (a 500).
+            ({"amount": "sNaN"}, "amount_mismatch"),
+            ({"amount": "NaN"}, "amount_mismatch"),
+            ({"amount": "Infinity"}, "amount_mismatch"),
             ({"referencia": "ABC"}, "invalid_reference"),
             ({"codigo_aut": ""}, "invalid_auth_code"),
         ],
@@ -309,6 +313,22 @@ class TestVerify:
         resp = self._verify(api_client, approved, referencia="248233587990", amount="200")
         assert resp.status_code == 400 and resp.data["code"] == "not_success"
 
+    @pytest.mark.parametrize("amount", ["sNaN", "NaN", "-Infinity", "abc", ""])
+    def test_a_non_numeric_amount_is_a_mismatch_not_a_500(self, api_client, approved, amount):
+        resp = self._verify(api_client, approved, referencia="248233587990", amount=amount)
+        assert resp.status_code == 400 and resp.data["code"] == "amount_mismatch"
+        approved.refresh_from_db()
+        assert approved.verified_at is None
+
+
+def test_parse_amount_accepts_typed_money_and_rejects_non_numbers():
+    from apps.payments.multicobros import parse_amount
+
+    assert parse_amount("$1,234.50") == Decimal("1234.50")
+    assert parse_amount(" 200 ") == Decimal("200")
+    for bad in ("sNaN", "NaN", "Infinity", "-inf", "abc", "", None):
+        assert parse_amount(bad) is None
+
 
 # ── simulations never reach the POS ──────────────────────────
 
@@ -465,6 +485,20 @@ class TestBrowserAnswers:
             ),
         )
         assert len(_alerts(mailoutbox, "configuración")) == 1
+
+    def test_an_american_express_rejection_is_the_card_not_the_merchant(
+        self, api_client, opened, mailoutbox
+    ):
+        # The afiliación takes Visa and Mastercard only: Payworks rejecting an
+        # Amex card must not email the admins about a configuration problem.
+        AdminFactory(email="direccion@interlaken.test")
+        _, _, checkout = opened
+        resp = _report(api_client, checkout.payment_id, "success", _bank_answer(
+            checkout, resultadoPayw="R", codigoAut=None, codigoPayw="PAYW-0500",
+            texto="Tarjeta no permitida", marcaTarjeta="AMEX"))
+        assert resp.data["status"] == "failed"
+        assert resp.data["failure_reason"] == "card_not_accepted"
+        assert _alerts(mailoutbox, "configuración") == []
 
     def test_aut10_alerts_too(self, api_client, opened, mailoutbox):
         AdminFactory(email="direccion@interlaken.test")

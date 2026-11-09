@@ -122,10 +122,14 @@ def needs_review_q(now=None) -> Q:
 
 
 def parse_amount(value) -> Decimal | None:
+    """The amount staff typed ("$1,234.50"), or ``None`` when it is not a finite
+    number: ``Decimal`` also parses "NaN"/"sNaN"/"Infinity", and comparing an
+    sNaN raises (a 500 on «Conciliar» and «Verificar»)."""
     try:
-        return Decimal(str(value).strip().replace("$", "").replace(",", ""))
+        amount = Decimal(str(value).strip().replace("$", "").replace(",", ""))
     except (InvalidOperation, AttributeError):
         return None
+    return amount if amount.is_finite() else None
 
 
 def _locked(payment_id):
