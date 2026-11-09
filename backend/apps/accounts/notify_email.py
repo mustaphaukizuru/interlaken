@@ -152,6 +152,23 @@ def confirmation_email(user, token: str):
     return f"Confirme su correo para los avisos {whose}", content
 
 
+def guardian_receives(user, email: str) -> bool:
+    """True when ``email`` already gets this student's avisos through an
+    active linked guardian's own account (their login or their confirmed
+    personal address): adding it to the student's login would only repeat them."""
+    from django.db.models import Q
+
+    from .models import User
+
+    profile = getattr(user, 'student_profile', None) if user.role == User.Role.STUDENT else None
+    if profile is None:
+        return False
+    return (profile.parents.filter(is_active=True).exclude(pk=user.pk)
+            .filter(Q(email__iexact=email)
+                    | Q(notify_email__iexact=email, notify_email_verified_at__isnull=False))
+            .exists())
+
+
 class _EmailIn(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
 
@@ -178,6 +195,10 @@ class NotifyEmailView(APIView):
         if is_synthetic_email(email):
             return Response(error_body('Escriba un correo personal.', code='invalid'),
                             status=status.HTTP_400_BAD_REQUEST)
+        if guardian_receives(user, email):
+            return Response(error_body('Ese correo ya recibe los avisos de este alumno por su cuenta de '
+                                       'Padre/Tutor vinculada. No hace falta agregarlo aquí.',
+                                       code='guardian_account'), status=status.HTTP_400_BAD_REQUEST)
         before = _state(user)
         user.notify_email = email
         user.notify_email_verified_at = None

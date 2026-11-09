@@ -109,7 +109,8 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     ``fanout`` (default) also delivers a student's email/push to every linked
     guardian who keeps that channel on; pass ``fanout=False`` when the caller
     already iterates the family (``family_notify_recipients``) so nobody is
-    notified twice.
+    notified twice: a student's copy then leaves out the addresses a guardian's
+    own copy reaches (``own_copy_mailboxes``).
 
     The email carries the same title and text, plus what only email shows:
     ``details`` (label/value rows), ``highlight`` (one big figure), the button
@@ -145,24 +146,27 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     # A student's notification must reach the student's real mailbox (if any)
     # AND every linked guardian; synthetic importer addresses are skipped. Each
     # guardian gets it on the channels they keep on (their own Avisos tab).
-    from apps.accounts.recipients import delivery_users, mailboxes_of, wants
+    from apps.accounts.recipients import delivery_users, mailboxes_of, own_copy_mailboxes, wants
 
     cache = {user.pk: prefs}
     guardians = [t for t in delivery_users(user) if t.pk != user.pk] if fanout else []
-    email_to = ([user] if want_email else []) + [
-        g for g in guardians if email and wants(g, 'email', notif_type, cache)]
+    if fanout:
+        recipients = mailboxes_of(([user] if want_email else []) + [
+            g for g in guardians if email and wants(g, 'email', notif_type, cache)])
+    else:
+        # The caller notifies every family member: this copy leaves out the
+        # addresses a guardian's own copy already reaches (one email each).
+        recipients = own_copy_mailboxes(user, notif_type, cache=cache) if want_email else []
     push_to = ([user] if want_push else []) + [
         g for g in guardians if wants(g, 'push', notif_type, cache)]
     email_status = Notification.Delivery.SKIPPED
-    if email_to:
-        recipients = mailboxes_of(email_to)
-        if recipients:
-            from .emailing import notification_content
-            content = notification_content(user=user, notif_type=notif_type, title=title, message=message,
-                                           details=details, highlight=highlight, tone=tone, url=url,
-                                           cta_label=cta_label, intro=intro)
-            ok = send_email(subject=title, message=message, recipients=recipients, content=content)
-            email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
+    if recipients:
+        from .emailing import notification_content
+        content = notification_content(user=user, notif_type=notif_type, title=title, message=message,
+                                       details=details, highlight=highlight, tone=tone, url=url,
+                                       cta_label=cta_label, intro=intro)
+        ok = send_email(subject=title, message=message, recipients=recipients, content=content)
+        email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
 
     push_status = Notification.Delivery.SKIPPED
     if push_to:
@@ -362,6 +366,27 @@ def emergency_broadcast(
     }
 
 
+# Rows of one notice queued for each family member together (the bulk top-up's
+# late notices) share type, title and text and are created within moments.
+SAME_NOTICE_WINDOW = timedelta(minutes=10)
+
+
+def _has_own_copy(user, n) -> bool:
+    """True when ``user`` holds a row of the same notice as ``n``: the same
+    comunicado, or the same queued notice (type, title and text, created
+    within ``SAME_NOTICE_WINDOW``)."""
+    from apps.portal.models import Notification
+
+    rows = Notification.objects.filter(user=user).exclude(pk=n.pk)
+    if n.announcement_id:
+        return rows.filter(announcement_id=n.announcement_id).exists()
+    return rows.filter(
+        announcement__isnull=True, notif_type=n.notif_type, title=n.title, message=n.message,
+        created_at__gte=n.created_at - SAME_NOTICE_WINDOW,
+        created_at__lte=n.created_at + SAME_NOTICE_WINDOW,
+    ).exists()
+
+
 def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> int:
     """Deliver email + web-push for notifications not yet dispatched.
 
@@ -370,7 +395,8 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     ``dispatch_notifications`` cron) sends the out-of-band channels so a
     school-wide comunicado actually reaches inboxes without blocking the publish
     request. Every target is emailed / pushed only on the channels its own
-    preferences keep on (urgent warnings always). Rows older than
+    preferences keep on (urgent warnings always), and one notice reaches each
+    address once (``_has_own_copy``, ``own_copy_reach``). Rows older than
     ``max_age_days`` are marked delivered *without* sending, so a cron that was
     down for a while can't fire a surprise blast of stale announcements.
     Returns the number actually sent.
@@ -386,7 +412,7 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     if not pending:
         return 0
 
-    from apps.accounts.recipients import delivery_users, mailboxes_of, wants
+    from apps.accounts.recipients import delivery_users, mailboxes_of, own_copy_reach, wants
 
     max_attempts = getattr(settings, 'NOTIFICATION_MAX_ATTEMPTS', 3)
     prefs = {}  # user pk → NotificationPreference, read once per pass
@@ -399,20 +425,20 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
                 last_error='Caducó sin enviarse')
             continue  # too old — mark delivered below, don't send
         ann = n.announcement
-        # Student rows also reach the guardians — unless a guardian already has
-        # their own row for the same comunicado (audience fan-out), in which
-        # case that row carries their copy and we must not double-send.
-        targets = []
-        for target in delivery_users(n.user):
-            if target.pk != n.user_id and ann is not None and Notification.objects.filter(
-                user=target, announcement=ann).exists():
-                continue
-            targets.append(target)
+        kind = n.notif_type
+        # Student rows also reach the guardians, unless a guardian holds their
+        # own row of the same notice (the comunicado fan-out, the bulk top-up
+        # queue): that row carries their copy, so this one neither goes to them
+        # nor to an address their copy already reaches.
+        family = delivery_users(n.user)
+        own = [g for g in family if g.pk != n.user_id and _has_own_copy(g, n)]
+        targets = [t for t in family if t not in own]
+        covered = own_copy_reach(own, kind, cache=prefs)
         # Each target on the channels it keeps on (its own Avisos tab), so the
         # footer's «tiene activados los avisos por correo» is true; urgent
         # warnings reach everyone (NotificationPreference.wants).
-        kind = n.notif_type
-        emails = mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
+        emails = [addr for addr in mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
+                  if addr.lower() not in covered]
         email_status = Notification.Delivery.SKIPPED
         if emails:
             from .emailing import notification_content
