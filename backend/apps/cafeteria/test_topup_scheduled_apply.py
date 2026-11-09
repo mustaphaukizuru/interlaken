@@ -171,10 +171,12 @@ class TestPaymentLeavesTheWalletAlone:
 
 # ── staff "Aplicar" ──────────────────────────────────────────────────────────
 class TestApplyPaidTopup:
-    def test_applies_once_loyverse_shows_the_load(self):
+    def test_applies_once_loyverse_shows_the_load(self, django_capture_on_commit_callbacks):
         student, topup, payment = paid_topup(balance=100)
         admin = AdminFactory()
-        with patch(GUARD, return_value=Decimal('300')):
+        # The family is told after the commit (see the bulk test below).
+        with patch(GUARD, return_value=Decimal('300')), \
+                django_capture_on_commit_callbacks(execute=True):
             tx, balance = apply_paid_topup(topup, actor=admin)
 
         topup.refresh_from_db()
@@ -346,6 +348,37 @@ class TestApplyEndpoints:
         assert r.data['ok'] == 1 and r.data['total'] == '100.00'
         assert [f['id'] for f in r.data['failed']] == [missing.pk]
         assert 'Loyverse aún no muestra' in r.data['failed'][0]['error']
+
+    def test_bulk_apply_tells_families_only_after_its_chunk_commits(
+            self, api_client, django_capture_on_commit_callbacks):
+        """The rows run inside their chunk's transaction: a family email sent
+        from inside it would survive a rollback (a slow Loyverse read or SMTP
+        call timing the request out) of a credit it announced."""
+        from apps.core import bulk
+
+        first, a, _ = paid_topup('100.00', balance=0)
+        other_parent = ParentFactory()
+        other = StudentProfileFactory(parents=[other_parent], loyverse_id='lv-2')
+        _, b, _ = paid_topup('50.00', student=other, parent=other_parent, balance=0)
+        families = [first.parents.first(), other_parent]
+        api_client.force_authenticate(user=AdminFactory())
+
+        def points(student):
+            return Decimal('100') if student.loyverse_id == 'lv-1' else Decimal('50')
+
+        with patch(GUARD, side_effect=points), \
+                patch('apps.core.bulk.run_bulk', wraps=bulk.run_bulk) as run, \
+                django_capture_on_commit_callbacks(execute=False) as callbacks:
+            r = api_client.post(reverse('admin-topups-bulk'),
+                                {'action': 'apply_paid', 'ids': [a.pk, b.pk]}, format='json')
+            assert r.status_code == 200 and r.data['ok'] == 2, r.data
+            sent = Notification.objects.filter(user__in=families, title='Recarga aplicada')
+            assert not sent.exists()            # nothing announced inside the transaction
+        assert run.call_args.kwargs['chunk'] == 5
+
+        for callback in callbacks:
+            callback()
+        assert sent.count() == 2
 
     def test_refund_before_apply_needs_both_confirmations(self, api_client):
         student, topup, payment = paid_topup(checkout='PRD', balance=5)

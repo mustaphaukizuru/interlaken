@@ -1294,7 +1294,10 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
                actor=actor, context='cafeteria.topup.apply_paid')
         balance = cb.balance
 
-    notify_topup_applied(topup, balance)
+    # After COMMIT: right away for «Aplicar» (no transaction open), but the bulk
+    # action runs inside its chunk's transaction; a family must never be told
+    # "ya está disponible" about a credit that a later rollback undid.
+    transaction.on_commit(lambda: notify_topup_applied(topup, balance), robust=True)
     logger.info('Paid top-up #%s applied by %s (%s): $%s to %s.',
                 topup.pk, actor, via, amount, student)
     return tx, balance
