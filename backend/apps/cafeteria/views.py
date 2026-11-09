@@ -1689,21 +1689,26 @@ def _queue_balance_notification(student, title, message) -> int:
 
     For the bulk top-up rows that did not fit the inline budget: one INSERT per
     guardian instead of an SMTP round trip inside the request. Honours the
-    same category / channel preferences ``notify`` does."""
+    same category / channel preferences ``notify`` does: the row waits for the
+    cron only when email or push is on, and the dispatcher sends each channel
+    only if this family member still keeps it on when it runs."""
     from apps.accounts.family import family_notify_recipients
     from apps.accounts.models import NotificationPreference
     from apps.portal.models import Notification
 
+    kind = Notification.NotifType.CAFETERIA
+    skipped = Notification.Delivery.SKIPPED
     queued = 0
     for parent in family_notify_recipients(student):
         prefs = NotificationPreference.for_user(parent)
-        if not prefs.allows(Notification.NotifType.CAFETERIA) or not prefs.in_app_enabled:
+        if not prefs.allows(kind) or not prefs.wants('in_app', kind):
             continue
-        out_of_band = prefs.email_enabled or prefs.push_enabled
+        email, push = prefs.wants('email', kind), prefs.wants('push', kind)
         Notification.objects.create(
-            user=parent, notif_type=Notification.NotifType.CAFETERIA,
-            title=title, message=message,
-            delivered_at=None if out_of_band else timezone.now())
+            user=parent, notif_type=kind, title=title, message=message,
+            email_status=Notification.Delivery.PENDING if email else skipped,
+            push_status=Notification.Delivery.PENDING if push else skipped,
+            delivered_at=None if (email or push) else timezone.now())
         queued += 1
     return queued
 

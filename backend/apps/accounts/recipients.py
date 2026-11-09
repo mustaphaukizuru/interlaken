@@ -57,3 +57,20 @@ def email_recipients(user) -> list[str]:
     """Real mailboxes for ``user``: own (unless synthetic) + guardians', each
     with its confirmed personal address."""
     return mailboxes_of(delivery_users(user))
+
+
+def wants(user, channel: str, notif_type: str, cache: dict | None = None) -> bool:
+    """Whether ``user`` receives ``notif_type`` notices by ``channel`` ('email' or 'push').
+
+    Each delivery target answers for itself (Avisos tab: channel on, category
+    not muted; urgent warnings always). ``cache`` (a dict, user pk → prefs)
+    reads each user's preferences once per dispatch pass; never creates a row.
+    """
+    from .models import NotificationPreference
+
+    prefs = cache.get(user.pk) if cache is not None else None
+    if prefs is None:
+        prefs = NotificationPreference.lookup(user)
+        if cache is not None:
+            cache[user.pk] = prefs
+    return prefs.wants(channel, notif_type)

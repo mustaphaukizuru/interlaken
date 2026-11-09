@@ -104,10 +104,12 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
            url: str | None = None, cta_label: str | None = None, intro: str | None = None):
     """Create an in-app ``Notification`` for ``user`` and optionally email them.
 
-    Respects ``NotificationPreference`` toggles when present (defaults = all on).
+    Respects ``NotificationPreference`` toggles when present (defaults = all on);
+    urgent warnings go out on every channel (``NotificationPreference.wants``).
     ``fanout`` (default) also delivers a student's email/push to every linked
-    guardian; pass ``fanout=False`` when the caller already iterates the family
-    (``family_notify_recipients``) so nobody is notified twice.
+    guardian who keeps that channel on; pass ``fanout=False`` when the caller
+    already iterates the family (``family_notify_recipients``) so nobody is
+    notified twice.
 
     The email carries the same title and text, plus what only email shows:
     ``details`` (label/value rows), ``highlight`` (one big figure), the button
@@ -124,9 +126,9 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     if not prefs.allows(notif_type):
         logger.info('Notification muted by category for %s: %s', user, title)
         return None
-    want_in_app = prefs.in_app_enabled
-    want_email = email and prefs.email_enabled
-    want_push = prefs.push_enabled
+    want_in_app = prefs.wants('in_app', notif_type)
+    want_email = email and prefs.wants('email', notif_type)
+    want_push = prefs.wants('push', notif_type)
 
     notification = None
     if want_in_app:
@@ -141,13 +143,19 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
         )
 
     # A student's notification must reach the student's real mailbox (if any)
-    # AND every linked guardian; synthetic importer addresses are skipped.
-    from apps.accounts.recipients import delivery_users, email_recipients, mailboxes_of
+    # AND every linked guardian; synthetic importer addresses are skipped. Each
+    # guardian gets it on the channels they keep on (their own Avisos tab).
+    from apps.accounts.recipients import delivery_users, mailboxes_of, wants
 
-    targets = delivery_users(user) if fanout else [user]
+    cache = {user.pk: prefs}
+    guardians = [t for t in delivery_users(user) if t.pk != user.pk] if fanout else []
+    email_to = ([user] if want_email else []) + [
+        g for g in guardians if email and wants(g, 'email', notif_type, cache)]
+    push_to = ([user] if want_push else []) + [
+        g for g in guardians if wants(g, 'push', notif_type, cache)]
     email_status = Notification.Delivery.SKIPPED
-    if want_email:
-        recipients = email_recipients(user) if fanout else mailboxes_of([user])
+    if email_to:
+        recipients = mailboxes_of(email_to)
         if recipients:
             from .emailing import notification_content
             content = notification_content(user=user, notif_type=notif_type, title=title, message=message,
@@ -157,10 +165,10 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
             email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
 
     push_status = Notification.Delivery.SKIPPED
-    if want_push:
+    if push_to:
         from apps.portal.push import send_web_push
         delivered = 0
-        for target in targets:
+        for target in push_to:
             delivered += send_web_push(target, title, message)
         push_status = Notification.Delivery.SENT if delivered else Notification.Delivery.SKIPPED
 
@@ -361,9 +369,11 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     ``delivered_at=NULL``; this batched, capped pass (run from the
     ``dispatch_notifications`` cron) sends the out-of-band channels so a
     school-wide comunicado actually reaches inboxes without blocking the publish
-    request. Rows older than ``max_age_days`` are marked delivered *without*
-    sending, so a cron that was down for a while can't fire a surprise blast of
-    stale announcements. Returns the number actually sent.
+    request. Every target is emailed / pushed only on the channels its own
+    preferences keep on (urgent warnings always). Rows older than
+    ``max_age_days`` are marked delivered *without* sending, so a cron that was
+    down for a while can't fire a surprise blast of stale announcements.
+    Returns the number actually sent.
     """
     from apps.portal.models import Notification
     from apps.portal.push import send_web_push
@@ -376,9 +386,10 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
     if not pending:
         return 0
 
-    from apps.accounts.recipients import delivery_users, mailboxes_of
+    from apps.accounts.recipients import delivery_users, mailboxes_of, wants
 
     max_attempts = getattr(settings, 'NOTIFICATION_MAX_ATTEMPTS', 3)
+    prefs = {}  # user pk → NotificationPreference, read once per pass
     sent, handled_ids, retry_ids, failures = 0, [], [], []
     for n in pending:
         if n.created_at < cutoff:
@@ -397,7 +408,11 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
                 user=target, announcement=ann).exists():
                 continue
             targets.append(target)
-        emails = mailboxes_of(targets)
+        # Each target on the channels it keeps on (its own Avisos tab), so the
+        # footer's «tiene activados los avisos por correo» is true; urgent
+        # warnings reach everyone (NotificationPreference.wants).
+        kind = n.notif_type
+        emails = mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
         email_status = Notification.Delivery.SKIPPED
         if emails:
             from .emailing import notification_content
@@ -415,7 +430,8 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
             url = f'/portal/notificaciones/{n.pk}' if ann else '/portal'
             delivered = 0
             for target in targets:
-                delivered += send_web_push(target, n.title, n.message, url=url)
+                if wants(target, 'push', kind, prefs):
+                    delivered += send_web_push(target, n.title, n.message, url=url)
             push_status = Notification.Delivery.SENT if delivered else Notification.Delivery.SKIPPED
 
         attempts = n.attempts + 1
