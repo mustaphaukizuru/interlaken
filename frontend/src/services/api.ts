@@ -493,6 +493,7 @@ export interface LoyverseCustomer {
   first_visit: string | null;
   last_visit: string | null;
   total_visits: number;
+  /** Loyverse's figure: cash/card paid at the register only (wallet purchases are points). */
   total_spent: string;
   total_points: string;
   loyverse_created_at: string | null;
@@ -503,6 +504,8 @@ export interface LoyverseCustomer {
   student: { id: number; name: string; grade: string; group: string; student_id: string } | null;
   /** Parked wallet receipts for a card with no student. */
   receipts: number;
+  /** The pupil's «Consumo registrado» from the ledger (sort key `spent`); null for a card with no student. */
+  consumption: string | null;
 }
 
 export interface LoyverseCustomerPage {

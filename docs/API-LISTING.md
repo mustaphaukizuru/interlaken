@@ -182,10 +182,10 @@ All under `/cafeteria/admin/` (`backend/apps/cafeteria/admin_data.py`). Matrícu
 | | |
 | --- | --- |
 | Search | name, email, customer code, linked matrícula |
-| Ordering | `name`, `code`, `kind`, `points`, `visits`, `spent`, `last_visit`; default `kind, -last_visit, name` |
+| Ordering | `name`, `code`, `kind`, `points`, `visits`, `spent`, `last_visit`; default `kind, -last_visit, name`. `spent` is the pupil's «Consumo registrado» (sum of its ledger purchases, one correlated subquery; 0 for cards with no student), not Loyverse's `total_spent` |
 | Filters | `kind` (`student`, `staff`, `test`, `other`, `nonstudent`), `missing` |
-| Extra fields | `summary` (cards per kind + `missing`) in the envelope; 50 per page by default (`page_size` honoured) |
-| Export | `customers/export/` CSV, XLSX, PDF. Entity `cafeteria.customers`. |
+| Extra fields | `summary` (cards per kind + `missing`) in the envelope; 50 per page by default (`page_size` honoured). Each row: `consumption` («Consumo registrado», `null` for a card with no student) and Loyverse's `total_spent` (cash/card paid at the register only: wallet purchases are points) |
+| Export | `customers/export/` CSV, XLSX, PDF; columns «Consumo registrado» (pupils only) and «Efectivo/tarjeta en caja» (`total_spent`). Entity `cafeteria.customers`. |
 | Bulk / Import | n/a |
 
 ### Reconciliación: `GET /cafeteria/admin/reconcile/`

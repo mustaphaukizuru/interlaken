@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -88,6 +88,7 @@ const DETAIL = {
       balance_after: '140.00',
     },
   ],
+  consumption: { total: '0.00', since: null },
   loyverse: null,
 };
 
@@ -180,5 +181,52 @@ describe('AdminCafeteriaStudent money actions', () => {
       expect(refundTransaction).toHaveBeenCalledWith(55, '', false);
     });
     expect(toastSuccess).toHaveBeenCalledWith('Devolución procesada.');
+  });
+});
+
+describe('AdminCafeteriaStudent «Consumo registrado» (owner, 2026-11-08)', () => {
+  const tz = process.env.TZ;
+  // Loyverse's own snapshot: wallet purchases are points, so total_spent is $0.00.
+  const LOYVERSE = {
+    customer_code: 'ci0007', name: 'López Luis-3PRI', email: '', phone_number: '', address_code: '3PRI',
+    note: '', first_visit: '2024-08-26T14:00:00Z', last_visit: '2026-11-06T18:30:00Z', total_visits: 274,
+    total_spent: '0.00', total_points: '120.00', loyverse_created_at: null, synced_at: '2026-11-07T12:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubViewport(1280);
+    // In Mexico City, '2024-09-03' read as UTC midnight is still 2 September.
+    process.env.TZ = 'America/Mexico_City';
+    vi.mocked(cafeteriaAdminApi.transactions).mockResolvedValue({ data: { count: 0, results: [] } } as never);
+    vi.mocked(cafeteriaAdminApi.adjustments).mockResolvedValue({ data: { count: 0, results: [] } } as never);
+  });
+
+  afterEach(() => {
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  });
+
+  it('shows the ledger consumption and names Loyverse total_spent for what it is', async () => {
+    getStudentDetail.mockResolvedValue({ data: {
+      ...DETAIL, transactions: [], adjustments: [],
+      consumption: { total: '907.00', since: '2024-09-03' }, loyverse: LOYVERSE,
+    } } as never);
+    renderPage();
+
+    const consumo = (await screen.findByText('Consumo registrado')).parentElement as HTMLElement;
+    expect(within(consumo).getByText('$907.00')).toBeInTheDocument();
+    expect(within(consumo).getByText('Compras desde el 3 de sep 2024')).toBeInTheDocument();
+    expect(screen.queryByText('Gasto total')).toBeNull();
+    const cash = screen.getByText('Efectivo/tarjeta en caja').parentElement as HTMLElement;
+    expect(within(cash).getByText('$0.00')).toBeInTheDocument();
+  });
+
+  it('says so when the student has no purchase yet', async () => {
+    getStudentDetail.mockResolvedValue({ data: { ...DETAIL, transactions: [], adjustments: [] } } as never);
+    renderPage();
+    const consumo = (await screen.findByText('Consumo registrado')).parentElement as HTMLElement;
+    expect(within(consumo).getByText('$0.00')).toBeInTheDocument();
+    expect(within(consumo).getByText('Sin compras registradas')).toBeInTheDocument();
   });
 });

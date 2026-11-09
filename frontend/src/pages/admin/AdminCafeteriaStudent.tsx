@@ -6,7 +6,7 @@ import {
   Plus, Minus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -44,6 +44,8 @@ const txLabel = (type: string) => {
 };
 
 const fmtDate = (d: string) => format(new Date(d), "d 'de' MMM yyyy, HH:mm", { locale: es });
+// A calendar date (YYYY-MM-DD) is that local day, not UTC midnight.
+const fmtDay = (ymd: string) => format(parseISO(ymd), "d 'de' MMM yyyy", { locale: es });
 
 export default function AdminCafeteriaStudent() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -110,7 +112,7 @@ export default function AdminCafeteriaStudent() {
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
-  const { balance, parents, loyverse } = data;
+  const { balance, parents, loyverse, consumption } = data;
   const isLow = parseFloat(balance.balance) <= parseFloat(balance.low_balance_threshold ?? '50');
   const refundable = (t: AdminTransaction) =>
     t.transaction_type === 'purchase' || t.transaction_type === 'topup';
@@ -144,13 +146,22 @@ export default function AdminCafeteriaStudent() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Saldo actual</p>
           <p className="mt-1 text-2xl font-bold text-ink">${parseFloat(balance.balance).toFixed(2)}</p>
           <Badge variant={isLow ? 'warning' : 'success'} className="mt-2">
             {isLow ? 'Saldo bajo' : 'Normal'}
           </Badge>
+        </Card>
+        {/* Every purchase in the ledger: the family card shows the same figure.
+            Not Loyverse's total_spent, which only counts cash/card. */}
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Consumo registrado</p>
+          <p className="mt-1 text-2xl font-bold text-ink">${parseFloat(consumption.total).toFixed(2)}</p>
+          <p className="mt-1 text-xs text-subtle">
+            {consumption.since ? `Compras desde el ${fmtDay(consumption.since)}` : 'Sin compras registradas'}
+          </p>
         </Card>
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Última sincronización</p>
@@ -186,7 +197,7 @@ export default function AdminCafeteriaStudent() {
         </div>
       )}
 
-      {/* Loyverse customer snapshot — full visit history + lifetime spend */}
+      {/* Loyverse customer snapshot: visits, points, cash/card paid at the register */}
       {loyverse && (
         <Card>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -198,7 +209,8 @@ export default function AdminCafeteriaStudent() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
             {[
               { label: 'Visitas', value: loyverse.total_visits.toLocaleString('es-MX') },
-              { label: 'Gasto total', value: `$${parseFloat(loyverse.total_spent).toFixed(2)}` },
+              // Loyverse's total_spent: wallet purchases are points and never count here.
+              { label: 'Efectivo/tarjeta en caja', value: `$${parseFloat(loyverse.total_spent).toFixed(2)}` },
               { label: 'Puntos', value: parseFloat(loyverse.total_points).toFixed(2) },
               { label: 'Grado (Loyverse)', value: loyverse.address_code || '—' },
               { label: 'Primera visita', value: loyverse.first_visit ? fmtDate(loyverse.first_visit) : '—' },

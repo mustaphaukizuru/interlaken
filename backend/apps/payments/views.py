@@ -71,18 +71,19 @@ class PaymentAvailabilityView(APIView):
     topup_policy}``.
 
     The top-up form reads it to offer (or hide) card payment; the top-up
-    endpoint enforces the same rule.
+    endpoint enforces the same rule. ``min_amount`` is the same $20 for every
+    account, test accounts included.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         from apps.cafeteria.schedule import policy
-        from apps.cafeteria.serializers import topup_min_amount
+        from apps.cafeteria.serializers import TOPUP_MIN_AMOUNT
 
         from .gateways.banorte import online_payments_status
 
         return Response({**online_payments_status(request.user),
-                         'min_amount': f'{topup_min_amount(request.user):.2f}',
+                         'min_amount': f'{TOPUP_MIN_AMOUNT:.2f}',
                          # When a card top-up reaches the wallet (scheduled POS
                          # load) and the WhatsApp for same-day requests.
                          'topup_policy': policy()})

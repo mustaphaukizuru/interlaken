@@ -92,11 +92,9 @@ export default function CafeteriaPage() {
     staleTime: 60_000,
   });
   const onlineAvailable = availability?.online ?? false;
-  // Test accounts may top up $1 to try the checkout; families keep $20.
-  // Test accounts (PAYMENTS_TEST_EMAILS) get a $1 option to try the real
-  // Banorte checkout; families keep the $20 minimum (owner, 2026-10-21).
+  // The server's minimum: $20 for every account, test accounts included (owner,
+  // 2026-11-08: the "$1 (prueba)" option is gone).
   const topupMin = availability?.min_amount ? Number(availability.min_amount) || TOPUP_MIN : TOPUP_MIN;
-  const topupPresets = topupMin < TOPUP_MIN ? [1, ...TOPUP_PRESETS] : TOPUP_PRESETS;
   // Families pay by card only; there is no "pago en caja escolar" request.
   const topupMethod = 'online' as const;
   // Card top-ups reach the balance at the school's next POS load (7:30 on
@@ -718,7 +716,7 @@ export default function CafeteriaPage() {
                 <p className="mt-1 text-xs text-coral">El monto mínimo por recarga es ${topupMin}.</p>
               )}
               <div className="mt-2.5 flex flex-wrap gap-2">
-                {topupPresets.map((amt) => (
+                {TOPUP_PRESETS.map((amt) => (
                   <button
                     key={amt}
                     type="button"
@@ -729,7 +727,7 @@ export default function CafeteriaPage() {
                         : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
                     }`}
                   >
-                    {amt < TOPUP_MIN ? `$${amt} (prueba)` : `$${amt}`}
+                    {`$${amt}`}
                   </button>
                 ))}
               </div>

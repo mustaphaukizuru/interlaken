@@ -152,11 +152,11 @@ With `PAYMENTS_LIVE=true` and incomplete configuration or an expired
 certificate the top-up refuses to open ("no disponible"). `PAYMENTS_OPEN_TO_ALL`
 alone never opens the simulation to families.
 
-Accounts in `PAYMENTS_TEST_EMAILS` may top up from **$1** (a "$1 (prueba)"
-button) to try the checkout cheaply; everyone else keeps the $20 minimum,
-enforced by the server. This depends only on the list, not on the stage: in
-the **Open** stage a listed account can still make real $1 charges, so trim
-`PAYMENTS_TEST_EMAILS` after certification if that is not wanted.
+The minimum top-up is **$20 for every account**, test accounts included,
+enforced by the server (`TOPUP_MIN_AMOUNT`). The "$1 (prueba)" button that
+`PAYMENTS_TEST_EMAILS` accounts had was removed on 2026-11-08 at the owner's
+request. The list now only decides who sees card payment in the
+**Simulation** and **Certification** stages; it has no effect once **Open**.
 
 Staging always runs `PAYMENTS_LIVE=false` and `BANORTE_MODE=AUT`
 (`deploy/docker-compose.staging.yml`).
