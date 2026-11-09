@@ -2192,9 +2192,12 @@ def _record_wallet_audit(customers, result, now) -> dict:
         'at': now.isoformat(),
         'compared': (result['credited'] + result['in_sync'] + result['below']
                      + result['deferred'] + result['skipped_pending']
-                     + result.get('applied_paid_students', 0) + result.get('held_paid', 0)),
+                     + result.get('applied_paid_students', 0) + result.get('held_paid', 0)
+                     + result.get('held_unverified', 0)),
         'applied_paid': result.get('applied_paid', 0),
         'held_paid': result.get('held_paid', 0),
+        # Loaded into the POS, waiting for «Verificar en MultiCobros».
+        'held_unverified': result.get('held_unverified', 0),
         'in_sync': result['in_sync'],
         'credited': result['credited'],
         'drifting': result['below'],
@@ -2285,7 +2288,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     wallets = {cb.student_id: cb for cb in CafeteriaBalance.objects.filter(
         student__in=students).only('student_id', 'balance', 'last_synced')}
     credited = skipped_pending = in_sync = below = unseeded = deferred = 0
-    applied_paid = held_paid = applied_paid_students = 0
+    applied_paid = held_paid = held_unverified = applied_paid_students = 0
     total = drift_total = applied_paid_total = Decimal('0')
     stamp: list[int] = []
     applied_notices: list = []
@@ -2348,9 +2351,14 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                 # Staff typed paid online top-ups into the POS: apply exactly
                 # those, linked to their payments. A gap that matches no
                 # combination of them is held for staff (never credited as a
-                # cash recarga: it may be one of them loaded with a typo).
+                # cash recarga: it may be one of them loaded with a typo), and
+                # so is one only a real approval nobody has matched in
+                # MultiCobros yet explains: it waits for «Verificar».
                 applied = _apply_matched_paid_locked(student, cb, paid, delta, now)
                 stamp.append(student.id)
+                if applied is WAITS_VERIFICATION:
+                    held_unverified += 1
+                    continue
                 if applied is None:
                     held_paid += 1
                     continue
@@ -2400,7 +2408,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
               'skipped_pending': skipped_pending, 'unseeded': unseeded,
               'applied_paid': applied_paid, 'applied_paid_total': applied_paid_total,
               'applied_paid_students': applied_paid_students,
-              'held_paid': held_paid}
+              'held_paid': held_paid, 'held_unverified': held_unverified}
     if full_roster:
         result['audit'] = _record_wallet_audit(customers, result, now)
 
@@ -2410,6 +2418,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         f'{deferred} deferred (ledger still settling), '
         f'{applied_paid} paid online top-up(s) applied (${applied_paid_total}), '
         f'{held_paid} held (gap matches no paid top-up), '
+        f'{held_unverified} held until verified in MultiCobros, '
         f'{skipped_pending} pending POS load/unload, {unseeded} unseeded.')
     return result
 
@@ -2457,16 +2466,34 @@ def _match_paid_topups(entries, delta):
     return None
 
 
+# ``_apply_matched_paid_locked`` result: the gap is explained only with a real
+# card approval that staff have not matched in MultiCobros yet.
+WAITS_VERIFICATION = object()
+
+
 def _apply_matched_paid_locked(student, cb, entries, delta, now):
     """Apply the paid top-ups that explain a positive Loyverse gap. The caller
     holds the locks (those top-up rows, then ``cb``) and passed only top-ups
-    still PAID. Returns the applied top-ups, or ``None`` when no combination
-    of them adds up to exactly ``delta``."""
+    still PAID.
+
+    Only top-ups whose payment needs no MultiCobros check take part: a real
+    (PRD) approval reached us through the parent's browser in a result
+    Banorte does not sign, so, exactly as for «Aplicar» and the bulk action,
+    the wallet is not credited until staff verify it. Returns the applied
+    top-ups; ``WAITS_VERIFICATION`` when the gap is explained only with an
+    unverified approval (it waits for «Verificar en MultiCobros», never
+    credited as a cash recarga meanwhile); ``None`` when no combination of
+    the paid top-ups adds up to exactly ``delta``."""
     from apps.cafeteria.models import TopUpRequest
     from apps.core.audit import record
 
-    match = _match_paid_topups(entries, delta)
+    ready = [(t, p) for t, p in entries if not p.needs_bank_verification()]
+    match = _match_paid_topups(ready, delta)
     if match is None:
+        if len(ready) < len(entries) and _match_paid_topups(entries, delta) is not None:
+            logger.warning('POS gap of $%s for %s is a paid online top-up not yet verified in '
+                           'MultiCobros; held until staff verify it.', delta, student)
+            return WAITS_VERIFICATION
         logger.warning('POS gap of $%s for %s matches no paid online top-up; held for staff.',
                        delta, student)
         return None

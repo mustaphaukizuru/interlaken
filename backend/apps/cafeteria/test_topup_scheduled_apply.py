@@ -408,6 +408,58 @@ class TestMirrorAppliesPaidTopups:
         topup.refresh_from_db()
         assert topup.status == TopUpRequest.Status.PAID
 
+    def test_an_unverified_real_approval_waits_for_multicobros(self, api_client):
+        """The browser-reported approval is typed into Loyverse before anyone
+        matched it in MultiCobros: the mirror neither applies it nor credits
+        the gap as a cash recarga (same rule as «Aplicar»), until verified."""
+        student, topup, payment = paid_topup('500.00', checkout='PRD', balance=10)
+        assert payment.needs_bank_verification()
+        store = [{'id': 'lv-1', 'total_points': 510}]
+
+        with patch('apps.cafeteria.services.get_all_customers', return_value=store):
+            r = mirror_pos_topups()
+
+        assert r['held_unverified'] == 1 and r['audit']['held_unverified'] == 1
+        assert r['applied_paid'] == 0 and r['credited'] == 0 and r['held_paid'] == 0
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.PAID
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('10')
+
+        # Verified in MultiCobros: the next pass applies it.
+        api_client.force_authenticate(user=AdminFactory())
+        ok = api_client.post(reverse('admin-payment-banorte-verify', args=[payment.pk]),
+                             {'referencia': '123456', 'amount': '500.00'}, format='json')
+        assert ok.status_code == 200, ok.data
+        again = mirror_pos_topups(customers=store)
+        assert again['applied_paid'] == 1 and again['held_unverified'] == 0
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.COMPLETED
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('510')
+
+    def test_a_verified_topup_still_applies_beside_an_unverified_one(self):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent], loyverse_id='lv-1')
+        seeded(student, 0)
+        _, unverified, _ = paid_topup('100.00', student=student, parent=parent, checkout='PRD')
+        _, verified, payment = paid_topup('100.00', student=student, parent=parent,
+                                          checkout='PRD')
+        BanorteCheckout.objects.filter(payment=payment).update(verified_at=timezone.now())
+
+        r = mirror_pos_topups(customers=[{'id': 'lv-1', 'total_points': 100}])
+
+        assert r['applied_paid'] == 1 and r['held_unverified'] == 0
+        verified.refresh_from_db()
+        unverified.refresh_from_db()
+        assert verified.status == TopUpRequest.Status.COMPLETED
+        assert unverified.status == TopUpRequest.Status.PAID
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('100')
+
+        # The second one loaded too: it waits for its own verification.
+        r = mirror_pos_topups(customers=[{'id': 'lv-1', 'total_points': 200}], fresh=True)
+        assert r['held_unverified'] == 1 and r['credited'] == 0
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('100')
+
 
 class TestNothingElseCreditsItTwice:
     def test_corregir_refuses_while_a_paid_topup_is_pending(self):
@@ -489,6 +541,28 @@ class TestApplyReport:
         assert set(send.call_args.args[2]) == {admin.email, cashier.email}
         assert Notification.objects.filter(user=cashier).exists()
         assert not Notification.objects.filter(user=office).exists()
+
+    def test_unverified_rows_say_to_check_multicobros_before_loading(self):
+        AdminFactory()
+        _, unverified, payment = paid_topup('300.00', checkout='PRD', balance=0)
+        other_parent = ParentFactory()
+        other = StudentProfileFactory(parents=[other_parent], loyverse_id='lv-2')
+        _, plain, _ = paid_topup('50.00', student=other, parent=other_parent, balance=0)
+        TopUpRequest.objects.filter(pk__in=[unverified.pk, plain.pk]).update(
+            apply_due_at=timezone.now() - timedelta(minutes=5))
+
+        out = StringIO()
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('topup_apply_report', stdout=out)
+
+        flagged = [line for line in out.getvalue().splitlines() if 'SIN VERIFICAR' in line]
+        assert len(flagged) == 1
+        assert f'folio {payment.pk}' in flagged[0]
+        assert 'verifique en MultiCobros antes de cargarla' in flagged[0]
+        assert payment.banorte.control_number in flagged[0]
+        subject, body = send.call_args.args[:2]
+        assert '(1 sin verificar)' in subject
+        assert '«Verificar en MultiCobros»' in body
 
     def test_silent_when_nothing_is_due(self):
         admin = AdminFactory()
