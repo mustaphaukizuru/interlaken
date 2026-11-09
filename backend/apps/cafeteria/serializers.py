@@ -1,7 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Q, Sum
+from django.db.models import DecimalField, Min, OuterRef, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -40,9 +41,14 @@ class LoyverseCustomerSerializer(serializers.ModelSerializer):
     ``receipts`` is the number of wallet receipts parked for a card with no
     student (staff meals); it comes from the view's one grouped query via
     ``context['receipt_counts']`` so listing 400 cards is not 400 queries.
+    ``consumption`` is the linked student's "Consumo registrado" (the list
+    annotates ``consumption_total``; see ``build_consumption_map``), ``None``
+    for a card with no student: their purchases are not in the ledger.
+    ``total_spent`` is Loyverse's own figure: cash/card only.
     """
     student = serializers.SerializerMethodField()
     receipts = serializers.SerializerMethodField()
+    consumption = serializers.SerializerMethodField()
     kind_display = serializers.CharField(source='get_kind_display', read_only=True)
 
     class Meta:
@@ -52,6 +58,7 @@ class LoyverseCustomerSerializer(serializers.ModelSerializer):
             'phone_number', 'address_code', 'note', 'first_visit', 'last_visit',
             'total_visits', 'total_spent', 'total_points', 'loyverse_created_at',
             'loyverse_updated_at', 'synced_at', 'missing_since', 'student', 'receipts',
+            'consumption',
         ]
         read_only_fields = fields
 
@@ -64,6 +71,56 @@ class LoyverseCustomerSerializer(serializers.ModelSerializer):
 
     def get_receipts(self, obj):
         return (self.context.get('receipt_counts') or {}).get(obj.loyverse_id, 0)
+
+    def get_consumption(self, obj):
+        total = getattr(obj, 'consumption_total', None)
+        if obj.student_id is None or total is None:
+            return None
+        return f'{total:.2f}'
+
+
+# "Consumo registrado" (owner, 2026-11-08): what a student bought, from OUR
+# ledger. Loyverse's customer ``total_spent`` only counts cash/card, and the
+# school's wallet is Loyverse *points*, so it showed $0 for most pupils (189
+# of 299 active cards in production, $144 at most). Every PURCHASE row counts:
+# its ``amount`` is the positive MXN charged to the wallet (the type gives the
+# direction; the balance moved by -amount), history-only rows (``applied=
+# False``, older than the opening balance) included. Refunds are not netted,
+# like the spend trend, categories and budgets.
+NO_CONSUMPTION = {'total': '0.00', 'since': None}
+
+
+def build_consumption_map(students) -> dict:
+    """``{student_id: {'total': '907.00', 'since': '2024-09-03'}}`` in ONE
+    grouped query. ``since`` is the local date of the first mirrored purchase.
+    A student with no purchase is absent: read with ``.get(pk, NO_CONSUMPTION)``.
+    """
+    rows = (CafeteriaTransaction.objects
+            .filter(student__in=students,
+                    transaction_type=CafeteriaTransaction.TxType.PURCHASE)
+            .values('student')
+            .annotate(total=Sum('amount'), first=Min('date')))
+    return {
+        row['student']: {
+            'total': f"{row['total'] or Decimal('0'):.2f}",
+            'since': timezone.localdate(row['first']).isoformat(),
+        }
+        for row in rows
+    }
+
+
+def consumption_total_subquery():
+    """The same total for the row's ``student`` (0 when none or no student), as
+    a correlated subquery: a list sorts and exports by it in its own query."""
+    purchases = (CafeteriaTransaction.objects
+                 .filter(student=OuterRef('student'),
+                         transaction_type=CafeteriaTransaction.TxType.PURCHASE)
+                 .order_by()
+                 .values('student')
+                 .annotate(total=Sum('amount'))
+                 .values('total'))
+    return Coalesce(Subquery(purchases), Value(Decimal('0')),
+                    output_field=DecimalField(max_digits=12, decimal_places=2))
 
 
 def build_spend_map(students):

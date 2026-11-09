@@ -32,6 +32,7 @@ from apps.core.throttling import SharedScopedRateThrottle
 
 from .models import BalanceAdjustment, CafeteriaBalance, CafeteriaTransaction, TopUpRequest
 from .serializers import (
+    NO_CONSUMPTION,
     AdjustmentInputSerializer,
     BalanceAdjustmentSerializer,
     CafeteriaBalanceSerializer,
@@ -42,6 +43,7 @@ from .serializers import (
     RefundInputSerializer,
     SpendLimitsSerializer,
     TopUpRequestSerializer,
+    build_consumption_map,
     build_pending_topups_map,
     build_spend_map,
 )
@@ -433,8 +435,10 @@ def _family_students_qs(user):
 class MyCardsView(APIView):
     """GET /api/v1/cafeteria/cards/ — digital cafetería card(s) for the caller's
     children: identity + the Loyverse code the POS scans (for the on-screen
-    QR/barcode) + live balance + the Loyverse profile stats (visits, lifetime
-    spend, points, first/last visit)."""
+    QR/barcode) + live balance + ``consumption`` (``{total, since}``: the
+    "Consumo registrado" from our ledger, see ``build_consumption_map``) + the
+    Loyverse profile stats (visits, first/last visit; its ``total_spent`` is
+    cash/card only, so the family page no longer shows it)."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -452,6 +456,7 @@ class MyCardsView(APIView):
         CafeteriaBalance.objects.bulk_create(
             [CafeteriaBalance(student=s) for s in students], ignore_conflicts=True)
         balances = {b.student_id: b for b in CafeteriaBalance.objects.filter(student__in=students)}
+        consumption = build_consumption_map(students)
         cards = []
         for s in students:
             balance = balances.get(s.pk) or CafeteriaBalance(student=s)
@@ -471,6 +476,7 @@ class MyCardsView(APIView):
                 'balance': str(balance.balance),
                 'is_low_balance': balance.is_low_balance,
                 'points': str(loyverse.total_points) if loyverse else None,
+                'consumption': consumption.get(s.pk, NO_CONSUMPTION),
                 'loyverse': LoyverseProfileSerializer(loyverse).data if loyverse else None,
             })
         return Response(cards)
@@ -1380,6 +1386,8 @@ class AdminStudentDetailView(APIView):
     audit trail of manual adjustments/refunds (spec §5 "Per-student detail").
     ``?ledger=0`` omits the two capped lists: the console pages them through
     ``admin/transactions/?student=`` and ``admin/adjustments/?student=``.
+    ``consumption`` is ``{total, since}``, the "Consumo registrado" of the
+    family card (``build_consumption_map``).
     """
     admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
@@ -1401,7 +1409,7 @@ class AdminStudentDetailView(APIView):
             for p in student.parents.all()[:20]
         ]
 
-        # Full Loyverse customer snapshot (visit history + lifetime spend), if
+        # Full Loyverse customer snapshot (visit history, cash/card spend), if
         # synced (sync_loyverse_profiles). Null when never synced.
         loyverse = getattr(student, 'loyverse_profile', None)
 
@@ -1412,6 +1420,7 @@ class AdminStudentDetailView(APIView):
             'parents': parents,
             'transactions': CafeteriaTransactionSerializer(transactions, many=True).data,
             'adjustments': BalanceAdjustmentSerializer(adjustments, many=True).data,
+            'consumption': build_consumption_map([student]).get(student.pk, NO_CONSUMPTION),
             'loyverse': LoyverseProfileSerializer(loyverse).data if loyverse else None,
         })
 

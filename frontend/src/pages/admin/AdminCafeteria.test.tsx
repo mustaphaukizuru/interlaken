@@ -357,10 +357,10 @@ describe('AdminCafeteria Clientes Loyverse tab (every card, not only pupils)', (
     address_code: '', note: '', first_visit: null, last_visit: '2026-09-17T16:00:00Z',
     total_visits: 177, total_spent: '9000.00', total_points: '178.00', loyverse_created_at: null,
     loyverse_updated_at: null, synced_at: '2026-09-23T14:00:00Z', missing_since: null,
-    student: null, receipts: 2,
+    student: null, receipts: 2, consumption: null,
   };
   const pupil = { ...staff, loyverse_id: 'p1', kind: 'student' as const, kind_display: 'Alumno',
-    customer_code: 'ci10999', name: 'Perez Lopez Ana-1PRI', receipts: 0,
+    customer_code: 'ci10999', name: 'Perez Lopez Ana-1PRI', receipts: 0, total_spent: '0.00', consumption: '907.00',
     student: { id: 7, name: 'Ana Perez Lopez', grade: '1° Primaria', group: '', student_id: '10999' } };
 
   beforeEach(() => {
@@ -382,6 +382,16 @@ describe('AdminCafeteria Clientes Loyverse tab (every card, not only pupils)', (
     expect(screen.getByText(/2 tarjeta\(s\) en Loyverse/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver alumno' })).toHaveAttribute('href', '/admin/cafeteria/7');
     expect(api.customers).toHaveBeenCalledWith(expect.objectContaining({ page_size: 50, kind: 'nonstudent' }));
+  });
+
+  it('shows the pupil «Consumo registrado» from the ledger, never Loyverse total_spent (owner, 2026-11-08)', async () => {
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?tab=customers' });
+    const row = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+    await screen.findByText('ZP-Rivero Montes de Oca Nadia');
+    expect(screen.getByRole('columnheader', { name: /Consumo/ })).toBeInTheDocument();
+    expect(within(row('Perez Lopez Ana-1PRI')).getByText('$907.00')).toBeInTheDocument();
+    // A staff card has no ledger: a dash, never its $9,000 of cash/card.
+    expect(within(row('ZP-Rivero Montes de Oca Nadia')).queryByText('$9000.00')).toBeNull();
   });
 
   it('opens the receipts of a staff card', async () => {

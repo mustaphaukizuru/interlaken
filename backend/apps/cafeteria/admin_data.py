@@ -91,6 +91,7 @@ from .serializers import (
     LowBalanceThresholdSerializer,
     LoyverseCustomerSerializer,
     TopUpLogSerializer,
+    consumption_total_subquery,
 )
 
 logger = logging.getLogger(__name__)
@@ -366,7 +367,9 @@ CUSTOMER_ORDERING = {
     "kind": "kind",
     "points": "total_points",
     "visits": "total_visits",
-    "spent": "total_spent",
+    # "Consumo registrado" from the ledger (annotated by the customers list),
+    # not Loyverse's total_spent: that one is cash/card only, $0 for most pupils.
+    "spent": "consumption_total",
     "last_visit": "last_visit",
 }
 RECONCILE_ORDERING = {
@@ -541,7 +544,17 @@ CUSTOMER_EXPORT = ExportSpec(
         Col("phone_number", "Teléfono", width=14, fmt="text"),
         Col("total_points", "Saldo", width=11, fmt="money"),
         Col("total_visits", "Visitas", width=8, fmt="int"),
-        Col("total_spent", "Gasto total", width=12, fmt="money"),
+        # Pupils only: a card with no student has no purchases in the ledger.
+        Col(
+            "consumption_total",
+            "Consumo registrado",
+            getter=lambda c: c.consumption_total if c.student_id else None,
+            width=14,
+            fmt="money",
+        ),
+        # Loyverse's own total_spent: what was paid in cash or by card at the
+        # register (wallet purchases are points and never count there).
+        Col("total_spent", "Efectivo/tarjeta en caja", width=14, fmt="money"),
         Col("last_visit", "Última visita", width=17, fmt="datetime"),
         Col(
             "student",
@@ -1262,7 +1275,9 @@ class AdminLoyverseCustomersView(CodeSearchMixin, AdminListMixin, generics.ListA
 
     The whole Loyverse store, one row per card (pupils, staff meals, the
     school's own and test cards). Adds ``summary`` (cards per kind + missing)
-    to the list envelope. ``page_size`` is honoured (default 50).
+    to the list envelope. ``page_size`` is honoured (default 50). Each row
+    carries the pupil's "Consumo registrado" (``consumption``, sortable as
+    ``spent``) from one correlated subquery in the same SQL statement.
     """
     admin_area = 'cafeteria'
 
@@ -1275,7 +1290,9 @@ class AdminLoyverseCustomersView(CodeSearchMixin, AdminListMixin, generics.ListA
     search_code_fields = ("customer_code", "student__student_id")
 
     def get_queryset(self):
-        return LoyverseProfile.objects.select_related("student__user")
+        return LoyverseProfile.objects.select_related("student__user").annotate(
+            consumption_total=consumption_total_subquery()
+        )
 
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())

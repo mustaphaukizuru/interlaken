@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Coffee, Store, CalendarCheck, CalendarClock, Star, ShoppingBag } from 'lucide-react';
+import { Coffee, Store, CalendarCheck, CalendarClock, ShoppingBag } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -16,14 +16,18 @@ import { formatMXN } from '@/lib/format';
 const money = formatMXN;
 const fmtDate = (d: string | null, withTime = false) =>
   d ? format(new Date(d), withTime ? "d MMM yyyy · HH:mm" : 'd MMM yyyy', { locale: es }) : '—';
+// A calendar date (YYYY-MM-DD) is that local day: `new Date('2024-09-03')` is
+// UTC midnight, which in Mexico is still the 2nd.
+const fmtDay = (ymd: string) => format(parseISO(ymd), 'd MMM yyyy', { locale: es });
 
-function Stat({ icon: Icon, label, value }: { icon: typeof Store; label: string; value: string }) {
+function Stat({ icon: Icon, label, value, hint }: { icon: typeof Store; label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-xl2 border border-line bg-white p-3">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-subtle">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
       <p className="mt-1 font-head text-lg font-bold text-ink">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-subtle">{hint}</p>}
     </div>
   );
 }
@@ -100,14 +104,20 @@ export default function CredencialPage() {
 
           <StudentCard card={active} />
 
-          {/* Loyverse profile stats */}
+          {/* Activity: visits from Loyverse; consumption from the school's
+              ledger. Loyverse's own "total_spent" only counts cash/card (the
+              wallet is points), and the points ARE the balance on the card. */}
           {active.loyverse && (
             <div>
               <h2 className="mb-2 font-head text-[15px] font-bold text-ink">Actividad en cafetería</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                 <Stat icon={Store} label="Visitas" value={String(active.loyverse.total_visits)} />
-                <Stat icon={ShoppingBag} label="Gasto histórico" value={money(active.loyverse.total_spent)} />
-                <Stat icon={Star} label="Puntos" value={String(Math.round(Number(active.points ?? active.loyverse.total_points)))} />
+                <Stat
+                  icon={ShoppingBag}
+                  label="Consumo registrado"
+                  value={money(active.consumption.total)}
+                  hint={active.consumption.since ? `desde ${fmtDay(active.consumption.since)}` : 'Sin compras registradas'}
+                />
                 <Stat icon={CalendarCheck} label="Primera visita" value={fmtDate(active.loyverse.first_visit)} />
                 <Stat icon={CalendarClock} label="Última visita" value={fmtDate(active.loyverse.last_visit, true)} />
               </div>
