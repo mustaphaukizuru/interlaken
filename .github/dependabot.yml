@@ -37,6 +37,14 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # axios 1.21.0 adds ~2.4 kB gz to every public page (/ went over its
+      # 170 kB budget) for server/proxy/HTTP-2 fixes the browser app does not
+      # use, plus a header-defaults breaking change and new XSRF cookie reads
+      # (our auth path). Held at 1.20.0 (#228, 2026-11-08). Only this exact
+      # version is skipped: the next axios release is proposed again and the
+      # budget check judges it then.
+      - dependency-name: "axios"
+        versions: ["1.21.0"]
 
   - package-ecosystem: github-actions
     directory: /
