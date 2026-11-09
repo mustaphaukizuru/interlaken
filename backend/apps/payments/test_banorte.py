@@ -852,13 +852,14 @@ class TestAdminAlerts:
         assert mailoutbox == []
 
 
-# ── $1 top-ups for test accounts ─────────────────────────────
+# ── $20 minimum for every account ────────────────────────────
 
 
 @pytest.mark.django_db
-class TestTesterOnePeso:
-    """$20 minimum for families; the PAYMENTS_TEST_EMAILS accounts may pay $1 to
-    test the real checkout (owner, 2026-10-21)."""
+class TestTopUpMinimum:
+    """$20 minimum for everyone. The PAYMENTS_TEST_EMAILS accounts could pay $1
+    (a "$1 (prueba)" button, owner 2026-10-21); the owner removed it on
+    2026-11-08. The list still decides who pays by card before going open."""
 
     def _post(self, api_client, user, student, amount):
         api_client.force_authenticate(user=user)
@@ -868,13 +869,25 @@ class TestTesterOnePeso:
             format="json",
         )
 
-    def test_tester_may_top_up_one_peso(self, api_client, banorte):
+    @pytest.mark.parametrize("stage", ["simulation", "certification", "open"])
+    def test_tester_can_no_longer_top_up_one_peso(self, api_client, banorte, monkeypatch, stage):
+        monkeypatch.delenv("SQLITE_LOCAL", raising=False)
+        banorte.DEBUG = False
+        banorte.PAYMENTS_LIVE = stage != "simulation"
+        banorte.PAYMENTS_OPEN_TO_ALL = stage == "open"
         banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]
         tester, child = _family()
         tester.email = "probador@interlaken.test"
         tester.save(update_fields=["email"])
-        assert self._post(api_client, tester, child, "1.00").status_code == 201
-        assert api_client.get(reverse("payment-availability")).data["min_amount"] == "1.00"
+
+        resp = self._post(api_client, tester, child, "1.00")
+        assert resp.status_code == 400
+        assert resp.data["amount"] == ["El monto mínimo por recarga es $20."]
+        assert not Payment.objects.exists() and not TopUpRequest.objects.exists()
+        avail = api_client.get(reverse("payment-availability")).data
+        # The list still lets the tester pay by card (before the open stage, only them).
+        assert avail["online"] is True and avail["min_amount"] == "20.00"
+        assert self._post(api_client, tester, child, "20.00").status_code == 201
 
     def test_families_keep_the_twenty_peso_minimum(self, api_client, banorte):
         banorte.PAYMENTS_TEST_EMAILS = ["probador@interlaken.test"]

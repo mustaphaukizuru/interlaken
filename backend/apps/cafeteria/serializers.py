@@ -15,18 +15,11 @@ from .models import (
     TopUpRequest,
 )
 
-# Minimum top-up: $20 for families. The accounts in PAYMENTS_TEST_EMAILS may
-# use $1 to test the real Banorte checkout (owner, 2026-10-21: families never
-# see it; it comes back only for the test accounts).
+# Minimum top-up: $20 for every account, the PAYMENTS_TEST_EMAILS testers
+# included (owner, 2026-11-08: the "$1 (prueba)" option they had since
+# 2026-10-21 is gone). PAYMENTS_TEST_EMAILS still decides who may pay by card
+# before PAYMENTS_OPEN_TO_ALL (payments.gateways.banorte.online_payments_status).
 TOPUP_MIN_AMOUNT = Decimal('20.00')
-TOPUP_TESTER_MIN_AMOUNT = Decimal('1.00')
-
-
-def topup_min_amount(user) -> Decimal:
-    """The smallest top-up ``user`` may request."""
-    from apps.payments.gateways.banorte import is_payment_tester
-
-    return TOPUP_TESTER_MIN_AMOUNT if user is not None and is_payment_tester(user) else TOPUP_MIN_AMOUNT
 
 
 class LoyverseProfileSerializer(serializers.ModelSerializer):
@@ -198,19 +191,12 @@ class TopUpRequestSerializer(serializers.ModelSerializer):
     # could POST amount=0 or a NEGATIVE value; a later admin "apply" would then
     # DEBIT the child's balance (add_points_to_customer(points<0)). Match the
     # payment-initiation floor and add a sane ceiling against fat-finger typos.
-    # Match parent UI copy: mínimo $20 · máximo $2,000 (fat-finger guard).
-    # Test accounts (PAYMENTS_TEST_EMAILS) may go down to $1 to try the
-    # Banorte checkout cheaply; validate_amount applies the per-user floor.
+    # Match parent UI copy: mínimo $20 for every account (test accounts too)
+    # · máximo $2,000 (fat-finger guard).
     amount = serializers.DecimalField(
         max_digits=10, decimal_places=2,
-        min_value=TOPUP_TESTER_MIN_AMOUNT, max_value=Decimal('2000.00'))
-
-    def validate_amount(self, value):
-        request = self.context.get('request')
-        if value < topup_min_amount(getattr(request, 'user', None)):
-            raise serializers.ValidationError(
-                f'El monto mínimo por recarga es ${TOPUP_MIN_AMOUNT:.0f}.')
-        return value
+        min_value=TOPUP_MIN_AMOUNT, max_value=Decimal('2000.00'),
+        error_messages={'min_value': f'El monto mínimo por recarga es ${TOPUP_MIN_AMOUNT:.0f}.'})
 
     class Meta:
         model = TopUpRequest
