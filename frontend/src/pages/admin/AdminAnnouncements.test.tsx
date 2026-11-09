@@ -12,6 +12,7 @@ vi.mock('@/services/api', () => ({
     adminUpdateAnnouncement: vi.fn(),
     adminDeleteAnnouncement: vi.fn(),
     adminEmergencyBroadcast: vi.fn(),
+    getAnnouncementRecipientCount: vi.fn(),
   },
 }));
 
@@ -34,6 +35,7 @@ const bulk = vi.mocked(announcementsAdminApi.bulk);
 const exportList = vi.mocked(announcementsAdminApi.export);
 const create = vi.mocked(portalApi.adminCreateAnnouncement);
 const broadcast = vi.mocked(portalApi.adminEmergencyBroadcast);
+const recipientCount = vi.mocked(portalApi.getAnnouncementRecipientCount);
 const toastSuccess = vi.mocked(toast.success);
 const toastError = vi.mocked(toast.error);
 
@@ -89,7 +91,14 @@ describe('AdminAnnouncements', () => {
     });
     expect(publish).toBeEnabled();
 
+    // Sending now asks once more, naming the audience; nothing is sent yet.
     await user.click(publish);
+    const confirm = within(dialog).getByRole('alertdialog', { name: /¿Enviar ahora\?/i });
+    expect(confirm).toHaveTextContent(/«Suspensión» se enviará ahora a: todos, por notificación en el portal, correo y push/);
+    expect(within(confirm).getByRole('button', { name: /^Volver$/i })).toHaveFocus();
+    expect(create).not.toHaveBeenCalled();
+
+    await user.click(within(confirm).getByRole('button', { name: /^Enviar ahora$/i }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith(expect.objectContaining({
         title: 'Suspensión',
@@ -123,11 +132,51 @@ describe('AdminAnnouncements', () => {
     expect(pushToggle).not.toBeChecked();
 
     await user.click(within(dialog).getByRole('button', { name: /^Publicar$/i }));
+    const confirm = within(dialog).getByRole('alertdialog', { name: /¿Enviar ahora\?/i });
+    expect(confirm).toHaveTextContent(/en el portal y correo\. No se puede deshacer/);
+    await user.click(within(confirm).getByRole('button', { name: /^Enviar ahora$/i }));
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({ push_enabled: false }),
       );
     });
+  });
+
+  // Launch review #4: «Publicar» sent to every family on one click.
+  it('«Volver» leaves the comunicado unsent, and the confirmation shows the audience size', async () => {
+    recipientCount.mockResolvedValue({ data: { count: 640 } } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Aviso' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Texto.' } });
+    await user.click(within(dialog).getByRole('button', { name: /^Publicar$/i }));
+
+    const confirm = within(dialog).getByRole('alertdialog', { name: /¿Enviar ahora\?/i });
+    await waitFor(() => expect(confirm).toHaveTextContent(/~640 familia\(s\)/));
+    await user.click(within(confirm).getByRole('button', { name: /^Volver$/i }));
+    expect(within(dialog).queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /^Publicar$/i })).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('saves a draft without the send confirmation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+
+    await user.click(screen.getByRole('button', { name: /Nuevo comunicado/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Borrador' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Texto.' } });
+    await user.click(within(dialog).getByLabelText(/^Publicado/i));
+    await user.click(within(dialog).getByRole('button', { name: /^Guardar borrador$/i }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ is_active: false })));
+    expect(within(dialog).queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
   it('requires confirmation before sending an urgent broadcast', async () => {

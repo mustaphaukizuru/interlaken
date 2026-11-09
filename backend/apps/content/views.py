@@ -344,6 +344,55 @@ def _calendar_fields(data) -> dict:
     }
 
 
+# Model field ← file column. On an update an empty or missing cell keeps the
+# event's value: a «titulo,inicio» file no longer resets the type and level,
+# clears the description or publishes a draft.
+_CALENDAR_UPDATE_FIELDS = (
+    ("title", "titulo"),
+    ("kind", "tipo"),
+    ("end_date", "fin"),
+    ("level", "nivel"),
+    ("description", "descripcion"),
+    ("is_published", "publicado"),
+)
+_CALENDAR_TEXT_KEYS = ("titulo", "descripcion")  # '' = empty cell; typed columns use None
+
+
+def _calendar_changes(event, data) -> dict:
+    """``{field: new value}`` for the cells the file fills that differ from ``event``."""
+    changes = {}
+    for field, key in _CALENDAR_UPDATE_FIELDS:
+        value = data.get(key)
+        if value is None or (key in _CALENDAR_TEXT_KEYS and value == ""):
+            continue
+        if getattr(event, field) != value:
+            changes[field] = value
+    return changes
+
+
+_CALENDAR_FIELD_LABELS = {
+    "title": "título", "kind": "tipo", "end_date": "fin", "level": "nivel",
+    "description": "descripción", "is_published": "publicado",
+}
+
+
+def _calendar_unchanged(data, event):
+    if event is not None and not _calendar_changes(event, data):
+        return "sin cambios"
+    return None
+
+
+def _calendar_update_note(data, event):
+    changes = _calendar_changes(event, data)
+    labels = ", ".join(_CALENDAR_FIELD_LABELS[f] for f in changes)
+    note = f"Cambia: {labels}. Las celdas vacías conservan lo que ya tiene el evento."
+    if changes.get("is_published") is True:
+        note += " Se publicará."
+    elif changes.get("is_published") is False:
+        note += " Pasará a borrador."
+    return note
+
+
 def _calendar_match(data):
     if not data.get("titulo") or not data.get("inicio"):
         return None
@@ -359,10 +408,12 @@ def _calendar_create(data, actor):
 
 
 def _calendar_update(event, data, actor):
-    for key, value in _calendar_fields(data).items():
-        setattr(event, key, value)
-    event.save()
-    invalidate_calendar()
+    changes = _calendar_changes(event, data)
+    for field, value in changes.items():
+        setattr(event, field, value)
+    if changes:
+        event.save(update_fields=list(changes))
+        invalidate_calendar()
     return event
 
 
@@ -410,6 +461,8 @@ CALENDAR_IMPORT = ImportSpec(
     create=_calendar_create,
     update=_calendar_update,
     validate_row=_calendar_row,
+    skip_reason=_calendar_unchanged,
+    update_note=_calendar_update_note,
 )
 
 

