@@ -36,6 +36,15 @@ const loyverseGap = (d: TopUpLogEntry) =>
     ? null
     : parseFloat(d.loyverse_points) - parseFloat(d.wallet_balance);
 
+const cents = (v: number) => Math.round(v * 100);
+
+/** Loyverse is above the wallet by exactly this top-up: the POS mirror's own
+ *  rule for applying it (it never applies a gap that does not match exactly). */
+const gapIsThisTopUp = (d: TopUpLogEntry) => {
+  const gap = loyverseGap(d);
+  return gap != null && cents(gap) === cents(parseFloat(d.amount));
+};
+
 function useInvalidateMoney() {
   const queryClient = useQueryClient();
   return () => invalidateEntity(queryClient, CAF_TOPUPS, [...CAF_MONEY_VIEWS, PAYMENTS_ENTITY]);
@@ -98,17 +107,16 @@ export function PaidTopUpQueue() {
     { id: 'amount', header: 'Monto', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
     {
       id: 'pos', header: 'Loyverse / App', minWidth: 150,
-      cell: (d) => {
-        const gap = loyverseGap(d);
-        return (
-          <span className="block text-xs text-muted">
-            {d.loyverse_points != null ? `${mxn(d.loyverse_points)} / ${mxn(d.wallet_balance)}` : '—'}
-            {gap != null && gap >= parseFloat(d.amount) && (
-              <span className="mt-0.5 block font-semibold text-green-700">Ya está en Loyverse; se aplica sola en minutos</span>
-            )}
-          </span>
-        );
-      },
+      cell: (d) => (
+        <span className="block text-xs text-muted">
+          {d.loyverse_points != null ? `${mxn(d.loyverse_points)} / ${mxn(d.wallet_balance)}` : '—'}
+          {gapIsThisTopUp(d) && (d.banorte?.needs_verification ? (
+            <span className="mt-0.5 block font-semibold text-amber">Ya está en Loyverse: verifíquela en MultiCobros para que se aplique</span>
+          ) : (
+            <span className="mt-0.5 block font-semibold text-green-700">Ya está en Loyverse; se aplica sola en minutos</span>
+          ))}
+        </span>
+      ),
     },
     { id: 'folio', header: 'Folio', className: 'font-mono text-xs text-ink', cell: (d) => d.payment_id ?? '—' },
     {
@@ -336,7 +344,10 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
       });
     },
   });
-  const canForce = refusal?.code === 'pos_not_loaded' || refusal?.code === 'pos_unknown';
+  // seed_ambiguous: a never-seeded wallet with another paid top-up waiting; the
+  // server cannot tell which one Loyverse holds, so staff apply with a reason.
+  const canForce = refusal?.code === 'pos_not_loaded' || refusal?.code === 'pos_unknown'
+    || refusal?.code === 'seed_ambiguous';
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (force && !note.trim()) return;

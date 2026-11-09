@@ -60,6 +60,12 @@ class Command(BaseCommand):
             problems.append(f'{held} alumno(s) con más saldo en Loyverse que en la app y una '
                             f'recarga en línea por aplicar que no coincide con esa diferencia '
                             f'(revise POS Loyverse → Por aplicar)')
+        unverified = int(audit.get('held_unverified') or 0)
+        if unverified:
+            problems.append(f'{unverified} alumno(s) con una recarga con tarjeta ya cargada en '
+                            f'Loyverse que falta verificar en MultiCobros: no se suma al saldo '
+                            f'hasta verificarla (POS Loyverse → Por aplicar → «Verificar en '
+                            f'MultiCobros»)')
 
         OpsStatus.set('wallet_drift_check', {
             'at': timezone.now().isoformat(), 'problems': len(problems),

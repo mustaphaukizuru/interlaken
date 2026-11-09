@@ -6,7 +6,10 @@ wallet only after staff type it into the Loyverse POS (every school day at
 ``CAFETERIA_TOPUP_APPLY_TIME``, 07:30). This lists every paid top-up due by
 the next hour, oldest first, with what staff need at the POS: student,
 Loyverse customer code, amount and folio. Each one marked VENCIDA is past its
-promised time: the family was told it would be applied by then.
+promised time: the family was told it would be applied by then. Each one
+marked SIN VERIFICAR is a real card approval staff have not matched in
+MultiCobros yet (with its número de control): the app does not credit it,
+neither the POS mirror nor «Aplicar», until it is verified.
 
 Delivered to every active admin and to staff with the cafetería area, as an
 in-app notification (always) and by email. Runs at 07:05 and hourly during the school day (deploy/crontab.example);
@@ -68,10 +71,11 @@ class Command(BaseCommand):
             self.stdout.write('topups: nothing to apply')
             return
 
-        folios = dict(Payment.objects.filter(related_topup__in=topups,
-                                             status=Payment.Status.SUCCESS)
-                      .order_by('created_at', 'pk').values_list('related_topup_id', 'pk'))
-        rows, overdue_ids = [], []
+        payments = {}
+        for p in (Payment.objects.filter(related_topup__in=topups, status=Payment.Status.SUCCESS)
+                  .select_related('banorte').order_by('created_at', 'pk')):
+            payments[p.related_topup_id] = p      # newest wins
+        rows, overdue_ids, unverified_ids = [], [], []
         for t in topups:
             try:
                 code = t.student.loyverse_profile.customer_code or '-'
@@ -80,13 +84,23 @@ class Command(BaseCommand):
             late = t.apply_due_at <= now - GRACE
             if late:
                 overdue_ids.append(t.pk)
+            payment = payments.get(t.pk)
+            # A real approval reported by the parent's browser: the app does not
+            # credit it (POS mirror, «Aplicar») until staff match it in MultiCobros.
+            unverified = payment is not None and payment.needs_bank_verification()
+            if unverified:
+                unverified_ids.append(t.pk)
+            checkout = payment.banorte_checkout() if payment is not None else None
             paid = timezone.localtime(t.processed_at) if t.processed_at else None
             rows.append(
                 f'- {t.student.user.full_name} · cliente Loyverse {code} · '
-                f'{format_amount(t.amount)} · folio {folios.get(t.pk, "-")}'
+                f'{format_amount(t.amount)} · folio {payment.pk if payment else "-"}'
                 + (f' · pagada {paid:%d/%m %H:%M}' if paid else '')
                 + f' · se aplica {timezone.localtime(t.apply_due_at):%d/%m %H:%M}'
                 + (' · VENCIDA' if late else '')
+                + (' · SIN VERIFICAR: verifique en MultiCobros antes de cargarla'
+                   + (f' (número de control {checkout.control_number})' if checkout else '')
+                   if unverified else '')
             )
         for row in rows:
             self.stdout.write(row)
@@ -101,10 +115,18 @@ class Command(BaseCommand):
 
         total = sum((t.amount for t in topups), Decimal('0'))
         title = (f'{len(rows)} recarga(s) en línea por cargar en el POS'
-                 + (f' ({len(overdue_ids)} vencida(s))' if overdue_ids else ''))
+                 + (f' ({len(overdue_ids)} vencida(s))' if overdue_ids else '')
+                 + (f' ({len(unverified_ids)} sin verificar)' if unverified_ids else ''))
+        verify_first = (
+            '\n\nLas marcadas SIN VERIFICAR: antes de cargarlas, búsquelas en MultiCobros por '
+            'su número de control y confírmelas en Cafetería → POS Loyverse → «Por aplicar» → '
+            '«Verificar en MultiCobros» (referencia y monto). La app no suma al saldo una '
+            'recarga sin verificar, aunque ya esté en Loyverse.'
+            if unverified_ids else '')
         body = (
             f'Recargas pagadas con tarjeta que aún no están en el saldo de cafetería '
             f'(total {format_amount(total)}):\n\n' + '\n'.join(rows)
+            + verify_first
             + '\n\nCárguelas en el POS de Loyverse (cliente de cada alumno). En unos minutos '
             'la app las detecta y las aplica; también puede usar Cafetería → POS Loyverse → '
             '«Por aplicar» → «Aplicar». Las marcadas VENCIDA ya pasaron de la hora prometida '

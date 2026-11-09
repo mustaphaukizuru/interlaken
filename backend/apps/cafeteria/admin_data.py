@@ -45,7 +45,7 @@ from rest_framework.response import Response
 
 from apps.accounts.models import StudentProfile
 from apps.core.audit import record_export
-from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
+from apps.core.bulk import CHUNK, AdminBulkView, BulkAction, BulkSkip
 from apps.core.exceptions import error_response
 from apps.core.exporting import (
     AdminExportMixin,
@@ -1062,6 +1062,8 @@ class AdminTopUpExportView(AdminExportMixin, AdminTopUpLogView):
 
 
 TOPUP_ENTITY = "cafeteria.topuprequest"
+# Rows per transaction for the bulk «Aplicar (ya cargadas en POS)» (see the view).
+APPLY_PAID_CHUNK = 5
 
 
 def _apply_plan(topup, payload):
@@ -1224,6 +1226,12 @@ class AdminTopUpBulkView(AdminBulkView):
     def post(self, request):
         raw = request.data.get("ids") if hasattr(request.data, "get") else None
         self._ids = [int(i) for i in (raw or []) if str(i).isdigit()]
+        action = request.data.get("action") if hasattr(request.data, "get") else None
+        # «Aplicar (ya cargadas en POS)» reads Loyverse for every row while its
+        # chunk holds the top-up row locks (the 5-minute POS mirror waits on
+        # them): small chunks keep that short and commit as they go. The
+        # family's email waits for its chunk's commit (``apply_paid_topup``).
+        self.chunk = APPLY_PAID_CHUNK if action == "apply_paid" else CHUNK
         response = super().post(request)
         result = response.data
         if result.get("action") in ("apply", "apply_paid"):

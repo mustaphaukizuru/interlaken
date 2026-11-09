@@ -119,6 +119,24 @@ describe('CafeteriaPage states', () => {
     expect(mockedTx).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
   });
 
+  it('says why a history-only row did not move the balance', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({
+      data: { count: 2, results: [
+        { id: 1, transaction_type: 'purchase', amount: '25.00', date: '2026-07-10T12:00:00Z',
+          balance_after: null, applied: false, items: [] },
+        // A POS refund the POS sync had already credited as a recarga.
+        { id: 2, transaction_type: 'refund', amount: '40.00', date: '2026-11-09T12:00:00Z',
+          balance_after: null, applied: false, items: [] },
+      ] },
+    } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    expect(await screen.findByText('Incluida en el saldo inicial')).toBeInTheDocument();
+    expect(screen.getByText('Ya incluida en el saldo')).toBeInTheDocument();
+  });
+
   it('hides Recargar when the student is not linked to Loyverse', async () => {
     mockedBalance.mockResolvedValue({ data: [unlinkedAccount] } as never);
     mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);

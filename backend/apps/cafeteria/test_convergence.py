@@ -437,6 +437,17 @@ class TestDailyDriftAlarm:
         send.assert_not_called()
         assert 'converged' in out.getvalue()
 
+    def test_a_loaded_card_topup_waiting_for_multicobros_is_reported(self):
+        OpsStatus.set('wallet_audit', {'compared': 351, 'drifting': 0, 'drift_total': '0',
+                                       'stale_links': 0, 'unlinked_students': 0,
+                                       'unmatched_receipts': 0, 'held_unverified': 2})
+        AdminFactory()
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('check_wallet_drift', stdout=StringIO())
+        body = send.call_args.args[1]
+        assert '2 alumno(s) con una recarga con tarjeta ya cargada' in body
+        assert '«Verificar en MultiCobros»' in body
+
     def test_the_same_problems_are_emailed_once_and_a_change_is_emailed_again(self):
         audit = {'compared': 351, 'drifting': 0, 'drift_total': '0', 'stale_links': 35,
                  'unlinked_students': 0, 'unmatched_receipts': 90, 'unmatched_receipts_student': 0}

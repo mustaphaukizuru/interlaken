@@ -248,7 +248,9 @@ export default function AdminCafeteriaStudent() {
               { header: 'Tipo', cell: (t) => <span className="inline-flex items-center gap-1.5">{txIcon(t.transaction_type)} {txLabel(t.transaction_type)}</span> },
               { header: 'Descripción', className: 'text-muted', cell: (t) => <span className="block min-w-0 max-w-xs truncate" title={t.description}>{t.description || '—'}</span> },
               { header: 'Monto', align: 'right', className: 'font-medium text-ink', cell: (t) => `$${parseFloat(t.amount).toFixed(2)}` },
-              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.applied === false ? <span className="text-xs" title="Compra anterior al alta: ya estaba incluida en el saldo inicial">incl. saldo inicial</span> : t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
+              { header: 'Saldo', align: 'right', className: 'text-muted', cell: (t) => (t.applied === false ? (t.transaction_type === 'refund'
+                ? <span className="text-xs" title="Devolución del POS que el saldo ya tenía: saldo inicial, devolución hecha en la consola o recarga detectada en Loyverse antes de este recibo">ya en el saldo</span>
+                : <span className="text-xs" title="Compra anterior al alta: ya estaba incluida en el saldo inicial">incl. saldo inicial</span>) : t.balance_after !== null ? `$${parseFloat(t.balance_after).toFixed(2)}` : '—') },
               {
                 header: 'Acción', align: 'right',
                 cell: (t) => refundable(t) && (
