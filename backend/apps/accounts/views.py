@@ -120,7 +120,9 @@ def _resolve_google_user(email: str, *, defaults: dict) -> User | None:
     Returns ``None`` when the email is unknown and auto-create is not allowed —
     callers must refuse the login with a clear error (no silent portal account).
     """
-    user = User.objects.filter(email=email).first()
+    # Case-insensitive like the database's unique constraint (Lower(email)):
+    # Google may return «Ci09938@…» for an account stored as «ci09938@…».
+    user = User.objects.filter(email__iexact=email).first()
     if user is not None:
         return user
     if not _google_domain_allowed(email):
@@ -336,6 +338,17 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
     """
 
     def get_serializer(self, *args, **kwargs):
+        # The typed email, matched like the database's unique constraint
+        # (Lower(email)): phones capitalize «Ci09938@…», and ModelBackend's
+        # lookup is exact, so the right password failed. Pass the stored address.
+        data = kwargs.get('data')
+        if isinstance(data, dict) or hasattr(data, 'getlist'):
+            typed = str(data.get('email') or '').strip()
+            stored = User.objects.filter(email__iexact=typed).values_list('email', flat=True).first() if typed else None
+            if stored and stored != data.get('email'):
+                data = data.copy()
+                data['email'] = stored
+                kwargs['data'] = data
         # Kept so post() can read ``user``: the account that just proved the password.
         self.login_serializer = super().get_serializer(*args, **kwargs)
         return self.login_serializer

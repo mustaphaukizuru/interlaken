@@ -694,7 +694,8 @@ class AnnouncementRecipientCountView(APIView):
         return Response({'audience': audience, 'count': count})
 
 
-@method_decorator(ratelimit('emergency-broadcast', '3/m', key='user', method='POST'), name='dispatch')
+# On the handler (DRF has authenticated there), so the limit is per account, not shared.
+@method_decorator(ratelimit('emergency-broadcast', '3/m', key='user', method='POST'), name='post')
 class EmergencyBroadcastView(APIView):
     """POST /api/v1/portal/admin/broadcast/
 

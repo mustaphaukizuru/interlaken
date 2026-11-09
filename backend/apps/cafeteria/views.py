@@ -906,7 +906,8 @@ class AdminApplyTopUpView(APIView):
 # Families never trigger the store-wide poll (it re-reads every receipt in
 # the store and advances the shared cursor); they read what the 5-minute cron
 # and the webhook already recorded.
-@method_decorator(ratelimit('cafeteria-refresh', '6/m', key='user', method='POST'), name='dispatch')
+# On the handler (DRF has authenticated there), so the limit is per account, not school-wide.
+@method_decorator(ratelimit('cafeteria-refresh', '6/m', key='user', method='POST'), name='post')
 class RefreshFromLoyverseView(APIView):
     """POST /api/v1/cafeteria/refresh/
 

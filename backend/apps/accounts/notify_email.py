@@ -156,7 +156,9 @@ class _EmailIn(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
 
 
-@method_decorator(ratelimit('notify-email', '5/h', key='user', method='PUT'), name='dispatch')
+# On the handler, not dispatch(): there DRF has authenticated, so key='user' is this account
+# (on dispatch every family shared one bucket: 5 requests an hour for the whole school).
+@method_decorator(ratelimit('notify-email', '5/h', key='user', method='PUT'), name='put')
 class NotifyEmailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
