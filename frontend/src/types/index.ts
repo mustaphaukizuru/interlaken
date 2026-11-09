@@ -32,6 +32,8 @@ export interface StudentProfile {
   enrollment_date?: string | null;
   is_active?: boolean;
   status?: 'active' | 'on_leave' | 'graduated' | 'withdrawn';
+  /** Set when the student was archived: off every list, history kept (Restaurar brings it back). */
+  archived_at?: string | null;
   birth_date?: string | null;
   age?: number | null;
   curp?: string;
@@ -403,4 +405,6 @@ export interface AuditLogEntry {
   changes: Record<string, unknown>;
   context: string;
   created_at: string;
+  /** What the row is about ("Ana Ríos", "Pago #4"); only the staff activity feed sends it. */
+  object_label?: string;
 }

@@ -94,7 +94,7 @@ test('Alumnos data ops: import with errors, valid-only commit, bulk group change
   await expect(page.getByRole('heading', { name: 'Alumnos', exact: true })).toBeVisible();
 
   // ── Import: dry run shows the errors ────────────────────────────────────
-  await page.getByRole('button', { name: 'Más acciones' }).click();
+  await page.getByRole('button', { name: 'Más acciones', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Importar archivo' }).click();
   const importDialog = page.getByRole('dialog', { name: 'Importar alumnos' });
   await importDialog.getByLabel('Elegir archivo').setInputFiles({

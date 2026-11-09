@@ -9,7 +9,7 @@
  */
 import axios from 'axios';
 import type { BulkRequest, BulkResult, ExportParams, ImportFormat, ListParams } from './dataOps';
-import type { CheckoutStart } from '@/types';
+import type { AuditLogEntry, CheckoutStart } from '@/types';
 
 // Data Operations contracts (lists, exports, imports, bulk actions) live in
 // ./dataOps. Only the TYPES are re-exported here: a runtime `export *` would
@@ -37,6 +37,8 @@ export interface StaffUser {
   /** Job title and console areas of a staff account (empty for an admin: it has all). */
   staff_title?: string;
   staff_areas?: string[];
+  /** Set when the account was archived: off the list, cannot sign in (Restaurar). */
+  archived_at?: string | null;
 }
 
 export interface PasswordRequest {
@@ -999,6 +1001,9 @@ export const portalApi = {
     });
     return { ...res, data: { ...res.data, updated: res.data.ok } };
   },
+  /** Changes to a student's file and login, newest first (admin console). */
+  getStudentHistory: (studentId: number) =>
+    api.get<AuditLogEntry[]>(`/accounts/admin/students/${studentId}/history/`),
   /** One student profile (admin, or a family's own child). */
   getStudent: (studentId: number) =>
     api.get(`/accounts/students/${studentId}/`),
@@ -1117,8 +1122,11 @@ export const portalApi = {
   staffBulk: (body: BulkRequest) => api.post<BulkResult>('/accounts/admin/staff/bulk/', body),
   inviteStaff: (data: { email: string; first_name: string; last_name?: string; role: StaffUser['role']; staff_title?: string; staff_areas?: string[] }) =>
     api.post<StaffUser & { temporary_password: string }>('/accounts/admin/staff/', data),
-  updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name' | 'staff_title' | 'staff_areas'>>) =>
+  updateStaff: (id: number, data: Partial<Pick<StaffUser, 'role' | 'is_active' | 'first_name' | 'last_name' | 'email' | 'staff_title' | 'staff_areas'>>) =>
     api.patch<StaffUser>(`/accounts/admin/staff/${id}/`, data),
+  /** The account and its last 20 actions in Auditoría. */
+  getStaffActivity: (id: number) =>
+    api.get<{ user: StaffUser; total_actions: number; recent: AuditLogEntry[] }>(`/accounts/admin/staff/${id}/activity/`),
   resetStaffPassword: (id: number) =>
     api.post<{ temporary_password: string; sessions_revoked: number }>(`/accounts/admin/staff/${id}/reset-password/`, {}),
   /** Password request inbox (admin). */

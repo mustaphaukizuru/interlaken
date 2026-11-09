@@ -29,6 +29,7 @@ ADMIN_ONLY = {
     'apps.accounts.merge.GuardianMergeView',
     'apps.accounts.school_year.SchoolYearPreviewView',
     'apps.accounts.school_year.SchoolYearRunView',
+    'apps.accounts.staff_users.StaffActivityView',
     'apps.accounts.staff_users.StaffBulkView',
     'apps.accounts.staff_users.StaffDetailView',
     'apps.accounts.staff_users.StaffExportView',

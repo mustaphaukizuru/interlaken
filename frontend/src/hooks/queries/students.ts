@@ -19,6 +19,8 @@ export interface StudentsListParams {
   grade?: string;
   group?: string;
   linked?: string;
+  /** `1` lists only archived students; otherwise they are left out. */
+  archived?: string;
   enrolled_from?: string;
   enrolled_to?: string;
   [key: string]: string | number | undefined;

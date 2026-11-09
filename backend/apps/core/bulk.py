@@ -18,6 +18,10 @@ core/bulk.py — the one bulk-action contract for admin lists (Data Ops C5).
   summary row (``object_type='bulk:<entity>'``) closes the call.
 * ``dry_run`` runs the transition guard and the action's ``plan`` hook only,
   so the confirm dialog can say "Se confirmarán 14; 2 se omitirán".
+* An action whose rows end differently (a delete that erases some and archives
+  others) names each row's outcome: ``plan`` returns it as a string and the
+  handler as ``changes['outcome']``. The response counts them under
+  ``outcomes`` (``{"erased": 16, "archived": 19}``), dry run and commit alike.
 * Side effects: ``per_row`` (the handler sends its own email/notification),
   ``batched`` (``after(instances, payload, actor)`` runs once at the end) or
   ``none``.
@@ -188,7 +192,7 @@ def _process_row(
     note: str,
     context: str,
 ):
-    """→ ``('ok', None) | ('skipped', reason) | ('failed', error)`` for one row."""
+    """→ ``('ok', outcome | None) | ('skipped', reason) | ('failed', error)`` for one row."""
     if action.allowed_from is not None:
         current = getattr(instance, action.status_field, None)
         if current not in action.allowed_from:
@@ -199,7 +203,7 @@ def _process_row(
         if action.plan is None:
             return "ok", None
         try:
-            action.plan(instance, payload)
+            planned = action.plan(instance, payload)
         except BulkSkip as skip:
             return "skipped", str(skip) or "Omitido."
         except TransitionError as exc:
@@ -207,7 +211,7 @@ def _process_row(
             return kind, _message(exc)
         except (ValidationError, DjangoValidationError, ValueError) as exc:
             return "failed", _message(exc)
-        return "ok", None
+        return "ok", planned if isinstance(planned, str) else None
 
     try:
         with transaction.atomic():
@@ -224,7 +228,7 @@ def _process_row(
                 actor=actor,
                 context=context or f"bulk:{entity}:{action.name}",
             )
-        return "ok", None
+        return "ok", changes.get("outcome") if isinstance(changes, dict) else None
     except BulkSkip as skip:
         return "skipped", str(skip) or "Omitido."
     except TransitionError as exc:
@@ -262,6 +266,7 @@ def run_bulk(
         "dry_run": bool(dry_run),
     }
     done: list = []
+    outcomes: dict[str, int] = {}
 
     for chunk_ids in chunked(ids, chunk):
         with transaction.atomic():
@@ -287,10 +292,15 @@ def run_bulk(
                 if outcome == "ok":
                     result["ok"] += 1
                     done.append(instance)
+                    if message:
+                        outcomes[message] = outcomes.get(message, 0) + 1
                 elif outcome == "skipped":
                     result["skipped"].append({"id": pk, "reason": message})
                 else:
                     result["failed"].append({"id": pk, "error": message})
+
+    if outcomes:
+        result["outcomes"] = outcomes
 
     if not dry_run and done and action.side_effects == "batched" and action.after is not None:
         try:

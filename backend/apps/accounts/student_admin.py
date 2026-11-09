@@ -27,7 +27,13 @@ from apps.core.transitions import assert_transition
 from .import_students import STUDENT_EMAIL_DOMAIN
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer
-from .student_delete import DELETE_CONFIRMATION, delete_student, deletion_blocker
+from .student_delete import (
+    DELETE_CONFIRMATION,
+    archive_student,
+    removal_plan,
+    remove_student,
+    restore_student,
+)
 
 EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id', 'status',
                     'birth_date', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
@@ -104,12 +110,32 @@ def _snapshot(profile: StudentProfile) -> dict:
     return snap
 
 
+def _existing_student(student_id) -> dict | None:
+    """The record that already holds ``student_id``, archived ones included, so the
+    form can offer to open or restore it instead of creating a second copy."""
+    sid = str(student_id or '').strip().upper()
+    profile = (StudentProfile.objects.filter(student_id=sid).select_related('user').first()
+               if sid else None)
+    if profile is None:
+        return None
+    return {'id': profile.id, 'name': profile.user.full_name, 'student_id': profile.student_id,
+            'status': profile.status, 'archived': profile.user.archived_at is not None}
+
+
 class AdminStudentCreateView(APIView):
-    """POST /api/v1/accounts/admin/students/ — create a student (admin)."""
+    """POST /api/v1/accounts/admin/students/ — create a student (admin).
+
+    A matrícula already on file is refused with ``existing`` (id, name, whether
+    archived), so the console can point to that record instead of a duplicate.
+    """
     admin_area = 'alumnos'
     permission_classes = [IsAdmin]
 
     def post(self, request):
+        existing = _existing_student(request.data.get('student_id'))
+        if existing is not None:
+            return Response({'student_id': ['Ya existe un alumno con esa matrícula.'], 'existing': existing},
+                            status=status.HTTP_400_BAD_REQUEST)
         ser = StudentWriteSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
@@ -252,13 +278,31 @@ def _apply_sync(profile, payload, actor):
 
 
 def _plan_delete(profile, payload):
-    blocker = deletion_blocker(profile)
-    if blocker:
-        raise BulkSkip(blocker)
+    return removal_plan(profile)
 
 
 def _apply_delete(profile, payload, actor):
-    return {'deleted': delete_student(profile), 'via': 'portal-bulk'}
+    return {**remove_student(profile), 'via': 'portal-bulk'}
+
+
+def _plan_archive(profile, payload):
+    if profile.user.archived_at is not None:
+        raise BulkSkip('ya está archivado')
+    return 'archived'
+
+
+def _apply_archive(profile, payload, actor):
+    return {**archive_student(profile), 'via': 'portal-bulk'}
+
+
+def _plan_restore(profile, payload):
+    if profile.user.archived_at is None:
+        raise BulkSkip('no está archivado')
+    return 'restored'
+
+
+def _apply_restore(profile, payload, actor):
+    return {**restore_student(profile), 'via': 'portal-bulk'}
 
 
 _plan_grade, _apply_grade = _field_action('grade', 'grado')
@@ -276,10 +320,14 @@ STUDENT_BULK_ACTIONS = {
         # that were never seeded (sync_student_balance); a no-op otherwise.
         BulkAction('sync_loyverse', 'Sincronizar con Loyverse', handler=_apply_sync,
                    plan=_plan_sync, side_effects='per_row'),
-        # Only for a record with nothing to keep (see student_delete); the rest
-        # come back as skipped with the reason, and "withdrawn" is their archive.
-        BulkAction('delete', 'Eliminar definitivamente', handler=_apply_delete,
+        # Admins only (see post): erases a record with nothing to keep and
+        # archives the rest; each row reports which (student_delete.py).
+        BulkAction('delete', 'Eliminar', handler=_apply_delete,
                    plan=_plan_delete, side_effects='none', audit_action='delete'),
+        BulkAction('archive', 'Archivar', handler=_apply_archive, plan=_plan_archive,
+                   side_effects='none'),
+        BulkAction('restore', 'Restaurar', handler=_apply_restore, plan=_plan_restore,
+                   side_effects='none'),
     )
 }
 
@@ -321,8 +369,11 @@ class AdminStudentBulkView(AdminBulkView):
     withdrawal lists the students that still hold a wallet balance under
     ``warnings``), ``grade`` / ``group`` (``{"value": "..."}``) and
     ``sync_loyverse`` (seed the opening balance of linked, never-seeded
-    students) and ``delete`` (admins only, ``{"confirm": "ELIMINAR"}`` on the
-    commit; refuses anyone with something to keep, whose archive is ``withdrawn``).
+    students), ``archive`` / ``restore`` (off and back on the lists, history
+    kept) and ``delete`` (admins only, ``{"confirm": "ELIMINAR"}`` on the
+    commit; erases a record with nothing to keep and archives the rest, counted
+    under ``outcomes``). The dry run of a withdrawal, an archive or a delete
+    lists who still holds money or a paid top-up under ``warnings``.
     """
     admin_area = 'alumnos'
     entity = STUDENT_ENTITY
@@ -354,17 +405,44 @@ class AdminStudentBulkView(AdminBulkView):
             if request.user.role != User.Role.ADMIN:
                 raise PermissionDenied('Solo un administrador puede eliminar alumnos.')
             if not truthy(data.get('dry_run', False)) and payload.get('confirm') != DELETE_CONFIRMATION:
-                raise ValidationError({'confirm': [f'Escriba {DELETE_CONFIRMATION} para confirmar.']})
+                raise ValidationError({'confirm': ['Confirme la eliminación.']})
         if action == 'group' and _value(payload):
             payload['value'] = _value(payload).upper()
         self.validate_payload(action, payload)
         response = super().post(request)
         result = response.data
-        if (result.get('dry_run') and action == 'status'
-                and _value(payload) == StudentProfile.Status.WITHDRAWN):
+        leaving = action in ('archive', 'delete') or (
+            action == 'status' and _value(payload) == StudentProfile.Status.WITHDRAWN)
+        if result.get('dry_run') and leaving:
             if data.get('all_matching'):
                 ids = self.matching_ids(request, data.get('filters') or {})
             else:
                 ids = [int(i) for i in data.get('ids') or []]
             result['warnings'] = withdrawal_warnings(ids)
         return response
+
+
+class AdminStudentHistoryView(APIView):
+    """GET /api/v1/accounts/admin/students/<pk>/history/ — the student's record in Auditoría.
+
+    Changes to the file and to its login, newest first (the last 100). Wallet
+    movements live in Cafetería: one row per purchase would drown the rest.
+    """
+    admin_area = 'alumnos'
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        from django.db.models import Q
+
+        from apps.core.models import AuditLog
+        from apps.core.serializers import AuditLogSerializer
+
+        profile = StudentProfile.objects.filter(pk=pk).only('id', 'user_id').first()
+        if profile is None:
+            return Response({'detail': 'No encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        rows = (AuditLog.objects.select_related('actor')
+                .filter(Q(object_type='accounts.studentprofile', object_id=str(profile.id))
+                        | Q(object_type='accounts.user', object_id=str(profile.user_id)))
+                .order_by('-created_at', '-pk')[:100])
+        return Response(AuditLogSerializer(rows, many=True).data)
+

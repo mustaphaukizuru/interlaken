@@ -68,6 +68,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     notify_email = models.EmailField('Correo para avisos', blank=True)
     notify_email_verified_at = models.DateTimeField(null=True, blank=True)
 
+    # Set when an admin archives the account (accounts/account_removal.py): it
+    # leaves every list and cannot sign in; its history stays. None = on the lists.
+    archived_at = models.DateTimeField('Archivado', null=True, blank=True, db_index=True)
+
     @property
     def mailboxes(self) -> list[str]:
         """Where this account's emails go: its own address (unless synthetic)

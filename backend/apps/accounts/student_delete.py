@@ -1,96 +1,96 @@
 """
-accounts/student_delete.py — removing a student who should not be on the platform.
+accounts/student_delete.py — taking a student off the platform.
 
-"Baja definitiva" stays the archive for anyone with a past. A real delete is only
-for a record with nothing to keep: never signed in, no money, no history, and no
-Loyverse customer that would bring it back at the next roster sync.
-
-The history check fails closed: it asks Django what a delete of the login would
-touch, and anything outside ``DISPOSABLE`` stops it, a model added next year
-included. The wallet is the one exception, because the row itself carries no
-history once its balance is zero.
+Owner, 2026-11-08: an admin must always be able to remove a student who no
+longer attends. A record with nothing to keep is erased; anyone with a past
+(payments, purchases, a balance, a Loyverse customer, a family that signed in)
+is archived instead: off every list, no sign-in, history and balance intact,
+and back with Restaurar. Shared rules: ``account_removal``.
 """
-from django.contrib.admin.utils import NestedObjects
-from django.db import DEFAULT_DB_ALIAS
-from django.db.models import QuerySet
-
 from apps.core.bulk import BulkSkip
 
+from .account_removal import archive_account, has_history, restore_account
 from .models import StudentProfile, User
 
-# Typed by the person in the confirm dialog and checked again by the server.
+# Sent by the console with every delete; the server refuses a delete without it.
 DELETE_CONFIRMATION = 'ELIMINAR'
 
-# What a delete may take with it: the account and its own settings and inbox.
-DISPOSABLE = frozenset({
-    'accounts.user',
-    'accounts.studentprofile',
-    'accounts.studentprofile_parents',
-    'accounts.notificationpreference',
-    'cafeteria.loyverseprofile',
-    'portal.notification',
-    'portal.pushsubscription',
-    'portal.announcementread',
-})
+ERASE, ARCHIVE = 'erased', 'archived'
 
 
-def _has_history(user, wallet) -> bool:
-    """Would deleting ``user`` remove, block on or orphan anything worth keeping?"""
-    collector = NestedObjects(using=DEFAULT_DB_ALIAS)
-    collector.collect([user])
-    if any(obj != wallet for obj in collector.protected):
-        return True
-    if any(model._meta.label_lower not in DISPOSABLE for model in collector.model_objs):
-        return True
-    # SET_NULL relations (a payment, a consent, an audit row) would silently lose
-    # their owner: a row in any of them is history too.
-    return any(
-        batch.exists() if isinstance(batch, QuerySet) else bool(batch)
-        for batches in collector.field_updates.values()
-        for batch in batches
-    )
+def _student_account(profile):
+    """A profile whose login is not a student's (a tutor's, after a merge) is handled in Usuarios."""
+    if profile.user.role != User.Role.STUDENT:
+        raise BulkSkip('su cuenta no es de alumno; adminístrela en Usuarios')
 
 
-def deletion_blocker(profile) -> str | None:
-    """Why ``profile`` cannot be deleted, worded to follow "N porque …", or None.
+def keep_reason(profile) -> str | None:
+    """Why ``profile`` must be archived rather than erased, or None when nothing needs keeping.
 
-    Cheap checks first: a dry run can cover hundreds of rows, and most stop here
-    before the collector runs its queries.
+    Cheap checks first: a plan can cover hundreds of rows, and most stop here
+    before the delete collector runs its queries.
     """
     from apps.cafeteria.models import CafeteriaBalance
 
     user = profile.user
-    if user.role != User.Role.STUDENT:
-        return 'su cuenta no es de alumno'
     if user.last_login is not None:
         return 'ya inició sesión en el portal'
     if profile.loyverse_id and profile.loyverse_missing_since is None:
-        return 'sigue en Loyverse y la sincronización lo volvería a crear'
+        return 'sigue en Loyverse'
     if profile.registration_id:
         return 'viene de una inscripción de Admisiones'
     wallet = CafeteriaBalance.objects.filter(student=profile).first()
     if wallet is not None and wallet.balance != 0:
-        return 'todavía tiene saldo en cafetería'
+        return 'tiene saldo en cafetería'
     if profile.parents.exclude(pk=user.pk).exists():
         return 'tiene un tutor con cuenta propia'
     if StudentProfile.objects.filter(parents=user).exclude(pk=profile.pk).exists():
         return 'es tutor de otro alumno'
-    if _has_history(user, wallet):
-        return 'tiene historial de compras, pagos o consentimientos'
+    if has_history(user, keep_allowed=wallet):
+        return 'tiene compras, pagos o actividad'
     return None
 
 
-def delete_student(profile) -> dict:
-    """Remove the login, the profile and the empty wallet.
+def removal_plan(profile) -> str:
+    """What a delete will do to ``profile``: ``erased`` or ``archived``."""
+    _student_account(profile)
+    if keep_reason(profile) is None:
+        return ERASE
+    if profile.user.archived_at is not None:
+        raise BulkSkip('ya está archivado')
+    return ARCHIVE
 
-    Returns the identity the audit row keeps, since nothing else will say who
-    this was. The caller holds the row lock and the transaction.
+
+def archive_student(profile) -> dict:
+    """Withdraw and hide ``profile``; its history and balance stay."""
+    _student_account(profile)
+    before = profile.status
+    if before != StudentProfile.Status.WITHDRAWN:
+        profile.save(update_fields=profile.apply_status(StudentProfile.Status.WITHDRAWN))
+    changes = archive_account(profile.user)
+    return {'outcome': ARCHIVE, 'status': [before, profile.status], **changes}
+
+
+def restore_student(profile) -> dict:
+    """Back on the lists as «Baja definitiva»; Reactivar lets them sign in again."""
+    _student_account(profile)
+    return {'outcome': 'restored', **restore_account(profile.user, reactivate=False)}
+
+
+def remove_student(profile) -> dict:
+    """Erase ``profile`` when there is nothing to keep, else archive it.
+
+    Returns the audit changes; an erase keeps the identity, since nothing else
+    will say who this was. The caller holds the row lock and the transaction.
     """
     from apps.cafeteria.models import CafeteriaBalance
 
-    blocker = deletion_blocker(profile)
-    if blocker:
-        raise BulkSkip(blocker)
+    _student_account(profile)
+    reason = keep_reason(profile)
+    if reason is not None:
+        if profile.user.archived_at is not None:
+            raise BulkSkip('ya está archivado')
+        return {**archive_student(profile), 'reason': reason}
     deleted = {
         'matricula': profile.student_id,
         'name': profile.user.full_name,
@@ -99,4 +99,4 @@ def delete_student(profile) -> dict:
     }
     CafeteriaBalance.objects.filter(student=profile).delete()
     profile.user.delete()
-    return deleted
+    return {'outcome': ERASE, 'deleted': deleted}

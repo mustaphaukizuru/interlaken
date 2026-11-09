@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
@@ -65,6 +67,12 @@ export function StudentFormModal({ open, onClose, student, onSaved }: Props) {
   );
 }
 
+/** The record the server says already holds this matrícula (archived ones included). */
+interface ExistingStudent { id: number; name: string; student_id: string; status: string; archived: boolean }
+
+const existingOf = (err: unknown): ExistingStudent | null =>
+  (err as { response?: { data?: { existing?: ExistingStudent } } })?.response?.data?.existing ?? null;
+
 function StudentForm({ student, onClose, onSaved, qc }: {
   student?: StudentProfile | null; onClose: () => void; onSaved?: (s: StudentProfile) => void;
   qc: ReturnType<typeof useQueryClient>;
@@ -72,6 +80,8 @@ function StudentForm({ student, onClose, onSaved, qc }: {
   const editing = !!student;
   const [form, setForm] = useState<StudentWrite>(() => initial(student));
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [existing, setExisting] = useState<ExistingStudent | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const set = <K extends keyof StudentWrite>(k: K, v: StudentWrite[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -94,6 +104,7 @@ function StudentForm({ student, onClose, onSaved, qc }: {
       onClose();
     },
     onError: (err: unknown) => {
+      setExisting(existingOf(err));
       const next = fieldErrorsOrNull(err) as FieldErrors | null;
       if (next) {
         setErrors(next);
@@ -103,6 +114,22 @@ function StudentForm({ student, onClose, onSaved, qc }: {
       }
     },
   });
+
+  // An archived student who comes back keeps their history: restore instead of re-creating.
+  const restore = async () => {
+    if (!existing) return;
+    setRestoring(true);
+    try {
+      await portalApi.studentsBulk({ action: 'restore', ids: [existing.id], all_matching: false, payload: {}, dry_run: false });
+      void invalidateStudents(qc);
+      toast.success(`${existing.name} volvió a la lista como «Baja definitiva».`);
+      onClose();
+    } catch {
+      toast.error('No se pudo restaurar. Inténtelo desde la pestaña Archivados.');
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -177,6 +204,28 @@ function StudentForm({ student, onClose, onSaved, qc }: {
           </select>
           <p className="mt-1.5 text-xs text-subtle">Si no está activo, su acceso familiar al portal se desactiva y deja de recibir comunicados y sincronización de cafetería.</p>
         </div>
+        {!editing && existing && (
+          <div role="alert" className="space-y-3 rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink">
+            <p className="flex items-start gap-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
+              <span>
+                La matrícula {existing.student_id} ya pertenece a <strong>{existing.name}</strong>
+                {existing.archived ? ', que está archivado' : ''}. Use ese expediente en lugar de crear uno nuevo.
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link to={`/admin/alumnos/${existing.id}`} onClick={onClose} className="btn-outline min-h-[44px] text-sm sm:min-h-[40px]">
+                Abrir expediente
+              </Link>
+              {existing.archived && (
+                <Button type="button" size="sm" loading={restoring} onClick={restore} className="min-h-[44px] sm:min-h-[40px]">
+                  Restaurar a {existing.name.split(' ')[0]}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
           <Button type="submit" loading={mutation.isPending} className="min-h-[44px]">

@@ -36,6 +36,19 @@ type Phase = 'planning' | 'plan' | 'plan-error' | 'running' | 'done';
 
 const singularIfOne = (noun: string, n: number) => (n === 1 ? noun.replace(/s$/, '') : noun);
 
+/** Per-row outcomes the summary names instead of "procesados" (stem + suffix, gendered by the dialog). */
+const OUTCOME_WORDS: Record<string, [string, string]> = {
+  erased: ['eliminad', ' por completo'],
+  archived: ['archivad', ''],
+  restored: ['restaurad', ''],
+};
+
+/** "1 alumno eliminado por completo, 2 archivados": the outcomes the server counted, in a fixed order. */
+const doneParts = (r: BulkResult): [string, number, string, string][] =>
+  Object.keys(OUTCOME_WORDS)
+    .filter((k) => (r.outcomes?.[k] ?? 0) > 0)
+    .map((k) => [k, r.outcomes![k], ...OUTCOME_WORDS[k]]);
+
 /** Group skip reasons: "2 se omitirán porque ya están canceladas". */
 function groupReasons(items: { reason: string }[]): { reason: string; n: number }[] {
   const map = new Map<string, number>();
@@ -95,6 +108,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
   const [notify, setNotify] = useState(true);
   const [typed, setTyped] = useState('');
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const typedRef = useRef<HTMLInputElement>(null);
 
@@ -131,10 +145,14 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Focus follows the phase: the field to fill first when there is one, else the confirm button.
+  // Focus follows the phase: the field to fill first when there is one; for a
+  // destructive action Cancelar, so a stray Enter never confirms it; else the confirm button.
   useEffect(() => {
-    if (phase === 'plan') (action.requiresNote ? noteRef.current : (typedRef.current ?? confirmRef.current))?.focus();
-  }, [phase, action.requiresNote]);
+    if (phase !== 'plan') return;
+    const target = action.requiresNote ? noteRef.current
+      : typedRef.current ?? (action.danger ? cancelRef.current : confirmRef.current);
+    target?.focus();
+  }, [phase, action.requiresNote, action.danger]);
 
   const payload = (): Record<string, unknown> => {
     const p: Record<string, unknown> = { ...(snapshot.extra ?? {}) };
@@ -256,7 +274,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
           {error && <p className="text-sm text-coral-700" role="alert">{error}</p>}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={phase === 'running'}>Cancelar</Button>
+            <Button ref={cancelRef} type="button" variant="secondary" size="sm" onClick={onClose} disabled={phase === 'running'}>Cancelar</Button>
             <Button
               ref={confirmRef}
               type="button"
@@ -280,7 +298,14 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </span>
             <div className="text-sm text-muted" role="status">
               <p>
-                <strong className="text-ink">{result.ok.toLocaleString('es-MX')}</strong> {singularIfOne(entityLabel, result.ok)} {p('procesad', result.ok)}
+                {doneParts(result).length > 0 ? doneParts(result).map(([key, n, stem, suffix], i) => (
+                  <span key={key}>
+                    {i > 0 && ', '}
+                    <strong className="text-ink">{n.toLocaleString('es-MX')}</strong>{i === 0 && ` ${singularIfOne(entityLabel, n)}`} {p(stem, n)}{suffix}
+                  </span>
+                )) : (
+                  <><strong className="text-ink">{result.ok.toLocaleString('es-MX')}</strong> {singularIfOne(entityLabel, result.ok)} {p('procesad', result.ok)}</>
+                )}
                 {result.skipped.length > 0 && <>, {result.skipped.length} {p('omitid', result.skipped.length)}</>}
                 {result.failed.length > 0 && <>, <strong className="text-coral-700">{result.failed.length} {p('fallid', result.failed.length)}</strong></>}.
               </p>

@@ -32,9 +32,15 @@ def _yes_no(value) -> bool | None:
     return None
 
 
+# The Usuarios tab that lists archived accounts (``?activo=archivadas``).
+ARCHIVED_TAB = ("archivadas", "archived")
+
+
 class StudentFilterSet(django_filters.FilterSet):
     """``status|estado``, ``access|acceso``, ``level|nivel``, ``grade|grado``,
-    ``group|grupo``, ``linked|vinculado`` and ``enrolled_from``/``enrolled_to``."""
+    ``group|grupo``, ``linked|vinculado``, ``enrolled_from``/``enrolled_to`` and
+    ``archived|archivados``: archived students are left out unless it is ``1``,
+    which lists only them."""
 
     status = django_filters.CharFilter(method="filter_status")
     estado = django_filters.CharFilter(method="filter_status")
@@ -54,6 +60,12 @@ class StudentFilterSet(django_filters.FilterSet):
     class Meta:
         model = StudentProfile
         fields: list[str] = []
+
+    @property
+    def qs(self):
+        params = self.data or {}
+        archived = _yes_no(params.get("archived") or params.get("archivados"))
+        return super().qs.filter(user__archived_at__isnull=not archived)
 
     def filter_status(self, qs, name, value):
         return qs.filter(status=value) if value in StudentProfile.Status.values else qs
@@ -97,7 +109,8 @@ class StudentFilterSet(django_filters.FilterSet):
 
 
 class StaffFilterSet(django_filters.FilterSet):
-    """``role|rol`` (admin/staff) and ``active|activo`` (1/0)."""
+    """``role|rol`` (admin/staff) and ``active|activo`` (1/0, or ``archivadas``:
+    archived accounts are left out of every other view)."""
 
     role = django_filters.CharFilter(method="filter_role")
     rol = django_filters.CharFilter(method="filter_role")
@@ -112,8 +125,16 @@ class StaffFilterSet(django_filters.FilterSet):
         return qs.filter(role=value) if value in STAFF_ROLES else qs
 
     def filter_active(self, qs, name, value):
+        if value in ARCHIVED_TAB:
+            return qs
         flag = _yes_no(value)
         return qs if flag is None else qs.filter(is_active=flag)
+
+    @property
+    def qs(self):
+        params = self.data or {}
+        archived = (params.get("active") or params.get("activo")) in ARCHIVED_TAB
+        return super().qs.filter(archived_at__isnull=not archived)
 
 
 class PasswordRequestFilterSet(django_filters.FilterSet):

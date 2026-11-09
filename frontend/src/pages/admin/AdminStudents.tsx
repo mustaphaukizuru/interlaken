@@ -1,6 +1,7 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useMemo, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, RotateCcw, Trash2, UserMinus, type LucideIcon } from 'lucide-react';
+import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, type LucideIcon } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
@@ -10,7 +11,8 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { BulkValueDialog, type BulkValueOption } from '@/components/admin/BulkValueDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
-import { DELETE_ACTION, REACTIVATE_ACTION, WITHDRAW_ACTION, studentPlanNote } from '@/components/admin/studentActions';
+import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
+import { RowActionsMenu, type RowMenuItem } from '@/components/admin/RowActionsMenu';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -36,9 +38,10 @@ type StatusKey = keyof typeof STUDENT_STATUS;
 
 const STATUS_OPTIONS = (Object.entries(STUDENT_STATUS) as [StatusKey, (typeof STUDENT_STATUS)[StatusKey]][])
   .map(([value, m]) => ({ value, label: m.label }));
-/** The roster opens on who is here today; this tab shows everyone, bajas included. */
+/** The roster opens on who is here today; "Todos" shows everyone on the lists, bajas included. */
 const ALL_STATUSES = 'todos';
-const STATUS_TABS = [...STATUS_OPTIONS, { value: ALL_STATUSES, label: 'Todos' }];
+/** Archived students are off every other tab; this one lists only them, with Restaurar. */
+const ARCHIVED = 'archivados';
 const ACCESS_OPTIONS = [
   { value: 'never', label: 'Nunca ha iniciado sesión' },
   { value: 'nopass', label: 'Sin contraseña asignada' },
@@ -66,9 +69,13 @@ const BULK_ACTIONS: BulkActionDef[] = [
 
 // A column of icons wide enough to stay pinned beside the data; below lg the
 // table moves them into its overflow menu, where the words show too.
-const ROW_ACTION =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:px-2';
-const ROW_ACTION_DANGER = `${ROW_ACTION} text-coral-700 hover:bg-coral-50`;
+const ROW_ACTION_BASE =
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:px-2';
+const ROW_ACTION = `${ROW_ACTION_BASE} text-purple hover:bg-cream-2`;
+// Below lg the table already folds the row into a menu, so the items show as plain buttons there;
+// the destructive one is coral, behind a divider (one color class each: Tailwind order would pick the winner).
+const MENU_BUTTON = `${ROW_ACTION} w-full justify-start`;
+const MENU_BUTTON_DANGER = `${ROW_ACTION_BASE} w-full justify-start text-coral-700 hover:bg-coral-50`;
 
 function RowActionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
@@ -88,10 +95,10 @@ function initial(s: RosterStudent) {
  * estado tabs, nivel/grado/acceso/vínculo, grupo), DataTable v2 (server sort on
  * every mapped column, column controls persisted as `students`, pinned name),
  * selection with bulk status/grade/group/sync, export CSV/Excel/PDF of the view
- * or the selection, and the generic ImportDialog. Opens on the active students;
- * "Baja definitiva" is the archive, and an admin may erase a record with nothing
- * to keep (server rules: student_delete.py). On 2xl screens a row opens the
- * detail pane.
+ * or the selection, and the generic ImportDialog. Opens on the active students.
+ * Archivar takes a student off every list (Archivados tab, Restaurar); an admin's
+ * Eliminar erases a record with nothing to keep and archives the rest (server
+ * rules: student_delete.py). On 2xl screens a row opens the detail pane.
  */
 export default function AdminStudents() {
   const [page, setPage] = useUrlPage();
@@ -102,7 +109,8 @@ export default function AdminStudents() {
   const canDelete = isAdmin(useAuthStore((s) => s.user));
   const filters: Omit<StudentsListParams, 'page'> = {
     q: get('q') || undefined,
-    status: estado === ALL_STATUSES ? undefined : estado || 'active',
+    status: estado === ALL_STATUSES || estado === ARCHIVED ? undefined : estado || 'active',
+    archived: estado === ARCHIVED ? '1' : undefined,
     access: get('acceso') || undefined,
     level: get('nivel') || undefined,
     grade: get('grado') || undefined,
@@ -116,6 +124,10 @@ export default function AdminStudents() {
   const { data, isLoading, isError, refetch } = useStudentsList({ page, ...filters });
   const { data: missing } = useStudentsList({ page: 1, page_size: 1, status: 'active', linked: MISSING });
   const missingCount = missing?.count ?? 0;
+  const { data: archivedList } = useStudentsList({ page: 1, page_size: 1, archived: '1' });
+  const archivedCount = archivedList?.count ?? 0;
+  const viewingArchived = estado === ARCHIVED;
+  const isLg = useMediaQuery('(min-width: 1024px)');
   const exportStudents = useStudentsExport();
   const bulk = useStudentsBulk();
   const students = data?.results;
@@ -147,11 +159,14 @@ export default function AdminStudents() {
     return Array.from(seen).sort().map((g) => ({ value: g, label: `Grupo ${g}` }));
   }, [students]);
 
-  const bulkActions: BulkActionDef[] = [
-    !estado || estado === 'active' || estado === ALL_STATUSES ? WITHDRAW_ACTION : REACTIVATE_ACTION,
-    ...(canDelete ? [DELETE_ACTION] : []),
-    ...BULK_ACTIONS,
+  const statusTabs = [
+    ...STATUS_OPTIONS,
+    { value: ALL_STATUSES, label: 'Todos' },
+    { value: ARCHIVED, label: 'Archivados', count: archivedCount },
   ];
+  const bulkActions: BulkActionDef[] = viewingArchived
+    ? [RESTORE_ACTION, ...(canDelete ? [DELETE_ACTION] : [])]
+    : [ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS];
 
   const columns = useMemo<Column<RosterStudent>[]>(() => [
     {
@@ -191,6 +206,13 @@ export default function AdminStudents() {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
       cell: (s) => {
         const meta = STUDENT_STATUS[(s.status ?? 'active') as StatusKey];
+        if (s.archived_at) {
+          return (
+            <span title={`Archivado el ${new Date(s.archived_at).toLocaleDateString('es-MX')}`}>
+              <Badge variant="neutral">Archivado</Badge>
+            </span>
+          );
+        }
         return (
           <div className="flex flex-wrap gap-1">
             <Badge variant={meta?.variant ?? 'neutral'}>{meta?.label ?? s.status}</Badge>
@@ -222,7 +244,7 @@ export default function AdminStudents() {
     });
 
   const startBulk = (action: BulkActionDef) => {
-    if (action.payload || action.requireText || action.name === 'sync_loyverse') setConfirming({ action, payload: action.payload });
+    if (['archive', 'restore', 'delete', 'sync_loyverse'].includes(action.name)) setConfirming({ action, payload: action.payload });
     else setPicking(action);
   };
   const pickedValue = (value: string) => {
@@ -242,7 +264,7 @@ export default function AdminStudents() {
   };
 
   const pickerProps = (() => {
-    if (picking?.name === 'status') return { label: 'Nuevo estado', options: STATUS_OPTIONS, hint: '«Baja definitiva» archiva al alumno: no se borra nada y su saldo se muestra antes de confirmar.' };
+    if (picking?.name === 'status') return { label: 'Nuevo estado', options: STATUS_OPTIONS, hint: '«Baja definitiva» deja al alumno en la pestaña de bajas y su saldo se muestra antes de confirmar. Para quitarlo de las listas use Archivar.' };
     if (picking?.name === 'grade') return { label: 'Nuevo grado', options: GRADES.map((g) => ({ value: g, label: g })), freeText: true, maxLength: 20 };
     return { label: 'Nuevo grupo', options: groupOptions, freeText: true, maxLength: 5, uppercase: true, hint: 'Elija un grupo existente o escriba uno nuevo.' };
   })();
@@ -254,6 +276,40 @@ export default function AdminStudents() {
   ];
   const anyFilter = !!estado || Object.entries(filters).some(([k, v]) => k !== 'ordering' && k !== 'status' && v);
   const startOne = (action: BulkActionDef, one: RosterStudent) => setConfirming({ action, payload: action.payload, one });
+  const lifecycleItems = (s: RosterStudent): RowMenuItem[] => [
+    s.archived_at
+      ? { key: 'restore', label: 'Restaurar', icon: RESTORE_ACTION.icon, onSelect: () => startOne(RESTORE_ACTION, s) }
+      : { key: 'archive', label: 'Archivar', icon: ARCHIVE_ACTION.icon, onSelect: () => startOne(ARCHIVE_ACTION, s) },
+    ...(canDelete ? [{ key: 'delete', label: 'Eliminar', icon: DELETE_ACTION.icon, danger: true, onSelect: () => startOne(DELETE_ACTION, s) }] : []),
+  ];
+
+  // Archiving a few named rows can be undone from the toast; a whole filtered
+  // view is restored from the Archivados tab instead.
+  const afterAction = (action: BulkActionDef, ids: number[], result: { ok: number }) => {
+    if (action.name !== 'archive' || result.ok === 0) return;
+    toast((t) => (
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span>{result.ok === 1 ? 'Alumno archivado.' : `${result.ok.toLocaleString('es-MX')} alumnos archivados.`}</span>
+        {ids.length > 0 && (
+          <button
+            type="button"
+            className="font-semibold text-purple underline-offset-2 hover:underline"
+            onClick={() => {
+              toast.dismiss(t.id);
+              void bulk.mutateAsync({ action: 'restore', ids, all_matching: false, payload: {}, dry_run: false })
+                .then(() => toast.success('Listo: volvieron a la lista.'))
+                .catch(() => toast.error('No se pudo deshacer. Restáurelos desde Archivados.'));
+            }}
+          >
+            Deshacer
+          </button>
+        )}
+        <Link to={`/admin/alumnos?estado=${ARCHIVED}`} onClick={() => toast.dismiss(t.id)} className="font-semibold text-purple underline-offset-2 hover:underline">
+          Ver archivados
+        </Link>
+      </span>
+    ), { duration: 7000 });
+  };
 
   return (
     <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
@@ -311,13 +367,14 @@ export default function AdminStudents() {
         <ImportLoyverseModal open={importLoyverseOpen} onClose={() => setImportLoyverseOpen(false)} onImported={() => refetch()} />
         <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
 
-        {vinculado === MISSING ? (
+        {/* The note leaves once nobody is left to review (the table says «Sin resultados»). */}
+        {vinculado === MISSING ? (isLoading || count > 0) && (
           <div role="note" className="flex flex-col gap-3 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
             <p>
               <strong>Estos alumnos ya no existen en Loyverse</strong>, así que no pueden comprar en cafetería.{' '}
               {canDelete
-                ? <>Selecciónelos y use <strong>Eliminar definitivamente</strong>: se borra a quienes no tienen historial ni saldo. A los demás use <strong>Dar de baja</strong>.</>
-                : <>Selecciónelos y use <strong>Dar de baja</strong> para archivarlos.</>}
+                ? <>Selecciónelos y use <strong>Eliminar</strong>: se borran por completo quienes no tienen nada que conservar, y se archivan los demás (salen de la lista y su historial se conserva).</>
+                : <>Selecciónelos y use <strong>Archivar</strong>: salen de la lista y su historial se conserva.</>}
             </p>
             {count > 0 && (
               <button type="button" className="btn-outline min-h-[44px] shrink-0 sm:min-h-[40px]" onClick={selection.onSelectAllMatching}>
@@ -338,7 +395,7 @@ export default function AdminStudents() {
           </Link>
         )}
 
-        <Card title={`${count.toLocaleString('es-MX')} alumnos`}>
+        <Card title={`${count.toLocaleString('es-MX')} ${count === 1 ? 'alumno' : 'alumnos'}`}>
           <p role="status" aria-live="polite" className="sr-only">{count} alumnos encontrados</p>
           <DataTable<RosterStudent>
             tableId="students"
@@ -373,26 +430,25 @@ export default function AdminStudents() {
                 <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} title="Cafetería" aria-label={`Cafetería de ${s.user.full_name}`}>
                   <RowActionLabel icon={Wallet} label="Cafetería" />
                 </Link>
-                {s.is_active === false ? (
-                  <button type="button" onClick={() => startOne(REACTIVATE_ACTION, s)} className={ROW_ACTION} title="Reactivar" aria-label={`Reactivar a ${s.user.full_name}`}>
-                    <RowActionLabel icon={RotateCcw} label="Reactivar" />
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => startOne(WITHDRAW_ACTION, s)} className={ROW_ACTION_DANGER} title="Dar de baja" aria-label={`Dar de baja a ${s.user.full_name}`}>
-                    <RowActionLabel icon={UserMinus} label="Dar de baja" />
-                  </button>
-                )}
-                {canDelete && (
-                  <button type="button" onClick={() => startOne(DELETE_ACTION, s)} className={ROW_ACTION_DANGER} title="Eliminar" aria-label={`Eliminar a ${s.user.full_name}`}>
-                    <RowActionLabel icon={Trash2} label="Eliminar" />
-                  </button>
-                )}
+                {isLg ? (
+                  <RowActionsMenu label={`Más acciones para ${s.user.full_name}`} items={lifecycleItems(s)} />
+                ) : lifecycleItems(s).map((it) => {
+                  const Icon = it.icon!;
+                  return (
+                    <Fragment key={it.key}>
+                      {it.danger && <div role="separator" className="my-0.5 h-px bg-line" />}
+                      <button type="button" onClick={it.onSelect} className={it.danger ? MENU_BUTTON_DANGER : MENU_BUTTON} aria-label={`${it.label} a ${s.user.full_name}`}>
+                        <Icon size={16} aria-hidden="true" /> {it.label}
+                      </button>
+                    </Fragment>
+                  );
+                })}
               </>
             )}
             toolbar={(
               <FilterBar
                 search={{ placeholder: 'Buscar por nombre, matrícula, correo o grado…', label: 'Buscar alumnos' }}
-                tabs={{ paramKey: 'estado', options: STATUS_TABS, allLabel: null, defaultValue: 'active', label: 'Filtrar por estado' }}
+                tabs={{ paramKey: 'estado', options: statusTabs, allLabel: null, defaultValue: 'active', label: 'Filtrar por estado' }}
                 selects={[
                   { key: 'nivel', label: 'Nivel', options: NIVELES.map(([value, label]) => ({ value, label })), allLabel: 'Todos los niveles' },
                   {
@@ -425,7 +481,7 @@ export default function AdminStudents() {
                 itemLabel="alumnos"
                 gender="m"
                 actions={bulkActions}
-                inline={5}
+                inline={6}
                 onAction={startBulk}
                 busy={bulk.isPending}
                 exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="alumnos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
@@ -433,8 +489,10 @@ export default function AdminStudents() {
             )}
             empty={{
               icon: Users,
-              title: anyFilter ? 'Sin resultados' : 'Sin alumnos',
-              description: anyFilter ? 'Ningún alumno coincide con los filtros.' : 'Los alumnos registrados aparecerán aquí.',
+              title: viewingArchived ? 'No hay alumnos archivados' : anyFilter ? 'Sin resultados' : 'Sin alumnos',
+              description: viewingArchived
+                ? 'Los alumnos que archive aparecerán aquí, con la opción de restaurarlos.'
+                : anyFilter ? 'Ningún alumno coincide con los filtros.' : 'Los alumnos registrados aparecerán aquí.',
               action: anyFilter ? undefined : (
                 <button type="button" className="btn-outline" onClick={() => setImportOpen(true)}>
                   <FileUp size={16} aria-hidden="true" /> Importar archivo
@@ -463,10 +521,13 @@ export default function AdminStudents() {
           subject={confirming?.one?.user.full_name}
           filters={filters}
           execute={(body) => bulk.mutateAsync(body)}
-          renderPlan={studentPlanNote(confirming?.action)}
+          renderPlan={removalPlanNote(confirming?.action)}
           onDone={(r) => {
+            const action = confirming?.action;
+            const ids = confirming?.one ? [confirming.one.id] : selection.allMatching ? [] : selection.ids.map(Number);
             if (!r.failed.length) selection.onClear();
-            if (confirming?.action.name === 'delete') setSelectedId(null);
+            if (action && ['archive', 'delete'].includes(action.name)) setSelectedId(null);
+            if (action) afterAction(action, ids, r);
           }}
         />
       </div>
