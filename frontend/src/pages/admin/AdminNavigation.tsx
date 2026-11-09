@@ -32,7 +32,7 @@ const ICON_OPTIONS = ['Users', 'BookOpen', 'Camera', 'Blocks', 'Pencil', 'Gradua
 
 /** The built-in menu, offered as the starting point when the CMS menu is empty. */
 export const DEFAULT_MENU: MenuGroup[] = [
-  { label: 'El Colegio', items: [{ label: 'Quiénes Somos', to: '/nosotros', icon: 'Users' }, { label: 'Modelo Educativo', to: '/modelo-educativo', icon: 'BookOpen' }, { label: 'Galería', to: '/galeria', icon: 'Camera' }, { label: 'Calendario escolar', to: '/calendario', icon: 'CalendarDays' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
+  { label: 'El Colegio', items: [{ label: 'Quiénes Somos', to: '/nosotros', icon: 'Users' }, { label: 'Modelo Educativo', to: '/modelo-educativo', icon: 'BookOpen' }, { label: 'Galería', to: '/galeria', icon: 'Camera' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
   { label: 'Niveles Educativos', items: [{ label: 'Preescolar', to: '/niveles/preescolar', icon: 'Blocks' }, { label: 'Primaria', to: '/niveles/primaria', icon: 'Pencil' }, { label: 'Secundaria', to: '/niveles/secundaria', icon: 'GraduationCap' }] },
   { label: 'Admisiones', items: [{ label: 'Proceso de Inscripción', to: '/admisiones', icon: 'ClipboardList' }, { label: 'Documentación', to: '/admisiones/documentacion', icon: 'FileText' }, { label: 'Costos', to: '/admisiones/costos', icon: 'CircleDollarSign' }, { label: 'Pre-Registro', to: '/pre-registro', icon: 'UserPlus' }] },
   { label: 'Pagos', items: [{ label: 'Colegiaturas y cafetería', to: '/pagos', icon: 'CircleDollarSign' }, { label: 'Facturación', to: '/comunidad/facturacion', icon: 'Receipt' }] },

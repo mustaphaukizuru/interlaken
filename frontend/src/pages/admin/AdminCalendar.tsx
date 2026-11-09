@@ -104,7 +104,7 @@ export default function AdminCalendar() {
     <>
       <PageHeader
         title="Calendario escolar"
-        subtitle="Fechas que las familias ven en /calendario y en su calendario suscrito (.ics). Sin publicar = solo visible aquí."
+        subtitle="Fechas que las familias ven en las Novedades de su portal y en su calendario suscrito (.ics). Sin publicar = solo visible aquí."
         actions={(
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => { void copyIcs(); }}><Link2 size={16} aria-hidden="true" /> Copiar liga .ics</Button>

@@ -46,7 +46,7 @@ def build_feed(user, since) -> list[dict]:
     today = timezone.localdate()
     for e in SchoolEvent.objects.filter(is_published=True, start_date__gte=today, start_date__lte=today + timedelta(days=14)).order_by('start_date')[:8]:
         when = e.start_date.strftime('%d/%m')
-        items.append({'type': 'evento', 'title': f'{when} · {e.title}', 'text': e.description, 'link': '/calendario',
+        items.append({'type': 'evento', 'title': f'{when} · {e.title}', 'text': e.description, 'link': '',
                       'at': timezone.make_aware(timezone.datetime.combine(e.start_date, timezone.datetime.min.time())).isoformat(), 'unread': e.created_at >= since})
 
     students = family_students(user)

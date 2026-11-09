@@ -196,7 +196,6 @@ function CalendarBlock() {
       <ul className="divide-y divide-line rounded-xl2 border border-line bg-white">{next.map((e) => (
         <li key={e.id} className="flex justify-between gap-3 px-4 py-3 text-sm"><span className="text-ink">{e.title}</span><span className="text-muted">{e.start_date}</span></li>
       ))}</ul>
-      <Link to="/calendario" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-purple">Ver calendario completo <ArrowRight size={14} /></Link>
     </Section>
   );
 }

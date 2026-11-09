@@ -7,6 +7,7 @@ vi.mock('@/services/api', () => ({
   portalApi: { novedades: vi.fn().mockResolvedValue({ data: { since: 'x', unread: 1, items: [
     { type: 'comunicado', title: 'Junta de padres', text: 'Viernes 9:00', link: '/portal/comunicados/3', at: '2026-08-22T10:00:00Z', unread: true },
     { type: 'cafeteria', title: 'Consumo de Ana: $35', text: '', link: '/portal/cafeteria', at: '2026-08-21T10:00:00Z', unread: false },
+    { type: 'evento', title: '14/11 · Festival', text: 'Patio central', link: '', at: '2026-11-14T00:00:00Z', unread: false },
   ] } }) },
 }));
 
@@ -17,5 +18,17 @@ describe('NovedadesPanel', () => {
     expect(await screen.findByRole('link', { name: /Junta de padres/ })).toHaveAttribute('href', '/portal/comunicados/3');
     expect(screen.getByText('Novedades (1)')).toBeInTheDocument();
     expect(readSeen()).toBeTruthy();
+  });
+
+  it('shows a school date as a plain row, not a link to a page that no longer exists', async () => {
+    renderWithProviders(<NovedadesPanel />);
+    expect(await screen.findByText('14/11 · Festival')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Festival/ })).toBeNull();
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('announces an unread item to screen readers without a stray aria-label', async () => {
+    renderWithProviders(<NovedadesPanel />);
+    expect(await screen.findByRole('link', { name: /Junta de padres.*Nuevo/ })).toBeInTheDocument();
   });
 });
