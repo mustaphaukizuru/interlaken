@@ -2490,7 +2490,12 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                    f'{student.user.first_name or student.user.full_name}.'))
 
     if stamp:
-        CafeteriaBalance.objects.filter(student_id__in=stamp).update(last_synced=now)
+        # Only wallets already seeded: ``last_synced`` is also the "seeded" flag
+        # (``sync_student_balance``), and a never-seeded or reset wallet
+        # (``reset_wallet_seed``) waiting in the POS queues must keep waiting for
+        # its opening balance instead of being frozen at whatever it holds.
+        (CafeteriaBalance.objects.filter(student_id__in=stamp, last_synced__isnull=False)
+         .update(last_synced=now))
 
     if notify:
         for topup, balance in applied_notices:

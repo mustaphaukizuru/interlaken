@@ -80,6 +80,36 @@ class TestMirrorPosTopups:
         assert r['credited'] == 0 and r['skipped_pending'] == 1
         assert CafeteriaBalance.objects.get(student=s).balance == Decimal('300')
 
+    def test_a_queued_wallet_waiting_for_its_seed_is_not_stamped_as_seeded(self):
+        """A relinked student (``reset_wallet_seed`` cleared the seed) with a POS
+        unload in the queue: the skip used to stamp ``last_synced``, the
+        "seeded" flag, so the new customer's opening balance was never copied."""
+        from apps.cafeteria.services import sync_student_balance
+
+        now = timezone.now()
+        relinked = StudentProfileFactory(loyverse_id='u-new')
+        cb = CafeteriaBalance.objects.create(student=relinked, balance=Decimal('70'))
+        queued = StudentProfileFactory(loyverse_id='u2')
+        old_stamp = now - timedelta(days=1)
+        CafeteriaBalance.objects.create(student=queued, balance=Decimal('10'),
+                                        last_synced=old_stamp)
+        for s in (relinked, queued):
+            TopUpRequest.objects.create(
+                student=s, amount=Decimal('50'), method=TopUpRequest.Method.ONLINE,
+                status=TopUpRequest.Status.COMPLETED, pos_loaded_at=now,
+                pos_unload_needed_at=now)
+
+        r = mirror_pos_topups(customers=[customer('u-new', 500), customer('u2', 60)])
+
+        assert r['skipped_pending'] == 2
+        cb.refresh_from_db()
+        assert cb.last_synced is None and cb.seeded_at is None
+        assert CafeteriaBalance.objects.get(student=queued).last_synced > old_stamp
+        with patch('apps.cafeteria.services.get_customer_by_id',
+                   return_value=customer('u-new', 500)) as read:
+            assert sync_student_balance(relinked) == Decimal('500')
+        read.assert_called_once()
+
     def test_leaves_unseeded_wallets_to_the_seed_cron(self):
         s = StudentProfileFactory(loyverse_id='u1')
         CafeteriaBalance.objects.create(student=s, balance=Decimal('0'), last_synced=None)
