@@ -5,6 +5,7 @@ Authentication paths: email/password token issuance, Google OAuth callback
 All Google network calls are mocked — the suite never touches the internet.
 """
 
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,7 @@ import requests
 from django.conf import settings
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.factories import (
     DEFAULT_PASSWORD,
@@ -442,3 +444,85 @@ class TestGoogleLongAvatar:
 
         assert resp.status_code == 302 and "/login?login=ok" in resp["Location"]
         assert User.objects.get(email="nuevo@test.mx").avatar == ""
+
+
+# ── last_login: "Último acceso" is the last real sign-in ───────────────────
+class TestLastLogin:
+    """Every sign-in (password, Google token, Google redirect) stamps
+    ``User.last_login``; a failed attempt and the silent cookie refresh do not.
+    API logins never set it before 2026-11-08, so every list said "Nunca"."""
+
+    def test_password_login_sets_it(self, api_client):
+        user = ParentFactory(email="login@test.mx")
+        assert user.last_login is None
+        before = timezone.now()
+        resp = api_client.post(
+            reverse("token-obtain"),
+            {"email": "login@test.mx", "password": DEFAULT_PASSWORD},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+        user.refresh_from_db()
+        assert user.last_login is not None and user.last_login >= before
+
+    def test_wrong_password_leaves_it_alone(self, api_client):
+        user = ParentFactory(email="login@test.mx")
+        resp = api_client.post(
+            reverse("token-obtain"), {"email": "login@test.mx", "password": "nope"}, format="json"
+        )
+        assert resp.status_code == 401
+        user.refresh_from_db()
+        assert user.last_login is None
+
+    def test_password_without_the_totp_code_is_not_a_sign_in(self, api_client, admin_user):
+        from apps.accounts.security import TotpDevice, new_secret, totp_code
+
+        secret = new_secret()
+        TotpDevice.objects.create(user=admin_user, secret=secret, confirmed=True)
+        body = {"email": admin_user.email, "password": "admin-pass-123"}
+        assert api_client.post(reverse("token-obtain"), body, format="json").status_code == 401
+        admin_user.refresh_from_db()
+        assert admin_user.last_login is None
+        resp = api_client.post(
+            reverse("token-obtain"), {**body, "totp": totp_code(secret)}, format="json"
+        )
+        assert resp.status_code == 200, resp.data
+        admin_user.refresh_from_db()
+        assert admin_user.last_login is not None
+
+    @patch("apps.accounts.views.google_id_token.verify_oauth2_token")
+    def test_google_token_login_sets_it(self, mock_verify, api_client):
+        user = ParentFactory(email="gtoken@test.mx")
+        mock_verify.return_value = {
+            "sub": "g-1", "email": "gtoken@test.mx", "email_verified": True,
+            "given_name": "G", "family_name": "T",
+        }
+        resp = api_client.post(reverse("google-token"), {"credential": "fake"}, format="json")
+        assert resp.status_code == 200, resp.data
+        user.refresh_from_db()
+        assert user.last_login is not None
+        # The account in the answer already carries it (Mi perfil · Último acceso).
+        assert resp.data["user"]["last_login"] is not None
+
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_google_callback_sets_it(self, mock_post, mock_get, api_client):
+        user = ParentFactory(email="nuevo@test.mx")
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(200, _VERIFIED_USERINFO)
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse("google-callback"), {"code": "abc", "state": state})
+        assert resp.status_code == 302 and "/login?login=ok" in resp["Location"]
+        user.refresh_from_db()
+        assert user.last_login is not None
+
+    def test_refresh_is_not_a_sign_in(self, api_client):
+        _, csrf, _ = _login(api_client)
+        signed_in = timezone.now() - timedelta(days=2)
+        User.objects.filter(email="login@test.mx").update(last_login=signed_in)
+        api_client.cookies[CSRF_COOKIE] = csrf
+        resp = api_client.post(
+            reverse("token-refresh"), {}, format="json", HTTP_X_CSRF_TOKEN=csrf
+        )
+        assert resp.status_code == 200, resp.data
+        assert User.objects.get(email="login@test.mx").last_login == signed_in

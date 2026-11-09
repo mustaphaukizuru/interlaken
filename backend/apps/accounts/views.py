@@ -36,6 +36,7 @@ from .cookies import (
     new_csrf_token,
     set_csrf_cookie,
     set_refresh_cookie,
+    start_session,
 )
 from .filters import StudentFilterSet
 from .models import StudentProfile, User
@@ -366,8 +367,8 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
             access = response.data.get('access')
             response.data = {'access': access}
             if refresh:
-                set_refresh_cookie(response, refresh)
-                set_csrf_cookie(response, new_csrf_token())
+                # Cookies + last_login, like every other sign-in.
+                start_session(user, response, refresh)
         return response
 
 
