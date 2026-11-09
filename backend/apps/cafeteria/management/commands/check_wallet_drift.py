@@ -8,6 +8,12 @@ students whose Loyverse customer is gone, student-looking customers no
 student is linked to, or wallet receipts parked without an owner. Runs at
 07:35, before the cafetería opens, so a purchase in flight cannot show up as
 drift. Silent when everything is zero.
+
+Receipts of staff and test cards are parked too and never resolve; they are
+not a problem (until 2026-10-29 they made this email go out every morning).
+An unchanged list of problems is emailed once and then weekly
+(``apps.payments.ops_alerts``), so a daily copy of the same email does not
+teach the office to ignore the one that matters.
 """
 from decimal import Decimal
 
@@ -15,6 +21,9 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.core.models import OpsStatus
+from apps.payments import ops_alerts
+
+ALERT_KEY = 'wallet_drift_alert'
 
 
 class Command(BaseCommand):
@@ -32,7 +41,8 @@ class Command(BaseCommand):
         drifting = int(audit.get('drifting') or 0)
         stale = int(audit.get('stale_links') or 0)
         unlinked = int(audit.get('unlinked_students') or 0)
-        parked = int(audit.get('unmatched_receipts') or 0)
+        # An audit written before the split has only the total.
+        parked = int(audit.get('unmatched_receipts_student', audit.get('unmatched_receipts')) or 0)
         drift_total = Decimal(str(audit.get('drift_total') or 0))
         problems = []
         if drifting:
@@ -55,25 +65,27 @@ class Command(BaseCommand):
             'audit_at': audit.get('at'),
         })
         if not problems:
+            ops_alerts.clear_alert(ALERT_KEY)
             self.stdout.write(f'wallet converged: {audit.get("compared")} compared, 0 issues')
             return
 
         self.stdout.write(self.style.ERROR('WALLET DRIFT: ' + '; '.join(problems)))
         if o['no_email']:
             return
-
-        from apps.accounts.models import User
-        from apps.portal.services import send_email
-
-        recipients = list(User.objects.filter(role=User.Role.ADMIN, is_active=True)
-                          .exclude(email='').values_list('email', flat=True))
-        if not recipients:
-            self.stderr.write('no active admin to email')
+        fingerprint = '; '.join(problems)
+        if not ops_alerts.should_alert(ALERT_KEY, fingerprint):
+            self.stdout.write('same problems as the last email; not repeated before a week')
             return
+
         body = ('La revisión diaria de la cafetería encontró:\n\n'
                 + '\n'.join(f'  - {p}' for p in problems)
                 + '\n\nRevise Administración → Cafetería → Estado de la sincronización y la '
                   'pestaña Reconciliación. Los alumnos sin cliente en Loyverse aparecen en '
-                  'Alumnos → Vincular Loyverse, donde puede darlos de baja.')
-        sent = send_email('Interlaken: la cafetería tiene diferencias por revisar', body, recipients)
-        self.stdout.write(f'alert email {"sent" if sent else "NOT sent"} to {len(recipients)} admin(s)')
+                  'Alumnos → Vincular Loyverse, donde puede darlos de baja.\n\n'
+                  'Mientras la lista no cambie, este aviso se repite una vez por semana.')
+        sent = ops_alerts.email_admins('Interlaken: la cafetería tiene diferencias por revisar', body)
+        if not sent:
+            self.stderr.write('alert email NOT sent (no active admin, or the send failed)')
+            return
+        ops_alerts.mark_alerted(ALERT_KEY, fingerprint)
+        self.stdout.write(f'alert email sent to {sent} admin(s)')

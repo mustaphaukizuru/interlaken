@@ -87,6 +87,11 @@ def _get(endpoint, params=None):
         raise LoyverseError(str(e)) from e
 
 
+def get_webhooks() -> list:
+    """The merchant's webhooks as Loyverse lists them (read-only; check_loyverse_webhook)."""
+    return _get('/webhooks').get('webhooks', [])
+
+
 def get_customer_by_id(loyverse_customer_id: str) -> dict:
     """Fetch a single customer from Loyverse by their ID."""
     return _get(f'/customers/{loyverse_customer_id}')
@@ -2094,7 +2099,7 @@ def _record_wallet_audit(customers, result, now) -> dict:
     from django.db.models import Sum
 
     from apps.accounts.models import StudentProfile
-    from apps.cafeteria.models import UnmatchedReceipt
+    from apps.cafeteria.models import LoyverseProfile, UnmatchedReceipt
     from apps.core.models import OpsStatus
 
     remote_ids = {c.get('id') for c in customers if c.get('id')}
@@ -2140,6 +2145,11 @@ def _record_wallet_audit(customers, result, now) -> dict:
         'unlinked_customers': len(unlinked),
         'unlinked_students': sum(1 for c in unlinked if _is_loyverse_student(c)),
         'unmatched_receipts': pending.count(),
+        # Staff and test cards spend points too and never resolve to a pupil;
+        # only the rest can be a student's lost purchase (the daily alarm).
+        'unmatched_receipts_student': pending.exclude(customer_id__in=LoyverseProfile.objects.filter(
+            kind__in=[LoyverseProfile.Kind.STAFF, LoyverseProfile.Kind.TEST],
+        ).values('loyverse_id')).count(),
         'unmatched_points': str(pending.aggregate(s=Sum('points'))['s'] or Decimal('0')),
     }
     OpsStatus.set('wallet_audit', audit)

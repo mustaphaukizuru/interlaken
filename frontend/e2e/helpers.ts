@@ -14,7 +14,7 @@ export const DEV_PARENT = { email: 'devparent@interlaken.test', password: 'DevPa
 /** Log in through the real UI + backend (email/password). */
 export async function login(page: Page, creds = DEV_ADMIN) {
   await page.goto('/login');
-  await page.getByPlaceholder('correo@interlaken.edu.mx').fill(creds.email);
+  await page.getByPlaceholder('correo@interlaken.com.mx').fill(creds.email);
   await page.getByPlaceholder('••••••••').fill(creds.password);
   await page.getByRole('button', { name: /ingresar/i }).click();
   // Wait until auth is established (redirected away from /login, refresh cookie

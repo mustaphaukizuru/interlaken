@@ -69,6 +69,16 @@ if command -v dig >/dev/null; then
   [[ -n "$resolved" ]] || echo "  WARNING: $PORTAL_DOMAIN does not resolve yet; the certificate will fail until it does."
 fi
 
+# Every hour in crontab.example is Mexico City time, and Ubuntu's cron ignores
+# the CRON_TZ line in it: cron reads the HOST clock. Until 2026-10-29 the box
+# ran on UTC and every job fired six hours early (the 07:05 "load these
+# top-ups" report went out at 01:05). Warn, never change it from here.
+host_tz="$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo unknown)"
+if [[ "$host_tz" != "America/Mexico_City" ]]; then
+  echo "  WARNING: the server clock is $host_tz, so every scheduled job runs at the wrong hour."
+  echo "           Fix once: sudo timedatectl set-timezone America/Mexico_City && sudo systemctl restart cron"
+fi
+
 # ── Rollback point ──────────────────────────────────────────────────────────
 # Tag the currently-running image before rebuilding, so a bad deploy has
 # somewhere to go back to. Without this the rebuild plus `image prune` destroys

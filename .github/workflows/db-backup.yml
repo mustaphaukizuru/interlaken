@@ -3,8 +3,17 @@ name: Database backup (Supabase Postgres)
 # OFF-SITE nightly backup of the managed Postgres, kept as a GitHub Actions
 # artifact (30-day retention). --clean --if-exists means the dump replays onto
 # a database that already has these tables, which is what a real restore is;
-# without it a restore stops on "schema public already exists". Restore with:
-#   gunzip -c interlaken-db-*.sql.gz | psql "<connection-string>"
+# without it a restore stops on "schema public already exists".
+#
+# ENCRYPTED, ALWAYS. This repository is public, and artifacts of a public
+# repository can be downloaded by any signed-in GitHub user, so the job encrypts
+# to deploy/backup-public-key.asc before anything leaves the runner, and refuses
+# to upload a file that is still a plain gzip. Never remove that step. The matching
+# private key is NOT in GitHub: it is kept by the school's administrator and in
+# /root/.interlaken-backup-PRIVATE-key.asc on the VPS. Restore with:
+#   gpg --import interlaken-backup-PRIVATE-key.asc
+#   gpg --decrypt interlaken-db-*.sql.gz.gpg > db.sql.gz
+#   deploy/restore-db.sh db.sql.gz            # drill; --into-live for real
 #
 # This is the second of two backups, and deliberately so. deploy/backup-db.sh
 # runs on the VPS and writes to that box; this one runs somewhere else entirely,
@@ -71,11 +80,32 @@ jobs:
           ls -lh "$out"
           # A dump that silently produced (near-)nothing is not a backup.
           test "$(stat -c%s "$out")" -gt 10240
-      - name: Upload backup artifact
+      - name: Fetch the backup public key
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: deploy/backup-public-key.asc
+          sparse-checkout-cone-mode: false
+          path: repo
+      - name: Encrypt (public key only; the private key never touches GitHub)
+        run: |
+          set -euo pipefail
+          for f in interlaken-db-*.sql.gz; do
+            gpg --batch --quiet --trust-model always \
+              --recipient-file repo/deploy/backup-public-key.asc \
+              --output "$f.gpg" --encrypt "$f"
+            rm -f "$f"
+            # Fail closed: an artifact that still reads as gzip is the clear dump.
+            if gunzip -t < "$f.gpg" 2>/dev/null; then
+              echo "::error::$f.gpg is not encrypted; refusing to upload"; exit 1
+            fi
+          done
+          ls -lh interlaken-db-*.sql.gz.gpg
+      - name: Upload backup artifact (encrypted)
         uses: actions/upload-artifact@v7
         with:
           name: interlaken-db-backup
-          path: interlaken-db-*.sql.gz
+          path: interlaken-db-*.sql.gz.gpg
+          if-no-files-found: error
           retention-days: 30
       # Backups failed for 5 days with nobody noticing — failures now open/refresh
       # a labeled issue so they surface outside the Actions tab.

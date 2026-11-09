@@ -8,8 +8,8 @@ the next hour, oldest first, with what staff need at the POS: student,
 Loyverse customer code, amount and folio. Each one marked VENCIDA is past its
 promised time: the family was told it would be applied by then.
 
-Delivered to every active admin as an in-app notification (always) and by
-email. Runs at 07:05 and hourly during the school day (deploy/crontab.example);
+Delivered to every active admin and to staff with the cafetería area, as an
+in-app notification (always) and by email. Runs at 07:05 and hourly during the school day (deploy/crontab.example);
 it only notifies when the list changed since the last notice, plus a
 reminder every few hours while something is overdue. ``--no-email`` prints.
 
@@ -110,18 +110,26 @@ class Command(BaseCommand):
             '«Por aplicar» → «Aplicar». Las marcadas VENCIDA ya pasaron de la hora prometida '
             'a la familia.'
         )
-        self._notify_admins(title, body)
-        from apps.payments import ops_alerts
-        sent = ops_alerts.email_admins(f'Interlaken: {title}', body)
+        from apps.portal.models import Notification
+        from apps.portal.services import notify, send_email
+
+        people = self._recipients()
+        for person in people:
+            notify(person, Notification.NotifType.CAFETERIA, title, body,
+                   email=False, fanout=False)
+        emails = [p.email for p in people if p.email]
+        sent = bool(emails) and send_email(f'Interlaken: {title}', body, emails)
         OpsStatus.set(STATE_KEY, {'fingerprint': fingerprint, 'alerted_at': now.isoformat()})
-        self.stdout.write(f'notified admins in-app; email {"sent" if sent else "NOT sent"}')
+        self.stdout.write(f'notified {len(people)} in-app; email {"sent" if sent else "NOT sent"}')
 
     @staticmethod
-    def _notify_admins(title: str, body: str) -> None:
+    def _recipients() -> list:
+        """Every active admin, and every active staff account whose puesto
+        includes the cafetería area: the cashier does the 07:30 load, and
+        until 2026-10-29 only admins heard about it."""
         from apps.accounts.models import User
-        from apps.portal.models import Notification
-        from apps.portal.services import notify
 
-        for admin in User.objects.filter(role=User.Role.ADMIN, is_active=True):
-            notify(admin, Notification.NotifType.CAFETERIA, title, body,
-                   email=False, fanout=False)
+        admins = list(User.objects.filter(role=User.Role.ADMIN, is_active=True))
+        cashiers = [u for u in User.objects.filter(role=User.Role.STAFF, is_active=True)
+                    if 'cafeteria' in (u.staff_areas or [])]
+        return admins + cashiers
