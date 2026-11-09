@@ -39,6 +39,22 @@ EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_activ
                     'birth_date', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
                     'blood_type', 'allergies', 'medical_notes')
 SENSITIVE = ('blood_type', 'allergies', 'medical_notes')
+
+
+def _student_payload(profile, user) -> dict:
+    """The file as the editor returns it, medical data masked like the read endpoint.
+
+    Admins see it; «Alumnos» staff never do (accounts.medical): before, the
+    editor's create/PATCH answers carried the real allergies to any staff.
+    """
+    from .medical import mask_medical, medical_access
+
+    data = StudentProfileSerializer(profile, context={'include_medical': True}).data
+    allowed, reason = medical_access(user, profile)
+    if not allowed:
+        mask_medical(data)
+        data['medical_masked'] = reason
+    return data
 EDITABLE_USER = ('first_name', 'last_name', 'email')
 
 
@@ -72,7 +88,13 @@ class StudentWriteSerializer(serializers.Serializer):
                 f.required = False
 
     def validate_student_id(self, value):
-        value = value.strip().upper()
+        # Spelled like every other matrícula input (importers, Loyverse,
+        # admissions): «CI09932» is stored as «09932», never as a second student.
+        from apps.core.matricula import normalize_matricula
+
+        value = normalize_matricula(value).upper()
+        if not value:
+            raise serializers.ValidationError('Escriba la matrícula.')
         qs = StudentProfile.objects.filter(student_id=value)
         current = self.context.get('profile')
         if current is not None:
@@ -113,7 +135,9 @@ def _snapshot(profile: StudentProfile) -> dict:
 def _existing_student(student_id) -> dict | None:
     """The record that already holds ``student_id``, archived ones included, so the
     form can offer to open or restore it instead of creating a second copy."""
-    sid = str(student_id or '').strip().upper()
+    from apps.core.matricula import normalize_matricula
+
+    sid = normalize_matricula(str(student_id or '')).upper()
     profile = (StudentProfile.objects.filter(student_id=sid).select_related('user').first()
                if sid else None)
     if profile is None:
@@ -160,7 +184,7 @@ class AdminStudentCreateView(APIView):
             # StudentProfile is auto-audited by core.audit signals; add the actor context.
             record('create', profile, {'via': 'portal', 'snapshot': _snapshot(profile)},
                    actor=request.user, context='portal: alta de alumno')
-        return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data,
+        return Response(_student_payload(profile, request.user),
                         status=status.HTTP_201_CREATED)
 
 
@@ -176,9 +200,17 @@ class AdminStudentUpdateView(APIView):
             return Response({'detail': 'Alumno no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         ser = StudentWriteSerializer(data=request.data, partial=True, context={'profile': profile})
         ser.is_valid(raise_exception=True)
-        d = ser.validated_data
+        d = dict(ser.validated_data)
+        # Medical fields: only someone who may read them may write them, and the
+        # mask itself is never stored. «Alumnos» staff see «●●●» in the form;
+        # saving it back used to overwrite the real allergies with the mask.
+        from .medical import MASK, medical_access
+        may_edit_medical = medical_access(request.user, profile)[0]
+        for f in SENSITIVE:
+            if f in d and (not may_edit_medical or d[f] == MASK):
+                d.pop(f)
         if not d:
-            return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)
+            return Response(_student_payload(profile, request.user))
 
         before = _snapshot(profile)
         old_loyverse_id = profile.loyverse_id or ''
@@ -217,7 +249,7 @@ class AdminStudentUpdateView(APIView):
             if changes:
                 record('update', profile, {'via': 'portal', **changes},
                        actor=request.user, context='portal: edición de alumno')
-        return Response(StudentProfileSerializer(profile, context={'include_medical': True}).data)
+        return Response(_student_payload(profile, request.user))
 
 
 # ── bulk actions (Data Ops C5) ─────────────────────────────
@@ -302,7 +334,8 @@ def _plan_restore(profile, payload):
 
 
 def _apply_restore(profile, payload, actor):
-    return {**restore_student(profile), 'via': 'portal-bulk'}
+    # payload.undo: the toast's «Deshacer» puts the previous status back.
+    return {**restore_student(profile, undo=bool(payload.get('undo'))), 'via': 'portal-bulk'}
 
 
 _plan_grade, _apply_grade = _field_action('grade', 'grado')

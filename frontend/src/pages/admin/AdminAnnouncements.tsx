@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, Copy, Eye, Megaphone, Pencil, Plus, Power, Send, Siren, Trash2 } from 'lucide-react';
@@ -67,6 +67,12 @@ export default function AdminAnnouncements() {
   const [alertForm, setAlertForm] = useState(EMPTY_ALERT);
   const [alertConfirm, setAlertConfirm] = useState(false);
   const [toActivate, setToActivate] = useState<Announcement | null>(null);
+  // «Publicar» that sends right away asks once more (portal, email and push to
+  // the whole audience cannot be taken back).
+  const [confirmSend, setConfirmSend] = useState(false);
+  // Focus lands on «Volver»: a stray Enter never sends to the whole audience.
+  const backFromSendRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (confirmSend) backFromSendRef.current?.focus(); }, [confirmSend]);
 
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
@@ -103,9 +109,17 @@ export default function AdminAnnouncements() {
     onSuccess: () => {
       void invalidate();
       toast.success(saveToast(editing, form));
+      setConfirmSend(false);
       setOpen(false);
     },
-    onError: () => toast.error('No se pudo guardar el comunicado.'),
+    onError: () => { setConfirmSend(false); toast.error('No se pudo guardar el comunicado.'); },
+  });
+  const sendsNow = sendsOnSave(editing, form);
+  const recipients = useQuery({
+    queryKey: ['announcement-recipient-count', form.audience],
+    queryFn: async () => (await portalApi.getAnnouncementRecipientCount(form.audience)).data,
+    staleTime: 60_000,
+    enabled: open && sendsNow,
   });
 
   const toggleActive = useMutation({
@@ -150,7 +164,7 @@ export default function AdminAnnouncements() {
     onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo enviar el aviso urgente.')),
   });
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY); setConfirmSend(false); setOpen(true); };
 
   // Command-palette deep link: /admin/comunicados?nuevo=1 opens the composer
   // (same modal, same validations) and consumes the param.
@@ -185,6 +199,7 @@ export default function AdminAnnouncements() {
       show_on_site: a.show_on_site ?? false, site_until: a.site_until ?? null, site_link: a.site_link ?? '',
       publish_at: a.publish_at ?? null, requires_ack: a.requires_ack ?? false, attachments: a.attachments ?? [],
     });
+    setConfirmSend(false);
     setOpen(true);
   };
   const openAlert = () => {
@@ -318,7 +333,7 @@ export default function AdminAnnouncements() {
       />
 
       {/* Composer */}
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Editar comunicado' : 'Nuevo comunicado'} maxWidth={520}>
+      <Modal open={open} onClose={() => { setOpen(false); setConfirmSend(false); }} title={editing ? 'Editar comunicado' : 'Nuevo comunicado'} maxWidth={520}>
         <div className="space-y-4">
           <Input label="Título" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Ej. Suspensión de clases" />
           <div>
@@ -366,12 +381,32 @@ export default function AdminAnnouncements() {
           {/* «Pedir Enterado» and attachments are not offered: no family channel
               delivers them since the portal comunicados page was retired. */}
           <Input label="Programar envío (opcional)" type="datetime-local" value={toLocalInput(form.publish_at)} onChange={(e) => setForm((f) => ({ ...f, publish_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} hint="Vacío = se envía al publicar." />
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!form.title.trim() || !form.body.trim()}>
-              {editing ? 'Guardar' : !form.is_active ? 'Guardar borrador' : isFuture(form.publish_at) ? 'Programar' : 'Publicar'}
-            </Button>
-          </div>
+          {confirmSend && sendsNow ? (
+            <div role="alertdialog" aria-labelledby="ann-send-title" aria-describedby="ann-send-desc"
+              className="space-y-3 rounded-xl border border-amber/40 bg-amber/10 p-3">
+              <p id="ann-send-title" className="text-sm font-semibold text-ink">¿Enviar ahora?</p>
+              <p id="ann-send-desc" className="text-sm text-muted">
+                «{form.title.trim()}» se enviará ahora a: {audienceMeta(form.audience).label.toLowerCase()}
+                {recipients.data ? ` (~${recipients.data.count} ${form.audience === 'staff' ? 'cuenta(s) del personal' : 'familia(s)'})` : ''}
+                , por notificación en el portal{form.push_enabled ? ', correo y push' : ' y correo'}. No se puede deshacer.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button ref={backFromSendRef} variant="secondary" onClick={() => setConfirmSend(false)} disabled={save.isPending}>Volver</Button>
+                <Button onClick={() => save.mutate()} loading={save.isPending}>Enviar ahora</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button
+                onClick={() => (sendsNow ? setConfirmSend(true) : save.mutate())}
+                loading={save.isPending}
+                disabled={!form.title.trim() || !form.body.trim()}
+              >
+                {editing ? 'Guardar' : !form.is_active ? 'Guardar borrador' : isFuture(form.publish_at) ? 'Programar' : 'Publicar'}
+              </Button>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -476,6 +511,12 @@ export default function AdminAnnouncements() {
       />
     </>
   );
+}
+
+/** True when saving the composer sends the comunicado right away (what the toast calls «publicado y enviado»). */
+function sendsOnSave(editing: Announcement | null, form: typeof EMPTY): boolean {
+  if (!form.is_active || isFuture(form.publish_at)) return false;
+  return !editing || (!editing.is_active && !editing.fanout_at);
 }
 
 function saveToast(editing: Announcement | null, form: typeof EMPTY): string {

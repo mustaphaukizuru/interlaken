@@ -7,6 +7,7 @@ vi.mock('@/services/api', () => ({
   portalApi: {
     getNotification: vi.fn(),
     markNotificationRead: vi.fn(async () => ({ data: {} })),
+    markAnnouncementsRead: vi.fn(async () => ({ data: { marked: 1 } })),
   },
 }));
 
@@ -75,6 +76,24 @@ describe('NotificationDetailPage', () => {
     renderPage();
     expect(await screen.findByText('Junta de padres')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Abrir el comunicado/ })).not.toBeInTheDocument();
+  });
+
+  it('counts the comunicado as read when its notification is opened, even if already marked read', async () => {
+    // The staff «Leídos» rate: the dashboard used to send this for every
+    // comunicado on each visit, without showing any of them.
+    getNotification.mockResolvedValue({
+      data: { ...notif, is_read: true, announcement: 12, announcement_title: 'Junta de padres' },
+    } as any);
+    renderPage();
+    await screen.findByText('Junta de padres');
+    await waitFor(() => expect(portalApi.markAnnouncementsRead).toHaveBeenCalledWith([12]));
+  });
+
+  it('sends no comunicado receipt for other notifications', async () => {
+    renderPage();
+    await screen.findByText('Saldo bajo');
+    await waitFor(() => expect(markRead).toHaveBeenCalled());
+    expect(portalApi.markAnnouncementsRead).not.toHaveBeenCalled();
   });
 
   it('surfaces an error state instead of a blank page', async () => {

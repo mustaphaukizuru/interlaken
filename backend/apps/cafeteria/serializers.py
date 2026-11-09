@@ -234,13 +234,22 @@ class CafeteriaTransactionSerializer(serializers.ModelSerializer):
     # the row. ``source='student.id'`` fetched the whole related object once per
     # row (N+1 on every ledger page).
     student_id = serializers.IntegerField(read_only=True)
+    # An adjustment's amount is stored absolute; its sign lives on the
+    # BalanceAdjustment audit row. The family history annotates it (one
+    # subquery) so a debit no longer reads as a «+» credit.
+    adjustment_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = CafeteriaTransaction
         fields = [
             'id', 'student_id', 'transaction_type', 'amount', 'description',
             'items', 'balance_after', 'date', 'loyverse_receipt_id', 'applied',
+            'adjustment_amount',
         ]
+
+    def get_adjustment_amount(self, obj):
+        value = getattr(obj, 'adjustment_amount', None)
+        return None if value is None else f'{value:.2f}'
 
 
 class TopUpRequestSerializer(serializers.ModelSerializer):

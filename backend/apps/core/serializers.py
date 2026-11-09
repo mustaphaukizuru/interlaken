@@ -13,6 +13,12 @@ class ContactMessageSerializer(serializers.ModelSerializer):
 class AuditLogSerializer(serializers.ModelSerializer):
     """Read-only row for the admin audit viewer (append-only log)."""
     action_display = serializers.CharField(source='get_action_display', read_only=True)
+    # Sensitive values masked, also on rows stored before they were registered.
+    changes = serializers.SerializerMethodField()
+
+    def get_changes(self, obj):
+        from .audit import redacted_changes
+        return redacted_changes(obj)
 
     class Meta:
         model = AuditLog

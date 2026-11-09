@@ -515,6 +515,21 @@ class TestLastLogin:
         assert resp.status_code == 302 and "/login?login=ok" in resp["Location"]
         user.refresh_from_db()
         assert user.last_login is not None
+        # The redirect flow is in the sign-in history too (it never was).
+        from apps.accounts.security import LoginEvent
+        assert LoginEvent.objects.filter(user=user, method="google", success=True).exists()
+
+    @patch("apps.accounts.views.requests.get")
+    @patch("apps.accounts.views.requests.post")
+    def test_google_callback_refusals_are_in_the_history(self, mock_post, mock_get, api_client):
+        from apps.accounts.security import LoginEvent
+        mock_post.return_value = _FakeResponse(200, {"access_token": "ya29.fake"})
+        mock_get.return_value = _FakeResponse(200, _VERIFIED_USERINFO)
+        state = _armed_state(api_client)
+        resp = api_client.get(reverse("google-callback"), {"code": "abc", "state": state})
+        assert "error=not_invited" in resp["Location"]
+        assert LoginEvent.objects.filter(email=_VERIFIED_USERINFO["email"], method="google", success=False,
+                                         reason="not_invited").exists()
 
     def test_refresh_is_not_a_sign_in(self, api_client):
         _, csrf, _ = _login(api_client)

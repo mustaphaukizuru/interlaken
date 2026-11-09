@@ -229,8 +229,13 @@ class PreRegistrationInviteView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
+        from .services import AlreadyApplied
+
         pre = get_object_or_404(PreRegistration, pk=pk)
-        out = invite_preregistration(pre, request.user)
+        try:
+            out = invite_preregistration(pre, request.user)
+        except AlreadyApplied as exc:
+            return Response({'detail': f'La familia {exc}.'}, status=status.HTTP_409_CONFLICT)
         reg = out['registration']
         return Response({
             'registration_id': reg.id,
@@ -330,8 +335,12 @@ class MyRegistrationsView(APIView):
         return Response(RegistrationParentStatusSerializer(regs, many=True).data)
 
 
-class RegistrationStatusView(generics.UpdateAPIView):
-    """PATCH /api/v1/admissions/register/<pk>/status/ — admin review action.
+class RegistrationStatusView(generics.RetrieveUpdateAPIView):
+    """GET/PATCH /api/v1/admissions/register/<pk>/status/: admin review action.
+
+    GET returns ``{id, status, admin_notes}``: the review modal seeds «Notas
+    internas» from it (the applicant-facing detail never carries them), so
+    saving a decision no longer blanks the previous reviewer's notes.
 
     Moves a registration through review under the transition table shared
     with the bulk actions (``apps.core.transitions``): a reverse move needs
@@ -343,7 +352,7 @@ class RegistrationStatusView(generics.UpdateAPIView):
     queryset = Registration.objects.all()
     serializer_class = RegistrationStatusSerializer
     permission_classes = [IsAdmin]
-    http_method_names = ['patch']
+    http_method_names = ['get', 'patch']
 
     def perform_update(self, serializer):
         reg = serializer.instance

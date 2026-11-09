@@ -23,6 +23,7 @@ close them here:
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import timedelta
@@ -35,6 +36,8 @@ from django.utils import timezone
 
 from .gateways.base import PaymentEvent
 from .models import BanorteCheckout, Payment
+
+logger = logging.getLogger(__name__)
 
 # Soft-fail stages that can hide a real charge: the window closed or was
 # replaced without Banorte's answer, or the issuer did not answer in time.
@@ -119,10 +122,14 @@ def needs_review_q(now=None) -> Q:
 
 
 def parse_amount(value) -> Decimal | None:
+    """The amount staff typed ("$1,234.50"), or ``None`` when it is not a finite
+    number: ``Decimal`` also parses "NaN"/"sNaN"/"Infinity", and comparing an
+    sNaN raises (a 500 on «Conciliar» and «Verificar»)."""
     try:
-        return Decimal(str(value).strip().replace("$", "").replace(",", ""))
+        amount = Decimal(str(value).strip().replace("$", "").replace(",", ""))
     except (InvalidOperation, AttributeError):
         return None
+    return amount if amount.is_finite() else None
 
 
 def _locked(payment_id):
@@ -293,6 +300,15 @@ def reconcile_not_found(payment_id, *, note: str, actor) -> ReconcileResult:
                 actor=actor,
                 context="payments.banorte.reconcile",
             )
+    if previous["stage"] == "bank_timeout":
+        # That family was told «el banco no confirmó: no vuelva a pagar, le
+        # avisaremos» (``notify_topup_result``): tell them it was not charged.
+        try:
+            from apps.cafeteria.services import notify_topup_not_charged
+
+            notify_topup_not_charged(payment)
+        except Exception:  # a notice never undoes the reconciliation
+            logger.exception("not-charged notice failed for payment %s", payment.pk)
     return ReconcileResult(payment, "closed")
 
 

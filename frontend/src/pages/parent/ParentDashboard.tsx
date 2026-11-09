@@ -15,7 +15,6 @@ import { NovedadesPanel } from '@/components/portal/NovedadesPanel';
 import { useAuthStore } from '@/store/authStore';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { portalApi } from '@/services/api';
-import { useAnnouncementsRead } from '@/hooks/useAnnouncementsRead';
 import { PushOptIn } from '@/components/portal/PushOptIn';
 import { InstallHint } from '@/components/portal/InstallHint';
 import type { DashboardData } from '@/types';
@@ -63,12 +62,14 @@ export default function ParentDashboard() {
     ...LIVE,
   });
 
-  useAnnouncementsRead(data?.announcements);
   const nowMs = useNowMs();
 
   const children = data?.children ?? [];
   const needsFamilyLink = Boolean(data?.needs_family_link) || (!isLoading && !isError && children.length === 0);
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
+  // A stored child that is not one of this family's (another account on this
+  // phone, an unlinked sibling) must not empty the cards below.
+  const activeChildId = children.some((c) => c.id === childId) ? childId : null;
   const balances = data?.cafeteria_balances ?? [];
   const totalBalance = balances.reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
   const totalPending = balances.reduce((s, b) => s + parseFloat(b.pending_topups || '0'), 0);
@@ -170,14 +171,14 @@ export default function ParentDashboard() {
       {balances.length > 1 && (
         <ul className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Saldo por alumno">
           {balances.map((b) => (
-            <li key={b.student_name} className={`rounded-2xl border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
+            <li key={b.student ?? b.student_name} className={`rounded-2xl border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
               <p className="truncate text-sm font-semibold text-ink">{b.student_name}</p>
               <p className={`mt-1 font-head text-2xl font-extrabold ${b.low ? 'text-amber' : 'text-ink'}`}>${parseFloat(b.balance).toFixed(2)}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {[100, 200].map((amt) => (
-                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}`} className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-purple transition-colors hover:border-purple/40 active:scale-[0.98]">+${amt}</Link>
+                  <Link key={amt} to={`/portal/cafeteria?recarga=${amt}${b.student ? `&hijo=${b.student}` : ''}`} aria-label={`Recargar $${amt} a ${b.student_name}`} className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-purple transition-colors hover:border-purple/40 active:scale-[0.98]">+${amt}</Link>
                 ))}
-                <Link to="/portal/cafeteria" className="inline-flex min-h-[44px] items-center rounded-full px-3 text-sm font-semibold text-muted hover:text-ink">Ver más →</Link>
+                <Link to={b.student ? `/portal/cafeteria?hijo=${b.student}` : '/portal/cafeteria'} className="inline-flex min-h-[44px] items-center rounded-full px-3 text-sm font-semibold text-muted hover:text-ink">Ver más →</Link>
               </div>
             </li>
           ))}
@@ -245,7 +246,7 @@ export default function ParentDashboard() {
               <CafeteriaTrendCard />
             </Suspense>
             <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
-              <CafeteriaCategoriesCard student={childId ?? 'all'} />
+              <CafeteriaCategoriesCard student={activeChildId ?? 'all'} />
             </Suspense>
           </div>
         </Reveal>

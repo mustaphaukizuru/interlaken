@@ -57,6 +57,15 @@ export default function NotificationDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unread, notifId]);
 
+  // Opening a comunicado's notification is reading the comunicado: the read
+  // receipt behind the staff «Leídos» rate (idempotent server-side, so also
+  // after «Marcar todas como leídas»). The dashboard used to send it for every
+  // comunicado on each visit without showing any of them.
+  const announcementId = data?.announcement ?? null;
+  useEffect(() => {
+    if (announcementId != null) void portalApi.markAnnouncementsRead([announcementId]).catch(() => {});
+  }, [announcementId]);
+
   const meta = data ? (NOTIF_META[data.notif_type] ?? NOTIF_META.info) : NOTIF_META.info;
   const Icon = meta.icon;
   const link = data ? related(data) : null;

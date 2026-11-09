@@ -314,6 +314,43 @@ def _purchase_refunded_locally(receipt_number: str) -> bool:
         loyverse_receipt_id__in=[f'refund-tx-{pk}' for pk in ids]).exists()
 
 
+# Loyverse's clock and ours may disagree by this much.
+MIRRORED_REFUND_SKEW = timedelta(minutes=2)
+
+
+def _refund_already_mirrored(student, amount, since) -> bool:
+    """Did the POS mirror already credit this POS refund as a «Recarga en caja»?
+
+    A refund on the POS returns the points to the Loyverse customer at once.
+    Until its REFUND receipt reaches the ledger, every mirror pass (the cron,
+    or a ``customers.update`` webhook processed before the ``receipts.update``
+    one) sees those points as a positive gap and credits them as a cash
+    recarga. So a ``pos-topup-`` credit of exactly ``amount``, written for
+    ``student`` at or after the refund's Loyverse time (``since``, less a
+    clock skew) and not reversed since, already holds this refund: crediting
+    the receipt as well would pay the family twice.
+
+    Fail-safe by construction: a wrong match only leaves the wallet BELOW
+    Loyverse, which the next mirror pass credits back. It can never mint money.
+    """
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaTransaction
+
+    if since is None or not amount or amount <= 0:
+        return False
+    if timezone.is_naive(since):
+        since = timezone.make_aware(since)
+    reversed_ids = BalanceAdjustment.objects.filter(
+        student=student, source_transaction__isnull=False).values('source_transaction_id')
+    return (CafeteriaTransaction.objects
+            .filter(student=student,
+                    transaction_type=CafeteriaTransaction.TxType.TOPUP,
+                    loyverse_receipt_id__startswith=f'pos-topup-{student.id}-',
+                    amount=amount,
+                    recorded_at__gte=since - MIRRORED_REFUND_SKEW)
+            .exclude(pk__in=reversed_ids)
+            .exists())
+
+
 def _record_receipt(student, receipt: dict, *, apply=None):
     """Idempotently record one receipt against ``student``.
 
@@ -338,6 +375,10 @@ def _record_receipt(student, receipt: dict, *, apply=None):
     amount, items, summary, is_refund, date = _parse_receipt(receipt)
     tx_type = (CafeteriaTransaction.TxType.REFUND if is_refund
                else CafeteriaTransaction.TxType.PURCHASE)
+    # When Loyverse's SERVER took the receipt (and moved the points): its
+    # created_at when present, else the tablet's sale time.
+    raw_ingested = receipt.get('created_at')
+    ingested = (parse_datetime(raw_ingested) if raw_ingested else None) or date
 
     with transaction.atomic():
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
@@ -347,8 +388,6 @@ def _record_receipt(student, receipt: dict, *, apply=None):
             # server's created_at when present, not the tablet's sale time
             # (a tablet syncing after a day offline ingests old-dated sales
             # the seed could not have known about; those must still debit).
-            raw_ingested = receipt.get('created_at')
-            ingested = (parse_datetime(raw_ingested) if raw_ingested else None) or date
             apply = not (cb.seeded_at is not None and ingested is not None
                          and ingested <= cb.seeded_at)
         refund_of = str(receipt.get('refund_for') or '').strip() if is_refund else ''
@@ -357,6 +396,12 @@ def _record_receipt(student, receipt: dict, *, apply=None):
             # local-only credit the POS never saw); the cashier's POS refund is
             # what finally returns the points in Loyverse. Crediting it here too
             # would pay the family twice, so it is kept as history only.
+            apply = False
+        if apply and is_refund and _refund_already_mirrored(student, amount, ingested):
+            # The POS mirror read the refunded points before this receipt
+            # arrived and already credited them as a cash recarga.
+            logger.info('POS refund %s ($%s) for %s was already credited by the POS mirror; '
+                        'kept as history.', receipt_id, amount, student)
             apply = False
         tx, created = CafeteriaTransaction.objects.get_or_create(
             loyverse_receipt_id=receipt_id,
@@ -474,8 +519,11 @@ def _maybe_low_balance_alert(cb, now):
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
-        notify(parent, Notification.NotifType.CAFETERIA, title, message,
+        # WARNING, not CAFETERIA: the Avisos tab promises «saldo muy bajo …
+        # siempre se envían», and only urgent alerts bypass a muted category.
+        notify(parent, Notification.NotifType.WARNING, title, message,
                whatsapp=use_wa, fanout=False, tone='warning',
+               url='/portal/cafeteria',
                highlight=('Saldo actual', money(cb.balance)),
                details=[('Alumno', student.user.full_name),
                         ('Saldo mínimo configurado', money(cb.low_balance_threshold))],
@@ -1200,6 +1248,17 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
         amount = Decimal(str(payment.amount))
         local = cb.balance or Decimal('0')
         seed_opening = cb.last_synced is None and points is not None
+        if seed_opening and (paid_topups_pending().filter(student=student)
+                             .exclude(pk=topup.pk).exists()):
+            # The opening balance would be Loyverse minus THIS load; a second
+            # paid top-up already typed in would be swallowed by it (then never
+            # applied, and refunding it would leave the money in the wallet).
+            raise TopUpApplyError(
+                'Este alumno aún no tiene saldo inicial en la app y tiene otra recarga con '
+                'tarjeta por aplicar, así que no se puede saber cuál ya está en Loyverse. Use '
+                '«Aplicar sin verificar» con un motivo para cada recarga que ya cargó en '
+                'Loyverse y después márquelas como cargadas en el POS: la sincronización '
+                'completará el saldo inicial.', code='seed_ambiguous', status=409)
         if not force:
             if points is None:
                 raise TopUpApplyError(
@@ -1238,7 +1297,10 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
                actor=actor, context='cafeteria.topup.apply_paid')
         balance = cb.balance
 
-    notify_topup_applied(topup, balance)
+    # After COMMIT: right away for «Aplicar» (no transaction open), but the bulk
+    # action runs inside its chunk's transaction; a family must never be told
+    # "ya está disponible" about a credit that a later rollback undid.
+    transaction.on_commit(lambda: notify_topup_applied(topup, balance), robust=True)
     logger.info('Paid top-up #%s applied by %s (%s): $%s to %s.',
                 topup.pk, actor, via, amount, student)
     return tx, balance
@@ -1438,6 +1500,22 @@ def notify_topup_result(payment, *, success: bool) -> int:
         )
         tone, highlight = 'success', ('Monto pagado', format_amount(payment.amount))
         details.append(('Referencia', str(payment.gateway_tx_id or payment.id)))
+    elif payment.is_soft_failed():
+        # The bank did not confirm (Payworks T, "sin respuesta del banco"): the
+        # card may have been charged, and staff look it up in MultiCobros. "No
+        # charge, try again" invited a second payment for the same recarga.
+        title = 'Pago de recarga sin confirmar'
+        message = (
+            f'El banco no confirmó el pago de {format_amount(payment.amount)} para la cafetería '
+            f'de {name}. No vuelva a pagar: el colegio revisará la operación con Banorte y le '
+            f'avisará. Si el cargo se realizó, la recarga se registrará sin que usted tenga '
+            f'que hacer nada. Folio: {payment.id}.'
+        )
+        tone, highlight = 'warning', ('Monto', format_amount(payment.amount))
+        details += [('Estado', 'Pendiente de confirmar con el banco'), ('Folio', str(payment.id))]
+        intro = (f'El banco no confirmó su pago para la cafetería de '
+                 f'{student.user.first_name or name}. No vuelva a pagar: el colegio revisará '
+                 f'la operación con Banorte y le avisará.')
     else:
         title = 'Recarga de cafetería no completada'
         message = (
@@ -1454,6 +1532,38 @@ def notify_topup_result(payment, *, success: bool) -> int:
         notify(parent, Notification.NotifType.PAYMENT, title, message, fanout=False,
                details=details, highlight=highlight, tone=tone, cta_label=cta_label,
                url='/portal/cafeteria' if cta_label else None, intro=intro)
+        notified += 1
+    return notified
+
+
+def notify_topup_not_charged(payment) -> int:
+    """Close the loop of «Pago de recarga sin confirmar»: staff looked the
+    operation up in MultiCobros and found no charge, so the family may pay
+    again. Best-effort; call after the transaction committed. Returns the
+    number of guardians notified."""
+    from apps.accounts.family import family_notify_recipients
+    from apps.cafeteria.schedule import format_amount
+    from apps.portal.models import Notification
+    from apps.portal.services import notify
+
+    topup = getattr(payment, 'related_topup', None)
+    if topup is None:
+        return 0
+    student = topup.student
+    name = student.user.full_name
+    amount = format_amount(payment.amount)
+    message = (f'Revisamos con Banorte el pago de {amount} para la cafetería de {name} '
+               f'(folio {payment.id}): no se realizó ningún cargo a su tarjeta. Puede volver '
+               f'a intentarlo desde el portal.')
+    notified = 0
+    for parent in family_notify_recipients(student):
+        notify(parent, Notification.NotifType.PAYMENT, 'Pago de recarga no realizado', message,
+               fanout=False, tone='neutral', cta_label='Intentar de nuevo',
+               url='/portal/cafeteria',
+               details=[('Alumno', name), ('Monto', amount),
+                        ('Cargo', 'No se realizó ningún cargo'), ('Folio', str(payment.id))],
+               intro=(f'Revisamos con Banorte su pago para la cafetería de '
+                      f'{student.user.first_name or name}: no se realizó ningún cargo.'))
         notified += 1
     return notified
 
@@ -1936,6 +2046,40 @@ def _net_effect(tx) -> Decimal:
     return Decimal(str(adj.amount)) if adj else amount
 
 
+def with_signed_amounts(qs):
+    """Annotate ``adjustment_amount``: the signed amount of a movement's audit row.
+
+    Ledger amounts are stored absolute. A purchase debits and a top-up credits,
+    but a refund or an adjustment can go either way (reversing a top-up debits,
+    an adjustment is a credit or a debit); its ``BalanceAdjustment`` keeps the
+    sign. One subquery, so a list or a statement reads it without N+1.
+    """
+    from django.db.models import OuterRef, Subquery
+
+    from apps.cafeteria.models import BalanceAdjustment
+
+    return qs.annotate(adjustment_amount=Subquery(
+        BalanceAdjustment.objects.filter(transaction=OuterRef('pk')).order_by('pk').values('amount')[:1]))
+
+
+def signed_amount(tx) -> Decimal:
+    """The movement's effect on the balance (needs ``with_signed_amounts``).
+
+    Purchases debit, top-ups credit; refunds and adjustments take the sign of
+    their audit row. A POS refund receipt (no audit row) gives a purchase back.
+    """
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    amount = Decimal(str(tx.amount))
+    if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
+        return -amount
+    if tx.transaction_type in (CafeteriaTransaction.TxType.REFUND, CafeteriaTransaction.TxType.ADJUSTMENT):
+        audited = getattr(tx, 'adjustment_amount', None)
+        if audited is not None:
+            return Decimal(str(audited))
+    return amount
+
+
 # A POS refund receipt this long after the sale is not taken as its reversal
 # by the legacy (pre ``refund_of``) same-amount match below.
 POS_REFUND_MATCH_DAYS = 30
@@ -2192,9 +2336,12 @@ def _record_wallet_audit(customers, result, now) -> dict:
         'at': now.isoformat(),
         'compared': (result['credited'] + result['in_sync'] + result['below']
                      + result['deferred'] + result['skipped_pending']
-                     + result.get('applied_paid_students', 0) + result.get('held_paid', 0)),
+                     + result.get('applied_paid_students', 0) + result.get('held_paid', 0)
+                     + result.get('held_unverified', 0)),
         'applied_paid': result.get('applied_paid', 0),
         'held_paid': result.get('held_paid', 0),
+        # Loaded into the POS, waiting for «Verificar en MultiCobros».
+        'held_unverified': result.get('held_unverified', 0),
         'in_sync': result['in_sync'],
         'credited': result['credited'],
         'drifting': result['below'],
@@ -2285,7 +2432,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     wallets = {cb.student_id: cb for cb in CafeteriaBalance.objects.filter(
         student__in=students).only('student_id', 'balance', 'last_synced')}
     credited = skipped_pending = in_sync = below = unseeded = deferred = 0
-    applied_paid = held_paid = applied_paid_students = 0
+    applied_paid = held_paid = held_unverified = applied_paid_students = 0
     total = drift_total = applied_paid_total = Decimal('0')
     stamp: list[int] = []
     applied_notices: list = []
@@ -2348,9 +2495,14 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                 # Staff typed paid online top-ups into the POS: apply exactly
                 # those, linked to their payments. A gap that matches no
                 # combination of them is held for staff (never credited as a
-                # cash recarga: it may be one of them loaded with a typo).
+                # cash recarga: it may be one of them loaded with a typo), and
+                # so is one only a real approval nobody has matched in
+                # MultiCobros yet explains: it waits for «Verificar».
                 applied = _apply_matched_paid_locked(student, cb, paid, delta, now)
                 stamp.append(student.id)
+                if applied is WAITS_VERIFICATION:
+                    held_unverified += 1
+                    continue
                 if applied is None:
                     held_paid += 1
                     continue
@@ -2389,7 +2541,12 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                    f'{student.user.first_name or student.user.full_name}.'))
 
     if stamp:
-        CafeteriaBalance.objects.filter(student_id__in=stamp).update(last_synced=now)
+        # Only wallets already seeded: ``last_synced`` is also the "seeded" flag
+        # (``sync_student_balance``), and a never-seeded or reset wallet
+        # (``reset_wallet_seed``) waiting in the POS queues must keep waiting for
+        # its opening balance instead of being frozen at whatever it holds.
+        (CafeteriaBalance.objects.filter(student_id__in=stamp, last_synced__isnull=False)
+         .update(last_synced=now))
 
     if notify:
         for topup, balance in applied_notices:
@@ -2400,7 +2557,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
               'skipped_pending': skipped_pending, 'unseeded': unseeded,
               'applied_paid': applied_paid, 'applied_paid_total': applied_paid_total,
               'applied_paid_students': applied_paid_students,
-              'held_paid': held_paid}
+              'held_paid': held_paid, 'held_unverified': held_unverified}
     if full_roster:
         result['audit'] = _record_wallet_audit(customers, result, now)
 
@@ -2410,6 +2567,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         f'{deferred} deferred (ledger still settling), '
         f'{applied_paid} paid online top-up(s) applied (${applied_paid_total}), '
         f'{held_paid} held (gap matches no paid top-up), '
+        f'{held_unverified} held until verified in MultiCobros, '
         f'{skipped_pending} pending POS load/unload, {unseeded} unseeded.')
     return result
 
@@ -2457,16 +2615,34 @@ def _match_paid_topups(entries, delta):
     return None
 
 
+# ``_apply_matched_paid_locked`` result: the gap is explained only with a real
+# card approval that staff have not matched in MultiCobros yet.
+WAITS_VERIFICATION = object()
+
+
 def _apply_matched_paid_locked(student, cb, entries, delta, now):
     """Apply the paid top-ups that explain a positive Loyverse gap. The caller
     holds the locks (those top-up rows, then ``cb``) and passed only top-ups
-    still PAID. Returns the applied top-ups, or ``None`` when no combination
-    of them adds up to exactly ``delta``."""
+    still PAID.
+
+    Only top-ups whose payment needs no MultiCobros check take part: a real
+    (PRD) approval reached us through the parent's browser in a result
+    Banorte does not sign, so, exactly as for «Aplicar» and the bulk action,
+    the wallet is not credited until staff verify it. Returns the applied
+    top-ups; ``WAITS_VERIFICATION`` when the gap is explained only with an
+    unverified approval (it waits for «Verificar en MultiCobros», never
+    credited as a cash recarga meanwhile); ``None`` when no combination of
+    the paid top-ups adds up to exactly ``delta``."""
     from apps.cafeteria.models import TopUpRequest
     from apps.core.audit import record
 
-    match = _match_paid_topups(entries, delta)
+    ready = [(t, p) for t, p in entries if not p.needs_bank_verification()]
+    match = _match_paid_topups(ready, delta)
     if match is None:
+        if len(ready) < len(entries) and _match_paid_topups(entries, delta) is not None:
+            logger.warning('POS gap of $%s for %s is a paid online top-up not yet verified in '
+                           'MultiCobros; held until staff verify it.', delta, student)
+            return WAITS_VERIFICATION
         logger.warning('POS gap of $%s for %s matches no paid online top-up; held for staff.',
                        delta, student)
         return None

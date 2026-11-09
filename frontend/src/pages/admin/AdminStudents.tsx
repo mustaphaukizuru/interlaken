@@ -29,7 +29,7 @@ import {
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { GRADES, NIVELES } from '@/lib/grades';
 import { formatMXN } from '@/lib/format';
-import { isAdmin } from '@/lib/areas';
+import { canOpen, isAdmin } from '@/lib/areas';
 import { useAuthStore } from '@/store/authStore';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
 import AdminStudentDetail from './AdminStudentDetail';
@@ -106,7 +106,10 @@ export default function AdminStudents() {
   const sort = parseSort(get('orden'));
   const estado = get('estado');
   const vinculado = get('vinculado');
-  const canDelete = isAdmin(useAuthStore((s) => s.user));
+  const me = useAuthStore((s) => s.user);
+  const canDelete = isAdmin(me);
+  // Secretaría without the cafetería area was bounced from that link silently.
+  const canCafeteria = canOpen(me, '/admin/cafeteria');
   const filters: Omit<StudentsListParams, 'page'> = {
     q: get('q') || undefined,
     status: estado === ALL_STATUSES || estado === ARCHIVED ? undefined : estado || 'active',
@@ -296,8 +299,9 @@ export default function AdminStudents() {
             className="font-semibold text-purple underline-offset-2 hover:underline"
             onClick={() => {
               toast.dismiss(t.id);
-              void bulk.mutateAsync({ action: 'restore', ids, all_matching: false, payload: {}, dry_run: false })
-                .then(() => toast.success('Listo: volvieron a la lista.'))
+              // undo: each student gets back the status they had before (not «Baja definitiva»).
+              void bulk.mutateAsync({ action: 'restore', ids, all_matching: false, payload: { undo: true }, dry_run: false })
+                .then(() => toast.success('Listo: volvieron a la lista como estaban.'))
                 .catch(() => toast.error('No se pudo deshacer. Restáurelos desde Archivados.'));
             }}
           >
@@ -427,9 +431,11 @@ export default function AdminStudents() {
                 <button type="button" onClick={() => setEditing(s)} className={ROW_ACTION} title="Editar" aria-label={`Editar a ${s.user.full_name}`}>
                   <RowActionLabel icon={Pencil} label="Editar" />
                 </button>
-                <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} title="Cafetería" aria-label={`Cafetería de ${s.user.full_name}`}>
-                  <RowActionLabel icon={Wallet} label="Cafetería" />
-                </Link>
+                {canCafeteria && (
+                  <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} title="Cafetería" aria-label={`Cafetería de ${s.user.full_name}`}>
+                    <RowActionLabel icon={Wallet} label="Cafetería" />
+                  </Link>
+                )}
                 {isLg ? (
                   <RowActionsMenu label={`Más acciones para ${s.user.full_name}`} items={lifecycleItems(s)} />
                 ) : lifecycleItems(s).map((it) => {

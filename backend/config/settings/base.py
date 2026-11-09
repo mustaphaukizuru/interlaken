@@ -213,6 +213,12 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    # JSON bodies must be objects: a top-level array was a 500 (request.data.get).
+    'DEFAULT_PARSER_CLASSES': [
+        'apps.core.parsers.ObjectJSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     # Keeps DRF's {detail} / field-dict shapes, converts Django ValidationError
     # to a 400 and folds any stray {'error': ...} body into {'detail'}.
@@ -337,6 +343,10 @@ EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@interlaken.edu.mx')
+# Seconds before an SMTP connect/read gives up. Without it a hung mail server
+# blocks the caller for good: a publish request inside a 60 s gunicorn worker,
+# or the dispatcher holding a notification's row lock.
+EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=10)
 
 # ── WEB PUSH (VAPID) ──────────────────────────────────────
 # Inert until keys are set. Generate once (see apps/portal/push.py docstring);
@@ -344,6 +354,8 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@interlaken.edu.m
 VAPID_PUBLIC_KEY = env('VAPID_PUBLIC_KEY', default='')
 VAPID_PRIVATE_KEY = env('VAPID_PRIVATE_KEY', default='')
 VAPID_ADMIN_EMAIL = env('VAPID_ADMIN_EMAIL', default='info@interlaken.com.mx')
+# Seconds per push-service request (same reason as EMAIL_TIMEOUT).
+WEBPUSH_TIMEOUT = env.int('WEBPUSH_TIMEOUT', default=5)
 
 # ── SCHOOL MAILBOXES ──────────────────────────────────────
 # interlaken.edu.mx has NO MX records: it can send (noreply@) but never receive.

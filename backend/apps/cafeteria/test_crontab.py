@@ -119,6 +119,20 @@ def test_the_two_nightly_jobs_sit_off_the_five_minute_grid():
     assert by_cmd['purchases7'][:2] == ['42', '5']
 
 
+
+def test_notifications_are_dispatched_every_five_minutes_on_their_own_lock():
+    """Launch fix (2026-11-08): the job that emails pending comunicados ran once
+    a day at 06:15, so a comunicado published at 10:00 reached most families
+    the next morning. It runs every 5 minutes now, on a lock nothing else uses
+    (a slow SMTP run must not hold up the cafeteria sync, nor stack runs)."""
+    entries = parse_crontab(CRONTAB.read_text(encoding='utf-8'))
+    dispatch = [e for e in entries if 'dispatch_notifications' in e['command']]
+    assert len(dispatch) == 1, 'exactly one dispatch_notifications job'
+    (job,) = dispatch
+    assert job['fields'] == ['*/5', '*', '*', '*', '*']
+    assert job['flock_flag'] == '-n' and job['lock'] == '/tmp/interlaken-dispatch.lock'
+    assert [e['lock'] for e in entries].count(job['lock']) == 1
+
 def test_the_detector_would_have_caught_the_old_crontab():
     """Regression guard for the guard: the pre-fix schedule must be rejected."""
     old = (

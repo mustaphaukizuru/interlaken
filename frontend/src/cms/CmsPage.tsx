@@ -246,7 +246,17 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
     staleTime: 60_000,
   });
   if (isLoading) return <div className="flex min-h-[50vh] items-center justify-center"><LoadingSpinner /></div>;
-  if (isError || !data) return null;
+  // An unknown /p/<slug> says so (a blank page looked broken); kept inline, this
+  // module ships with the home page and the full 404 page would weigh on it.
+  if (isError || !data) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center px-5 text-center">
+        <h1 className="font-head text-fluid-2xl font-bold text-ink">Página no encontrada</h1>
+        <p className="mt-2 text-muted">La página que busca no existe o ya no está publicada.</p>
+        <Link to="/" className="btn-outline mt-6 min-h-[44px]">Ir al inicio</Link>
+      </div>
+    );
+  }
   return (
     <div>
       <Seo title={data.seo?.title || data.title} description={data.seo?.description || ''} />

@@ -24,6 +24,7 @@ from apps.payments.models import BanorteCheckout, Payment
 from apps.payments.multicobros import needs_review_q, review_reason
 from apps.payments.services import fail_checkout_if_still_open
 from apps.payments.test_banorte import _bank_answer, _family, _report, _start
+from apps.portal.models import Notification
 
 # The Banorte fixtures (fake configuration, certificate, an opened checkout).
 banorte = tb.banorte
@@ -127,6 +128,10 @@ class TestReconcileApproved:
         "extra,code",
         [
             ({"amount": "150.00"}, "amount_mismatch"),
+            # Decimal parses these; comparing an sNaN used to raise (a 500).
+            ({"amount": "sNaN"}, "amount_mismatch"),
+            ({"amount": "NaN"}, "amount_mismatch"),
+            ({"amount": "Infinity"}, "amount_mismatch"),
             ({"referencia": "ABC"}, "invalid_reference"),
             ({"codigo_aut": ""}, "invalid_auth_code"),
         ],
@@ -185,10 +190,29 @@ class TestReconcileNotFound:
 
         checkout.refresh_from_db()
         assert checkout.key_material
+        # An expired attempt was never announced to the family: nothing to close.
+        assert not Notification.objects.filter(user=payment.user).exists()
         api_client.force_authenticate(user=payment.user)
         _report(api_client, payment.pk, "success", _bank_answer(checkout))
         assert Payment.objects.get(pk=payment.pk).status == Payment.Status.SUCCESS
         assert _balance(student) == Decimal("200.00")
+
+    def test_a_bank_timeout_family_is_told_when_nothing_was_charged(self, api_client, banorte):
+        checkout = _open(api_client, banorte)
+        parent = checkout.payment.user
+        _report(api_client, checkout.payment_id, "success",
+                _bank_answer(checkout, resultadoPayw="T", codigoAut=None))
+        payment = Payment.objects.get(pk=checkout.payment_id)
+        assert payment.failure_stage() == "bank_timeout"
+        assert list(Notification.objects.filter(user=parent).values_list("title", flat=True)) == [
+            "Pago de recarga sin confirmar"]
+
+        resp = _reconcile(api_client, payment.pk, outcome="not_found", note="No aparece en MC")
+
+        assert resp.status_code == 200, resp.data
+        closed = Notification.objects.get(user=parent, title="Pago de recarga no realizado")
+        assert "no se realizó ningún cargo" in closed.message
+        assert f"folio {payment.pk}" in closed.message
 
 
 # ── what needs a MultiCobros check ───────────────────────────
@@ -288,6 +312,22 @@ class TestVerify:
         Payment.objects.filter(pk=approved.payment_id).update(status=Payment.Status.REFUNDED)
         resp = self._verify(api_client, approved, referencia="248233587990", amount="200")
         assert resp.status_code == 400 and resp.data["code"] == "not_success"
+
+    @pytest.mark.parametrize("amount", ["sNaN", "NaN", "-Infinity", "abc", ""])
+    def test_a_non_numeric_amount_is_a_mismatch_not_a_500(self, api_client, approved, amount):
+        resp = self._verify(api_client, approved, referencia="248233587990", amount=amount)
+        assert resp.status_code == 400 and resp.data["code"] == "amount_mismatch"
+        approved.refresh_from_db()
+        assert approved.verified_at is None
+
+
+def test_parse_amount_accepts_typed_money_and_rejects_non_numbers():
+    from apps.payments.multicobros import parse_amount
+
+    assert parse_amount("$1,234.50") == Decimal("1234.50")
+    assert parse_amount(" 200 ") == Decimal("200")
+    for bad in ("sNaN", "NaN", "Infinity", "-inf", "abc", "", None):
+        assert parse_amount(bad) is None
 
 
 # ── simulations never reach the POS ──────────────────────────
@@ -445,6 +485,20 @@ class TestBrowserAnswers:
             ),
         )
         assert len(_alerts(mailoutbox, "configuración")) == 1
+
+    def test_an_american_express_rejection_is_the_card_not_the_merchant(
+        self, api_client, opened, mailoutbox
+    ):
+        # The afiliación takes Visa and Mastercard only: Payworks rejecting an
+        # Amex card must not email the admins about a configuration problem.
+        AdminFactory(email="direccion@interlaken.test")
+        _, _, checkout = opened
+        resp = _report(api_client, checkout.payment_id, "success", _bank_answer(
+            checkout, resultadoPayw="R", codigoAut=None, codigoPayw="PAYW-0500",
+            texto="Tarjeta no permitida", marcaTarjeta="AMEX"))
+        assert resp.data["status"] == "failed"
+        assert resp.data["failure_reason"] == "card_not_accepted"
+        assert _alerts(mailoutbox, "configuración") == []
 
     def test_aut10_alerts_too(self, api_client, opened, mailoutbox):
         AdminFactory(email="direccion@interlaken.test")

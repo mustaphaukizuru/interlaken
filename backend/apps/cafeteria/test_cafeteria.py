@@ -745,7 +745,22 @@ class TestSpendingDigest:
         assert "$50.00" in digest.message  # 30 + 20 total
 
     @patch("apps.cafeteria.services.get_receipts")
-    def test_digest_skips_families_without_spend(self, mock_receipts):
+    def test_no_digest_when_per_purchase_notices_are_on(self, mock_receipts, settings):
+        """Production default: families already got each purchase; the 18:00 run sends nothing."""
+        settings.CAFETERIA_PURCHASE_DIGEST = False
+        parent = ParentFactory()
+        student = StudentProfileFactory(loyverse_id="loy-buyer", parents=[parent])
+        CafeteriaBalance.objects.create(student=student, balance=Decimal("500"))
+        mock_receipts.return_value = [_recent_receipt("loy-buyer", "R-1", 30)]
+        services.sync_purchases()
+        call_command("send_spending_digest", period="daily")
+        assert not Notification.objects.filter(title__startswith="Resumen de cafetería").exists()
+        call_command("send_spending_digest", period="daily", force=True)
+        assert Notification.objects.filter(user=parent, title__startswith="Resumen de cafetería").exists()
+
+    @patch("apps.cafeteria.services.get_receipts")
+    def test_digest_skips_families_without_spend(self, mock_receipts, settings):
+        settings.CAFETERIA_PURCHASE_DIGEST = True
         ParentFactory()
         StudentProfileFactory(loyverse_id="loy-buyer")
         mock_receipts.return_value = []

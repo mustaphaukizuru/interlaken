@@ -20,10 +20,11 @@ showing the plan); the commit enforces the note for reverse transitions.
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import partial
 
 from rest_framework.exceptions import ValidationError
 
-from apps.core.bulk import AdminBulkView, BulkAction, BulkSkip
+from apps.core.bulk import EMAIL_CHUNK, AdminBulkView, BulkAction, BulkSkip, after_commit
 from apps.core.transitions import assert_transition
 
 from .models import PreRegistration, Registration, RegistrationDocument
@@ -31,11 +32,13 @@ from .services import (
     OUTCOME_STATES,
     PREREG_ENTITY,
     REG_ENTITY,
+    AlreadyApplied,
     change_status,
     email_registration_outcome,
     email_rejected_documents,
     invite_preregistration,
     request_missing_documents,
+    sent_registration,
     set_document_review,
 )
 from .views import PreRegistrationAdminListView, RegistrationAdminListView
@@ -78,8 +81,17 @@ def _prereg_status_handler(instance, payload, actor):
     return {"status": [before, after]}
 
 
+def _invite_plan(instance, payload):
+    sent = sent_registration(instance)
+    if sent is not None:
+        raise BulkSkip(f"ya envió su inscripción («{sent.get_status_display()}»)")
+
+
 def _invite_handler(instance, payload, actor):
-    out = invite_preregistration(instance, actor, audit=False)
+    try:
+        out = invite_preregistration(instance, actor, audit=False)
+    except AlreadyApplied as exc:
+        raise BulkSkip(str(exc)) from None
     return out["changes"]
 
 
@@ -96,9 +108,11 @@ PREREG_ACTIONS = {
             name="invite",
             label_es="Invitar a inscripción",
             handler=_invite_handler,
+            plan=_invite_plan,
             allowed_from=frozenset(
                 {PreRegistration.Status.PENDING, PreRegistration.Status.CONTACTED}
             ),
+            chunk=EMAIL_CHUNK,
         ),
     )
 }
@@ -133,11 +147,14 @@ def registration_status_action(name: str, label_es: str, target: str) -> BulkAct
         )
         notified = False
         if target in OUTCOME_STATES and _notify(payload):
-            email_registration_outcome(instance)
+            # Sent once the row is committed: never an approval the DB rolled back.
+            after_commit(partial(email_registration_outcome, instance))
             notified = True
         return {"status": [before, after], "notified": notified}
 
-    return BulkAction(name=name, label_es=label_es, handler=handler, plan=plan)
+    emails = target in OUTCOME_STATES
+    return BulkAction(name=name, label_es=label_es, handler=handler, plan=plan,
+                      chunk=EMAIL_CHUNK if emails else None)
 
 
 def _request_docs_plan(instance, payload):
@@ -165,6 +182,7 @@ REGISTRATION_ACTIONS = {
             label_es="Solicitar documentos",
             handler=_request_docs_handler,
             plan=_request_docs_plan,
+            chunk=EMAIL_CHUNK,
             allowed_from=frozenset(
                 {
                     Registration.Status.SUBMITTED,

@@ -46,11 +46,16 @@ def _can_access_booking(user, booking):
 
     Bookings carry no FK to a User (they are created from the public form), so a
     "guardian owns it" is established by matching the authenticated account's email
-    to the booking's contact email. Admin/staff may access any booking.
+    to the booking's contact email. Admins, and staff holding the «visitas» area,
+    may access any booking (a cafetería cashier may not).
     """
+    from apps.core.areas import has_area
+
     if not (user and user.is_authenticated):
         return False
-    if user.role in (User.Role.ADMIN, User.Role.STAFF):
+    if user.role == User.Role.ADMIN:
+        return True
+    if user.role == User.Role.STAFF and has_area(user, 'visitas'):
         return True
     return bool(booking.parent_email) and \
         booking.parent_email.strip().lower() == (user.email or '').strip().lower()
@@ -228,8 +233,11 @@ class BookingCancelView(APIView):
             return Response({'detail': 'La reserva ya estaba cancelada.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        previous = booking.status
         booking.status = Booking.Status.CANCELLED
         booking.save(update_fields=['status', 'updated_at'])
+        record('update', booking, {'status': [previous, Booking.Status.CANCELLED]},
+               actor=request.user, context='bookings: cancelación')
         # Remove the parent's calendar event (fail-soft; clears the stored id).
         calendar.sync_booking_cancelled(booking)
         return Response(BookingSerializer(booking).data)

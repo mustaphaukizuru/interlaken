@@ -166,6 +166,8 @@ NOTIFICATION_STYLE: dict[str, tuple[str, str, str, str]] = {
     'info': ('Aviso del colegio', 'brand', 'Ver en el portal', '/portal/notificaciones'),
 }
 STAFF_ROLES = ('admin', 'staff')
+# Mirrors NotificationPreference.URGENT_TYPES: sent whatever the family's toggles.
+URGENT_TYPES = ('warning',)
 
 
 def notification_content(*, user, notif_type: str, title: str, message: str, details=None,
@@ -184,6 +186,15 @@ def notification_content(*, user, notif_type: str, title: str, message: str, det
         category, label = 'Comunicado', 'Ver comunicado'
     if staff and not url:
         label, path = 'Abrir la consola', '/admin'
+    # Senders email a family only when its Avisos tab has email on, except for
+    # urgent alerts, which go to everyone: the footer says which one this is.
+    if staff:
+        reason = 'Aviso interno de la consola del Colegio Interlaken.'
+    elif notif_type in URGENT_TYPES:
+        reason = ('Recibe este aviso porque es una alerta urgente: el colegio las envía a todas '
+                  'las familias, aunque tengan los avisos por correo desactivados.')
+    else:
+        reason = 'Recibe este aviso porque tiene activados los avisos por correo en el Portal de Familias.'
     return EmailContent(
         title=title,
         intro=intro or message,
@@ -195,8 +206,7 @@ def notification_content(*, user, notif_type: str, title: str, message: str, det
         cta_url=portal_url(url or path),
         link_fallback=False,
         manage_prefs=not staff,
-        reason=('Aviso interno de la consola del Colegio Interlaken.' if staff else
-                'Recibe este aviso porque tiene activados los avisos por correo en el Portal de Familias.'),
+        reason=reason,
     )
 
 

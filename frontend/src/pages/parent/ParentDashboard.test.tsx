@@ -17,10 +17,6 @@ vi.mock('@/components/portal/InstallHint', () => ({
   InstallHint: () => null,
 }));
 
-vi.mock('@/hooks/useAnnouncementsRead', () => ({
-  useAnnouncementsRead: () => undefined,
-}));
-
 vi.mock('@/components/ui/Reveal', () => ({
   Reveal: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -135,6 +131,25 @@ describe('ParentDashboard', () => {
     );
     expect(screen.queryByRole('link', { name: /Recargar cafetería/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
+  });
+
+  it('per-child quick top-ups open the wizard for that child (?hijo=)', async () => {
+    getDashboard.mockResolvedValue({
+      data: {
+        ...LINKED_DATA,
+        cafeteria_balances: [
+          { student: 11, student_name: 'Luis López', balance: '20.00', low: true, last_synced: '2026-08-01T00:00:00Z' },
+          { student: 12, student_name: 'Sofía López', balance: '180.00', low: false, last_synced: '2026-08-01T00:00:00Z' },
+        ],
+      },
+    } as never);
+
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Recargar $100 a Sofía López' }))
+      .toHaveAttribute('href', '/portal/cafeteria?recarga=100&hijo=12');
+    expect(screen.getByRole('link', { name: 'Recargar $200 a Luis López' }))
+      .toHaveAttribute('href', '/portal/cafeteria?recarga=200&hijo=11');
   });
 
   it('keeps money CTAs for a linked family', async () => {

@@ -54,7 +54,8 @@ class AuditLogFilterSet(django_filters.FilterSet):
 
 
 def _changes_json(entry) -> str:
-    return json.dumps(entry.changes or {}, ensure_ascii=False, default=str)[:2000]
+    from .audit import redacted_changes
+    return json.dumps(redacted_changes(entry), ensure_ascii=False, default=str)[:2000]
 
 
 AUDIT_EXPORT_SPEC = ExportSpec(

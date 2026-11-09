@@ -91,11 +91,13 @@ export default function CredencialPage() {
                     key={c.student.id}
                     type="button"
                     onClick={() => setSelectedId(c.student.id)}
+                    aria-pressed={on}
                     className={`inline-flex min-h-[44px] items-center rounded-full border px-4 text-sm font-semibold transition ${
                       on ? 'border-purple bg-purple text-white' : 'border-line bg-white text-muted hover:border-purple/40 hover:text-purple'
                     }`}
                   >
-                    {c.student.name.split(' ')[0]}
+                    {/* Two words: «María José» and «María Fernanda» must not both read «María». */}
+                    {c.student.name.split(' ').slice(0, 2).join(' ')}
                   </button>
                 );
               })}

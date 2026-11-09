@@ -50,7 +50,7 @@ from rest_framework.views import APIView
 
 from .audit import record, record_import
 from .exceptions import PayloadTooLarge, cap_message, error_response
-from .exporting import CONTENT_TYPES, xlsx_bytes
+from .exporting import CONTENT_TYPES, csv_safe, xlsx_bytes
 from .exports import as_download, export_filename
 from .permissions import IsAdmin
 from .throttling import SharedScopedRateThrottle
@@ -189,6 +189,8 @@ class ImportSpec:
     update: Callable[[Any, dict, Any], Any] | None = None
     validate_row: Callable[[dict, ImportRow], None] | None = None
     skip_reason: Callable[[dict, Any], str | None] | None = None
+    # What an «actualizar» row will change, shown as a warning in the preview.
+    update_note: Callable[[dict, Any], str | None] | None = None
     key_of: Callable[[dict], str] | None = None
     max_rows: int = MAX_ROWS
     max_bytes: int = MAX_BYTES
@@ -478,6 +480,10 @@ def validate(rows, spec: ImportSpec, *, headers=None, fmt: str = "csv") -> Impor
             if reason:
                 row.action = "omitir"
                 row.warn(reason)
+        if row.action == "actualizar" and spec.update_note is not None:
+            note = spec.update_note(row.data, row.instance)
+            if note:
+                row.warn(note)
 
     return ImportReport(entity=spec.entity, rows=report_rows, headers=list(headers), fmt=fmt)
 
@@ -572,7 +578,7 @@ def _csv_response(headers, rows, filename: str) -> HttpResponse:
     buf.write("﻿")
     writer = csv.writer(buf, lineterminator="\r\n")
     writer.writerow(headers)
-    writer.writerows(rows)
+    writer.writerows([csv_safe(cell) for cell in row] for row in rows)
     response = HttpResponse(buf.getvalue().encode("utf-8"), content_type=CONTENT_TYPES["csv"])
     return as_download(response, filename)
 

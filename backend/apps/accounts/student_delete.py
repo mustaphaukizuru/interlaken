@@ -71,10 +71,37 @@ def archive_student(profile) -> dict:
     return {'outcome': ARCHIVE, 'status': [before, profile.status], **changes}
 
 
-def restore_student(profile) -> dict:
-    """Back on the lists as «Baja definitiva»; Reactivar lets them sign in again."""
+def status_before_archive(profile):
+    """The status ``profile`` had when it was last archived (its audit row), or None."""
+    from apps.core.models import AuditLog
+
+    changes = (AuditLog.objects
+               .filter(object_type='accounts.studentprofile', object_id=str(profile.pk),
+                       changes__outcome=ARCHIVE)
+               .order_by('-pk').values_list('changes', flat=True).first()) or {}
+    status = changes.get('status')
+    if isinstance(status, list) and status and status[0] in StudentProfile.Status.values:
+        return status[0]
+    return None
+
+
+def restore_student(profile, *, undo: bool = False) -> dict:
+    """Back on the lists as «Baja definitiva»; Reactivar lets them sign in again.
+
+    ``undo`` is the «Deshacer» offered right after Archivar: the student gets
+    back the status they had (an active student is active again, login
+    included), instead of landing in «Baja definitiva», off the Activos tab,
+    with their POS purchases parked as unmatched.
+    """
     _student_account(profile)
-    return {'outcome': 'restored', **restore_account(profile.user, reactivate=False)}
+    changes = restore_account(profile.user, reactivate=False)
+    if undo:
+        before = status_before_archive(profile)
+        if before and before != profile.status:
+            old = profile.status
+            profile.save(update_fields=profile.apply_status(before))
+            changes['status'] = [old, profile.status]
+    return {'outcome': 'restored', **changes}
 
 
 def remove_student(profile) -> dict:

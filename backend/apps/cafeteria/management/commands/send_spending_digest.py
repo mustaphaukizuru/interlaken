@@ -8,9 +8,10 @@ roll-up of their children's cafeteria spend for the period:
     python manage.py send_spending_digest --period weekly     # Mon–now this week
 
 Pairs with ``CAFETERIA_PURCHASE_DIGEST=True`` (which suppresses the per-purchase
-alert) but is safe to run either way — the digest is a distinct summary message.
-Suggested cron: daily ~19:00 and/or weekly Fri ~17:00. Families with no spend in
-the window are skipped, so quiet days send nothing.
+alert). With the setting off (production default) families already get one
+notice per purchase, so the scheduled run does nothing; ``--force`` sends it
+anyway for a deliberate one-off. Families with no spend in the window are
+skipped, so quiet days send nothing.
 """
 from collections import defaultdict
 from datetime import timedelta
@@ -34,8 +35,19 @@ class Command(BaseCommand):
             '--period', choices=['daily', 'weekly'], default='daily',
             help='Window to summarise: daily (today) or weekly (Mon–now).',
         )
+        parser.add_argument(
+            '--force', action='store_true',
+            help='Send even when CAFETERIA_PURCHASE_DIGEST is off (families also get per-purchase notices).',
+        )
 
     def handle(self, *args, **options):
+        from django.conf import settings
+
+        # With per-purchase notices on (the default) the 18:00 digest repeated
+        # every purchase in a second email to every family that bought that day.
+        if not getattr(settings, 'CAFETERIA_PURCHASE_DIGEST', False) and not options['force']:
+            self.stdout.write('CAFETERIA_PURCHASE_DIGEST is off: per-purchase notices are on, no digest sent.')
+            return
         period = options['period']
         now = timezone.localtime()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)

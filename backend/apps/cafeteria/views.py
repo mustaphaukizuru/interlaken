@@ -18,6 +18,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -204,6 +205,10 @@ class MyTransactionsView(generics.ListAPIView):
 
         # Aware bounds (invalid dates ignored) so the (student, -date) index is usable.
         qs = apply_date_range(qs, 'date', params.get('from'), params.get('to'))
+
+        # The signed amount of a refund or adjustment (credit or debit), from its audit row.
+        from .services import with_signed_amounts
+        qs = with_signed_amounts(qs)
 
         return apply_ordering(qs, self.request, TRANSACTION_ORDERING, '-date')
 
@@ -578,6 +583,10 @@ class LoyverseWebhookView(APIView):
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes: list = []
+    # The plain JSON parser, not the object-only default: this view already
+    # acknowledges and ignores a non-object body, and a 400 could make Loyverse
+    # disable the webhook.
+    parser_classes = [JSONParser]
 
     @staticmethod
     def _authorized(request, secret, token):
@@ -906,7 +915,8 @@ class AdminApplyTopUpView(APIView):
 # Families never trigger the store-wide poll (it re-reads every receipt in
 # the store and advances the shared cursor); they read what the 5-minute cron
 # and the webhook already recorded.
-@method_decorator(ratelimit('cafeteria-refresh', '6/m', key='user', method='POST'), name='dispatch')
+# On the handler (DRF has authenticated there), so the limit is per account, not school-wide.
+@method_decorator(ratelimit('cafeteria-refresh', '6/m', key='user', method='POST'), name='post')
 class RefreshFromLoyverseView(APIView):
     """POST /api/v1/cafeteria/refresh/
 
@@ -1620,35 +1630,52 @@ class MyStatementPdfView(APIView):
             end = _date(y, m, _cal.monthrange(y, m)[1])
         except (ValueError, TypeError):
             return Response({'month': ['Use AAAA-MM.']}, status=400)
+        from .services import signed_amount, with_signed_amounts
+
         # Aware bounds instead of ``date__date__range`` so the (student, -date) index is usable.
-        rows = list(CafeteriaTransaction.objects.filter(
+        # Signed amounts: a top-up reversal or a debit adjustment is a charge, not a «+».
+        rows = list(with_signed_amounts(CafeteriaTransaction.objects.filter(
             student=student, date__gte=day_start(start), date__lt=day_end_exclusive(end),
-        ).order_by('date', 'id'))
-        prev = (CafeteriaTransaction.objects.filter(student=student, date__lt=day_start(start))
+        )).order_by('date', 'id'))
+        # History-only rows (applied=False: a purchase older than the opening
+        # balance, a POS refund the balance already held) never moved it and
+        # carry no balance_after: they are listed, never counted.
+        prev = (CafeteriaTransaction.objects.filter(student=student, date__lt=day_start(start),
+                                                    applied=True, balance_after__isnull=False)
                 .order_by('-date', '-id').first())
-        if prev is not None and prev.balance_after is not None:
+        anchor = next((i for i, t in enumerate(rows) if t.applied and t.balance_after is not None), None)
+        if prev is not None:
             opening = prev.balance_after
-        elif rows and rows[0].balance_after is not None:
-            sign = -1 if rows[0].transaction_type == CafeteriaTransaction.TxType.PURCHASE else 1
-            opening = rows[0].balance_after - sign * rows[0].amount
+        elif anchor is not None:
+            opening = rows[anchor].balance_after - sum(
+                (signed_amount(t) for t in rows[:anchor + 1] if t.applied), Decimal('0'))
         else:
             opening = Decimal('0')
         label = {'purchase': 'Consumo', 'topup': 'Recarga', 'refund': 'Devolución', 'adjustment': 'Ajuste'}
+        plural = {'Consumo': 'consumos', 'Recarga': 'recargas', 'Devolución': 'devoluciones', 'Ajuste': 'ajustes'}
+
+        def mxn(v):
+            return f'{"-" if v < 0 else ""}${abs(v):,.2f}'
+
         totals: dict[str, Decimal] = {}
         lines = [f'Alumno: {student.user.full_name}  ·  Matrícula {student.student_id}  ·  {student.grade} {student.group}'.rstrip(),
-                 f'Periodo: {start:%d/%m/%Y} al {end:%d/%m/%Y}', '', f'Saldo inicial: ${opening:,.2f}', '',
+                 f'Periodo: {start:%d/%m/%Y} al {end:%d/%m/%Y}', '', f'Saldo inicial: {mxn(opening)}', '',
                  f'{"Fecha":<12}{"Movimiento":<12}{"Detalle":<34}{"Importe":>10}{"Saldo":>10}', '-' * 78]
         running = opening
         for t in rows:
             kind = label.get(t.transaction_type, t.transaction_type)
-            amt = -t.amount if t.transaction_type == CafeteriaTransaction.TxType.PURCHASE else t.amount
+            amt = signed_amount(t)
+            if not t.applied:
+                detail = f'(ya en el saldo) {t.description or ""}'[:32]
+                lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{"":>10}')
+                continue
             running = t.balance_after if t.balance_after is not None else running + amt
-            totals[kind] = totals.get(kind, Decimal('0')) + t.amount
+            totals[kind] = totals.get(kind, Decimal('0')) + amt
             detail = (t.description or '')[:32]
             lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{running:>10,.2f}')
-        lines += ['-' * 78, f'Saldo final: ${running:,.2f}', '']
+        lines += ['-' * 78, f'Saldo final: {mxn(running)}', '']
         for k, v in totals.items():
-            lines.append(f'Total {k.lower()}s: ${v:,.2f}')
+            lines.append(f'Total {plural.get(k, k.lower())}: {mxn(v)}')
         lines += ['', 'Este estado de cuenta es informativo; el saldo oficial es el del punto de venta (Loyverse).',
                   f'Colegio Interlaken · generado el {timezone.localtime():%d/%m/%Y %H:%M}']
         pdf = simple_document_pdf('Estado de cuenta de cafetería', lines, subtitle=f'{start:%B %Y}'.capitalize())
@@ -1689,21 +1716,26 @@ def _queue_balance_notification(student, title, message) -> int:
 
     For the bulk top-up rows that did not fit the inline budget: one INSERT per
     guardian instead of an SMTP round trip inside the request. Honours the
-    same category / channel preferences ``notify`` does."""
+    same category / channel preferences ``notify`` does: the row waits for the
+    cron only when email or push is on, and the dispatcher sends each channel
+    only if this family member still keeps it on when it runs."""
     from apps.accounts.family import family_notify_recipients
     from apps.accounts.models import NotificationPreference
     from apps.portal.models import Notification
 
+    kind = Notification.NotifType.CAFETERIA
+    skipped = Notification.Delivery.SKIPPED
     queued = 0
     for parent in family_notify_recipients(student):
         prefs = NotificationPreference.for_user(parent)
-        if not prefs.allows(Notification.NotifType.CAFETERIA) or not prefs.in_app_enabled:
+        if not prefs.allows(kind) or not prefs.wants('in_app', kind):
             continue
-        out_of_band = prefs.email_enabled or prefs.push_enabled
+        email, push = prefs.wants('email', kind), prefs.wants('push', kind)
         Notification.objects.create(
-            user=parent, notif_type=Notification.NotifType.CAFETERIA,
-            title=title, message=message,
-            delivered_at=None if out_of_band else timezone.now())
+            user=parent, notif_type=kind, title=title, message=message,
+            email_status=Notification.Delivery.PENDING if email else skipped,
+            push_status=Notification.Delivery.PENDING if push else skipped,
+            delivered_at=None if (email or push) else timezone.now())
         queued += 1
     return queued
 

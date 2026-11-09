@@ -458,8 +458,9 @@ next `./deploy.sh`. Without it the opt-in card never renders.
 
 Flow once configured: parents opt in on the portal dashboard (subscription
 stored per user + device) → publishing a comunicado with **“Enviar notificación
-push”** sends the first batch inline and the `dispatch_notifications` cron on
-this box drains the rest → taps deep-link to `/portal/comunicados/<id>` →
+push”** sends the first 20 inline and the `dispatch_notifications` cron on
+this box (every 5 minutes) drains the rest → taps open the notification
+(`/portal/notificaciones/<id>`) →
 expired subscriptions (HTTP 404/410) are pruned automatically on send.
 
 ---

@@ -176,6 +176,43 @@ def _make_online_topup(parent, student, amount="200.00"):
     return topup, payment
 
 
+class TestFailureNotices:
+    """What the family is told when a card top-up does not go through."""
+
+    def _family_payment(self):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent])
+        _, payment = _make_online_topup(parent, student)
+        return parent, payment
+
+    def test_bank_timeout_says_not_to_pay_again(self, mailoutbox):
+        # Payworks T: the issuer did not answer; the card may have been charged
+        # and staff check it in MultiCobros. "No charge, try again" was wrong.
+        parent, payment = self._family_payment()
+        settle(PaymentEvent(payment.id, "failed", "IK-T-1", {"payworks": {"resultadoPayw": "T"}},
+                            stage="bank_timeout"), actor_label="test")
+        payment.refresh_from_db()
+        assert payment.is_soft_failed()
+
+        note = Notification.objects.get(user=parent, notif_type=Notification.NotifType.PAYMENT)
+        assert note.title == "Pago de recarga sin confirmar"
+        assert "No vuelva a pagar" in note.message and "le avisará" in note.message
+        assert "ningún cargo" not in note.message and "nuevamente" not in note.message
+        email = mailoutbox[-1]
+        html = email.alternatives[0][0] if email.alternatives else ""
+        assert "No vuelva a pagar" in email.body
+        assert "Intentar de nuevo" not in email.body and "Intentar de nuevo" not in html
+
+    def test_a_bank_decline_still_offers_to_try_again(self, mailoutbox):
+        parent, payment = self._family_payment()
+        _settle(payment, "failed", tx="IK-D-1")
+
+        note = Notification.objects.get(user=parent, notif_type=Notification.NotifType.PAYMENT)
+        assert note.title == "Recarga de cafetería no completada"
+        assert "No se realizó ningún cargo" in note.message
+        assert "Intentar de nuevo" in mailoutbox[-1].body
+
+
 # Credit-on-payment mode (CAFETERIA_TOPUP_APPLY_MODE=instant); the default
 # scheduled mode is covered in apps/cafeteria/test_topup_scheduled_apply.py.
 @pytest.mark.usefixtures("instant_topups")

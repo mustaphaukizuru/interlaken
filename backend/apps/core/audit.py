@@ -71,6 +71,35 @@ def _redact(field, value, sensitive):
     return _jsonable(value)
 
 
+def sensitive_fields_for(object_type: str) -> set:
+    """The fields registered as sensitive for an ``app_label.model`` audit type."""
+    for model, (_fields, _label, sensitive) in _TRACKED.items():
+        if model._meta.label_lower == object_type:
+            return sensitive
+    return set()
+
+
+def redacted_changes(entry) -> dict:
+    """``entry.changes`` as it may be shown or exported.
+
+    Values of fields registered as sensitive are masked, also on rows written
+    before the field was registered (StudentProfile's medical fields until
+    2026-11-09 stored «Nuez» in cleartext, readable from the student's
+    Historial tab by any staff account with the alumnos area).
+    """
+    changes = entry.changes or {}
+    sensitive = sensitive_fields_for(entry.object_type)
+    if not sensitive or not isinstance(changes, dict):
+        return changes
+    out = {}
+    for field, pair in changes.items():
+        if field in sensitive and isinstance(pair, (list, tuple)):
+            out[field] = [v if v == _REDACTED else _redact(field, v, sensitive) for v in pair]
+        else:
+            out[field] = pair
+    return out
+
+
 def record(action, instance=None, changes=None, *, actor=None, actor_label='', context='',
            object_type='', object_id=''):
     """Write one immutable AuditLog row for a mutation on `instance`.
@@ -241,10 +270,13 @@ def connect_default_tracking():
     register_audit(CafeteriaTransaction, ['amount', 'transaction_type', 'balance_after'],
                    'cafeteria.wallet')
     # Student personal + medical fields.
+    # Medical values are never stored (who / when / which field only): the
+    # student's Historial is readable by staff, who may not see them.
     register_audit(StudentProfile, ['grade', 'group', 'loyverse_id', 'is_active', 'status',
                                     'birth_date', 'curp', 'emergency_phone',
                                     'blood_type', 'allergies', 'medical_notes'],
-                   'student.personal')
+                   'student.personal',
+                   sensitive=['blood_type', 'allergies', 'medical_notes'])
     register_audit(Registration, ['blood_type', 'allergies', 'medical_notes'],
                    'student.medical',
                    sensitive=['blood_type', 'allergies', 'medical_notes'])

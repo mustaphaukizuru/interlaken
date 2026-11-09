@@ -4,7 +4,9 @@ dispatch_notifications — deliver email + web-push for pending notifications.
 Bulk announcement fan-out only creates in-app rows (fast, one INSERT); this cron
 sends the out-of-band channels (email + push) in a capped batch so a comunicado
 targeted at hundreds of families actually reaches them without timing out the
-publish request. Schedule it alongside the other daily jobs.
+publish request (which sends only a first batch of 20 itself). Scheduled every
+5 minutes under its own flock (deploy/crontab.example). Safe to overlap with a
+publish request or another run: each row is claimed on its own.
 """
 from django.core.management.base import BaseCommand
 

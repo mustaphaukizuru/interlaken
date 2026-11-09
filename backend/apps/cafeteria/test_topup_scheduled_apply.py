@@ -171,10 +171,12 @@ class TestPaymentLeavesTheWalletAlone:
 
 # ── staff "Aplicar" ──────────────────────────────────────────────────────────
 class TestApplyPaidTopup:
-    def test_applies_once_loyverse_shows_the_load(self):
+    def test_applies_once_loyverse_shows_the_load(self, django_capture_on_commit_callbacks):
         student, topup, payment = paid_topup(balance=100)
         admin = AdminFactory()
-        with patch(GUARD, return_value=Decimal('300')):
+        # The family is told after the commit (see the bulk test below).
+        with patch(GUARD, return_value=Decimal('300')), \
+                django_capture_on_commit_callbacks(execute=True):
             tx, balance = apply_paid_topup(topup, actor=admin)
 
         topup.refresh_from_db()
@@ -248,6 +250,35 @@ class TestApplyPaidTopup:
         cb = CafeteriaBalance.objects.get(student=student)
         assert balance == Decimal('530') and cb.seeded_at is not None
 
+    def test_unseeded_wallet_with_two_paid_topups_does_not_guess_the_seed(self):
+        """Seeding as "Loyverse minus this load" would swallow a second paid
+        top-up already typed in: it then never applied, and refunding it left
+        the money in the wallet."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent], loyverse_id='lv-1')
+        CafeteriaBalance.objects.create(student=student)        # portal opened, never seeded
+        _, first, _ = paid_topup('100.00', student=student, parent=parent)
+        _, second, _ = paid_topup('50.00', student=student, parent=parent)
+        admin = AdminFactory()
+
+        # Opening $300 in Loyverse; both typed in at 07:30.
+        with patch(GUARD, return_value=Decimal('450')), pytest.raises(TopUpApplyError) as err:
+            apply_paid_topup(first, actor=admin)
+        assert err.value.code == 'seed_ambiguous' and err.value.status == 409
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert cb.last_synced is None and cb.balance == Decimal('0')
+
+        # Staff apply each loaded one with the audited override, mark them
+        # loaded, and the mirror brings in the opening balance: Loyverse's $450.
+        apply_paid_topup(first, actor=admin, force=True, note='sin saldo inicial')
+        apply_paid_topup(second, actor=admin, force=True, note='sin saldo inicial')
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('150')
+        TopUpRequest.objects.filter(pk__in=[first.pk, second.pk]).update(
+            pos_loaded_at=timezone.now())
+        r = mirror_pos_topups(customers=[{'id': 'lv-1', 'total_points': 450}], fresh=True)
+        assert r['credited'] == 1
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('450')
+
     def test_seed_cron_waits_while_a_paid_topup_is_pending(self):
         student, _, _ = paid_topup()
         with patch('apps.cafeteria.services.get_customer_by_id') as read:
@@ -317,6 +348,37 @@ class TestApplyEndpoints:
         assert r.data['ok'] == 1 and r.data['total'] == '100.00'
         assert [f['id'] for f in r.data['failed']] == [missing.pk]
         assert 'Loyverse aún no muestra' in r.data['failed'][0]['error']
+
+    def test_bulk_apply_tells_families_only_after_its_chunk_commits(
+            self, api_client, django_capture_on_commit_callbacks):
+        """The rows run inside their chunk's transaction: a family email sent
+        from inside it would survive a rollback (a slow Loyverse read or SMTP
+        call timing the request out) of a credit it announced."""
+        from apps.core import bulk
+
+        first, a, _ = paid_topup('100.00', balance=0)
+        other_parent = ParentFactory()
+        other = StudentProfileFactory(parents=[other_parent], loyverse_id='lv-2')
+        _, b, _ = paid_topup('50.00', student=other, parent=other_parent, balance=0)
+        families = [first.parents.first(), other_parent]
+        api_client.force_authenticate(user=AdminFactory())
+
+        def points(student):
+            return Decimal('100') if student.loyverse_id == 'lv-1' else Decimal('50')
+
+        with patch(GUARD, side_effect=points), \
+                patch('apps.core.bulk.run_bulk', wraps=bulk.run_bulk) as run, \
+                django_capture_on_commit_callbacks(execute=False) as callbacks:
+            r = api_client.post(reverse('admin-topups-bulk'),
+                                {'action': 'apply_paid', 'ids': [a.pk, b.pk]}, format='json')
+            assert r.status_code == 200 and r.data['ok'] == 2, r.data
+            sent = Notification.objects.filter(user__in=families, title='Recarga aplicada')
+            assert not sent.exists()            # nothing announced inside the transaction
+        assert run.call_args.kwargs['chunk'] == 5
+
+        for callback in callbacks:
+            callback()
+        assert sent.count() == 2
 
     def test_refund_before_apply_needs_both_confirmations(self, api_client):
         student, topup, payment = paid_topup(checkout='PRD', balance=5)
@@ -408,6 +470,58 @@ class TestMirrorAppliesPaidTopups:
         topup.refresh_from_db()
         assert topup.status == TopUpRequest.Status.PAID
 
+    def test_an_unverified_real_approval_waits_for_multicobros(self, api_client):
+        """The browser-reported approval is typed into Loyverse before anyone
+        matched it in MultiCobros: the mirror neither applies it nor credits
+        the gap as a cash recarga (same rule as «Aplicar»), until verified."""
+        student, topup, payment = paid_topup('500.00', checkout='PRD', balance=10)
+        assert payment.needs_bank_verification()
+        store = [{'id': 'lv-1', 'total_points': 510}]
+
+        with patch('apps.cafeteria.services.get_all_customers', return_value=store):
+            r = mirror_pos_topups()
+
+        assert r['held_unverified'] == 1 and r['audit']['held_unverified'] == 1
+        assert r['applied_paid'] == 0 and r['credited'] == 0 and r['held_paid'] == 0
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.PAID
+        assert not CafeteriaTransaction.objects.filter(student=student).exists()
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('10')
+
+        # Verified in MultiCobros: the next pass applies it.
+        api_client.force_authenticate(user=AdminFactory())
+        ok = api_client.post(reverse('admin-payment-banorte-verify', args=[payment.pk]),
+                             {'referencia': '123456', 'amount': '500.00'}, format='json')
+        assert ok.status_code == 200, ok.data
+        again = mirror_pos_topups(customers=store)
+        assert again['applied_paid'] == 1 and again['held_unverified'] == 0
+        topup.refresh_from_db()
+        assert topup.status == TopUpRequest.Status.COMPLETED
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('510')
+
+    def test_a_verified_topup_still_applies_beside_an_unverified_one(self):
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent], loyverse_id='lv-1')
+        seeded(student, 0)
+        _, unverified, _ = paid_topup('100.00', student=student, parent=parent, checkout='PRD')
+        _, verified, payment = paid_topup('100.00', student=student, parent=parent,
+                                          checkout='PRD')
+        BanorteCheckout.objects.filter(payment=payment).update(verified_at=timezone.now())
+
+        r = mirror_pos_topups(customers=[{'id': 'lv-1', 'total_points': 100}])
+
+        assert r['applied_paid'] == 1 and r['held_unverified'] == 0
+        verified.refresh_from_db()
+        unverified.refresh_from_db()
+        assert verified.status == TopUpRequest.Status.COMPLETED
+        assert unverified.status == TopUpRequest.Status.PAID
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('100')
+
+        # The second one loaded too: it waits for its own verification.
+        r = mirror_pos_topups(customers=[{'id': 'lv-1', 'total_points': 200}], fresh=True)
+        assert r['held_unverified'] == 1 and r['credited'] == 0
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('100')
+
 
 class TestNothingElseCreditsItTwice:
     def test_corregir_refuses_while_a_paid_topup_is_pending(self):
@@ -489,6 +603,28 @@ class TestApplyReport:
         assert set(send.call_args.args[2]) == {admin.email, cashier.email}
         assert Notification.objects.filter(user=cashier).exists()
         assert not Notification.objects.filter(user=office).exists()
+
+    def test_unverified_rows_say_to_check_multicobros_before_loading(self):
+        AdminFactory()
+        _, unverified, payment = paid_topup('300.00', checkout='PRD', balance=0)
+        other_parent = ParentFactory()
+        other = StudentProfileFactory(parents=[other_parent], loyverse_id='lv-2')
+        _, plain, _ = paid_topup('50.00', student=other, parent=other_parent, balance=0)
+        TopUpRequest.objects.filter(pk__in=[unverified.pk, plain.pk]).update(
+            apply_due_at=timezone.now() - timedelta(minutes=5))
+
+        out = StringIO()
+        with patch('apps.portal.services.send_email', return_value=True) as send:
+            call_command('topup_apply_report', stdout=out)
+
+        flagged = [line for line in out.getvalue().splitlines() if 'SIN VERIFICAR' in line]
+        assert len(flagged) == 1
+        assert f'folio {payment.pk}' in flagged[0]
+        assert 'verifique en MultiCobros antes de cargarla' in flagged[0]
+        assert payment.banorte.control_number in flagged[0]
+        subject, body = send.call_args.args[:2]
+        assert '(1 sin verificar)' in subject
+        assert '«Verificar en MultiCobros»' in body
 
     def test_silent_when_nothing_is_due(self):
         admin = AdminFactory()

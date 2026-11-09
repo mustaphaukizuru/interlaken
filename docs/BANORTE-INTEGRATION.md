@@ -303,7 +303,11 @@ The mirror never credits a Loyverse gap as a cash recarga while a student has
 a paid top-up waiting: an exact match (one or several of their paid top-ups) is
 applied, anything else is held and counted in the 07:35 wallet check
 (`check_wallet_drift`). "Corregir" in Reconciliación is refused for those
-students until the top-up is applied.
+students until the top-up is applied. Like **Aplicar**, the mirror only applies
+a real approval once it is verified (step 1): a **Sin verificar** top-up typed
+into Loyverse is held, the 07:05 list marks it "SIN VERIFICAR" with its número
+de control, and it is applied on the first pass after **Verificar en
+MultiCobros**.
 
 **Cargar en POS** keeps the card top-ups that are in the wallet but not yet in
 Loyverse: those credited on payment (`instant` mode, or before 2026-10-18) and

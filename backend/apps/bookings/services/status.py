@@ -25,6 +25,7 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework.exceptions import ValidationError
 
+from apps.core.bulk import after_commit
 from apps.core.transitions import assert_transition
 
 from ..models import AvailabilitySlot, Booking
@@ -93,13 +94,18 @@ def change_booking_status(booking, target: str, *, note: str | None = None, noti
         booking.status = target
         booking.save(update_fields=["status", "updated_at"])
 
-    if target == Booking.Status.CONFIRMED:
-        if notify and booking.parent_email and not booking.confirmation_sent:
-            send_booking_confirmation(booking)
-        calendar.sync_booking_created(booking)
-    elif target == Booking.Status.PENDING:
-        # A reopened (previously cancelled) visit gets its calendar event back.
-        calendar.sync_booking_created(booking)
-    elif target == Booking.Status.CANCELLED:
-        calendar.sync_booking_cancelled(booking)
+    def side_effects():
+        if target == Booking.Status.CONFIRMED:
+            if notify and booking.parent_email and not booking.confirmation_sent:
+                send_booking_confirmation(booking)
+            calendar.sync_booking_created(booking)
+        elif target == Booking.Status.PENDING:
+            # A reopened (previously cancelled) visit gets its calendar event back.
+            calendar.sync_booking_created(booking)
+        elif target == Booking.Status.CANCELLED:
+            calendar.sync_booking_cancelled(booking)
+
+    # Now on a single row; in a bulk run once the chunk commits, so a rolled
+    # back confirmation never leaves a sent email or a calendar event behind.
+    after_commit(side_effects)
     return previous

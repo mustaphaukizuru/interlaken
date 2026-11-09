@@ -457,8 +457,13 @@ def interpret_result(checkout, browser_event: str, response: dict) -> ResultOutc
             fields,
         )
     if code in _FINAL_FAILURES:
+        from ..models import is_amex
+
         config_error = ""
-        if code in _CONFIG_ERROR_CODES:
+        # The afiliación takes Visa and Mastercard only: Payworks rejecting an
+        # American Express card is the family's card (shown to them as «Tarjeta
+        # no aceptada»), not a merchant set-up problem to alarm the admins about.
+        if code in _CONFIG_ERROR_CODES and not is_amex(fields.get("marca_tarjeta")):
             detail = " ".join(
                 part for part in (fields.get("codigo_payw", ""), fields.get("texto", "")) if part
             )

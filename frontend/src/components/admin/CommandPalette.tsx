@@ -49,7 +49,7 @@ const FAMILY_ACTIONS: Item[] = [
   { key: 'f-recargar', group: 'Acciones', icon: Download, title: 'Recargar cafetería', detail: 'Abre la recarga con tarjeta', to: '/portal/cafeteria?recarga=200' },
   { key: 'f-cafeteria', group: 'Ir a', icon: CalendarCheck, title: 'Cafetería', detail: 'Saldo y movimientos', to: '/portal/cafeteria' },
   { key: 'f-credencial', group: 'Ir a', icon: CalendarCheck, title: 'Credencial digital', detail: 'Código para pagar en caja', to: '/portal/credencial' },
-  { key: 'f-pagos', group: 'Ir a', icon: Download, title: 'Pagos', detail: 'Próximamente', to: '/portal/pagos' },
+  { key: 'f-pagos', group: 'Ir a', icon: Download, title: 'Pagos', detail: 'Recargas pagadas en línea', to: '/portal/pagos' },
   { key: 'f-notificaciones', group: 'Ir a', icon: Megaphone, title: 'Notificaciones', detail: 'Centro de avisos', to: '/portal/notificaciones' },
   { key: 'f-perfil', group: 'Ir a', icon: Settings, title: 'Mi perfil', detail: 'Datos, avisos, seguridad', to: '/portal/perfil' },
 ];

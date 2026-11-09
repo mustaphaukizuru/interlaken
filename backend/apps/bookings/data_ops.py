@@ -22,7 +22,7 @@ import django_filters
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.core.bulk import BulkAction, BulkSkip
+from apps.core.bulk import EMAIL_CHUNK, BulkAction, BulkSkip
 from apps.core.exporting import Col, ExportSpec
 from apps.core.importing import ImportCol, ImportRow, ImportSpec, parse_choice, parse_date_es
 
@@ -165,6 +165,8 @@ def _booking_action(name: str, label_es: str, target: str, *, requires_note=Fals
         plan=plan,
         requires_note=requires_note,
         side_effects="per_row",
+        # Each row emails and/or syncs Google Calendar: small transactions.
+        chunk=EMAIL_CHUNK,
     )
 
 

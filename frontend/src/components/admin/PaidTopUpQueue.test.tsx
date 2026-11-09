@@ -106,6 +106,27 @@ describe('PaidTopUpQueue («Por aplicar»)', () => {
     await waitFor(() => expect(applyPaid).toHaveBeenLastCalledWith(7, { force: true, note: 'El alumno compró justo después' }));
   });
 
+  it('a never-seeded wallet with another paid top-up also offers the audited override', async () => {
+    applyPaid
+      .mockRejectedValueOnce(axiosError(409, {
+        detail: 'Este alumno aún no tiene saldo inicial en la app y tiene otra recarga con tarjeta por aplicar.',
+        code: 'seed_ambiguous',
+      }))
+      .mockResolvedValueOnce(ok({ id: 7, status: 'completed', balance: '200.00', detail: 'Recarga aplicada sin verificar en Loyverse; quedó en «Cargar en POS».' }));
+    const u = userEvent.setup();
+    renderWithProviders(<PaidTopUpQueue />);
+    await u.click(await screen.findByRole('button', { name: 'Aplicar la recarga de Luis Pérez' }));
+    const dialog = await screen.findByRole('dialog');
+    await u.click(within(dialog).getByRole('button', { name: 'Ya la cargué: aplicar' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('aún no tiene saldo inicial');
+    await u.click(within(dialog).getByRole('checkbox'));
+    await u.type(within(dialog).getByLabelText(/Motivo/), 'sin saldo inicial');
+    await u.click(within(dialog).getByRole('button', { name: 'Aplicar sin verificar' }));
+
+    await waitFor(() => expect(applyPaid).toHaveBeenLastCalledWith(7, { force: true, note: 'sin saldo inicial' }));
+  });
+
   it('refund before apply needs the reason and both confirmations', async () => {
     refundPaid.mockResolvedValue(ok({ id: 7, status: 'refunded', detail: 'ok' }));
     const u = userEvent.setup();
@@ -133,5 +154,26 @@ describe('PaidTopUpQueue («Por aplicar»)', () => {
     renderWithProviders(<PaidTopUpQueue />);
     expect(await screen.findByRole('button', { name: /Verificar en MultiCobros/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aplicar la recarga de Luis Pérez' })).toBeNull();
+  });
+
+  // The POS mirror only applies a gap that matches exactly (and a verified
+  // approval): the hint must not promise more than that.
+  it.each([
+    ['exactly this amount, verified', '250.00', null, 'Ya está en Loyverse; se aplica sola en minutos'],
+    ['more than this amount (a cash recarga too)', '300.00', null, null],
+    ['less than this amount', '200.00', null, null],
+    ['exactly this amount, not verified', '250.00', true, 'Ya está en Loyverse: verifíquela en MultiCobros para que se aplique'],
+  ])('Loyverse %s: hint', async (_label, points, unverified, hint) => {
+    api.topups.mockResolvedValue(ok({ count: 1, next: null, previous: null, results: [{
+      ...row, loyverse_points: points, wallet_balance: '50.00',
+      banorte: { ...row.banorte, ...(unverified ? { verified_at: null, needs_verification: true } : {}) },
+    }] }));
+    renderWithProviders(<PaidTopUpQueue />);
+    expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
+    for (const text of ['Ya está en Loyverse; se aplica sola en minutos',
+      'Ya está en Loyverse: verifíquela en MultiCobros para que se aplique']) {
+      if (text === hint) expect(screen.getByText(text)).toBeInTheDocument();
+      else expect(screen.queryByText(text)).toBeNull();
+    }
   });
 });
