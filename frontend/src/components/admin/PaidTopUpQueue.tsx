@@ -336,7 +336,10 @@ function ApplyPaidForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
       });
     },
   });
-  const canForce = refusal?.code === 'pos_not_loaded' || refusal?.code === 'pos_unknown';
+  // seed_ambiguous: a never-seeded wallet with another paid top-up waiting; the
+  // server cannot tell which one Loyverse holds, so staff apply with a reason.
+  const canForce = refusal?.code === 'pos_not_loaded' || refusal?.code === 'pos_unknown'
+    || refusal?.code === 'seed_ambiguous';
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (force && !note.trim()) return;

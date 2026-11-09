@@ -106,6 +106,27 @@ describe('PaidTopUpQueue («Por aplicar»)', () => {
     await waitFor(() => expect(applyPaid).toHaveBeenLastCalledWith(7, { force: true, note: 'El alumno compró justo después' }));
   });
 
+  it('a never-seeded wallet with another paid top-up also offers the audited override', async () => {
+    applyPaid
+      .mockRejectedValueOnce(axiosError(409, {
+        detail: 'Este alumno aún no tiene saldo inicial en la app y tiene otra recarga con tarjeta por aplicar.',
+        code: 'seed_ambiguous',
+      }))
+      .mockResolvedValueOnce(ok({ id: 7, status: 'completed', balance: '200.00', detail: 'Recarga aplicada sin verificar en Loyverse; quedó en «Cargar en POS».' }));
+    const u = userEvent.setup();
+    renderWithProviders(<PaidTopUpQueue />);
+    await u.click(await screen.findByRole('button', { name: 'Aplicar la recarga de Luis Pérez' }));
+    const dialog = await screen.findByRole('dialog');
+    await u.click(within(dialog).getByRole('button', { name: 'Ya la cargué: aplicar' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('aún no tiene saldo inicial');
+    await u.click(within(dialog).getByRole('checkbox'));
+    await u.type(within(dialog).getByLabelText(/Motivo/), 'sin saldo inicial');
+    await u.click(within(dialog).getByRole('button', { name: 'Aplicar sin verificar' }));
+
+    await waitFor(() => expect(applyPaid).toHaveBeenLastCalledWith(7, { force: true, note: 'sin saldo inicial' }));
+  });
+
   it('refund before apply needs the reason and both confirmations', async () => {
     refundPaid.mockResolvedValue(ok({ id: 7, status: 'refunded', detail: 'ok' }));
     const u = userEvent.setup();

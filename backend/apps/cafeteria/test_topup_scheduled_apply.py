@@ -248,6 +248,35 @@ class TestApplyPaidTopup:
         cb = CafeteriaBalance.objects.get(student=student)
         assert balance == Decimal('530') and cb.seeded_at is not None
 
+    def test_unseeded_wallet_with_two_paid_topups_does_not_guess_the_seed(self):
+        """Seeding as "Loyverse minus this load" would swallow a second paid
+        top-up already typed in: it then never applied, and refunding it left
+        the money in the wallet."""
+        parent = ParentFactory()
+        student = StudentProfileFactory(parents=[parent], loyverse_id='lv-1')
+        CafeteriaBalance.objects.create(student=student)        # portal opened, never seeded
+        _, first, _ = paid_topup('100.00', student=student, parent=parent)
+        _, second, _ = paid_topup('50.00', student=student, parent=parent)
+        admin = AdminFactory()
+
+        # Opening $300 in Loyverse; both typed in at 07:30.
+        with patch(GUARD, return_value=Decimal('450')), pytest.raises(TopUpApplyError) as err:
+            apply_paid_topup(first, actor=admin)
+        assert err.value.code == 'seed_ambiguous' and err.value.status == 409
+        cb = CafeteriaBalance.objects.get(student=student)
+        assert cb.last_synced is None and cb.balance == Decimal('0')
+
+        # Staff apply each loaded one with the audited override, mark them
+        # loaded, and the mirror brings in the opening balance: Loyverse's $450.
+        apply_paid_topup(first, actor=admin, force=True, note='sin saldo inicial')
+        apply_paid_topup(second, actor=admin, force=True, note='sin saldo inicial')
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('150')
+        TopUpRequest.objects.filter(pk__in=[first.pk, second.pk]).update(
+            pos_loaded_at=timezone.now())
+        r = mirror_pos_topups(customers=[{'id': 'lv-1', 'total_points': 450}], fresh=True)
+        assert r['credited'] == 1
+        assert CafeteriaBalance.objects.get(student=student).balance == Decimal('450')
+
     def test_seed_cron_waits_while_a_paid_topup_is_pending(self):
         student, _, _ = paid_topup()
         with patch('apps.cafeteria.services.get_customer_by_id') as read:

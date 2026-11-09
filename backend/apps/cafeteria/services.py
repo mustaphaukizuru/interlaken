@@ -1245,6 +1245,17 @@ def apply_paid_topup(topup, *, actor=None, force: bool = False, note: str = ''):
         amount = Decimal(str(payment.amount))
         local = cb.balance or Decimal('0')
         seed_opening = cb.last_synced is None and points is not None
+        if seed_opening and (paid_topups_pending().filter(student=student)
+                             .exclude(pk=topup.pk).exists()):
+            # The opening balance would be Loyverse minus THIS load; a second
+            # paid top-up already typed in would be swallowed by it (then never
+            # applied, and refunding it would leave the money in the wallet).
+            raise TopUpApplyError(
+                'Este alumno aún no tiene saldo inicial en la app y tiene otra recarga con '
+                'tarjeta por aplicar, así que no se puede saber cuál ya está en Loyverse. Use '
+                '«Aplicar sin verificar» con un motivo para cada recarga que ya cargó en '
+                'Loyverse y después márquelas como cargadas en el POS: la sincronización '
+                'completará el saldo inicial.', code='seed_ambiguous', status=409)
         if not force:
             if points is None:
                 raise TopUpApplyError(
