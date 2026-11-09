@@ -314,6 +314,43 @@ def _purchase_refunded_locally(receipt_number: str) -> bool:
         loyverse_receipt_id__in=[f'refund-tx-{pk}' for pk in ids]).exists()
 
 
+# Loyverse's clock and ours may disagree by this much.
+MIRRORED_REFUND_SKEW = timedelta(minutes=2)
+
+
+def _refund_already_mirrored(student, amount, since) -> bool:
+    """Did the POS mirror already credit this POS refund as a «Recarga en caja»?
+
+    A refund on the POS returns the points to the Loyverse customer at once.
+    Until its REFUND receipt reaches the ledger, every mirror pass (the cron,
+    or a ``customers.update`` webhook processed before the ``receipts.update``
+    one) sees those points as a positive gap and credits them as a cash
+    recarga. So a ``pos-topup-`` credit of exactly ``amount``, written for
+    ``student`` at or after the refund's Loyverse time (``since``, less a
+    clock skew) and not reversed since, already holds this refund: crediting
+    the receipt as well would pay the family twice.
+
+    Fail-safe by construction: a wrong match only leaves the wallet BELOW
+    Loyverse, which the next mirror pass credits back. It can never mint money.
+    """
+    from apps.cafeteria.models import BalanceAdjustment, CafeteriaTransaction
+
+    if since is None or not amount or amount <= 0:
+        return False
+    if timezone.is_naive(since):
+        since = timezone.make_aware(since)
+    reversed_ids = BalanceAdjustment.objects.filter(
+        student=student, source_transaction__isnull=False).values('source_transaction_id')
+    return (CafeteriaTransaction.objects
+            .filter(student=student,
+                    transaction_type=CafeteriaTransaction.TxType.TOPUP,
+                    loyverse_receipt_id__startswith=f'pos-topup-{student.id}-',
+                    amount=amount,
+                    recorded_at__gte=since - MIRRORED_REFUND_SKEW)
+            .exclude(pk__in=reversed_ids)
+            .exists())
+
+
 def _record_receipt(student, receipt: dict, *, apply=None):
     """Idempotently record one receipt against ``student``.
 
@@ -338,6 +375,10 @@ def _record_receipt(student, receipt: dict, *, apply=None):
     amount, items, summary, is_refund, date = _parse_receipt(receipt)
     tx_type = (CafeteriaTransaction.TxType.REFUND if is_refund
                else CafeteriaTransaction.TxType.PURCHASE)
+    # When Loyverse's SERVER took the receipt (and moved the points): its
+    # created_at when present, else the tablet's sale time.
+    raw_ingested = receipt.get('created_at')
+    ingested = (parse_datetime(raw_ingested) if raw_ingested else None) or date
 
     with transaction.atomic():
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=student)
@@ -347,8 +388,6 @@ def _record_receipt(student, receipt: dict, *, apply=None):
             # server's created_at when present, not the tablet's sale time
             # (a tablet syncing after a day offline ingests old-dated sales
             # the seed could not have known about; those must still debit).
-            raw_ingested = receipt.get('created_at')
-            ingested = (parse_datetime(raw_ingested) if raw_ingested else None) or date
             apply = not (cb.seeded_at is not None and ingested is not None
                          and ingested <= cb.seeded_at)
         refund_of = str(receipt.get('refund_for') or '').strip() if is_refund else ''
@@ -357,6 +396,12 @@ def _record_receipt(student, receipt: dict, *, apply=None):
             # local-only credit the POS never saw); the cashier's POS refund is
             # what finally returns the points in Loyverse. Crediting it here too
             # would pay the family twice, so it is kept as history only.
+            apply = False
+        if apply and is_refund and _refund_already_mirrored(student, amount, ingested):
+            # The POS mirror read the refunded points before this receipt
+            # arrived and already credited them as a cash recarga.
+            logger.info('POS refund %s ($%s) for %s was already credited by the POS mirror; '
+                        'kept as history.', receipt_id, amount, student)
             apply = False
         tx, created = CafeteriaTransaction.objects.get_or_create(
             loyverse_receipt_id=receipt_id,

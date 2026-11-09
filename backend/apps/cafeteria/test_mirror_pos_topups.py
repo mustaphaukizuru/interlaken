@@ -5,6 +5,7 @@ amounts, many negative: purchases were debited faithfully while the cash
 top-ups typed into the POS tablet had no channel into the ledger. The mirror
 is strictly one-directional, only credits, and is idempotent by construction.
 """
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -14,7 +15,7 @@ from django.utils import timezone
 
 from apps.accounts.factories import AdminFactory, StudentProfileFactory
 from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, TopUpRequest
-from apps.cafeteria.services import mirror_pos_topups
+from apps.cafeteria.services import mirror_pos_topups, record_receipts
 
 
 def customer(uuid, points):
@@ -317,3 +318,102 @@ class TestSyncAllStaysFast:
         with patch('apps.cafeteria.services.get_customer_by_id') as remote:
             assert sync_all_balances() == {'synced': 5, 'failed': 0}
         remote.assert_not_called()
+
+
+def _refund_receipt(number, customer_id, amount, *, refund_for='', at=None):
+    """A POS REFUND receipt that returns ``amount`` points to the customer."""
+    at = (at or timezone.now()).isoformat()
+    return {'receipt_number': number, 'receipt_type': 'REFUND', 'refund_for': refund_for,
+            'customer_id': customer_id, 'created_at': at, 'receipt_date': at,
+            'line_items': [{'item_name': 'Torta', 'quantity': 1, 'total_money': 0}],
+            'total_discounts': [{'type': 'DISCOUNT_BY_POINTS', 'money_amount': amount}]}
+
+
+@pytest.mark.django_db
+class TestPosRefundIsCreditedOnce:
+    """A refund on the POS returns the points at once. When the mirror reads
+    them before the REFUND receipt is recorded (the customers.update webhook
+    processed before receipts.update, or the cron reading customers right after
+    its receipts poll), it credits them as a «Recarga en caja»; the receipt
+    must then not credit the same money a second time."""
+
+    def _bought_yesterday(self, student, amount, balance_after):
+        when = timezone.now() - timedelta(days=1)
+        return CafeteriaTransaction.objects.create(
+            student=student, transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+            amount=Decimal(amount), loyverse_receipt_id='1-100', date=when, recorded_at=when,
+            balance_after=Decimal(balance_after))
+
+    def _student(self):
+        s = StudentProfileFactory(loyverse_id='u1')
+        seeded(s, 100)
+        self._bought_yesterday(s, 40, 100)
+        return s
+
+    def test_receipt_after_the_mirror_credit_is_kept_as_history(self):
+        s = self._student()
+        refunded_at = timezone.now()
+        r = mirror_pos_topups(customers=[customer('u1', 140)], fresh=True)
+        assert r['credited'] == 1
+
+        out = record_receipts([_refund_receipt('1-101', 'u1', 40, refund_for='1-100',
+                                               at=refunded_at)], notify=False)
+
+        assert out['created'] == 1
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('140')
+        refund = CafeteriaTransaction.objects.get(loyverse_receipt_id='1-101')
+        assert refund.transaction_type == CafeteriaTransaction.TxType.REFUND
+        assert refund.applied is False and refund.balance_after is None
+        assert mirror_pos_topups(customers=[customer('u1', 140)], fresh=True)['in_sync'] == 1
+
+    def test_webhook_order_customers_update_then_receipts_update(self, api_client, settings):
+        settings.LOYVERSE_WEBHOOK_SECRET = 'hook-secret'
+        s = self._student()
+        url = reverse('cafeteria-loyverse-webhook-token', args=['hook-secret'])
+        fresh = customer('u1', 140)
+        with patch('apps.cafeteria.services.get_customer_by_id', return_value=fresh):
+            first = api_client.post(url, {'type': 'customers.update', 'customers': [fresh]},
+                                    format='json')
+        assert first.status_code == 200 and first.json()['credited'] == 1
+
+        second = api_client.post(url, {'type': 'receipts.update', 'receipts': [
+            _refund_receipt('1-101', 'u1', 40, refund_for='1-100')]}, format='json')
+
+        assert second.status_code == 200
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('140')
+
+    def test_receipt_first_is_credited_and_the_mirror_stays_quiet(self):
+        s = self._student()
+        record_receipts([_refund_receipt('1-101', 'u1', 40, refund_for='1-100')], notify=False)
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('140')
+        assert CafeteriaTransaction.objects.get(loyverse_receipt_id='1-101').applied is True
+
+        r = mirror_pos_topups(customers=[customer('u1', 140)], fresh=True)
+
+        assert r['in_sync'] == 1 and r['credited'] == 0
+
+    def test_an_earlier_cash_recarga_of_the_same_amount_does_not_swallow_it(self):
+        s = self._student()
+        mirror_pos_topups(customers=[customer('u1', 140)], fresh=True)   # real $40 cash, 1 h ago
+        CafeteriaTransaction.objects.filter(loyverse_receipt_id__startswith='pos-topup-').update(
+            recorded_at=timezone.now() - timedelta(hours=1))
+
+        record_receipts([_refund_receipt('1-101', 'u1', 40, refund_for='1-100')], notify=False)
+
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('180')
+        assert CafeteriaTransaction.objects.get(loyverse_receipt_id='1-101').applied is True
+
+    def test_a_reversed_mirror_credit_does_not_count(self):
+        from apps.cafeteria.services import reverse_phantom_topup
+
+        s = self._student()
+        refunded_at = timezone.now()
+        mirror_pos_topups(customers=[customer('u1', 140)], fresh=True)
+        phantom = CafeteriaTransaction.objects.get(loyverse_receipt_id__startswith='pos-topup-')
+        reverse_phantom_topup(phantom, reason='prueba')
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('100')
+
+        record_receipts([_refund_receipt('1-101', 'u1', 40, refund_for='1-100',
+                                         at=refunded_at)], notify=False)
+
+        assert CafeteriaBalance.objects.get(student=s).balance == Decimal('140')
