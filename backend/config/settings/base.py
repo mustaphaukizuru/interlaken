@@ -213,6 +213,12 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    # JSON bodies must be objects: a top-level array was a 500 (request.data.get).
+    'DEFAULT_PARSER_CLASSES': [
+        'apps.core.parsers.ObjectJSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     # Keeps DRF's {detail} / field-dict shapes, converts Django ValidationError
     # to a 400 and folds any stray {'error': ...} body into {'detail'}.

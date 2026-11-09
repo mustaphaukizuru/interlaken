@@ -18,6 +18,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -582,6 +583,10 @@ class LoyverseWebhookView(APIView):
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes: list = []
+    # The plain JSON parser, not the object-only default: this view already
+    # acknowledges and ignores a non-object body, and a 400 could make Loyverse
+    # disable the webhook.
+    parser_classes = [JSONParser]
 
     @staticmethod
     def _authorized(request, secret, token):
