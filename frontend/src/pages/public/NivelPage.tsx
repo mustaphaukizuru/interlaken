@@ -1,5 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowRight, CalendarCheck, CheckCircle2, Users } from 'lucide-react';
+import { LevelStory } from '@/components/public/LevelStory';
 import { Seo } from '@/components/seo/Seo';
 import { Reveal } from '@/components/ui/Reveal';
 import { LEVELS, getLevel } from '@/lib/levels';
@@ -13,7 +14,10 @@ const ACCENT = {
   purple: { label: 'section-label-purple', text: 'text-purple', ring: 'border-purple/30', soft: 'bg-purple/5' },
 } as const;
 
-/** Un template para los tres niveles (contenido en src/lib/levels.ts). */
+/**
+ * Un template para los tres niveles (contenido en src/lib/levels.ts): el texto
+ * del colegio (LevelStory) y, debajo, los datos prácticos del nivel.
+ */
 export default function NivelPage() {
   const { nivel } = useParams();
   const sepRows = useSep();
@@ -47,7 +51,10 @@ export default function NivelPage() {
           <h1 className="mt-3 font-head text-fluid-3xl font-black leading-tight tracking-[-0.02em]">
             {level.name}
           </h1>
-          <p className="mt-4 max-w-2xl text-[15.5px] leading-relaxed text-white/80">
+          <p className="mt-3 max-w-2xl text-balance font-head text-fluid-2xl font-bold leading-snug text-white">
+            {level.headline}
+          </p>
+          <p className="mt-4 max-w-2xl text-[16.5px] leading-relaxed text-white/85">
             {level.intro}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
@@ -63,26 +70,12 @@ export default function NivelPage() {
 
       {/* Contenido + sidebar */}
       <section className="bg-white py-12 sm:py-16">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_300px]">
-          <div className="space-y-10">
-            <Reveal>
-              <div>
-                <h2 className={`font-head text-fluid-xl font-bold ${accent.text}`}>
-                  {level.modelTitle}
-                </h2>
-                <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                  {level.model.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-[15px] leading-snug text-ink/90">
-                      <CheckCircle2 size={17} className={`mt-0.5 shrink-0 ${accent.text}`} aria-hidden="true" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0 space-y-10">
+            <LevelStory level={level} />
 
             <Reveal>
-              <div>
+              <div className="max-w-[68ch] border-t border-line pt-12">
                 <h2 className="font-head text-fluid-xl font-bold text-ink">{level.groupsTitle}</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   {level.groups.map((g) => (

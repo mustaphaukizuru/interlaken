@@ -1,6 +1,11 @@
 /**
- * levels.ts — contenido de los tres niveles educativos (fuente: material
- * institucional del colegio). Un solo template (NivelPage) lo renderiza.
+ * levels.ts — los tres niveles educativos: nombre, colores, la línea de título
+ * y el primer párrafo del texto del colegio, grupos y datos prácticos. Un solo
+ * template (NivelPage) lo renderiza.
+ *
+ * El texto largo de cada nivel vive en levelStories.ts: este archivo lo
+ * importa también la página del CMS (compartida con «/»), y el texto completo
+ * pesaría en la portada.
  */
 export interface LevelGroup {
   name: string;
@@ -14,10 +19,10 @@ export interface LevelData {
   /** Official nivel color (tokens --nivel-*): Preescolar aqua, Primaria pink, Secundaria yellow. */
   color: string;
   hero: string;
+  /** The document's title line, shown in the hero under the level's name. */
+  headline: string;
+  /** The document's first paragraph (hero lead; also the short summary other pages show). */
   intro: string;
-  /** Sección "Modelo educativo / actividades" (viñetas). */
-  modelTitle: string;
-  model: string[];
   /** Grupos y capacidades. */
   groupsTitle: string;
   groups: LevelGroup[];
@@ -32,17 +37,8 @@ export const LEVELS: LevelData[] = [
     accent: 'green',
     color: '#8ac6a4',
     hero: '/assets/hopscotch.webp',
-    intro:
-      'Recibimos a los pequeños desde los dos años de edad en un entorno seguro y estimulante. Nuestro modelo bilingüe (Español–Inglés) integra Educación en Valores, Cantos y Juegos y Educación Física; a partir de 1º de Preescolar se suman Computación y Yoga.',
-    modelTitle: 'Campos formativos',
-    model: [
-      'Lenguaje y comunicación',
-      'Pensamiento matemático',
-      'Exploración y conocimiento del mundo',
-      'Desarrollo personal y social',
-      'Expresión y apreciación artística',
-      'Formación bilingüe Español–Inglés',
-    ],
+    headline: 'Aprender también es jugar, descubrir y disfrutar',
+    intro: 'Cuando un niño se divierte, se emociona y siente curiosidad, aprender sucede de manera natural.',
     groupsTitle: 'Cuatro grupos en este nivel',
     groups: [
       {
@@ -61,7 +57,7 @@ export const LEVELS: LevelData[] = [
       'Al concluir el tercer grado, los alumnos reciben su Certificado de Educación Preescolar.',
     ],
     seoDescription:
-      'Preescolar bilingüe desde los 2 años en Tlalnepantla: campos formativos SEP, valores, computación y yoga. Grupos reducidos de 10 a 20 alumnos.',
+      'Kínder bilingüe en Tlalnepantla, de maternal a KIII: aprender jugando, proyectos en inglés y español, computación, música, deportes y yoga.',
   },
   {
     slug: 'primaria',
@@ -69,18 +65,8 @@ export const LEVELS: LevelData[] = [
     accent: 'coral',
     color: '#f4436c',
     hero: '/assets/court-primaria.webp',
-    intro:
-      'Educación de calidad basada en los Planes y Programas de la SEP y en el Modelo Educativo propio del colegio: alto nivel académico, sólida preparación y una excelente formación humana.',
-    modelTitle: 'Modelo educativo',
-    model: [
-      'Educación bilingüe (Español–Inglés)',
-      'Proyecto de Activación a la Inteligencia',
-      'Educación en Valores',
-      'Cultura Ecológica',
-      'Educación Física y Educación Artística',
-      'Educación Tecnológica (Computación)',
-      'iPad integrado al salón de clases de 4º a 6º',
-    ],
+    headline: 'Aprender tiene sentido',
+    intro: 'Queremos que nuestros alumnos no solo sepan más. Queremos que sepan qué hacer con lo que aprenden.',
     groupsTitle: 'Seis grupos en este nivel',
     groups: [
       {
@@ -94,7 +80,7 @@ export const LEVELS: LevelData[] = [
       'Acompañamiento del Departamento de Psicopedagogía.',
     ],
     seoDescription:
-      'Primaria bilingüe en Tlalnepantla: planes SEP + modelo propio, activación a la inteligencia, valores, iPad de 4º a 6º. Grupos de 20 a 25 alumnos.',
+      'Primaria bilingüe e integral en Tlalnepantla: trabajo por proyectos, pocas tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos.',
   },
   {
     slug: 'secundaria',
@@ -102,18 +88,8 @@ export const LEVELS: LevelData[] = [
     accent: 'purple',
     color: '#f1c82f',
     hero: '/assets/secundaria.webp',
-    intro:
-      'Formamos adolescentes competentes para la vida diaria y preparados para su siguiente nivel educativo, con un alto nivel académico y una excelente formación. El iPad se utiliza en el salón de clases.',
-    modelTitle: 'Actividades que enriquecen el aprendizaje',
-    model: [
-      'Horas clase que enriquecen los Planes y Programas de la SEP',
-      'Educación bilingüe con preparación para el First Certificate (Universidad de Cambridge)',
-      'Taller de Lectura y Redacción',
-      'Educación en Valores y Cultura Ecológica',
-      'Educación Tecnológica con certificación en Word, Excel y PowerPoint',
-      'ExpoInterlaken · Maratón de Conocimientos',
-      'Orientación y tutoría de alumnos',
-    ],
+    headline: 'Formación integral para la vida',
+    intro: 'La Secundaria es una etapa de grandes cambios, descubrimientos y decisiones. Por eso, para nosotros educar va mucho más allá de enseñar contenidos.',
     groupsTitle: 'Seis grupos en este nivel',
     groups: [
       {
@@ -127,7 +103,7 @@ export const LEVELS: LevelData[] = [
       'Actividades extraescolares deportivas y culturales.',
     ],
     seoDescription:
-      'Secundaria bilingüe en Tlalnepantla: preparación Cambridge First Certificate, iPad en el aula, certificación Office. Grupos de 20 a 25 alumnos.',
+      'Secundaria en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, Money Adventure en inglés, arte y viajes opcionales al extranjero.',
   },
 ];
 
