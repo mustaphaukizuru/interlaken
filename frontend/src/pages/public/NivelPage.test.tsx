@@ -6,6 +6,7 @@ vi.mock('@/hooks/useSep', () => ({ useSep: () => [{ level: 'Primaria', label: 'I
 
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { LEVELS } from '@/lib/levels';
+import { LEVEL_STORIES } from '@/lib/levelStories';
 import NivelPage from './NivelPage';
 
 const open = (slug: string) => renderWithProviders(
@@ -20,8 +21,7 @@ describe('NivelPage: the school\'s own text for each level (owner, 2026-11-08)',
     expect(screen.getByText('Aprender tiene sentido')).toBeInTheDocument();
     expect(screen.getByText('Queremos que nuestros alumnos no solo sepan más. Queremos que sepan qué hacer con lo que aprenden.')).toBeInTheDocument();
 
-    const primaria = LEVELS.find((l) => l.slug === 'primaria')!;
-    for (const s of primaria.story.filter((x) => x.title)) {
+    for (const s of LEVEL_STORIES.primaria.story.filter((x) => x.title)) {
       expect(screen.getByRole('heading', { level: 2, name: s.title })).toBeInTheDocument();
     }
     // One-line statements set as pull-quotes.
@@ -49,7 +49,7 @@ describe('NivelPage: the school\'s own text for each level (owner, 2026-11-08)',
     open(slug);
     expect(screen.getByText(level.headline)).toBeInTheDocument();
     expect(screen.getByText(level.intro)).toBeInTheDocument();
-    for (const s of level.story.filter((x) => x.title)) {
+    for (const s of LEVEL_STORIES[level.slug].story.filter((x) => x.title)) {
       expect(screen.getByRole('heading', { level: 2, name: s.title })).toBeInTheDocument();
     }
     expect(document.body.textContent).not.toContain('**');

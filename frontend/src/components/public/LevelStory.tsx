@@ -2,7 +2,8 @@ import { Fragment, type ReactNode } from 'react';
 import { BookOpenText, Calculator, MessageCircle } from 'lucide-react';
 import { Reveal } from '@/components/ui/Reveal';
 import { assetSrcSet } from '@/lib/images';
-import type { LevelData, LevelProgram, StoryBlock } from '@/lib/levels';
+import type { LevelData } from '@/lib/levels';
+import { LEVEL_STORIES, type LevelProgram, type StoryBlock } from '@/lib/levelStories';
 
 const PROGRAM_ICON: Record<LevelProgram['icon'], typeof BookOpenText> = {
   reading: BookOpenText,
@@ -57,14 +58,15 @@ function Block({ block, color, lede }: { block: StoryBlock; color: string; lede:
 }
 
 /**
- * The level's own text (src/lib/levels.ts), set for reading: one column of
+ * The level's own text (src/lib/levelStories.ts), set for reading: one column of
  * about 68 characters, the school's bold phrases kept, its one-line
  * statements as pull-quotes, and a photo of the school partway through.
  */
 export function LevelStory({ level }: { level: LevelData }) {
+  const { story, photo } = LEVEL_STORIES[level.slug];
   return (
     <div className="max-w-[68ch] space-y-14 sm:space-y-16">
-      {level.story.map((section, i) => {
+      {story.map((section, i) => {
         const id = section.title ? `${level.slug}-${i}` : undefined;
         return (
           <Fragment key={section.title ?? 'apertura'}>
@@ -81,14 +83,14 @@ export function LevelStory({ level }: { level: LevelData }) {
                 ))}
               </section>
             </Reveal>
-            {level.photo.after === i && (
+            {photo.after === i && (
               <Reveal>
                 <figure className="overflow-hidden rounded-xl2 bg-cream-2">
                   <img
-                    src={level.photo.src}
-                    srcSet={assetSrcSet(level.photo.src)}
+                    src={photo.src}
+                    srcSet={assetSrcSet(photo.src)}
                     sizes="(min-width: 1024px) 680px, 100vw"
-                    alt={level.photo.alt}
+                    alt={photo.alt}
                     width={1600}
                     height={900}
                     loading="lazy"
