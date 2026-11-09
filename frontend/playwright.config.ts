@@ -17,8 +17,11 @@ export default defineConfig({
   expect: {
     timeout: 20_000,
     // Visual baselines: absorb sub-pixel AA jitter without hiding real
-    // regressions (≈0.2% of a 1280×800 shot ≈ 2k px).
-    toHaveScreenshot: { maxDiffPixelRatio: 0.002 },
+    // regressions. An absolute count, the same in every viewport: as a ratio
+    // (0.2%) the 390-wide phone shot got only ~650 px, less than one line of
+    // text re-antialiased one pixel over (CI #599, login-mobile: 785 px).
+    // 2k px is ≈0.2% of a 1280×800 shot; a real layout change moves far more.
+    toHaveScreenshot: { maxDiffPixels: 2_000 },
   },
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
