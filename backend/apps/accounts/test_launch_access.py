@@ -76,3 +76,82 @@ class TestMedicalDataInTheEditor:
         api_client.patch(url, {'allergies': '●●●'}, format='json')
         profile.refresh_from_db()
         assert profile.allergies == 'Nuez y cacahuate'
+
+
+class TestMedicalDataInTheAuditTrail:
+    """The student's Historial (alumnos staff) showed «Alergias: — → Nuez»."""
+
+    def _legacy_row(self, profile):
+        from apps.core.models import AuditLog
+        # As written before 2026-11-09: medical values stored in cleartext.
+        return AuditLog.objects.create(
+            action='update', object_type='accounts.studentprofile', object_id=str(profile.pk),
+            changes={'allergies': ['', 'Nuez'], 'medical_notes': [None, 'Epilepsia'], 'group': ['A', 'B']},
+            context='student.personal')
+
+    def test_a_new_change_stores_who_and_when_but_not_the_value(self):
+        from apps.core.models import AuditLog
+        profile = StudentProfileFactory()
+        profile.allergies = 'Cacahuate'
+        profile.save()
+        row = AuditLog.objects.filter(object_type='accounts.studentprofile', object_id=str(profile.pk),
+                                      action='update').latest('pk')
+        assert row.changes['allergies'] == ['', '[redacted]']
+
+    def test_history_masks_rows_stored_before_the_fix(self, api_client):
+        profile = StudentProfileFactory()
+        self._legacy_row(profile)
+        api_client.force_authenticate(_staff('alumnos'))
+        r = api_client.get(reverse('admin-student-history', args=[profile.pk]))
+        assert r.status_code == 200
+        body = str(r.data)
+        assert 'Nuez' not in body and 'Epilepsia' not in body
+        legacy = next(e for e in r.data if 'group' in e['changes'])
+        assert legacy['changes']['allergies'] == ['', '[redacted]']
+        assert legacy['changes']['group'] == ['A', 'B']  # non-sensitive fields untouched
+
+    def test_the_audit_viewer_and_its_export_mask_them_too(self, api_client, admin_user):
+        profile = StudentProfileFactory()
+        self._legacy_row(profile)
+        api_client.force_authenticate(admin_user)
+        listing = api_client.get(reverse('core-admin-audit'), {'object_type': 'accounts.studentprofile'})
+        assert listing.status_code == 200 and 'Nuez' not in str(listing.data)
+        export = api_client.get(reverse('core-admin-audit-export'), {'fmt': 'csv'})
+        assert export.status_code == 200
+        content = b''.join(export.streaming_content) if export.streaming else export.content
+        assert b'Nuez' not in content and b'Epilepsia' not in content
+
+
+class TestUndoArchive:
+    """«Deshacer» right after Archivar used to leave the students in «Baja definitiva»."""
+
+    def _bulk(self, client, action, ids, payload=None):
+        return client.post(reverse('admin-student-bulk'), {
+            'action': action, 'ids': ids, 'all_matching': False, 'payload': payload or {}, 'dry_run': False,
+        }, format='json')
+
+    def test_undo_puts_back_the_status_and_the_login(self, api_client, admin_user):
+        active = StudentProfileFactory()
+        leave = StudentProfileFactory()
+        StudentProfile.objects.filter(pk=leave.pk).update(status=StudentProfile.Status.ON_LEAVE, is_active=False)
+        api_client.force_authenticate(admin_user)
+
+        assert self._bulk(api_client, 'archive', [active.pk, leave.pk]).status_code == 200
+        r = self._bulk(api_client, 'restore', [active.pk, leave.pk], {'undo': True})
+
+        assert r.status_code == 200
+        active.refresh_from_db()
+        leave.refresh_from_db()
+        assert (active.status, active.is_active, active.user.is_active, active.user.archived_at) == (
+            'active', True, True, None)
+        assert (leave.status, leave.user.archived_at) == ('on_leave', None)
+
+    def test_a_plain_restore_still_lands_in_baja_definitiva(self, api_client, admin_user):
+        profile = StudentProfileFactory()
+        api_client.force_authenticate(admin_user)
+        self._bulk(api_client, 'archive', [profile.pk])
+
+        self._bulk(api_client, 'restore', [profile.pk])
+
+        profile.refresh_from_db()
+        assert (profile.status, profile.user.is_active, profile.user.archived_at) == ('withdrawn', False, None)

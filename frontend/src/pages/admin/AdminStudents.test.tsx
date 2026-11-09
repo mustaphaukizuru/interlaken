@@ -303,6 +303,26 @@ describe('AdminStudents on DataTable v2 (Data Ops Phase 3)', () => {
       await user.click(within(dialog).getByRole('button', { name: /Archivar \(1\)/ }));
       await waitFor(() => expect(bulk()).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'archive', ids: [5], dry_run: false })));
       await waitFor(() => expect(vi.mocked(toast)).toHaveBeenCalled());
+
+      // «Deshacer» puts back the status they had, not «Baja definitiva» (launch review).
+      respond({ restored: 1 });
+      const toastBody = vi.mocked(toast).mock.lastCall![0] as unknown as (t: { id: string }) => Parameters<typeof renderWithProviders>[0];
+      renderWithProviders(toastBody({ id: 't-undo' }));
+      await user.click(screen.getByRole('button', { name: 'Deshacer' }));
+      await waitFor(() => expect(bulk()).toHaveBeenLastCalledWith({ action: 'restore', ids: [5], all_matching: false, payload: { undo: true }, dry_run: false }));
+    });
+
+    it('shows the Cafetería shortcut only to who may open the cafetería', async () => {
+      roster();
+      asRole('staff'); // alumnos only: the link used to bounce silently
+      const first = renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+      await screen.findByText('Ana López');
+      expect(screen.queryByRole('link', { name: 'Cafetería de Ana López' })).toBeNull();
+      first.unmount();
+
+      asRole('admin');
+      renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+      expect(await screen.findByRole('link', { name: 'Cafetería de Ana López' })).toBeInTheDocument();
     });
 
     it('on a phone the row actions are plain buttons named after the student', async () => {

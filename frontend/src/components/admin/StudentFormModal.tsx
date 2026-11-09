@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, Lock } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { portalApi, type StudentWrite, type StudentStatus } from '@/services/api';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
-import { invalidateStudents } from '@/hooks/queries/studentKeys';
+import { invalidateStudents, studentDetailKey } from '@/hooks/queries/studentKeys';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
 import type { StudentProfile } from '@/types';
 
@@ -59,13 +59,39 @@ function initial(student?: StudentProfile | null): StudentWrite {
 export function StudentFormModal({ open, onClose, student, onSaved }: Props) {
   const qc = useQueryClient();
   const editing = !!student;
+  // A roster row carries no medical fields: editing from it would show blanks
+  // (and once saved them over the real allergies). Load the file first, the
+  // same query the student page uses.
+  const needsFile = open && editing && student!.blood_type === undefined && !student!.medical_masked;
+  const file = useQuery({
+    queryKey: studentDetailKey(student?.id ?? 0),
+    queryFn: async () => (await portalApi.getStudent(student!.id)).data as StudentProfile,
+    enabled: needsFile,
+  });
+  const source = needsFile ? file.data : student;
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Editar alumno' : 'Nuevo alumno'} maxWidth={640}>
-      {/* Keyed so each open starts from the current student (no effect-driven reset). */}
-      <StudentForm key={`${open}-${student?.id ?? 'new'}`} student={student} onClose={onClose} onSaved={onSaved} qc={qc} />
+      {needsFile && !source ? (
+        file.isError ? (
+          <div role="alert" className="space-y-4 py-2">
+            <p className="text-sm text-ink">No se pudo cargar el expediente del alumno.</p>
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" onClick={() => void file.refetch()} className="min-h-[44px]">Reintentar</Button>
+              <Button type="button" variant="ghost" onClick={onClose} className="min-h-[44px]">Cancelar</Button>
+            </div>
+          </div>
+        ) : (
+          <p role="status" className="py-6 text-center text-sm text-muted">Cargando expediente…</p>
+        )
+      ) : (
+        /* Keyed so each open starts from the current student (no effect-driven reset). */
+        <StudentForm key={`${open}-${source?.id ?? 'new'}`} student={source} onClose={onClose} onSaved={onSaved} qc={qc} />
+      )}
     </Modal>
   );
 }
+
+const MEDICAL_KEYS: ReadonlyArray<keyof StudentWrite> = ['blood_type', 'allergies', 'medical_notes'];
 
 /** The record the server says already holds this matrícula (archived ones included). */
 interface ExistingStudent { id: number; name: string; student_id: string; status: string; archived: boolean }
@@ -78,6 +104,8 @@ function StudentForm({ student, onClose, onSaved, qc }: {
   qc: ReturnType<typeof useQueryClient>;
 }) {
   const editing = !!student;
+  // Masked for this account (staff, by role): the values are «●●●», never real.
+  const medicalLocked = !!student?.medical_masked;
   const [form, setForm] = useState<StudentWrite>(() => initial(student));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [existing, setExisting] = useState<ExistingStudent | null>(null);
@@ -90,11 +118,19 @@ function StudentForm({ student, onClose, onSaved, qc }: {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload: StudentWrite = { ...form, enrollment_date: form.enrollment_date || null, birth_date: form.birth_date || null };
-      const { data } = editing
-        ? await portalApi.updateStudent(student!.id, payload)
-        : await portalApi.createStudent(payload);
-      return data as StudentProfile;
+      if (!editing) {
+        const payload: StudentWrite = { ...form, enrollment_date: form.enrollment_date || null, birth_date: form.birth_date || null };
+        return (await portalApi.createStudent(payload)).data as StudentProfile;
+      }
+      // Only what was changed: a field nobody touched is never re-sent (a
+      // stale or masked value can not overwrite the record).
+      const base = initial(student);
+      const changed = (Object.keys(form) as (keyof StudentWrite)[])
+        .filter((k) => form[k] !== base[k] && !(medicalLocked && MEDICAL_KEYS.includes(k)));
+      const payload = Object.fromEntries(changed.map((k) => [k, form[k]])) as Partial<StudentWrite>;
+      if ('enrollment_date' in payload) payload.enrollment_date = payload.enrollment_date || null;
+      if ('birth_date' in payload) payload.birth_date = payload.birth_date || null;
+      return (await portalApi.updateStudent(student!.id, payload)).data as StudentProfile;
     },
     onSuccess: (saved) => {
       // Roster list + this student's file (both under ['admin', 'students', ...]).
@@ -187,15 +223,26 @@ function StudentForm({ student, onClose, onSaved, qc }: {
         </fieldset>
         <fieldset className="space-y-4 rounded-xl border border-coral/30 bg-coral-50/40 p-4">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-coral-600">Datos médicos (confidencial)</legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Tipo de sangre" value={form.blood_type ?? ''} onChange={(e) => set('blood_type', e.target.value.toUpperCase())} maxLength={10} placeholder="O+" />
-            <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} hint="Visible en cafetería para evitar incidentes." />
-          </div>
-          <div>
-            <label className="label" htmlFor="sf-med">Notas médicas</label>
-            <textarea id="sf-med" className="input-field min-h-[80px]" value={form.medical_notes ?? ''} onChange={(e) => set('medical_notes', e.target.value)} />
-            <p className="mt-1.5 text-xs text-subtle">Cifrado en reposo; solo administración y la familia del alumno lo ven.</p>
-          </div>
+          {medicalLocked ? (
+            <p className="flex items-start gap-2.5 text-sm text-muted">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" aria-hidden="true" />
+              <span>Solo administración ve y edita los datos médicos. Guardar este formulario no los cambia.</span>
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input label="Tipo de sangre" value={form.blood_type ?? ''} onChange={(e) => set('blood_type', e.target.value.toUpperCase())} error={errors.blood_type} maxLength={10} placeholder="O+" />
+                <Input label="Alergias" value={form.allergies ?? ''} onChange={(e) => set('allergies', e.target.value)} error={errors.allergies} hint="Visible en cafetería para evitar incidentes." />
+              </div>
+              <div>
+                <label className="label" htmlFor="sf-med">Notas médicas</label>
+                <textarea id="sf-med" className="input-field min-h-[80px]" value={form.medical_notes ?? ''} onChange={(e) => set('medical_notes', e.target.value)} aria-invalid={!!errors.medical_notes || undefined} aria-describedby={errors.medical_notes ? 'sf-med-error' : undefined} />
+                {errors.medical_notes
+                  ? <p id="sf-med-error" className="mt-1.5 text-xs text-coral-600">{errors.medical_notes}</p>
+                  : <p className="mt-1.5 text-xs text-subtle">Cifrado en reposo; solo administración y la familia del alumno lo ven.</p>}
+              </div>
+            </>
+          )}
         </fieldset>
         <div>
           <label className="label" htmlFor="sf-status">Estado</label>

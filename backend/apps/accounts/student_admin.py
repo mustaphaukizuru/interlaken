@@ -326,7 +326,8 @@ def _plan_restore(profile, payload):
 
 
 def _apply_restore(profile, payload, actor):
-    return {**restore_student(profile), 'via': 'portal-bulk'}
+    # payload.undo: the toast's «Deshacer» puts the previous status back.
+    return {**restore_student(profile, undo=bool(payload.get('undo'))), 'via': 'portal-bulk'}
 
 
 _plan_grade, _apply_grade = _field_action('grade', 'grado')
