@@ -1165,6 +1165,8 @@ function CustomersTab() {
     { id: 'email', header: 'Correo', className: 'text-muted', cell: (c) => c.email || '—' },
     { id: 'points', header: 'Saldo', sortKey: 'points', align: 'right', className: 'font-semibold text-ink', cell: (c) => mxn(c.total_points) },
     { id: 'visits', header: 'Visitas', sortKey: 'visits', align: 'right', className: 'text-muted', cell: (c) => c.total_visits },
+    // The pupil's purchases from the ledger; a card with no student has none.
+    { id: 'spent', header: 'Consumo', label: 'Consumo registrado', sortKey: 'spent', align: 'right', className: 'text-muted', cell: (c) => (c.consumption == null ? '—' : mxn(c.consumption)) },
     { id: 'last_visit', header: 'Última visita', sortKey: 'last_visit', className: 'whitespace-nowrap text-muted', cell: (c) => fmtDate(c.last_visit) },
     {
       id: 'state', header: 'Estado',

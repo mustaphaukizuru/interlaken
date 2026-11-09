@@ -22,6 +22,20 @@ export type * from './dataOps';
 /** «Correo para avisos»: a personal address confirmed by a signed link. */
 export interface NotifyEmailState { email: string; verified: boolean; sent?: boolean }
 
+/** What the emailed confirmation link confirms (public page, no sign-in). */
+export type NotifyEmailLinkState = 'ready' | 'confirmed' | 'expired' | 'invalid' | 'superseded';
+export interface NotifyEmailLink {
+  state: NotifyEmailLinkState;
+  /** Who the avisos are about: «Carla R.» + «1° Secundaria · Grupo A» for a student. */
+  account?: { name: string; detail: string; is_student: boolean };
+  /** Masked: «mu…@gmail.com». */
+  email?: string;
+  expires_at?: string | null;
+  /** The address also has its own portal login (they stay separate). */
+  separate_account?: boolean;
+  detail?: string;
+}
+
 export interface StaffUser {
   id: number;
   email: string;
@@ -269,7 +283,6 @@ export const authApi = {
   getNotifyEmail: () => api.get<NotifyEmailState>('/accounts/me/notify-email/'),
   setNotifyEmail: (email: string) => api.put<NotifyEmailState>('/accounts/me/notify-email/', { email }),
   deleteNotifyEmail: () => api.delete<NotifyEmailState>('/accounts/me/notify-email/'),
-  verifyNotifyEmail: (token: string) => api.post<NotifyEmailState>('/accounts/me/notify-email/verify/', { token }),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
   updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>
@@ -480,6 +493,7 @@ export interface LoyverseCustomer {
   first_visit: string | null;
   last_visit: string | null;
   total_visits: number;
+  /** Loyverse's figure: cash/card paid at the register only (wallet purchases are points). */
   total_spent: string;
   total_points: string;
   loyverse_created_at: string | null;
@@ -490,6 +504,8 @@ export interface LoyverseCustomer {
   student: { id: number; name: string; grade: string; group: string; student_id: string } | null;
   /** Parked wallet receipts for a card with no student. */
   receipts: number;
+  /** The pupil's «Consumo registrado» from the ledger (sort key `spent`); null for a card with no student. */
+  consumption: string | null;
 }
 
 export interface LoyverseCustomerPage {

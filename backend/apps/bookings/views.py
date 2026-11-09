@@ -363,12 +363,22 @@ class AdminBookingRescheduleView(APIView):
             calendar.sync_booking_created(booking)
         except Exception:  # noqa: BLE001 - calendar is best effort, but never silent
             logging.getLogger(__name__).exception('Calendar resync failed for booking %s', booking.pk)
+        from apps.portal.emailing import EmailContent, long_date
         from apps.portal.services import send_email
-        send_email(
-            'Su visita al Colegio Interlaken cambió de horario',
-            f'Hola {booking.parent_name}:\n\nSu visita quedó reprogramada para el {slot.date:%d/%m/%Y} a las {slot.start_time:%H:%M}'
-            f' (antes {old.date:%d/%m/%Y} {old.start_time:%H:%M}).\n\nSi no le es posible, responda a este correo o escríbanos por WhatsApp.',
-            [booking.parent_email], reply_to=settings.ADMISSIONS_EMAIL)
+        content = EmailContent(
+            category='Visitas', tone='warning',
+            title='Su visita fue reprogramada',
+            intro=(f'Estimado/a {booking.parent_name}: su visita quedó reprogramada para el '
+                   f'{long_date(slot.date)} a las {slot.start_time:%H:%M}.'),
+            details=[('Nuevo horario', f'{long_date(slot.date)}, {slot.start_time:%H:%M} a {slot.end_time:%H:%M}'),
+                     ('Horario anterior', f'{long_date(old.date)}, {old.start_time:%H:%M}'),
+                     ('Lugar', slot.location or 'Campus Interlaken')],
+            note='Si no le es posible, responda a este correo o escríbanos por WhatsApp.',
+            signoff='Equipo de Admisiones',
+            reason='Recibe este correo porque agendó una visita al Colegio Interlaken.',
+        )
+        send_email('Su visita al Colegio Interlaken cambió de horario', '', [booking.parent_email],
+                   reply_to=settings.ADMISSIONS_EMAIL, content=content)
         record('update', booking, {'slot': {'from': old.pk, 'to': slot.pk}}, actor=request.user, context='bookings: reprogramación')
         return Response(BookingSerializer(booking).data)
 

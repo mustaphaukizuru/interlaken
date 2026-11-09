@@ -105,10 +105,20 @@ export interface LoyverseProfile {
   first_visit: string | null;
   last_visit: string | null;
   total_visits: number;
+  /** Loyverse's own figure: cash/card paid at the register only. The wallet is
+   *  points, so it is $0 for most pupils: show `CafeteriaConsumption` instead. */
   total_spent: string;
   total_points: string;
   loyverse_created_at: string | null;
   synced_at: string;
+}
+
+/** «Consumo registrado»: every purchase in the school's ledger (the Loyverse
+ *  wallet receipts mirrored by the portal). `since` is the local calendar date
+ *  (YYYY-MM-DD) of the first one; null with no purchase yet. */
+export interface CafeteriaConsumption {
+  total: string;
+  since: string | null;
 }
 
 /** Digital cafetería card for one child (from /cafeteria/cards/). */
@@ -119,6 +129,7 @@ export interface CafeteriaCard {
   balance: string;
   is_low_balance: boolean;
   points: string | null;
+  consumption: CafeteriaConsumption;
   loyverse: LoyverseProfile | null;
 }
 
@@ -259,6 +270,8 @@ export interface CafeteriaStudentDetail {
   parents: Array<{ id: number; full_name: string; email: string; whatsapp: string }>;
   transactions: CafeteriaTransaction[];
   adjustments: BalanceAdjustment[];
+  /** «Consumo registrado», the same figure as the family card. */
+  consumption: CafeteriaConsumption;
   /** Full Loyverse customer snapshot; null when never synced. */
   loyverse: LoyverseProfile | null;
 }

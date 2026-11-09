@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -11,7 +12,6 @@ vi.mock('@/services/api', () => ({
     getNotifyEmail: vi.fn(),
     setNotifyEmail: vi.fn(),
     deleteNotifyEmail: vi.fn(),
-    verifyNotifyEmail: vi.fn(),
   },
 }));
 
@@ -41,13 +41,31 @@ describe('NotifyEmailCard («Correo para avisos», owner 2026-10-20)', () => {
     expect(screen.getByRole('button', { name: 'Reenviar enlace' })).toBeInTheDocument();
   });
 
-  it('confirms the address once when arriving from the email link', async () => {
-    api.verifyNotifyEmail.mockResolvedValue({ data: { email: 'mama@gmail.com', verified: true } } as never);
-    renderWithProviders(<NotifyEmailCard />, { route: '/portal/perfil?tab=avisos&verificar_correo=tok123' });
+  it('says the copy creates no account, and turns «Confirmado» by itself while pending', async () => {
+    api.getNotifyEmail
+      .mockResolvedValueOnce({ data: { email: 'mama@gmail.com', verified: false } } as never)
+      .mockResolvedValue({ data: { email: 'mama@gmail.com', verified: true } } as never);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderWithProviders(<NotifyEmailCard />);
+      expect(await screen.findByText(/no necesita iniciar sesión/)).toBeInTheDocument();
+      expect(screen.getByText(/no crea otra cuenta ni da acceso al portal/)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(8500);
+      expect(await screen.findByText(/Confirmado: recibe los avisos/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-    await waitFor(() => expect(api.verifyNotifyEmail).toHaveBeenCalledWith('tok123'));
-    expect(await screen.findByText(/Confirmado: recibe los avisos/)).toBeInTheDocument();
-    expect(api.verifyNotifyEmail).toHaveBeenCalledTimes(1);
+  it('a link sent before 2026-11-08 opened signed in goes to the public confirmation', () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/portal/perfil" element={<NotifyEmailCard />} />
+        <Route path="/confirmar-correo" element={<div>confirmar</div>} />
+      </Routes>,
+      { route: '/portal/perfil?tab=avisos&verificar_correo=old-tok' },
+    );
+    expect(screen.getByText('confirmar')).toBeInTheDocument();
   });
 
   it('removes a confirmed address', async () => {

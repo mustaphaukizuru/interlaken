@@ -46,8 +46,17 @@ class ContactCreateView(APIView):
                      or settings.DEFAULT_FROM_EMAIL)
         # Reply-To is the visitor, so staff answer them with one click.
         # (lazy import: apps.portal.services imports from apps.core at module load)
+        from apps.portal.emailing import EmailContent
         from apps.portal.services import send_email
 
+        content = EmailContent(
+            category='Contacto web · aviso interno',
+            title=message.subject or 'Mensaje desde el sitio',
+            intro='Llegó un mensaje desde el formulario de contacto. Responda a este correo para contestarle directamente.',
+            details=[('Nombre', message.name), ('Correo', message.email)],
+            paragraphs=[message.message],
+            reason='Aviso interno del sitio del Colegio Interlaken.',
+        )
         send_email(
             f'[Contacto web] {message.subject}',
             (
@@ -57,6 +66,7 @@ class ContactCreateView(APIView):
             ),
             [recipient],
             reply_to=message.email,
+            content=content,
         )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -200,14 +210,28 @@ class FacturacionRequestView(APIView):
         recipient = getattr(settings, 'BILLING_EMAIL', '') or settings.CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL
         send_email(f'[Facturación] Solicitud de factura: {d["razon_social"]}', body, [recipient],
                    reply_to=d['email'], html=False)
-        send_email('Recibimos su solicitud de facturación - Colegio Interlaken',
+        from apps.portal.emailing import EmailContent
+
+        ack = EmailContent(
+            category='Facturación', tone='success',
+            title='Recibimos su solicitud de facturación',
+            intro=('Registramos sus datos fiscales. A partir de ahora recibirá sus facturas cada mes, '
+                   '24 horas hábiles después de realizar sus pagos.'),
+            details=[('Alumno', d['student']), ('Razón social', d['razon_social']), ('RFC', rfc),
+                     ('Código postal', d['cp']), ('Régimen fiscal', d['regimen']),
+                     ('Facturas a', d['email'])],
+            note=('Solo se emiten facturas del mes en curso y no es posible cancelar ni cambiar facturas '
+                  'fuera del mes en que se realizó el pago. Si algún dato cambia, responda a este correo.'),
+            reason='Recibe este correo porque envió una solicitud de facturación desde interlaken.edu.mx.',
+        )
+        send_email('Recibimos su solicitud de facturación',
                    f'Recibimos su solicitud de facturación para {d["razon_social"]} ({rfc}), '
                    f'alumno {d["student"]}.\n\n'
                    'A partir de ahora recibirá sus facturas cada mes, 24 horas hábiles después de '
                    'realizar sus pagos. Solo se emiten facturas del mes en curso y no es posible '
                    'cancelar ni cambiar facturas fuera del mes en que se realizó el pago.\n\n'
-                   f'Si algún dato cambia, escríbanos a {recipient}.\n\nColegio Interlaken',
-                   [d['email']], reply_to=recipient)
+                   f'Si algún dato cambia, escríbanos a {recipient}.',
+                   [d['email']], reply_to=recipient, content=ack)
         return Response({'detail': 'Solicitud enviada.'}, status=status.HTTP_201_CREATED)
 
 
