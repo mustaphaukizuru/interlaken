@@ -31,6 +31,8 @@ def test_feed_merges_sources_and_respects_since(auth_client, parent_user, admin_
     assert not any(i['type'] == 'comunicado' for i in r.data['items'])
     assert 'Junta de padres' not in titles and 'Solo personal' not in titles
     assert any(t.endswith('· Festival') for t in titles) and not any('Lejano' in t for t in titles)
+    # No public calendar page to open any more: a school date is a plain row.
+    assert all(i['link'] == '' for i in r.data['items'] if i['type'] == 'evento')
     assert any(t.startswith('Consumo de') and '$35' in t for t in titles)
 
     since = (timezone.now() + dt.timedelta(minutes=1)).isoformat()

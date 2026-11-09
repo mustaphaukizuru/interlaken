@@ -76,7 +76,6 @@ const AdminAudit      = lazy(() => import('./pages/admin/AdminAudit'));
 import { CmsOverride } from './cms/CmsOverride';
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
-const CalendarioPage = lazy(() => import('./pages/public/CalendarioPage'));
 const AdminVisitsWeek = lazy(() => import('./pages/admin/AdminVisitsWeek'));
 const AdminPipeline = lazy(() => import('./pages/admin/AdminPipeline'));
 const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
@@ -156,7 +155,8 @@ export default function App() {
               <Route path="/comunidad/plataformas" element={<Navigate to="/pagos" replace />} />
               <Route path="/pagos" element={<PagosPage />} />
               <Route path="/plataformas" element={<CmsOverride slug="plataformas"><PlataformasPage /></CmsOverride>} />
-              <Route path="/calendario" element={<CalendarioPage />} />
+              {/* Calendario escolar left the public site (owner, 2026-11-08); old links land on the home page. */}
+              <Route path="/calendario" element={<Navigate to="/" replace />} />
               <Route path="/comunidad/facturacion" element={<FacturacionPage />} />
               {/* 404 — honest not-found instead of a silent redirect home. */}
               <Route path="p/:slug" element={<CmsPage />} />

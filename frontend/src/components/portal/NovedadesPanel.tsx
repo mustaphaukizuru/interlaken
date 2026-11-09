@@ -16,6 +16,20 @@ export function writeSeen(iso: string) {
   try { localStorage.setItem(KEY, iso); } catch { /* private mode */ }
 }
 
+function NovedadRow({ it, Icon }: { it: NovedadItem; Icon: typeof Bell }) {
+  return (
+    <>
+      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${it.unread ? 'bg-purple/10 text-purple' : 'bg-cream-2 text-subtle'}`}><Icon size={14} aria-hidden="true" /></span>
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-sm ${it.unread ? 'font-semibold text-ink' : 'text-ink'}`}>{it.title}</span>
+        {it.text && <span className="block truncate text-xs text-muted">{it.text}</span>}
+        <span className="block text-[11px] text-subtle">{formatDateTime(it.at)}</span>
+      </span>
+      {it.unread && <><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-pink" aria-hidden="true" /><span className="sr-only">Nuevo</span></>}
+    </>
+  );
+}
+
 /** "What's new since your last visit" (BACKLOG P4-11). `since` = last time this panel was shown. */
 export function NovedadesPanel({ className = '' }: { className?: string }) {
   const [since] = useState<string | null>(readSeen);
@@ -32,15 +46,16 @@ export function NovedadesPanel({ className = '' }: { className?: string }) {
             const Icon = ICON[it.type] ?? Bell;
             return (
               <li key={i}>
-                <Link to={it.link} className="flex items-start gap-3 py-2.5 hover:bg-cream-2 -mx-2 px-2 rounded-lg">
-                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${it.unread ? 'bg-purple/10 text-purple' : 'bg-cream-2 text-subtle'}`}><Icon size={14} aria-hidden="true" /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-sm ${it.unread ? 'font-semibold text-ink' : 'text-ink'}`}>{it.title}</span>
-                    {it.text && <span className="block truncate text-xs text-muted">{it.text}</span>}
-                    <span className="block text-[11px] text-subtle">{formatDateTime(it.at)}</span>
-                  </span>
-                  {it.unread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-pink" aria-label="Nuevo" />}
-                </Link>
+                {/* An item without a page to open (a school date) is a plain row, not a dead link. */}
+                {it.link ? (
+                  <Link to={it.link} className="flex items-start gap-3 py-2.5 hover:bg-cream-2 -mx-2 px-2 rounded-lg">
+                    <NovedadRow it={it} Icon={Icon} />
+                  </Link>
+                ) : (
+                  <div className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5">
+                    <NovedadRow it={it} Icon={Icon} />
+                  </div>
+                )}
               </li>
             );
           })}

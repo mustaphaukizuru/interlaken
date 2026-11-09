@@ -58,3 +58,5 @@ class TestSitemap:
         assert '/borrador' not in xml and '/oculta' not in xml
         assert 'https://interlaken.edu.mx/galeria</loc>' not in xml
         assert 'https://interlaken.edu.mx/admisiones</loc>' in xml
+        # Calendario escolar left the public site (owner, 2026-11-08).
+        assert '/calendario</loc>' not in xml

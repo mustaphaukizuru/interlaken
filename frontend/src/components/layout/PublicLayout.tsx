@@ -43,14 +43,13 @@ export function resolveMenu(cms: MenuGroup[] | undefined, fallback: MenuGroupEnt
   return cms.map((g) => ({ label: g.label, items: g.items.map((it) => ({ label: it.label, to: it.to, icon: ICONS[it.icon ?? ''] ?? FileText })) }));
 }
 
-const DEFAULT_MENU: MenuGroupEntry[] = [
+export const DEFAULT_MENU: MenuGroupEntry[] = [
   {
     label: 'El Colegio',
     items: [
       { label: 'Quiénes Somos', to: '/nosotros', icon: Users },
       { label: 'Modelo Educativo', to: '/modelo-educativo', icon: BookOpen },
       { label: 'Galería', to: '/galeria', icon: Camera },
-      { label: 'Calendario escolar', to: '/calendario', icon: CalendarDays },
       { label: 'Plataformas', to: '/plataformas', icon: MonitorSmartphone },
     ],
   },

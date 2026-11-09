@@ -70,10 +70,6 @@ export default function FacturacionPage() {
                 </span>
                 Solicitud de facturación
               </h2>
-              <p className="mt-3 text-sm leading-relaxed text-muted sm:text-[15px]">
-                Su solicitud llega a{' '}
-                <a href={`mailto:${BILLING_EMAIL}`} className="font-medium text-green-dark underline">{BILLING_EMAIL}</a>.
-              </p>
               <div className="mt-5">
                 <FacturacionForm billingEmail={BILLING_EMAIL} />
               </div>

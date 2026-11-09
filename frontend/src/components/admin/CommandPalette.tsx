@@ -52,7 +52,6 @@ const FAMILY_ACTIONS: Item[] = [
   { key: 'f-pagos', group: 'Ir a', icon: Download, title: 'Pagos', detail: 'Próximamente', to: '/portal/pagos' },
   { key: 'f-notificaciones', group: 'Ir a', icon: Megaphone, title: 'Notificaciones', detail: 'Centro de avisos', to: '/portal/notificaciones' },
   { key: 'f-perfil', group: 'Ir a', icon: Settings, title: 'Mi perfil', detail: 'Datos, avisos, seguridad', to: '/portal/perfil' },
-  { key: 'f-calendario', group: 'Ir a', icon: CalendarCheck, title: 'Calendario escolar', detail: 'Fechas del ciclo', to: '/calendario' },
 ];
 const STAFF_ACTIONS: Item[] = [
   { key: 's-analitica', group: 'Ir a', icon: Settings, title: 'Analítica', detail: '/staff', to: '/staff' },

@@ -360,7 +360,7 @@ export default function AdminAnnouncements() {
           {form.show_on_site && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Input label="Mostrar hasta (opcional)" type="date" value={form.site_until ?? ''} onChange={(e) => setForm((f) => ({ ...f, site_until: e.target.value || null }))} />
-              <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setForm((f) => ({ ...f, site_link: e.target.value }))} placeholder="/calendario" />
+              <Input label="Enlace «Ver más» (opcional)" value={form.site_link} onChange={(e) => setForm((f) => ({ ...f, site_link: e.target.value }))} placeholder="/admisiones" />
             </div>
           )}
           {/* «Pedir Enterado» and attachments are not offered: no family channel

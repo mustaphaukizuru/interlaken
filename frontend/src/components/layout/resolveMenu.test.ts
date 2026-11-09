@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FileText, Users } from 'lucide-react';
-import { resolveMenu } from './PublicLayout';
+import { DEFAULT_MENU, resolveMenu } from './PublicLayout';
 
 const fallback = [{ label: 'A', items: [{ label: 'x', to: '/x', icon: Users }] }];
 
@@ -14,5 +14,10 @@ describe('resolveMenu', () => {
     expect(out[0].items[0].icon).toBe(Users);
     expect(out[0].items[1].icon).toBe(FileText);
     expect(out[0].items[1].to).toBe('https://x.mx');
+  });
+  it('the built-in menu no longer offers Calendario escolar (owner, 2026-11-08)', () => {
+    const links = DEFAULT_MENU.flatMap((g) => g.items.map((i) => i.to));
+    expect(links).not.toContain('/calendario');
+    expect(links).toContain('/plataformas');
   });
 });
