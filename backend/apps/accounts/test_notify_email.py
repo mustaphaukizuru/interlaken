@@ -96,6 +96,48 @@ class TestSetAndVerify:
         assert api_client.get(URL).status_code in (401, 403)
 
 
+
+class TestGuardianAddress:
+    """Launch fix 2: a student's login does not repeat a linked guardian's own address.
+
+    That guardian already gets every notice about the student in their own
+    copy; the send-time dedupe covers addresses saved before this check.
+    """
+
+    def _as_student_of(self, api_client, guardian):
+        kid = StudentUserFactory(email='ci1@interlaken.com.mx')
+        StudentProfileFactory(user=kid, parents=[guardian])
+        api_client.force_authenticate(kid)
+        return kid
+
+    def test_a_linked_guardians_login_is_refused(self, api_client):
+        kid = self._as_student_of(api_client, ParentFactory(email='mama@gmail.com'))
+        mail.outbox.clear()
+        r = api_client.put(URL, {'email': 'Mama@Gmail.com'}, format='json')
+        assert r.status_code == 400 and r.json()['code'] == 'guardian_account'
+        assert 'Padre/Tutor' in r.json()['detail']
+        kid.refresh_from_db()
+        assert kid.notify_email == '' and mail.outbox == []
+
+    def test_a_linked_guardians_confirmed_personal_address_is_refused(self, api_client):
+        dad = ParentFactory(email='papa@test.mx', notify_email='familia@gmail.com',
+                            notify_email_verified_at=timezone.now())
+        self._as_student_of(api_client, dad)
+        r = api_client.put(URL, {'email': 'familia@gmail.com'}, format='json')
+        assert r.status_code == 400 and r.json()['code'] == 'guardian_account'
+
+    def test_an_inactive_guardians_address_is_accepted(self, api_client):
+        mom = ParentFactory(email='mama@gmail.com')
+        mom.is_active = False
+        mom.save(update_fields=['is_active'])
+        self._as_student_of(api_client, mom)
+        assert api_client.put(URL, {'email': 'mama@gmail.com'}, format='json').status_code == 200
+
+    def test_a_guardian_may_add_their_own_personal_address(self, auth_client, parent_user):
+        kid = StudentUserFactory(email='ci2@interlaken.com.mx')
+        StudentProfileFactory(user=kid, parents=[parent_user])
+        assert auth_client.put(URL, {'email': 'casa@gmail.com'}, format='json').status_code == 200
+
 class TestPublicConfirmation:
     """The page the emailed link opens: works signed out; opening it changes nothing."""
 

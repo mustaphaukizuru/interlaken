@@ -36,7 +36,7 @@ from apps.core.throttling import SharedScopedRateThrottle
 from apps.core.transitions import assert_transition
 from apps.payments.models import Payment
 
-from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification
+from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification, published_q
 from .serializers import (
     AnnouncementAdminSerializer,
     AnnouncementCommentSerializer,
@@ -44,7 +44,7 @@ from .serializers import (
     NotificationDetailSerializer,
     NotificationSerializer,
 )
-from .services import _audience_roles, emergency_broadcast, fanout_and_stamp
+from .services import INLINE_DISPATCH_LIMIT, _audience_roles, emergency_broadcast, fanout_and_stamp
 
 
 def audiences_for_user(user):
@@ -66,6 +66,15 @@ def audiences_for_user(user):
         audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS,
                       Announcement.Audience.STAFF]
     return audiences
+
+
+def visible_announcements(user):
+    """The comunicados ``user`` may see or act on outside the console: active,
+    for their audience and published (``published_q``). A comunicado scheduled
+    for later is invisible here until its time, as it is in the fan-out."""
+    return (Announcement.objects
+            .filter(is_active=True, audience__in=audiences_for_user(user))
+            .filter(published_q()))
 
 
 def _pending_topup_counts() -> dict:
@@ -221,9 +230,7 @@ class DashboardView(APIView):
             }
 
         # Common: announcements + unread notifications
-        announcements = Announcement.objects.filter(
-            is_active=True, audience__in=audiences_for_user(user)
-        ).annotate(
+        announcements = visible_announcements(user).annotate(
             visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
             # Annotated here too, so passing the request (needed for the correct
             # 'acknowledged' value) does not cost one EXISTS per announcement.
@@ -237,12 +244,24 @@ class DashboardView(APIView):
 
 
 SITE_NOTICES_CACHE = 'portal:site-notices'
+SITE_NOTICES_TTL = 300
+
+
+def site_notices_ttl(now) -> int:
+    """Seconds to cache the banner: 5 minutes, or less when a notice scheduled
+    for the site goes live sooner (it must not wait for the cache to expire)."""
+    soonest = (Announcement.objects.filter(is_active=True, show_on_site=True, publish_at__gt=now)
+               .order_by('publish_at').values_list('publish_at', flat=True).first())
+    if soonest is None:
+        return SITE_NOTICES_TTL
+    return max(1, min(SITE_NOTICES_TTL, int((soonest - now).total_seconds()) + 1))
 
 
 class SiteNoticesView(APIView):
     """GET /portal/avisos/ — public banner notices (BACKLOG P3-9): active announcements
-    flagged "publicar en el sitio", not past site_until. Cached 5 min; saving an
-    announcement clears the cache."""
+    flagged "publicar en el sitio", published (``publish_at`` reached), not past
+    site_until. Cached 5 min at most (less when a scheduled notice is due
+    sooner); saving an announcement clears the cache."""
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
@@ -251,13 +270,15 @@ class SiteNoticesView(APIView):
 
         data = cache.get(SITE_NOTICES_CACHE)
         if data is None:
+            now = timezone.now()
             today = timezone.localdate()
             qs = (Announcement.objects.filter(is_active=True, show_on_site=True)
+                  .filter(published_q(now))
                   .filter(Q(site_until__isnull=True) | Q(site_until__gte=today))
                   .order_by('-created_at')[:3])
             data = [{'id': a.id, 'title': a.title, 'body': a.body[:280], 'link': a.site_link, 'until': a.site_until.isoformat() if a.site_until else None}
                     for a in qs]
-            cache.set(SITE_NOTICES_CACHE, data, 300)
+            cache.set(SITE_NOTICES_CACHE, data, site_notices_ttl(now))
         resp = Response(data)
         resp['Cache-Control'] = 'public, max-age=120'
         return resp
@@ -269,10 +290,7 @@ class AnnouncementListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Announcement.objects.filter(
-            is_active=True,
-            audience__in=audiences_for_user(self.request.user),
-        ).filter(Q(publish_at__isnull=True) | Q(publish_at__lte=timezone.now())).annotate(
+        return visible_announcements(self.request.user).annotate(
             visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
             acknowledged_ann=Exists(AnnouncementRead.objects.filter(
                 announcement=OuterRef('pk'), user=self.request.user, acknowledged_at__isnull=False)),
@@ -285,10 +303,7 @@ class AnnouncementDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Announcement.objects.filter(
-            is_active=True,
-            audience__in=audiences_for_user(self.request.user),
-        ).annotate(
+        return visible_announcements(self.request.user).annotate(
             visible_comment_count=Count('comments', filter=Q(comments__is_hidden=False)),
         )
 
@@ -305,12 +320,9 @@ class AnnouncementCommentListCreateView(generics.ListCreateAPIView):
 
     def _announcement(self):
         # 404s (not 403) if the comunicado isn't visible to this family — never
-        # leaks the existence of an announcement targeted at another audience.
-        return get_object_or_404(
-            Announcement.objects.filter(
-                is_active=True,
-                audience__in=audiences_for_user(self.request.user)),
-            pk=self.kwargs['pk'])
+        # leaks the existence of an announcement targeted at another audience
+        # (or scheduled for later).
+        return get_object_or_404(visible_announcements(self.request.user), pk=self.kwargs['pk'])
 
     def get_queryset(self):
         return AnnouncementComment.objects.filter(
@@ -335,13 +347,18 @@ def announcement_state(a) -> str:
     return 'draft' if a.fanout_at is None else 'inactive'
 
 
-def _maybe_fanout(announcement, *, context):
-    """First publish fans out once; scheduled comunicados wait for the cron."""
+def _maybe_fanout(announcement, *, context, dispatch_limit=INLINE_DISPATCH_LIMIT):
+    """First publish fans out once; scheduled comunicados wait for the cron.
+
+    A single publish emails a small first batch itself; a bulk «Activar»
+    passes ``dispatch_limit=0``: it runs inside the bulk transaction and may
+    publish several comunicados in one request, so the 5-minute
+    dispatch_notifications cron sends all of it once that commits."""
     scheduled_later = bool(announcement.publish_at and announcement.publish_at > timezone.now())
     if not announcement.is_active or announcement.fanout_at is not None or scheduled_later:
         return
     try:
-        fanout_and_stamp(announcement)
+        fanout_and_stamp(announcement, dispatch_limit=dispatch_limit)
     except Exception:  # noqa: BLE001 — best-effort notification
         logging.getLogger(__name__).exception('Announcement %s %s fan-out failed', announcement.pk, context)
 
@@ -472,7 +489,7 @@ def _activation(name, label_es, target):
         a.is_active = target == 'active'
         a.save(update_fields=['is_active', 'updated_at'])
         if a.is_active:
-            _maybe_fanout(a, context='bulk-activate')
+            _maybe_fanout(a, context='bulk-activate', dispatch_limit=0)
         return {'state': [current, target]}
 
     return BulkAction(name=name, label_es=label_es, handler=handler, plan=plan, side_effects='per_row')
@@ -595,7 +612,7 @@ class AnnouncementMarkReadView(APIView):
     """
     POST /api/v1/portal/announcements/mark-read/  {"ids": [1, 2]}
     Idempotent read receipts; only announcements the caller can actually
-    see (active + matching audience) are recorded.
+    see (active + matching audience + published) are recorded.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -605,10 +622,8 @@ class AnnouncementMarkReadView(APIView):
                 or not all(isinstance(i, int) for i in ids)):
             return Response(error_body('ids debe ser una lista de enteros.'), status=400)
 
-        visible = list(Announcement.objects.filter(
-            id__in=ids[:50], is_active=True,
-            audience__in=audiences_for_user(request.user),
-        ).values_list('id', flat=True))
+        visible = list(visible_announcements(request.user).filter(
+            id__in=ids[:50]).values_list('id', flat=True))
         AnnouncementRead.objects.bulk_create(
             [AnnouncementRead(announcement_id=a, user=request.user) for a in visible],
             ignore_conflicts=True,
@@ -622,7 +637,7 @@ class AnnouncementAckView(APIView):
 
     def post(self, request, pk):
         from django.utils import timezone as tz
-        ann = Announcement.objects.filter(pk=pk, is_active=True, audience__in=audiences_for_user(request.user)).first()
+        ann = visible_announcements(request.user).filter(pk=pk).first()
         if ann is None:
             return Response({'detail': 'No encontrado.'}, status=404)
         read, _ = AnnouncementRead.objects.get_or_create(announcement=ann, user=request.user)

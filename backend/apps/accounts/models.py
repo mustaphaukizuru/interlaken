@@ -255,12 +255,28 @@ class NotificationPreference(models.Model):
         prefs, _ = cls.objects.get_or_create(user=user)
         return prefs
 
+    @classmethod
+    def lookup(cls, user):
+        """Prefs without creating a row: the defaults (everything on) when the user never saved any."""
+        return cls.objects.filter(user_id=user.pk).first() or cls(user_id=user.pk)
+
     CATEGORY_FIELD = {'cafeteria': 'cat_cafeteria', 'payment': 'cat_payment', 'info': 'cat_info'}
+    # Urgent alerts (emergency broadcasts) go out on every channel whatever the
+    # toggles say: the Avisos tab promises «Las alertas urgentes … siempre se envían».
+    URGENT_TYPES = frozenset({'warning'})
 
     def allows(self, notif_type: str) -> bool:
         """False when the user muted this category; warnings are never muted."""
         field = self.CATEGORY_FIELD.get(notif_type)
         return True if field is None else bool(getattr(self, field, True))
+
+    def wants(self, channel: str, notif_type: str) -> bool:
+        """Whether a ``notif_type`` notice reaches this user by ``channel``
+        ('email', 'push' or 'in_app'): the channel on and the category not
+        muted, or an urgent alert, which always does."""
+        if notif_type in self.URGENT_TYPES:
+            return True
+        return bool(getattr(self, f'{channel}_enabled')) and self.allows(notif_type)
 
 
 class PasswordRequest(models.Model):

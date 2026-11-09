@@ -55,6 +55,18 @@ class Announcement(models.Model):
         cache.delete('portal:site-notices')
 
 
+def published_q(now=None) -> models.Q:
+    """Comunicados whose time has come: no ``publish_at``, or one already past.
+
+    Everything families and the public site see goes through it: a comunicado
+    scheduled for later stays a draft until then (the console lists it anyway).
+    """
+    from django.utils import timezone
+
+    now = now or timezone.now()
+    return models.Q(publish_at__isnull=True) | models.Q(publish_at__lte=now)
+
+
 class Notification(models.Model):
     class NotifType(models.TextChoices):
         INFO      = 'info',      'Información'
