@@ -48,6 +48,27 @@ def test_password_login_records_history_and_requires_totp(api_client, admin_user
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize('typed', [' {}', '{}  ', '\t{}\n'])
+def test_totp_gate_ignores_spaces_around_the_email(api_client, admin_user, typed):
+    """SimpleJWT trims the email before checking the password, but the TOTP gate
+    looked the account up with the raw value: ' admin@…' found nobody there and
+    signed in without the code."""
+    from apps.accounts.security import TotpDevice
+
+    secret = new_secret()
+    TotpDevice.objects.create(user=admin_user, secret=secret, confirmed=True)
+    url = reverse('token-obtain')
+    email = typed.format(admin_user.email)
+    r = api_client.post(url, {'email': email, 'password': 'admin-pass-123'}, format='json')
+    assert r.status_code == 401 and r.data['totp_required'] is True and 'access' not in r.data
+    r = api_client.post(url, {'email': email, 'password': 'admin-pass-123',
+                              'totp': totp_code(secret)}, format='json')
+    assert r.status_code == 200 and 'access' in r.data
+    assert LoginEvent.objects.filter(user=admin_user, success=True,
+                                     email=admin_user.email).exists()
+
+
+@pytest.mark.django_db
 def test_parent_cannot_setup_totp(auth_client):
     assert auth_client.post(reverse('totp-setup'), {}, format='json').status_code == 403
 

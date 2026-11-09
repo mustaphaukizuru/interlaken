@@ -329,9 +329,14 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
     stripped from the body; only the short-lived access token is returned.
     """
 
+    def get_serializer(self, *args, **kwargs):
+        # Kept so post() can read ``user``: the account that just proved the password.
+        self.login_serializer = super().get_serializer(*args, **kwargs)
+        return self.login_serializer
+
     def post(self, request, *args, **kwargs):
         from .security import record_login, totp_enabled, verify_totp
-        email = str(request.data.get('email') or '')[:254]
+        email = str(request.data.get('email') or '').strip()[:254]
         try:
             response = super().post(request, *args, **kwargs)
         except (AuthenticationFailed, InvalidToken, TokenError):
@@ -340,8 +345,11 @@ class RateLimitedTokenObtainView(TokenObtainPairView):
         if response.status_code != status.HTTP_200_OK:
             record_login(request, email=email, success=False, reason='bad_password')
             return response
-        user = User.objects.filter(email__iexact=email).first()
-        if user is not None and totp_enabled(user):
+        # The authenticated account itself, never a re-lookup of the typed email:
+        # SimpleJWT trims spaces before checking the password, so ' admin@…'
+        # signed in while the lookup found nobody and skipped the TOTP gate.
+        user = self.login_serializer.user
+        if totp_enabled(user):
             code = str(request.data.get('totp') or '')
             if not code:
                 record_login(request, user=user, success=False, reason='totp_required')
