@@ -1637,12 +1637,18 @@ class MyStatementPdfView(APIView):
         rows = list(with_signed_amounts(CafeteriaTransaction.objects.filter(
             student=student, date__gte=day_start(start), date__lt=day_end_exclusive(end),
         )).order_by('date', 'id'))
-        prev = (CafeteriaTransaction.objects.filter(student=student, date__lt=day_start(start))
+        # History-only rows (applied=False: a purchase older than the opening
+        # balance, a POS refund the balance already held) never moved it and
+        # carry no balance_after: they are listed, never counted.
+        prev = (CafeteriaTransaction.objects.filter(student=student, date__lt=day_start(start),
+                                                    applied=True, balance_after__isnull=False)
                 .order_by('-date', '-id').first())
-        if prev is not None and prev.balance_after is not None:
+        anchor = next((i for i, t in enumerate(rows) if t.applied and t.balance_after is not None), None)
+        if prev is not None:
             opening = prev.balance_after
-        elif rows and rows[0].balance_after is not None:
-            opening = rows[0].balance_after - signed_amount(rows[0])
+        elif anchor is not None:
+            opening = rows[anchor].balance_after - sum(
+                (signed_amount(t) for t in rows[:anchor + 1] if t.applied), Decimal('0'))
         else:
             opening = Decimal('0')
         label = {'purchase': 'Consumo', 'topup': 'Recarga', 'refund': 'Devolución', 'adjustment': 'Ajuste'}
@@ -1659,6 +1665,10 @@ class MyStatementPdfView(APIView):
         for t in rows:
             kind = label.get(t.transaction_type, t.transaction_type)
             amt = signed_amount(t)
+            if not t.applied:
+                detail = f'(ya en el saldo) {t.description or ""}'[:32]
+                lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{"":>10}')
+                continue
             running = t.balance_after if t.balance_after is not None else running + amt
             totals[kind] = totals.get(kind, Decimal('0')) + amt
             detail = (t.description or '')[:32]

@@ -89,3 +89,27 @@ def test_statement_signs_debits_and_opens_from_the_right_balance(api_client, mon
     assert 'Total devoluciones: -$50.00' in text
     assert 'Total recargas: $50.00' in text
     assert '-30.00' in text and '-50.00' in text
+
+
+def test_statement_lists_history_rows_without_counting_them(api_client, monkeypatch):
+    # A POS refund the balance already held (applied=False, no balance_after)
+    # used to be added to the running balance and the totals again.
+    captured = {}
+    monkeypatch.setattr('apps.core.pdf.simple_document_pdf',
+                        lambda title, lines, subtitle='': captured.setdefault('lines', list(lines)) and b'%PDF')
+    parent = ParentFactory()
+    kid = _kid(parent, '100.00')
+    CafeteriaTransaction.objects.create(
+        student=kid, transaction_type='refund', amount=Decimal('25'), date=timezone.now(),
+        balance_after=None, applied=False, description='Devolución en caja', loyverse_receipt_id='pos-r-1')
+    adjust_balance(kid, Decimal('-30'), 'Corrección', notify=False)
+    api_client.force_authenticate(parent)
+
+    r = api_client.get(reverse('cafeteria-statement'), {'student': kid.pk})
+
+    assert r.status_code == 200
+    text = '\n'.join(captured['lines'])
+    assert 'Saldo inicial: $100.00' in text
+    assert 'Saldo final: $70.00' in text
+    assert '(ya en el saldo) Devolución' in text
+    assert 'Total devoluciones' not in text
