@@ -194,12 +194,15 @@ class GoogleCallbackView(APIView):
             'avatar': avatar,
             'role': User.Role.PARENT,  # default role; admin assigns final role
         })
+        from .security import record_login
         if user is None:
             # Invite-only: admin must pre-create / link the parent (or allowlist
             # the domain via GOOGLE_AUTO_CREATE_DOMAINS).
+            record_login(request, email=email, method='google', success=False, reason='not_invited')
             return redirect(f'{settings.FRONTEND_URL}/login?error=not_invited')
         if not user.is_active:
             # Deactivated or archived: the password path already refuses it.
+            record_login(request, user=user, method='google', success=False, reason='inactive')
             return redirect(f'{settings.FRONTEND_URL}/login?error=inactive')
 
         # Refresh google_id / avatar for returning users.
@@ -220,6 +223,8 @@ class GoogleCallbackView(APIView):
         # from the cookie via the refresh endpoint.
         response = redirect(f'{settings.FRONTEND_URL}/login?login=ok')
         issue_session(user, response)
+        # The sign-in history (Seguridad, Auditoría) also lists Google redirect sign-ins.
+        record_login(request, user=user, method='google')
         return response
 
 
