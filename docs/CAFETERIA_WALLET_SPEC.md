@@ -182,7 +182,7 @@ Most is reuse. Additions:
   > **Rules the pipeline now enforces:**
   > 1. **Settle before crediting.** A positive remote-minus-local delta is credited only when the student's ledger has had no row for `POS_MIRROR_SETTLE_SECONDS` (180) and the delta does not equal a purchase recorded in the last `POS_MIRROR_ECHO_MINUTES` (15). Otherwise it is *deferred* to the next pass. A genuine cash recarga inside the window waits one tick; it is never lost.
   > 2. **Every compared student is stamped.** `last_synced` is written on every full pass, so "386 of 386 synced today" is a real statement.
-  > 3. **Stale links are flagged, never deleted.** `StudentProfile.loyverse_missing_since` is set when the customer is gone from a full list and cleared when it reappears. The office withdraws them through Vincular Loyverse → Dar de baja.
+  > 3. **Stale links are flagged, never deleted.** `StudentProfile.loyverse_missing_since` is set when the customer is gone from a full list and cleared when it reappears. The office withdraws them from the roster's "Sin cliente en Loyverse" filter, and an admin may erase those with nothing to keep (`accounts/student_delete.py`).
   > 4. **Unmatched wallet receipts are parked** (`UnmatchedReceipt`) and replayed through the normal record path when their customer gets linked, but only receipts newer than the student's `seeded_at`; older ones are already netted into the opening balance and are marked absorbed. Replays are silent.
   > 5. **Nightly window.** `sync_purchases --since-days 7` re-reads a week of receipts at 05:40; the unique receipt id makes it a no-op for everything already recorded.
   > 6. **Roster self-heals daily** (`sync_roster`, 06:05): exact-match link, import of `ci<digits>@` customers, replay, audit.

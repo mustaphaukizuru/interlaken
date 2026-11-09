@@ -28,9 +28,13 @@ interface Props {
   renderPlan?: (plan: BulkResult) => ReactNode;
   /** Alias of `payload` kept for the Contenido pages (e.g. `{tag}`); merged over `payload`. */
   extraPayload?: Record<string, unknown>;
+  /** Names the one row a row action opened the dialog for, in place of "1 alumno". */
+  subject?: string;
 }
 
 type Phase = 'planning' | 'plan' | 'plan-error' | 'running' | 'done';
+
+const singularIfOne = (noun: string, n: number) => (n === 1 ? noun.replace(/s$/, '') : noun);
 
 /** Group skip reasons: "2 se omitirán porque ya están canceladas". */
 function groupReasons(items: { reason: string }[]): { reason: string; n: number }[] {
@@ -46,7 +50,7 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan }: Props) {
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan, subject }: Props) {
   // The title keeps the count the dialog opened with: `onDone` usually clears
   // the selection, which must not turn "Cambiar grupo: 2 alumnos" into "0 alumnos".
   const [opened, setOpened] = useState<{ n: number; all: boolean } | null>(null);
@@ -54,14 +58,14 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
   if (!open && opened !== null) setOpened(null);
   const count = opened?.n ?? ids.length;
   const all = opened?.all ?? allMatching;
-  const title = action ? `${action.label}: ${all ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${count} ${entityLabel}`}` : '';
+  const title = action ? `${action.label}: ${subject ?? (all ? `tod${gender === 'm' ? 'os' : 'as'} l${gender === 'm' ? 'os' : 'as'} que coinciden` : `${count} ${singularIfOne(entityLabel, count)}`)}` : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
       {action && (
         // Modal unmounts its children when closed, so every opening is a fresh
         // body with its own dry run; the key only guards an action switch while open.
         <BulkConfirmBody
-          key={action.name}
+          key={action.key ?? action.name}
           action={action}
           entityLabel={entityLabel}
           gender={gender}
@@ -82,15 +86,17 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
 
 function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, payload: basePayload, extraPayload: aliasPayload, execute, onDone, renderPlan, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
   // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
-  const p = (stem: string) => `${stem}${gender === 'm' ? 'o' : 'a'}s`;
+  const p = (stem: string, n: number) => `${stem}${gender === 'm' ? 'o' : 'a'}${n === 1 ? '' : 's'}`;
   const [phase, setPhase] = useState<Phase>('planning');
   const [plan, setPlan] = useState<BulkResult | null>(null);
   const [result, setResult] = useState<BulkResult | null>(null);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [notify, setNotify] = useState(true);
+  const [typed, setTyped] = useState('');
   const confirmRef = useRef<HTMLButtonElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
+  const typedRef = useRef<HTMLInputElement>(null);
 
   // Snapshot the selection at mount: `onDone` typically clears it while the
   // summary is still on screen, and a retry must target the ids that were
@@ -125,15 +131,16 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Focus follows the phase: the note first when one is required, else the confirm button.
+  // Focus follows the phase: the field to fill first when there is one, else the confirm button.
   useEffect(() => {
-    if (phase === 'plan') (action.requiresNote ? noteRef.current : confirmRef.current)?.focus();
+    if (phase === 'plan') (action.requiresNote ? noteRef.current : (typedRef.current ?? confirmRef.current))?.focus();
   }, [phase, action.requiresNote]);
 
   const payload = (): Record<string, unknown> => {
     const p: Record<string, unknown> = { ...(snapshot.extra ?? {}) };
     if (action.requiresNote) p.note = note.trim();
     if (action.notifyOption) p.notify = notify;
+    if (action.requireText) p.confirm = action.requireText;
     return p;
   };
 
@@ -151,6 +158,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
   const verb = action.planVerb ?? `Se aplicará «${action.label}» a`;
   const willRun = plan ? plan.requested - plan.skipped.length - plan.failed.length : 0;
   const noteMissing = !!action.requiresNote && note.trim().length < 3;
+  const typedMissing = !!action.requireText && typed.trim() !== action.requireText;
   const skipGroups = plan ? groupReasons(plan.skipped) : [];
 
   return (
@@ -177,9 +185,9 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </span>
             <div className="space-y-1 text-sm text-muted">
               <p>
-                {verb} <strong className="text-ink">{willRun.toLocaleString('es-MX')}</strong> {entityLabel}
+                {verb} <strong className="text-ink">{willRun.toLocaleString('es-MX')}</strong> {singularIfOne(entityLabel, willRun)}
                 {plan.skipped.length > 0 && (
-                  <>; <strong className="text-ink">{plan.skipped.length}</strong> se omitirán</>
+                  <>; <strong className="text-ink">{plan.skipped.length}</strong> se omitirá{plan.skipped.length === 1 ? '' : 'n'}</>
                 )}
                 .
               </p>
@@ -222,6 +230,22 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </div>
           )}
 
+          {action.requireText && willRun > 0 && (
+            <div>
+              <label htmlFor="bulk-confirm-text" className="label">Escriba {action.requireText} para confirmar</label>
+              <input
+                id="bulk-confirm-text"
+                ref={typedRef}
+                className="input-field"
+                autoComplete="off"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                aria-describedby="bulk-confirm-hint"
+              />
+              <p id="bulk-confirm-hint" className="mt-1 text-xs text-coral-700">Esto no se puede deshacer.</p>
+            </div>
+          )}
+
           {action.notifyOption && (
             <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink">
               <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
@@ -239,7 +263,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
               variant={action.danger ? 'danger' : 'primary'}
               size="sm"
               loading={phase === 'running'}
-              disabled={willRun === 0 || noteMissing}
+              disabled={willRun === 0 || noteMissing || typedMissing}
               onClick={() => commit()}
             >
               {action.label} ({willRun.toLocaleString('es-MX')})
@@ -256,9 +280,9 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </span>
             <div className="text-sm text-muted" role="status">
               <p>
-                <strong className="text-ink">{result.ok.toLocaleString('es-MX')}</strong> {entityLabel} {p('procesad')}
-                {result.skipped.length > 0 && <>, {result.skipped.length} {p('omitid')}</>}
-                {result.failed.length > 0 && <>, <strong className="text-coral-700">{result.failed.length} {p('fallid')}</strong></>}.
+                <strong className="text-ink">{result.ok.toLocaleString('es-MX')}</strong> {singularIfOne(entityLabel, result.ok)} {p('procesad', result.ok)}
+                {result.skipped.length > 0 && <>, {result.skipped.length} {p('omitid', result.skipped.length)}</>}
+                {result.failed.length > 0 && <>, <strong className="text-coral-700">{result.failed.length} {p('fallid', result.failed.length)}</strong></>}.
               </p>
             </div>
           </div>

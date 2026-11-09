@@ -90,10 +90,13 @@ desde **Admin → Alumnos**, todos con vista previa antes de aplicar.
    (con su saldo inicial tomado de Loyverse) y actualiza nombre y grado de los
    existentes. Ejecútelo al inicio del ciclo y cada vez que haya inscripciones.
    Es idempotente: repetirlo no duplica a nadie.
-2. **Bajas: `Vincular Loyverse` → "Sin cliente en Loyverse".** Esa lista son
-   los alumnos activos cuyo cliente ya no existe en Loyverse: en la práctica,
-   egresados y bajas. Muestra grado y **saldo restante**; seleccione y use
-   *Dar de baja*. La baja no toca el saldo: si queda dinero, decida la
+2. **Bajas: Alumnos → aviso "Revisarlos" (filtro `Sin cliente en Loyverse`).**
+   Son los alumnos activos cuyo cliente ya no existe en Loyverse: en la
+   práctica, egresados y bajas. Muestra grado y **saldo restante**. Seleccione
+   a todos y use *Eliminar definitivamente*: el sistema borra solo a quien
+   nunca entró al portal y no tiene saldo ni historial, y dice por qué omite a
+   los demás. A esos use *Dar de baja*: quedan en la pestaña "Baja definitiva" y
+   se pueden reactivar. La baja no toca el saldo: si queda dinero, decida la
    devolución aparte (Cafetería → Ajustes / Devoluciones).
 3. **Etiqueta del ciclo: `Nuevo ciclo`.** Cambia el ciclo que muestra el sitio,
    marca como egresados a 3° de Secundaria y, opcionalmente, reinicia el umbral
@@ -154,8 +157,10 @@ use Corregir en esa fila: deja el saldo en el número de Loyverse con un ajuste
 auditado.
 
 **Enlaces obsoletos.** Son bajas: la cafetería borró el cliente y nada más se
-lo dijo a la app. Alumnos → Vincular Loyverse lista a esos alumnos con su
-saldo restante y el botón Dar de baja. Nada se borra solo.
+lo dijo a la app. El aviso "Revisarlos" en Alumnos y en el Dashboard lista a
+esos alumnos con su saldo restante. Nada se borra solo: eliminar pide escribir
+ELIMINAR, es solo para administradores y queda en Auditoría con el nombre y la
+matrícula de quien se borró.
 
 **Recargas duplicadas históricas (auditoría del 23-09-2026).** Antes de la
 regla de espera, el espejo acreditó 31 recargas fantasma. Para revisarlas y

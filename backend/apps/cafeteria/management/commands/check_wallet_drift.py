@@ -17,6 +17,7 @@ teach the office to ignore the one that matters.
 """
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -80,9 +81,12 @@ class Command(BaseCommand):
         body = ('La revisión diaria de la cafetería encontró:\n\n'
                 + '\n'.join(f'  - {p}' for p in problems)
                 + '\n\nRevise Administración → Cafetería → Estado de la sincronización y la '
-                  'pestaña Reconciliación. Los alumnos sin cliente en Loyverse aparecen en '
-                  'Alumnos → Vincular Loyverse, donde puede darlos de baja.\n\n'
-                  'Mientras la lista no cambie, este aviso se repite una vez por semana.')
+                  'pestaña Reconciliación.'
+                + (f'\n\nPara quitar a los alumnos sin cliente en Loyverse abra '
+                   f'{settings.FRONTEND_URL}/admin/alumnos?vinculado=missing, selecciónelos y use '
+                   f'«Eliminar definitivamente» (quienes no tienen historial ni saldo) o '
+                   f'«Dar de baja» (los demás).' if stale else '')
+                + '\n\nMientras la lista no cambie, este aviso se repite una vez por semana.')
         sent = ops_alerts.email_admins('Interlaken: la cafetería tiene diferencias por revisar', body)
         if not sent:
             self.stderr.write('alert email NOT sent (no active admin, or the send failed)')

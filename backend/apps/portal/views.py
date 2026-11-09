@@ -120,7 +120,8 @@ class DashboardView(APIView):
 
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students
-            balances = (CafeteriaBalance.objects.filter(student__in=students)
+            # A child who left keeps their file, but no longer gets a tile or a low-balance nudge.
+            balances = (CafeteriaBalance.objects.filter(student__in=students, student__is_active=True)
                         .select_related('student__user', 'student__loyverse_profile'))
             # Paid card top-ups the school has not loaded into the POS yet:
             # the hero card must not look like the payment vanished.

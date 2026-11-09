@@ -1,6 +1,6 @@
 import { useMemo, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet } from 'lucide-react';
+import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, RotateCcw, Trash2, UserMinus, type LucideIcon } from 'lucide-react';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
@@ -10,6 +10,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { BulkValueDialog, type BulkValueOption } from '@/components/admin/BulkValueDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
+import { DELETE_ACTION, REACTIVATE_ACTION, WITHDRAW_ACTION, studentPlanNote } from '@/components/admin/studentActions';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -26,6 +27,8 @@ import {
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { GRADES, NIVELES } from '@/lib/grades';
 import { formatMXN } from '@/lib/format';
+import { isAdmin } from '@/lib/areas';
+import { useAuthStore } from '@/store/authStore';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
 import AdminStudentDetail from './AdminStudentDetail';
 
@@ -33,14 +36,19 @@ type StatusKey = keyof typeof STUDENT_STATUS;
 
 const STATUS_OPTIONS = (Object.entries(STUDENT_STATUS) as [StatusKey, (typeof STUDENT_STATUS)[StatusKey]][])
   .map(([value, m]) => ({ value, label: m.label }));
+/** The roster opens on who is here today; this tab shows everyone, bajas included. */
+const ALL_STATUSES = 'todos';
+const STATUS_TABS = [...STATUS_OPTIONS, { value: ALL_STATUSES, label: 'Todos' }];
 const ACCESS_OPTIONS = [
   { value: 'never', label: 'Nunca ha iniciado sesión' },
   { value: 'nopass', label: 'Sin contraseña asignada' },
   { value: 'active', label: 'Ya inició sesión' },
 ];
+const MISSING = 'missing';
 const LINKED_OPTIONS = [
   { value: '1', label: 'Vinculados a Loyverse' },
   { value: '0', label: 'Sin vínculo con Loyverse' },
+  { value: MISSING, label: 'Sin cliente en Loyverse' },
 ];
 const IMPORT_HEADERS = [
   { key: 'matricula', required: true }, { key: 'nombre', required: true }, { key: 'apellidos', required: true },
@@ -56,8 +64,20 @@ const BULK_ACTIONS: BulkActionDef[] = [
   { name: 'sync_loyverse', label: 'Sincronizar con Loyverse', icon: RefreshCw, planVerb: 'Se sincronizará el saldo inicial de' },
 ];
 
+// A column of icons wide enough to stay pinned beside the data; below lg the
+// table moves them into its overflow menu, where the words show too.
 const ROW_ACTION =
-  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px]';
+  'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-purple hover:bg-cream-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 lg:min-h-[36px] lg:px-2';
+const ROW_ACTION_DANGER = `${ROW_ACTION} text-coral-700 hover:bg-coral-50`;
+
+function RowActionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <>
+      <Icon size={16} aria-hidden="true" />
+      <span className="lg:hidden">{label}</span>
+    </>
+  );
+}
 
 function initial(s: RosterStudent) {
   return (s.user.first_name || s.user.full_name || '?').charAt(0).toUpperCase();
@@ -68,27 +88,34 @@ function initial(s: RosterStudent) {
  * estado tabs, nivel/grado/acceso/vínculo, grupo), DataTable v2 (server sort on
  * every mapped column, column controls persisted as `students`, pinned name),
  * selection with bulk status/grade/group/sync, export CSV/Excel/PDF of the view
- * or the selection, and the generic ImportDialog. There is no delete: "Baja
- * definitiva" is the archive. On 2xl screens a row opens the detail pane.
+ * or the selection, and the generic ImportDialog. Opens on the active students;
+ * "Baja definitiva" is the archive, and an admin may erase a record with nothing
+ * to keep (server rules: student_delete.py). On 2xl screens a row opens the
+ * detail pane.
  */
 export default function AdminStudents() {
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
   const sort = parseSort(get('orden'));
+  const estado = get('estado');
+  const vinculado = get('vinculado');
+  const canDelete = isAdmin(useAuthStore((s) => s.user));
   const filters: Omit<StudentsListParams, 'page'> = {
     q: get('q') || undefined,
-    status: get('estado') || undefined,
+    status: estado === ALL_STATUSES ? undefined : estado || 'active',
     access: get('acceso') || undefined,
     level: get('nivel') || undefined,
     grade: get('grado') || undefined,
     group: get('grupo') || undefined,
-    linked: get('vinculado') || undefined,
+    linked: vinculado || undefined,
     ordering: serializeSort(sort) || undefined,
   };
   const nivel = get('nivel');
   const grupo = get('grupo');
 
   const { data, isLoading, isError, refetch } = useStudentsList({ page, ...filters });
+  const { data: missing } = useStudentsList({ page: 1, page_size: 1, status: 'active', linked: MISSING });
+  const missingCount = missing?.count ?? 0;
   const exportStudents = useStudentsExport();
   const bulk = useStudentsBulk();
   const students = data?.results;
@@ -102,7 +129,7 @@ export default function AdminStudents() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [editing, setEditing] = useState<RosterStudent | null>(null);
   const [picking, setPicking] = useState<BulkActionDef | null>(null);
-  const [confirming, setConfirming] = useState<{ action: BulkActionDef; payload?: Record<string, unknown> } | null>(null);
+  const [confirming, setConfirming] = useState<{ action: BulkActionDef; payload?: Record<string, unknown>; one?: RosterStudent } | null>(null);
 
   // Large screens (2xl, docs/RESPONSIVE.md): list on the left, detail on the right, no navigation.
   const twoPane = useMediaQuery('(min-width: 1536px)');
@@ -119,6 +146,12 @@ export default function AdminStudents() {
     ['A', 'B', 'C'].forEach((g) => seen.add(g));
     return Array.from(seen).sort().map((g) => ({ value: g, label: `Grupo ${g}` }));
   }, [students]);
+
+  const bulkActions: BulkActionDef[] = [
+    !estado || estado === 'active' || estado === ALL_STATUSES ? WITHDRAW_ACTION : REACTIVATE_ACTION,
+    ...(canDelete ? [DELETE_ACTION] : []),
+    ...BULK_ACTIONS,
+  ];
 
   const columns = useMemo<Column<RosterStudent>[]>(() => [
     {
@@ -139,9 +172,18 @@ export default function AdminStudents() {
         </div>
       ),
     },
-    { id: 'student_id', header: 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted', cell: (s) => s.student_id },
     // What the office compares against Loyverse: the code exactly as the POS spells it (ci09932).
-    { id: 'loyverse_code', header: 'Código Loyverse', minWidth: 120, className: 'font-mono text-xs text-muted', cell: (s) => s.loyverse_code || s.student_id },
+    // Under the matrícula by default, so the table leaves room for the balance on a laptop.
+    {
+      id: 'student_id', header: 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted',
+      cell: (s) => (
+        <>
+          {s.student_id}
+          {s.loyverse_code && s.loyverse_code !== s.student_id && <span className="block font-mono text-xs text-subtle">{s.loyverse_code}</span>}
+        </>
+      ),
+    },
+    { id: 'loyverse_code', header: 'Código Loyverse', defaultHidden: true, minWidth: 120, className: 'font-mono text-xs text-muted', cell: (s) => s.loyverse_code || s.student_id },
     { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s) => s.grade },
     { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s) => s.group || '—' },
     { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
@@ -149,7 +191,12 @@ export default function AdminStudents() {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
       cell: (s) => {
         const meta = STUDENT_STATUS[(s.status ?? 'active') as StatusKey];
-        return <Badge variant={meta?.variant ?? 'neutral'}>{meta?.label ?? s.status}</Badge>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            <Badge variant={meta?.variant ?? 'neutral'}>{meta?.label ?? s.status}</Badge>
+            {s.is_active !== false && s.loyverse_missing_since && <Badge variant="warning">Sin cliente en Loyverse</Badge>}
+          </div>
+        );
       },
     },
     {
@@ -161,7 +208,7 @@ export default function AdminStudents() {
       cell: (s) => (s.enrollment_date ? new Date(`${s.enrollment_date}T12:00:00`).toLocaleDateString('es-MX') : '—'),
     },
     {
-      id: 'last_login', header: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'text-xs text-subtle',
+      id: 'last_login', header: 'Acceso', label: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'text-xs text-subtle',
       cell: (s) => (s.user.last_login ? new Date(s.user.last_login).toLocaleDateString('es-MX') : <span className="text-coral-600">Nunca</span>),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,7 +222,7 @@ export default function AdminStudents() {
     });
 
   const startBulk = (action: BulkActionDef) => {
-    if (action.name === 'sync_loyverse') setConfirming({ action });
+    if (action.payload || action.requireText || action.name === 'sync_loyverse') setConfirming({ action, payload: action.payload });
     else setPicking(action);
   };
   const pickedValue = (value: string) => {
@@ -205,7 +252,8 @@ export default function AdminStudents() {
     { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download, run: () => setImportLoyverseOpen(true) },
     { key: 'link', label: 'Vincular Loyverse', icon: Link2, run: () => setLinkOpen(true) },
   ];
-  const anyFilter = Object.entries(filters).some(([k, v]) => k !== 'ordering' && v);
+  const anyFilter = !!estado || Object.entries(filters).some(([k, v]) => k !== 'ordering' && k !== 'status' && v);
+  const startOne = (action: BulkActionDef, one: RosterStudent) => setConfirming({ action, payload: action.payload, one });
 
   return (
     <div className={twoPane && selectedId ? 'grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'space-y-6'}>
@@ -263,6 +311,33 @@ export default function AdminStudents() {
         <ImportLoyverseModal open={importLoyverseOpen} onClose={() => setImportLoyverseOpen(false)} onImported={() => refetch()} />
         <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
 
+        {vinculado === MISSING ? (
+          <div role="note" className="flex flex-col gap-3 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              <strong>Estos alumnos ya no existen en Loyverse</strong>, así que no pueden comprar en cafetería.{' '}
+              {canDelete
+                ? <>Selecciónelos y use <strong>Eliminar definitivamente</strong>: se borra a quienes no tienen historial ni saldo. A los demás use <strong>Dar de baja</strong>.</>
+                : <>Selecciónelos y use <strong>Dar de baja</strong> para archivarlos.</>}
+            </p>
+            {count > 0 && (
+              <button type="button" className="btn-outline min-h-[44px] shrink-0 sm:min-h-[40px]" onClick={selection.onSelectAllMatching}>
+                Seleccionar {count === 1 ? 'al alumno' : `los ${count.toLocaleString('es-MX')}`}
+              </button>
+            )}
+          </div>
+        ) : missingCount > 0 && (
+          <Link
+            to={`/admin/alumnos?vinculado=${MISSING}`}
+            className="flex flex-col gap-2 rounded-xl2 border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink transition hover:border-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span className="flex items-center gap-2.5">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-amber" aria-hidden="true" />
+              <span><strong>{missingCount.toLocaleString('es-MX')} alumno{missingCount === 1 ? '' : 's'}</strong> ya no {missingCount === 1 ? 'tiene' : 'tienen'} cliente en Loyverse: probablemente ya no estudian aquí.</span>
+            </span>
+            <span className="flex items-center gap-1 font-semibold text-purple">Revisarlos <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>
+          </Link>
+        )}
+
         <Card title={`${count.toLocaleString('es-MX')} alumnos`}>
           <p role="status" aria-live="polite" className="sr-only">{count} alumnos encontrados</p>
           <DataTable<RosterStudent>
@@ -284,24 +359,40 @@ export default function AdminStudents() {
             columnControls
             resizable
             pinFirstColumn
+            pinActions
             selection={selection}
             rowActions={(s) => (
               <>
-                <Link to={`/admin/alumnos/${s.id}`} className={ROW_ACTION} aria-label={`Ver ficha de ${s.user.full_name}`}>
-                  Ficha
+                {/* From lg the name is this link, and the pinned column has no room to spare. */}
+                <Link to={`/admin/alumnos/${s.id}`} className={`${ROW_ACTION} lg:hidden`} title="Ver ficha" aria-label={`Ver ficha de ${s.user.full_name}`}>
+                  <RowActionLabel icon={Eye} label="Ficha" />
                 </Link>
-                <button type="button" onClick={() => setEditing(s)} className={ROW_ACTION} aria-label={`Editar a ${s.user.full_name}`}>
-                  Editar
+                <button type="button" onClick={() => setEditing(s)} className={ROW_ACTION} title="Editar" aria-label={`Editar a ${s.user.full_name}`}>
+                  <RowActionLabel icon={Pencil} label="Editar" />
                 </button>
-                <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} aria-label={`Cafetería de ${s.user.full_name}`}>
-                  <Wallet size={14} aria-hidden="true" /> Cafetería
+                <Link to={`/admin/cafeteria/${s.id}`} className={ROW_ACTION} title="Cafetería" aria-label={`Cafetería de ${s.user.full_name}`}>
+                  <RowActionLabel icon={Wallet} label="Cafetería" />
                 </Link>
+                {s.is_active === false ? (
+                  <button type="button" onClick={() => startOne(REACTIVATE_ACTION, s)} className={ROW_ACTION} title="Reactivar" aria-label={`Reactivar a ${s.user.full_name}`}>
+                    <RowActionLabel icon={RotateCcw} label="Reactivar" />
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => startOne(WITHDRAW_ACTION, s)} className={ROW_ACTION_DANGER} title="Dar de baja" aria-label={`Dar de baja a ${s.user.full_name}`}>
+                    <RowActionLabel icon={UserMinus} label="Dar de baja" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button type="button" onClick={() => startOne(DELETE_ACTION, s)} className={ROW_ACTION_DANGER} title="Eliminar" aria-label={`Eliminar a ${s.user.full_name}`}>
+                    <RowActionLabel icon={Trash2} label="Eliminar" />
+                  </button>
+                )}
               </>
             )}
             toolbar={(
               <FilterBar
                 search={{ placeholder: 'Buscar por nombre, matrícula, correo o grado…', label: 'Buscar alumnos' }}
-                tabs={{ paramKey: 'estado', options: STATUS_OPTIONS, allLabel: 'Todos', label: 'Filtrar por estado' }}
+                tabs={{ paramKey: 'estado', options: STATUS_TABS, allLabel: null, defaultValue: 'active', label: 'Filtrar por estado' }}
                 selects={[
                   { key: 'nivel', label: 'Nivel', options: NIVELES.map(([value, label]) => ({ value, label })), allLabel: 'Todos los niveles' },
                   {
@@ -333,7 +424,8 @@ export default function AdminStudents() {
                 onClear={selection.onClear}
                 itemLabel="alumnos"
                 gender="m"
-                actions={BULK_ACTIONS}
+                actions={bulkActions}
+                inline={5}
                 onAction={startBulk}
                 busy={bulk.isPending}
                 exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="alumnos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
@@ -366,17 +458,22 @@ export default function AdminStudents() {
           payload={confirming?.payload}
           entityLabel="alumnos"
           gender="m"
-          ids={selection.ids}
-          allMatching={selection.allMatching}
+          ids={confirming?.one ? [confirming.one.id] : selection.ids}
+          allMatching={confirming?.one ? false : selection.allMatching}
+          subject={confirming?.one?.user.full_name}
           filters={filters}
           execute={(body) => bulk.mutateAsync(body)}
-          onDone={(r) => { if (!r.failed.length) selection.onClear(); }}
+          renderPlan={studentPlanNote(confirming?.action)}
+          onDone={(r) => {
+            if (!r.failed.length) selection.onClear();
+            if (confirming?.action.name === 'delete') setSelectedId(null);
+          }}
         />
       </div>
       {twoPane && selectedId && (
         <aside className="min-w-0 rounded-xl2 border border-line bg-white p-5 2xl:sticky 2xl:top-20 2xl:max-h-[calc(100svh-6rem)] 2xl:overflow-y-auto" aria-label="Detalle del alumno">
           <div className="mb-2 flex justify-end"><button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setSelectedId(null)}>Cerrar panel</button></div>
-          <AdminStudentDetail id={selectedId} embedded />
+          <AdminStudentDetail id={selectedId} embedded onDeleted={() => setSelectedId(null)} />
         </aside>
       )}
     </div>

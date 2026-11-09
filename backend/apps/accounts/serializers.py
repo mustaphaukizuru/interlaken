@@ -91,12 +91,12 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 class StudentRosterSerializer(StudentProfileSerializer):
     """Admin roster row: the profile plus the wallet balance the list annotates
     (``roster_queryset``), so the Saldo column and ``?ordering=balance`` cost no
-    extra query."""
+    extra query. ``loyverse_missing_since`` flags a leaver: the customer is gone."""
     balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True,
                                        default=None)
 
     class Meta(StudentProfileSerializer.Meta):
-        fields = StudentProfileSerializer.Meta.fields + ['balance']
+        fields = StudentProfileSerializer.Meta.fields + ['balance', 'loyverse_missing_since']
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):

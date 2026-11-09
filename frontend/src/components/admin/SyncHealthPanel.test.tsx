@@ -132,10 +132,10 @@ describe('buildChecks — convergence lights (2026-09-23 drift audit)', () => {
     const c = check({ stale_links: 36, unmatched_receipts: 4,
                       wallet_audit: { ...base.wallet_audit!, unlinked_students: 2 } }, 'roster');
     expect(c.tone).toBe('warn');
-    expect(c.label).toMatch(/36 enlace/);
+    expect(c.label).toMatch(/36 alumno\(s\) sin cliente en Loyverse/);
     expect(c.label).toMatch(/2 alumno\(s\) nuevo/);
     expect(c.label).toMatch(/4 recibo/);
-    expect(c.detail).toMatch(/Dar de baja/);
+    expect(c.detail).toMatch(/darlos de baja/);
   });
 });
 

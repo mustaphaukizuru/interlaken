@@ -424,7 +424,7 @@ class TestDailyDriftAlarm:
         assert 'WALLET DRIFT' in out.getvalue()
         subject, body, recipients = send.call_args.args[:3]
         assert set(recipients) == {a1.email, a2.email}
-        assert '123.00' in body and '36' in body and 'Vincular Loyverse' in body
+        assert '123.00' in body and '36' in body and 'admin/alumnos?vinculado=missing' in body
 
     def test_staff_cards_parked_receipts_alone_are_not_an_alarm(self):
         OpsStatus.set('wallet_audit', {'compared': 351, 'drifting': 0, 'drift_total': '0',

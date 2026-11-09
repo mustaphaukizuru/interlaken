@@ -64,7 +64,7 @@ describe('BulkConfirmDialog', () => {
     const failed = await screen.findByRole('list', { name: 'Filas fallidas' });
     expect(failed).toHaveTextContent('#2Cupo lleno');
     expect(failed).toHaveTextContent('#3Sin conexión con Calendar');
-    expect(screen.getByRole('status')).toHaveTextContent('1 reservas procesadas, 2 fallidas.');
+    expect(screen.getByRole('status')).toHaveTextContent('1 reserva procesada, 2 fallidas.');
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar fallidas (2)' }));
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(3));
     expect(execute.mock.calls[2][0]).toMatchObject({ ids: [2, 3], dry_run: false, all_matching: false });

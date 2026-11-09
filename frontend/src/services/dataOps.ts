@@ -184,8 +184,15 @@ export const BULK_MAX_MATCHING = 2000;
 
 /** A bulk action as the UI describes it (label, guards, options). */
 export interface BulkActionDef {
+  /** The API action. Two buttons may share one (a baja and a reactivation are both `status`). */
   name: string;
+  /** Tells such buttons apart; defaults to `name`. */
+  key?: string;
   label: string;
+  /** Sent with the dry run and the commit, for a button that needs no value picked first. */
+  payload?: Record<string, unknown>;
+  /** The person types this word to enable the button; sent as `payload.confirm`. */
+  requireText?: string;
   /** Coral button + confirmation copy in the danger register. */
   danger?: boolean;
   /** Reverse transitions need a note (audited with it). */
