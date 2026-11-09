@@ -155,4 +155,25 @@ describe('PaidTopUpQueue («Por aplicar»)', () => {
     expect(await screen.findByRole('button', { name: /Verificar en MultiCobros/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aplicar la recarga de Luis Pérez' })).toBeNull();
   });
+
+  // The POS mirror only applies a gap that matches exactly (and a verified
+  // approval): the hint must not promise more than that.
+  it.each([
+    ['exactly this amount, verified', '250.00', null, 'Ya está en Loyverse; se aplica sola en minutos'],
+    ['more than this amount (a cash recarga too)', '300.00', null, null],
+    ['less than this amount', '200.00', null, null],
+    ['exactly this amount, not verified', '250.00', true, 'Ya está en Loyverse: verifíquela en MultiCobros para que se aplique'],
+  ])('Loyverse %s: hint', async (_label, points, unverified, hint) => {
+    api.topups.mockResolvedValue(ok({ count: 1, next: null, previous: null, results: [{
+      ...row, loyverse_points: points, wallet_balance: '50.00',
+      banorte: { ...row.banorte, ...(unverified ? { verified_at: null, needs_verification: true } : {}) },
+    }] }));
+    renderWithProviders(<PaidTopUpQueue />);
+    expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
+    for (const text of ['Ya está en Loyverse; se aplica sola en minutos',
+      'Ya está en Loyverse: verifíquela en MultiCobros para que se aplique']) {
+      if (text === hint) expect(screen.getByText(text)).toBeInTheDocument();
+      else expect(screen.queryByText(text)).toBeNull();
+    }
+  });
 });
