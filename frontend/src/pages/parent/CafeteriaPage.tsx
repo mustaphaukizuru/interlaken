@@ -1074,7 +1074,12 @@ export default function CafeteriaPage() {
                     {tx.transaction_type === 'purchase' ? '-' : '+'}${parseFloat(tx.amount).toFixed(2)}
                   </span>
                   {tx.applied === false && (
-                    <p className="text-xs text-subtle sm:mt-0.5">Incluida en el saldo inicial</p>
+                    // History only: a purchase older than the opening balance, or a
+                    // POS refund the balance already holds (opening balance, a
+                    // console refund, or a recarga the POS sync detected first).
+                    <p className="text-xs text-subtle sm:mt-0.5">
+                      {tx.transaction_type === 'refund' ? 'Ya incluida en el saldo' : 'Incluida en el saldo inicial'}
+                    </p>
                   )}
                   {tx.balance_after != null && (
                     <p className="text-xs text-subtle sm:mt-0.5">Saldo ${parseFloat(tx.balance_after).toFixed(2)}</p>
