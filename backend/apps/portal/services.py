@@ -10,6 +10,7 @@ WhatsApp: when ``whatsapp=True`` and the user has a ``whatsapp`` number, we call
 ``send_text`` logs a no-op — same degradation as booking confirmations.
 """
 import logging
+import time
 from datetime import timedelta
 
 from django.conf import settings
@@ -258,18 +259,27 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     return len(user_ids)
 
 
+# A publish request (comunicado or emergency broadcast) emails the first rows of
+# its own comunicado itself: at most this many, for at most this many seconds,
+# so a school-wide comunicado never keeps a sync gunicorn worker (60 s timeout)
+# busy. The dispatch_notifications cron, every 5 minutes, sends the rest.
+INLINE_DISPATCH_LIMIT = 20
+INLINE_DISPATCH_SECONDS = 20
+
+
 def fanout_and_stamp(
     announcement,
     *,
     notif_type=None,
-    dispatch_limit: int = 200,
+    dispatch_limit: int = INLINE_DISPATCH_LIMIT,
 ) -> dict:
-    """In-app fan-out + stamp ``fanout_at`` + first email/push batch.
+    """In-app fan-out + stamp ``fanout_at`` + a small first email/push batch.
 
-    Shared by comunicado publish/activate and emergency broadcast so cron lag
-    does not leave families waiting for the next ``dispatch_notifications`` run.
-    Fail-soft for dispatch: channel errors are logged, never raised.
-    Returns ``{notified, dispatched}``.
+    Shared by comunicado publish/activate and emergency broadcast: the first
+    ``dispatch_limit`` rows of this comunicado go out at once (within
+    ``INLINE_DISPATCH_SECONDS``), the ``dispatch_notifications`` cron sends the
+    rest within 5 minutes. Fail-soft for dispatch: channel errors are logged,
+    never raised. Returns ``{notified, dispatched}``.
     """
     notified = fanout_announcement(announcement, notif_type=notif_type)
     from apps.portal.models import Announcement
@@ -278,7 +288,9 @@ def fanout_and_stamp(
     dispatched = 0
     if notified and dispatch_limit > 0:
         try:
-            dispatched = dispatch_pending_notifications(limit=dispatch_limit)
+            dispatched = dispatch_pending_notifications(
+                limit=dispatch_limit, announcement=announcement,
+                time_budget=INLINE_DISPATCH_SECONDS)
         except Exception:  # pragma: no cover — channel failures must not 500
             logger.exception(
                 'Announcement %s first-batch dispatch failed', announcement.pk)
@@ -291,7 +303,7 @@ def emergency_broadcast(
     message: str,
     audience: str,
     created_by=None,
-    dispatch_limit: int = 200,
+    dispatch_limit: int = INLINE_DISPATCH_LIMIT,
     whatsapp: bool = False,
     whatsapp_limit: int = 100,
 ) -> dict:
@@ -299,8 +311,9 @@ def emergency_broadcast(
 
     1. Persists an active ``Announcement`` so the aviso stays in Comunicados.
     2. Bulk-creates WARNING in-app notifications (``delivered_at=NULL``).
-    3. Immediately dispatches up to ``dispatch_limit`` email+push sends; the
-       ``dispatch_notifications`` cron finishes the rest.
+    3. Immediately dispatches a first batch of ``dispatch_limit`` email+push
+       sends; the ``dispatch_notifications`` cron finishes the rest within 5
+       minutes.
     4. Optionally WhatsApp-blasts users who have a number (capped, fail-soft).
 
     Returns counts for the admin UI. Never raises into the view for channel
@@ -387,101 +400,167 @@ def _has_own_copy(user, n) -> bool:
     ).exists()
 
 
-def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> int:
+# A row whose email failed is tried again only once it is this old (index =
+# failed attempts so far; the last value repeats). With the cron every 5
+# minutes, back-to-back retries would give up 10 minutes into an SMTP outage;
+# until 2026-11-08 the daily cron spread them over days.
+RETRY_AFTER = (timedelta(minutes=30), timedelta(hours=4))
+
+
+def _due(now):
+    """Pending rows ready for an attempt: never tried, or old enough for the next retry."""
+    from django.db.models import Q
+
+    if not RETRY_AFTER:
+        return Q()
+    due = Q(attempts=0)
+    for made, wait in enumerate(RETRY_AFTER, start=1):
+        tried = Q(attempts=made) if made < len(RETRY_AFTER) else Q(attempts__gte=made)
+        due |= tried & Q(created_at__lte=now - wait)
+    return due
+
+
+def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7, *, announcement=None,
+                                   time_budget: float | None = None) -> int:
     """Deliver email + web-push for notifications not yet dispatched.
 
     Bulk fan-out (``fanout_announcement``) creates in-app rows with
-    ``delivered_at=NULL``; this batched, capped pass (run from the
-    ``dispatch_notifications`` cron) sends the out-of-band channels so a
-    school-wide comunicado actually reaches inboxes without blocking the publish
-    request. Every target is emailed / pushed only on the channels its own
-    preferences keep on (urgent warnings always), and one notice reaches each
-    address once (``_has_own_copy``, ``own_copy_reach``). Rows older than
+    ``delivered_at=NULL``; this batched, capped pass (run every 5 minutes by
+    the ``dispatch_notifications`` cron, and for a first batch by the publish
+    request) sends the out-of-band channels so a school-wide comunicado
+    actually reaches inboxes without blocking the publish request. Every
+    target is emailed / pushed only on the channels its own preferences keep
+    on (urgent warnings always), and one notice reaches each address once
+    (``_has_own_copy``, ``own_copy_reach``).
+
+    Each row is claimed on its own (``SELECT … FOR UPDATE SKIP LOCKED`` in a
+    short transaction) and stamped ``delivered_at`` as soon as it is handled:
+    two dispatchers (the cron and a publish request) never send the same row,
+    and a worker killed half-way leaves pending only the row it was sending.
+    A row that raises counts as a failed attempt, so it can never block the
+    queue; a failed row is retried once ``RETRY_AFTER`` allows (30 min, then
+    4 h). ``announcement`` limits the pass to that comunicado's rows;
+    ``time_budget`` (seconds) stops taking new rows once spent. Rows older than
     ``max_age_days`` are marked delivered *without* sending, so a cron that was
     down for a while can't fire a surprise blast of stale announcements.
-    Returns the number actually sent.
+    Returns the number of rows delivered without an email failure.
     """
+    from django.db import transaction
+
     from apps.portal.models import Notification
-    from apps.portal.push import send_web_push
 
     now = timezone.now()
-    cutoff = now - timedelta(days=max_age_days)
-    pending = list(
-        Notification.objects.filter(delivered_at__isnull=True)
-        .select_related('user', 'announcement').order_by('created_at')[:limit])
-    if not pending:
-        return 0
-
-    from apps.accounts.recipients import delivery_users, mailboxes_of, own_copy_reach, wants
+    pending = Notification.objects.filter(delivered_at__isnull=True)
+    if announcement is not None:
+        pending = pending.filter(announcement=announcement)
+    pending.filter(created_at__lt=now - timedelta(days=max_age_days)).update(
+        delivered_at=now, email_status=Notification.Delivery.SKIPPED,
+        push_status=Notification.Delivery.SKIPPED, last_error='Caducó sin enviarse')
+    ids = list(pending.filter(_due(now)).order_by('created_at', 'pk')
+               .values_list('pk', flat=True)[:limit])
 
     max_attempts = getattr(settings, 'NOTIFICATION_MAX_ATTEMPTS', 3)
     prefs = {}  # user pk → NotificationPreference, read once per pass
-    sent, handled_ids, retry_ids, failures = 0, [], [], []
-    for n in pending:
-        if n.created_at < cutoff:
-            handled_ids.append(n.id)
-            Notification.objects.filter(pk=n.pk).update(
-                email_status=Notification.Delivery.SKIPPED, push_status=Notification.Delivery.SKIPPED,
-                last_error='Caducó sin enviarse')
-            continue  # too old — mark delivered below, don't send
-        ann = n.announcement
-        kind = n.notif_type
-        # Student rows also reach the guardians, unless a guardian holds their
-        # own row of the same notice (the comunicado fan-out, the bulk top-up
-        # queue): that row carries their copy, so this one neither goes to them
-        # nor to an address their copy already reaches.
-        family = delivery_users(n.user)
-        own = [g for g in family if g.pk != n.user_id and _has_own_copy(g, n)]
-        targets = [t for t in family if t not in own]
-        covered = own_copy_reach(own, kind, cache=prefs)
-        # Each target on the channels it keeps on (its own Avisos tab), so the
-        # footer's «tiene activados los avisos por correo» is true; urgent
-        # warnings reach everyone (NotificationPreference.wants).
-        emails = [addr for addr in mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
-                  if addr.lower() not in covered]
-        email_status = Notification.Delivery.SKIPPED
-        if emails:
-            from .emailing import notification_content
-            content = notification_content(user=n.user, notif_type=n.notif_type, title=n.title, message=n.message,
-                                           comunicado=ann is not None,
-                                           url=f'/portal/notificaciones/{n.pk}' if ann else None)
-            ok = send_email(subject=n.title, message=n.message, recipients=emails, content=content)
-            email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
-        # Comunicado rows deep-link the push to the announcement and honor its
-        # 'Enviar notificación push' toggle; standalone rows keep /portal.
-        push_status = Notification.Delivery.SKIPPED
-        if ann is None or ann.push_enabled:
-            # Bitácora 10: the family portal no longer has a comunicados page; the push opens the
-            # notification itself, which carries the full text.
-            url = f'/portal/notificaciones/{n.pk}' if ann else '/portal'
-            delivered = 0
-            for target in targets:
-                if wants(target, 'push', kind, prefs):
-                    delivered += send_web_push(target, n.title, n.message, url=url)
-            push_status = Notification.Delivery.SENT if delivered else Notification.Delivery.SKIPPED
-
-        attempts = n.attempts + 1
-        failed = email_status == Notification.Delivery.FAILED
-        if failed and attempts < max_attempts:
-            # Leave delivered_at NULL so the next cron run retries the email.
-            retry_ids.append(n.id)
-            Notification.objects.filter(pk=n.pk).update(
-                attempts=attempts, email_status=email_status, push_status=push_status,
-                last_error=f'Intento {attempts} falló')
-            continue
-        handled_ids.append(n.id)
-        Notification.objects.filter(pk=n.pk).update(
-            attempts=attempts, email_status=email_status, push_status=push_status,
-            last_error=f'Correo no entregado tras {attempts} intentos' if failed else '')
-        if failed:
-            failures.append(n)
-        else:
+    started = time.monotonic()
+    sent, failures = 0, []
+    for pk in ids:
+        if time_budget is not None and time.monotonic() - started >= time_budget:
+            break  # the rest waits for the next run
+        try:
+            with transaction.atomic():
+                # The claim: a row another dispatcher is sending is skipped, one
+                # it already delivered (or just retried) no longer matches.
+                n = (Notification.objects.select_for_update(skip_locked=True)
+                     .filter(_due(now), pk=pk, delivered_at__isnull=True).first())
+                if n is None:
+                    continue
+                outcome = _deliver(n, prefs, max_attempts)
+        except Exception as exc:  # noqa: BLE001 - one bad row must not stop the others
+            logger.exception('dispatch_notifications: notification %s raised', pk)
+            n, outcome = _count_crash(pk, exc, max_attempts)
+        if outcome == 'sent':
             sent += 1
+        elif outcome == 'failed' and n is not None:
+            failures.append(n)
 
-    Notification.objects.filter(id__in=handled_ids).update(delivered_at=now)
     if failures:
         _alert_ops_on_failures(failures)
     return sent
+
+
+def _deliver(n, prefs: dict, max_attempts: int) -> str:
+    """Email + push one claimed row and stamp it in the same transaction.
+
+    Returns ``'sent'``, ``'retry'`` (the email failed; left pending for the
+    next run) or ``'failed'`` (the email failed ``max_attempts`` times).
+    """
+    from apps.accounts.recipients import delivery_users, mailboxes_of, own_copy_reach, wants
+    from apps.portal.models import Notification
+    from apps.portal.push import send_web_push
+
+    Delivery = Notification.Delivery
+    ann, kind = n.announcement, n.notif_type
+    # Student rows also reach the guardians, unless a guardian holds their
+    # own row of the same notice (the comunicado fan-out, the bulk top-up
+    # queue): that row carries their copy, so this one neither goes to them
+    # nor to an address their copy already reaches.
+    family = delivery_users(n.user)
+    own = [g for g in family if g.pk != n.user_id and _has_own_copy(g, n)]
+    targets = [t for t in family if t not in own]
+    covered = own_copy_reach(own, kind, cache=prefs)
+    # Each target on the channels it keeps on (its own Avisos tab), so the
+    # footer's «tiene activados los avisos por correo» is true; urgent
+    # warnings reach everyone (NotificationPreference.wants).
+    emails = [addr for addr in mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
+              if addr.lower() not in covered]
+    email_status = Delivery.SKIPPED
+    if emails:
+        from .emailing import notification_content
+        content = notification_content(user=n.user, notif_type=kind, title=n.title, message=n.message,
+                                       comunicado=ann is not None,
+                                       url=f'/portal/notificaciones/{n.pk}' if ann else None)
+        ok = send_email(subject=n.title, message=n.message, recipients=emails, content=content)
+        email_status = Delivery.SENT if ok else Delivery.FAILED
+    # Comunicado rows deep-link the push to the notification (bitácora 10: the
+    # family portal has no comunicados page) and honor the comunicado's
+    # 'Enviar notificación push' toggle; standalone rows keep /portal. A retry
+    # after a failed email never pushes a second time.
+    push_status = Delivery.SENT if n.push_status == Delivery.SENT else Delivery.SKIPPED
+    if n.push_status != Delivery.SENT and (ann is None or ann.push_enabled):
+        url = f'/portal/notificaciones/{n.pk}' if ann else '/portal'
+        delivered = sum(send_web_push(t, n.title, n.message, url=url)
+                        for t in targets if wants(t, 'push', kind, prefs))
+        push_status = Delivery.SENT if delivered else Delivery.SKIPPED
+
+    attempts = n.attempts + 1
+    failed = email_status == Delivery.FAILED
+    retry = failed and attempts < max_attempts
+    n.last_error = (f'Intento {attempts} falló' if retry
+                    else f'Correo no entregado tras {attempts} intentos' if failed else '')
+    Notification.objects.filter(pk=n.pk).update(
+        attempts=attempts, email_status=email_status, push_status=push_status,
+        last_error=n.last_error, delivered_at=None if retry else timezone.now())
+    return 'retry' if retry else 'failed' if failed else 'sent'
+
+
+def _count_crash(pk, exc, max_attempts: int):
+    """A row whose delivery raised: one failed attempt, and once the attempts
+    run out it is closed as failed, so it can never block the queue.
+    Returns ``(row, 'retry' | 'failed')``."""
+    from django.db.models import F
+
+    from apps.portal.models import Notification
+
+    error = f'Error al enviar: {type(exc).__name__}'[:200]
+    Notification.objects.filter(pk=pk, delivered_at__isnull=True).update(
+        attempts=F('attempts') + 1, last_error=error)
+    n = Notification.objects.select_related('user').filter(pk=pk).first()
+    if n is None or n.delivered_at is not None or n.attempts < max_attempts:
+        return n, 'retry'
+    n.last_error = f'{error} ({n.attempts} intentos)'[:200]
+    Notification.objects.filter(pk=pk, delivered_at__isnull=True).update(
+        delivered_at=timezone.now(), email_status=Notification.Delivery.FAILED, last_error=n.last_error)
+    return n, 'failed'
 
 
 def _alert_ops_on_failures(failures) -> None:

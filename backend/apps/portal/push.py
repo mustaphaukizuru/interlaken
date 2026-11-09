@@ -56,6 +56,9 @@ def send_web_push(user, title: str, message: str, url: str = '/portal') -> int:
                 data=payload,
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
                 vapid_claims={'sub': f"mailto:{settings.VAPID_ADMIN_EMAIL or settings.DEFAULT_FROM_EMAIL}"},
+                # A push service that never answers must not hold a publish
+                # request (or the dispatcher's row lock) for ever.
+                timeout=getattr(settings, 'WEBPUSH_TIMEOUT', 5),
             )
             delivered += 1
         except WebPushException as exc:

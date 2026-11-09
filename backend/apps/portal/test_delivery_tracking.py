@@ -23,7 +23,9 @@ def test_notify_stamps_statuses():
     assert n.email_status == 'sent' and n.push_status == 'skipped' and n.attempts == 1
 
 
-def test_dispatch_retries_then_fails_and_alerts_ops(settings):
+def test_dispatch_retries_then_fails_and_alerts_ops(settings, monkeypatch):
+    # Each call stands for a cron run past the retry delay (RETRY_AFTER).
+    monkeypatch.setattr('apps.portal.services.RETRY_AFTER', ())
     settings.OPS_EMAIL = 'sistemas@test.mx'
     settings.NOTIFICATION_MAX_ATTEMPTS = 2
     p = ParentFactory(email='fam@test.mx')
@@ -41,7 +43,9 @@ def test_dispatch_retries_then_fails_and_alerts_ops(settings):
         assert ops_calls and ops_calls[0].args[2] == ['sistemas@test.mx']
 
 
-def test_delivery_report_and_resend(api_client):
+def test_delivery_report_and_resend(api_client, monkeypatch):
+    # Each dispatch call stands for a cron run past the retry delay (RETRY_AFTER).
+    monkeypatch.setattr('apps.portal.services.RETRY_AFTER', ())
     ann = Announcement.objects.create(title='A', body='B', audience='all')
     ok = ParentFactory(email='ok@test.mx')
     bad = ParentFactory(email='bad@test.mx')

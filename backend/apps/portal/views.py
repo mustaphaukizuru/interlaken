@@ -44,7 +44,7 @@ from .serializers import (
     NotificationDetailSerializer,
     NotificationSerializer,
 )
-from .services import _audience_roles, emergency_broadcast, fanout_and_stamp
+from .services import INLINE_DISPATCH_LIMIT, _audience_roles, emergency_broadcast, fanout_and_stamp
 
 
 def audiences_for_user(user):
@@ -333,13 +333,18 @@ def announcement_state(a) -> str:
     return 'draft' if a.fanout_at is None else 'inactive'
 
 
-def _maybe_fanout(announcement, *, context):
-    """First publish fans out once; scheduled comunicados wait for the cron."""
+def _maybe_fanout(announcement, *, context, dispatch_limit=INLINE_DISPATCH_LIMIT):
+    """First publish fans out once; scheduled comunicados wait for the cron.
+
+    A single publish emails a small first batch itself; a bulk «Activar»
+    passes ``dispatch_limit=0``: it runs inside the bulk transaction and may
+    publish several comunicados in one request, so the 5-minute
+    dispatch_notifications cron sends all of it once that commits."""
     scheduled_later = bool(announcement.publish_at and announcement.publish_at > timezone.now())
     if not announcement.is_active or announcement.fanout_at is not None or scheduled_later:
         return
     try:
-        fanout_and_stamp(announcement)
+        fanout_and_stamp(announcement, dispatch_limit=dispatch_limit)
     except Exception:  # noqa: BLE001 — best-effort notification
         logging.getLogger(__name__).exception('Announcement %s %s fan-out failed', announcement.pk, context)
 
@@ -470,7 +475,7 @@ def _activation(name, label_es, target):
         a.is_active = target == 'active'
         a.save(update_fields=['is_active', 'updated_at'])
         if a.is_active:
-            _maybe_fanout(a, context='bulk-activate')
+            _maybe_fanout(a, context='bulk-activate', dispatch_limit=0)
         return {'state': [current, target]}
 
     return BulkAction(name=name, label_es=label_es, handler=handler, plan=plan, side_effects='per_row')
