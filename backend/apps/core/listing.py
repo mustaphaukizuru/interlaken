@@ -139,7 +139,10 @@ def _to_date(value) -> date | None:
         return value.date()
     if isinstance(value, date):
         return value
-    return parse_date(str(value).strip())
+    try:
+        return parse_date(str(value).strip())
+    except ValueError:  # well formed but impossible («2026-02-30»): ignored like a typo
+        return None
 
 
 def date_bounds(param_from, param_to) -> tuple[datetime | None, datetime | None]:

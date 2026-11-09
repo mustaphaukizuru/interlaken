@@ -372,7 +372,10 @@ class FormBulkView(AdminBulkView):
     actions = {'delete': delete_action(guard=_form_delete_guard)}
 
     def get_queryset(self):
-        return _annotated()
+        # Not ``_annotated()``: its Count makes a GROUP BY, and Postgres refuses
+        # the bulk's SELECT … FOR UPDATE on it (SQLite ignores FOR UPDATE, so
+        # only production failed). The guard counts submissions per row.
+        return FormDefinition.objects.all()
 
 
 # ── submissions ───────────────────────────────────────────

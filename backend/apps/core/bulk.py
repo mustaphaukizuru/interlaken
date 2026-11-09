@@ -24,13 +24,23 @@ core/bulk.py — the one bulk-action contract for admin lists (Data Ops C5).
   ``outcomes`` (``{"erased": 16, "archived": 19}``), dry run and commit alike.
 * Side effects: ``per_row`` (the handler sends its own email/notification),
   ``batched`` (``after(instances, payload, actor)`` runs once at the end) or
-  ``none``.
+  ``none``. A handler that emails a family wraps the send in
+  ``after_commit``: it runs once the row's chunk is committed, so a worker
+  killed mid-chunk can no longer roll back a token the family already got.
+  Such actions set a small ``chunk`` (10).
+* A commit stops starting new chunks after ``TIME_BUDGET_SECONDS`` (gunicorn
+  kills a worker at 60 s): the rows not reached come back in ``failed`` with
+  ``NOT_REACHED``, so «Reintentar fallidas» continues where it stopped.
+* ``requires_note`` is enforced on the commit only: the dialog shows the dry
+  run first and asks for the note after it.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable, Iterable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,7 +63,42 @@ logger = logging.getLogger(__name__)
 MAX_IDS = 500
 MAX_MATCHING = 2_000
 CHUNK = 100
+# Rows per transaction for an action that emails each row (``BulkAction.chunk``).
+EMAIL_CHUNK = 10
 SIDE_EFFECTS = ("per_row", "batched", "none")
+# Seconds a commit keeps starting chunks; then the rest is reported as
+# NOT_REACHED. gunicorn's --timeout is 60 s and an emailing row takes ~1 s.
+TIME_BUDGET_SECONDS = 30
+NOT_REACHED = (
+    "Sin procesar: se agotó el tiempo de esta solicitud. "
+    "Pulse «Reintentar fallidas» para continuar."
+)
+
+# The side effects queued by the row being processed (None outside a bulk run).
+_AFTER_COMMIT: ContextVar[list | None] = ContextVar("bulk_after_commit", default=None)
+
+
+def after_commit(fn: Callable[[], Any]) -> None:
+    """Run ``fn`` once the bulk row it belongs to is committed; now, outside a bulk run.
+
+    For what a family receives (an invitation carrying a freshly minted token,
+    an approval, a confirmation): sent inside the chunk's transaction, a worker
+    killed before the commit rolled the row back after the email was out. A
+    row that fails or is skipped drops what it queued; a dry run runs nothing.
+    """
+    queue = _AFTER_COMMIT.get()
+    if queue is None:
+        fn()
+    else:
+        queue.append(fn)
+
+
+def _run_after_commit(callbacks, entity: str, action_name: str) -> None:
+    for fn in callbacks:
+        try:
+            fn()
+        except Exception:  # a failed email never undoes the committed rows
+            logger.exception("bulk %s/%s side effect failed", entity, action_name)
 
 
 class BulkSkip(Exception):
@@ -81,6 +126,8 @@ class BulkAction:
     plan: Callable[[Any, dict], Any] | None = None
     after: Callable[[list, dict, Any], None] | None = None
     audit_action: str = "update"
+    # Rows per transaction when smaller than the view's (EMAIL_CHUNK for emailing actions).
+    chunk: int | None = None
 
     def __post_init__(self):
         if self.side_effects not in SIDE_EFFECTS:
@@ -106,9 +153,10 @@ def status_action(
     """
 
     def plan(instance, payload):
-        assert_transition(
-            entity, getattr(instance, status_field), target, note=str(payload.get("note") or "")
-        )
+        # An action that asks for a note asks for it after the dry run, so its
+        # plan checks the table only (None); the handler enforces the note.
+        note = None if requires_note else str(payload.get("note") or "")
+        assert_transition(entity, getattr(instance, status_field), target, note=note)
 
     def handler(instance, payload, actor):
         current = getattr(instance, status_field)
@@ -267,8 +315,19 @@ def run_bulk(
     }
     done: list = []
     outcomes: dict[str, int] = {}
+    if action.chunk:
+        chunk = min(chunk, action.chunk)
+    started = time.monotonic()
+    chunks = list(chunked(ids, chunk))
 
-    for chunk_ids in chunked(ids, chunk):
+    for index, chunk_ids in enumerate(chunks):
+        if not dry_run and index and time.monotonic() - started > TIME_BUDGET_SECONDS:
+            # Stop before the worker is killed; the rest is one «Reintentar» away.
+            for later in chunks[index:]:
+                result["failed"].extend({"id": pk, "error": NOT_REACHED} for pk in later)
+            result["not_reached"] = sum(len(later) for later in chunks[index:])
+            break
+        committed_effects: list = []
         with transaction.atomic():
             rows = queryset.filter(pk__in=chunk_ids)
             if not dry_run:
@@ -279,25 +338,34 @@ def run_bulk(
                 if instance is None:
                     result["failed"].append({"id": pk, "error": "No encontrado."})
                     continue
-                outcome, message = _process_row(
-                    instance,
-                    action,
-                    payload,
-                    actor,
-                    entity=entity,
-                    dry_run=dry_run,
-                    note=note,
-                    context=context,
-                )
+                row_effects: list = []
+                token = _AFTER_COMMIT.set(row_effects)
+                try:
+                    outcome, message = _process_row(
+                        instance,
+                        action,
+                        payload,
+                        actor,
+                        entity=entity,
+                        dry_run=dry_run,
+                        note=note,
+                        context=context,
+                    )
+                finally:
+                    _AFTER_COMMIT.reset(token)
                 if outcome == "ok":
                     result["ok"] += 1
                     done.append(instance)
+                    if not dry_run:
+                        committed_effects.extend(row_effects)
                     if message:
                         outcomes[message] = outcomes.get(message, 0) + 1
                 elif outcome == "skipped":
                     result["skipped"].append({"id": pk, "reason": message})
                 else:
                     result["failed"].append({"id": pk, "error": message})
+        # The chunk is committed: now the emails can name what it wrote.
+        _run_after_commit(committed_effects, entity, action.name)
 
     if outcomes:
         result["outcomes"] = outcomes
@@ -374,7 +442,12 @@ class AdminBulkView(APIView):
         data = ser.validated_data
         action = self.get_action(data["action"])
         payload = dict(data["payload"] or {})
-        if action.requires_note and not str(payload.get("note") or "").strip():
+        # On the commit only: the dialog runs the dry run first, then asks for the note.
+        if (
+            action.requires_note
+            and not data["dry_run"]
+            and not str(payload.get("note") or "").strip()
+        ):
             raise ValidationError({"note": ["Indique el motivo."]})
         if data["all_matching"]:
             ids = self.matching_ids(request, data["filters"] or {})
