@@ -519,8 +519,11 @@ def _maybe_low_balance_alert(cb, now):
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
-        notify(parent, Notification.NotifType.CAFETERIA, title, message,
+        # WARNING, not CAFETERIA: the Avisos tab promises «saldo muy bajo …
+        # siempre se envían», and only urgent alerts bypass a muted category.
+        notify(parent, Notification.NotifType.WARNING, title, message,
                whatsapp=use_wa, fanout=False, tone='warning',
+               url='/portal/cafeteria',
                highlight=('Saldo actual', money(cb.balance)),
                details=[('Alumno', student.user.full_name),
                         ('Saldo mínimo configurado', money(cb.low_balance_threshold))],

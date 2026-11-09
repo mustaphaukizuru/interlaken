@@ -113,3 +113,27 @@ def test_statement_lists_history_rows_without_counting_them(api_client, monkeypa
     assert 'Saldo final: $70.00' in text
     assert '(ya en el saldo) Devolución' in text
     assert 'Total devoluciones' not in text
+
+
+def test_low_balance_alert_reaches_a_family_that_muted_cafeteria(mailoutbox):
+    """The Avisos tab says «saldo muy bajo … siempre se envían»; the alert went
+    out as the cafetería type, so muting that category (or email) silenced it."""
+    from unittest.mock import patch
+
+    from apps.accounts.models import NotificationPreference
+    from apps.cafeteria import services
+    from apps.cafeteria.test_cafeteria import _receipt
+    from apps.portal.models import Notification
+
+    parent = ParentFactory()
+    NotificationPreference.objects.update_or_create(user=parent, defaults={'cat_cafeteria': False, 'email_enabled': False})
+    student = StudentProfileFactory(loyverse_id='loy-low', parents=[parent])
+    CafeteriaBalance.objects.create(student=student, balance=Decimal('60'), low_balance_threshold=Decimal('50'))
+
+    with patch('apps.cafeteria.services.get_receipts', return_value=[_receipt('loy-low', 'R-low', 40)]):
+        services.sync_purchases()
+
+    titles = list(Notification.objects.filter(user=parent).values_list('title', 'notif_type'))
+    assert ('Saldo bajo en cafetería', 'warning') in titles
+    assert ('Compra en cafetería', 'cafeteria') not in titles  # the muted category stays muted
+    assert any('Saldo bajo' in m.subject for m in mailoutbox)

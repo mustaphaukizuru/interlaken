@@ -88,7 +88,13 @@ class StudentWriteSerializer(serializers.Serializer):
                 f.required = False
 
     def validate_student_id(self, value):
-        value = value.strip().upper()
+        # Spelled like every other matrícula input (importers, Loyverse,
+        # admissions): «CI09932» is stored as «09932», never as a second student.
+        from apps.core.matricula import normalize_matricula
+
+        value = normalize_matricula(value).upper()
+        if not value:
+            raise serializers.ValidationError('Escriba la matrícula.')
         qs = StudentProfile.objects.filter(student_id=value)
         current = self.context.get('profile')
         if current is not None:
@@ -129,7 +135,9 @@ def _snapshot(profile: StudentProfile) -> dict:
 def _existing_student(student_id) -> dict | None:
     """The record that already holds ``student_id``, archived ones included, so the
     form can offer to open or restore it instead of creating a second copy."""
-    sid = str(student_id or '').strip().upper()
+    from apps.core.matricula import normalize_matricula
+
+    sid = normalize_matricula(str(student_id or '')).upper()
     profile = (StudentProfile.objects.filter(student_id=sid).select_related('user').first()
                if sid else None)
     if profile is None:

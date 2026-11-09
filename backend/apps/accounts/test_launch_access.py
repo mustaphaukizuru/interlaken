@@ -155,3 +155,24 @@ class TestUndoArchive:
 
         profile.refresh_from_db()
         assert (profile.status, profile.user.is_active, profile.user.archived_at) == ('withdrawn', False, None)
+
+
+class TestMatriculaSpelling:
+    """The editor stored «CI09932» as typed; every importer stores «09932»."""
+
+    def test_create_stores_the_canonical_digits(self, api_client, admin_user):
+        api_client.force_authenticate(admin_user)
+        r = api_client.post(reverse('admin-student-create'), {
+            'first_name': 'Ana', 'last_name': 'Prueba', 'student_id': 'ci09932', 'grade': '1° Primaria',
+        }, format='json')
+        assert r.status_code == 201, r.data
+        assert r.data['student_id'] == '09932'
+
+    def test_the_loyverse_spelling_finds_the_existing_record(self, api_client, admin_user):
+        existing = StudentProfileFactory(student_id='09932')
+        api_client.force_authenticate(admin_user)
+        r = api_client.post(reverse('admin-student-create'), {
+            'first_name': 'Otra', 'last_name': 'Vez', 'student_id': 'CI09932', 'grade': '1° Primaria',
+        }, format='json')
+        assert r.status_code == 400
+        assert r.data['existing']['id'] == existing.pk

@@ -71,8 +71,11 @@ class Command(BaseCommand):
             sent_to_someone = False
             for parent in family_notify_recipients(student):
                 use_wa = bool(getattr(parent, 'whatsapp', '') or '')
-                notify(parent, Notification.NotifType.CAFETERIA, title, message,
-                       whatsapp=use_wa, fanout=False)
+                # An urgent alert (WARNING): sent whatever the family muted, as
+                # the Avisos tab promises for «saldo muy bajo».
+                notify(parent, Notification.NotifType.WARNING, title, message,
+                       whatsapp=use_wa, fanout=False, tone='warning', url='/portal/cafeteria',
+                       cta_label='Recargar saldo')
                 notified_parents += 1
                 sent_to_someone = True
 
