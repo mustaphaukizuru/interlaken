@@ -206,22 +206,47 @@ def _notify_requester(arco, *, intake=False):
     """Email the requester: acknowledgement with the statutory deadline on intake, outcome on resolution."""
     from django.conf import settings as dj_settings
 
+    from apps.portal.emailing import EmailContent, long_date
     from apps.portal.services import send_email
+
     label = arco.get_request_type_display()
+    reason = 'Recibe este correo porque presentó una solicitud de derechos ARCO al Colegio Interlaken.'
     if intake:
         subject = f'Recibimos su solicitud ARCO de {label.lower()}'
         body = (f'Registramos su solicitud de {label.lower()} el {arco.created_at:%d/%m/%Y}. '
                 f'Le responderemos a más tardar el {arco.statutory_deadline:%d/%m/%Y} (plazo legal de 20 días hábiles).\n\n'
                 f'Si desea ampliar la solicitud, responda a este correo o escriba a {dj_settings.PRIVACY_EMAIL}.')
+        content = EmailContent(
+            category='Privacidad', title='Recibimos su solicitud ARCO',
+            intro=(f'Registramos su solicitud de {label.lower()}. Le responderemos dentro del plazo legal '
+                   f'de 20 días hábiles.'),
+            details=[('Tipo de solicitud', label), ('Fecha de registro', long_date(arco.created_at)),
+                     ('Respuesta a más tardar', long_date(arco.statutory_deadline))],
+            note=f'Si desea ampliar la solicitud, responda a este correo o escriba a {dj_settings.PRIVACY_EMAIL}.',
+            reason=reason,
+        )
     elif arco.status == ArcoRequest.Status.RESOLVED:
         subject = f'Su solicitud ARCO de {label.lower()} fue atendida'
         body = f'Resolución: {arco.resolution_note or "atendida"}.\n\nGracias por ayudarnos a mantener sus datos correctos.'
+        content = EmailContent(
+            category='Privacidad', tone='success', title='Su solicitud ARCO fue atendida',
+            intro='Gracias por ayudarnos a mantener sus datos correctos.',
+            details=[('Tipo de solicitud', label), ('Resolución', arco.resolution_note or 'Atendida')],
+            reason=reason,
+        )
     elif arco.status == ArcoRequest.Status.REJECTED:
         subject = f'Su solicitud ARCO de {label.lower()} no procedió'
         body = f'Motivo: {arco.resolution_note or "no especificado"}.\n\nPuede acudir al INAI si no está de acuerdo con esta respuesta.'
+        content = EmailContent(
+            category='Privacidad', tone='neutral', title='Su solicitud ARCO no procedió',
+            intro='Revisamos su solicitud y no fue posible atenderla.',
+            details=[('Tipo de solicitud', label), ('Motivo', arco.resolution_note or 'No especificado')],
+            note='Puede acudir al INAI si no está de acuerdo con esta respuesta.',
+            reason=reason,
+        )
     else:
         return
-    send_email(subject, body, [arco.requester_email], reply_to=dj_settings.PRIVACY_EMAIL)
+    send_email(subject, body, [arco.requester_email], reply_to=dj_settings.PRIVACY_EMAIL, content=content)
 
 
 class AdminArcoIntakeView(APIView):

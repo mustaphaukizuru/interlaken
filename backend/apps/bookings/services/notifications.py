@@ -12,7 +12,6 @@ attendee invite (Prompt 13), so a parent always gets an Interlaken-styled email.
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
 
 from .ics import build_ics
 
@@ -23,6 +22,36 @@ def _visit_type_label(booking):
     return booking.slot.get_visit_type_display()
 
 
+VISIT_REASON = 'Recibe este correo porque agendó una visita al Colegio Interlaken.'
+
+
+def _visit_details(booking):
+    from apps.portal.emailing import long_date
+
+    slot = booking.slot
+    return [
+        ('Tipo de visita', _visit_type_label(booking)),
+        ('Fecha', long_date(slot.date)),
+        ('Horario', f'{slot.start_time:%H:%M} a {slot.end_time:%H:%M}'),
+        ('Lugar', slot.location or 'Campus Interlaken'),
+        ('Asistentes', str(booking.num_attendees)),
+    ]
+
+
+def _visit_email(booking, subject, body, content):
+    """The branded email plus the .ics invite (never blocks the send if the .ics fails)."""
+    from apps.portal.services import build_email
+
+    email = build_email(subject, body, [booking.parent_email], reply_to=settings.ADMISSIONS_EMAIL,
+                        content=content)
+    try:
+        email.attach('visita-interlaken.ics', build_ics(booking),
+                     'text/calendar; charset=utf-8; method=PUBLISH')
+    except Exception as exc:  # pragma: no cover - defensive; never block on ics
+        logger.warning('No se pudo generar el .ics para la reserva %s: %s', booking.pk, exc)
+    return email
+
+
 def send_booking_confirmation(booking):
     """Send a Spanish confirmation email (with a .ics calendar invite) for a
     booking and flag it as sent.
@@ -31,35 +60,20 @@ def send_booking_confirmation(booking):
     .ics attachment lets the parent add the visit to their calendar in one tap;
     if generation ever fails, the email still goes out without it.
     """
-    slot = booking.slot
-    subject = 'Confirmación de visita — Colegio Interlaken'
-    body = (
-        f'Estimado/a {booking.parent_name},\n\n'
-        f'Su visita ha quedado registrada:\n\n'
-        f'  • Tipo: {_visit_type_label(booking)}\n'
-        f'  • Fecha: {slot.date:%d/%m/%Y}\n'
-        f'  • Horario: {slot.start_time:%H:%M} - {slot.end_time:%H:%M}\n'
-        f'  • Lugar: {slot.location or "Campus Interlaken"}\n'
-        f'  • Asistentes: {booking.num_attendees}\n\n'
-        f'Adjuntamos una invitación de calendario (.ics) para que agregue la '
-        f'visita a su agenda.\n\n'
-        f'Si necesita cancelar o reprogramar, responda a este correo o '
-        f'comuníquese con nosotros.\n\n'
-        f'¡Le esperamos!\nColegio Interlaken'
-    )
+    from apps.portal.emailing import EmailContent
 
-    email = EmailMessage(
-        subject=subject,
-        body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[booking.parent_email],
+    subject = f'Visita confirmada: {_visit_type_label(booking)}'
+    content = EmailContent(
+        category='Visitas', tone='success',
+        title='Su visita al Colegio Interlaken está confirmada',
+        intro=(f'Estimado/a {booking.parent_name}: registramos su visita. Le compartimos los datos '
+               f'y una invitación de calendario para agregarla a su agenda con un toque.'),
+        details=_visit_details(booking),
+        note='¿Necesita cancelar o cambiar el horario? Responda a este correo o escríbanos por WhatsApp.',
+        signoff='¡Le esperamos!\nEquipo de Admisiones',
+        reason=VISIT_REASON,
     )
-    try:
-        email.attach('visita-interlaken.ics', build_ics(booking),
-                     'text/calendar; charset=utf-8; method=PUBLISH')
-    except Exception as exc:  # pragma: no cover - defensive; never block on ics
-        logger.warning('No se pudo generar el .ics para la reserva %s: %s',
-                       booking.pk, exc)
+    email = _visit_email(booking, subject, '', content)
 
     # send() returns the number of messages delivered (0 on a silent failure).
     # Only flag it sent when it actually went out, so a transient SMTP failure
@@ -80,36 +94,20 @@ def send_booking_reminder(booking):
     Best-effort and idempotent per booking via ``reminder_sent`` (the caller
     filters on it). Same fail-soft contract as the confirmation.
     """
-    slot = booking.slot
-    subject = 'Recordatorio: su visita es mañana — Colegio Interlaken'
-    body = (
-        f'Estimado/a {booking.parent_name},\n\n'
-        f'Le recordamos su visita programada para MAÑANA:\n\n'
-        f'  • Tipo: {_visit_type_label(booking)}\n'
-        f'  • Fecha: {slot.date:%d/%m/%Y}\n'
-        f'  • Horario: {slot.start_time:%H:%M} - {slot.end_time:%H:%M}\n'
-        f'  • Lugar: {slot.location or "Campus Interlaken"}\n'
-        f'  • Asistentes: {booking.num_attendees}\n\n'
-        f'Si ya no puede asistir, por favor avísenos respondiendo a este correo.\n\n'
-        f'¡Le esperamos!\nColegio Interlaken'
-    )
+    from apps.portal.emailing import EmailContent
 
-    email = EmailMessage(
-        subject=subject,
-        body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[booking.parent_email],
+    subject = 'Recordatorio: su visita es mañana'
+    content = EmailContent(
+        category='Visitas',
+        title='Su visita al Colegio Interlaken es mañana',
+        intro=f'Estimado/a {booking.parent_name}: le recordamos su visita programada para mañana.',
+        details=_visit_details(booking),
+        note='Si ya no puede asistir, avísenos respondiendo a este correo.',
+        signoff='¡Le esperamos!\nEquipo de Admisiones',
+        reason=VISIT_REASON,
     )
-    try:
-        email.attach('visita-interlaken.ics', build_ics(booking),
-                     'text/calendar; charset=utf-8; method=PUBLISH')
-    except Exception as exc:  # pragma: no cover - defensive; never block on ics
-        logger.warning('No se pudo generar el .ics para el recordatorio %s: %s',
-                       booking.pk, exc)
+    email = _visit_email(booking, subject, '', content)
 
-    # Gate the flag on real delivery: a failed send must leave reminder_sent
-    # False so the next cron run retries it (and is counted as a failure),
-    # instead of silently swallowing it and reporting "0 fallidos".
     delivered = bool(email.send(fail_silently=True))
     if delivered:
         booking.reminder_sent = True

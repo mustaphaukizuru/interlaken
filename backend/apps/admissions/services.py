@@ -25,6 +25,9 @@ from apps.portal.services import send_email
 from .models import PreRegistration, Registration, RegistrationDocument, current_school_cycle
 from .tokens import issue_invite
 
+# Footer line of every admissions email: why the family received it.
+ADM_REASON = "Recibe este correo porque inició un proceso de admisión en el Colegio Interlaken."
+
 PREREG_ENTITY = "admissions.preregistration"
 REG_ENTITY = "admissions.registration"
 
@@ -108,42 +111,65 @@ def invite_preregistration(
     return {"registration": reg, "raw": raw, "url": url, "changes": changes}
 
 
+def _child(reg) -> str:
+    return f"{reg.child_first_name} {reg.child_last_name}".strip()
+
+
 def email_invite(reg: Registration, invite_url: str):
-    send_email(
-        "Invitación de inscripción — Colegio Interlaken",
-        (
-            f"Estimado/a {reg.parent1_name},\n\n"
-            f"Le invitamos a completar la inscripción de {reg.child_first_name} "
-            f"{reg.child_last_name} para el ciclo {reg.cycle}.\n\n"
-            f"Ingrese al siguiente enlace para continuar:\n{invite_url}\n\n"
-            f"El enlace es personal y expira en 14 días.\n\n"
-            f"Colegio Interlaken"
-        ),
-        [reg.parent1_email],
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.portal.emailing import EmailContent, long_date
+
+    content = EmailContent(
+        category="Admisiones",
+        title=f"Le invitamos a completar la inscripción de {reg.child_first_name}",
+        intro=(f"Estimado/a {reg.parent1_name}: le invitamos a completar la inscripción de "
+               f"{_child(reg)} para el ciclo {reg.cycle} en el Colegio Interlaken."),
+        details=[("Alumno", _child(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle),
+                 ("El enlace vence", long_date(timezone.now() + timedelta(days=14)))],
+        cta_label="Completar la inscripción",
+        cta_url=invite_url,
+        note=("El enlace es personal: no lo comparta. Si tiene dudas, responda a este correo "
+              "y le atenderá el equipo de admisiones."),
+        signoff="Equipo de Admisiones",
+        reason=ADM_REASON,
     )
+    send_email(f"Invitación de inscripción: {_child(reg)}", "", [reg.parent1_email],
+               reply_to=settings.ADMISSIONS_EMAIL, content=content)
 
 
 # ── inscripciones ─────────────────────────────────────────
 def email_registration_outcome(reg: Registration):
     """Approved / rejected email to parent 1 (fail-soft via ``send_email``)."""
+    from apps.portal.emailing import EmailContent
+
     approved = reg.status == Registration.Status.APPROVED
-    subject = (
-        "Inscripción aprobada" if approved else "Actualización de su inscripción"
-    ) + " — Colegio Interlaken"
-    body = (
-        f"Estimado/a {reg.parent1_name},\n\n"
-        + (
-            f"Nos complace informarle que la inscripción de {reg.child_first_name} "
-            f"{reg.child_last_name} ha sido APROBADA. En breve le compartiremos los "
-            f"siguientes pasos.\n\n"
-            if approved
-            else f"Hemos revisado la solicitud de inscripción de {reg.child_first_name} "
-            f"{reg.child_last_name}. Un asesor de admisiones se pondrá en contacto con "
-            f"usted para darle más información.\n\n"
+    details = [("Alumno", _child(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle)]
+    if approved:
+        subject = f"Inscripción aprobada: {_child(reg)}"
+        content = EmailContent(
+            category="Admisiones", tone="success",
+            title=f"La inscripción de {reg.child_first_name} fue aprobada",
+            intro=(f"Estimado/a {reg.parent1_name}: nos da mucho gusto informarle que la inscripción "
+                   f"de {_child(reg)} fue aprobada. Bienvenidos a la familia Interlaken."),
+            details=details,
+            paragraphs=["En breve le compartiremos los siguientes pasos."],
+            signoff="Equipo de Admisiones", reason=ADM_REASON,
         )
-        + "Colegio Interlaken"
-    )
-    send_email(subject, body, [reg.parent1_email])
+    else:
+        subject = f"Actualización de su inscripción: {_child(reg)}"
+        content = EmailContent(
+            category="Admisiones", tone="neutral",
+            title="Actualización sobre su solicitud de inscripción",
+            intro=(f"Estimado/a {reg.parent1_name}: revisamos la solicitud de inscripción de {_child(reg)}. "
+                   f"Un asesor de admisiones se pondrá en contacto con usted para darle más información."),
+            details=details,
+            note="Si tiene preguntas, responda a este correo y le atenderemos.",
+            signoff="Equipo de Admisiones", reason=ADM_REASON,
+        )
+    send_email(subject, "", [reg.parent1_email], reply_to=settings.ADMISSIONS_EMAIL, content=content)
 
 
 OUTCOME_STATES = (Registration.Status.APPROVED, Registration.Status.REJECTED)
@@ -161,14 +187,30 @@ def request_missing_documents(
 
     if not checklist(reg)["missing"]:
         return {"missing": [], "text": "", "sent_to": ""}
-    text, missing = render_missing_docs(
-        reg, upload_url=documents_upload_url(reg, issue_invite(reg))
+    from apps.portal.emailing import EmailContent
+
+    upload_url = documents_upload_url(reg, issue_invite(reg))
+    text, missing = render_missing_docs(reg, upload_url=upload_url)
+    # The wording is the school's (Ajustes → plantilla): the text part is that text
+    # verbatim; the HTML part shows the same paragraphs with the link as a button.
+    paragraphs = [p.replace(upload_url, "").rstrip() for p in text.split("\n\n") if p.strip()]
+    content = EmailContent(
+        category="Admisiones", tone="warning",
+        title=f"Documentos pendientes para la inscripción de {reg.child_first_name}",
+        intro=paragraphs[0] if paragraphs else "",
+        paragraphs=[p for p in paragraphs[1:] if p],
+        cta_label="Subir documentos",
+        cta_url=upload_url,
+        note="El enlace es personal y de un solo uso. Si vence, pida uno nuevo respondiendo a este correo.",
+        reason=ADM_REASON,
     )
     send_email(
-        "Documentos pendientes para la inscripción",
+        f"Documentos pendientes para la inscripción de {reg.child_first_name}",
         text,
         [reg.parent1_email],
         reply_to=settings.ADMISSIONS_EMAIL,
+        content=content,
+        text_from_content=False,
     )
     if not audit:
         return {"missing": missing, "text": text, "sent_to": reg.parent1_email}
@@ -186,22 +228,26 @@ def email_rejected_documents(reg: Registration, docs: list[RegistrationDocument]
     """One email per registration listing every rejected document with its note."""
     if not docs:
         return
-    lines = "".join(
-        f"- {d.get_doc_type_display()}" + (f": {d.review_note}" if d.review_note else "") + "\n"
-        for d in docs
+    from apps.portal.emailing import EmailContent
+
+    items = [d.get_doc_type_display() + (f": {d.review_note}" if d.review_note else "") for d in docs]
+    plural = len(docs) > 1
+    content = EmailContent(
+        category="Admisiones", tone="warning",
+        title=("Hay documentos por corregir" if plural else "Hay un documento por corregir"),
+        intro=(f"Estimado/a {reg.parent1_name}: revisamos los documentos de inscripción de "
+               f"{reg.child_first_name} y {'estos necesitan' if plural else 'este necesita'} corrección:"),
+        items=items,
+        paragraphs=["Vuelva a subirlos con el enlace de documentos que le enviamos. "
+                    "Si su enlace ya venció, responda a este correo y le enviamos uno nuevo."],
+        signoff="Equipo de Admisiones", reason=ADM_REASON,
     )
-    subject = "Documento por corregir - Colegio Interlaken"
-    if len(docs) > 1:
-        subject = "Documentos por corregir - Colegio Interlaken"
     send_email(
-        subject,
-        f"Estimado/a {reg.parent1_name},\n\n"
-        f"Los siguientes documentos de {reg.child_first_name} necesitan corrección:\n"
-        f"{lines}\n"
-        "Solicite un nuevo enlace de documentos a admisiones si el suyo caducó.\n\n"
-        "Colegio Interlaken",
+        f"{'Documentos' if plural else 'Documento'} por corregir: {_child(reg)}",
+        "",
         [reg.parent1_email],
         reply_to=settings.ADMISSIONS_EMAIL,
+        content=content,
     )
 
 

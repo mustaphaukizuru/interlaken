@@ -1,43 +1,140 @@
 {% autoescape on %}<!doctype html>
-<html lang="es">
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,address=no,email=no,date=no">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
 <title>{{ subject }}</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<style>
+  body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+  a { color: #401A8E; }
+  @media (max-width: 620px) {
+    .card-pad { padding: 28px 22px 30px 22px !important; }
+    .h1 { font-size: 21px !important; line-height: 28px !important; }
+    .btn-table { width: 100% !important; }
+    .btn-a { display: block !important; text-align: center !important; }
+    .stack { display: block !important; width: auto !important; box-sizing: border-box; }
+    .detail-label { padding: 12px 16px 0 16px !important; }
+    .detail-value { padding: 2px 16px 12px 16px !important; border-top: 0 !important; }
+    .foot-pad { padding: 22px 16px 0 16px !important; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background:#F6F4F0;font-family:Inter,Segoe UI,Arial,sans-serif;color:#1B1536;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F6F4F0;padding:24px 12px;">
-  <tr><td align="center">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #ECEAF3;">
-      <tr>
-        <td style="height:6px;background:linear-gradient(90deg,#47A028 0%,#401A8E 50%,#E01A4E 100%);font-size:0;line-height:0;">&nbsp;</td>
-      </tr>
-      <tr>
-        <td style="padding:24px 28px 8px 28px;">
-          <div style="font-family:Poppins,Inter,Arial,sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.3px;color:#401A8E;">Colegio Interlaken</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:8px 28px 24px 28px;font-size:15px;line-height:1.6;">
-          <h1 style="margin:0 0 12px 0;font-family:Poppins,Inter,Arial,sans-serif;font-size:20px;line-height:1.3;color:#1B1536;">{{ subject }}</h1>
-          {% for paragraph in paragraphs %}<p style="margin:0 0 12px 0;white-space:pre-line;">{{ paragraph }}</p>{% endfor %}
-          {% if cta_url %}
-          <p style="margin:20px 0 8px 0;">
-            <a href="{{ cta_url }}" style="display:inline-block;background:#E01A4E;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:999px;">{{ cta_label|default:"Abrir el portal" }}</a>
-          </p>
-          {% endif %}
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:16px 28px 24px 28px;border-top:1px solid #ECEAF3;font-size:12px;line-height:1.6;color:#6F6A85;">
-          Colegio Interlaken · Tlalnepantla, Estado de México<br>
-          {% if contact_email %}Dudas: <a href="mailto:{{ contact_email }}" style="color:#401A8E;">{{ contact_email }}</a>{% endif %}
-          {% if portal_url %} · <a href="{{ portal_url }}" style="color:#401A8E;">Portal de Familias</a>{% endif %}<br>
-          Este mensaje se envía desde una cuenta no monitoreada.
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+<body style="margin:0;padding:0;background-color:#F4F1EA;word-spacing:normal;">
+<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:#F4F1EA;">{{ preheader }}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F4F1EA;">
+  <tr>
+    <td align="center" style="padding:32px 12px 40px 12px;">
+      <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+        <tr>
+          <td style="background-color:#FFFFFF;border:1px solid #E6E1EF;border-radius:16px;overflow:hidden;">
+            <!-- brand stripe: the logo's three colors -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td height="4" width="34%" style="height:4px;line-height:4px;font-size:0;background-color:#47A028;">&nbsp;</td>
+                <td height="4" width="33%" style="height:4px;line-height:4px;font-size:0;background-color:#401A8E;">&nbsp;</td>
+                <td height="4" width="33%" style="height:4px;line-height:4px;font-size:0;background-color:#E01A4E;">&nbsp;</td>
+              </tr>
+            </table>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="card-pad" style="padding:32px 40px 36px 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1B1536;">
+                  <a href="{{ portal_home }}" target="_blank" style="text-decoration:none;"><img src="{{ logo_url }}" width="168" height="54" alt="Colegio Interlaken" style="display:block;width:168px;height:auto;max-width:168px;"></a>
+
+                  {% if c.category %}
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
+                    <tr><td style="background-color:{{ tone.bg }};border-radius:999px;padding:5px 12px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:{{ tone.fg }};">{{ c.category }}</td></tr>
+                  </table>
+                  <h1 class="h1" style="margin:14px 0 0 0;font-size:24px;line-height:32px;font-weight:700;color:#1B1536;">{{ c.title }}</h1>
+                  {% else %}
+                  <h1 class="h1" style="margin:28px 0 0 0;font-size:24px;line-height:32px;font-weight:700;color:#1B1536;">{{ c.title }}</h1>
+                  {% endif %}
+
+                  {% if c.intro %}<p style="margin:12px 0 0 0;font-size:16px;line-height:26px;color:#3D3852;white-space:pre-line;">{{ c.intro }}</p>{% endif %}
+
+                  {% if c.highlight %}
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+                    <tr><td style="background-color:{{ tone.bg }};border-radius:12px;padding:18px 20px;">
+                      <div style="font-size:13px;line-height:18px;font-weight:600;color:{{ tone.fg }};">{{ c.highlight.0 }}</div>
+                      <div style="margin-top:4px;font-size:30px;line-height:38px;font-weight:800;color:#1B1536;">{{ c.highlight.1 }}</div>
+                    </td></tr>
+                  </table>
+                  {% endif %}
+
+                  {% if c.details %}
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;background-color:#F8F6FB;border:1px solid #ECE8F3;border-radius:12px;">
+                    {% for label, value in c.details %}
+                    <tr>
+                      <td class="stack detail-label" width="38%" valign="top" style="padding:12px 0 12px 18px;{% if not forloop.first %}border-top:1px solid #ECE8F3;{% endif %}font-size:13px;line-height:20px;color:#6B6680;">{{ label }}</td>
+                      <td class="stack detail-value" valign="top" style="padding:12px 18px 12px 12px;{% if not forloop.first %}border-top:1px solid #ECE8F3;{% endif %}font-size:15px;line-height:22px;font-weight:600;color:#1B1536;white-space:pre-line;">{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                  </table>
+                  {% endif %}
+
+                  {% if c.items %}
+                  {% if c.list_title %}<p style="margin:24px 0 0 0;font-size:15px;line-height:22px;font-weight:700;color:#1B1536;">{{ c.list_title }}</p>{% endif %}
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:{% if c.list_title %}10px{% else %}20px{% endif %};">
+                    {% for item in c.items %}
+                    <tr>
+                      <td width="22" valign="top" style="padding:3px 0;font-size:16px;line-height:24px;font-weight:700;color:#47A028;">&#8226;</td>
+                      <td valign="top" style="padding:3px 0;font-size:15px;line-height:24px;color:#3D3852;">{{ item }}</td>
+                    </tr>
+                    {% endfor %}
+                  </table>
+                  {% endif %}
+
+                  {% for paragraph in c.paragraphs %}<p style="margin:16px 0 0 0;font-size:16px;line-height:26px;color:#3D3852;white-space:pre-line;">{{ paragraph }}</p>{% endfor %}
+
+                  {% if c.cta_url %}
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn-table" style="margin-top:28px;">
+                    <tr>
+                      <td align="center" bgcolor="#316F1C" style="border-radius:10px;background-color:#316F1C;">
+                        <a class="btn-a" href="{{ c.cta_url }}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;">{{ c.cta_label|default:"Abrir el portal" }}</a>
+                      </td>
+                    </tr>
+                  </table>
+                  {% if c.link_fallback %}
+                  <p style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#6B6680;">¿El botón no funciona? Copie y pegue este enlace en su navegador:<br><a href="{{ c.cta_url }}" target="_blank" style="color:#401A8E;word-break:break-all;">{{ c.cta_url }}</a></p>
+                  {% endif %}
+                  {% endif %}
+
+                  {% if c.note %}
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
+                    <tr><td style="background-color:{{ note_colors.bg }};border-left:3px solid {{ note_colors.fg }};border-radius:8px;padding:14px 16px;font-size:14px;line-height:21px;color:#3D3852;white-space:pre-line;">{{ c.note }}</td></tr>
+                  </table>
+                  {% endif %}
+
+                  {% if c.signoff %}<p style="margin:28px 0 0 0;font-size:15px;line-height:22px;color:#3D3852;white-space:pre-line;">{{ c.signoff }}</p>{% endif %}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td class="foot-pad" align="center" style="padding:24px 24px 0 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#6B6680;">
+            <strong style="color:#3D3852;">{{ contact.name }}</strong><br>
+            {{ contact.address }}<br>
+            Tel. {{ contact.phone }} &middot; <a href="mailto:{{ contact.email }}" style="color:#401A8E;">{{ contact.email }}</a><br>
+            {{ contact.hours }}
+            {% if c.reason or reply_to %}<br><br>{% endif %}
+            {% if c.reason %}{{ c.reason }}{% if reply_to %}<br>{% endif %}{% endif %}
+            {% if reply_to %}Si responde a este correo, su mensaje llega a {{ reply_to }}.{% endif %}
+            <br><br>
+            {% if c.manage_prefs %}<a href="{{ prefs_url }}" target="_blank" style="color:#401A8E;">Cambiar qué avisos recibo</a> &middot; {% endif %}<a href="{{ portal_home }}" target="_blank" style="color:#401A8E;">Portal de Familias</a>
+          </td>
+        </tr>
+      </table>
+      <!--[if mso]></td></tr></table><![endif]-->
+    </td>
+  </tr>
 </table>
 </body>
 </html>{% endautoescape %}

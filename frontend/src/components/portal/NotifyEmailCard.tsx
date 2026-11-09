@@ -1,27 +1,28 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useUrlFilters } from '@/hooks/useUrlFilters';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { authApi, type NotifyEmailState } from '@/services/api';
 
 /**
  * «Correo para avisos» (owner, 2026-10-20): a personal address that also gets
  * this account's emails. It only receives mail once confirmed from the link we
- * send to it; the link lands here with `?verificar_correo=<token>`.
+ * send to it. Since 2026-11-08 that link opens the public /confirmar-correo
+ * page (no sign-in), so while it is pending this card re-checks every few
+ * seconds and turns «Confirmado» on its own when the parent clicks on their phone.
  */
 export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
   const qc = useQueryClient();
-  const { get, set } = useUrlFilters();
-  const token = get('verificar_correo');
   const [draft, setDraft] = useState('');
   const { data } = useQuery({
     queryKey: ['notify-email'],
     queryFn: () => authApi.getNotifyEmail().then((r) => r.data),
+    refetchOnWindowFocus: true,
+    refetchInterval: (q) => (q.state.data?.email && !q.state.data.verified ? 8000 : false),
   });
   const store = (next: NotifyEmailState) => qc.setQueryData(['notify-email'], next);
 
@@ -39,22 +40,6 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
     onSuccess: ({ data: next }) => { store(next); toast.success('Ya no se enviarán avisos a ese correo.'); },
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
-  const verify = useMutation({
-    mutationFn: (t: string) => authApi.verifyNotifyEmail(t),
-    onSuccess: ({ data: next }) => { store(next); toast.success(`Listo: los avisos también llegarán a ${next.email}.`); },
-    onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo confirmar el correo.')),
-    onSettled: () => set({ verificar_correo: null }),
-  });
-
-  // Confirm once when arriving from the email link (StrictMode runs effects twice).
-  const verified = useRef('');
-  useEffect(() => {
-    if (token && verified.current !== token) {
-      verified.current = token;
-      verify.mutate(token);
-    }
-  }, [token, verify]);
-
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (draft.trim()) save.mutate(draft.trim());
@@ -66,9 +51,12 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
         <Mail className="h-4 w-4 text-purple" aria-hidden="true" />
         <h2 className="font-head text-base font-semibold text-ink">Correo para avisos</h2>
       </div>
-      <p className="mb-4 text-sm text-muted">
+      <p className="text-sm text-muted">
         Los avisos llegan a {accountEmail ? <strong className="font-semibold text-ink">{accountEmail}</strong> : 'el correo de la cuenta'}.
         Si prefiere recibirlos también en un correo personal, escríbalo aquí.
+      </p>
+      <p className="mb-4 mt-1 text-xs text-subtle">
+        Ese correo solo recibe una copia de los avisos: no crea otra cuenta ni da acceso al portal.
       </p>
 
       {data?.email && (
@@ -78,7 +66,7 @@ export function NotifyEmailCard({ accountEmail }: { accountEmail?: string }) {
             {data.verified ? (
               <p className="mt-0.5 flex items-center gap-1 text-xs text-green-700"><CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Confirmado: recibe los avisos</p>
             ) : (
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-amber"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> Pendiente: abra el enlace que le enviamos a ese correo</p>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-amber" role="status"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> Pendiente: abra el enlace que enviamos a ese correo (no necesita iniciar sesión)</p>
             )}
           </div>
           <div className="flex shrink-0 gap-2">

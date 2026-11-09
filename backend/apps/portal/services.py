@@ -18,63 +18,76 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
-def render_email_html(subject: str, message: str, *, cta_url: str = '', cta_label: str = '') -> str:
-    """Brand the plain-text ``message`` as HTML (BACKLOG P1-C3).
+def render_email_html(subject: str, message: str, *, cta_url: str = '', cta_label: str = '',
+                      content=None, reply_to: str = '') -> str:
+    """The branded HTML part (design system in ``portal/emailing.py``).
 
-    Paragraphs are split on blank lines; the text itself is autoescaped, so
-    callers keep writing plain text and never hand-roll markup. A rendering
-    failure must never block the send: fall back to no HTML part.
+    Pass ``content`` (an ``EmailContent``) for a structured email; plain
+    ``message`` text still renders in the same design (paragraphs on blank
+    lines). The text is autoescaped, so callers never hand-roll markup. A
+    rendering failure must never block the send: it returns ''.
     """
-    from django.template.loader import render_to_string
+    from .emailing import content_from_text, render_html
 
-    paragraphs = [p.strip() for p in (message or '').split('\n\n') if p.strip()]
-    try:
-        return render_to_string('email/base.html', {
-            'subject': subject,
-            'paragraphs': paragraphs,
-            'cta_url': cta_url,
-            'cta_label': cta_label,
-            'contact_email': getattr(settings, 'CONTACT_EMAIL', ''),
-            'portal_url': f"{(settings.FRONTEND_URL or '').rstrip('/')}/portal",
-        })
-    except Exception as e:  # pragma: no cover - template errors are logged, not raised
-        logger.warning('Email HTML render failed (%r): %s', subject, e)
-        return ''
+    if content is None:
+        content = content_from_text(subject, message, cta_url=cta_url, cta_label=cta_label)
+    return render_html(subject, content, reply_to=reply_to)
+
+
+def build_email(subject: str, message: str, recipients, *, reply_to: str | None = None,
+                cta_url: str = '', cta_label: str = '', html: bool = True, content=None,
+                text_from_content: bool = True):
+    """The ``EmailMultiAlternatives`` ``send_email`` sends (callers that attach files use it directly).
+
+    With ``content`` the plain-text part is rendered from it too, so both parts
+    say the same thing in the same order; ``text_from_content=False`` keeps
+    ``message`` as the text part (wording the school edits itself).
+    """
+    from django.core.mail import EmailMultiAlternatives
+
+    from .emailing import render_text
+
+    reply = reply_to or getattr(settings, 'CONTACT_EMAIL', '') or ''
+    body = render_text(content, reply_to=reply) if content is not None and text_from_content else message
+    msg = EmailMultiAlternatives(
+        subject=f'{getattr(settings, "EMAIL_SUBJECT_PREFIX", "")}{subject}',
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+        reply_to=[reply] if reply else None,
+    )
+    if html:
+        rendered = render_email_html(subject, message, cta_url=cta_url, cta_label=cta_label,
+                                     content=content, reply_to=reply)
+        if rendered:
+            msg.attach_alternative(rendered, 'text/html')
+    return msg
 
 
 def send_email(subject: str, message: str, recipients, *, fail_silently: bool = True,
                reply_to: str | None = None, cta_url: str = '', cta_label: str = '',
-               html: bool = True) -> bool:
-    """Send a plain-text email (plus a branded HTML alternative) from ``DEFAULT_FROM_EMAIL``.
+               html: bool = True, content=None, text_from_content: bool = True) -> bool:
+    """Send an email (plain text + branded HTML) from ``DEFAULT_FROM_EMAIL``.
 
     Best-effort by default: mail failures are **logged**, never raised, so a
     broken SMTP config can't block the action that triggered the notification.
     Returns ``True`` when at least one recipient was accepted.
 
     ``reply_to`` defaults to ``CONTACT_EMAIL`` so a family that hits "reply"
-    reaches a monitored mailbox, never noreply@ (BACKLOG P1-C1).
+    reaches a monitored mailbox, never noreply@ (BACKLOG P1-C1). ``content``
+    (an ``emailing.EmailContent``) gives the email its structure; without it
+    ``message`` is rendered as paragraphs in the same design.
     """
-    from django.core.mail import EmailMultiAlternatives
-
     if isinstance(recipients, str):
         recipients = [recipients]
     recipients = [r for r in (recipients or []) if r]
     if not recipients:
         return False
 
-    reply = reply_to or getattr(settings, 'CONTACT_EMAIL', '') or ''
     try:
-        msg = EmailMultiAlternatives(
-            subject=f'{getattr(settings, "EMAIL_SUBJECT_PREFIX", "")}{subject}',
-            body=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=recipients,
-            reply_to=[reply] if reply else None,
-        )
-        if html:
-            rendered = render_email_html(subject, message, cta_url=cta_url, cta_label=cta_label)
-            if rendered:
-                msg.attach_alternative(rendered, 'text/html')
+        msg = build_email(subject, message, recipients, reply_to=reply_to, cta_url=cta_url,
+                          cta_label=cta_label, html=html, content=content,
+                          text_from_content=text_from_content)
         sent = msg.send(fail_silently=False)
         if not sent:
             logger.error('Email send returned 0 (%r → %s)', subject, recipients)
@@ -87,13 +100,19 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
 
 
 def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bool = False,
-           fanout: bool = True):
+           fanout: bool = True, details=None, highlight=None, tone: str | None = None,
+           url: str | None = None, cta_label: str | None = None, intro: str | None = None):
     """Create an in-app ``Notification`` for ``user`` and optionally email them.
 
     Respects ``NotificationPreference`` toggles when present (defaults = all on).
     ``fanout`` (default) also delivers a student's email/push to every linked
     guardian; pass ``fanout=False`` when the caller already iterates the family
     (``family_notify_recipients``) so nobody is notified twice.
+
+    The email carries the same title and text, plus what only email shows:
+    ``details`` (label/value rows), ``highlight`` (one big figure), the button
+    to ``url`` (default: the portal page for ``notif_type``), ``tone`` and an
+    email-only ``intro`` (a human sentence when the card already has the figures).
     """
     from apps.accounts.models import NotificationPreference
     from apps.portal.models import Notification
@@ -130,7 +149,11 @@ def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bo
     if want_email:
         recipients = email_recipients(user) if fanout else mailboxes_of([user])
         if recipients:
-            ok = send_email(subject=title, message=message, recipients=recipients)
+            from .emailing import notification_content
+            content = notification_content(user=user, notif_type=notif_type, title=title, message=message,
+                                           details=details, highlight=highlight, tone=tone, url=url,
+                                           cta_label=cta_label, intro=intro)
+            ok = send_email(subject=title, message=message, recipients=recipients, content=content)
             email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
 
     push_status = Notification.Delivery.SKIPPED
@@ -377,7 +400,11 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7) -> i
         emails = mailboxes_of(targets)
         email_status = Notification.Delivery.SKIPPED
         if emails:
-            ok = send_email(subject=n.title, message=n.message, recipients=emails)
+            from .emailing import notification_content
+            content = notification_content(user=n.user, notif_type=n.notif_type, title=n.title, message=n.message,
+                                           comunicado=ann is not None,
+                                           url=f'/portal/notificaciones/{n.pk}' if ann else None)
+            ok = send_email(subject=n.title, message=n.message, recipients=emails, content=content)
             email_status = Notification.Delivery.SENT if ok else Notification.Delivery.FAILED
         # Comunicado rows deep-link the push to the announcement and honor its
         # 'Enviar notificación push' toggle; standalone rows keep /portal.

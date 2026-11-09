@@ -391,11 +391,13 @@ def _record_receipt(student, receipt: dict, *, apply=None):
 def _notify_purchase(tx):
     """Fan out an in-app + email purchase notification to every guardian."""
     from apps.cafeteria.models import CafeteriaTransaction
+    from apps.portal.emailing import long_date, money
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
     student = tx.student
-    if tx.transaction_type == CafeteriaTransaction.TxType.REFUND:
+    refund = tx.transaction_type == CafeteriaTransaction.TxType.REFUND
+    if refund:
         title = 'Devolución en cafetería'
         head = f'Se registró una devolución de ${tx.amount:.2f}'
     else:
@@ -404,13 +406,25 @@ def _notify_purchase(tx):
     detail = f' — {tx.description}' if tx.description else ''
     balance = f' Saldo actual: ${tx.balance_after:.2f}.' if tx.balance_after is not None else ''
     message = f'{student.user.full_name}: {head}{detail}.{balance}'
+    # Email only: the same facts as a card, the balance left as the figure that matters.
+    details = [('Alumno', student.user.full_name),
+               ('Devolución' if refund else 'Compra', money(tx.amount))]
+    if tx.description:
+        details.append(('Detalle', tx.description))
+    if getattr(tx, 'date', None):
+        details.append(('Fecha', long_date(tx.date, with_time=True)))
+    highlight = ('Saldo actual', money(tx.balance_after)) if tx.balance_after is not None else None
+    first = student.user.first_name or student.user.full_name
+    intro = (f'Se registró una devolución de {money(tx.amount)} en la cafetería para {first}.' if refund
+             else f'{first} hizo una compra de {money(tx.amount)} en la cafetería.')
 
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
-               whatsapp=use_wa, fanout=False)
+               whatsapp=use_wa, fanout=False, details=details, highlight=highlight,
+               tone='success' if refund else None, intro=intro)
         notified += 1
     return notified
 
@@ -455,12 +469,20 @@ def _maybe_low_balance_alert(cb, now):
         f'${cb.low_balance_threshold:.2f}. Le recomendamos recargar para evitar '
         f'contratiempos a la hora del almuerzo.'
     )
+    from apps.portal.emailing import money
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
-               whatsapp=use_wa, fanout=False)
+               whatsapp=use_wa, fanout=False, tone='warning',
+               highlight=('Saldo actual', money(cb.balance)),
+               details=[('Alumno', student.user.full_name),
+                        ('Saldo mínimo configurado', money(cb.low_balance_threshold))],
+               cta_label='Recargar saldo',
+               intro=(f'El saldo de cafetería de {student.user.first_name or student.user.full_name} '
+                      f'quedó por debajo del mínimo. Le recomendamos recargar para evitar '
+                      f'contratiempos a la hora del almuerzo.'))
         notified += 1
     return notified
 
@@ -538,7 +560,9 @@ def _maybe_budget_alert(cb, now):
     for parent in family_notify_recipients(student):
         use_wa = bool(getattr(parent, 'whatsapp', '') or '')
         notify(parent, Notification.NotifType.CAFETERIA, title, message,
-               whatsapp=use_wa, fanout=False)
+               whatsapp=use_wa, fanout=False, tone='warning',
+               details=[('Alumno', student.user.full_name), ('Límite superado', ' y '.join(over))],
+               cta_label='Revisar límites')
         notified += 1
     return notified
 
@@ -1109,7 +1133,12 @@ def notify_topup_applied(topup, balance) -> int:
         return _notify_balance_change(
             topup.student, 'Recarga aplicada',
             f'La recarga de {format_amount(topup.amount)} para {topup.student.user.full_name} '
-            f'ya está disponible en la cafetería. Saldo actual: {format_amount(balance)}.')
+            f'ya está disponible en la cafetería. Saldo actual: {format_amount(balance)}.',
+            details=[('Recarga', format_amount(topup.amount))],
+            highlight=('Saldo actual', format_amount(balance)), tone='success',
+            intro=(f'La recarga de {format_amount(topup.amount)} para '
+                   f'{topup.student.user.first_name or topup.student.user.full_name} '
+                   f'ya está disponible en la cafetería.'))
     except Exception:  # noqa: BLE001 — the credit is already committed
         logger.exception('Applied-top-up notification failed for top-up #%s', topup.pk)
         return 0
@@ -1267,7 +1296,9 @@ def refund_paid_topup(topup, *, actor=None, note: str = '', bank_refund_confirme
         _notify_balance_change(
             topup.student, 'Recarga devuelta',
             f'Se devolvió a su tarjeta el pago de {format_amount(topup.amount)} de la recarga de '
-            f'cafetería de {topup.student.user.full_name}; no se aplicó saldo. Motivo: {note}.')
+            f'cafetería de {topup.student.user.full_name}; no se aplicó saldo. Motivo: {note}.',
+            details=[('Monto devuelto a su tarjeta', format_amount(topup.amount)), ('Motivo', note)],
+            tone='neutral')
     except Exception:  # noqa: BLE001
         logger.exception('Refund notification failed for top-up #%s', topup.pk)
     return topup
@@ -1378,6 +1409,8 @@ def notify_topup_result(payment, *, success: bool) -> int:
     # Read after commit: the settlement that just ran may have moved it.
     topup.refresh_from_db(fields=['status', 'apply_due_at'])
     student = topup.student
+    name = student.user.full_name
+    details, highlight, tone, cta_label, intro = [('Alumno', name)], None, None, None, None
     if success and topup.status == TopUpRequest.Status.PAID:
         title = 'Pago de recarga recibido'
         when = (f'el {format_apply_at(topup.apply_due_at)}' if topup.apply_due_at
@@ -1391,6 +1424,10 @@ def notify_topup_result(payment, *, success: bool) -> int:
             f'{student.user.full_name}. El saldo se actualizará {when}{urgent} '
             f'Folio: {payment.id}.'
         )
+        tone, highlight = 'success', ('Monto pagado', format_amount(payment.amount))
+        details += [('El saldo se actualiza', when.removeprefix('el ')), ('Folio', str(payment.id))]
+        intro = (f'Recibimos su pago para la cafetería de {student.user.first_name or name}. '
+                 f'El saldo se actualizará {when}{urgent}')
     elif success:
         title = 'Recarga de cafetería exitosa'
         message = (
@@ -1399,6 +1436,8 @@ def notify_topup_result(payment, *, success: bool) -> int:
             f'el colegio cargará el monto en el POS para que pueda usarlo al comprar. '
             f'Referencia: {payment.gateway_tx_id or payment.id}.'
         )
+        tone, highlight = 'success', ('Monto pagado', format_amount(payment.amount))
+        details.append(('Referencia', str(payment.gateway_tx_id or payment.id)))
     else:
         title = 'Recarga de cafetería no completada'
         message = (
@@ -1406,11 +1445,15 @@ def notify_topup_result(payment, *, success: bool) -> int:
             f'{student.user.full_name}. No se realizó ningún cargo a su saldo. '
             f'Puede intentarlo nuevamente desde el portal.'
         )
+        tone, cta_label = 'danger', 'Intentar de nuevo'
+        details += [('Monto', format_amount(payment.amount)), ('Cargo', 'No se realizó ningún cargo')]
 
     notified = 0
     from apps.accounts.family import family_notify_recipients
     for parent in family_notify_recipients(student):
-        notify(parent, Notification.NotifType.PAYMENT, title, message, fanout=False)
+        notify(parent, Notification.NotifType.PAYMENT, title, message, fanout=False,
+               details=details, highlight=highlight, tone=tone, cta_label=cta_label,
+               url='/portal/cafeteria' if cta_label else None, intro=intro)
         notified += 1
     return notified
 
@@ -1486,15 +1529,22 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
 # source of truth — we never write ``total_points`` to Loyverse.
 
 
-def _notify_balance_change(student, title, message):
-    """Fan out an in-app + email notification to every guardian. Returns count."""
+def _notify_balance_change(student, title, message, *, details=None, highlight=None, tone=None,
+                           intro=None):
+    """Fan out an in-app + email notification to every guardian. Returns count.
+
+    The email's details card always opens with the student; callers add the
+    amount, the reason and the new balance as ``highlight``.
+    """
     from apps.accounts.family import family_notify_recipients
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
+    card = [('Alumno', student.user.full_name), *(details or [])]
     notified = 0
     for parent in family_notify_recipients(student):
-        notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False)
+        notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False,
+               details=card, highlight=highlight, tone=tone, intro=intro)
         notified += 1
     return notified
 
@@ -1727,10 +1777,16 @@ def adjust_balance(student, amount, reason: str, admin=None, *,
             message = (f'Se {verb} ${amount.copy_abs():.2f} al saldo de cafetería de '
                        f'{student.user.full_name}. Motivo: {reason}. '
                        f'Saldo actual: ${cb.balance:.2f}.')
+            card = [('Ajuste', f'{"+" if amount > 0 else "-"}${amount.copy_abs():,.2f}'), ('Motivo', reason)]
+            figure = ('Saldo actual', f'${cb.balance:,.2f}')
             # After COMMIT (immediately when no transaction is open). robust:
             # a mail failure is logged and can never undo or 500 the money.
             transaction.on_commit(
-                lambda: _notify_balance_change(student, title, message), robust=True)
+                lambda: _notify_balance_change(
+                    student, title, message, details=card, highlight=figure,
+                    intro=(f'Se {verb} ${amount.copy_abs():,.2f} al saldo de cafetería de '
+                           f'{student.user.first_name or student.user.full_name}.')),
+                robust=True)
 
     _audit_wallet(
         'cafeteria.adjust', cb, admin=admin,
@@ -2027,6 +2083,10 @@ def refund_transaction(tx, reason: str = '', admin=None, *, flag_pos_unload: boo
          f'cafetería de {student.user.full_name}.'
          + (f' Motivo: {reason}.' if reason else '')
          + f' Saldo actual: ${cb.balance:.2f}.'),
+        details=[('Devolución', f'${reversal.copy_abs():,.2f}')] + ([('Motivo', reason)] if reason else []),
+        highlight=('Saldo actual', f'${cb.balance:,.2f}'), tone='success',
+        intro=(f'Se procesó una devolución de ${reversal.copy_abs():,.2f} en el saldo de cafetería de '
+               f'{student.user.first_name or student.user.full_name}.'),
     )
     logger.info(f'Refund of tx #{tx.id} for {student} by {admin} — reversal ${reversal}')
     return adj
@@ -2322,7 +2382,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
         _notify_balance_change(
             student, 'Recarga registrada',
             f'Se registró una recarga de ${delta:.2f} en la cafetería. '
-            f'Saldo actual: ${cb.balance:.2f}.')
+            f'Saldo actual: ${cb.balance:.2f}.',
+            details=[('Recarga', f'${delta:,.2f}')],
+            highlight=('Saldo actual', f'${cb.balance:,.2f}'), tone='success',
+            intro=(f'Se registró una recarga de ${delta:,.2f} en la cafetería para '
+                   f'{student.user.first_name or student.user.full_name}.'))
 
     if stamp:
         CafeteriaBalance.objects.filter(student_id__in=stamp).update(last_synced=now)

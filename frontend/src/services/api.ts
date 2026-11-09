@@ -22,6 +22,20 @@ export type * from './dataOps';
 /** «Correo para avisos»: a personal address confirmed by a signed link. */
 export interface NotifyEmailState { email: string; verified: boolean; sent?: boolean }
 
+/** What the emailed confirmation link confirms (public page, no sign-in). */
+export type NotifyEmailLinkState = 'ready' | 'confirmed' | 'expired' | 'invalid' | 'superseded';
+export interface NotifyEmailLink {
+  state: NotifyEmailLinkState;
+  /** Who the avisos are about: «Carla R.» + «1° Secundaria · Grupo A» for a student. */
+  account?: { name: string; detail: string; is_student: boolean };
+  /** Masked: «mu…@gmail.com». */
+  email?: string;
+  expires_at?: string | null;
+  /** The address also has its own portal login (they stay separate). */
+  separate_account?: boolean;
+  detail?: string;
+}
+
 export interface StaffUser {
   id: number;
   email: string;
@@ -269,7 +283,9 @@ export const authApi = {
   getNotifyEmail: () => api.get<NotifyEmailState>('/accounts/me/notify-email/'),
   setNotifyEmail: (email: string) => api.put<NotifyEmailState>('/accounts/me/notify-email/', { email }),
   deleteNotifyEmail: () => api.delete<NotifyEmailState>('/accounts/me/notify-email/'),
-  verifyNotifyEmail: (token: string) => api.post<NotifyEmailState>('/accounts/me/notify-email/verify/', { token }),
+  /** Public: the link's token is the proof; works signed out or in any account. */
+  previewNotifyEmailLink: (token: string) => api.get<NotifyEmailLink>('/accounts/notify-email/confirm/', { params: { token } }),
+  confirmNotifyEmailLink: (token: string) => api.post<NotifyEmailLink & Partial<NotifyEmailState>>('/accounts/notify-email/confirm/', { token }),
   updateMe: (data: { first_name?: string; last_name?: string; whatsapp?: string; avatar?: string }) =>
     api.patch('/accounts/me/', data),
   updateNotifPrefs: (data: Partial<{ email_enabled: boolean; in_app_enabled: boolean; push_enabled: boolean; cat_cafeteria: boolean; cat_payment: boolean; cat_info: boolean }>) =>
