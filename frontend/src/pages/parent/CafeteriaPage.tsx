@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Coffee, CreditCard, Plus, ArrowDownCircle, ArrowUpCircle, RotateCcw,
-  Search, X, Download, Wallet,
+  Search, X, Download, Wallet, SlidersHorizontal,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -57,13 +57,26 @@ const TOPUP_PRESETS = [20, 50, 100, 200, 300, 500];
 const txIcon = (type: string) => {
   if (type === 'topup')   return <ArrowUpCircle className="w-4 h-4 text-green-600" />;
   if (type === 'refund')  return <RotateCcw className="w-4 h-4 text-purple" />;
+  if (type === 'adjustment') return <SlidersHorizontal className="w-4 h-4 text-subtle" />;
   return <ArrowDownCircle className="w-4 h-4 text-subtle" />;
 };
 
 const txLabel = (type: string) => {
   if (type === 'topup')  return 'Recarga';
   if (type === 'refund') return 'Devolución';
+  if (type === 'adjustment') return 'Ajuste';
   return 'Compra';
+};
+
+/** The sign a movement had on the balance: purchases debit, top-ups credit; a
+ *  refund or an adjustment carries its own (from its audit row): reversing a
+ *  top-up is a charge. A POS refund has no audit row and gives a purchase back. */
+const txSign = (tx: { transaction_type: string; adjustment_amount?: string | null }): '-' | '+' | '' => {
+  if (tx.transaction_type === 'purchase') return '-';
+  if (tx.adjustment_amount != null && (tx.transaction_type === 'adjustment' || tx.transaction_type === 'refund')) {
+    return parseFloat(tx.adjustment_amount) < 0 ? '-' : '+';
+  }
+  return tx.transaction_type === 'adjustment' ? '' : '+';
 };
 
 type TypeFilter = '' | 'purchase' | 'topup' | 'refund';
@@ -79,7 +92,7 @@ function topupErrorMessage(err: unknown): string {
 
 export default function CafeteriaPage() {
   const queryClient = useQueryClient();
-  const childId = useSelectedChildStore((s) => s.childId);
+  const storedChildId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
   // Card payment is offered only when the server allows it for this family
@@ -153,6 +166,16 @@ export default function CafeteriaPage() {
       return Array.isArray(data) ? data : [data];
     },
   });
+
+  // The stored child (kept in this browser) only counts when it is one of this
+  // family's: another account on the same phone, or a sibling unlinked or
+  // archived, must not filter the page down to nothing (no card, no Recargar).
+  const childId = storedChildId != null && balances && !balances.some((b) => b.student.id === storedChildId)
+    ? null
+    : storedChildId;
+  useEffect(() => {
+    if (balances && storedChildId != null && childId == null) setChildId(null);
+  }, [balances, storedChildId, childId, setChildId]);
 
   // The alumno filter IS the portal child switcher (shared store), kept in
   // step with ?alumno= by the effect below. A valid ?alumno= (one of this
@@ -236,8 +259,11 @@ export default function CafeteriaPage() {
       return next;
     }, { replace: true });
     const amount = Number(raw);
+    // The dashboard tile names its child (?hijo=); otherwise the selected one.
+    const hijo = Number(searchParams.get('hijo'));
     const target =
-      balances.find((b) => b.student.id === childId && canTopUp(b))
+      balances.find((b) => b.student.id === hijo && canTopUp(b))
+      ?? balances.find((b) => b.student.id === childId && canTopUp(b))
       ?? balances.find(canTopUp);
     if (!target || !Number.isFinite(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) return;
     // Suppressed: one-shot URL command — the param is external navigation
@@ -319,6 +345,9 @@ export default function CafeteriaPage() {
     onSuccess: ({ data }) => {
       if (data?.checkout) {
         const checkout = data.checkout;
+        // Back from the bank, the page opens on the child that was paid for
+        // (its «Recarga por aplicar» visible), not the previously selected sibling.
+        if ((balances?.length ?? 0) > 1 && selectedStudent != null) setChildId(selectedStudent);
         setShowTopup(false);
         setTopupAmount('');
         setTopupStep(1);
@@ -399,11 +428,13 @@ export default function CafeteriaPage() {
     }
   };
 
+  // The statement is for the child on screen: the selected one, or the only one.
+  const statementStudent = childId ?? (balances?.length === 1 ? balances[0].student.id : null);
   const downloadStatement = async () => {
-    if (!selectedStudent) return;
+    if (!statementStudent) return;
     try {
       const month = format(new Date(), 'yyyy-MM');
-      const { data } = await cafeteriaApi.statementPdf(selectedStudent, month);
+      const { data } = await cafeteriaApi.statementPdf(statementStudent, month);
       downloadBlob(data, `estado-cuenta-cafeteria-${month}.pdf`);
     } catch {
       toast.error('No se pudo generar el estado de cuenta.');
@@ -463,7 +494,7 @@ export default function CafeteriaPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
-          {selectedStudent && (
+          {statementStudent && (
             <Button variant="secondary" size="sm" onClick={downloadStatement} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
               <Download className="w-3 h-3" /> Estado de cuenta (PDF)
             </Button>
@@ -529,9 +560,11 @@ export default function CafeteriaPage() {
                     ${bal.toFixed(2)}
                   </p>
                 </div>
-                <p className="pb-1 text-right text-[11px] leading-tight text-subtle">
-                  Actualizado<br />{b.last_synced ? format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es }) : 'N/A'}
-                </p>
+                {b.last_synced && (
+                  <p className="pb-1 text-right text-[11px] leading-tight text-subtle">
+                    Actualizado<br />{format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es })}
+                  </p>
+                )}
               </div>
 
               <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} />
@@ -672,7 +705,7 @@ export default function CafeteriaPage() {
               <li key={label} className="flex items-center gap-2" aria-current={state === 'current' ? 'step' : undefined}>
                 <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${state === 'todo' ? 'bg-cream-2 text-subtle' : 'bg-purple text-white'}`}>{n}</span>
                 <span className={`hidden sm:inline ${state === 'current' ? 'text-ink' : 'text-subtle'}`}>{label}</span>
-                {n < 3 && <span className="h-px w-4 bg-line" aria-hidden="true" />}
+                {n < 4 && <span className="h-px w-4 bg-line" aria-hidden="true" />}
               </li>
             );
           })}
@@ -1069,9 +1102,9 @@ export default function CafeteriaPage() {
                 </div>
                 <div className="flex flex-shrink-0 items-baseline justify-between gap-2 pl-7 sm:block sm:pl-0 sm:text-right">
                   <span className={`text-sm font-semibold ${
-                    tx.transaction_type === 'purchase' ? 'text-ink' : 'text-green-700'
+                    txSign(tx) === '+' ? 'text-green-700' : 'text-ink'
                   }`}>
-                    {tx.transaction_type === 'purchase' ? '-' : '+'}${parseFloat(tx.amount).toFixed(2)}
+                    {txSign(tx)}${parseFloat(tx.amount).toFixed(2)}
                   </span>
                   {tx.applied === false && (
                     <p className="text-xs text-subtle sm:mt-0.5">Incluida en el saldo inicial</p>

@@ -121,7 +121,7 @@ export default function PaymentsPage() {
     <>
       <PageHeader
         title="Pagos"
-        subtitle="Recargas de cafetería pagadas en línea o en caja, y su historial."
+        subtitle="Recargas de cafetería pagadas en línea y su historial."
         actions={<PortalExportButtons what="pagos" filenamePrefix="pagos" fetch={exportPayments} />}
       />
 

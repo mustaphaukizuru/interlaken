@@ -155,6 +155,8 @@ class DashboardView(APIView):
                 ],
                 'cafeteria_balances': [
                     {
+                        # The tile's quick top-up opens the wizard for THIS child.
+                        'student': b.student_id,
                         'student_name': b.student.user.full_name,
                         'balance': str(b.balance),
                         'low': b.is_low_balance,

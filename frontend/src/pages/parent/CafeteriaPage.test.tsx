@@ -504,3 +504,56 @@ describe('CafeteriaPage «Titular de la tarjeta» (Banorte requires it)', () => 
     expect(screen.getByRole('option', { name: 'Ciudad de México' })).toHaveValue('DF');
   });
 });
+
+describe('CafeteriaPage launch fixes (2026-11-09)', () => {
+  const sibling = { ...account, id: 3, student: { ...account.student, id: 12, user: { full_name: 'Leo Quintana' } } };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSelectedChildStore.setState({ childId: null });
+  });
+
+  it('ignores a child stored in this browser that is not one of this family', async () => {
+    // Another account used this phone, or the sibling was unlinked: the page
+    // used to filter down to nothing (no balance card, no Recargar).
+    useSelectedChildStore.setState({ childId: 999 });
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    expect(await screen.findByText('4° · Grupo A')).toBeInTheDocument();
+    await waitFor(() => expect(useSelectedChildStore.getState().childId).toBeNull());
+    expect(mockedTx).not.toHaveBeenCalledWith(expect.objectContaining({ student: 999 }));
+  });
+
+  it('opens the top-up for the child named by the dashboard tile (?recarga=&hijo=)', async () => {
+    useSelectedChildStore.setState({ childId: 10 });
+    mockedBalance.mockResolvedValue({ data: [account, sibling] } as never);
+    mockedTx.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=100&hijo=12' });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    expect(within(dialog).getByLabelText('Alumno')).toHaveValue('12');
+    expect(within(dialog).getByLabelText('Monto (MXN)')).toHaveValue(100);
+  });
+
+  it('shows a debit adjustment and a reversed top-up as charges', async () => {
+    mockedBalance.mockResolvedValue({ data: [account] } as never);
+    mockedTx.mockResolvedValue({ data: { count: 3, results: [
+      { id: 1, transaction_type: 'adjustment', amount: '30.00', adjustment_amount: '-30.00', description: 'Corrección',
+        date: '2026-11-05T12:00:00Z', balance_after: '120.00', items: [] },
+      { id: 2, transaction_type: 'refund', amount: '50.00', adjustment_amount: '-50.00', description: 'Devolución de recarga #9',
+        date: '2026-11-04T12:00:00Z', balance_after: '150.00', items: [] },
+      { id: 3, transaction_type: 'refund', amount: '25.00', adjustment_amount: null, description: 'Devolución en caja',
+        date: '2026-11-03T12:00:00Z', balance_after: '200.00', items: [] },
+    ] } } as never);
+
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    expect((await screen.findAllByText('-$30.00')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('-$50.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('+$25.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Ajuste').length).toBeGreaterThan(0);
+  });
+});

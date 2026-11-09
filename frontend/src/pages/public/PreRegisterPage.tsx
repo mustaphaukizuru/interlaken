@@ -113,13 +113,6 @@ export default function PreRegisterPage() {
               Contactar al colegio
             </Link>
           </div>
-          <p className="mt-6 text-sm text-subtle">
-            Si ya tiene cuenta de padres, puede consultar el estado de su inscripción en el{' '}
-            <Link to="/login" className="font-semibold text-green-dark underline">
-              portal
-            </Link>
-            .
-          </p>
         </div>
       </div>
     );
@@ -257,7 +250,7 @@ export default function PreRegisterPage() {
             <input type="checkbox" className="mt-0.5 h-5 w-5" {...register('wants_visit')} />
             <span>
               <span className="block font-semibold">Deseo agendar una visita para conocer el colegio</span>
-              <span className="block text-xs text-muted">Al enviar, le mostraremos el calendario para elegir fecha y hora.</span>
+              <span className="block text-xs text-muted">Al enviar, le daremos el enlace para elegir fecha y hora.</span>
             </span>
           </label>
 

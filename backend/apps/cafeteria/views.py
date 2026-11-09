@@ -205,6 +205,10 @@ class MyTransactionsView(generics.ListAPIView):
         # Aware bounds (invalid dates ignored) so the (student, -date) index is usable.
         qs = apply_date_range(qs, 'date', params.get('from'), params.get('to'))
 
+        # The signed amount of a refund or adjustment (credit or debit), from its audit row.
+        from .services import with_signed_amounts
+        qs = with_signed_amounts(qs)
+
         return apply_ordering(qs, self.request, TRANSACTION_ORDERING, '-date')
 
 
@@ -1621,35 +1625,42 @@ class MyStatementPdfView(APIView):
             end = _date(y, m, _cal.monthrange(y, m)[1])
         except (ValueError, TypeError):
             return Response({'month': ['Use AAAA-MM.']}, status=400)
+        from .services import signed_amount, with_signed_amounts
+
         # Aware bounds instead of ``date__date__range`` so the (student, -date) index is usable.
-        rows = list(CafeteriaTransaction.objects.filter(
+        # Signed amounts: a top-up reversal or a debit adjustment is a charge, not a «+».
+        rows = list(with_signed_amounts(CafeteriaTransaction.objects.filter(
             student=student, date__gte=day_start(start), date__lt=day_end_exclusive(end),
-        ).order_by('date', 'id'))
+        )).order_by('date', 'id'))
         prev = (CafeteriaTransaction.objects.filter(student=student, date__lt=day_start(start))
                 .order_by('-date', '-id').first())
         if prev is not None and prev.balance_after is not None:
             opening = prev.balance_after
         elif rows and rows[0].balance_after is not None:
-            sign = -1 if rows[0].transaction_type == CafeteriaTransaction.TxType.PURCHASE else 1
-            opening = rows[0].balance_after - sign * rows[0].amount
+            opening = rows[0].balance_after - signed_amount(rows[0])
         else:
             opening = Decimal('0')
         label = {'purchase': 'Consumo', 'topup': 'Recarga', 'refund': 'Devolución', 'adjustment': 'Ajuste'}
+        plural = {'Consumo': 'consumos', 'Recarga': 'recargas', 'Devolución': 'devoluciones', 'Ajuste': 'ajustes'}
+
+        def mxn(v):
+            return f'{"-" if v < 0 else ""}${abs(v):,.2f}'
+
         totals: dict[str, Decimal] = {}
         lines = [f'Alumno: {student.user.full_name}  ·  Matrícula {student.student_id}  ·  {student.grade} {student.group}'.rstrip(),
-                 f'Periodo: {start:%d/%m/%Y} al {end:%d/%m/%Y}', '', f'Saldo inicial: ${opening:,.2f}', '',
+                 f'Periodo: {start:%d/%m/%Y} al {end:%d/%m/%Y}', '', f'Saldo inicial: {mxn(opening)}', '',
                  f'{"Fecha":<12}{"Movimiento":<12}{"Detalle":<34}{"Importe":>10}{"Saldo":>10}', '-' * 78]
         running = opening
         for t in rows:
             kind = label.get(t.transaction_type, t.transaction_type)
-            amt = -t.amount if t.transaction_type == CafeteriaTransaction.TxType.PURCHASE else t.amount
+            amt = signed_amount(t)
             running = t.balance_after if t.balance_after is not None else running + amt
-            totals[kind] = totals.get(kind, Decimal('0')) + t.amount
+            totals[kind] = totals.get(kind, Decimal('0')) + amt
             detail = (t.description or '')[:32]
             lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{running:>10,.2f}')
-        lines += ['-' * 78, f'Saldo final: ${running:,.2f}', '']
+        lines += ['-' * 78, f'Saldo final: {mxn(running)}', '']
         for k, v in totals.items():
-            lines.append(f'Total {k.lower()}s: ${v:,.2f}')
+            lines.append(f'Total {plural.get(k, k.lower())}: {mxn(v)}')
         lines += ['', 'Este estado de cuenta es informativo; el saldo oficial es el del punto de venta (Loyverse).',
                   f'Colegio Interlaken · generado el {timezone.localtime():%d/%m/%Y %H:%M}']
         pdf = simple_document_pdf('Estado de cuenta de cafetería', lines, subtitle=f'{start:%B %Y}'.capitalize())

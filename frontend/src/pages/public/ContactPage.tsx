@@ -65,7 +65,7 @@ export default function ContactPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/70 to-dark/45" />
         <Blob tone="pink" opacity={0.4} size={460} shape={1} className="hidden sm:block" style={{ top: -150, left: -110 }} />
         <Blob tone="purple" opacity={0.4} size={420} shape={0} className="hidden sm:block" style={{ bottom: -150, right: -110 }} />
-        <div className="relative mx-auto w-full max-w-[1120px] py-14 sm:py-16">
+        <div className="relative mx-auto w-full max-w-[1120px] px-5 py-14 sm:px-6 sm:py-16">
           <span className="section-label-pink inline-flex">Estamos para ayudarle</span>
           <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-tight">
             Contacto
@@ -245,7 +245,7 @@ export default function ContactPage() {
 
       {/* ── MAPA ── */}
       <section className="bg-white pb-14 pt-4">
-        <div className="mx-auto w-full max-w-[1120px]">
+        <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-6">
           <h2 className="font-head text-fluid-xl font-bold text-ink">Cómo llegar</h2>
           <p className="mt-1 text-sm text-muted">
             {settings.address}

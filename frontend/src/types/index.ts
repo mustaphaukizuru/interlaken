@@ -40,6 +40,8 @@ export interface StudentProfile {
   emergency_name?: string;
   emergency_phone?: string;
   emergency_rel?: string;
+  /** Set when the medical fields came masked (P5-6): no access by role, or no consent. */
+  medical_masked?: 'consent_required' | 'role';
   blood_type?: string;
   allergies?: string;
   medical_notes?: string;
@@ -155,6 +157,8 @@ export interface CafeteriaTransaction {
   applied?: boolean;
   date: string;
   loyverse_receipt_id: string;
+  /** Adjustments only: the signed amount from the audit row (credit "+", debit "-"). */
+  adjustment_amount?: string | null;
 }
 
 export interface TopUpLogEntry {
@@ -372,7 +376,7 @@ export interface DashboardData {
   children_count?: number;
   children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;
   /** `pending_topups`: paid card top-ups not applied yet (school's 7:30 POS load). */
-  cafeteria_balances?: Array<{ student_name: string; balance: string; low: boolean; last_synced: string; pending_topups?: string }>;
+  cafeteria_balances?: Array<{ student?: number; student_name: string; balance: string; low: boolean; last_synced: string; pending_topups?: string }>;
   recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
   /** True when the family account has no linked StudentProfile yet. */
   needs_family_link?: boolean;

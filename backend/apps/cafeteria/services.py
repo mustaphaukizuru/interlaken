@@ -1936,6 +1936,40 @@ def _net_effect(tx) -> Decimal:
     return Decimal(str(adj.amount)) if adj else amount
 
 
+def with_signed_amounts(qs):
+    """Annotate ``adjustment_amount``: the signed amount of a movement's audit row.
+
+    Ledger amounts are stored absolute. A purchase debits and a top-up credits,
+    but a refund or an adjustment can go either way (reversing a top-up debits,
+    an adjustment is a credit or a debit); its ``BalanceAdjustment`` keeps the
+    sign. One subquery, so a list or a statement reads it without N+1.
+    """
+    from django.db.models import OuterRef, Subquery
+
+    from apps.cafeteria.models import BalanceAdjustment
+
+    return qs.annotate(adjustment_amount=Subquery(
+        BalanceAdjustment.objects.filter(transaction=OuterRef('pk')).order_by('pk').values('amount')[:1]))
+
+
+def signed_amount(tx) -> Decimal:
+    """The movement's effect on the balance (needs ``with_signed_amounts``).
+
+    Purchases debit, top-ups credit; refunds and adjustments take the sign of
+    their audit row. A POS refund receipt (no audit row) gives a purchase back.
+    """
+    from apps.cafeteria.models import CafeteriaTransaction
+
+    amount = Decimal(str(tx.amount))
+    if tx.transaction_type == CafeteriaTransaction.TxType.PURCHASE:
+        return -amount
+    if tx.transaction_type in (CafeteriaTransaction.TxType.REFUND, CafeteriaTransaction.TxType.ADJUSTMENT):
+        audited = getattr(tx, 'adjustment_amount', None)
+        if audited is not None:
+            return Decimal(str(audited))
+    return amount
+
+
 # A POS refund receipt this long after the sale is not taken as its reversal
 # by the legacy (pre ``refund_of``) same-amount match below.
 POS_REFUND_MATCH_DAYS = 30
