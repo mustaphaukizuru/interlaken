@@ -532,7 +532,7 @@ export default function CafeteriaPage() {
           // Prefer API flag (balance <= threshold); fall back to same inequality.
           const isLow = typeof b.is_low_balance === 'boolean'
             ? b.is_low_balance
-            : parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
+            : parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '20');
           const left = b.student.is_active === false;
           const notLinked = !b.student.loyverse_id;
           const bal = parseFloat(b.balance);
@@ -596,11 +596,11 @@ export default function CafeteriaPage() {
                 type="button"
                 onClick={() => {
                   setThresholdStudent(b);
-                  setThresholdValue(parseFloat(b.low_balance_threshold ?? '50').toFixed(0));
+                  setThresholdValue(parseFloat(b.low_balance_threshold ?? '20').toFixed(0));
                 }}
                 className="mt-2 self-start rounded text-left text-[11.5px] font-medium text-subtle transition hover:text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"
               >
-                Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '50').toFixed(0)}</span> · Cambiar
+                Alerta de saldo bajo: <span className="font-semibold">${parseFloat(b.low_balance_threshold ?? '20').toFixed(0)}</span> · Cambiar
               </button>
 
               {/* Spending budget (#13): progress vs the parent-set daily/weekly cap.
@@ -897,11 +897,11 @@ export default function CafeteriaPage() {
                 min="0"
                 step="10"
                 className="input-field min-h-[44px] text-base"
-                placeholder="Ej. 50"
+                placeholder="Ej. 20"
                 value={thresholdValue}
                 onChange={(e) => setThresholdValue(e.target.value)}
               />
-              <p className="mt-1 text-xs text-subtle">Predeterminado: $50</p>
+              <p className="mt-1 text-xs text-subtle">Predeterminado: $20</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="secondary" onClick={() => setThresholdStudent(null)} className="min-h-[44px] flex-1 focus-visible:ring-2 focus-visible:ring-purple/40">Cancelar</Button>

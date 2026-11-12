@@ -5,7 +5,7 @@ GET  /accounts/admin/school-year/preview/   what would happen: per-grade moves,
                                             graduates, skipped (on leave / withdrawn),
                                             current + suggested cycle label.
 POST /accounts/admin/school-year/run/       {"confirm": "AVANZAR", "new_cycle": "2027-2028",
-                                            "reset_threshold": 50 | null}
+                                            "reset_threshold": 20 | null}
      Atomic: promotes every active student one grade, graduates 3° Secundaria,
      optionally resets every cafetería low-balance threshold, stamps the new
      cycle on SiteSettings and writes one AuditLog entry. Refuses to run twice

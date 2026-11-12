@@ -18,7 +18,7 @@ class CafeteriaBalance(models.Model):
                                StudentProfile, on_delete=models.PROTECT,
                                related_name='cafeteria_balance')
     balance              = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    low_balance_threshold= models.DecimalField(max_digits=8, decimal_places=2, default=50)
+    low_balance_threshold= models.DecimalField(max_digits=8, decimal_places=2, default=20)
     last_synced          = models.DateTimeField(null=True, blank=True)
     # When the opening balance was copied from Loyverse points. Those points
     # already net out every receipt before this instant, so a parked receipt

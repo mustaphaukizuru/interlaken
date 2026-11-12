@@ -247,11 +247,11 @@ function balanceColumns(name: string): Column<CafeteriaBalance>[] {
     { id: 'code', header: 'Código Loyverse', className: 'font-mono text-xs text-muted', cell: (b) => b.student.loyverse_code || b.student.student_id },
     { id: 'grade', header: 'Grado', sortKey: 'grade', className: 'text-muted whitespace-nowrap', cell: (b) => `${b.student.grade} ${b.student.group}`.trim() },
     { id: 'balance', header: name, sortKey: 'balance', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (b) => mxn(b.balance) },
-    { id: 'threshold', header: 'Umbral', sortKey: 'threshold', align: 'right', defaultHidden: name === 'Saldo', className: 'text-muted', cell: (b) => mxn(b.low_balance_threshold ?? '50') },
+    { id: 'threshold', header: 'Umbral', sortKey: 'threshold', align: 'right', defaultHidden: name === 'Saldo', className: 'text-muted', cell: (b) => mxn(b.low_balance_threshold ?? '20') },
     {
       id: 'state', header: 'Estado',
       cell: (b) => {
-        const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '50');
+        const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '20');
         return <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>;
       },
     },
@@ -281,7 +281,7 @@ function RosterTab() {
   const bulk = useBalancesBulk();
   const [pending, setPending] = useState<BulkActionDef | null>(null);
   const [askThreshold, setAskThreshold] = useState(false);
-  const [threshold, setThreshold] = useState('50');
+  const [threshold, setThreshold] = useState('20');
 
   const [lastSync, setLastSync] = useState<{
     receipts: number; purchases_created: number; balances_ok: number; balances_failed: number;

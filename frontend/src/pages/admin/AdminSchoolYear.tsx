@@ -92,7 +92,7 @@ export default function AdminSchoolYear() {
                     </p>
                   </div>
                 )}
-                <Input label="Reiniciar umbral de saldo bajo (opcional)" type="number" inputMode="decimal" value={resetThreshold} onChange={(e) => setResetThreshold(e.target.value)} placeholder="50" hint="Vacío = conservar el umbral de cada familia." error={errors.reset_threshold} />
+                <Input label="Reiniciar umbral de saldo bajo (opcional)" type="number" inputMode="decimal" value={resetThreshold} onChange={(e) => setResetThreshold(e.target.value)} placeholder="20" hint="Vacío = conservar el umbral de cada familia." error={errors.reset_threshold} />
                 <Button onClick={() => { setCycle(newCycle); setStep('confirm'); }} disabled={data.active_total === 0}><CalendarRange size={16} aria-hidden="true" /> Continuar</Button>
               </div>
             ) : (
