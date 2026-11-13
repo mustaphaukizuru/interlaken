@@ -53,7 +53,7 @@ function Kids({ students }: { students: FamilyStudent[] }) {
       {students.map((s) => (
         <li key={s.id}>
           <Link to={`/admin/alumnos/${s.id}`} title={`${s.name} · ${gradeLine(s)} · ${s.student_id}`}
-            className="inline-flex min-h-[32px] items-center gap-1 rounded-full bg-cream px-2.5 text-xs text-ink hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+            className="inline-flex min-h-[32px] items-center gap-1 whitespace-nowrap rounded-full bg-cream px-2.5 text-xs text-ink hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
             <span className="font-semibold">{s.first_name || s.name}</span>
             <span className="text-subtle">· {gradeLine(s)}</span>
           </Link>
@@ -241,7 +241,7 @@ function FamilyDialog({ id, onClose }: { id: number | null; onClose: () => void 
   const mode: FamilyLinkMode | null = data ? { kind: 'family', family: { id: data.id, name: data.name }, memberIds: data.students.map((s) => s.id) } : null;
   return (
     <>
-      <Modal open={id != null && !adding} onClose={onClose} title={data?.name ?? 'Familia'} maxWidth={880}>
+      <Modal open={id != null && !adding} onClose={onClose} title="Detalle de la familia" maxWidth={880}>
         {isLoading ? <ListSkeleton rows={3} /> : isError || !data ? <ErrorState onRetry={() => refetch()} /> : (
           <FamilyPanel family={data} onAdd={() => setAdding(true)} onGone={onClose} />
         )}
@@ -319,7 +319,7 @@ function SuggestionsView() {
             </button>
             <button type="button" className={`${ROW_ACTION} text-muted`} onClick={() => openSingle(sg, DISMISS)}
               aria-label={`Descartar la sugerencia de ${names(sg)}`}>
-              <XCircle className="h-4 w-4" aria-hidden="true" /> No son hermanos
+              <XCircle className="h-4 w-4" aria-hidden="true" /> Descartar
             </button>
           </>
         )}

@@ -77,6 +77,43 @@ class TestSignals:
         assert build_suggestions() == []
 
 
+class TestGrouping:
+    """Two families of cousins share both surnames; each has its own phone."""
+
+    @pytest.fixture
+    def cousins(self):
+        a1 = _kid('Ana', last='García López', emergency_phone='5511110000')
+        a2 = _kid('Beto', last='García López', emergency_phone='5511110000')
+        b1 = _kid('Carla', last='García López', emergency_phone='5522220000')
+        b2 = _kid('Dani', last='García López', emergency_phone='5522220000')
+        return a1, a2, b1, b2
+
+    def test_surnames_never_chain_two_strong_groups(self, cousins):
+        a1, a2, b1, b2 = cousins
+        rows = _keys(build_suggestions())
+        assert rows[suggestion_key([a1.pk, a2.pk])]['confidence'] == 'alta'
+        assert rows[suggestion_key([b1.pk, b2.pk])]['confidence'] == 'alta'
+        hint = rows[suggestion_key([a1.pk, a2.pk, b1.pk, b2.pk])]
+        assert hint['confidence'] == 'media'
+        assert hint['units'] == [sorted([a1.pk, a2.pk]), sorted([b1.pk, b2.pk])]
+        assert len(rows) == 3
+
+    def test_dismissing_the_surname_hint_keeps_the_phone_matches(self, admin_client, cousins):
+        a1, a2, b1, b2 = cousins
+        key = suggestion_key([a1.pk, a2.pk, b1.pk, b2.pk])
+        body = admin_client.post(BULK, {'action': 'dismiss', 'ids': [key]}, format='json').data
+        assert body['ok'] == 1
+        assert FamilySuggestionDismissal.objects.count() == 4  # only the cross pairs
+        rows = _keys(build_suggestions())
+        assert set(rows) == {suggestion_key([a1.pk, a2.pk]), suggestion_key([b1.pk, b2.pk])}
+
+    def test_dismissing_a_strong_group_removes_it(self, admin_client, cousins):
+        a1, a2, *_ = cousins
+        key = suggestion_key([a1.pk, a2.pk])
+        admin_client.post(BULK, {'action': 'dismiss', 'ids': [key]}, format='json')
+        assert key not in _keys(build_suggestions())
+
+
 class TestFiltering:
     def test_students_already_together_are_not_suggested(self):
         a, b = _kid('Ana'), _kid('Luis')
@@ -161,6 +198,13 @@ class TestApi:
         key = suggestion_key([a.pk, b.pk])
         assert admin_client.post(BULK, {'action': 'dismiss', 'ids': [key]}, format='json').data['ok'] == 1
         assert admin_client.get(URL).data['count'] == 0
+
+    def test_dismissing_a_stale_key_is_skipped(self, admin_client):
+        a, b = _kid('Ana', last='Ruiz'), _kid('Luis', last='Soto')
+        body = admin_client.post(BULK, {'action': 'dismiss', 'ids': [suggestion_key([a.pk, b.pk])]},
+                                 format='json').data
+        assert body['ok'] == 0 and body['skipped'][0]['reason'] == 'ya no es una sugerencia'
+        assert not FamilySuggestionDismissal.objects.exists()
 
     def test_validation(self, admin_client):
         assert admin_client.post(BULK, {'action': 'explode', 'ids': ['1-2']}, format='json').status_code == 400

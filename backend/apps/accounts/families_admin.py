@@ -351,8 +351,11 @@ class FamilySuggestionsBulkView(APIView):
                     continue
                 result['ok'] += 1
             else:
+                if row is None:
+                    result['skipped'].append({'id': key, 'reason': 'ya no es una sugerencia'})
+                    continue
                 if not dry_run:
-                    fs.dismiss(ids, actor=request.user)
+                    fs.dismiss(actor=request.user, pairs=fs.pairs_to_dismiss(row))
                 result['ok'] += 1
         if not dry_run:
             record('update', object_type='bulk:accounts.family_suggestion', object_id=action,

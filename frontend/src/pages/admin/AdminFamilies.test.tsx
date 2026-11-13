@@ -70,7 +70,7 @@ describe('AdminFamilies', () => {
     expect(within(table).getByText('3 cuentas')).toBeInTheDocument();
 
     await userEvent.click(within(table).getByRole('button', { name: 'Familia Pérez López' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Familia Pérez López' });
+    const dialog = await screen.findByRole('dialog', { name: 'Detalle de la familia' });
     await waitFor(() => expect(familiesApi.get).toHaveBeenCalledWith(5));
     expect(await within(dialog).findByText('2 hermanos · 0 cuentas con acceso')).toBeInTheDocument();
   });
