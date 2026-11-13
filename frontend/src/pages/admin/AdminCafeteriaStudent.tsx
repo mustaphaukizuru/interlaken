@@ -113,7 +113,7 @@ export default function AdminCafeteriaStudent() {
   if (!data) return <EmptyState icon={ArrowLeft} title="Alumno no encontrado" />;
 
   const { balance, parents, loyverse, consumption } = data;
-  const isLow = parseFloat(balance.balance) <= parseFloat(balance.low_balance_threshold ?? '50');
+  const isLow = parseFloat(balance.balance) <= parseFloat(balance.low_balance_threshold ?? '20');
   const refundable = (t: AdminTransaction) =>
     t.transaction_type === 'purchase' || t.transaction_type === 'topup';
 
