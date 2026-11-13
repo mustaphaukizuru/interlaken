@@ -471,6 +471,9 @@ def _notify_purchase(tx):
                whatsapp=use_wa, fanout=False, details=details, highlight=highlight,
                tone='success' if refund else None, intro=intro)
         notified += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, Notification.NotifType.CAFETERIA, title, message)
     return notified
 
 
@@ -532,6 +535,9 @@ def _maybe_low_balance_alert(cb, now):
                       f'quedó por debajo del mínimo. Le recomendamos recargar para evitar '
                       f'contratiempos a la hora del almuerzo.'))
         notified += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, Notification.NotifType.WARNING, title, message)
     return notified
 
 
@@ -612,6 +618,9 @@ def _maybe_budget_alert(cb, now):
                details=[('Alumno', student.user.full_name), ('Límite superado', ' y '.join(over))],
                cta_label='Revisar límites')
         notified += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, Notification.NotifType.CAFETERIA, title, message)
     return notified
 
 
@@ -1533,6 +1542,9 @@ def notify_topup_result(payment, *, success: bool) -> int:
                details=details, highlight=highlight, tone=tone, cta_label=cta_label,
                url='/portal/cafeteria' if cta_label else None, intro=intro)
         notified += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, Notification.NotifType.PAYMENT, title, message)
     return notified
 
 
@@ -1565,6 +1577,9 @@ def notify_topup_not_charged(payment) -> int:
                intro=(f'Revisamos con Banorte su pago para la cafetería de '
                       f'{student.user.first_name or name}: no se realizó ningún cargo.'))
         notified += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, Notification.NotifType.PAYMENT, 'Pago de recarga no realizado', message)
     return notified
 
 
@@ -1656,6 +1671,9 @@ def _notify_balance_change(student, title, message, *, details=None, highlight=N
         notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False,
                details=card, highlight=highlight, tone=tone, intro=intro)
         notified += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, Notification.NotifType.CAFETERIA, title, message)
     return notified
 
 

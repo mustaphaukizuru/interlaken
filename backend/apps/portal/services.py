@@ -100,6 +100,41 @@ def send_email(subject: str, message: str, recipients, *, fail_silently: bool = 
         return False
 
 
+def copy_to_family(student, notif_type, title, message) -> int:
+    """In-app copy of a child's alert for the OTHER accounts of its Family.
+
+    Families (hermanos, 2026-11-13) sign in with any child's login, so the bell
+    of every family account shows every child's alerts. Bell only: the email,
+    push and WhatsApp already went to the child's own recipients
+    (``family_notify_recipients``), and each child's mailbox is read by the
+    family, so a second email would only repeat it. Respects each account's
+    category and in-app preferences like ``notify``. Returns the copies made.
+    """
+    from apps.accounts.family import family_alert_logins
+    from apps.accounts.models import NotificationPreference
+    from apps.portal.models import Notification
+
+    logins = family_alert_logins(student)
+    if not logins:
+        return 0
+    name = getattr(getattr(student, 'user', None), 'full_name', '') or ''
+    first = getattr(getattr(student, 'user', None), 'first_name', '') or name
+    if first and first not in message:
+        message = f'{name}: {message}'
+    skipped = Notification.Delivery.SKIPPED
+    now = timezone.now()
+    made = 0
+    for user in logins:
+        prefs = NotificationPreference.for_user(user)
+        if not prefs.allows(notif_type) or not prefs.wants('in_app', notif_type):
+            continue
+        Notification.objects.create(
+            user=user, notif_type=notif_type, title=title, message=message,
+            email_status=skipped, push_status=skipped, delivered_at=now)
+        made += 1
+    return made
+
+
 def notify(user, notif_type, title, message, *, email: bool = True, whatsapp: bool = False,
            fanout: bool = True, details=None, highlight=None, tone: str | None = None,
            url: str | None = None, cta_label: str | None = None, intro: str | None = None):

@@ -21,10 +21,27 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from apps.accounts.family import family_notify_recipients
+from apps.accounts.family import family_alert_logins, family_notify_recipients
 from apps.cafeteria.models import CafeteriaTransaction
 from apps.portal.models import Notification
 from apps.portal.services import notify
+
+
+def _bell_only(user, title, message):
+    """The digest as an in-app row only (an account that sees the children
+    through their Family; their own recipients already got the email)."""
+    from django.utils import timezone
+
+    from apps.accounts.models import NotificationPreference
+
+    kind = Notification.NotifType.CAFETERIA
+    prefs = NotificationPreference.for_user(user)
+    if not prefs.allows(kind) or not prefs.wants('in_app', kind):
+        return
+    skipped = Notification.Delivery.SKIPPED
+    Notification.objects.create(user=user, notif_type=kind, title=title, message=message,
+                                email_status=skipped, push_status=skipped,
+                                delivered_at=timezone.now())
 
 
 class Command(BaseCommand):
@@ -80,17 +97,29 @@ class Command(BaseCommand):
 
         # Group children under each guardian so a parent of two kids gets ONE digest.
         # Keyed by guardian pk → {'user', 'lines': [(name, total, count)], 'total'}.
+        # An account of a sibling's Family (hermanos) gets the child's line too:
+        # in its own digest when it has one, else as a bell-only copy (``full``
+        # stays False: the child's mailbox already got the email).
         families: dict[int, dict] = defaultdict(
-            lambda: {'user': None, 'lines': [], 'total': Decimal('0')})
+            lambda: {'user': None, 'lines': [], 'total': Decimal('0'), 'full': False})
+
+        def add(user, student, total, count, *, full):
+            bucket = families[user.pk]
+            bucket['user'] = user
+            bucket['full'] = bucket['full'] or full
+            line = (student.user.full_name, total, count)
+            if line not in bucket['lines']:
+                bucket['lines'].append(line)
+                bucket['total'] += total
+
         for student_pk, (total, count) in spend.items():
             student = students.get(student_pk)
             if student is None:
                 continue
             for parent in family_notify_recipients(student):
-                bucket = families[parent.pk]
-                bucket['user'] = parent
-                bucket['lines'].append((student.user.full_name, total, count))
-                bucket['total'] += total
+                add(parent, student, total, count, full=True)
+            for login in family_alert_logins(student):
+                add(login, student, total, count, full=False)
 
         title = f'Resumen de cafetería ({when_es})'
         sent = 0
@@ -107,6 +136,9 @@ class Command(BaseCommand):
                 f'Gasto en cafetería {when_es}: ' + '; '.join(parts)
                 + f'. Total: ${bucket["total"]:.2f}.'
             )
+            if not bucket['full']:
+                _bell_only(parent, title, message)
+                continue
             use_wa = bool(getattr(parent, 'whatsapp', '') or '')
             notify(parent, Notification.NotifType.CAFETERIA, title, message, fanout=False,
                    whatsapp=use_wa)
