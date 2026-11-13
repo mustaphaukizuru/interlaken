@@ -11,6 +11,8 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { BulkValueDialog, type BulkValueOption } from '@/components/admin/BulkValueDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
+import { FamilyLinkDialog } from '@/components/admin/families/FamilyLinkDialog';
+import { fromRoster, type PickedStudent } from '@/components/admin/families/familyUtils';
 import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
 import { RowActionsMenu, type RowMenuItem } from '@/components/admin/RowActionsMenu';
 import { Card } from '@/components/ui/Card';
@@ -66,6 +68,8 @@ const BULK_ACTIONS: BulkActionDef[] = [
   { name: 'group', label: 'Cambiar grupo', icon: UsersRound },
   { name: 'sync_loyverse', label: 'Sincronizar con Loyverse', icon: RefreshCw, planVerb: 'Se sincronizará el saldo inicial de' },
 ];
+/** First in the bar: select the siblings, then the family preview (who joins, who gains access). */
+const FAMILY_ACTION: BulkActionDef = { name: 'family', label: 'Vincular como hermanos', icon: House };
 
 // A column of icons wide enough to stay pinned beside the data; below lg the
 // table moves them into its overflow menu, where the words show too.
@@ -136,6 +140,7 @@ export default function AdminStudents() {
   const students = data?.results;
   const count = data?.count ?? 0;
   const selection = useRowSelection(count, JSON.stringify(filters));
+  const [linkFamily, setLinkFamily] = useState<PickedStudent[] | null>(null);
   const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
 
   const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
@@ -169,7 +174,7 @@ export default function AdminStudents() {
   ];
   const bulkActions: BulkActionDef[] = viewingArchived
     ? [RESTORE_ACTION, ...(canDelete ? [DELETE_ACTION] : [])]
-    : [ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS];
+    : [FAMILY_ACTION, ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS];
 
   const columns = useMemo<Column<RosterStudent>[]>(() => [
     {
@@ -259,6 +264,18 @@ export default function AdminStudents() {
     });
 
   const startBulk = (action: BulkActionDef) => {
+    if (action.name === 'family') {
+      if (selection.allMatching) { toast.error('Elija a los hermanos uno por uno, no «todos los que coinciden».'); return; }
+      const ids = selection.ids.map(Number);
+      if (ids.length < 2) { toast.error('Elija al menos dos alumnos para vincularlos como hermanos.'); return; }
+      if (ids.length > 10) { toast.error('Una familia admite hasta 10 alumnos.'); return; }
+      const byId = new Map((students ?? []).map((s) => [s.id, s]));
+      setLinkFamily(ids.map((id) => {
+        const s = byId.get(id);
+        return s ? fromRoster(s) : { id, name: '', grade: '', group: '', student_id: '', family: null };
+      }));
+      return;
+    }
     if (['archive', 'restore', 'delete', 'sync_loyverse'].includes(action.name)) setConfirming({ action, payload: action.payload });
     else setPicking(action);
   };
@@ -379,6 +396,13 @@ export default function AdminStudents() {
           headers={IMPORT_HEADERS}
           templatePrefix="alumnos"
           description={<>Cree o actualice alumnos por matrícula (se aceptan <code>ci09932</code> y <code>09932</code>) y vincule a sus tutores por correo. CSV o Excel.</>}
+        />
+        <FamilyLinkDialog
+          open={!!linkFamily}
+          onClose={() => setLinkFamily(null)}
+          mode={{ kind: 'new' }}
+          preselected={linkFamily ?? undefined}
+          onDone={() => selection.onClear()}
         />
         <ImportLoyverseModal open={importLoyverseOpen} onClose={() => setImportLoyverseOpen(false)} onImported={() => refetch()} />
         <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />

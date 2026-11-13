@@ -1723,6 +1723,9 @@ def _queue_balance_notification(student, title, message) -> int:
             push_status=Notification.Delivery.PENDING if push else skipped,
             delivered_at=None if (email or push) else timezone.now())
         queued += 1
+    # Any other account of the child's family sees it in the bell (no extra email).
+    from apps.portal.services import copy_to_family
+    copy_to_family(student, kind, title, message)
     return queued
 
 

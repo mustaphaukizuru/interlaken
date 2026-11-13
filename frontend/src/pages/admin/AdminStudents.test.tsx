@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
 
 vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { loading: vi.fn(() => 't1'), success: vi.fn(), error: vi.fn(), dismiss: vi.fn() }) }));
+vi.mock('@/services/familiesApi', () => ({ familiesApi: { link: vi.fn() } }));
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), post: vi.fn() },
   portalApi: {
@@ -386,5 +387,38 @@ describe('AdminStudents · Familia column (hermanos)', () => {
     const link = await screen.findByRole('link', { name: 'Familia López' });
     expect(link).toHaveAttribute('href', '/admin/familias?q=Familia%20L%C3%B3pez');
     expect(screen.getAllByRole('columnheader', { name: /Familia/ }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('AdminStudents · Vincular como hermanos (bulk)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    stubViewport(1280);
+    mockedStudents.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [ana, beto] } } as never);
+  });
+
+  it('selected students open the family preview with exactly those ids', async () => {
+    const { familiesApi } = await import('@/services/familiesApi');
+    const link = vi.mocked(familiesApi.link);
+    link.mockResolvedValue({ data: {
+      dry_run: true, action: 'create', family: null, name: 'Familia López', merging: [], new_access: [],
+      students_after: [], adding: [],
+    } } as never);
+    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+    await screen.findByText('Ana López');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Ana López/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Beto Ruiz/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Vincular como hermanos/ }));
+    await waitFor(() => expect(link).toHaveBeenCalledWith({ student_ids: [5, 6], family: undefined, dry_run: true }));
+    expect(await screen.findByText('Se creará una familia nueva')).toBeInTheDocument();
+  });
+
+  it('one student alone is not a family', async () => {
+    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+    await screen.findByText('Ana López');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Ana López/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Vincular como hermanos/ }));
+    expect(toast.error).toHaveBeenCalledWith('Elija al menos dos alumnos para vincularlos como hermanos.');
   });
 });

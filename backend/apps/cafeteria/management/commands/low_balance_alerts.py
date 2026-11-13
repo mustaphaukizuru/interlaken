@@ -17,7 +17,7 @@ from django.utils import timezone
 from apps.accounts.family import family_notify_recipients
 from apps.cafeteria.models import CafeteriaBalance
 from apps.portal.models import Notification
-from apps.portal.services import notify
+from apps.portal.services import copy_to_family, notify
 
 
 class Command(BaseCommand):
@@ -78,6 +78,9 @@ class Command(BaseCommand):
                        cta_label='Recargar saldo')
                 notified_parents += 1
                 sent_to_someone = True
+
+            # Any other account of the child's family sees it in the bell (no extra email).
+            copy_to_family(student, Notification.NotifType.WARNING, title, message)
 
             if sent_to_someone:
                 alerted_students += 1

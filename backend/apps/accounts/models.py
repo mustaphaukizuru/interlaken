@@ -175,6 +175,27 @@ class FamilySuggestionDismissal(models.Model):
         ]
 
 
+class FamilyLinkCode(models.Model):
+    """A one-time code a family uses to add another child itself (2026-11-13).
+
+    The code goes to the other child's mailboxes (its school address, its
+    confirmed personal address and its guardians'): typing it back proves the
+    family reads that child's mail. Only a hash is stored; it expires, allows a
+    few attempts and is spent on success (``apps.accounts.family_self``).
+    """
+    requester  = models.ForeignKey('User', on_delete=models.CASCADE, related_name='+')
+    student    = models.ForeignKey('StudentProfile', on_delete=models.CASCADE, related_name='+')
+    code_hash  = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField()
+    attempts   = models.PositiveSmallIntegerField(default=0)
+    used_at    = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Código para vincular hermano'
+        indexes = [models.Index(fields=['requester', 'student', '-created_at'])]
+
+
 class StudentProfile(models.Model):
     """Extended profile for student users."""
     user          = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')

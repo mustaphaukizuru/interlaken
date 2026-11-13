@@ -283,7 +283,7 @@ def _audit_student(student: StudentProfile, old: str | None, new: str | None, ac
     record('update', student, {'family': [old, new]}, actor=actor, context=context)
 
 
-def _notify_gains(gains: list[dict], names: list[str]):
+def _notify_gains(gains: list[dict], names: list[str], by_family: bool = False):
     """One notice per login that can now see more children (after the commit).
 
     The family's name stays out of it: the console promises the office that
@@ -304,9 +304,13 @@ def _notify_gains(gains: list[dict], names: list[str]):
             notify(
                 user, Notification.NotifType.INFO,
                 'Sus hijos, juntos en el portal',
-                f'El Colegio Interlaken agrupó a {everyone} como hermanos. '
-                f'Desde esta cuenta ya puede ver y recargar la cafetería de {_join_names(g["gains"])}, '
-                f'además de lo que ya veía. Puede seguir entrando con cualquiera de sus cuentas.',
+                (f'Desde el portal se agrupó a {everyone} como hermanos, con un código enviado '
+                 f'al correo escolar. Desde esta cuenta ya puede ver y recargar la cafetería de '
+                 f'{_join_names(g["gains"])}. Si usted no hizo este cambio, avise al colegio.')
+                if by_family else
+                (f'El Colegio Interlaken agrupó a {everyone} como hermanos. '
+                 f'Desde esta cuenta ya puede ver y recargar la cafetería de {_join_names(g["gains"])}, '
+                 f'además de lo que ya veía. Puede seguir entrando con cualquiera de sus cuentas.'),
                 fanout=False,
                 url='/portal',
                 cta_label='Abrir el portal',
@@ -323,7 +327,8 @@ def _join_names(names: list[str]) -> str:
 
 
 def link_students(student_ids, *, family_id=None, name='', actor=None, notify: bool = True,
-                  context: str = 'familia: vincular') -> tuple[Family | None, LinkPlan]:
+                  context: str = 'familia: vincular',
+                  by_family: bool = False) -> tuple[Family | None, LinkPlan]:
     """Apply ``plan_link``: create, add to, or merge into one family."""
     with transaction.atomic():
         # Lock first, plan second: two clicks on «Vincular» cannot race.
@@ -373,7 +378,7 @@ def link_students(student_ids, *, family_id=None, name='', actor=None, notify: b
         if notify:
             gains = plan.new_access
             names = [s.user.first_name or s.user.full_name for s in plan.students_after]
-            transaction.on_commit(lambda: _notify_gains(gains, names))
+            transaction.on_commit(lambda: _notify_gains(gains, names, by_family))
     family.refresh_from_db()
     return family, plan
 

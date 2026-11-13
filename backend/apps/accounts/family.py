@@ -14,9 +14,12 @@ export). A login reaches a student when:
 ``test_family_scope_contract`` fails if a view goes back to filtering
 ``parents=user`` by hand.
 
-``family_notify_recipients`` is unchanged by families on purpose: families read
-each child's school mailbox, so a sibling's login copy would only repeat every
-email.
+``family_notify_recipients`` (who gets a child's alert by email, push and in
+the bell) is unchanged by families: families read each child's school mailbox,
+so a sibling's login copy by email would only repeat every message. Instead
+``family_alert_logins`` names the OTHER accounts of the child's family, which
+get an in-app copy only (``apps.portal.services.copy_to_family``): whichever
+login a parent uses, the bell shows every child's alerts.
 """
 from __future__ import annotations
 
@@ -67,6 +70,28 @@ def family_notify_recipients(student: StudentProfile) -> list[User]:
     guardians = [u for u in users if u.pk != owner.pk]
     own = [u for u in users if u.pk == owner.pk and getattr(u, 'role', None) == User.Role.STUDENT]
     return guardians + own
+
+
+def family_alert_logins(student: StudentProfile) -> list[User]:
+    """Active accounts of ``student``'s Family that do not already receive its
+    notices: each sibling's own school-email login and each sibling's guardians.
+
+    Empty when the student has no family. Order: by pk, for stable fan-out.
+    """
+    if not getattr(student, 'family_id', None):
+        return []
+    already = {u.pk for u in family_notify_recipients(student)}
+    out: dict[int, User] = {}
+    siblings = (StudentProfile.objects.filter(family_id=student.family_id)
+                .exclude(pk=student.pk).select_related('user').prefetch_related('parents'))
+    for sib in siblings:
+        own = sib.user
+        if own.is_active and own.role == User.Role.STUDENT:
+            out[own.pk] = own
+        for guardian in sib.parents.all():
+            if guardian.is_active:
+                out[guardian.pk] = guardian
+    return [out[pk] for pk in sorted(out) if pk not in already]
 
 
 def iter_family_notify_recipients(students: Iterable[StudentProfile]) -> list[User]:

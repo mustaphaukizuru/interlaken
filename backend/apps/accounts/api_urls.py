@@ -15,6 +15,7 @@ from .families_admin import (
     FamilySuggestionsView,
     StudentFamilyView,
 )
+from .family_self import MyFamilyAddView, MyFamilyConfirmView, MyFamilyView
 from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
@@ -119,6 +120,10 @@ urlpatterns = [
     path('me/avatar/',       MyAvatarView.as_view(),              name='my-avatar'),
     # Personal email for notifications, confirmed by a signed link (owner, 2026-10-20).
     path('me/notify-email/',  NotifyEmailView.as_view(),          name='my-notify-email'),
+    # A family adds another child itself (code to that child's mailbox), 2026-11-13.
+    path('me/family/',         MyFamilyView.as_view(),         name='my-family'),
+    path('me/family/add/',     MyFamilyAddView.as_view(),      name='my-family-add'),
+    path('me/family/confirm/', MyFamilyConfirmView.as_view(),  name='my-family-confirm'),
     path('me/notify-email/verify/', NotifyEmailVerifyView.as_view(), name='my-notify-email-verify'),
     path('notify-email/confirm/', NotifyEmailConfirmView.as_view(), name='notify-email-confirm'),
     path('avatar/<int:user_id>/<str:token>/', AvatarServeView.as_view(), name='avatar-serve'),

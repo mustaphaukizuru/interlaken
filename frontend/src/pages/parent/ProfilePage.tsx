@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore, type User } from '@/store/authStore';
 import { AvatarUpload } from '@/components/portal/AvatarUpload';
+import { MyChildren } from '@/components/portal/MyChildren';
 import { SecurityPanel } from '@/components/portal/SecurityPanel';
 import { authApi } from '@/services/api';
 import { PasswordHelp } from '@/components/portal/PasswordHelp';
@@ -22,9 +23,10 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /** "Mi información" — name, WhatsApp, notification prefs (password is admin-managed). */
-type Tab = 'perfil' | 'seguridad' | 'avisos' | 'privacidad';
+type Tab = 'perfil' | 'hijos' | 'seguridad' | 'avisos' | 'privacidad';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'perfil', label: 'Perfil' },
+  { key: 'hijos', label: 'Mis hijos' },
   { key: 'seguridad', label: 'Seguridad' },
   { key: 'avisos', label: 'Notificaciones' },
   { key: 'privacidad', label: 'Privacidad' },
@@ -33,8 +35,10 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
   const { get, set } = useUrlFilters();
-  const tab = (['perfil', 'seguridad', 'avisos', 'privacidad'].includes(get('tab')) ? get('tab') : 'perfil') as Tab;
   const isFamily = user?.role === 'parent' || user?.role === 'student';
+  // «Mis hijos» is for family accounts only (staff and admins have no children here).
+  const tabs = isFamily ? TABS : TABS.filter((t) => t.key !== 'hijos');
+  const tab = (tabs.some((t) => t.key === get('tab')) ? get('tab') : 'perfil') as Tab;
   // Bitácora 10 (14/10/2026): families cannot edit their profile; the school keeps it.
   // The server enforces the same rule on PATCH /accounts/me/ and the avatar upload.
   const locked = isFamily;
@@ -125,7 +129,7 @@ export default function ProfilePage() {
       <PageHeader title="Mi información" subtitle="Tus datos, tu familia, tu seguridad y tus avisos." />
       <div className="mx-auto max-w-2xl space-y-4">
         <div role="tablist" aria-label="Secciones" className="flex gap-1 overflow-x-auto rounded-xl bg-cream-2 p-1">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => set({ tab: t.key === 'perfil' ? null : t.key })}
               className={`min-h-[40px] flex-1 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-white text-ink shadow-card' : 'text-muted hover:text-ink'}`}>
               {t.label}
@@ -280,6 +284,8 @@ export default function ProfilePage() {
           </div>
         </Card>
         </>)}
+
+        {tab === 'hijos' && isFamily && <MyChildren />}
 
         {tab === 'privacidad' && (
         <Card>
