@@ -103,34 +103,42 @@ export function PricingSections() {
     <>
       <section className="bg-cream-2 py-10 sm:py-14">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          {isError ? (
-            <ErrorState
-              title="No fue posible cargar los costos"
-              description="Intente de nuevo más tarde o contáctenos para recibir la información del ciclo."
-              onRetry={() => refetch()}
-            />
-          ) : isLoading ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Cargando costos">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="skeleton h-[280px] rounded-xl2" aria-hidden="true" />
-              ))}
+          {isError || isLoading || isEmpty ? (
+            // Loading, error and «próximamente» share ONE reserved height (two
+            // skeleton rows), so swapping one for another never moves the rest
+            // of the page: when the costs failed slowly, the short error used to
+            // pull the section below up into view (Lighthouse CLS 0.44).
+            <div className="flex min-h-[584px] flex-col justify-center">
+            {isError ? (
+              <ErrorState
+                title="No fue posible cargar los costos"
+                description="Intente de nuevo más tarde o contáctenos para recibir la información del ciclo."
+                onRetry={() => refetch()}
+              />
+            ) : isLoading ? (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Cargando costos">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className={`skeleton h-[280px] rounded-xl2 ${i > 1 ? 'hidden md:block' : ''}`} aria-hidden="true" />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={CircleDollarSign}
+                title="Costos próximamente"
+                description={`El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo ${CURRENT_CYCLE}. Mientras tanto, nuestro equipo de admisiones puede orientarle.`}
+                action={
+                  <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <Link to="/contacto" className="btn-primary">
+                      Contactar al colegio
+                    </Link>
+                    <Link to="/admisiones" className="btn-outline">
+                      Ver admisiones
+                    </Link>
+                  </div>
+                }
+              />
+            )}
             </div>
-          ) : isEmpty ? (
-            <EmptyState
-              icon={CircleDollarSign}
-              title="Costos próximamente"
-              description={`El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo ${CURRENT_CYCLE}. Mientras tanto, nuestro equipo de admisiones puede orientarle.`}
-              action={
-                <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <Link to="/contacto" className="btn-primary">
-                    Contactar al colegio
-                  </Link>
-                  <Link to="/admisiones" className="btn-outline">
-                    Ver admisiones
-                  </Link>
-                </div>
-              }
-            />
           ) : (
             <div className="space-y-6">
               {/* Estructura del pago — explicación breve */}
@@ -298,17 +306,16 @@ export function PricingSections() {
             </div>
           )}
 
-          {!isError && (
-            <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
-              <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
-              <p>
-                Información de referencia: los costos los publica la administración y pueden
-                actualizarse cada ciclo escolar. <strong className="text-ink">Inscripciones y colegiaturas se pagan
-                directamente con el colegio, no en este sitio.</strong> Para becas, hermanos o planes de
-                pago, <Link to="/contacto" className="font-medium text-green-dark underline">contacte a admisiones</Link>.
-              </p>
-            </div>
-          )}
+          {/* Always shown (also with the error) so the page below never jumps. */}
+          <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
+            <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
+            <p>
+              Información de referencia: los costos los publica la administración y pueden
+              actualizarse cada ciclo escolar. <strong className="text-ink">Inscripciones y colegiaturas se pagan
+              directamente con el colegio, no en este sitio.</strong> Para becas, hermanos o planes de
+              pago, <Link to="/contacto" className="font-medium text-green-dark underline">contacte a admisiones</Link>.
+            </p>
+          </div>
 
           {/* Page CTA — Costos keeps in-page CTAs; sticky Agendar bar stays global */}
           <div className="mt-10 flex flex-col items-center gap-3 rounded-xl2 bg-dark px-6 py-8 text-center text-white sm:py-10">
