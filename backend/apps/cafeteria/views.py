@@ -22,6 +22,7 @@ from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.family import can_access_student, family_students
 from apps.accounts.models import StudentProfile, User
 from apps.core.audit import record
 from apps.core.exceptions import error_body
@@ -70,21 +71,14 @@ logger = logging.getLogger(__name__)
 def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
     """True if ``user`` may top up / manage cafeteria for ``student``.
 
-    Parents need an explicit guardian link. Students may act on their own profile
-    (family login with ``ci…@interlaken.com.mx``) or when linked as a guardian
-    (Loyverse import adds the student to ``student.parents``).
+    Admins always. A family login (parent, or the school-email student login)
+    for any of its family's students: linked children, its own profile and the
+    siblings of its ``Family`` (``accounts.family.family_students``).
     """
     if user.role == User.Role.ADMIN:
         return True
-    if user.role == User.Role.PARENT:
-        return student.parents.filter(pk=user.pk).exists()
-    if user.role == User.Role.STUDENT:
-        try:
-            if user.student_profile.pk == student.pk:
-                return True
-        except StudentProfile.DoesNotExist:
-            pass
-        return student.parents.filter(pk=user.pk).exists()
+    if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        return can_access_student(user, student)
     return False
 
 
@@ -106,8 +100,9 @@ ADMIN_PREVIEW_LIMIT = 200
 class MyBalanceView(APIView):
     """
     GET /api/v1/cafeteria/balance/
-    Returns balance(s) for the authenticated user's children (parent)
-    or the student's own balance (student role).
+    Returns balance(s) for the authenticated user's children (parent, or a
+    school-email student login with siblings in its ``Family``), or the
+    student's own balance (a student login with no siblings: one object).
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -115,14 +110,17 @@ class MyBalanceView(APIView):
         user = request.user
 
         if user.role == User.Role.STUDENT:
-            try:
-                profile = user.student_profile
-            except StudentProfile.DoesNotExist:
-                return Response(error_body('Perfil de alumno no encontrado.'), status=404)
-            balance, _ = CafeteriaBalance.objects.get_or_create(student=profile)
-            return Response(CafeteriaBalanceSerializer(
-                balance, context={'include_spend': True,
-                                  'pending_topups': build_pending_topups_map([profile])}).data)
+            family = list(family_students(user))
+            if len(family) <= 1:
+                # A login with one child keeps its single-object answer.
+                try:
+                    profile = user.student_profile
+                except StudentProfile.DoesNotExist:
+                    return Response(error_body('Perfil de alumno no encontrado.'), status=404)
+                balance, _ = CafeteriaBalance.objects.get_or_create(student=profile)
+                return Response(CafeteriaBalanceSerializer(
+                    balance, context={'include_spend': True,
+                                      'pending_topups': build_pending_topups_map([profile])}).data)
 
         if user.role == User.Role.ADMIN:
             # Admin wide view: skip the per-student spend aggregates so a
@@ -140,7 +138,7 @@ class MyBalanceView(APIView):
             # the whole school's wallets from an endpoint called "my balance";
             # the staff dashboard reads aggregates, never per-child balances,
             # and admins have the paginated /cafeteria/admin/balances/.
-            students = list(StudentProfile.objects.filter(parents=user))
+            students = list(family_students(user))
             include_spend = True
 
         # Constant query count regardless of family size: create any missing
@@ -182,13 +180,8 @@ class MyTransactionsView(generics.ListAPIView):
         params = self.request.query_params
         student_id = _student_param(self.request)
 
-        if user.role == User.Role.STUDENT:
-            try:
-                qs = CafeteriaTransaction.objects.filter(student=user.student_profile)
-            except StudentProfile.DoesNotExist:
-                return CafeteriaTransaction.objects.none()
-        elif user.role == User.Role.PARENT:
-            my_students = StudentProfile.objects.filter(parents=user)
+        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+            my_students = family_students(user)
             if student_id:
                 my_students = my_students.filter(id=student_id)
             qs = CafeteriaTransaction.objects.filter(student__in=my_students)
@@ -230,10 +223,8 @@ class MySpendingTrendView(APIView):
             days = 30
         days = max(7, min(days, 90))
 
-        if user.role == User.Role.STUDENT:
-            students = StudentProfile.objects.filter(user=user)
-        elif user.role == User.Role.PARENT:
-            students = StudentProfile.objects.filter(parents=user)
+        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+            students = family_students(user)
         elif user.role == User.Role.ADMIN:
             students = StudentProfile.objects.all()
         else:
@@ -358,10 +349,8 @@ class MySpendingCategoriesView(APIView):
             days = 30
         days = max(7, min(days, 90))
 
-        if user.role == User.Role.STUDENT:
-            students = StudentProfile.objects.filter(user=user)
-        elif user.role == User.Role.PARENT:
-            students = StudentProfile.objects.filter(parents=user)
+        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+            students = family_students(user)
         elif user.role == User.Role.ADMIN:
             students = StudentProfile.objects.all()
         else:
@@ -426,12 +415,11 @@ class MySpendingCategoriesView(APIView):
 
 
 def _family_students_qs(user):
-    """StudentProfiles the caller may see: own children (parent), self (student),
-    all (admin). Same scoping as the other 'my' cafetería endpoints."""
-    if user.role == User.Role.PARENT:
-        return StudentProfile.objects.filter(parents=user)
-    if user.role == User.Role.STUDENT:
-        return StudentProfile.objects.filter(user=user)
+    """StudentProfiles the caller may see: the family's students (parent or
+    school-email student login), all (admin). Same scoping as the other 'my'
+    cafetería endpoints."""
+    if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        return family_students(user)
     if user.role == User.Role.ADMIN:
         return StudentProfile.objects.all()
     return StudentProfile.objects.none()
@@ -1616,10 +1604,8 @@ class MyStatementPdfView(APIView):
         student_id = _student_param(request)
         if user.role == User.Role.ADMIN:
             qs_students = StudentProfile.objects.all()
-        elif user.role == User.Role.STUDENT and hasattr(user, 'student_profile'):
-            qs_students = StudentProfile.objects.filter(pk=user.student_profile.pk)
         else:
-            qs_students = StudentProfile.objects.filter(parents=user)
+            qs_students = family_students(user)
         student = qs_students.filter(pk=student_id).select_related('user').first() if student_id else qs_students.select_related('user').first()
         if student is None:
             return Response({'detail': 'Alumno no encontrado.'}, status=404)

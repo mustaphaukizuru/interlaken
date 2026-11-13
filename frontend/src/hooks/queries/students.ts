@@ -5,8 +5,12 @@ import { STUDENTS_ENTITY, STUDENTS_RELATED } from './studentKeys';
 
 export { STUDENTS_ENTITY, STUDENTS_RELATED, invalidateStudents, studentDetailKey } from './studentKeys';
 
-/** Roster row: the profile plus the wallet balance the admin list annotates. */
-export type RosterStudent = StudentProfile & { balance?: string | null; loyverse_missing_since?: string | null };
+/** Roster row: the profile plus the wallet balance the admin list annotates and its family (hermanos). */
+export type RosterStudent = StudentProfile & {
+  balance?: string | null;
+  loyverse_missing_since?: string | null;
+  family?: { id: number; name: string } | null;
+};
 
 export interface StudentsListParams {
   page?: number;

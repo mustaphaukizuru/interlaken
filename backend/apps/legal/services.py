@@ -80,7 +80,9 @@ def export_household_data(user) -> dict:
     def _iso(v):
         return v.isoformat() if hasattr(v, 'isoformat') else v
 
-    children = list(user.children.all()) if hasattr(user, 'children') else []
+    from apps.accounts.family import family_students
+
+    children = list(family_students(user))
 
     data = {
         'account': {

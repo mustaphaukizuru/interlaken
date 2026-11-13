@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.contrib.auth import logout
-from django.db.models import DecimalField, F, Q, Value
+from django.db.models import DecimalField, F, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -38,6 +38,7 @@ from .cookies import (
     set_refresh_cookie,
     start_session,
 )
+from .family import family_students
 from .filters import StudentFilterSet
 from .models import StudentProfile, User
 from .serializers import StudentProfileSerializer, StudentRosterSerializer, UserSerializer
@@ -470,7 +471,7 @@ def roster_queryset():
     """The admin roster: user + Loyverse snapshot joined, wallet balance annotated.
 
     One SELECT for any page size (the 2-query budget is count + page)."""
-    return (StudentProfile.objects.select_related('user', 'loyverse_profile')
+    return (StudentProfile.objects.select_related('user', 'loyverse_profile', 'family')
             .annotate(balance=Coalesce(F('cafeteria_balance__balance'),
                                        Value(Decimal('0.00')),
                                        output_field=DecimalField(max_digits=10, decimal_places=2))))
@@ -515,15 +516,10 @@ class StudentListView(AdminListMixin, generics.ListAPIView):
         if self._is_admin():
             # Filters, search and ordering are applied by AdminListMixin.filter_queryset.
             return roster_queryset()
-        elif user.role == User.Role.PARENT:
-            # Return only children linked to this parent
-            return (StudentProfile.objects.filter(parents=user)
-                    .select_related('user', 'loyverse_profile'))
-        elif user.role == User.Role.STUDENT:
-            # A school-email student sees its own file (and any sibling it is a
-            # self-guardian of) — same rule as StudentDetailView and the dashboard.
-            return (StudentProfile.objects.filter(Q(user=user) | Q(parents=user))
-                    .distinct().select_related('user', 'loyverse_profile'))
+        elif user.role in (User.Role.PARENT, User.Role.STUDENT):
+            # The family's children: linked ones, the login's own file and the
+            # siblings of a Family (accounts.family.family_students).
+            return family_students(user).select_related('user', 'loyverse_profile')
         return StudentProfile.objects.none()
 
 
@@ -558,8 +554,6 @@ class StudentDetailView(generics.RetrieveAPIView):
         # staff: accounts.medical).
         if has_area(user, 'alumnos'):
             return qs
-        elif user.role == User.Role.PARENT:
-            return qs.filter(parents=user)
-        elif user.role == User.Role.STUDENT:
-            return qs.filter(user=user)
+        elif user.role in (User.Role.PARENT, User.Role.STUDENT):
+            return qs.filter(pk__in=family_students(user).values('pk'))
         return StudentProfile.objects.none()

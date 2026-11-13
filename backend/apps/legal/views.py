@@ -10,7 +10,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import StudentProfile, User
+from apps.accounts.models import User
 from apps.core.audit import record
 from apps.core.bulk import AdminBulkView, status_action
 from apps.core.exporting import AdminExportMixin
@@ -66,8 +66,10 @@ class ConsentView(APIView):
     def _student(self, request, sid):
         if not sid:
             return None
-        # A guardian may only record/read consent for their own children.
-        return get_object_or_404(StudentProfile, pk=sid, parents=request.user)
+        # A guardian may only record/read consent for their own family's children.
+        from apps.accounts.family import family_students
+
+        return get_object_or_404(family_students(request.user), pk=sid)
 
     def get(self, request):
         student = self._student(request, request.query_params.get('student'))

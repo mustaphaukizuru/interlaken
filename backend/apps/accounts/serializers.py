@@ -95,9 +95,16 @@ class StudentRosterSerializer(StudentProfileSerializer):
     extra query. ``loyverse_missing_since`` flags a leaver: the customer is gone."""
     balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True,
                                        default=None)
+    # Siblings group (accounts.Family), joined by ``roster_queryset``.
+    family = serializers.SerializerMethodField()
 
     class Meta(StudentProfileSerializer.Meta):
-        fields = StudentProfileSerializer.Meta.fields + ['balance', 'loyverse_missing_since']
+        fields = StudentProfileSerializer.Meta.fields + ['balance', 'loyverse_missing_since', 'family']
+
+    def get_family(self, obj):
+        if not obj.family_id:
+            return None
+        return {'id': obj.family_id, 'name': obj.family.name}
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):

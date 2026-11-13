@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
@@ -53,6 +53,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
       items: [
         { icon: BarChart3,     label: 'Dashboard',  to: '/admin', end: true },
         { icon: Users,         label: 'Alumnos',    to: '/admin/alumnos' },
+        { icon: House,         label: 'Familias',   to: '/admin/familias' },
         { icon: ClipboardList, label: 'Admisiones', to: '/admin/admisiones', end: true, badgeKey: 'admisiones' },
         { icon: KanbanSquare, label: 'Pipeline', to: '/admin/admisiones/pipeline' },
         { icon: CalendarClock, label: 'Visitas',    to: '/admin/visitas', end: true, badgeKey: 'visitas' },
