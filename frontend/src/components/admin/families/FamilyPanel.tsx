@@ -134,8 +134,9 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
           <Button type="button" variant="secondary" size="sm" onClick={onAdd}>
             <UserPlus className="h-4 w-4" aria-hidden="true" /> Agregar hermano
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label={`Renombrar ${family.name}`}>
-            <Pencil className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Renombrar</span>
+          {/* The family's internal label, never a student's name (those stay in «Editar» of each file). */}
+          <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label={`Renombrar la familia ${family.name}`}>
+            <Pencil className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Renombrar familia</span>
           </Button>
           {/* Destructive: coral, like every Eliminar/Disolver in the console (Button's ghost would win the text color). */}
           <button type="button" onClick={() => setDissolving(true)} aria-label={`Disolver ${family.name}`}
@@ -200,7 +201,7 @@ export function FamilyPanel({ family, currentStudentId, onAdd, onGone }: Props) 
 
 function RenameFamilyModal({ family, open, onClose }: { family: FamilyDetail; open: boolean; onClose: () => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Editar familia" maxWidth={440}>
+    <Modal open={open} onClose={onClose} title="Renombrar familia" maxWidth={440}>
       <RenameForm family={family} onClose={onClose} />
     </Modal>
   );
@@ -226,11 +227,14 @@ function RenameForm({ family, onClose }: { family: FamilyDetail; onClose: () => 
       }}
     >
       <div>
-        <label htmlFor={nameId} className="label">Nombre</label>
+        <label htmlFor={nameId} className="label">Nombre de la familia</label>
         <input id={nameId} className="input-field min-h-[44px] text-base sm:text-sm" maxLength={150} required
           value={name} onChange={(e) => { setName(e.target.value); setError(''); }}
-          aria-invalid={!!error} aria-describedby={error ? `${nameId}-err` : undefined} />
+          aria-invalid={!!error} aria-describedby={error ? `${nameId}-err ${nameId}-hint` : `${nameId}-hint`} />
         {error && <p id={`${nameId}-err`} className="mt-1 text-xs text-coral-700" role="alert">{error}</p>}
+        <p id={`${nameId}-hint`} className="mt-1 text-xs text-subtle">
+          Solo lo ve el colegio, para encontrar a la familia. No cambia el nombre de ningún alumno.
+        </p>
       </div>
       <div>
         <label htmlFor={notesId} className="label">Notas internas <span className="font-normal text-subtle">(opcional)</span></label>

@@ -283,8 +283,12 @@ def _audit_student(student: StudentProfile, old: str | None, new: str | None, ac
     record('update', student, {'family': [old, new]}, actor=actor, context=context)
 
 
-def _notify_gains(gains: list[dict], family_name: str, names: list[str]):
-    """One notice per login that can now see more children (after the commit)."""
+def _notify_gains(gains: list[dict], names: list[str]):
+    """One notice per login that can now see more children (after the commit).
+
+    The family's name stays out of it: the console promises the office that
+    only the school sees that label (it may read «Familia García (Kínder)»).
+    """
     from apps.portal.models import Notification
     from apps.portal.services import notify
 
@@ -300,7 +304,7 @@ def _notify_gains(gains: list[dict], family_name: str, names: list[str]):
             notify(
                 user, Notification.NotifType.INFO,
                 'Sus hijos, juntos en el portal',
-                f'El Colegio Interlaken agrupó a {everyone} como hermanos ({family_name}). '
+                f'El Colegio Interlaken agrupó a {everyone} como hermanos. '
                 f'Desde esta cuenta ya puede ver y recargar la cafetería de {_join_names(g["gains"])}, '
                 f'además de lo que ya veía. Puede seguir entrando con cualquiera de sus cuentas.',
                 fanout=False,
@@ -369,8 +373,7 @@ def link_students(student_ids, *, family_id=None, name='', actor=None, notify: b
         if notify:
             gains = plan.new_access
             names = [s.user.first_name or s.user.full_name for s in plan.students_after]
-            fam_name = family.name
-            transaction.on_commit(lambda: _notify_gains(gains, fam_name, names))
+            transaction.on_commit(lambda: _notify_gains(gains, names))
     family.refresh_from_db()
     return family, plan
 

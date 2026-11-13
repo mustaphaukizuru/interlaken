@@ -75,7 +75,10 @@ class TestLink:
         assert {s['id'] for s in resp.data['result']['students']} == {a.pk, b.pk}
         # Each sibling's login learns it now sees the other.
         for login in (a.user, b.user):
-            assert Notification.objects.filter(user=login, title='Sus hijos, juntos en el portal').count() == 1
+            notices = Notification.objects.filter(user=login, title='Sus hijos, juntos en el portal')
+            assert notices.count() == 1
+            # The family's name is the school's internal label: never sent to families.
+            assert 'Familia Pérez' not in notices.get().message
         # The family and each student's Historial record the change.
         assert AuditLog.objects.filter(object_type='accounts.family', object_id=str(fam.pk), action='create').exists()
         history = AuditLog.objects.filter(object_type='accounts.studentprofile', object_id=str(a.pk))
