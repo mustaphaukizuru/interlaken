@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StudentGuardians } from '@/components/admin/StudentGuardians';
+import { StudentFamily } from '@/components/admin/families/StudentFamily';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
@@ -27,8 +28,8 @@ import type { BulkActionDef } from '@/services/api';
 import type { StudentProfile } from '@/types';
 
 /**
- * /admin/alumnos/:studentId — student file: identity, guardians, the cafetería
- * shortcut and the Historial of changes, with Archivar / Restaurar and (admins)
+ * /admin/alumnos/:studentId — student file: identity, guardians, family
+ * (hermanos), the cafetería shortcut and the Historial of changes, with Archivar / Restaurar and (admins)
  * Eliminar. (The app does not bill tuition, so there is no ledger.)
  */
 /** Full page at /admin/alumnos/:id, or embedded as the right pane of the 2xl two-pane roster (BACKLOG P1-B10). */
@@ -85,11 +86,12 @@ function CredencialCard({ studentId }: { studentId: number }) {
   );
 }
 
-type Tab = 'datos' | 'tutores' | 'cafeteria' | 'historial';
-// `short` keeps the four tabs on one phone-width row.
+type Tab = 'datos' | 'tutores' | 'familia' | 'cafeteria' | 'historial';
+// `short` keeps the five tabs on one phone-width row (the strip scrolls if it must).
 const TABS: { key: Tab; label: string; short?: string }[] = [
   { key: 'datos', label: 'Datos' },
   { key: 'tutores', label: 'Tutores' },
+  { key: 'familia', label: 'Familia' },
   { key: 'cafeteria', label: 'Cafetería y credencial', short: 'Cafetería' },
   { key: 'historial', label: 'Historial' },
 ];
@@ -269,6 +271,8 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
       </>)}
 
       {tab === 'tutores' && <StudentGuardians studentId={student.id} />}
+
+      {tab === 'familia' && <StudentFamily studentId={student.id} />}
 
       {tab === 'historial' && <StudentHistory studentId={student.id} />}
 

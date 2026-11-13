@@ -14,7 +14,7 @@ student's file (LFPDPPP minimisation; the full file stays in the portal).
 
 from __future__ import annotations
 
-from django.db.models import Count, IntegerField, OuterRef, Subquery
+from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Coalesce
 
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
@@ -33,6 +33,23 @@ def _loyverse_code(s):
     return s.student_id
 
 
+def _family_name(s):
+    return s.family.name if s.family_id else ""
+
+
+def _siblings(s):
+    """The other students of the family, «Luis Pérez (1° Secundaria B)»."""
+    if not s.family_id:
+        return ""
+    out = []
+    for sib in s.family.students.all():
+        if sib.pk == s.pk:
+            continue
+        grade = f"{sib.grade} {sib.group}".strip()
+        out.append(f"{sib.user.full_name} ({grade})" if grade else sib.user.full_name)
+    return "; ".join(out)
+
+
 STUDENTS_EXPORT = ExportSpec(
     filename_prefix="alumnos",
     title="Directorio de alumnos",
@@ -47,6 +64,8 @@ STUDENTS_EXPORT = ExportSpec(
         Col("status", "Estado", lambda s: STATUS_LABEL.get(s.status, s.status), width=15),
         Col("email", "Correo", lambda s: s.user.email, width=32),
         Col("guardians", "Tutores", lambda s: getattr(s, "guardians_count", 0), width=8, fmt="int"),
+        Col("family", "Familia", _family_name, width=24),
+        Col("siblings", "Hermanos", _siblings, width=40),
         Col(
             "balance",
             "Saldo cafetería",
@@ -79,8 +98,10 @@ class AdminStudentExportView(AdminExportMixin, StudentListView):
             .annotate(n=Count("pk"))
             .values("n")
         )
+        siblings = StudentProfile.objects.select_related("user").order_by("user__first_name", "pk")
         return (
             super()
             .get_export_queryset()
             .annotate(guardians_count=Coalesce(Subquery(guardians, output_field=IntegerField()), 0))
+            .prefetch_related(Prefetch("family__students", queryset=siblings))
         )

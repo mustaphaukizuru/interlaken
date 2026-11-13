@@ -25,7 +25,7 @@ const WEIGHT: Record<string, number> = { delete: 5, create: 4, permission: 3, im
 const FIELD: Record<string, string> = {
   first_name: 'Nombre', last_name: 'Apellidos', email: 'Correo', grade: 'Grado', group: 'Grupo',
   status: 'Estado', is_active: 'Puede entrar', archived: 'Archivado', loyverse_id: 'Loyverse',
-  student_id: 'Matrícula', birth_date: 'Nacimiento', curp: 'CURP', emergency_phone: 'Tel. de emergencia',
+  student_id: 'Matrícula', family: 'Familia', birth_date: 'Nacimiento', curp: 'CURP', emergency_phone: 'Tel. de emergencia',
   blood_type: 'Tipo de sangre', allergies: 'Alergias', medical_notes: 'Notas médicas', role: 'Rol',
   staff_title: 'Puesto', staff_areas: 'Áreas', password: 'Contraseña', sessions_revoked: 'Sesiones cerradas',
   reason: 'Motivo', enrollment_date: 'Ingreso', notify_email: 'Correo para avisos',

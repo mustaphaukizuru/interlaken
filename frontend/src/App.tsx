@@ -81,6 +81,7 @@ const AdminVisitsWeek = lazy(() => import('./pages/admin/AdminVisitsWeek'));
 const AdminPipeline = lazy(() => import('./pages/admin/AdminPipeline'));
 const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
 const AdminGuardianMerge = lazy(() => import('./pages/admin/AdminGuardianMerge'));
+const AdminFamilies = lazy(() => import('./pages/admin/AdminFamilies'));
 const AdminSchoolYear = lazy(() => import('./pages/admin/AdminSchoolYear'));
 const AdminNavigation = lazy(() => import('./pages/admin/AdminNavigation'));
 const AdminForms = lazy(() => import('./pages/admin/AdminForms'));
@@ -229,6 +230,7 @@ export default function App() {
               <Route path="cafeteria/:studentId" element={<AdminCafeteriaStudent />} />
               <Route path="alumnos"     element={<AdminStudents />} />
               <Route path="alumnos/:studentId" element={<AdminStudentDetail />} />
+              <Route path="familias"    element={<AdminFamilies />} />
               <Route path="comunicados" element={<AdminAnnouncements />} />
               <Route path="ajustes"     element={<AdminSettings />} />
               <Route path="auditoria"   element={<AdminAudit />} />

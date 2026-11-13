@@ -156,13 +156,14 @@ def expire_stale_checkouts(*, older_than_minutes: int | None = None) -> int:
 def payments_visible_to(user):
     """Payments the family portal actor may list/poll.
 
-    Includes the caller's own rows plus cafeteria top-up payments for linked
-    children (and a school-email student's own profile when the self-guardian
-    M2M row is missing). Admins see everything.
+    Includes the caller's own rows plus cafeteria top-up payments for the
+    family's students (``accounts.family.family_students``: linked children,
+    the school-email login's own profile, siblings of its Family). Admins see
+    everything.
     """
     from django.db.models import Q
 
-    from apps.accounts.models import StudentProfile, User
+    from apps.accounts.family import family_students
     from apps.core.areas import has_area
 
     # Admins, and "Cafetería y pagos" staff (receipts from the admin ledger).
@@ -171,15 +172,9 @@ def payments_visible_to(user):
 
     # Resolve the family's student ids once — filtering on id lists keeps the
     # guardian M2M join (which multiplied rows and forced DISTINCT over a wide
-    # join) out of every history/detail query.
-    student_ids = list(
-        StudentProfile.objects.filter(parents=user).values_list('pk', flat=True))
-
-    if getattr(user, 'role', None) == User.Role.STUDENT:
-        own_pk = (StudentProfile.objects.filter(user_id=user.pk)
-                  .values_list('pk', flat=True).first())
-        if own_pk is not None and own_pk not in student_ids:
-            student_ids.append(own_pk)
+    # join) out of every history/detail query. Linked children, the login's
+    # own profile and its Family's siblings (accounts.family.family_students).
+    student_ids = list(family_students(user).values_list('pk', flat=True))
 
     q = Q(user=user) | Q(related_topup__student_id__in=student_ids)
 

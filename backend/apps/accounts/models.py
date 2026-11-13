@@ -127,6 +127,54 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role == self.Role.STUDENT
 
 
+class Family(models.Model):
+    """Siblings the school groups into one household (admin-only, 2026-11-13).
+
+    At Interlaken a family signs in with a child's own school address, so a
+    family with two children has two logins. Every login that reaches one
+    student of a family (the student's own login, or a linked guardian) sees
+    and acts for every student of that family in the portal: see
+    ``apps.accounts.family.family_students``, the single visibility rule.
+    A family always has two or more students: removing the second-to-last one
+    dissolves it (``apps.accounts.families``).
+    """
+    name       = models.CharField('Nombre', max_length=150)
+    notes      = models.CharField('Notas', max_length=300, blank=True)
+    created_at = models.DateTimeField('Creada', auto_now_add=True)
+    updated_at = models.DateTimeField('Actualizada', auto_now=True)
+    created_by = models.ForeignKey('User', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='+')
+
+    class Meta:
+        verbose_name = 'Familia'
+        verbose_name_plural = 'Familias'
+        ordering = ['name', 'pk']
+
+    def __str__(self):
+        return self.name
+
+
+class FamilySuggestionDismissal(models.Model):
+    """Two students the office said are NOT siblings: never suggested together again.
+
+    Stored once per pair with ``student_a_id < student_b_id``.
+    """
+    student_a    = models.ForeignKey('StudentProfile', on_delete=models.CASCADE, related_name='+')
+    student_b    = models.ForeignKey('StudentProfile', on_delete=models.CASCADE, related_name='+')
+    dismissed_by = models.ForeignKey('User', null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='+')
+    dismissed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Sugerencia de familia descartada'
+        constraints = [
+            models.UniqueConstraint(fields=['student_a', 'student_b'],
+                                    name='accounts_family_dismissal_pair_uniq'),
+            models.CheckConstraint(condition=models.Q(student_a__lt=models.F('student_b')),
+                                   name='accounts_family_dismissal_pair_order'),
+        ]
+
+
 class StudentProfile(models.Model):
     """Extended profile for student users."""
     user          = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
@@ -143,6 +191,9 @@ class StudentProfile(models.Model):
                                          related_name='student_profile')  # origin when converted (P4-1)
     parents       = models.ManyToManyField(User, related_name='children', blank=True,
                                            limit_choices_to={'role': User.Role.PARENT})
+    # Household (siblings). Empty = not grouped; see ``Family``.
+    family        = models.ForeignKey(Family, null=True, blank=True, on_delete=models.SET_NULL,
+                                      related_name='students', verbose_name='Familia')
     enrollment_date = models.DateField(null=True, blank=True)
     is_active     = models.BooleanField(default=True)
 

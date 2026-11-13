@@ -13,6 +13,7 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.family import family_students
 from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
@@ -113,22 +114,10 @@ class DashboardView(APIView):
         user = request.user
         data = {}
 
-        # Family portal: parents via guardian M2M; school-email students via M2M
-        # self-guardian OR their own StudentProfile (defense when M2M is missing).
-        family_students = list(
-            StudentProfile.objects.filter(parents=user).select_related('user')
-        )
-        if user.role == User.Role.STUDENT and not family_students:
-            own = (
-                StudentProfile.objects.filter(user_id=user.pk)
-                .select_related('user')
-                .first()
-            )
-            if own is not None:
-                family_students = [own]
-
         if user.role in (User.Role.PARENT, User.Role.STUDENT):
-            students = family_students
+            # The family's children: guardian links, the school-email login's own
+            # profile and its Family's siblings (accounts.family.family_students).
+            students = list(family_students(user).select_related('user').order_by('pk'))
             # A child who left keeps their file, but no longer gets a tile or a low-balance nudge.
             balances = (CafeteriaBalance.objects.filter(student__in=students, student__is_active=True)
                         .select_related('student__user', 'student__loyverse_profile'))

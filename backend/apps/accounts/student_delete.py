@@ -124,6 +124,10 @@ def remove_student(profile) -> dict:
         'grade': profile.grade,
         'group': profile.group,
     }
+    family_id = profile.family_id
     CafeteriaBalance.objects.filter(student=profile).delete()
     profile.user.delete()
+    # A family left with one child is no family: ungroup the sibling.
+    from .families import prune_after_student_delete
+    prune_after_student_delete(family_id)
     return {'outcome': ERASE, 'deleted': deleted}

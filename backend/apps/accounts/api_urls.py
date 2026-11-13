@@ -4,6 +4,17 @@ from . import password_views, views
 from .admin_password import AdminSetPasswordView
 from .avatar import AvatarServeView, MyAvatarView
 from .exports import AdminStudentExportView
+from .families_admin import (
+    FamilyBulkView,
+    FamilyDetailView,
+    FamilyExportView,
+    FamilyLinkView,
+    FamilyListView,
+    FamilyStudentDetailView,
+    FamilySuggestionsBulkView,
+    FamilySuggestionsView,
+    StudentFamilyView,
+)
 from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
@@ -59,6 +70,18 @@ urlpatterns = [
     path('admin/students/<int:pk>/', AdminStudentUpdateView.as_view(), name='admin-student-update'),
     path('admin/students/<int:pk>/history/', AdminStudentHistoryView.as_view(),
          name='admin-student-history'),
+    # Families (hermanos), 2026-11-13: accounts.families_admin.
+    path('admin/families/', FamilyListView.as_view(), name='admin-families'),
+    path('admin/families/export/', FamilyExportView.as_view(), name='admin-families-export'),
+    path('admin/families/bulk/', FamilyBulkView.as_view(), name='admin-families-bulk'),
+    path('admin/families/link/', FamilyLinkView.as_view(), name='admin-families-link'),
+    path('admin/families/suggestions/', FamilySuggestionsView.as_view(), name='admin-family-suggestions'),
+    path('admin/families/suggestions/bulk/', FamilySuggestionsBulkView.as_view(),
+         name='admin-family-suggestions-bulk'),
+    path('admin/families/<int:pk>/', FamilyDetailView.as_view(), name='admin-family-detail'),
+    path('admin/families/<int:pk>/students/<int:student_id>/', FamilyStudentDetailView.as_view(),
+         name='admin-family-student'),
+    path('admin/students/<int:pk>/family/', StudentFamilyView.as_view(), name='admin-student-family'),
     path('admin/students/<int:pk>/guardians/', StudentGuardiansView.as_view(),
          name='student-guardians'),
     path('admin/students/<int:pk>/guardians/<int:user_id>/',

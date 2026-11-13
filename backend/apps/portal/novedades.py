@@ -19,18 +19,14 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import StudentProfile, User
-
 MAX_ITEMS = 30
 
 
 def family_students(user):
-    students = list(StudentProfile.objects.filter(parents=user).select_related('user'))
-    if user.role == User.Role.STUDENT and not students:
-        own = StudentProfile.objects.filter(user_id=user.pk).select_related('user').first()
-        if own is not None:
-            students = [own]
-    return students
+    """The family's students as a list (``accounts.family.family_students``)."""
+    from apps.accounts.family import family_students as scope
+
+    return list(scope(user).select_related('user'))
 
 
 def build_feed(user, since) -> list[dict]:

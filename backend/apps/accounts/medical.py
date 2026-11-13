@@ -7,7 +7,9 @@ Who may read them
 * admin: always (the school holds them to act in an emergency).
 * the student's guardian: only after granting the MEDICAL_DATA consent for
   that student (or household-wide); otherwise the fields are masked and the
-  API says why, so the portal can offer the consent switch.
+  API says why, so the portal can offer the consent switch. A guardian of one
+  sibling of a ``Family`` counts as the guardian of every sibling (school
+  decision, 2026-11-13: linked logins see the sibling's file like their own).
 * staff and students: never (rosters, analytics, exports).
 
 Exports and audit logs never carry the values: `mask_medical()` replaces them
@@ -15,6 +17,7 @@ with MASK, and AuditLog already records '[set]' for these fields.
 """
 from __future__ import annotations
 
+from .family import can_access_student
 from .serializers import MEDICAL_FIELDS
 
 MASK = '●●●'
@@ -27,7 +30,7 @@ def medical_access(user, profile) -> tuple[bool, str]:
     role = getattr(user, 'role', None)
     if role == 'admin':
         return True, ''
-    if role == 'parent' and profile.parents.filter(pk=user.pk).exists():
+    if role == 'parent' and can_access_student(user, profile):
         from apps.legal.models import ConsentPurpose
         from apps.legal.services import has_consent
         if has_consent(user, ConsentPurpose.MEDICAL_DATA, student=profile) or has_consent(user, ConsentPurpose.MEDICAL_DATA):
