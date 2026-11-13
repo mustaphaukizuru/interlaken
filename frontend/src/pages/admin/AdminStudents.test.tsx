@@ -374,3 +374,17 @@ describe('AdminStudents on DataTable v2 (Data Ops Phase 3)', () => {
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/accounts/admin/students/import/template/', { params: { fmt: 'xlsx' }, responseType: 'blob' }));
   });
 });
+
+describe('AdminStudents · Familia column (hermanos)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('shows the family as a link to Familias, and a dash without one', async () => {
+    mockedStudents.mockResolvedValue({
+      data: { count: 2, next: null, previous: null, results: [{ ...ana, family: { id: 3, name: 'Familia López' } }, { ...beto, family: null }] },
+    } as never);
+    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos' });
+    const link = await screen.findByRole('link', { name: 'Familia López' });
+    expect(link).toHaveAttribute('href', '/admin/familias?q=Familia%20L%C3%B3pez');
+    expect(screen.getAllByRole('columnheader', { name: /Familia/ }).length).toBeGreaterThan(0);
+  });
+});

@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, type LucideIcon } from 'lucide-react';
+import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, House, type LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
@@ -204,6 +204,18 @@ export default function AdminStudents() {
     { id: 'loyverse_code', header: 'Código Loyverse', defaultHidden: true, minWidth: 120, className: 'font-mono text-xs text-muted', cell: (s) => s.loyverse_code || s.student_id },
     { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s) => s.grade },
     { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s) => s.group || '—' },
+    {
+      // Siblings grouped by the office (Familias): the family opens filtered on its name.
+      id: 'family', header: 'Familia', minWidth: 150,
+      cell: (s) => (s.family ? (
+        <Link to={`/admin/familias?q=${encodeURIComponent(s.family.name)}`} title={`Ver ${s.family.name}`}
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+          <House className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{s.family.name}</span>
+        </Link>
+      ) : <span className="text-subtle">—</span>),
+    },
     { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
     {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
