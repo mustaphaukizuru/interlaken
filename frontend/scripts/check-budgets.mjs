@@ -70,7 +70,12 @@ const ROUTE_BUDGET_OVERRIDES = {
   // ~14.5 kB gz motionFeatures engine — see src/lib/motion.tsx). That's
   // ~30 kB gz of intentional motion; dropping framer for CSS reveals would
   // reclaim it. Measured 2026-08: ~162 kB gz total.
-  '/': { budgetKb: 170, reason: 'intentional framer-motion animations (~30 kB gz)' },
+  // 2026-11-13 (+1 kB, reviewed): master reached exactly 170.0 kB; the new
+  // /admin/familias route took it to 170.1 kB. The cause is structural: every
+  // console page's lazy() stub and <Route> sits in the entry chunk the public
+  // home also loads (~60 stubs today). Follow-up that reclaims more than this:
+  // move the /admin route tree into one lazily loaded module.
+  '/': { budgetKb: 171, reason: 'intentional framer-motion animations (~30 kB gz) + admin route table in the entry chunk' },
 };
 
 /**
