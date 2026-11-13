@@ -4,6 +4,7 @@ A family adds another child itself, without the office (2026-11-13).
     GET  /accounts/me/family/          the children this login sees + whether it may add one
     POST /accounts/me/family/add/      {student}  (school email or matrícula) → sends a code
     POST /accounts/me/family/confirm/  {student, code} → links the child to the family
+    POST /accounts/me/family/remove/   {student}  (id) → takes a sibling out of the family
 
 Proof of the relationship: a 6-digit code goes to the other child's mailboxes
 (its school address, which the family reads, plus its confirmed personal
@@ -16,6 +17,14 @@ spend it, a family may ask for 5 codes an hour and a child may receive 3 an
 hour (no inbox flooding), every code sent and every link is audited, and after
 the link every account that gains access is told, «si usted no hizo este
 cambio, avise al colegio». The office can undo it from Familias («Quitar»).
+
+Removing (2026-11-13): a family can also take a sibling out itself, e.g. a
+child who finished school while a brother or sister keeps studying. Only a
+child the account reaches THROUGH the family can be removed, never the
+account's own child (its school login or a guardian link the school made).
+It only takes access away, so no code is asked; it is audited, and a family
+left with one child dissolves (``families.remove_student``). Each child's file,
+balance and history are untouched.
 """
 from __future__ import annotations
 
@@ -37,8 +46,8 @@ from apps.core.exceptions import error_body
 from apps.core.matricula import is_ci_code, normalize_matricula
 from apps.core.ratelimit import ratelimit
 
-from .families import FamilyError, link_students, plan_link, student_summary
-from .family import family_students
+from .families import FamilyError, link_students, plan_link, remove_student, student_summary
+from .family import family_students, own_student_ids
 from .models import FamilyLinkCode, StudentProfile, User
 from .notify_email import mask_email
 from .recipients import email_recipients
@@ -64,9 +73,13 @@ def _hash(code: str, requester_id: int, student_id: int) -> str:
 
 
 def _children(user) -> list[dict]:
+    """Each child on its own row; ``own`` children cannot be removed, siblings
+    reached through the family can (``removable``)."""
+    own = own_student_ids(user)
     qs = (family_students(user).select_related('user', 'family')
           .order_by('user__first_name', 'pk'))
-    return [student_summary(s) for s in qs]
+    return [{**student_summary(s), 'own': s.pk in own,
+             'removable': s.pk not in own and s.family_id is not None} for s in qs]
 
 
 def find_child(term: str) -> StudentProfile | None:
@@ -85,6 +98,11 @@ class _StudentIn(serializers.Serializer):
     student = serializers.CharField(max_length=254, error_messages={
         'blank': 'Escriba el correo escolar o la matrícula de su otro hijo.',
         'required': 'Escriba el correo escolar o la matrícula de su otro hijo.'})
+
+
+class _RemoveIn(serializers.Serializer):
+    student = serializers.IntegerField(error_messages={
+        'invalid': 'Elija al alumno que quiere quitar.', 'required': 'Elija al alumno que quiere quitar.'})
 
 
 class _ConfirmIn(_StudentIn):
@@ -232,3 +250,32 @@ class MyFamilyConfirmView(APIView):
         except FamilyError as exc:
             return _bad(str(exc), 'refused')
         return Response({'linked': child.user.full_name, 'children': _children(user)})
+
+
+@method_decorator(ratelimit('family-self-remove', '20/h', key='user', method='POST'), name='post')
+class MyFamilyRemoveView(APIView):
+    """Take a sibling out of this account's family (e.g. it finished school).
+
+    The sibling stops showing in every account of the family, and its own
+    accounts stop seeing the others; nothing else about it changes.
+    """
+    permission_classes = [permissions.IsAuthenticated, FamilyLogin]
+
+    def post(self, request):
+        data = _RemoveIn(data=request.data)
+        data.is_valid(raise_exception=True)
+        user = request.user
+        child = (family_students(user).select_related('user', 'family')
+                 .filter(pk=data.validated_data['student']).first())
+        if child is None:
+            return _bad('Ese alumno no aparece en su cuenta.', 'not_found', status.HTTP_404_NOT_FOUND)
+        first = child.user.first_name or child.user.full_name
+        if child.pk in own_student_ids(user) or child.family_id is None:
+            return _bad(f'{first} es el alumno de esta cuenta, así que no se puede quitar desde aquí. '
+                        'Si hace falta, pida ayuda al colegio.', 'own_child')
+        try:
+            result = remove_student(child.family, child, actor=user, context='familia: quitado por la familia')
+        except FamilyError as exc:
+            return _bad(str(exc), 'refused')
+        return Response({'removed': child.user.full_name, 'dissolved': result['dissolved'],
+                         'children': _children(user)})

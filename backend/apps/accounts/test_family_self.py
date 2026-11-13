@@ -12,6 +12,7 @@ from apps.accounts.factories import (
     StudentProfileFactory,
     StudentUserFactory,
 )
+from apps.accounts.families import link_students
 from apps.accounts.family import family_students
 from apps.accounts.models import FamilyLinkCode, StudentProfile
 from apps.core.models import AuditLog
@@ -22,6 +23,7 @@ pytestmark = pytest.mark.django_db
 ADD = reverse('my-family-add')
 CONFIRM = reverse('my-family-confirm')
 MINE = reverse('my-family')
+REMOVE = reverse('my-family-remove')
 
 
 def _kid(email, first, student_id, **kw):
@@ -182,3 +184,85 @@ class TestRefusals:
         api_client.force_authenticate(kids[0].user)
         resp = api_client.post(CONFIRM, {'student': '09628', 'code': '12ab'}, format='json')
         assert resp.status_code == 400 and '6 números' in str(resp.data)
+
+
+def _pks(user):
+    return set(family_students(user).values_list('pk', flat=True))
+
+
+class TestRemoveSibling:
+    """A family takes a sibling out itself, e.g. the one who finished school."""
+
+    def test_the_list_says_which_child_can_be_removed(self, api_client, kids):
+        olivia, alejandro = kids
+        link_students([olivia.pk, alejandro.pk], actor=AdminFactory(), notify=False)
+        api_client.force_authenticate(olivia.user)
+        rows = {c['id']: c for c in api_client.get(MINE).data['children']}
+        assert (rows[olivia.pk]['own'], rows[olivia.pk]['removable']) == (True, False)
+        assert (rows[alejandro.pk]['own'], rows[alejandro.pk]['removable']) == (False, True)
+
+    def test_a_graduate_leaves_and_the_sibling_keeps_its_own_account(self, api_client, kids):
+        olivia, alejandro = kids
+        link_students([olivia.pk, alejandro.pk], actor=AdminFactory(), notify=False)
+        StudentProfile.objects.filter(pk=alejandro.pk).update(status=StudentProfile.Status.GRADUATED)
+        api_client.force_authenticate(olivia.user)
+        resp = api_client.post(REMOVE, {'student': alejandro.pk}, format='json')
+        assert resp.status_code == 200, resp.data
+        assert resp.data['removed'] == alejandro.user.full_name and resp.data['dissolved'] is True
+        assert [c['id'] for c in resp.data['children']] == [olivia.pk]
+        # Both sides lose each other; nobody loses their own child.
+        assert _pks(olivia.user) == {olivia.pk}
+        assert _pks(alejandro.user) == {alejandro.pk}
+        olivia.refresh_from_db()
+        alejandro.refresh_from_db()
+        assert olivia.family_id is None and alejandro.family_id is None
+        assert AuditLog.objects.filter(context='familia: quitado por la familia').exists()
+
+    def test_three_children_the_other_two_stay_together(self, api_client, kids):
+        olivia, alejandro = kids
+        third = _kid('ci09999@interlaken.com.mx', 'Mateo', '09999')
+        link_students([olivia.pk, alejandro.pk, third.pk], actor=AdminFactory(), notify=False)
+        api_client.force_authenticate(olivia.user)
+        resp = api_client.post(REMOVE, {'student': alejandro.pk}, format='json')
+        assert resp.status_code == 200 and resp.data['dissolved'] is False
+        assert _pks(olivia.user) == {olivia.pk, third.pk}
+        assert _pks(alejandro.user) == {alejandro.pk}
+
+    def test_a_parent_removes_a_sibling_added_through_the_family(self, api_client, kids):
+        olivia, alejandro = kids
+        mom = ParentFactory(email='mama@correo.mx')
+        olivia.parents.add(mom)
+        link_students([olivia.pk, alejandro.pk], actor=AdminFactory(), notify=False)
+        api_client.force_authenticate(mom)
+        assert api_client.post(REMOVE, {'student': alejandro.pk}, format='json').status_code == 200
+        assert _pks(mom) == {olivia.pk}
+
+    def test_the_accounts_own_child_cannot_be_removed(self, api_client, kids):
+        olivia, alejandro = kids
+        link_students([olivia.pk, alejandro.pk], actor=AdminFactory(), notify=False)
+        api_client.force_authenticate(olivia.user)
+        resp = api_client.post(REMOVE, {'student': olivia.pk}, format='json')
+        assert resp.status_code == 400 and resp.data['code'] == 'own_child'
+        assert _pks(olivia.user) == {olivia.pk, alejandro.pk}
+
+    def test_a_guardian_linked_by_the_school_is_not_removable(self, api_client, kids):
+        olivia, alejandro = kids
+        mom = ParentFactory(email='mama@correo.mx')
+        olivia.parents.add(mom)
+        alejandro.parents.add(mom)
+        api_client.force_authenticate(mom)
+        rows = api_client.get(MINE).data['children']
+        assert [c['removable'] for c in rows] == [False, False]
+        resp = api_client.post(REMOVE, {'student': alejandro.pk}, format='json')
+        assert resp.status_code == 400 and resp.data['code'] == 'own_child'
+
+    def test_a_child_outside_the_account(self, api_client, kids):
+        olivia, alejandro = kids
+        api_client.force_authenticate(olivia.user)
+        resp = api_client.post(REMOVE, {'student': alejandro.pk}, format='json')
+        assert resp.status_code == 404
+        assert api_client.post(REMOVE, {'student': 'x'}, format='json').status_code == 400
+
+    def test_admins_cannot_use_it(self, api_client, kids):
+        api_client.force_authenticate(AdminFactory())
+        assert api_client.post(REMOVE, {'student': kids[0].pk}, format='json').status_code == 403

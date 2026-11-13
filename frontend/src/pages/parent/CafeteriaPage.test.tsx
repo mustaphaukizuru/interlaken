@@ -266,9 +266,35 @@ describe('CafeteriaPage history: URL filters, sort and export (Data Ops Phase 9)
     await waitFor(() => expect(mockedTx).toHaveBeenLastCalledWith(expect.objectContaining({ student: 12 })));
     expect(useSelectedChildStore.getState().childId).toBe(12);
 
-    await userEvent.selectOptions(screen.getByLabelText('Filtrar por alumno'), 'all');
-    await waitFor(() => expect(urlParams().get('alumno')).toBeNull());
-    await waitFor(() => expect(mockedTx).toHaveBeenLastCalledWith(expect.objectContaining({ student: undefined })));
+    // Siblings are never listed together: the select only offers each child.
+    expect(screen.queryByRole('option', { name: 'Todos los alumnos' })).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText('Filtrar por alumno'), '10');
+    await waitFor(() => expect(urlParams().get('alumno')).toBe('10'));
+    await waitFor(() => expect(mockedTx).toHaveBeenLastCalledWith(expect.objectContaining({ student: 10 })));
+  });
+
+  it('with two children it shows ONE at a time, the first by default, never both mixed', async () => {
+    mockedBalance.mockResolvedValue({ data: [account, sibling] } as never);
+    mockedTx.mockResolvedValue(oneRow as never);
+
+    renderWithProviders(<><CafeteriaPage /><LocationProbe /></>, { route: '/portal/cafeteria' });
+
+    // Emma (first): her card only, her movements only, no «Todos» anywhere.
+    const cardNames = () => screen.queryAllByText(/Quintana$/).filter((el) => el.tagName === 'P').map((el) => el.textContent);
+    await waitFor(() => expect(cardNames()).toEqual(['Emma Quintana']));
+    await waitFor(() => expect(mockedTx).toHaveBeenLastCalledWith(expect.objectContaining({ student: 10 })));
+    expect(mockedTx).not.toHaveBeenCalledWith(expect.objectContaining({ student: undefined }));
+    const switcher = screen.getByRole('group', { name: 'Seleccionar alumno' });
+    expect(within(switcher).queryByRole('button', { name: 'Todos' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Todos los alumnos' })).toBeNull();
+    await waitFor(() => expect(useSelectedChildStore.getState().childId).toBe(10));
+
+    // Leo: the page moves to him alone.
+    await userEvent.click(within(switcher).getByRole('button', { name: /Leo Quintana/ }));
+    await waitFor(() => expect(mockedTx).toHaveBeenLastCalledWith(expect.objectContaining({ student: 12 })));
+    await waitFor(() => expect(urlParams().get('alumno')).toBe('12'));
+    expect(within(switcher).getByRole('button', { name: /Leo Quintana/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(cardNames()).toEqual(['Leo Quintana']);
   });
 
   it('exports exactly the filtered, sorted view in the chosen format', async () => {

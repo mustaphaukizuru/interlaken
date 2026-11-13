@@ -12,6 +12,9 @@ interface ChildSwitcherProps {
   students: SwitcherChild[];
   /** When true, include a "Todos" chip (useful on list pages). */
   allowAll?: boolean;
+  /** The page's effective child, when the page owns the default (e.g. a
+   *  ?alumno= link): the chips show it and the switcher never picks one itself. */
+  selected?: number | null;
   className?: string;
 }
 
@@ -19,13 +22,15 @@ interface ChildSwitcherProps {
  * Compact chip row to pick among linked children. Persists selection so
  * Cafetería can filter to the same alumno.
  */
-export function ChildSwitcher({ students, allowAll = false, className = '' }: ChildSwitcherProps) {
-  const childId = useSelectedChildStore((s) => s.childId);
+export function ChildSwitcher({ students, allowAll = false, selected, className = '' }: ChildSwitcherProps) {
+  const storedId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
+  const controlled = selected !== undefined;
+  const childId = controlled ? selected : storedId;
 
   // Drop a stale id (unlinked child) and default to first when "Todos" is off.
   useEffect(() => {
-    if (!students.length) return;
+    if (controlled || !students.length) return;
     const valid = childId != null && students.some((c) => c.id === childId);
     if (valid) return;
     if (allowAll) {
@@ -33,7 +38,7 @@ export function ChildSwitcher({ students, allowAll = false, className = '' }: Ch
       return;
     }
     setChildId(students[0].id);
-  }, [students, childId, allowAll, setChildId]);
+  }, [students, childId, allowAll, controlled, setChildId]);
 
   if (students.length < 2) return null;
 
