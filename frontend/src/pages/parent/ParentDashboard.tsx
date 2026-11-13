@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   Coffee, AlertTriangle, GraduationCap, ArrowRight, UserCircle,
   MessageCircle, QrCode, Plus, RefreshCw, Clock,
+  UserPlus,
 } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
@@ -185,11 +186,19 @@ export default function ParentDashboard() {
         </ul>
       )}
 
-      {/* 2. Child switcher */}
-      {children.length > 1 && (
-        <div className="mb-5">
-          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wider text-subtle">Alumno</p>
-          <ChildSwitcher students={children} />
+      {/* 2. Child switcher, and the way to add a sibling without the office (Mi perfil → Mis hijos) */}
+      {children.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          {children.length > 1 && (
+            <div className="min-w-0">
+              <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wider text-subtle">Alumno</p>
+              <ChildSwitcher students={children} />
+            </div>
+          )}
+          <Link to="/portal/perfil?tab=hijos"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-purple hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+            <UserPlus className="h-4 w-4" aria-hidden="true" /> Agregar otro hijo
+          </Link>
         </div>
       )}
 
