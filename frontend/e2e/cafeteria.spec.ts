@@ -97,7 +97,7 @@ test('the dashboard quick chip deep-links into the top-up modal with the amount 
         children_count: 1,
         children: [{ id: 3, name: 'Test Alumno', grade: '3° Primaria', group: 'A', student_id: 'A-003' }],
         cafeteria_balances: [
-          { student_name: 'Test Alumno', balance: '30.00', low: false, last_synced: '2026-07-11T12:00:00Z' },
+          { student: 3, student_name: 'Test Alumno', balance: '30.00', low: false, last_synced: '2026-07-11T12:00:00Z' },
         ],
         recent_payments: [],
         announcements: [],
@@ -108,8 +108,8 @@ test('the dashboard quick chip deep-links into the top-up modal with the amount 
   await login(page, DEV_PARENT);
   await expect(page).toHaveURL(/\/portal\/?$/);
 
-  // The $200 chip navigates to /portal/cafeteria?recarga=200 …
-  await page.getByRole('link', { name: 'Recargar $200 en cafetería' }).click();
+  // The $200 chip navigates to /portal/cafeteria?recarga=200&hijo=3 (this child) …
+  await page.getByRole('link', { name: 'Recargar $200 a Test Alumno' }).click();
   await expect(page).toHaveURL(/\/portal\/cafeteria/);
 
   // … which opens the top-up modal with the amount prefilled (param consumed).

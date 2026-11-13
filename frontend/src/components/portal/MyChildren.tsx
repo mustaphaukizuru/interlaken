@@ -1,13 +1,15 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Check, Mail, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowLeft, Check, Mail, ShieldCheck, UserMinus, UserPlus } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { apiErrorMessage } from '@/lib/apiErrors';
-import { myFamilyApi, type CodeSent } from '@/services/myFamilyApi';
+import { myFamilyApi, type CodeSent, type MyChild } from '@/services/myFamilyApi';
 
 const gradeLine = (s: { grade: string; group: string }) => `${s.grade}${s.group ? ` ${s.group}` : ''}`;
 const initial = (name: string) => (name.trim().charAt(0) || '?').toUpperCase();
@@ -17,6 +19,10 @@ const initial = (name: string) => (name.trim().charAt(0) || '?').toUpperCase();
  * hijo», without the office. Two steps: the other child's school email or
  * matrícula → a 6-digit code arrives in that child's mailbox → typing it links
  * the children, so either login sees all of them.
+ *
+ * «Quitar» takes a sibling back out (one who finished school while another
+ * keeps studying, or a link made by mistake). Only siblings reached through
+ * the family offer it; the account's own child is marked «Esta cuenta».
  */
 export function MyChildren() {
   const qc = useQueryClient();
@@ -25,6 +31,17 @@ export function MyChildren() {
     queryFn: async () => (await myFamilyApi.get()).data,
   });
   const [adding, setAdding] = useState(false);
+  const [toRemove, setToRemove] = useState<MyChild | null>(null);
+  const remove = useMutation({
+    mutationFn: async (child: MyChild) => (await myFamilyApi.remove(child.id)).data,
+    onSuccess: (d) => {
+      setToRemove(null);
+      toast.success(`${d.removed} ya no aparece en su cuenta.`);
+      // Inicio, cafetería, credencial and pagos lose that child.
+      void qc.invalidateQueries();
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo quitar. Inténtelo de nuevo.')),
+  });
 
   if (isLoading) return <Card title="Mis hijos"><ListSkeleton rows={2} /></Card>;
   if (isError || !data) return <Card title="Mis hijos"><ErrorState onRetry={() => refetch()} /></Card>;
@@ -37,10 +54,19 @@ export function MyChildren() {
             <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-purple">
               {initial(c.name)}
             </span>
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-ink">{c.name}</span>
               <span className="block truncate text-xs text-subtle">{gradeLine(c)} · Matrícula {c.student_id}</span>
             </span>
+            {c.status !== 'active' && <Badge variant="neutral">{c.status_label}</Badge>}
+            {c.own && data.children.length > 1 && <Badge variant="info">Esta cuenta</Badge>}
+            {c.removable && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setToRemove(c)}
+                aria-label={`Quitar a ${c.name} de esta cuenta`} className="shrink-0">
+                <UserMinus className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Quitar</span>
+              </Button>
+            )}
           </li>
         ))}
       </ul>
@@ -68,6 +94,22 @@ export function MyChildren() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!toRemove}
+        onClose={() => { if (!remove.isPending) setToRemove(null); }}
+        onConfirm={() => { if (toRemove) remove.mutate(toRemove); }}
+        loading={remove.isPending}
+        title="Quitar de su cuenta"
+        confirmLabel={toRemove ? `Quitar a ${toRemove.first_name || toRemove.name}` : 'Quitar'}
+        message={toRemove ? (
+          <>
+            <strong className="text-ink">{toRemove.name}</strong> dejará de aparecer en esta cuenta y en las demás
+            cuentas de su familia, y su propia cuenta dejará de ver a sus hermanos. Su expediente, su saldo y sus
+            movimientos no cambian. Si fue un error, puede volver a agregarlo con un código.
+          </>
+        ) : ''}
+      />
     </Card>
   );
 }

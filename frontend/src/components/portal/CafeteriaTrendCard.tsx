@@ -21,13 +21,16 @@ const AXIS_FONT = 11;
  * entrance gated through useChartEntrance so a backgrounded tab can't blank it).
  * Lazy-loaded so Recharts never touches the dashboard's main chunk.
  */
-export default function CafeteriaTrendCard() {
+/** `student` given: the card follows the page's child switcher (one child at a
+ *  time, never a mixed total of siblings) and hides its own picker. */
+export default function CafeteriaTrendCard({ student: controlled }: { student?: number | 'all' } = {}) {
   const dark = usePrefersDark();
   const reduced = useReducedMotion();
   const theme = getChartTheme(dark);
   const entrance = useChartEntrance();
 
-  const [student, setStudent] = useState<number | 'all'>('all');
+  const [picked, setStudent] = useState<number | 'all'>('all');
+  const student = controlled ?? picked;
 
   // Children (from balances) power the per-child switcher; shares the balances
   // cache with the cafetería page — so the CACHED value must keep the raw
@@ -66,7 +69,7 @@ export default function CafeteriaTrendCard() {
           <p className="text-[12px] text-subtle">Últimos 30 días</p>
         </div>
         <div className="flex items-center gap-3">
-          {(children?.length ?? 0) > 1 && (
+          {controlled === undefined && (children?.length ?? 0) > 1 && (
             <select
               value={student}
               onChange={(e) => setStudent(e.target.value === 'all' ? 'all' : Number(e.target.value))}

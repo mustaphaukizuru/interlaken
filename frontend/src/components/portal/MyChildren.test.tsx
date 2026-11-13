@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/myFamilyApi', () => ({
-  myFamilyApi: { get: vi.fn(), add: vi.fn(), confirm: vi.fn() },
+  myFamilyApi: { get: vi.fn(), add: vi.fn(), confirm: vi.fn(), remove: vi.fn() },
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
@@ -15,12 +15,17 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 const olivia = {
   id: 1, name: 'Olivia Alvarado Felix', first_name: 'Olivia', last_name: 'Alvarado Felix', email: 'ci10073@interlaken.com.mx',
   student_id: '10073', grade: '2° Primaria', group: 'A', status: 'active', status_label: 'Activo', archived: false, family: null,
+  own: true, removable: false,
 };
-const alejandro = { ...olivia, id: 2, name: 'Alejandro Alvarado Felix', first_name: 'Alejandro', student_id: '09628', grade: '1° Secundaria' };
+const alejandro = {
+  ...olivia, id: 2, name: 'Alejandro Alvarado Felix', first_name: 'Alejandro', student_id: '09628', grade: '1° Secundaria',
+  own: false, removable: true,
+};
 
 const get = vi.mocked(myFamilyApi.get);
 const add = vi.mocked(myFamilyApi.add);
 const confirm = vi.mocked(myFamilyApi.confirm);
+const remove = vi.mocked(myFamilyApi.remove);
 
 describe('MyChildren (Mi perfil → Mis hijos)', () => {
   beforeEach(() => {
@@ -78,5 +83,35 @@ describe('MyChildren (Mi perfil → Mis hijos)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Agregar a Alejandro/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Le quedan 4 intentos');
     expect(screen.getByLabelText('Código de 6 números')).toBeInTheDocument();
+  });
+
+  it('removes a sibling who left the school, after a clear confirmation', async () => {
+    const graduate = { ...alejandro, status: 'graduated', status_label: 'Egresado' };
+    get.mockResolvedValue({ data: { children: [graduate, olivia], can_add: true } } as never);
+    remove.mockResolvedValue({ data: { removed: 'Alejandro Alvarado Felix', dissolved: true, children: [olivia] } } as never);
+    renderWithProviders(<MyChildren />);
+
+    expect(await screen.findByText('Egresado')).toBeInTheDocument();
+    expect(screen.getByText('Esta cuenta')).toBeInTheDocument();
+    // The account's own child has no «Quitar»; the sibling does.
+    expect(screen.queryByRole('button', { name: 'Quitar a Olivia Alvarado Felix de esta cuenta' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar a Alejandro Alvarado Felix de esta cuenta' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Quitar de su cuenta' });
+    expect(dialog).toHaveTextContent('Su expediente, su saldo y sus movimientos no cambian');
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Quitar a Alejandro' }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(2));
+    expect(toast.success).toHaveBeenCalledWith('Alejandro Alvarado Felix ya no aparece en su cuenta.');
+  });
+
+  it('cancelling keeps the child', async () => {
+    get.mockResolvedValue({ data: { children: [olivia, alejandro], can_add: true } } as never);
+    renderWithProviders(<MyChildren />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Quitar a Alejandro Alvarado Felix de esta cuenta' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Quitar de su cuenta' });
+    await userEvent.click(within(dialog).getByRole('button', { name: /Cancelar/ }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(remove).not.toHaveBeenCalled();
   });
 });

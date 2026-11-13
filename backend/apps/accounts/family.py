@@ -47,6 +47,16 @@ def family_students(user) -> QuerySet[StudentProfile]:
     return StudentProfile.objects.filter(Q(pk__in=direct_ids) | Q(family_id__in=family_ids))
 
 
+def own_student_ids(user) -> set[int]:
+    """The students ``user`` reaches WITHOUT a family: its own school login, or
+    a guardian link. A family can take a sibling out of its account (Mis hijos
+    → «Quitar»), never one of these."""
+    if user is None or not getattr(user, 'is_authenticated', False) or not getattr(user, 'pk', None):
+        return set()
+    return set(StudentProfile.objects.filter(Q(parents=user) | Q(user_id=user.pk))
+               .values_list('pk', flat=True))
+
+
 def can_access_student(user, student: StudentProfile | int) -> bool:
     """True when ``student`` is one of ``family_students(user)``."""
     pk = student if isinstance(student, int) else getattr(student, 'pk', None)

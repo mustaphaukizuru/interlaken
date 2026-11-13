@@ -170,12 +170,7 @@ export default function CafeteriaPage() {
   // The stored child (kept in this browser) only counts when it is one of this
   // family's: another account on the same phone, or a sibling unlinked or
   // archived, must not filter the page down to nothing (no card, no Recargar).
-  const childId = storedChildId != null && balances && !balances.some((b) => b.student.id === storedChildId)
-    ? null
-    : storedChildId;
-  useEffect(() => {
-    if (balances && storedChildId != null && childId == null) setChildId(null);
-  }, [balances, storedChildId, childId, setChildId]);
+  const storedValid = storedChildId != null && !(balances && !balances.some((b) => b.student.id === storedChildId));
 
   // The alumno filter IS the portal child switcher (shared store), kept in
   // step with ?alumno= by the effect below. A valid ?alumno= (one of this
@@ -183,6 +178,19 @@ export default function CafeteriaPage() {
   // fetches the wrong child's page first.
   const urlAlumno = get('alumno');
   const urlChild = balances?.some((b) => String(b.student.id) === urlAlumno) ? Number(urlAlumno) : null;
+  // Siblings are never shown together: with several children the page is
+  // always about ONE of them (the picked one, the linked one, else the first),
+  // so balances, movements and categories never mix two wallets.
+  const childId = storedValid
+    ? storedChildId
+    : urlChild ?? (balances && balances.length > 1 ? balances[0].student.id : null);
+  // Keep the store on the child shown here, so Inicio and the other portal
+  // pages follow; a single child needs no pick, so a stale id is just dropped.
+  useEffect(() => {
+    if (!balances || storedValid) return;
+    if (childId != null) setChildId(childId);
+    else if (storedChildId != null) setChildId(null);
+  }, [balances, storedValid, childId, storedChildId, setChildId]);
   const filterStudent: number | 'all' = urlChild ?? childId ?? 'all';
   // One param set for the list and its export, so the file is the list.
   const historyParams = {
@@ -449,11 +457,8 @@ export default function CafeteriaPage() {
   // one-tap reset (the list auto-applies filters, so without this a filter that
   // matches nothing looks like a dead end).
   const filtersActive =
-    filterType !== '' || filterFrom !== '' || filterTo !== '' || filterStudent !== 'all';
-  const clearFilters = () => {
-    set({ tipo: null, desde: null, hasta: null, alumno: null, page: null });
-    setChildId(null);
-  };
+    filterType !== '' || filterFrom !== '' || filterTo !== '';
+  const clearFilters = () => set({ tipo: null, desde: null, hasta: null, page: null });
 
   if (balancesError) {
     return (
@@ -520,7 +525,7 @@ export default function CafeteriaPage() {
       {!balancesLoading && switcherStudents.length > 1 && (
         <ChildSwitcher
           students={switcherStudents}
-          allowAll
+          selected={filterStudent === 'all' ? null : filterStudent}
           className="mb-1"
         />
       )}
@@ -987,11 +992,10 @@ export default function CafeteriaPage() {
               value={filterStudent}
               onChange={(e) => {
                 // The sync effect mirrors this into ?alumno= and resets ?page=.
-                setChildId(e.target.value === 'all' ? null : Number(e.target.value));
+                setChildId(Number(e.target.value));
               }}
               aria-label="Filtrar por alumno"
             >
-              <option value="all">Todos los alumnos</option>
               {balances?.map((b) => (
                 <option key={b.student.id} value={b.student.id}>{b.student.user.full_name}</option>
               ))}

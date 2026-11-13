@@ -15,7 +15,7 @@ from .families_admin import (
     FamilySuggestionsView,
     StudentFamilyView,
 )
-from .family_self import MyFamilyAddView, MyFamilyConfirmView, MyFamilyView
+from .family_self import MyFamilyAddView, MyFamilyConfirmView, MyFamilyRemoveView, MyFamilyView
 from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
@@ -124,6 +124,7 @@ urlpatterns = [
     path('me/family/',         MyFamilyView.as_view(),         name='my-family'),
     path('me/family/add/',     MyFamilyAddView.as_view(),      name='my-family-add'),
     path('me/family/confirm/', MyFamilyConfirmView.as_view(),  name='my-family-confirm'),
+    path('me/family/remove/',  MyFamilyRemoveView.as_view(),   name='my-family-remove'),
     path('me/notify-email/verify/', NotifyEmailVerifyView.as_view(), name='my-notify-email-verify'),
     path('notify-email/confirm/', NotifyEmailConfirmView.as_view(), name='notify-email-confirm'),
     path('avatar/<int:user_id>/<str:token>/', AvatarServeView.as_view(), name='avatar-serve'),

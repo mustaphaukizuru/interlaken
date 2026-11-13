@@ -68,14 +68,14 @@ export default function ParentDashboard() {
   const children = data?.children ?? [];
   const needsFamilyLink = Boolean(data?.needs_family_link) || (!isLoading && !isError && children.length === 0);
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
-  // A stored child that is not one of this family's (another account on this
-  // phone, an unlinked sibling) must not empty the cards below.
-  const activeChildId = children.some((c) => c.id === childId) ? childId : null;
   const balances = data?.cafeteria_balances ?? [];
-  const totalBalance = balances.reduce((s, b) => s + parseFloat(b.balance || '0'), 0);
-  const totalPending = balances.reduce((s, b) => s + parseFloat(b.pending_topups || '0'), 0);
-  const hasLowBalance = balances.some((b) => b.low);
+  // Each child is its own wallet: the hero shows the SELECTED child's balance,
+  // never a sum of siblings (the per-child tiles above show every child).
+  // One child only: its single row, even if an older API left out the id.
+  const selectedBalance = balances.find((b) => b.student === selectedChild?.id)
+    ?? (children.length <= 1 && balances.length === 1 ? balances[0] : undefined);
   const hasCafeteria = balances.length > 0;
+  const lowBalances = balances.filter((b) => b.low);
 
   const now = new Date(nowMs);
   const todayLine = format(now, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });
@@ -152,21 +152,25 @@ export default function ParentDashboard() {
         </>
       ) : (
       <>
-      {/* 1. Low balance alert */}
-      {hasLowBalance && (
-        <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber/30 bg-amber/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:px-[18px]">
-          <AlertTriangle size={20} className="shrink-0 text-amber" />
+      {/* 1. Low balance alert: one line per child, each with its own top-up */}
+      {lowBalances.map((b) => (
+        <div key={b.student ?? b.student_name} className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber/30 bg-amber/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:px-[18px]">
+          <AlertTriangle size={20} className="shrink-0 text-amber" aria-hidden="true" />
           <div className="flex-1 text-[13.5px] text-ink">
-            <strong className="font-semibold text-amber">Saldo bajo en cafetería.</strong> Recargue el saldo para continuar usando los servicios.
+            <strong className="font-semibold text-amber">
+              {balances.length > 1 ? `Saldo bajo de ${b.student_name}.` : 'Saldo bajo en cafetería.'}
+            </strong>{' '}
+            Recargue el saldo para continuar usando los servicios.
           </div>
           <Link
-            to="/portal/cafeteria"
+            to={b.student ? `/portal/cafeteria?hijo=${b.student}` : '/portal/cafeteria'}
+            aria-label={balances.length > 1 ? `Recargar a ${b.student_name}` : undefined}
             className="whitespace-nowrap rounded text-[13px] font-bold text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
           >
             Recargar →
           </Link>
         </div>
-      )}
+      ))}
 
       {/* 1b. Per-child tiles (BACKLOG P1-H6): balance + quick top-up per alumno */}
       {balances.length > 1 && (
@@ -205,8 +209,23 @@ export default function ParentDashboard() {
       {/* 3. Cafetería saldo + quick top-up (or wallet explainer for families without activity) */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-[18px]">
         <Reveal className="sm:col-span-2" delay={0}>
-          {hasCafeteria ? (
-            <CafeteriaSaldoCard total={totalBalance} pending={totalPending} low={!!hasLowBalance} studentsCount={balances.length} />
+          {hasCafeteria && selectedBalance ? (
+            <CafeteriaSaldoCard
+              childId={selectedBalance.student}
+              name={selectedBalance.student_name}
+              several={children.length > 1}
+              amount={parseFloat(selectedBalance.balance || '0')}
+              pending={parseFloat(selectedBalance.pending_topups || '0')}
+              low={!!selectedBalance.low}
+            />
+          ) : hasCafeteria ? (
+            <div className="card h-full">
+              <EmptyState
+                icon={Coffee}
+                title={`${selectedChild?.name ?? 'Este alumno'} no tiene monedero activo`}
+                description="Ya no está activo en el colegio o aún no tiene servicio de cafetería. Elija a otro alumno arriba."
+              />
+            </div>
           ) : (
             <div className="card h-full">
               <EmptyState
@@ -252,10 +271,10 @@ export default function ParentDashboard() {
         <Reveal delay={20} className="mb-6">
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
-              <CafeteriaTrendCard />
+              <CafeteriaTrendCard student={selectedChild?.id ?? 'all'} />
             </Suspense>
             <Suspense fallback={<div className="skeleton h-[300px] rounded-xl2" aria-hidden="true" />}>
-              <CafeteriaCategoriesCard student={activeChildId ?? 'all'} />
+              <CafeteriaCategoriesCard student={selectedChild?.id ?? 'all'} />
             </Suspense>
           </div>
         </Reveal>
@@ -276,27 +295,29 @@ export default function ParentDashboard() {
 }
 
 /**
- * Hero card: family cafetería balance + quick top-up chips. The chips deep-link
- * into CafeteriaPage with `?recarga=<monto>` so its top-up modal opens with the
- * amount prefilled (no payment logic here).
+ * Hero card: the SELECTED child's cafetería wallet (never a sum of siblings)
+ * and quick top-up chips. The chips deep-link into CafeteriaPage with
+ * `?recarga=<monto>&hijo=<id>` so its top-up modal opens for this child with
+ * the amount prefilled (no payment logic here).
  */
-function CafeteriaSaldoCard({ total, pending = 0, low, studentsCount }: {
-  total: number; pending?: number; low: boolean; studentsCount: number;
+function CafeteriaSaldoCard({ childId, name, several, amount, pending = 0, low }: {
+  childId?: number; name: string; several: boolean; amount: number; pending?: number; low: boolean;
 }) {
+  const first = name.split(' ')[0] || name;
+  const hijo = childId ? `hijo=${childId}` : '';
+  const page = hijo ? `/portal/cafeteria?${hijo}` : '/portal/cafeteria';
   return (
     <div className="card flex h-full flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[13px] font-medium text-muted">Saldo Cafetería</p>
+          <p className="text-[13px] font-medium text-muted">{several ? `Saldo de ${first}` : 'Saldo Cafetería'}</p>
           <p className={`mt-1 font-head text-[clamp(26px,8vw,36px)] font-extrabold leading-[1.1] tracking-[-1px] ${low ? 'text-amber' : 'text-ink'}`}>
-            ${total.toFixed(2)}
+            ${amount.toFixed(2)}
           </p>
-          {studentsCount > 1 && (
-            <p className="mt-0.5 text-[12px] text-subtle">Suma de {studentsCount} alumnos</p>
-          )}
+          {several && <p className="mt-0.5 text-[12px] text-subtle">{name}</p>}
           {pending > 0 && (
             <Link
-              to="/portal/cafeteria"
+              to={page}
               className="mt-1.5 inline-flex items-center gap-1.5 rounded text-[12.5px] font-semibold text-amber hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
             >
               <Clock size={13} aria-hidden="true" /> ${pending.toFixed(2)} pagado, por aplicar (7:30 a.m.)
@@ -313,15 +334,15 @@ function CafeteriaSaldoCard({ total, pending = 0, low, studentsCount }: {
           {QUICK_TOPUP_AMOUNTS.map((amt) => (
             <Link
               key={amt}
-              to={`/portal/cafeteria?recarga=${amt}`}
-              aria-label={`Recargar $${amt} en cafetería`}
+              to={`/portal/cafeteria?recarga=${amt}${hijo ? `&${hijo}` : ''}`}
+              aria-label={`Recargar $${amt} a ${name}`}
               className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-green/40 bg-green-50 px-4 py-1.5 text-sm font-bold text-green-dark transition hover:border-green hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
             >
               <Plus size={14} aria-hidden="true" /> ${amt}
             </Link>
           ))}
           <Link
-            to="/portal/cafeteria"
+            to={page}
             className="rounded px-1 text-[13px] font-semibold text-purple focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
           >
             Otro monto →
