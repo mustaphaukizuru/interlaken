@@ -159,4 +159,28 @@ echo "==> Live check"
 code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${PORTAL_DOMAIN}/healthz" || echo 000)"
 echo "    https://${PORTAL_DOMAIN}/healthz -> ${code}"
 [[ "$code" == "200" ]] || fail "the site did not answer 200 from the outside (check DNS and 'docker compose logs caddy')"
+
+# ── Money query check ───────────────────────────────────────────────────────
+# The test suite runs on SQLite, which ignores row locks, so a lock PostgreSQL
+# refuses passes CI and fails only here, as a 500 on a payment screen
+# (2026-11-18: every «Verificar en MultiCobros»). This runs every row-locked
+# payment / cafetería / bulk-action query on the real database inside one
+# transaction that is always rolled back: read-only, takes a second or two.
+echo "==> Money query check"
+if ! docker compose exec -T app python manage.py check_money_queries; then
+  echo "" >&2
+  echo "############################################################################" >&2
+  echo "DEPLOY FAILED: a money query FAILS on the production database (see FAIL above)." >&2
+  echo "The site is up on the new version, but the screen behind that query answers" >&2
+  echo "500 (payments, cafetería top-ups or an admin bulk action) until it is fixed." >&2
+  echo "" >&2
+  echo "Roll back to the previous image now (from $(pwd)):" >&2
+  echo "  $ROLLBACK_CMD" >&2
+  echo "" >&2
+  echo "Then revert or fix the commit on master before the next ./deploy.sh, which" >&2
+  echo "would rebuild the same code. Re-run the check by hand with:" >&2
+  echo "  docker compose exec -T app python manage.py check_money_queries -v 2" >&2
+  echo "############################################################################" >&2
+  exit 1
+fi
 echo "==> Done."

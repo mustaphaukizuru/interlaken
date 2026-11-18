@@ -574,7 +574,10 @@ same key paths, before you redeploy with the new settings.
 
 `deploy.sh` tags the running image as `interlaken-app:previous` before each
 build, and exits non-zero (printing this command) if the new one never becomes
-healthy. To go back, from `/opt/interlaken/deploy`:
+healthy, or if `check_money_queries` finds a row-locked payment, cafetería or
+bulk-action query that fails on the production database (it runs right after
+the live check, read-only, inside a transaction that is always rolled back).
+To go back, from `/opt/interlaken/deploy`:
 
 ```bash
 docker tag interlaken-app:previous interlaken-app:latest
