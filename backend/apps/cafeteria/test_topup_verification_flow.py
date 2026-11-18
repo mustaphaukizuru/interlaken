@@ -251,6 +251,14 @@ class TestPorVerificarBadge:
                           pos_not_loaded_confirmed=True)
         assert _compute_badges(admin)['cafeteria_verificar'] == 0
 
+    def test_verifying_refreshes_the_verifier_s_badge_at_once(self, api_client):
+        _, _, payment = paid_topup('200.00', checkout='PRD', balance=3)
+        admin = AdminFactory()
+        api_client.force_authenticate(user=admin)
+        assert api_client.get(reverse('core-badges')).data['cafeteria_verificar'] == 1  # now cached
+        verify(api_client, payment, '200.00')
+        assert api_client.get(reverse('core-badges')).data['cafeteria_verificar'] == 0
+
     def test_only_accounts_with_the_cafeteria_area_get_it(self):
         paid_topup('200.00', checkout='PRD', balance=0)
         cashier = UserFactory(role='staff', staff_areas=['cafeteria'])

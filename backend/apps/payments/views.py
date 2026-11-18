@@ -271,6 +271,13 @@ class AdminBanorteVerifyView(APIView):
             except Exception:  # noqa: BLE001 — the verification itself stands
                 logger.exception('apply after verification failed payment=%s', pk)
                 applied = {'apply_state': 'pos_unknown', 'balance': None}
+        # «Por verificar» just changed: the console refetches the badges now,
+        # so the 30 s cache of whoever verified must not answer the old count.
+        from django.core.cache import cache
+
+        from apps.core.badges import BADGE_CACHE_KEY
+
+        cache.delete(BADGE_CACHE_KEY.format(pk=request.user.pk))
         return Response({
             'payment_id': pk,
             'verified_at': checkout.verified_at,

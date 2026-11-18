@@ -47,7 +47,11 @@ function OperationFacts({ row }: { row: TopUpLogEntry }) {
 
 function useInvalidateMoney() {
   const queryClient = useQueryClient();
-  return () => invalidateEntity(queryClient, CAF_TOPUPS, [...CAF_MONEY_VIEWS, PAYMENTS_ENTITY]);
+  return () => {
+    // Verifying (or reconciling) changes «Por verificar» and the Cafetería count too.
+    void queryClient.invalidateQueries({ queryKey: ['badges'] });
+    return invalidateEntity(queryClient, CAF_TOPUPS, [...CAF_MONEY_VIEWS, PAYMENTS_ENTITY]);
+  };
 }
 
 /** "Verificar en MultiCobros": staff type back the referencia and the amount they
