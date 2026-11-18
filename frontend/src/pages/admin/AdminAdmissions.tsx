@@ -232,7 +232,7 @@ function PreRegistrationsSection() {
       cell: (p) => <StatusSelect row={p} disabled={savingId === p.id} onChange={(t) => changeStatus(p, t)} />,
     },
     { id: 'date', header: 'Fecha', sortKey: 'created_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (p) => fmtDate(p.created_at) },
-    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 110, className: 'text-muted', cell: (p) => p.grade_applying },
+    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 110, className: 'whitespace-nowrap text-muted', cell: (p) => p.grade_applying },
     { id: 'level', header: 'Nivel', sortKey: 'level', minWidth: 100, defaultHidden: true, className: 'text-muted', cell: (p) => PREREG_LEVELS.find((l) => l.value === p.level)?.label ?? p.level },
     { id: 'cycle', header: 'Ciclo', minWidth: 100, defaultHidden: true, className: 'text-muted whitespace-nowrap', cell: (p) => p.cycle ?? '—' },
     { id: 'parent', header: 'Tutor', sortKey: 'parent', minWidth: 140, className: 'text-muted', cell: (p) => p.parent_name },
@@ -449,7 +449,7 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
       cell: (r) => { const meta = STATUS_BADGE[r.status] ?? STATUS_BADGE.draft; return <Badge variant={meta.variant}>{meta.label}</Badge>; },
     },
     { id: 'submitted', header: 'Enviada', sortKey: 'submitted_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (r) => fmtDate(r.submitted_at) },
-    { id: 'grade', header: 'Grado', minWidth: 110, className: 'text-muted', cell: (r) => r.grade_applying },
+    { id: 'grade', header: 'Grado', minWidth: 110, className: 'whitespace-nowrap text-muted', cell: (r) => r.grade_applying },
     { id: 'level', header: 'Nivel', sortKey: 'level', minWidth: 100, defaultHidden: true, className: 'text-muted capitalize', cell: (r) => r.level || '—' },
     { id: 'cycle', header: 'Ciclo', minWidth: 100, defaultHidden: true, className: 'text-muted whitespace-nowrap', cell: (r) => r.cycle },
     {
