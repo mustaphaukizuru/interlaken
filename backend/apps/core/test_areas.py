@@ -202,7 +202,8 @@ def test_medical_data_stays_masked_for_staff(api_client):
 def test_badges_only_count_the_areas_held(api_client):
     api_client.force_authenticate(user=puesto('cafeteria'))
     keys = set(api_client.get('/api/v1/core/badges/').data)
-    assert keys == {'notificaciones', 'cafeteria'}
+    # «Por verificar» belongs to the cafetería area too (2026-11-18).
+    assert keys == {'notificaciones', 'cafeteria', 'cafeteria_verificar'}
 
 
 def test_me_reports_the_effective_areas(api_client):
