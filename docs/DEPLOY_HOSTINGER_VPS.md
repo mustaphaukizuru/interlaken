@@ -380,15 +380,13 @@ Render is gone: the service, its blueprint (`render.yaml`) and its deploy doc we
 removed once the VPS had served a full school day. Nothing in this repository
 targets Render any more.
 
-Rollback is now local to this box and faster than the old DNS swap:
-
-```
-cd /opt/interlaken && git log --oneline -5      # pick the last good commit
-git reset --hard <commit> && ./deploy.sh        # rebuild and restart
-```
-
-Docker keeps the previous image layers, so a rebuild of an older commit is quick.
-The database is unaffected by an application rollback.
+Rollback is now local to this box and faster than the old DNS swap: the
+previous image is kept as `interlaken-app:previous`, and the three commands in
+[Rolling back](#rolling-back) put it back in seconds without a build. (Resetting
+the checkout to an older commit and running `./deploy.sh` does NOT roll back:
+the script resets to `origin/master` first. To pin older code, revert the
+commit on master and deploy that.) The database is unaffected by an
+application rollback.
 
 ---
 
@@ -403,17 +401,24 @@ All optional — every item below is inert until its variable is set in
 |---|---|
 | `SENTRY_DSN` | Enables the SDK. Unset (default) → Sentry is never even imported. |
 | `SENTRY_ENVIRONMENT` | Event environment tag. Defaults to `production`. |
-| `SENTRY_RELEASE` | Release tag; falls back to `GIT_SHA` if the deploy exports one. |
+| `SENTRY_RELEASE` | Release tag; falls back to `GIT_SHA`, the commit `deploy.sh` bakes into the image as a build arg (so a rolled-back image reports its own commit). |
 | `SENTRY_TRACES_SAMPLE_RATE` | Tracing sample rate `0`–`1`. Default `0` (errors only). |
 
-PII is scrubbed in `before_send` (user email/name/IP, secret-looking headers and
-extras) and `send_default_pii=False`.
+No personal data leaves (`apps/core/sentry.py`): `send_default_pii=False`, no
+request bodies (`max_request_body_size="never"`), no local variables, no
+cookies, query strings or client IP; the user is reduced to its id, secret
+route segments (the Loyverse webhook key) are replaced by their parameter name,
+and emails and CURPs are masked in every string. Activation guide in Spanish:
+[docs/SENTRY.md](SENTRY.md).
 
 **Sentry (frontend)** — *build-time* Vite vars, baked into the bundle when the
 image is built: `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`,
 `VITE_SENTRY_TRACES_SAMPLE_RATE`, `VITE_GIT_SHA`. `docker-compose.yml` passes
 `VITE_SENTRY_DSN` through as a build arg, so setting it in `deploy/.env` and
 running `./deploy.sh` is enough. Without it the bundle never initialises Sentry.
+`deploy.sh` sets `VITE_GIT_SHA` (the release) only when `VITE_SENTRY_DSN` is
+set, since a value that changes every commit rebuilds the SPA on every deploy.
+The same scrubbing rules apply in the browser (`src/services/sentryScrub.ts`).
 Source-map upload (`SENTRY_AUTH_TOKEN` + `@sentry/vite-plugin`) is deliberately
 not wired in, so events arrive minified until you add it.
 
@@ -575,12 +580,26 @@ same key paths, before you redeploy with the new settings.
 ## Rolling back
 
 `deploy.sh` tags the running image as `interlaken-app:previous` before each
-build, and exits non-zero if the new one never becomes healthy. To go back:
+build, and exits non-zero (printing this command) if the new one never becomes
+healthy, or if `check_money_queries` finds a row-locked payment, cafetería or
+bulk-action query that fails on the production database (it runs right after
+the live check, read-only, inside a transaction that is always rolled back).
+To go back, from `/opt/interlaken/deploy`:
 
 ```bash
+docker tag interlaken-app:previous interlaken-app:latest
 docker tag interlaken-app:previous interlaken-app:current
-docker compose up -d --force-recreate app
+docker compose up -d --no-build --force-recreate app
 ```
+
+Compose runs the image it builds, `interlaken-app:latest`; `:current` and
+`:previous` are only bookmarks. Re-tagging `:current` alone (what this section
+and `deploy.sh` said until 2026-11-18) recreates the container from the NEW
+image again: checked with a throwaway compose project. Re-tagging `:current`
+as well keeps the next deploy's rollback point on the good image. Afterwards,
+revert or fix the commit on master before the next `./deploy.sh`, which would
+otherwise rebuild the same code. Migrations the new version applied stay
+applied; the previous image runs on them as long as they were additive.
 
 If the whole VPS is in trouble, the fastest recovery is DNS: point the record
 back at Render, which is why the runbook says not to delete that service

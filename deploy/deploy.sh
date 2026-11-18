@@ -87,6 +87,12 @@ if docker image inspect interlaken-app:current >/dev/null 2>&1; then
   docker tag interlaken-app:current interlaken-app:previous
 fi
 
+# Compose runs the image it builds, interlaken-app:latest; :current and
+# :previous are only bookmarks. So rolling back means pointing :latest (and
+# :current, the next deploy's rollback point) at :previous and recreating
+# WITHOUT a build. Re-tagging :current alone recreates the new image again.
+ROLLBACK_CMD="docker tag interlaken-app:previous interlaken-app:latest && docker tag interlaken-app:previous interlaken-app:current && docker compose up -d --no-build --force-recreate app"
+
 echo "==> Fetching latest master"
 git -C .. fetch --quiet origin master
 BEFORE="$(git -C .. rev-parse HEAD)"
@@ -94,6 +100,13 @@ git -C .. checkout --quiet master
 git -C .. reset --hard --quiet origin/master
 AFTER="$(git -C .. rev-parse HEAD)"
 echo "    ${BEFORE:0:8} -> ${AFTER:0:8}"
+
+# Sentry release tag: the image records the commit it was built from (a build
+# arg, see the Dockerfile). Inert unless SENTRY_DSN / VITE_SENTRY_DSN is set.
+# The SPA gets it only with its DSN: a value that changes every commit would
+# rebuild the bundle on every deploy for nothing.
+export GIT_SHA="$AFTER"
+if [[ -n "${VITE_SENTRY_DSN:-}" ]]; then export VITE_GIT_SHA="$AFTER"; fi
 
 echo "==> Building image"
 docker compose build
@@ -138,7 +151,7 @@ if [[ "$healthy" != true ]]; then
   echo "  docker compose exec db psql -U $DB_USER -d $DB_NAME -c \"ALTER USER $DB_USER WITH PASSWORD '<the value in .env>';\"" >&2
   echo "" >&2
   echo "To roll back to the previous image:" >&2
-  echo "  docker tag interlaken-app:previous interlaken-app:current && docker compose up -d --force-recreate app" >&2
+  echo "  $ROLLBACK_CMD" >&2
   exit 1
 fi
 echo "    healthy"
@@ -153,4 +166,28 @@ echo "==> Live check"
 code="$(curl -sS -o /dev/null -w '%{http_code}' "https://${PORTAL_DOMAIN}/healthz" || echo 000)"
 echo "    https://${PORTAL_DOMAIN}/healthz -> ${code}"
 [[ "$code" == "200" ]] || fail "the site did not answer 200 from the outside (check DNS and 'docker compose logs caddy')"
+
+# ── Money query check ───────────────────────────────────────────────────────
+# The test suite runs on SQLite, which ignores row locks, so a lock PostgreSQL
+# refuses passes CI and fails only here, as a 500 on a payment screen
+# (2026-11-18: every «Verificar en MultiCobros»). This runs every row-locked
+# payment / cafetería / bulk-action query on the real database inside one
+# transaction that is always rolled back: read-only, takes a second or two.
+echo "==> Money query check"
+if ! docker compose exec -T app python manage.py check_money_queries; then
+  echo "" >&2
+  echo "############################################################################" >&2
+  echo "DEPLOY FAILED: a money query FAILS on the production database (see FAIL above)." >&2
+  echo "The site is up on the new version, but the screen behind that query answers" >&2
+  echo "500 (payments, cafetería top-ups or an admin bulk action) until it is fixed." >&2
+  echo "" >&2
+  echo "Roll back to the previous image now (from $(pwd)):" >&2
+  echo "  $ROLLBACK_CMD" >&2
+  echo "" >&2
+  echo "Then revert or fix the commit on master before the next ./deploy.sh, which" >&2
+  echo "would rebuild the same code. Re-run the check by hand with:" >&2
+  echo "  docker compose exec -T app python manage.py check_money_queries -v 2" >&2
+  echo "############################################################################" >&2
+  exit 1
+fi
 echo "==> Done."

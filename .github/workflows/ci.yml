@@ -58,6 +58,77 @@ jobs:
       - name: Tests (pytest on SQLite)
         run: pytest
 
+  backend-postgres:
+    # The job above runs on SQLite, which ignores row locks: a select_for_update
+    # PostgreSQL refuses (FOR UPDATE on the nullable side of an outer join, or
+    # with GROUP BY) passed CI and failed only in production. On 2026-11-18
+    # every «Verificar en MultiCobros» was a 500 (fixed in #246). Same suite on
+    # the PostgreSQL major the VPS runs, in parallel with the SQLite job.
+    name: Backend on PostgreSQL (migrate · money queries · pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          # Throwaway CI database on the runner; not a real credential.
+          POSTGRES_PASSWORD: ci-postgres-not-a-secret
+          POSTGRES_DB: interlaken_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      SECRET_KEY: ci-test-secret-key-not-for-production
+      GOOGLE_CLIENT_ID: ci-client-id.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: ci-client-secret
+      # pytest: config/settings/development.py switches the TEST database to
+      # this server (pytest-django creates and drops test_interlaken_ci).
+      TEST_DATABASE_URL: postgres://postgres:ci-postgres-not-a-secret@localhost:5432/interlaken_ci
+      # manage.py steps (not tests): base settings read DB_* (no SQLITE_LOCAL).
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: interlaken_ci
+      DB_USER: postgres
+      DB_PASSWORD: ci-postgres-not-a-secret
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_SSLMODE: disable
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # What entrypoint.sh does on the VPS, from an empty database: every
+      # migration, including the unaccent / pg_trgm extensions and the
+      # Postgres-only trigram indexes (core 0004-0006).
+      - name: Migrate a fresh PostgreSQL
+        run: python manage.py migrate --noinput
+
+      # What deploy.sh runs after every deploy: each row-locked payment,
+      # cafetería and bulk-action query on the real engine, rolled back.
+      - name: Money query check
+        run: python manage.py check_money_queries -v 2
+
+      - name: Tests (pytest on PostgreSQL)
+        run: pytest
+
   frontend:
     name: Frontend (eslint · tsc · vitest · build)
     runs-on: ubuntu-latest

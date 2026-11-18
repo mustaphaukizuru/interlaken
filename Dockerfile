@@ -26,6 +26,11 @@ ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 # here; unset keeps Sentry fully tree-shaken out (see src/services/sentry.ts).
 ARG VITE_SENTRY_DSN=
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+# Sentry release tag of the SPA (the deployed commit). deploy.sh passes it only
+# when VITE_SENTRY_DSN is set: a value that changes every commit would rebuild
+# this stage on every deploy, for nothing while Sentry is off.
+ARG VITE_GIT_SHA=
+ENV VITE_GIT_SHA=$VITE_GIT_SHA
 RUN npm run build   # → frontend/dist (assets reference /static/)
 
 # ── Stage 2: Django + gunicorn ──────────────────────────────────────────────
@@ -76,6 +81,13 @@ RUN chmod +x ./entrypoint.sh
 # an EXISTING volume written to as root must be chowned once at cutover.
 RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin app  && mkdir -p /data/media  && chown -R app:app /app /data/media
 USER app
+
+# The commit this image was built from (deploy.sh passes it). Read only by the
+# Sentry release tag (config/settings/base.py, when SENTRY_DSN is set). Baked
+# into the image rather than set by compose, so a rolled-back image reports its
+# own commit. Last, so a new value rebuilds nothing but this metadata layer.
+ARG GIT_SHA=
+ENV GIT_SHA=$GIT_SHA
 
 EXPOSE 8000
 CMD ["./entrypoint.sh"]

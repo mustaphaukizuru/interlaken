@@ -487,57 +487,24 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── ERROR MONITORING (Sentry) ─────────────────────────────
 # Fully optional: without SENTRY_DSN set, this block is a no-op and the SDK is
-# never even imported. PII is scrubbed (send_default_pii=False) and a before_send
-# hook strips anything that looks like a secret from the outgoing event.
+# never even imported. What may leave the server (no request bodies, cookies,
+# query strings, IPs, local variables; emails and CURPs masked; user = id only)
+# is decided in apps/core/sentry.py. Activation guide: docs/SENTRY.md.
 SENTRY_DSN = env('SENTRY_DSN', default='')
 if SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
+    from apps.core.sentry import init_sentry
 
-    _SENSITIVE_KEYS = (
-        'password', 'secret', 'token', 'authorization', 'api_key', 'apikey',
-        'credential', 'cookie', 'ssn', 'curp',
-    )
-    # Direct-PII keys stripped from the event's user/extra payloads even with
-    # send_default_pii=False (defence in depth — e.g. a log `extra=` kwarg).
-    _PII_KEYS = ('email', 'first_name', 'last_name', 'username', 'ip_address')
-
-    def _scrub_sensitive(event, _hint):
-        """Best-effort removal of secrets + user PII before an event is sent."""
-        request = event.get('request') or {}
-        headers = request.get('headers')
-        if isinstance(headers, dict):
-            for key in list(headers):
-                if any(s in key.lower() for s in _SENSITIVE_KEYS):
-                    headers[key] = '[Filtered]'
-        extra = event.get('extra')
-        if isinstance(extra, dict):
-            for key in list(extra):
-                lowered = key.lower()
-                if lowered in _PII_KEYS or any(s in lowered for s in _SENSITIVE_KEYS):
-                    extra[key] = '[Filtered]'
-        # Keep only the opaque user id — never email/name/IP.
-        user = event.get('user')
-        if isinstance(user, dict):
-            for key in list(user):
-                if key != 'id':
-                    user.pop(key, None)
-        return event
-
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
+    init_sentry(
+        SENTRY_DSN,
         environment=env('SENTRY_ENVIRONMENT',
                         default='development' if DEBUG else 'production'),
-        # Release tag: explicit SENTRY_RELEASE, else the deployed commit if the
-        # deploy exports GIT_SHA.
+        # Release tag: explicit SENTRY_RELEASE, else the deployed commit, which
+        # deploy.sh exports as GIT_SHA and compose passes to the container.
         release=(env('SENTRY_RELEASE', default='')
                  or env('GIT_SHA', default='')
                  or None),
         # env.float('') raises at import: a blank line in .env must mean 0.
         traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='') or 0.0),
-        send_default_pii=False,
-        before_send=_scrub_sensitive,
     )
 
 # ── CACHE ─────────────────────────────────────────────────

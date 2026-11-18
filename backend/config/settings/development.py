@@ -1,6 +1,9 @@
 import os
 import sys
 
+import environ
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *
 
 DEBUG = True
@@ -11,7 +14,28 @@ ALLOWED_HOSTS = ['*']
 # never touches Postgres even if the env var is set too late for the settings
 # import (pytest-django imports settings very early).
 _RUNNING_TESTS = 'pytest' in sys.modules or 'test' in sys.argv
-if os.getenv('SQLITE_LOCAL') or _RUNNING_TESTS:
+
+# The one exception, opt-in: TEST_DATABASE_URL runs the TEST SUITE on a
+# PostgreSQL server (CI's "Backend on PostgreSQL" job, or a throwaway local
+# container). SQLite ignores row locks, so a ``select_for_update`` PostgreSQL
+# refuses (outer join, GROUP BY) only ever failed in production. Read only while
+# tests run: runserver and every other command keep their database, and
+# production.py never loads this module.
+#   TEST_DATABASE_URL=postgres://postgres:pw@127.0.0.1:55441/ik pytest
+# pytest-django creates and drops ``test_<name>`` on that server, so only a
+# local or CI host is accepted: never point it at Supabase or the VPS.
+_TEST_DB_HOSTS = ('localhost', '127.0.0.1', '::1', 'postgres')
+_TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL', '').strip() if _RUNNING_TESTS else ''
+if _TEST_DATABASE_URL:
+    _test_db = environ.Env.db_url_config(_TEST_DATABASE_URL)
+    if 'postgresql' not in _test_db.get('ENGINE', ''):
+        raise ImproperlyConfigured('TEST_DATABASE_URL must be a postgres:// URL.')
+    if _test_db.get('HOST') not in _TEST_DB_HOSTS:
+        raise ImproperlyConfigured(
+            'TEST_DATABASE_URL must point at a local or CI PostgreSQL '
+            f'({", ".join(_TEST_DB_HOSTS)}): the tests create and drop a database there.')
+    DATABASES = {'default': _test_db}
+elif os.getenv('SQLITE_LOCAL') or _RUNNING_TESTS:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
