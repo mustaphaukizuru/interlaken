@@ -23,6 +23,34 @@ const LEGACY_ROSTER_TABLE_ID = 'students';
 
 export const prefsKey = (tableId: string) => `${TABLE_PREFS_PREFIX}${tableId}`;
 
+/**
+ * Sidecar key: the default-hidden columns a stored entry was saved against.
+ * Kept apart from the entry so the entry's shape (`{hidden, density, widths}`)
+ * stays exactly what older builds read and write.
+ */
+export const TABLE_DEFAULTS_PREFIX = 'interlaken:table-defaults:';
+export const defaultsKey = (tableId: string) => `${TABLE_DEFAULTS_PREFIX}${tableId}`;
+
+/**
+ * Default-hidden columns as they were BEFORE the 2026-11 column review, for
+ * the tables whose defaults that review changed. Entries saved by older
+ * builds carry no sidecar; this is what they were saved against, so a column
+ * that only became default-hidden in the review is hidden for them too, while
+ * a column they had already chosen to show stays shown.
+ */
+export const LEGACY_DEFAULT_HIDDEN: Readonly<Record<string, readonly string[]>> = {
+  students: ['loyverse_code', 'email', 'enrollment_date'],
+  staff: ['date_joined', 'has_password'],
+  'cafeteria-balances': ['threshold'],
+  'cafeteria-low-balance': [],
+  'cafeteria-customers': [],
+  payments: ['reference'],
+  'booking-slots': [],
+  'contact-messages': [],
+  forms: ['updated'],
+  'cms-pages': ['published'],
+};
+
 function safeRead(key: string): unknown {
   try {
     return JSON.parse(localStorage.getItem(key) || 'null');
@@ -79,9 +107,27 @@ export function migrateLegacyRosterPrefs(): boolean {
   return true;
 }
 
+function readSavedDefaults(tableId: string): string[] | null {
+  const raw = safeRead(defaultsKey(tableId));
+  return Array.isArray(raw) ? raw.filter((h): h is string => typeof h === 'string') : null;
+}
+
+/**
+ * Stored prefs merged with the current defaults.
+ *
+ * The stored `hidden` is the full hidden set at save time. Columns that became
+ * default-hidden AFTER that save (not in the defaults it was saved against)
+ * are added, so a new default reaches people who already customised the
+ * table. Nothing is ever un-hidden and every explicit choice survives: a
+ * column the person showed was in the old defaults, so it is not "new".
+ */
 export function readTablePrefs(tableId: string, defaults: TablePrefs): TablePrefs {
   if (tableId === LEGACY_ROSTER_TABLE_ID) migrateLegacyRosterPrefs();
-  return normalize(safeRead(prefsKey(tableId)), defaults) ?? defaults;
+  const stored = normalize(safeRead(prefsKey(tableId)), defaults);
+  if (!stored) return defaults;
+  const savedAgainst = readSavedDefaults(tableId) ?? LEGACY_DEFAULT_HIDDEN[tableId] ?? defaults.hidden;
+  const added = defaults.hidden.filter((id) => !savedAgainst.includes(id) && !stored.hidden.includes(id));
+  return added.length ? { ...stored, hidden: [...stored.hidden, ...added] } : stored;
 }
 
 export interface UseTablePrefsOptions {
@@ -127,11 +173,14 @@ export function useTablePrefs(tableId: string | undefined, options: UseTablePref
     (updater: (prev: TablePrefs) => TablePrefs) => {
       setState((prev) => {
         const next = updater(prev);
-        if (tableId) safeWrite(prefsKey(tableId), next);
+        if (tableId) {
+          safeWrite(prefsKey(tableId), next);
+          safeWrite(defaultsKey(tableId), defaults.hidden);
+        }
         return next;
       });
     },
-    [tableId],
+    [tableId, defaults],
   );
 
   const setColumnHidden = useCallback(
@@ -160,7 +209,10 @@ export function useTablePrefs(tableId: string | undefined, options: UseTablePref
     [commit],
   );
   const reset = useCallback(() => {
-    if (tableId) safeRemove(prefsKey(tableId));
+    if (tableId) {
+      safeRemove(prefsKey(tableId));
+      safeRemove(defaultsKey(tableId));
+    }
     setState(defaults);
   }, [tableId, defaults]);
 

@@ -11,6 +11,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { parseSort, serializeSort, type SortState } from '@/components/ui/SortableTh';
 import { formatMXN } from '@/lib/format';
+import { shortDateTime } from '@/lib/tableFormat';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import { usePaymentsExport, usePaymentsList, usePaymentsSummary, type PaymentsListParams } from '@/hooks/queries/payments';
@@ -32,14 +33,22 @@ const HARD_FAILURES = ['declined', 'config_error'];
  *  Bulk actions are export-only: payment state belongs to Banorte's settled result. */
 const COLUMNS: Column<Payment>[] = [
   {
-    id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted',
-    cell: (p) => new Date(p.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
-  },
-  {
     id: 'student', header: 'Alumno', sortKey: 'student', hideable: false, minWidth: 160, className: 'font-medium text-ink',
     cell: (p) => p.student_id
       ? <Link to={`/admin/cafeteria/${p.student_id}`} className="hover:text-purple hover:underline">{p.student_name}</Link>
       : '—',
+  },
+  {
+    id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
+    cell: (p) => {
+      const meta = paymentStatusMeta(p);
+      return <Badge variant={meta.variant}>{meta.label}</Badge>;
+    },
+  },
+  { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, minWidth: 110, className: 'font-semibold text-ink', cell: (p) => formatMXN(p.amount) },
+  {
+    id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted',
+    cell: (p) => shortDateTime(p.created_at),
   },
   {
     id: 'payer', header: 'Pagó', minWidth: 160, className: 'text-xs',
@@ -50,7 +59,6 @@ const COLUMNS: Column<Payment>[] = [
       </span>
     ) : '—'),
   },
-  { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, minWidth: 110, className: 'font-semibold text-ink', cell: (p) => formatMXN(p.amount) },
   { id: 'gateway', header: 'Pasarela', sortKey: 'gateway', minWidth: 130, className: 'text-muted', cell: (p) => p.gateway_label || gatewayLabel(p.gateway) || '—' },
   {
     // Número de control (what MultiCobros searches) plus the bank's referencia and autorización.
@@ -63,13 +71,8 @@ const COLUMNS: Column<Payment>[] = [
       </span>
     ),
   },
-  {
-    id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
-    cell: (p) => {
-      const meta = paymentStatusMeta(p);
-      return <Badge variant={meta.variant}>{meta.label}</Badge>;
-    },
-  },
+  // The folio printed on the family's comprobante.
+  { id: 'folio', header: 'Folio', align: 'right', minWidth: 80, defaultHidden: true, className: 'font-mono text-xs text-subtle', cell: (p) => p.id },
 ];
 
 export default function AdminPayments() {

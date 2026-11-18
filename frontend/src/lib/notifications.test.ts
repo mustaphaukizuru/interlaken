@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupNotifs, notifDestination, type Notif } from './notifications';
+import { groupNotifs, isLongMessage, notifDestination, type Notif } from './notifications';
 
 const base = (over: Partial<Notif>): Notif => ({
   id: 1, notif_type: 'info', title: 't', message: 'm', is_read: false, created_at: '', ...over,
@@ -33,5 +33,20 @@ describe('notifDestination', () => {
     // An aviso used to return null: the row clamped its message to two lines
     // and then did nothing at all when pressed.
     expect(notifDestination(base({ id: 42, notif_type: 'info' }))).toBe('/portal/notificaciones/42');
+  });
+});
+
+describe('notifDestination · long messages', () => {
+  it('opens a report longer than its preview in full, even when its type has a page', () => {
+    const report = 'Recargas pagadas por cargar (total $550.00):\n\n- Ana · $350.00\n- Beto · $200.00\n\nCárguelas en el POS.';
+    expect(notifDestination(base({ id: 8, notif_type: 'cafeteria', message: report }))).toBe('/portal/notificaciones/8');
+  });
+
+  it('keeps short alerts going straight to the cafetería', () => {
+    const alert = 'El saldo de cafetería de Ana es de $12.50, por debajo del mínimo de $20.00.';
+    expect(notifDestination(base({ notif_type: 'cafeteria', message: alert }))).toBe('/portal/cafeteria');
+    expect(isLongMessage(alert)).toBe(false);
+    expect(isLongMessage('Línea uno\nlínea dos')).toBe(false);
+    expect(isLongMessage('Uno.\n\nDos.')).toBe(true);
   });
 });

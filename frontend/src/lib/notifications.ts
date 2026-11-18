@@ -1,4 +1,5 @@
 import { Info, AlertTriangle, Receipt, Coffee, type LucideIcon } from 'lucide-react';
+import { notifPreview } from './notificationText';
 
 export interface Notif {
   id: number;
@@ -27,9 +28,18 @@ export const NOTIF_META: Record<Notif['notif_type'], { icon: LucideIcon; cls: st
  */
 export function notifDestination(n: Notif): string {
   // Bitácora 10: the portal no longer shows comunicados; the notification itself carries the text.
+  // A message longer than its preview (a staff report listing every pending
+  // top-up) opens in full first; its page links on to the cafetería.
+  if (isLongMessage(n.message)) return `/portal/notificaciones/${n.id}`;
   if (n.notif_type === 'payment') return '/portal/cafeteria';
   if (n.notif_type === 'cafeteria') return '/portal/cafeteria';
   return `/portal/notificaciones/${n.id}`;
+}
+
+/** True when the list preview cannot show the whole message. */
+export function isLongMessage(message: string | null | undefined): boolean {
+  const text = String(message ?? '').replace(/\s+/g, ' ').trim();
+  return text.length > 0 && notifPreview(message) !== text;
 }
 
 export type NotifGroup = 'Hoy' | 'Esta semana' | 'Anteriores';

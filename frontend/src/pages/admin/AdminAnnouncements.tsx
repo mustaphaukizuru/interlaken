@@ -218,8 +218,8 @@ export default function AdminAnnouncements() {
         </div>
       ),
     },
-    { id: 'audience', header: 'Dirigido a', sortKey: 'audience', minWidth: 110, cell: (a) => { const m = audienceMeta(a.audience); return <Badge variant={m.variant}>{m.label}</Badge>; } },
     { id: 'status', header: 'Estado', sortKey: 'active', minWidth: 110, cell: (a) => { const s = announcementStatus(a); return <Badge variant={s.variant}>{s.label}</Badge>; } },
+    { id: 'audience', header: 'Dirigido a', sortKey: 'audience', minWidth: 110, cell: (a) => { const m = audienceMeta(a.audience); return <Badge variant={m.variant}>{m.label}</Badge>; } },
     { id: 'created', header: 'Creado', sortKey: 'created', minWidth: 150, className: 'whitespace-nowrap text-xs text-muted', cell: (a) => formatDateTime(a.created_at) },
     { id: 'publish_at', header: 'Programado', sortKey: 'publish_at', minWidth: 150, defaultHidden: true, className: 'whitespace-nowrap text-xs text-muted', cell: (a) => formatDateTime(a.publish_at) || '—' },
     {

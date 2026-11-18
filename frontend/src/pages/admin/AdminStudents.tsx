@@ -31,6 +31,7 @@ import {
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { GRADES, NIVELES } from '@/lib/grades';
 import { formatMXN } from '@/lib/format';
+import { shortDate } from '@/lib/tableFormat';
 import { canOpen, isAdmin } from '@/lib/areas';
 import { useAuthStore } from '@/store/authStore';
 import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
@@ -210,19 +211,6 @@ export default function AdminStudents() {
     { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s) => s.grade },
     { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s) => s.group || '—' },
     {
-      // Siblings grouped by the office (Familias): the family opens filtered on its name.
-      id: 'family', header: 'Familia', minWidth: 150,
-      cell: (s) => (s.family ? (
-        <Link to={`/admin/familias?q=${encodeURIComponent(s.family.name)}`} title={`Ver ${s.family.name}`}
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
-          <House className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{s.family.name}</span>
-        </Link>
-      ) : <span className="text-subtle">—</span>),
-    },
-    { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
-    {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
       cell: (s) => {
         const meta = STUDENT_STATUS[(s.status ?? 'active') as StatusKey];
@@ -242,16 +230,30 @@ export default function AdminStudents() {
       },
     },
     {
-      id: 'balance', header: 'Saldo', sortKey: 'balance', align: 'right', minWidth: 100,
+      id: 'balance', header: 'Saldo', sortKey: 'balance', align: 'right', minWidth: 100, className: 'font-medium text-ink',
       cell: (s) => (s.balance === undefined || s.balance === null ? '—' : formatMXN(s.balance)),
     },
     {
-      id: 'enrollment_date', header: 'Ingreso', sortKey: 'enrollment_date', defaultHidden: true, minWidth: 110, className: 'text-xs text-subtle',
-      cell: (s) => (s.enrollment_date ? new Date(`${s.enrollment_date}T12:00:00`).toLocaleDateString('es-MX') : '—'),
+      // Siblings grouped by the office (Familias): the family opens filtered on its name.
+      id: 'family', header: 'Familia', minWidth: 150,
+      cell: (s) => (s.family ? (
+        <Link to={`/admin/familias?q=${encodeURIComponent(s.family.name)}`} title={`Ver ${s.family.name}`}
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+          <House className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{s.family.name}</span>
+        </Link>
+      ) : '—'),
+    },
+    { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
+    {
+      id: 'enrollment_date', header: 'Ingreso', sortKey: 'enrollment_date', defaultHidden: true, minWidth: 110, className: 'whitespace-nowrap text-xs text-subtle',
+      cell: (s) => shortDate(s.enrollment_date),
     },
     {
-      id: 'last_login', header: 'Acceso', label: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'text-xs text-subtle',
-      cell: (s) => (s.user.last_login ? new Date(s.user.last_login).toLocaleDateString('es-MX') : <span className="text-coral-600">Nunca</span>),
+      // The pupil's own login (families use theirs): secondary, one click away in «Columnas».
+      id: 'last_login', header: 'Acceso', label: 'Último acceso', sortKey: 'last_login', defaultHidden: true, minWidth: 120, className: 'whitespace-nowrap text-xs text-subtle',
+      cell: (s) => (s.user.last_login ? shortDate(s.user.last_login) : <span className="text-coral-600">Nunca</span>),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [twoPane, selectedId]);
