@@ -401,17 +401,24 @@ All optional — every item below is inert until its variable is set in
 |---|---|
 | `SENTRY_DSN` | Enables the SDK. Unset (default) → Sentry is never even imported. |
 | `SENTRY_ENVIRONMENT` | Event environment tag. Defaults to `production`. |
-| `SENTRY_RELEASE` | Release tag; falls back to `GIT_SHA` if the deploy exports one. |
+| `SENTRY_RELEASE` | Release tag; falls back to `GIT_SHA`, the commit `deploy.sh` bakes into the image as a build arg (so a rolled-back image reports its own commit). |
 | `SENTRY_TRACES_SAMPLE_RATE` | Tracing sample rate `0`–`1`. Default `0` (errors only). |
 
-PII is scrubbed in `before_send` (user email/name/IP, secret-looking headers and
-extras) and `send_default_pii=False`.
+No personal data leaves (`apps/core/sentry.py`): `send_default_pii=False`, no
+request bodies (`max_request_body_size="never"`), no local variables, no
+cookies, query strings or client IP; the user is reduced to its id, secret
+route segments (the Loyverse webhook key) are replaced by their parameter name,
+and emails and CURPs are masked in every string. Activation guide in Spanish:
+[docs/SENTRY.md](SENTRY.md).
 
 **Sentry (frontend)** — *build-time* Vite vars, baked into the bundle when the
 image is built: `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`,
 `VITE_SENTRY_TRACES_SAMPLE_RATE`, `VITE_GIT_SHA`. `docker-compose.yml` passes
 `VITE_SENTRY_DSN` through as a build arg, so setting it in `deploy/.env` and
 running `./deploy.sh` is enough. Without it the bundle never initialises Sentry.
+`deploy.sh` sets `VITE_GIT_SHA` (the release) only when `VITE_SENTRY_DSN` is
+set, since a value that changes every commit rebuilds the SPA on every deploy.
+The same scrubbing rules apply in the browser (`src/services/sentryScrub.ts`).
 Source-map upload (`SENTRY_AUTH_TOKEN` + `@sentry/vite-plugin`) is deliberately
 not wired in, so events arrive minified until you add it.
 

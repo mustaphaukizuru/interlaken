@@ -4,19 +4,7 @@ Qué vigilar, qué hacer cuando algo falla y cómo probar que los respaldos sirv
 
 ## 1. Sentry (errores en producción)
 
-Activación, una sola vez:
-
-1. Cree un proyecto **Django** y otro **React** en sentry.io (plan gratuito basta).
-2. En el VPS, `/opt/interlaken/deploy/.env`:
-   ```
-   SENTRY_DSN=https://…@o…ingest.sentry.io/…          # proyecto Django
-   SENTRY_ENVIRONMENT=production
-   SENTRY_TRACES_SAMPLE_RATE=0.1
-   VITE_SENTRY_DSN=https://…@o…ingest.sentry.io/…     # proyecto React (se inyecta en el build)
-   ```
-3. `./deploy.sh`. El backend reporta con la versión desplegada (`SENTRY_RELEASE` = commit) y el frontend solo carga el SDK cuando hay DSN (no afecta el presupuesto de rendimiento).
-4. Compruebe: en Sentry → Issues debe aparecer el evento de prueba `python manage.py shell -c "1/0"` (ejecútelo dentro del contenedor y luego cierre el issue).
-5. Alertas: Sentry → Alerts → "Issue alert" → *when a new issue is created* → correo a `sistemas@interlaken.com.mx` (OPS_EMAIL).
+Apagado mientras `SENTRY_DSN` y `VITE_SENTRY_DSN` estén vacíos en `/opt/interlaken/deploy/.env`. La guía de activación paso a paso (cuenta y región US, los dos proyectos, variables, prueba, regla de correo para errores nuevos y qué datos se envían) está en [docs/SENTRY.md](SENTRY.md). En corto: dos proyectos (Django y React), los dos DSN en `.env`, `./deploy.sh`, y una alerta *A new issue is created* que mande correo. La versión de cada error es el commit desplegado (`deploy.sh` la pasa sola) y el frontend solo carga el SDK cuando hay DSN (no afecta el presupuesto de rendimiento).
 
 ## 2. Disponibilidad (uptime)
 

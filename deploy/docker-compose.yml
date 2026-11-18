@@ -31,6 +31,11 @@ services:
         # Baked into the SPA bundle at build time, not read at runtime.
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        # Sentry release tags (the deployed commit), exported by deploy.sh and
+        # empty when built any other way. Build args, not runtime env: the
+        # image carries its own commit, so a rollback reports the right one.
+        GIT_SHA: ${GIT_SHA:-}
+        VITE_GIT_SHA: ${VITE_GIT_SHA:-}
     restart: unless-stopped
     env_file: .env
     logging: *logging

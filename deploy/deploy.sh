@@ -101,6 +101,13 @@ git -C .. reset --hard --quiet origin/master
 AFTER="$(git -C .. rev-parse HEAD)"
 echo "    ${BEFORE:0:8} -> ${AFTER:0:8}"
 
+# Sentry release tag: the image records the commit it was built from (a build
+# arg, see the Dockerfile). Inert unless SENTRY_DSN / VITE_SENTRY_DSN is set.
+# The SPA gets it only with its DSN: a value that changes every commit would
+# rebuild the bundle on every deploy for nothing.
+export GIT_SHA="$AFTER"
+if [[ -n "${VITE_SENTRY_DSN:-}" ]]; then export VITE_GIT_SHA="$AFTER"; fi
+
 echo "==> Building image"
 docker compose build
 

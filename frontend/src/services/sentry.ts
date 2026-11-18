@@ -3,13 +3,14 @@
  *
  * A complete no-op unless VITE_SENTRY_DSN is set at build time, so local dev and
  * the test suite never talk to Sentry (no init, no integrations, zero overhead).
- * PII is not sent: the user object is reduced to its opaque id, and query
- * strings / auth-ish request headers are scrubbed before events leave the
- * browser. Release defaults to the build's VITE_GIT_SHA when provided.
+ * No personal data is sent: see sentryScrub.ts (user reduced to its opaque id,
+ * URLs without query string or fragment, no request bodies, emails and CURPs
+ * masked, secret-looking headers filtered). Release is the deployed commit
+ * (VITE_GIT_SHA, passed by deploy.sh when the DSN is set). Activation guide:
+ * docs/SENTRY.md.
  */
 import * as Sentry from '@sentry/react';
-
-const SENSITIVE = ['token', 'password', 'secret', 'authorization', 'credential', 'curp'];
+import { scrubBreadcrumb, scrubEvent } from './sentryScrub';
 
 function parseRate(raw: string | undefined): number {
   const rate = Number(raw);
@@ -30,24 +31,8 @@ export function initSentry(): void {
     // sent by default — the integration then only adds trace headers locally.
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: parseRate(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE),
-    beforeSend(event) {
-      // Keep only the opaque user id — never email/name/username/IP.
-      if (event.user) {
-        event.user = event.user.id !== undefined ? { id: event.user.id } : undefined;
-      }
-      // Drop query strings (may carry OAuth tokens) and secret-looking headers.
-      if (event.request) {
-        if (event.request.query_string) event.request.query_string = '[Filtered]';
-        const headers = event.request.headers;
-        if (headers) {
-          for (const key of Object.keys(headers)) {
-            if (SENSITIVE.some((s) => key.toLowerCase().includes(s))) {
-              headers[key] = '[Filtered]';
-            }
-          }
-        }
-      }
-      return event;
-    },
+    beforeSend: (event) => scrubEvent(event),
+    beforeSendTransaction: (event) => scrubEvent(event),
+    beforeBreadcrumb: (breadcrumb) => scrubBreadcrumb(breadcrumb),
   });
 }
