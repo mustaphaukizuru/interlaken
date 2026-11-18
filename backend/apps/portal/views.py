@@ -97,12 +97,25 @@ def _pending_topup_counts() -> dict:
         pk__in=online_topups_awaiting_staff().filter(
             status=TopUpRequest.Status.PAID).values('pk'))
     paid_total = paid.aggregate(s=Sum('amount'))['s'] or 0
+    # «Recargas pendientes de verificar» (2026-11-18): paid by card, approval
+    # not matched in MultiCobros; nothing applies them until staff verify.
+    from django.db.models import Min
+
+    from apps.payments.multicobros import paid_topups_awaiting_verification
+
+    to_verify = TopUpRequest.objects.filter(
+        pk__in=paid_topups_awaiting_verification().values('pk')).aggregate(
+        n=Count('pk'), s=Sum('amount'), oldest=Min('processed_at'))
     return {
         'pending_topups': office + online,
         'pending_topups_office': office,
         'pending_topups_online': online,
         'paid_topups_to_apply': paid.count(),
         'paid_topups_to_apply_total': f'{paid_total:.2f}',
+        'topups_to_verify': to_verify['n'] or 0,
+        'topups_to_verify_total': f'{to_verify["s"] or 0:.2f}',
+        # When the oldest one was paid: how long it has been waiting.
+        'topups_to_verify_oldest': to_verify['oldest'],
     }
 
 

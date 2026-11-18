@@ -584,7 +584,9 @@ class TestApplyReport:
         call_command('topup_apply_report', stdout=out)
         assert 'VENCIDA' in out.getvalue() and f'folio {payment.pk}' in out.getvalue()
         note = Notification.objects.get(user=admin)
-        assert '1 recarga(s)' in note.title and '(1 vencida(s))' in note.title
+        # Short title since 2026-11-18 (test_topup_verification_flow has the layout).
+        assert note.title == '1 recarga por cargar en el POS · 1 vencida'
+        assert f'folio {payment.pk}' in note.message and 'VENCIDA' in note.message
 
         call_command('topup_apply_report', stdout=StringIO())
         assert Notification.objects.filter(user=admin).count() == 1   # unchanged list
@@ -623,8 +625,9 @@ class TestApplyReport:
         assert 'verifique en MultiCobros antes de cargarla' in flagged[0]
         assert payment.banorte.control_number in flagged[0]
         subject, body = send.call_args.args[:2]
-        assert '(1 sin verificar)' in subject
+        assert subject.endswith(' · 1 sin verificar')
         assert '«Verificar en MultiCobros»' in body
+        assert payment.banorte.control_number in body
 
     def test_silent_when_nothing_is_due(self):
         admin = AdminFactory()
