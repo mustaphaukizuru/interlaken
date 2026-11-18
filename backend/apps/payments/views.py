@@ -532,7 +532,7 @@ class PaymentReceiptView(APIView):
         from django.shortcuts import get_object_or_404
 
         from apps.core.exports import as_download, fmt_dt
-        from apps.core.pdf import simple_document_pdf
+        from apps.core.pdf_document import receipt_pdf
 
         from .services import payments_visible_to
 
@@ -579,7 +579,8 @@ class PaymentReceiptView(APIView):
             'Este comprobante acredita una recarga de saldo de cafetería. No es un CFDI;',
             f'para facturación escriba a {getattr(settings, "BILLING_EMAIL", "")}.',
         ]
-        pdf = simple_document_pdf('Comprobante de pago - Colegio Interlaken', lines,
-                                  subtitle='Portal de Familias')
+        paid = p.status == Payment.Status.SUCCESS
+        pdf = receipt_pdf('Comprobante de pago', lines, subtitle='Portal de Familias',
+                          status=('Pagado', 'success') if paid else (p.get_status_display(), 'neutral'))
         resp = HttpResponse(pdf, content_type='application/pdf')
         return as_download(resp, f'comprobante_{p.id}.pdf')

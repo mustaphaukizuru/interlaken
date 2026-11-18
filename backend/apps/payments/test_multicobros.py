@@ -534,7 +534,8 @@ class TestLabelsAndLedger:
 
         _, _, checkout = opened
         _report(api_client, checkout.payment_id, "success", _bank_answer(checkout))
-        with mock.patch("apps.core.pdf.simple_document_pdf", return_value=b"%PDF") as pdf:
+        # The receipt is laid out from the view's «Etiqueta: valor» lines.
+        with mock.patch("apps.core.pdf_document.receipt_pdf", return_value=b"%PDF") as pdf:
             resp = api_client.get(reverse("payment-receipt", args=[checkout.payment_id]))
         assert resp.status_code == 200
         lines = pdf.call_args.args[1]

@@ -1582,6 +1582,10 @@ class AdminExportStudentView(APIView):
         return response
 
 
+_MONTHS_ES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+              'septiembre', 'octubre', 'noviembre', 'diciembre')
+
+
 class MyStatementPdfView(APIView):
     """GET /api/v1/cafeteria/statement/?student=<id>&month=YYYY-MM — monthly statement PDF (BACKLOG P4-3).
 
@@ -1598,7 +1602,7 @@ class MyStatementPdfView(APIView):
         from django.http import HttpResponse
 
         from apps.core.exports import as_download
-        from apps.core.pdf import simple_document_pdf
+        from apps.core.pdf_document import Column, Document, Row, Table, render_document_pdf
 
         user = request.user
         student_id = _student_param(request)
@@ -1644,27 +1648,41 @@ class MyStatementPdfView(APIView):
             return f'{"-" if v < 0 else ""}${abs(v):,.2f}'
 
         totals: dict[str, Decimal] = {}
-        lines = [f'Alumno: {student.user.full_name}  ·  Matrícula {student.student_id}  ·  {student.grade} {student.group}'.rstrip(),
-                 f'Periodo: {start:%d/%m/%Y} al {end:%d/%m/%Y}', '', f'Saldo inicial: {mxn(opening)}', '',
-                 f'{"Fecha":<12}{"Movimiento":<12}{"Detalle":<34}{"Importe":>10}{"Saldo":>10}', '-' * 78]
+        table_rows: list[Row] = []
         running = opening
         for t in rows:
             kind = label.get(t.transaction_type, t.transaction_type)
             amt = signed_amount(t)
+            when = f'{timezone.localtime(t.date):%d/%m %H:%M}'
             if not t.applied:
-                detail = f'(ya en el saldo) {t.description or ""}'[:32]
-                lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{"":>10}')
+                # Listed so the history is complete, never counted (no running balance).
+                detail = f'(ya en el saldo) {t.description or ""}'.strip()
+                table_rows.append(Row([when, kind, detail, f'{amt:,.2f}', ''], muted=True))
                 continue
             running = t.balance_after if t.balance_after is not None else running + amt
             totals[kind] = totals.get(kind, Decimal('0')) + amt
-            detail = (t.description or '')[:32]
-            lines.append(f'{t.date:%d/%m %H:%M}  {kind:<12}{detail:<34}{amt:>10,.2f}{running:>10,.2f}')
-        lines += ['-' * 78, f'Saldo final: {mxn(running)}', '']
-        for k, v in totals.items():
-            lines.append(f'Total {plural.get(k, k.lower())}: {mxn(v)}')
-        lines += ['', 'Este estado de cuenta es informativo; el saldo oficial es el del punto de venta (Loyverse).',
-                  f'Colegio Interlaken · generado el {timezone.localtime():%d/%m/%Y %H:%M}']
-        pdf = simple_document_pdf('Estado de cuenta de cafetería', lines, subtitle=f'{start:%B %Y}'.capitalize())
+            table_rows.append(Row([when, kind, t.description or '', f'{amt:,.2f}', f'{running:,.2f}']))
+        period = f'{start:%d/%m/%Y} al {end:%d/%m/%Y}'
+        doc = Document(
+            title='Estado de cuenta',
+            reference=f'Cafetería · {_MONTHS_ES[start.month - 1].capitalize()} {start.year}',
+            summary=[('Saldo inicial', mxn(opening)), ('Saldo final', mxn(running))],
+            info=[('Alumno', student.user.full_name), ('Matrícula', student.student_id),
+                  ('Grado y grupo', f'{student.grade} {student.group}'.strip() or '-'), ('Periodo', period)],
+            table=Table(
+                columns=[Column('Fecha', 64), Column('Movimiento', 76), Column('Detalle'),
+                         Column('Importe', 76, 'right', strong=True), Column('Saldo', 76, 'right')],
+                rows=table_rows,
+            ),
+            totals=[('Saldo inicial', mxn(opening)),
+                    *[(f'Total {plural.get(k, k.lower())}', mxn(v)) for k, v in totals.items()],
+                    ('Saldo final', mxn(running))],
+            notes=['Este estado de cuenta es informativo; el saldo oficial es el del punto de venta (Loyverse).'
+                   + (' Los movimientos en cursiva («ya en el saldo») son historial: no cambian el saldo.'
+                      if any(r.muted for r in table_rows) else '')],
+            footer='Colegio Interlaken · Cafetería',
+        )
+        pdf = render_document_pdf(doc)
         resp = HttpResponse(pdf, content_type='application/pdf')
         return as_download(resp, f'cafeteria-{student.student_id}-{month}.pdf')
 

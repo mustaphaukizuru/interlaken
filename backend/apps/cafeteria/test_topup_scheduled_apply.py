@@ -695,7 +695,7 @@ class TestOtherConfirmations:
     def test_receipt_says_the_balance_is_still_to_be_applied(self, api_client):
         student, topup, payment = paid_topup()
         api_client.force_authenticate(user=student.parents.first())
-        with patch('apps.core.pdf.simple_document_pdf', return_value=b'%PDF-') as pdf:
+        with patch('apps.core.pdf_document.receipt_pdf', return_value=b'%PDF-') as pdf:
             r = api_client.get(reverse('payment-receipt', args=[payment.pk]))
         assert r.status_code == 200
         lines = pdf.call_args.args[1]
