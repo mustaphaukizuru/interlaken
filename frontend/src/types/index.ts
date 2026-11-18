@@ -204,6 +204,18 @@ export interface TopUpLogEntry {
   wallet_balance?: string | null;
 }
 
+/** POST /payments/admin/<id>/banorte-verify/. Since 2026-11-18 the server
+ *  also applies the top-up when Loyverse already has it, and says so. */
+export interface BanorteVerifyResult {
+  payment_id: number;
+  verified_at: string | null;
+  verified_by_name: string;
+  /** Absent on an older server. */
+  apply_state?: 'applied' | 'waiting_verification' | 'waiting_pos' | 'pos_unknown' | 'not_applicable';
+  /** The new wallet balance when applied. */
+  balance?: string | null;
+}
+
 export interface BanorteOperation {
   control_number: string;
   /** When the attempt was opened (the date to look for in MultiCobros). */
@@ -402,6 +414,11 @@ export interface DashboardData {
   /** Paid card top-ups waiting for the 07:30 POS load, and their total. */
   paid_topups_to_apply?: number;
   paid_topups_to_apply_total?: string;
+  /** Paid card top-ups whose approval nobody verified in MultiCobros yet:
+   *  how many, their total and when the oldest was paid (null when none). */
+  topups_to_verify?: number;
+  topups_to_verify_total?: string;
+  topups_to_verify_oldest?: string | null;
   visits_today?: number;
   open_password_requests?: number;
   unhandled_messages?: number;

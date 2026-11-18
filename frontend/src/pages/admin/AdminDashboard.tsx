@@ -7,6 +7,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Reveal } from '@/components/ui/Reveal';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { TopUpsToVerifyCard } from '@/components/admin/TopUpsToVerifyCard';
 import { portalApi } from '@/services/api';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { DashboardData } from '@/types';
@@ -36,6 +37,12 @@ export default function AdminDashboard() {
           <div className="card mb-6"><ErrorState onRetry={() => refetch()} /></div>
         ) : (
           <>
+          {/* Paid, in Loyverse or about to be, and stuck until someone checks MultiCobros. */}
+          <TopUpsToVerifyCard
+            count={data?.topups_to_verify}
+            total={data?.topups_to_verify_total}
+            oldest={data?.topups_to_verify_oldest}
+          />
           {/* "Who paid yesterday?" (owner, 2026-10-20): straight to the 07:30 list. */}
           {!!data?.paid_topups_to_apply && (
             <Link

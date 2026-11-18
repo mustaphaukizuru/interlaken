@@ -15,6 +15,7 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
+import { CopyButton } from '@/components/admin/CopyButton';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
 import { idsParam, type BulkResult, type ExportFormat } from '@/services/dataOps';
 import { cafeteriaAdminApi, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
@@ -120,8 +121,23 @@ export function PaidTopUpQueue() {
     },
     { id: 'folio', header: 'Folio', className: 'font-mono text-xs text-ink', cell: (d) => d.payment_id ?? '—' },
     {
-      id: 'bank', header: 'Banorte', cell: (d) => (
-        d.banorte?.needs_verification ? <Badge variant="warning">Sin verificar</Badge>
+      id: 'bank', header: 'Banorte', minWidth: 150, cell: (d) => (
+        d.banorte?.needs_verification ? (
+          // What staff search in MultiCobros, one tap away.
+          <span className="block">
+            <Badge variant="warning">Sin verificar</Badge>
+            <span className="mt-1 flex items-center gap-0.5 font-mono text-xs text-ink">
+              {d.banorte.control_number}
+              <CopyButton value={d.banorte.control_number} label={`número de control de ${d.student_name}`} />
+            </span>
+            {d.payment_id != null && (
+              <span className="flex items-center gap-0.5 font-mono text-xs text-muted">
+                PAGO{d.payment_id}
+                <CopyButton value={`PAGO${d.payment_id}`} label={`Referencia 1 de ${d.student_name}`} />
+              </span>
+            )}
+          </span>
+        )
           : d.banorte?.simulation ? <Badge variant="neutral">Simulación</Badge>
           : d.banorte?.verified_at ? <span className="text-xs text-green-700">Verificada</span>
           : <span className="text-xs text-subtle">—</span>

@@ -157,8 +157,11 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
             )}
             {rail && <div className="mx-auto mb-1 h-px w-8 bg-line" aria-hidden="true" />}
             <div id={panelId} className={`${isFolded ? 'hidden' : 'flex'} flex-col gap-0.5`}>
-              {group.items.map(({ icon: Icon, label, to, end, badgeKey }) => {
+              {group.items.map(({ icon: Icon, label, to, end, badgeKey, subBadge }) => {
                 const count = badgeKey ? badges[badgeKey] ?? 0 : 0;
+                const sub = subBadge ? badges[subBadge.key] ?? 0 : 0;
+                const name = [label, count ? `${count} pendientes` : '', sub && subBadge ? `${subBadge.label.toLowerCase()}: ${sub}` : '']
+                  .filter(Boolean).join(', ');
                 return (
                   <NavLink
                     key={to}
@@ -166,7 +169,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                     end={end}
                     onClick={onNavigate}
                     title={rail ? label : undefined}
-                    aria-label={count ? `${label}, ${count} pendientes` : label}
+                    aria-label={name}
                     className={({ isActive }) =>
                       `relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                         rail ? 'lg:justify-center lg:px-0' : ''
@@ -177,12 +180,23 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
                       }`
                     }
                   >
-                    <Icon size={19} className="flex-shrink-0" />
-                    <span className={`flex-1 ${rail ? 'lg:hidden' : ''}`}>{label}</span>
-                    {count > 0 && (
-                      <span className={`flex h-[19px] min-w-[20px] items-center justify-center rounded-full bg-coral px-1.5 text-[11px] font-bold text-white ${rail ? 'lg:absolute lg:-right-0.5 lg:-top-0.5 lg:h-4 lg:min-w-[16px] lg:px-1 lg:text-[10px]' : ''}`}>
-                        {count > 99 ? '99+' : count}
-                      </span>
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={19} className="flex-shrink-0" />
+                        <span className={`flex-1 ${rail ? 'lg:hidden' : ''}`}>
+                          {label}
+                          {sub > 0 && subBadge && (
+                            <span aria-hidden="true" className={`block text-[11px] font-semibold leading-tight ${isActive ? 'text-white/85' : 'text-amber'}`}>
+                              {subBadge.label}: {sub > 99 ? '99+' : sub}
+                            </span>
+                          )}
+                        </span>
+                        {count > 0 && (
+                          <span className={`flex h-[19px] min-w-[20px] items-center justify-center rounded-full bg-coral px-1.5 text-[11px] font-bold text-white ${rail ? 'lg:absolute lg:-right-0.5 lg:-top-0.5 lg:h-4 lg:min-w-[16px] lg:px-1 lg:text-[10px]' : ''}`}>
+                            {count > 99 ? '99+' : count}
+                          </span>
+                        )}
+                      </>
                     )}
                   </NavLink>
                 );
