@@ -37,6 +37,23 @@ export interface Column<Row> {
   /** Initial width in px (resizable tables); persisted widths win. */
   width?: number;
   minWidth?: number;
+  /** Cut a text cell to this many px with an ellipsis; the full text shows as a tooltip. */
+  truncate?: number;
+}
+
+/** What a cell renders when it has nothing to show: one muted dash, everywhere. */
+const BLANK = '—';
+const isBlank = (v: ReactNode) => v === null || v === undefined || v === false || v === '' || v === BLANK;
+
+function renderCell(value: ReactNode, truncate?: number): { content: ReactNode; blank: boolean } {
+  if (isBlank(value)) return { content: <span className="text-subtle">{BLANK}</span>, blank: true };
+  if (truncate && (typeof value === 'string' || typeof value === 'number')) {
+    return {
+      content: <span className="block truncate" style={{ maxWidth: truncate }} title={String(value)}>{value}</span>,
+      blank: false,
+    };
+  }
+  return { content: value, blank: false };
 }
 
 interface Props<Row> {
@@ -318,15 +335,23 @@ export function DataTable<Row>({
                       />
                     </td>
                   )}
-                  {visible.map((c, i) => (
-                    <td
-                      key={c.id}
-                      data-label={c.header}
-                      className={`${c.align === 'right' ? 'num' : ''} ${pinFirstColumn && i === 0 ? 'admin-table__pin' : ''} ${c.className ?? ''}`.trim() || undefined}
-                    >
-                      {c.cell(row)}
-                    </td>
-                  ))}
+                  {visible.map((c, i) => {
+                    const { content, blank } = renderCell(c.cell(row), c.truncate);
+                    return (
+                      <td
+                        key={c.id}
+                        data-label={c.header}
+                        className={[
+                          c.align === 'right' ? 'num' : '',
+                          pinFirstColumn && i === 0 ? 'admin-table__pin' : '',
+                          blank ? 'admin-table__blank' : '',
+                          c.className ?? '',
+                        ].filter(Boolean).join(' ') || undefined}
+                      >
+                        {content}
+                      </td>
+                    );
+                  })}
                   {rowActions && (
                     <td className="admin-table__actions" data-label="Acciones">
                       {isLg ? (

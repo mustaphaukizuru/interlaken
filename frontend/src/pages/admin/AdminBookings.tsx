@@ -29,6 +29,7 @@ import {
 } from '@/hooks/queries/bookings';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { shortDateTime } from '@/lib/tableFormat';
 import {
   BOOKING_SOURCE_OPTIONS, BOOKING_STATUS_OPTIONS, VISIT_TYPE_LABEL, VISIT_TYPE_OPTIONS, bookingStatusMeta, canMove,
   type BookingStatus,
@@ -296,8 +297,12 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
       </>
     ),
   },
+  { id: 'parent', header: 'Tutor', sortKey: 'parent', hideable: false, minWidth: 160, className: 'font-medium text-ink', cell: (b) => b.parent_name },
+  {
+    id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
+    cell: (b) => { const m = bookingStatusMeta(b.status); return <Badge variant={m.variant}>{m.label}</Badge>; },
+  },
   { id: 'type', header: 'Tipo', minWidth: 130, cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
-  { id: 'parent', header: 'Tutor', sortKey: 'parent', hideable: false, minWidth: 160, className: 'text-ink', cell: (b) => b.parent_name },
   {
     id: 'child', header: 'Alumno', sortKey: 'child', minWidth: 140, className: 'text-muted',
     cell: (b) => (
@@ -311,20 +316,16 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
     id: 'contact', header: 'Contacto', minWidth: 190,
     cell: (b) => (
       <>
-        <div className="break-words text-muted">{b.parent_email}</div>
+        <div className="max-w-[240px] truncate text-muted" title={b.parent_email}>{b.parent_email}</div>
         <div className="text-xs text-subtle">{b.parent_phone}</div>
       </>
     ),
   },
-  { id: 'attendees', header: 'Asistentes', sortKey: 'attendees', align: 'right', minWidth: 100, className: 'tabular-nums', cell: (b) => b.num_attendees },
-  {
-    id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
-    cell: (b) => { const m = bookingStatusMeta(b.status); return <Badge variant={m.variant}>{m.label}</Badge>; },
-  },
+  { id: 'attendees', header: 'Asistentes', sortKey: 'attendees', align: 'right', minWidth: 100, cell: (b) => b.num_attendees },
   { id: 'source', header: 'Origen', defaultHidden: true, minWidth: 120, className: 'text-muted', cell: (b) => SOURCE_LABEL[b.source] ?? b.source },
   {
     id: 'created_at', header: 'Registrada', sortKey: 'created_at', defaultHidden: true, minWidth: 150, className: 'whitespace-nowrap text-muted',
-    cell: (b) => new Date(b.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
+    cell: (b) => shortDateTime(b.created_at),
   },
 ];
 
@@ -542,18 +543,18 @@ const SLOT_COLUMNS: Column<AdminSlot>[] = [
     cell: (s) => format(parseISO(s.date), 'EEE d MMM yyyy', { locale: es }),
   },
   { id: 'start', header: 'Horario', sortKey: 'start', minWidth: 110, className: 'whitespace-nowrap tabular-nums', cell: (s) => `${hhmm(s.start_time)}–${hhmm(s.end_time)}` },
-  { id: 'type', header: 'Tipo', sortKey: 'type', minWidth: 130, cell: (s) => <Badge variant="neutral">{VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type}</Badge> },
-  { id: 'title', header: 'Evento', minWidth: 140, className: 'text-muted', cell: (s) => s.title || '—' },
-  { id: 'location', header: 'Lugar', minWidth: 140, className: 'text-muted', cell: (s) => s.location || '—' },
-  { id: 'capacity', header: 'Cupo', sortKey: 'capacity', align: 'right', minWidth: 80, className: 'tabular-nums', cell: (s) => s.capacity },
-  {
-    id: 'booked', header: 'Reservados', sortKey: 'booked', align: 'right', minWidth: 110, className: 'tabular-nums',
-    cell: (s) => <span className={s.is_full ? 'font-semibold text-coral-700' : ''}>{s.booked_count}/{s.capacity}</span>,
-  },
   {
     id: 'active', header: 'Estado', minWidth: 100,
     cell: (s) => <Badge variant={s.is_active ? 'success' : 'neutral'}>{s.is_active ? 'Activo' : 'Inactivo'}</Badge>,
   },
+  {
+    id: 'booked', header: 'Reservados', sortKey: 'booked', align: 'right', minWidth: 110,
+    cell: (s) => <span className={s.is_full ? 'font-semibold text-coral-700' : ''}>{s.booked_count}/{s.capacity}</span>,
+  },
+  { id: 'type', header: 'Tipo', sortKey: 'type', minWidth: 130, cell: (s) => <Badge variant="neutral">{VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type}</Badge> },
+  { id: 'title', header: 'Evento', minWidth: 140, truncate: 220, className: 'text-muted', cell: (s) => s.title },
+  { id: 'location', header: 'Lugar', minWidth: 140, truncate: 220, className: 'text-muted', cell: (s) => s.location },
+  { id: 'capacity', header: 'Cupo', sortKey: 'capacity', align: 'right', minWidth: 80, defaultHidden: true, cell: (s) => s.capacity },
 ];
 
 const SLOT_BULK: BulkActionDef[] = [

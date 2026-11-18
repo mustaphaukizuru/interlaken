@@ -48,9 +48,16 @@ function StatusBadge({ m }: { m: ContactMessage }) {
 }
 
 const COLUMNS: Column<ContactMessage>[] = [
-  { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (m) => when(m.created_at) },
-  { id: 'name', header: 'Nombre', sortKey: 'name', minWidth: 140, className: 'font-medium text-ink', cell: (m) => m.name },
-  { id: 'email', header: 'Correo', sortKey: 'email', minWidth: 160, className: 'text-muted max-w-[220px] truncate', cell: (m) => m.email },
+  {
+    // Who wrote, with the address to answer under the name.
+    id: 'name', header: 'Nombre', sortKey: 'name', minWidth: 160,
+    cell: (m) => (
+      <span className="block min-w-0">
+        <span className="block font-medium text-ink">{m.name}</span>
+        <span className="block max-w-[220px] truncate text-xs text-subtle" title={m.email}>{m.email}</span>
+      </span>
+    ),
+  },
   {
     id: 'subject', header: 'Asunto', sortKey: 'subject', hideable: false, minWidth: 200,
     cell: (m) => (
@@ -59,11 +66,13 @@ const COLUMNS: Column<ContactMessage>[] = [
           <span className="font-semibold text-ink">{m.subject}</span>
           {isInvoice(m) && <Badge variant="info">Factura</Badge>}
         </div>
-        <p className="line-clamp-1 text-xs text-subtle">{m.message}</p>
+        <p className="line-clamp-1 max-w-[420px] text-xs text-subtle" title={m.message}>{m.message}</p>
       </div>
     ),
   },
   { id: 'handled', header: 'Estado', sortKey: 'handled', minWidth: 110, cell: (m) => <StatusBadge m={m} /> },
+  { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (m) => when(m.created_at) },
+  { id: 'email', header: 'Correo', sortKey: 'email', minWidth: 160, defaultHidden: true, truncate: 220, className: 'text-muted', cell: (m) => m.email },
 ];
 
 /** /admin/mensajes — website contact + facturación inbox (BACKLOG P1-G7) on the Data Ops

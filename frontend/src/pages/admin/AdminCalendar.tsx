@@ -41,15 +41,15 @@ const IMPORT_HEADERS = [
 
 const COLUMNS: Column<SchoolEvent>[] = [
   { id: 'title', header: 'Evento', sortKey: 'title', hideable: false, minWidth: 200, className: 'font-medium text-ink', cell: (e) => e.title },
+  {
+    id: 'published', header: 'Estado', sortKey: 'published', minWidth: 110,
+    cell: (e) => { const m = publishedMeta(e.is_published); return <Badge variant={m.variant}>{m.label}</Badge>; },
+  },
   { id: 'start', header: 'Inicio', sortKey: 'start', minWidth: 110, className: 'whitespace-nowrap text-muted tabular-nums', cell: (e) => formatDateOnly(e.start_date) },
   { id: 'end', header: 'Fin', sortKey: 'end', minWidth: 110, className: 'whitespace-nowrap text-muted tabular-nums', cell: (e) => formatDateOnly(e.end_date) || '—' },
   { id: 'kind', header: 'Tipo', sortKey: 'kind', minWidth: 150, cell: (e) => <Badge variant="info">{e.kind_label}</Badge> },
   { id: 'level', header: 'Nivel', sortKey: 'level', minWidth: 110, className: 'text-muted', cell: (e) => levelLabel(e.level) },
   { id: 'description', header: 'Descripción', minWidth: 200, defaultHidden: true, className: 'text-xs text-muted', cell: (e) => e.description || '—' },
-  {
-    id: 'published', header: 'Estado', sortKey: 'published', minWidth: 110,
-    cell: (e) => { const m = publishedMeta(e.is_published); return <Badge variant={m.variant}>{m.label}</Badge>; },
-  },
 ];
 
 /** /admin/calendario — school calendar on the Data Ops list contract (BACKLOG P2-16, Phase 8):

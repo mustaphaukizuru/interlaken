@@ -110,13 +110,14 @@ export default function AdminForms() {
         </div>
       ),
     },
-    { id: 'notify', header: 'Buzón', minWidth: 160, className: 'text-xs text-muted break-all', cell: (f) => f.notify_to || 'info@ (contacto general)' },
-    { id: 'submissions', header: 'Envíos', sortKey: 'submissions', align: 'right', minWidth: 80, className: 'tabular-nums', cell: (f) => f.submissions_count },
+    { id: 'published', header: 'Estado', sortKey: 'published', minWidth: 100, cell: (f) => (f.is_published ? <Badge variant="success">Publicado</Badge> : <Badge variant="neutral">Borrador</Badge>) },
+    { id: 'submissions', header: 'Envíos', sortKey: 'submissions', align: 'right', minWidth: 80, cell: (f) => f.submissions_count },
     {
       id: 'pending', header: 'Pendientes', sortKey: 'pending', align: 'right', minWidth: 100,
       cell: (f) => (f.pending_count ? <Badge variant="warning">{f.pending_count}</Badge> : <span className="text-subtle">0</span>),
     },
-    { id: 'published', header: 'Estado', sortKey: 'published', minWidth: 100, cell: (f) => (f.is_published ? <Badge variant="success">Publicado</Badge> : <Badge variant="neutral">Borrador</Badge>) },
+    // Where submissions go: set once per form, so it waits in «Columnas».
+    { id: 'notify', header: 'Buzón', minWidth: 160, defaultHidden: true, truncate: 240, className: 'text-xs text-muted', cell: (f) => f.notify_to || 'info@ (contacto general)' },
     { id: 'updated', header: 'Actualizado', sortKey: 'updated', minWidth: 150, defaultHidden: true, className: 'whitespace-nowrap text-xs text-muted', cell: (f) => formatDateTime(f.updated_at) },
   ];
 
@@ -323,11 +324,11 @@ function SubmissionsModal({ form, onClose }: { form: FormDefinitionAdmin; onClos
 
   const columns = useMemo<Column<FormSubmission>[]>(() => [
     { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-xs text-muted', cell: (s) => formatDateTime(s.created_at) },
+    { id: 'handled', header: 'Estado', sortKey: 'handled', minWidth: 110, cell: (s) => (s.is_handled ? <Badge variant="success">Atendido</Badge> : <Badge variant="warning">Pendiente</Badge>) },
     ...form.fields.map((f, i): Column<FormSubmission> => ({
       id: `f:${f.key}`, header: f.label, minWidth: 140, defaultHidden: i >= 4, className: 'text-sm text-ink break-words', cell: (s) => answer(s, f.key),
     })),
     { id: 'page', header: 'Página', sortKey: 'page', minWidth: 110, defaultHidden: true, className: 'text-xs text-subtle', cell: (s) => s.page || '—' },
-    { id: 'handled', header: 'Estado', sortKey: 'handled', minWidth: 110, cell: (s) => (s.is_handled ? <Badge variant="success">Atendido</Badge> : <Badge variant="warning">Pendiente</Badge>) },
   ], [form.fields]);
 
   return (

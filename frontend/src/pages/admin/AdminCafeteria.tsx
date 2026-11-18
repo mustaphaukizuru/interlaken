@@ -243,19 +243,30 @@ function balanceColumns(name: string): Column<CafeteriaBalance>[] {
       id: 'student', header: 'Alumno', sortKey: 'student', hideable: false, minWidth: 180, className: 'font-medium text-ink',
       cell: (b) => <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>,
     },
-    { id: 'matricula', header: 'Matrícula', className: 'text-muted', cell: (b) => b.student.student_id },
-    { id: 'code', header: 'Código Loyverse', className: 'font-mono text-xs text-muted', cell: (b) => b.student.loyverse_code || b.student.student_id },
-    { id: 'grade', header: 'Grado', sortKey: 'grade', className: 'text-muted whitespace-nowrap', cell: (b) => `${b.student.grade} ${b.student.group}`.trim() },
-    { id: 'balance', header: name, sortKey: 'balance', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (b) => mxn(b.balance) },
-    { id: 'threshold', header: 'Umbral', sortKey: 'threshold', align: 'right', defaultHidden: name === 'Saldo', className: 'text-muted', cell: (b) => mxn(b.low_balance_threshold ?? '20') },
     {
-      id: 'state', header: 'Estado',
+      id: 'state', header: 'Estado', minWidth: 110,
       cell: (b) => {
         const isLow = parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '20');
         return <Badge variant={isLow ? 'warning' : 'success'}>{isLow ? 'Saldo bajo' : 'Normal'}</Badge>;
       },
     },
-    { id: 'last_synced', header: 'Últ. sinc.', sortKey: 'last_synced', className: 'text-muted whitespace-nowrap', cell: (b) => fmtDate(b.last_synced) },
+    { id: 'balance', header: name, sortKey: 'balance', align: 'right', hideable: false, minWidth: 100, className: 'font-semibold text-ink', cell: (b) => mxn(b.balance) },
+    { id: 'threshold', header: 'Umbral', sortKey: 'threshold', align: 'right', defaultHidden: name === 'Saldo', className: 'text-muted', cell: (b) => mxn(b.low_balance_threshold ?? '20') },
+    { id: 'grade', header: 'Grado', sortKey: 'grade', className: 'text-muted whitespace-nowrap', cell: (b) => `${b.student.grade} ${b.student.group}`.trim() },
+    {
+      // The POS code under the matrícula when it is spelled differently (ci09932), as in Alumnos.
+      id: 'matricula', header: 'Matrícula', className: 'whitespace-nowrap text-muted',
+      cell: (b) => (
+        <>
+          {b.student.student_id}
+          {b.student.loyverse_code && b.student.loyverse_code !== b.student.student_id && (
+            <span className="block font-mono text-xs text-subtle">{b.student.loyverse_code}</span>
+          )}
+        </>
+      ),
+    },
+    { id: 'code', header: 'Código Loyverse', defaultHidden: true, className: 'font-mono text-xs text-muted', cell: (b) => b.student.loyverse_code || b.student.student_id },
+    { id: 'last_synced', header: 'Últ. sinc.', label: 'Última sincronización', sortKey: 'last_synced', className: 'whitespace-nowrap text-xs text-muted', cell: (b) => fmtDate(b.last_synced) },
   ];
 }
 
@@ -480,7 +491,6 @@ function RosterTab() {
 
 // ── Movimientos (every student's ledger) ─────────────────────────────────────
 const TX_COLUMNS: Column<AdminTransaction>[] = [
-  { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
   {
     id: 'student', header: 'Alumno', sortKey: 'student', minWidth: 170, className: 'font-medium text-ink',
     cell: (t) => (
@@ -491,9 +501,10 @@ const TX_COLUMNS: Column<AdminTransaction>[] = [
     ),
   },
   { id: 'type', header: 'Tipo', sortKey: 'type', cell: (t) => <Badge variant={TX_TYPE[t.transaction_type]?.variant ?? 'neutral'}>{TX_TYPE[t.transaction_type]?.label ?? t.type_display}</Badge> },
-  { id: 'description', header: 'Descripción', className: 'text-muted', cell: (t) => <span className="block max-w-xs truncate" title={t.description}>{t.description || '—'}</span> },
   { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (t) => mxn(t.amount) },
-  { id: 'balance', header: 'Saldo', sortKey: 'balance', align: 'right', className: 'text-muted', cell: (t) => (t.balance_after !== null ? mxn(t.balance_after) : '—') },
+  { id: 'balance', header: 'Saldo', label: 'Saldo después', sortKey: 'balance', align: 'right', className: 'text-muted', cell: (t) => (t.balance_after !== null ? mxn(t.balance_after) : '—') },
+  { id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (t) => fmtDate(t.date) },
+  { id: 'description', header: 'Descripción', className: 'text-muted', truncate: 280, cell: (t) => t.description },
   { id: 'receipt', header: 'Recibo', defaultHidden: true, className: 'font-mono text-xs text-subtle', cell: (t) => t.loyverse_receipt_id || '—' },
 ];
 
@@ -660,12 +671,12 @@ const banorteCell = (d: TopUpLogEntry) => {
 };
 
 const TOPUP_COLUMNS: Column<TopUpLogEntry>[] = [
-  { id: 'created_at', header: 'Fecha', sortKey: 'created_at', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.created_at) },
   { id: 'student', header: 'Alumno', sortKey: 'student', minWidth: 170, className: 'font-medium text-ink', cell: studentCell },
+  { id: 'status', header: 'Estado', sortKey: 'status', cell: topupStatusBadge },
   { id: 'amount', header: 'Monto', sortKey: 'amount', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
+  { id: 'created_at', header: 'Fecha', sortKey: 'created_at', hideable: false, minWidth: 150, className: 'whitespace-nowrap text-muted', cell: (d) => fmtDate(d.created_at) },
   { id: 'method', header: 'Método', sortKey: 'method', className: 'text-muted', cell: (d) => d.method_display },
   { id: 'gateway', header: 'Pasarela', className: 'text-muted', cell: (d) => gatewayLabel(d.gateway) || '—' },
-  { id: 'status', header: 'Estado', sortKey: 'status', cell: topupStatusBadge },
   { id: 'pos', header: 'POS', cell: posBadge },
   { id: 'reference', header: 'Operación Banorte', minWidth: 210, cell: banorteCell },
 ];
@@ -944,16 +955,16 @@ function ReconcileTab() {
       id: 'student', header: 'Alumno', sortKey: 'student', hideable: false, minWidth: 170, className: 'font-medium text-ink',
       cell: (r) => <Link to={`/admin/cafeteria/${r.student_id}`} className="hover:text-brand-700">{r.student_name}</Link>,
     },
-    { id: 'matricula', header: 'Matrícula', sortKey: 'matricula', className: 'text-muted', cell: (r) => r.student_code },
-    { id: 'local', header: 'Saldo local', sortKey: 'local_balance', align: 'right', className: 'text-ink', cell: (r) => mxn(r.local_balance) },
-    { id: 'loyverse', header: 'Loyverse', align: 'right', className: 'text-muted', cell: (r) => (r.loyverse_balance !== null ? mxn(r.loyverse_balance) : '—') },
-    { id: 'drift', header: 'Diferencia', align: 'right', className: 'font-medium text-ink', cell: (r) => (r.drift !== null ? mxn(r.drift) : '—') },
     {
       id: 'state', header: 'Estado',
       cell: (r) => r.error ? <Badge variant="error">Error</Badge>
         : r.in_sync ? <Badge variant="success">En orden</Badge>
         : <Badge variant="warning">Diferencia</Badge>,
     },
+    { id: 'drift', header: 'Diferencia', align: 'right', className: 'font-semibold text-ink', cell: (r) => (r.drift !== null ? mxn(r.drift) : '—') },
+    { id: 'local', header: 'Saldo local', sortKey: 'local_balance', align: 'right', className: 'text-ink', cell: (r) => mxn(r.local_balance) },
+    { id: 'loyverse', header: 'Loyverse', label: 'Saldo en Loyverse', align: 'right', className: 'text-muted', cell: (r) => (r.loyverse_balance !== null ? mxn(r.loyverse_balance) : '—') },
+    { id: 'matricula', header: 'Matrícula', sortKey: 'matricula', className: 'text-muted', cell: (r) => r.student_code },
   ];
 
   return (
@@ -1162,16 +1173,16 @@ function CustomersTab() {
     },
     { id: 'code', header: 'Código', sortKey: 'code', className: 'font-mono text-xs text-muted', cell: (c) => c.customer_code || '—' },
     { id: 'kind', header: 'Tipo', sortKey: 'kind', cell: (c) => <Badge variant={CUSTOMER_KIND[c.kind].variant}>{CUSTOMER_KIND[c.kind].label}</Badge> },
-    { id: 'email', header: 'Correo', className: 'text-muted', cell: (c) => c.email || '—' },
-    { id: 'points', header: 'Saldo', sortKey: 'points', align: 'right', className: 'font-semibold text-ink', cell: (c) => mxn(c.total_points) },
-    { id: 'visits', header: 'Visitas', sortKey: 'visits', align: 'right', className: 'text-muted', cell: (c) => c.total_visits },
-    // The pupil's purchases from the ledger; a card with no student has none.
-    { id: 'spent', header: 'Consumo', label: 'Consumo registrado', sortKey: 'spent', align: 'right', className: 'text-muted', cell: (c) => (c.consumption == null ? '—' : mxn(c.consumption)) },
-    { id: 'last_visit', header: 'Última visita', sortKey: 'last_visit', className: 'whitespace-nowrap text-muted', cell: (c) => fmtDate(c.last_visit) },
     {
       id: 'state', header: 'Estado',
       cell: (c) => c.missing_since ? <Badge variant="error">Eliminado en Loyverse</Badge> : <Badge variant="success">Activo</Badge>,
     },
+    { id: 'points', header: 'Saldo', sortKey: 'points', align: 'right', className: 'font-semibold text-ink', cell: (c) => mxn(c.total_points) },
+    // The pupil's purchases from the ledger; a card with no student has none.
+    { id: 'spent', header: 'Consumo', label: 'Consumo registrado', sortKey: 'spent', align: 'right', className: 'text-muted', cell: (c) => (c.consumption == null ? '—' : mxn(c.consumption)) },
+    { id: 'last_visit', header: 'Última visita', sortKey: 'last_visit', className: 'whitespace-nowrap text-muted', cell: (c) => fmtDate(c.last_visit) },
+    { id: 'visits', header: 'Visitas', sortKey: 'visits', align: 'right', defaultHidden: true, className: 'text-muted', cell: (c) => c.total_visits },
+    { id: 'email', header: 'Correo', defaultHidden: true, truncate: 220, className: 'text-muted', cell: (c) => c.email },
     {
       id: 'receipts', header: 'Compras', align: 'right',
       cell: (c) => c.student

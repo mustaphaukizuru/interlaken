@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { migrateLegacyRosterPrefs, prefsKey, readTablePrefs, useTablePrefs } from './useTablePrefs';
+import { defaultsKey, LEGACY_DEFAULT_HIDDEN, migrateLegacyRosterPrefs, prefsKey, readTablePrefs, useTablePrefs } from './useTablePrefs';
 
 describe('useTablePrefs', () => {
   it('starts from the defaults and persists changes under interlaken:table:<id>', () => {
@@ -60,5 +60,58 @@ describe('useTablePrefs', () => {
     const { result } = renderHook(() => useTablePrefs('students'));
     expect(result.current.hidden).toEqual(['email']);
     expect(result.current.density).toBe('dense');
+  });
+});
+
+describe('useTablePrefs · new default-hidden columns reach saved prefs', () => {
+  it('hides a column that became default-hidden after an old (sidecar-less) save', () => {
+    // Saved by an older build: payments then hid only «reference» by default.
+    localStorage.setItem(prefsKey('payments'), JSON.stringify({ hidden: ['reference'], density: 'dense', widths: { date: 150 } }));
+    const { result } = renderHook(() => useTablePrefs('payments', { defaultHidden: ['reference', 'gateway'] }));
+    expect(result.current.hidden).toEqual(['reference', 'gateway']);
+    // Everything else the person chose is kept.
+    expect(result.current.density).toBe('dense');
+    expect(result.current.widths).toEqual({ date: 150 });
+  });
+
+  it('keeps a column the person had chosen to show, and their own hidden columns', () => {
+    // «reference» was default-hidden and they showed it; they hid «payer» themselves.
+    localStorage.setItem(prefsKey('payments'), JSON.stringify({ hidden: ['payer'], density: 'normal', widths: {} }));
+    const { result } = renderHook(() => useTablePrefs('payments', { defaultHidden: ['reference', 'gateway'] }));
+    expect(result.current.isHidden('reference')).toBe(false);
+    expect(result.current.isHidden('payer')).toBe(true);
+    expect(result.current.isHidden('gateway')).toBe(true);
+  });
+
+  it('records the defaults a save was made against, so showing a new default sticks', () => {
+    const { result, unmount } = renderHook(() => useTablePrefs('t2', { defaultHidden: ['a', 'b'] }));
+    act(() => result.current.toggleColumn('b'));
+    expect(JSON.parse(localStorage.getItem(defaultsKey('t2')) || 'null')).toEqual(['a', 'b']);
+    unmount();
+    const again = renderHook(() => useTablePrefs('t2', { defaultHidden: ['a', 'b'] }));
+    expect(again.result.current.isHidden('b')).toBe(false);
+    // A later default («c») still reaches this saved entry.
+    const later = renderHook(() => useTablePrefs('t2', { defaultHidden: ['a', 'b', 'c'] }));
+    expect(later.result.current.hidden).toEqual(['a', 'c']);
+  });
+
+  it('never un-hides a column a saved entry hides, even when it stops being a default', () => {
+    localStorage.setItem(prefsKey('t3'), JSON.stringify({ hidden: ['x'], density: 'normal', widths: {} }));
+    localStorage.setItem(defaultsKey('t3'), JSON.stringify(['x']));
+    const { result } = renderHook(() => useTablePrefs('t3', { defaultHidden: [] }));
+    expect(result.current.hidden).toEqual(['x']);
+  });
+
+  it('reset also forgets the sidecar', () => {
+    const { result } = renderHook(() => useTablePrefs('t4', { defaultHidden: ['x'] }));
+    act(() => result.current.toggleDensity());
+    expect(localStorage.getItem(defaultsKey('t4'))).not.toBeNull();
+    act(() => result.current.reset());
+    expect(localStorage.getItem(defaultsKey('t4'))).toBeNull();
+  });
+
+  it('knows the pre-review defaults of every table whose defaults the review changed', () => {
+    expect(LEGACY_DEFAULT_HIDDEN.payments).toEqual(['reference']);
+    expect(LEGACY_DEFAULT_HIDDEN.students).toEqual(['loyverse_code', 'email', 'enrollment_date']);
   });
 });

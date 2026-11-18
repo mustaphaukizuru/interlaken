@@ -5,7 +5,7 @@ import { Inbox } from 'lucide-react';
 import { DataTable, type Column, type DataTableSelection } from './DataTable';
 import type { SortState } from './SortableTh';
 import { stubViewport } from '@/test/viewport';
-import { prefsKey } from '@/hooks/useTablePrefs';
+import { defaultsKey, prefsKey } from '@/hooks/useTablePrefs';
 
 interface Row { id: number; name: string; amount: number }
 
@@ -185,5 +185,61 @@ describe('DataTable v2', () => {
     expect(onRetry).toHaveBeenCalled();
     rerender(<DataTable<Row> columns={COLUMNS} rows={undefined} rowKey={(r) => r.id} isLoading />);
     expect(document.querySelector('.skeleton')).not.toBeNull();
+  });
+});
+
+describe('DataTable · cell formatting', () => {
+  interface Contact { id: number; name: string; email: string | null; note: string }
+  const rows: Contact[] = [
+    { id: 1, name: 'Ana', email: null, note: 'Una nota bastante larga que no cabe en la columna de la tabla' },
+    { id: 2, name: 'Beto', email: 'beto@ejemplo.mx', note: '—' },
+  ];
+  const columns: Column<Contact>[] = [
+    { id: 'name', header: 'Nombre', cell: (r) => r.name },
+    { id: 'email', header: 'Correo', cell: (r) => r.email },
+    { id: 'note', header: 'Nota', truncate: 160, cell: (r) => r.note },
+  ];
+
+  it('shows one muted dash for an empty value or a «—», and marks the cell blank for phones', () => {
+    render(<DataTable<Contact> columns={columns} rows={rows} rowKey={(r) => r.id} />);
+    const anaRow = screen.getByText('Ana').closest('tr') as HTMLElement;
+    const emptyEmail = within(anaRow).getAllByRole('cell')[1];
+    expect(emptyEmail).toHaveTextContent('—');
+    expect(emptyEmail).toHaveClass('admin-table__blank');
+    expect(within(emptyEmail).getByText('—')).toHaveClass('text-subtle');
+    const betoRow = screen.getByText('Beto').closest('tr') as HTMLElement;
+    expect(within(betoRow).getAllByRole('cell')[2]).toHaveClass('admin-table__blank');
+    expect(within(betoRow).getAllByRole('cell')[1]).not.toHaveClass('admin-table__blank');
+  });
+
+  it('truncates a long text cell and keeps the full text as a tooltip', () => {
+    render(<DataTable<Contact> columns={columns} rows={rows} rowKey={(r) => r.id} />);
+    const note = screen.getByText(/Una nota bastante larga/);
+    expect(note).toHaveClass('truncate');
+    expect(note).toHaveAttribute('title', rows[0].note);
+    expect(note).toHaveStyle({ maxWidth: '160px' });
+  });
+
+  it('keeps a 0 (a real value) instead of a dash', () => {
+    render(<DataTable<Row> columns={[{ id: 'amount', header: 'Monto', align: 'right', cell: () => 0 }]} rows={ROWS.slice(0, 1)} rowKey={(r) => r.id} />);
+    const cell = screen.getByRole('cell');
+    expect(cell).toHaveTextContent('0');
+    expect(cell).not.toHaveClass('admin-table__blank');
+  });
+});
+
+describe('DataTable · a new default-hidden column reaches saved prefs', () => {
+  it('hides it for a person who saved prefs before it existed, keeping their choices', () => {
+    // Saved when the table had no default-hidden column at all.
+    localStorage.setItem(prefsKey('t-new'), JSON.stringify({ hidden: [], density: 'dense', widths: {} }));
+    localStorage.setItem(defaultsKey('t-new'), JSON.stringify([]));
+    const cols: Column<Row>[] = [
+      { id: 'name', header: 'Nombre', hideable: false, cell: (r) => r.name },
+      { id: 'amount', header: 'Monto', align: 'right', cell: (r) => r.amount },
+      { id: 'notes', header: 'Notas', defaultHidden: true, cell: () => 'n' },
+    ];
+    render(<DataTable<Row> tableId="t-new" columnControls columns={cols} rows={ROWS} rowKey={(r) => r.id} />);
+    expect(screen.queryByRole('columnheader', { name: 'Notas' })).not.toBeInTheDocument();
+    expect(screen.getByRole('table')).toHaveClass('admin-table--dense');
   });
 });
