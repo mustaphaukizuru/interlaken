@@ -87,6 +87,12 @@ if docker image inspect interlaken-app:current >/dev/null 2>&1; then
   docker tag interlaken-app:current interlaken-app:previous
 fi
 
+# Compose runs the image it builds, interlaken-app:latest; :current and
+# :previous are only bookmarks. So rolling back means pointing :latest (and
+# :current, the next deploy's rollback point) at :previous and recreating
+# WITHOUT a build. Re-tagging :current alone recreates the new image again.
+ROLLBACK_CMD="docker tag interlaken-app:previous interlaken-app:latest && docker tag interlaken-app:previous interlaken-app:current && docker compose up -d --no-build --force-recreate app"
+
 echo "==> Fetching latest master"
 git -C .. fetch --quiet origin master
 BEFORE="$(git -C .. rev-parse HEAD)"
@@ -138,7 +144,7 @@ if [[ "$healthy" != true ]]; then
   echo "  docker compose exec db psql -U $DB_USER -d $DB_NAME -c \"ALTER USER $DB_USER WITH PASSWORD '<the value in .env>';\"" >&2
   echo "" >&2
   echo "To roll back to the previous image:" >&2
-  echo "  docker tag interlaken-app:previous interlaken-app:current && docker compose up -d --force-recreate app" >&2
+  echo "  $ROLLBACK_CMD" >&2
   exit 1
 fi
 echo "    healthy"

@@ -380,15 +380,13 @@ Render is gone: the service, its blueprint (`render.yaml`) and its deploy doc we
 removed once the VPS had served a full school day. Nothing in this repository
 targets Render any more.
 
-Rollback is now local to this box and faster than the old DNS swap:
-
-```
-cd /opt/interlaken && git log --oneline -5      # pick the last good commit
-git reset --hard <commit> && ./deploy.sh        # rebuild and restart
-```
-
-Docker keeps the previous image layers, so a rebuild of an older commit is quick.
-The database is unaffected by an application rollback.
+Rollback is now local to this box and faster than the old DNS swap: the
+previous image is kept as `interlaken-app:previous`, and the three commands in
+[Rolling back](#rolling-back) put it back in seconds without a build. (Resetting
+the checkout to an older commit and running `./deploy.sh` does NOT roll back:
+the script resets to `origin/master` first. To pin older code, revert the
+commit on master and deploy that.) The database is unaffected by an
+application rollback.
 
 ---
 
@@ -575,12 +573,23 @@ same key paths, before you redeploy with the new settings.
 ## Rolling back
 
 `deploy.sh` tags the running image as `interlaken-app:previous` before each
-build, and exits non-zero if the new one never becomes healthy. To go back:
+build, and exits non-zero (printing this command) if the new one never becomes
+healthy. To go back, from `/opt/interlaken/deploy`:
 
 ```bash
+docker tag interlaken-app:previous interlaken-app:latest
 docker tag interlaken-app:previous interlaken-app:current
-docker compose up -d --force-recreate app
+docker compose up -d --no-build --force-recreate app
 ```
+
+Compose runs the image it builds, `interlaken-app:latest`; `:current` and
+`:previous` are only bookmarks. Re-tagging `:current` alone (what this section
+and `deploy.sh` said until 2026-11-18) recreates the container from the NEW
+image again: checked with a throwaway compose project. Re-tagging `:current`
+as well keeps the next deploy's rollback point on the good image. Afterwards,
+revert or fix the commit on master before the next `./deploy.sh`, which would
+otherwise rebuild the same code. Migrations the new version applied stay
+applied; the previous image runs on them as long as they were additive.
 
 If the whole VPS is in trouble, the fastest recovery is DNS: point the record
 back at Render, which is why the runbook says not to delete that service
