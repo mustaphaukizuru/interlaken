@@ -629,7 +629,7 @@ const posBadge = (d: TopUpLogEntry) =>
     : d.needs_pos_load ? <Badge variant="warning">Pendiente POS</Badge>
     : d.pos_loaded_at ? <Badge variant="success">En POS</Badge>
     : d.banorte?.simulation && d.status === 'completed' ? <Badge variant="neutral">Simulación (no cargar)</Badge>
-    : <span className="text-subtle">—</span>;
+    : '—';
 
 /** Deposit status: a failed card attempt says why (cancelled, expired, declined...). */
 const topupStatusBadge = (d: TopUpLogEntry) => {

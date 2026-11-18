@@ -243,7 +243,7 @@ export default function AdminStudents() {
           <House className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{s.family.name}</span>
         </Link>
-      ) : <span className="text-subtle">—</span>),
+      ) : '—'),
     },
     { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
     {
