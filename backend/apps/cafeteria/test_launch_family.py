@@ -67,11 +67,11 @@ def test_history_carries_the_sign_of_refunds_and_adjustments(api_client):
 def test_statement_signs_debits_and_opens_from_the_right_balance(api_client, monkeypatch):
     captured = {}
 
-    def fake_pdf(title, lines, subtitle=''):
-        captured['lines'] = list(lines)
+    def fake_pdf(doc, **kwargs):
+        captured['lines'] = doc.text_lines()
         return b'%PDF-1.4 test'
 
-    monkeypatch.setattr('apps.core.pdf.simple_document_pdf', fake_pdf)
+    monkeypatch.setattr('apps.core.pdf_document.render_document_pdf', fake_pdf)
     parent = ParentFactory()
     kid = _kid(parent, '100.00')
     # The month opens with a debit: before the fix the opening read $160.00.
@@ -95,8 +95,8 @@ def test_statement_lists_history_rows_without_counting_them(api_client, monkeypa
     # A POS refund the balance already held (applied=False, no balance_after)
     # used to be added to the running balance and the totals again.
     captured = {}
-    monkeypatch.setattr('apps.core.pdf.simple_document_pdf',
-                        lambda title, lines, subtitle='': captured.setdefault('lines', list(lines)) and b'%PDF')
+    monkeypatch.setattr('apps.core.pdf_document.render_document_pdf',
+                        lambda doc, **kw: captured.setdefault('lines', doc.text_lines()) and b'%PDF')
     parent = ParentFactory()
     kid = _kid(parent, '100.00')
     CafeteriaTransaction.objects.create(

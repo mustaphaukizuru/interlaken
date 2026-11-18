@@ -5,7 +5,7 @@ import {
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
 /** Keys returned by GET /core/badges/ (BACKLOG P1-E3). */
-export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
+export type BadgeKey = 'admisiones' | 'visitas' | 'cafeteria' | 'cafeteria_verificar' | 'contrasenas' | 'notificaciones' | 'mensajes' | 'formularios' | 'arco';
 
 export interface NavEntry {
   icon: LucideIcon;
@@ -14,6 +14,9 @@ export interface NavEntry {
   end?: boolean;
   /** Live counter from /core/badges/ to show next to the label. */
   badgeKey?: BadgeKey;
+  /** A second counter that needs its own words, shown under the label as
+   *  «label: N» while it is above zero (e.g. «Por verificar: 2»). */
+  subBadge?: { key: BadgeKey; label: string };
 }
 
 export interface NavGroup {
@@ -63,7 +66,10 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
     {
       heading: 'Cafetería y pagos',
       items: [
-        { icon: Coffee,     label: 'Cafetería', to: '/admin/cafeteria', badgeKey: 'cafeteria' },
+        // «Por verificar»: card top-ups nothing applies until someone checks
+        // them in MultiCobros (2026-11-18: two sat in Loyverse all morning).
+        { icon: Coffee,     label: 'Cafetería', to: '/admin/cafeteria', badgeKey: 'cafeteria',
+          subBadge: { key: 'cafeteria_verificar', label: 'Por verificar' } },
         { icon: CreditCard, label: 'Pagos',     to: '/admin/pagos' },
       ],
     },

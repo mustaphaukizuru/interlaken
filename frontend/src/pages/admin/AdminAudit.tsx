@@ -68,8 +68,8 @@ const COLUMNS: Column<AuditLogEntry>[] = [
     cell: (e) => format(new Date(e.created_at), 'd MMM yyyy, HH:mm', { locale: es }),
   },
   {
-    id: 'actor', header: 'Actor', sortKey: 'actor', minWidth: 140, className: 'text-muted max-w-[180px] truncate',
-    cell: (e) => <span title={e.actor_label}>{e.actor_label || 'system'}</span>,
+    id: 'actor', header: 'Actor', sortKey: 'actor', minWidth: 140, className: 'text-muted',
+    cell: (e) => <span className="block max-w-[180px] truncate" title={e.actor_label}>{e.actor_label || 'system'}</span>,
   },
   {
     id: 'action', header: 'Acción', sortKey: 'action', minWidth: 140,
@@ -91,8 +91,8 @@ const COLUMNS: Column<AuditLogEntry>[] = [
     cell: (e) => `${e.object_type}#${e.object_id}`,
   },
   {
-    id: 'detail', header: 'Detalle', minWidth: 200, className: 'text-muted max-w-md truncate',
-    cell: (e) => <span title={changesSummary(e)}>{changesSummary(e)}</span>,
+    id: 'detail', header: 'Detalle', minWidth: 200, className: 'text-muted',
+    cell: (e) => <span className="block max-w-md truncate" title={changesSummary(e)}>{changesSummary(e)}</span>,
   },
 ];
 

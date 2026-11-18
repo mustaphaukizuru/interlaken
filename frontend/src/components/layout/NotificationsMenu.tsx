@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, Check, X, ChevronRight } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
@@ -70,7 +71,12 @@ export function NotificationsMenu() {
 
   const header = (close: () => void, withClose: boolean) => (
     <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-      <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
+      <span className="flex items-center gap-2">
+        <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
+        {unread > 0 && (
+          <span className="rounded-full bg-coral/10 px-2 py-0.5 text-[11px] font-semibold text-coral-700">{unread} sin leer</span>
+        )}
+      </span>
       <div className="flex items-center gap-3">
         {unread > 0 && (
           <button
@@ -105,7 +111,9 @@ export function NotificationsMenu() {
     return (
       <>
         {bell(sheetOpen, () => setSheetOpen((v) => !v))}
-        {sheetOpen && (
+        {/* Portalled to <body>: inside the header's stacking context (z-30) the
+            sheet sat under the mobile tab bar, which hid «Ver todas». */}
+        {sheetOpen && createPortal(
           <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label="Notificaciones">
             <button type="button" aria-label="Cerrar" onClick={close} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
             <div className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl bg-white shadow-[0_-12px_40px_-12px_rgba(16,12,40,0.45)] pb-[env(safe-area-inset-bottom)]">
@@ -116,7 +124,8 @@ export function NotificationsMenu() {
               </div>
               {footer(close)}
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
       </>
     );

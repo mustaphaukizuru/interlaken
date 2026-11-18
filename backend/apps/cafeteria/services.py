@@ -492,6 +492,12 @@ def _maybe_low_balance_alert(cb, now):
 
     if not cb.is_low_balance:
         return 0
+    if pending_covers_low_balance(cb):
+        # A paid card top-up is on its way to this wallet (2026-11-18: a
+        # family was told «Saldo bajo» at $3 while $444 they had paid waited
+        # for verification). Checked BEFORE claiming the cooldown slot, so the
+        # alert still fires if that money never arrives (refunded).
+        return 0
 
     cooldown = getattr(settings, 'CAFETERIA_LOW_BALANCE_ALERT_COOLDOWN_DAYS', 7)
     cutoff = now - timedelta(days=cooldown)
@@ -1165,6 +1171,201 @@ def paid_topups_pending():
     return (TopUpRequest.objects.filter(method=TopUpRequest.Method.ONLINE,
                                         status=TopUpRequest.Status.PAID)
             .exclude(payments__status=Payment.Status.REFUNDED))
+
+
+def pending_paid_totals(student_ids) -> dict:
+    """``{student_id: Decimal}``: the paid card top-ups on their way to each
+    wallet, i.e. the ones the POS mirror may still apply (unverified approvals
+    included; refunds and, in a live installation, simulations left out)."""
+    return {sid: sum((Decimal(str(p.amount)) for _, p in entries), Decimal('0'))
+            for sid, entries in _paid_topups_by_student(student_ids).items()}
+
+
+def pending_covers_low_balance(cb, pending=None) -> bool:
+    """True when the wallet plus its paid top-ups on the way is at or above
+    the low-balance level: the family already paid, a «Saldo bajo» alert
+    would only alarm them. ``pending`` is the precomputed total (cron)."""
+    if pending is None:
+        pending = pending_paid_totals([cb.student_id]).get(cb.student_id, Decimal('0'))
+    if not pending:
+        return False
+    return (cb.balance or Decimal('0')) + pending >= cb.low_balance_threshold
+
+
+def cafeteria_staff() -> list:
+    """Who hears about cafetería money work: every active admin and every
+    active staff account whose console areas include the cafetería (the
+    cashier does the 07:30 load). Shared by ``topup_apply_report`` and the
+    POS mirror's «ya está en Loyverse, falta verificarla» notice."""
+    from apps.accounts.models import User
+
+    admins = list(User.objects.filter(role=User.Role.ADMIN, is_active=True))
+    cashiers = [u for u in User.objects.filter(role=User.Role.STAFF, is_active=True)
+                if 'cafeteria' in (u.staff_areas or [])]
+    return admins + cashiers
+
+
+# The console page with «Por aplicar» (and its «Verificar en MultiCobros»).
+PAID_QUEUE_PATH = '/admin/cafeteria?tab=pos'
+PAID_QUEUE_WHERE = 'Cafetería → POS Loyverse → «Por aplicar»'
+
+# «Ya está en Loyverse, falta verificarla»: one notice the first time the POS
+# mirror holds a top-up for it, then at most one reminder this long after,
+# during the school day only, while it still waits.
+VERIFY_REMIND_AFTER = timedelta(hours=3)
+VERIFY_REMIND_HOURS = (7, 19)       # local time, [from, to)
+
+
+def _claim_verify_alert(topup_id, now) -> str | None:
+    """Atomically claim the next staff notice for a held top-up: ``'first'``,
+    ``'reminder'`` or ``None`` (already told). A conditional UPDATE, so the
+    cron and a webhook pass running at once cannot both send it."""
+    from apps.cafeteria.models import TopUpRequest
+
+    rows = TopUpRequest.objects.filter(pk=topup_id, status=TopUpRequest.Status.PAID)
+    if rows.filter(verify_alert_count=0).update(verify_alert_at=now, verify_alert_count=1):
+        return 'first'
+    start, end = VERIFY_REMIND_HOURS
+    if not start <= timezone.localtime(now).hour < end:
+        return None
+    if rows.filter(verify_alert_count=1, verify_alert_at__lte=now - VERIFY_REMIND_AFTER).update(
+            verify_alert_at=now, verify_alert_count=2):
+        return 'reminder'
+    return None
+
+
+def _held_line(student, topup, payment) -> str:
+    """``Ana López · $200.00 · control IK000815 · folio 815``"""
+    from apps.cafeteria.schedule import format_amount
+
+    checkout = payment.banorte_checkout()
+    parts = [student.user.full_name, format_amount(payment.amount)]
+    if checkout is not None:
+        parts.append(f'control {checkout.control_number}')
+    parts.append(f'folio {payment.pk}')
+    return ' · '.join(parts)
+
+
+def notify_staff_held_unverified(held, now=None) -> int:
+    """Tell the cafetería staff, the same day, that paid top-ups are already in
+    Loyverse but cannot reach the wallet until verified in MultiCobros.
+
+    ``held`` is ``[(student, topup, payment), ...]`` from one POS mirror pass.
+    Each top-up is announced once, plus one reminder (``_claim_verify_alert``);
+    one short in-app notice per staff account and one email to all of them,
+    with a button to «Por aplicar». Returns how many top-ups it announced.
+    """
+    from apps.cafeteria.schedule import format_amount
+    from apps.portal.emailing import EmailContent, portal_url
+    from apps.portal.models import Notification
+    from apps.portal.services import notify, send_email
+
+    now = now or timezone.now()
+    claimed, seen = [], set()
+    for student, topup, payment in held:
+        if topup.pk in seen:
+            continue
+        seen.add(topup.pk)
+        kind = _claim_verify_alert(topup.pk, now)
+        if kind:
+            claimed.append((kind, student, topup, payment))
+    if not claimed:
+        return 0
+
+    one = len(claimed) == 1
+    total = sum((Decimal(str(p.amount)) for _, _, _, p in claimed), Decimal('0'))
+    lines = [_held_line(s, t, p) for _, s, t, p in claimed]
+    reminder = all(kind == 'reminder' for kind, *_ in claimed)
+    title = (f'Por verificar: {claimed[0][1].user.full_name}, {format_amount(total)}' if one
+             else f'Por verificar: {len(claimed)} recargas ya en Loyverse ({format_amount(total)})')
+    if reminder:
+        title = f'Recordatorio · {title}'
+    intro = ('Ya está cargada en Loyverse, pero no se suma al saldo hasta verificarla en MultiCobros.'
+             if one else
+             'Ya están cargadas en Loyverse, pero no se suman al saldo hasta verificarlas en MultiCobros.')
+    todo = (f'Verifíque{"la" if one else "las"} en {PAID_QUEUE_WHERE} → «Verificar en MultiCobros». '
+            f'Al verificar{"la" if one else "las"}, se aplica{"" if one else "n"} al saldo de inmediato.')
+    message = '\n\n'.join([intro, '\n'.join(f'• {line}' for line in lines), todo])
+
+    people = cafeteria_staff()
+    for person in people:
+        notify(person, Notification.NotifType.CAFETERIA, title, message, email=False, fanout=False)
+    emails = [p.email for p in people if p.email]
+    if emails:
+        if one:
+            _, student, _, payment = claimed[0]
+            checkout = payment.banorte_checkout()
+            details = [('Alumno', student.user.full_name), ('Monto', format_amount(payment.amount))]
+            if checkout is not None:
+                details.append(('Número de control', checkout.control_number))
+            details.append(('Folio', str(payment.pk)))
+            items = []
+        else:
+            details, items = [], lines
+        content = EmailContent(
+            title=title, intro=intro, category='Cafetería', tone='warning',
+            details=details, items=items, paragraphs=[todo],
+            cta_label='Abrir «Por aplicar»', cta_url=portal_url(PAID_QUEUE_PATH),
+            link_fallback=False, reason='Aviso interno de la consola del Colegio Interlaken.')
+        send_email(f'Interlaken: {title}', message, emails, content=content)
+    logger.info('Held-unverified notice (%s) for top-up(s) %s sent to %d staff.',
+                'reminder' if reminder else 'first',
+                ', '.join(str(t.pk) for _, _, t, _ in claimed), len(people))
+    return len(claimed)
+
+
+def apply_after_verification(payment) -> dict:
+    """Right after «Verificar en MultiCobros»: apply the top-up now when
+    Loyverse already holds it, instead of waiting for the next 5-minute pass.
+
+    Runs ``mirror_pos_topups`` (the path of the cron and the Loyverse webhook:
+    same row locks, same exact-gap match, the unique ``topup-payment-<id>``
+    ledger key, the same audit record and family notice) for this one
+    student, with their Loyverse card read fresh. It never credits what the
+    mirror would not: another unverified approval still waits and a gap that
+    matches no paid top-up is still held. Call it after the verification has
+    committed; a failure here leaves the top-up for the cron.
+
+    Returns ``{'apply_state', 'balance'}``: ``applied`` (``balance`` is the
+    new wallet figure), ``waiting_verification`` (Loyverse holds it together
+    with another paid top-up of the student still to verify: the mirror only
+    applies a gap it can explain entirely, so both go in once that one is
+    verified; the 2026-11-18 $200 + $244 case), ``waiting_pos`` (Loyverse
+    does not show it yet), ``pos_unknown`` (Loyverse could not be read) or
+    ``not_applicable`` (not a paid card top-up waiting for its POS load).
+    """
+    from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
+    from apps.payments.models import Payment
+
+    payment = (Payment.objects.select_related('banorte', 'related_topup__student')
+               .filter(pk=payment.pk).first())
+    topup = payment.related_topup if payment is not None else None
+    if (topup is None or topup.method != TopUpRequest.Method.ONLINE
+            or topup.status != TopUpRequest.Status.PAID
+            or payment.status != Payment.Status.SUCCESS
+            or _simulation_refused(payment) or payment.needs_bank_verification()):
+        return {'apply_state': 'not_applicable', 'balance': None}
+    student = topup.student
+    if not student.loyverse_id:
+        return {'apply_state': 'waiting_pos', 'balance': None}
+    try:
+        customer = get_customer_by_id(student.loyverse_id)
+    except LoyverseError as exc:
+        logger.warning('Apply after verification of payment #%s: Loyverse read failed (%s); '
+                       'the next sync applies it.', payment.pk, exc)
+        return {'apply_state': 'pos_unknown', 'balance': None}
+
+    # One customer in the list: the counters describe this student only.
+    result = mirror_pos_topups(customers=[customer], fresh=True)
+
+    topup.refresh_from_db(fields=['status'])
+    if topup.status != TopUpRequest.Status.COMPLETED:
+        state = 'waiting_verification' if result.get('held_unverified') else 'waiting_pos'
+        return {'apply_state': state, 'balance': None}
+    balance = (CafeteriaBalance.objects.filter(student=student)
+               .values_list('balance', flat=True).first())
+    return {'apply_state': 'applied',
+            'balance': None if balance is None else f'{Decimal(str(balance)):.2f}'}
 
 
 def _paid_payment(topup, *, lock=False):
@@ -2454,6 +2655,7 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     total = drift_total = applied_paid_total = Decimal('0')
     stamp: list[int] = []
     applied_notices: list = []
+    held_notices: list = []             # (student, topup, payment) in Loyverse, unverified
     now = timezone.now()
 
     for student in students:
@@ -2520,6 +2722,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
                 stamp.append(student.id)
                 if applied is WAITS_VERIFICATION:
                     held_unverified += 1
+                    # The money is in Loyverse already: tell the staff today
+                    # (once per top-up, see notify_staff_held_unverified).
+                    held_notices.extend(
+                        (student, t, p) for t, p in (_match_paid_topups(paid, delta) or [])
+                        if p.needs_bank_verification())
                     continue
                 if applied is None:
                     held_paid += 1
@@ -2569,6 +2776,11 @@ def mirror_pos_topups(customers=None, *, notify=True, fresh=None) -> dict:
     if notify:
         for topup, balance in applied_notices:
             notify_topup_applied(topup, balance)
+        if held_notices:
+            try:
+                notify_staff_held_unverified(held_notices, now)
+            except Exception:  # noqa: BLE001 — a staff notice never undoes the pass
+                logger.exception('Held-unverified staff notice failed')
 
     result = {'credited': credited, 'total': total, 'in_sync': in_sync, 'below': below,
               'deferred': deferred, 'drift_total': drift_total,

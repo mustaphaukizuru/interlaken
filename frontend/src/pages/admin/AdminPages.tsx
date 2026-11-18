@@ -95,14 +95,14 @@ export default function AdminPages() {
         </div>
       ),
     },
-    { id: 'slug', header: 'Dirección', sortKey: 'slug', minWidth: 140, className: 'font-mono text-xs text-subtle', cell: (p) => `/${p.slug}` },
-    { id: 'template', header: 'Plantilla', sortKey: 'template', minWidth: 140, className: 'text-muted', cell: (p) => TEMPLATES.find((t) => t.value === p.template)?.label ?? p.template },
     {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 170,
       cell: (p) => { const st = pageStatusLabel(p); return <Badge variant={st.tone}>{st.label}</Badge>; },
     },
+    { id: 'slug', header: 'Dirección', sortKey: 'slug', minWidth: 140, className: 'font-mono text-xs text-subtle', cell: (p) => `/${p.slug}` },
     { id: 'updated', header: 'Actualizada', sortKey: 'updated', minWidth: 150, className: 'whitespace-nowrap text-xs text-muted', cell: (p) => formatDateTime(p.updated_at) || '—' },
     { id: 'published', header: 'Publicada', sortKey: 'published', minWidth: 150, defaultHidden: true, className: 'whitespace-nowrap text-xs text-muted', cell: (p) => formatDateTime(p.published_at) || '—' },
+    { id: 'template', header: 'Plantilla', sortKey: 'template', minWidth: 140, defaultHidden: true, className: 'text-muted', cell: (p) => TEMPLATES.find((t) => t.value === p.template)?.label ?? p.template },
   ];
 
   return (

@@ -750,7 +750,7 @@ export const paymentsApi = {
   /** Staff confirm the approved operation appears in MultiCobros (before the POS load):
    *  the referencia and amount they read there must match the payment. */
   verifyBanorte: (paymentId: number, body: { referencia: string; amount: string }) =>
-    api.post(`/payments/admin/${paymentId}/banorte-verify/`, body),
+    api.post<import('@/types').BanorteVerifyResult>(`/payments/admin/${paymentId}/banorte-verify/`, body),
 
   /** "Conciliar con MultiCobros" for a pending or soft-failed Banorte payment. */
   reconcileBanorte: (paymentId: number, body:

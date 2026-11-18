@@ -54,10 +54,6 @@ export function deadlineLabel(r: Pick<ArcoRequest, 'status' | 'days_left' | 'is_
 }
 
 const COLUMNS: Column<ArcoRequest>[] = [
-  {
-    id: 'date', header: 'Recibida', sortKey: 'date', minWidth: 120, className: 'whitespace-nowrap text-muted',
-    cell: (r) => new Date(r.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' }),
-  },
   { id: 'type', header: 'Derecho', sortKey: 'type', hideable: false, minWidth: 120, className: 'font-semibold text-ink', cell: (r) => TYPE[r.request_type] ?? r.request_type },
   {
     id: 'requester', header: 'Solicitante', sortKey: 'requester', hideable: false, minWidth: 180,
@@ -68,7 +64,6 @@ const COLUMNS: Column<ArcoRequest>[] = [
       </div>
     ),
   },
-  { id: 'channel', header: 'Canal', minWidth: 100, className: 'text-muted', cell: (r) => CHANNEL[r.channel] ?? r.channel },
   { id: 'status', header: 'Estado', sortKey: 'status', minWidth: 110, cell: (r) => <Badge variant={STATUS[r.status]?.variant ?? 'neutral'}>{STATUS[r.status]?.label ?? r.status}</Badge> },
   {
     id: 'deadline', header: 'Plazo', sortKey: 'deadline', minWidth: 130,
@@ -78,8 +73,13 @@ const COLUMNS: Column<ArcoRequest>[] = [
       </span>
     ),
   },
-  { id: 'details', header: 'Detalle', minWidth: 200, defaultHidden: true, className: 'max-w-xs truncate text-xs text-muted', cell: (r) => r.details || '—' },
-  { id: 'resolution', header: 'Resolución', minWidth: 200, defaultHidden: true, className: 'max-w-xs truncate text-xs text-muted', cell: (r) => r.resolution_note || '—' },
+  { id: 'channel', header: 'Canal', minWidth: 100, className: 'text-muted', cell: (r) => CHANNEL[r.channel] ?? r.channel },
+  {
+    id: 'date', header: 'Recibida', sortKey: 'date', minWidth: 120, className: 'whitespace-nowrap text-muted',
+    cell: (r) => new Date(r.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' }),
+  },
+  { id: 'details', header: 'Detalle', minWidth: 200, defaultHidden: true, truncate: 320, className: 'text-xs text-muted', cell: (r) => r.details },
+  { id: 'resolution', header: 'Resolución', minWidth: 200, defaultHidden: true, truncate: 320, className: 'text-xs text-muted', cell: (r) => r.resolution_note },
 ];
 
 /** /admin/arco — ARCO workflow + privacidad@ intake (BACKLOG P5-5) on the Data Ops list:

@@ -33,6 +33,7 @@ import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/data
 import { apiErrorMessage, fieldErrorsOrNull } from '@/lib/apiErrors';
 import { StaffAccessFields, StaffAccessModal, StaffAccessSummary, type StaffAccess } from '@/components/admin/StaffAccessFields';
 import { PUESTOS } from '@/lib/areaCatalog';
+import { shortDate } from '@/lib/tableFormat';
 
 const ROLE: Record<string, string> = { admin: 'Administrador', staff: 'Personal' };
 const ROLE_OPTIONS = Object.entries(ROLE).map(([value, label]) => ({ value, label }));
@@ -127,10 +128,17 @@ export default function AdminStaffUsers() {
           </button>
           {u.id === me?.id && <span className="text-xs font-normal text-subtle">(usted)</span>}
           {u.is_superuser && <Badge variant="warning">Superusuario</Badge>}
+          {/* The address under the name: the account's identity, without a column of its own. */}
+          {u.full_name && <span className="block w-full truncate text-xs text-subtle" title={u.email}>{u.email}</span>}
         </span>
       ),
     },
-    { id: 'email', header: 'Correo', sortKey: 'email', minWidth: 180, className: 'text-xs text-subtle', cell: (u) => u.email },
+    {
+      id: 'is_active', header: 'Estado', sortKey: 'is_active', minWidth: 100,
+      cell: (u) => (u.archived_at
+        ? <Badge variant="neutral">Archivada</Badge>
+        : <Badge variant={u.is_active ? 'success' : 'neutral'}>{u.is_active ? 'Activa' : 'Inactiva'}</Badge>),
+    },
     {
       id: 'role', header: 'Rol', sortKey: 'role', minWidth: 150,
       cell: (u) => (u.is_superuser || u.id === me?.id ? (
@@ -149,22 +157,17 @@ export default function AdminStaffUsers() {
       )),
     },
     {
-      id: 'access', header: 'Puesto y áreas', minWidth: 220,
+      id: 'access', header: 'Puesto y áreas', minWidth: 180,
       cell: (u) => <StaffAccessSummary user={u} />,
     },
     {
-      id: 'is_active', header: 'Estado', sortKey: 'is_active', minWidth: 100,
-      cell: (u) => (u.archived_at
-        ? <Badge variant="neutral">Archivada</Badge>
-        : <Badge variant={u.is_active ? 'success' : 'neutral'}>{u.is_active ? 'Activa' : 'Inactiva'}</Badge>),
+      id: 'last_login', header: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'whitespace-nowrap text-xs text-subtle',
+      cell: (u) => (u.last_login ? shortDate(u.last_login) : 'Nunca'),
     },
+    { id: 'email', header: 'Correo', sortKey: 'email', defaultHidden: true, minWidth: 180, truncate: 240, className: 'text-xs text-subtle', cell: (u) => u.email },
     {
-      id: 'last_login', header: 'Último acceso', sortKey: 'last_login', minWidth: 120, className: 'text-xs text-subtle',
-      cell: (u) => (u.last_login ? new Date(u.last_login).toLocaleDateString('es-MX') : 'Nunca'),
-    },
-    {
-      id: 'date_joined', header: 'Alta', sortKey: 'date_joined', defaultHidden: true, minWidth: 110, className: 'text-xs text-subtle',
-      cell: (u) => new Date(u.date_joined).toLocaleDateString('es-MX'),
+      id: 'date_joined', header: 'Alta', sortKey: 'date_joined', defaultHidden: true, minWidth: 110, className: 'whitespace-nowrap text-xs text-subtle',
+      cell: (u) => shortDate(u.date_joined),
     },
     {
       id: 'has_password', header: 'Contraseña', defaultHidden: true, minWidth: 110, className: 'text-xs text-subtle',

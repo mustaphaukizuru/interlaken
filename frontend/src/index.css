@@ -225,7 +225,7 @@
   .admin-table tbody td { @apply px-3 py-2.5 align-middle; }
   .admin-table tbody tr { @apply border-t border-line; }
   .admin-table tbody tr:hover { @apply bg-cream; }
-  .admin-table .num { @apply text-right tabular-nums; }
+  .admin-table .num { @apply text-right tabular-nums whitespace-nowrap; }
 
   /* DataTable v2 (Data Ops round): selection, pinned first column, resizable
      widths, static header, clickable rows. All ≥ md; the card mode below
@@ -288,7 +288,8 @@
       min-height: 42px;
     }
     .admin-table-wrap:not(.hidden) tbody td:first-child { @apply border-t-0; }
-    .admin-table-wrap:not(.hidden) tbody td:empty { display: none; }
+    .admin-table-wrap:not(.hidden) tbody td:empty,
+    .admin-table-wrap:not(.hidden) tbody td.admin-table__blank { display: none; }
     .admin-table-wrap:not(.hidden) tbody td::before {
       content: attr(data-label);
       @apply flex-shrink-0 text-left font-head text-[10.5px] font-bold uppercase tracking-wide text-muted;

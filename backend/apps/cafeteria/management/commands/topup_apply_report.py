@@ -75,7 +75,9 @@ class Command(BaseCommand):
         for p in (Payment.objects.filter(related_topup__in=topups, status=Payment.Status.SUCCESS)
                   .select_related('banorte').order_by('created_at', 'pk')):
             payments[p.related_topup_id] = p      # newest wins
-        rows, overdue_ids, unverified_ids = [], [], []
+        # ``rows``: the detailed log line (stdout, unchanged); ``lines``: the
+        # compact one the staff read in the notice and the email.
+        rows, lines, overdue_ids, unverified_ids = [], [], [], []
         for t in topups:
             try:
                 code = t.student.loyverse_profile.customer_code or '-'
@@ -102,6 +104,13 @@ class Command(BaseCommand):
                    + (f' (número de control {checkout.control_number})' if checkout else '')
                    if unverified else '')
             )
+            lines.append(' · '.join(filter(None, [
+                t.student.user.full_name, format_amount(t.amount), f'Loyverse {code}',
+                f'folio {payment.pk if payment else "-"}',
+                'VENCIDA' if late else '',
+                ('SIN VERIFICAR' + (f' (control {checkout.control_number})' if checkout else ''))
+                if unverified else '',
+            ])))
         for row in rows:
             self.stdout.write(row)
         if no_email:
@@ -114,24 +123,7 @@ class Command(BaseCommand):
             return
 
         total = sum((t.amount for t in topups), Decimal('0'))
-        title = (f'{len(rows)} recarga(s) en línea por cargar en el POS'
-                 + (f' ({len(overdue_ids)} vencida(s))' if overdue_ids else '')
-                 + (f' ({len(unverified_ids)} sin verificar)' if unverified_ids else ''))
-        verify_first = (
-            '\n\nLas marcadas SIN VERIFICAR: antes de cargarlas, búsquelas en MultiCobros por '
-            'su número de control y confírmelas en Cafetería → POS Loyverse → «Por aplicar» → '
-            '«Verificar en MultiCobros» (referencia y monto). La app no suma al saldo una '
-            'recarga sin verificar, aunque ya esté en Loyverse.'
-            if unverified_ids else '')
-        body = (
-            f'Recargas pagadas con tarjeta que aún no están en el saldo de cafetería '
-            f'(total {format_amount(total)}):\n\n' + '\n'.join(rows)
-            + verify_first
-            + '\n\nCárguelas en el POS de Loyverse (cliente de cada alumno). En unos minutos '
-            'la app las detecta y las aplica; también puede usar Cafetería → POS Loyverse → '
-            '«Por aplicar» → «Aplicar». Las marcadas VENCIDA ya pasaron de la hora prometida '
-            'a la familia.'
-        )
+        title, body, content = _notice(lines, total, len(overdue_ids), len(unverified_ids))
         from apps.portal.models import Notification
         from apps.portal.services import notify, send_email
 
@@ -140,7 +132,7 @@ class Command(BaseCommand):
             notify(person, Notification.NotifType.CAFETERIA, title, body,
                    email=False, fanout=False)
         emails = [p.email for p in people if p.email]
-        sent = bool(emails) and send_email(f'Interlaken: {title}', body, emails)
+        sent = bool(emails) and send_email(f'Interlaken: {title}', body, emails, content=content)
         OpsStatus.set(STATE_KEY, {'fingerprint': fingerprint, 'alerted_at': now.isoformat()})
         self.stdout.write(f'notified {len(people)} in-app; email {"sent" if sent else "NOT sent"}')
 
@@ -149,9 +141,46 @@ class Command(BaseCommand):
         """Every active admin, and every active staff account whose puesto
         includes the cafetería area: the cashier does the 07:30 load, and
         until 2026-10-29 only admins heard about it."""
-        from apps.accounts.models import User
+        from apps.cafeteria.services import cafeteria_staff
 
-        admins = list(User.objects.filter(role=User.Role.ADMIN, is_active=True))
-        cashiers = [u for u in User.objects.filter(role=User.Role.STAFF, is_active=True)
-                    if 'cafeteria' in (u.staff_areas or [])]
-        return admins + cashiers
+        return cafeteria_staff()
+
+
+def _plural(n: int, one: str, many: str) -> str:
+    return f'{n} {one if n == 1 else many}'
+
+
+def _notice(lines, total, overdue: int, unverified: int):
+    """``(title, text, EmailContent)`` of the staff notice: a short title, one
+    compact line per top-up, and what to do said once at the end (it was one
+    long paragraph until 2026-11-18)."""
+    from apps.cafeteria.schedule import format_amount
+    from apps.cafeteria.services import PAID_QUEUE_PATH, PAID_QUEUE_WHERE
+    from apps.portal.emailing import EmailContent, portal_url
+
+    title = ' · '.join(filter(None, [
+        f'{_plural(len(lines), "recarga", "recargas")} por cargar en el POS',
+        _plural(overdue, 'vencida', 'vencidas') if overdue else '',
+        f'{unverified} sin verificar' if unverified else '',
+    ]))
+    intro = f'Total {format_amount(total)}. Recargas con tarjeta ya cobradas que aún no están en el saldo:'
+    steps = []
+    if unverified:
+        steps.append('SIN VERIFICAR: búsquela en MultiCobros por su número de control y confírmela '
+                     'con «Verificar en MultiCobros». Sin eso no se suma al saldo, aunque ya esté '
+                     'en Loyverse.')
+    steps.append('Cargue cada monto al cliente de Loyverse del alumno. La app lo aplica solo en unos '
+                 'minutos (o use «Aplicar»).')
+    todo = [f'{n}. {step}' for n, step in enumerate(steps, 1)]
+    if overdue:
+        todo.append('VENCIDA: ya pasó la hora prometida a la familia.')
+    where = f'En {PAID_QUEUE_WHERE}.'
+    body = '\n\n'.join([intro, '\n'.join(f'• {line}' for line in lines),
+                        'Qué hacer:\n' + '\n'.join(todo), where])
+    content = EmailContent(
+        title=title, intro=intro, category='Cafetería',
+        tone='warning' if (overdue or unverified) else 'brand',
+        items=list(lines), paragraphs=['Qué hacer:', *todo],
+        cta_label='Abrir «Por aplicar»', cta_url=portal_url(PAID_QUEUE_PATH),
+        link_fallback=False, reason='Aviso interno de la consola del Colegio Interlaken.')
+    return title, body, content

@@ -227,7 +227,12 @@ function PreRegistrationsSection() {
 
   const columns: Column<PreRegistrationRow>[] = [
     { id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 160, className: 'font-medium text-ink', cell: (p) => p.child_name },
-    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 110, className: 'text-muted', cell: (p) => p.grade_applying },
+    {
+      id: 'status', header: 'Estado', sortKey: 'status', minWidth: 140,
+      cell: (p) => <StatusSelect row={p} disabled={savingId === p.id} onChange={(t) => changeStatus(p, t)} />,
+    },
+    { id: 'date', header: 'Fecha', sortKey: 'created_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (p) => fmtDate(p.created_at) },
+    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 110, className: 'whitespace-nowrap text-muted', cell: (p) => p.grade_applying },
     { id: 'level', header: 'Nivel', sortKey: 'level', minWidth: 100, defaultHidden: true, className: 'text-muted', cell: (p) => PREREG_LEVELS.find((l) => l.value === p.level)?.label ?? p.level },
     { id: 'cycle', header: 'Ciclo', minWidth: 100, defaultHidden: true, className: 'text-muted whitespace-nowrap', cell: (p) => p.cycle ?? '—' },
     { id: 'parent', header: 'Tutor', sortKey: 'parent', minWidth: 140, className: 'text-muted', cell: (p) => p.parent_name },
@@ -235,18 +240,13 @@ function PreRegistrationsSection() {
       id: 'contact', header: 'Contacto', minWidth: 180,
       cell: (p) => (
         <>
-          <div className="break-all text-muted">{p.parent_email}</div>
+          <div className="max-w-[240px] truncate text-muted" title={p.parent_email}>{p.parent_email}</div>
           <div className="text-xs text-subtle">{p.parent_phone}</div>
         </>
       ),
     },
     { id: 'visit', header: 'Visita', minWidth: 80, defaultHidden: true, className: 'text-muted', cell: (p) => (p.wants_visit ? 'Sí' : 'No') },
     { id: 'source', header: 'Origen', minWidth: 120, defaultHidden: true, className: 'text-muted', cell: (p) => p.referral_source || '—' },
-    { id: 'date', header: 'Fecha', sortKey: 'created_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (p) => fmtDate(p.created_at) },
-    {
-      id: 'status', header: 'Estado', sortKey: 'status', minWidth: 140,
-      cell: (p) => <StatusSelect row={p} disabled={savingId === p.id} onChange={(t) => changeStatus(p, t)} />,
-    },
   ];
 
   return (
@@ -444,7 +444,12 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
 
   const columns: Column<RegistrationRow>[] = [
     { id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 160, className: 'font-medium text-ink', cell: (r) => r.child_name },
-    { id: 'grade', header: 'Grado', minWidth: 110, className: 'text-muted', cell: (r) => r.grade_applying },
+    {
+      id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
+      cell: (r) => { const meta = STATUS_BADGE[r.status] ?? STATUS_BADGE.draft; return <Badge variant={meta.variant}>{meta.label}</Badge>; },
+    },
+    { id: 'submitted', header: 'Enviada', sortKey: 'submitted_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (r) => fmtDate(r.submitted_at) },
+    { id: 'grade', header: 'Grado', minWidth: 110, className: 'whitespace-nowrap text-muted', cell: (r) => r.grade_applying },
     { id: 'level', header: 'Nivel', sortKey: 'level', minWidth: 100, defaultHidden: true, className: 'text-muted capitalize', cell: (r) => r.level || '—' },
     { id: 'cycle', header: 'Ciclo', minWidth: 100, defaultHidden: true, className: 'text-muted whitespace-nowrap', cell: (r) => r.cycle },
     {
@@ -452,17 +457,12 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
       cell: (r) => (
         <>
           <div className="text-muted">{r.parent1_name}</div>
-          <div className="break-all text-xs text-subtle">{r.parent1_email}</div>
+          <div className="max-w-[240px] truncate text-xs text-subtle" title={r.parent1_email}>{r.parent1_email}</div>
         </>
       ),
     },
     { id: 'curp', header: 'CURP', minWidth: 150, defaultHidden: true, className: 'font-mono text-xs text-subtle', cell: (r) => r.child_curp || '—' },
-    { id: 'docs', header: 'Docs', minWidth: 70, className: 'text-muted whitespace-nowrap tabular-nums', cell: (r) => `${r.doc_verified}/${r.doc_count}` },
-    {
-      id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
-      cell: (r) => { const meta = STATUS_BADGE[r.status] ?? STATUS_BADGE.draft; return <Badge variant={meta.variant}>{meta.label}</Badge>; },
-    },
-    { id: 'submitted', header: 'Enviada', sortKey: 'submitted_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (r) => fmtDate(r.submitted_at) },
+    { id: 'docs', header: 'Docs', label: 'Documentos verificados', align: 'right', minWidth: 70, className: 'text-muted', cell: (r) => `${r.doc_verified}/${r.doc_count}` },
     { id: 'created', header: 'Creada', sortKey: 'created_at', minWidth: 110, defaultHidden: true, className: 'text-subtle whitespace-nowrap', cell: (r) => fmtDate(r.created_at) },
     { id: 'updated', header: 'Actualizada', sortKey: 'updated_at', minWidth: 110, defaultHidden: true, className: 'text-subtle whitespace-nowrap', cell: (r) => fmtDate(r.updated_at) },
   ];

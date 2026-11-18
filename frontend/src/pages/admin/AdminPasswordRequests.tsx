@@ -103,10 +103,6 @@ export default function AdminPasswordRequests() {
 
   const columns: Column<PasswordRequest>[] = [
     {
-      id: 'created_at', header: 'Fecha', sortKey: 'created_at', hideable: false, minWidth: 140, className: 'whitespace-nowrap text-xs text-muted',
-      cell: (r) => new Date(r.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
-    },
-    {
       id: 'who', header: 'Cuenta', sortKey: 'requested_email', hideable: false, minWidth: 200,
       cell: (r) => (
         <div className="min-w-0">
@@ -118,13 +114,17 @@ export default function AdminPasswordRequests() {
         </div>
       ),
     },
-    { id: 'requester', header: 'Solicitante', minWidth: 130, className: 'text-xs text-muted', cell: (r) => r.requester_name || '—' },
-    { id: 'channel', header: 'Canal', sortKey: 'channel', minWidth: 100, className: 'text-xs text-muted', cell: (r) => CHANNEL[r.channel] ?? r.channel },
     {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 110,
       cell: (r) => <Badge variant={STATUS[r.status]?.variant ?? 'neutral'}>{STATUS[r.status]?.label ?? r.status}</Badge>,
     },
-    { id: 'note', header: 'Nota', minWidth: 160, className: 'max-w-xs truncate text-xs text-muted', cell: (r) => <span title={r.note}>{r.note || '—'}</span> },
+    {
+      id: 'created_at', header: 'Fecha', sortKey: 'created_at', hideable: false, minWidth: 140, className: 'whitespace-nowrap text-xs text-muted',
+      cell: (r) => new Date(r.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
+    },
+    { id: 'requester', header: 'Solicitante', minWidth: 130, className: 'text-xs text-muted', cell: (r) => r.requester_name || '—' },
+    { id: 'channel', header: 'Canal', sortKey: 'channel', minWidth: 100, className: 'text-xs text-muted', cell: (r) => CHANNEL[r.channel] ?? r.channel },
+    { id: 'note', header: 'Nota', minWidth: 160, truncate: 300, className: 'text-xs text-muted', cell: (r) => r.note },
     {
       id: 'resolved', header: 'Atendió', sortKey: 'resolved_at', defaultHidden: true, minWidth: 140, className: 'text-xs text-subtle',
       cell: (r) => (r.resolved_at ? `${r.resolved_by_name || '—'} · ${new Date(r.resolved_at).toLocaleDateString('es-MX')}` : '—'),
