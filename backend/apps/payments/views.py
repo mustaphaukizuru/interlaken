@@ -190,6 +190,18 @@ class BanorteResultView(APIView):
                          'detail': body.get('detail', '')}, status=http_status)
 
 
+def checkout_for_verify(pk):
+    """The checkout of payment ``pk``, row-locked for «Verificar en MultiCobros».
+
+    Locks the checkout and its payment only. ``verified_by`` is empty until
+    someone verifies, so it is a LEFT JOIN, and PostgreSQL refuses FOR UPDATE
+    on the nullable side of an outer join: until 2026-11-18 every verification
+    was a 500 in production (SQLite, which the tests use, ignores row locks).
+    """
+    return (BanorteCheckout.objects.select_for_update(of=('self', 'payment'))
+            .select_related('payment', 'verified_by').filter(payment_id=pk))
+
+
 class AdminBanorteVerifyView(APIView):
     """POST /api/v1/payments/admin/<pk>/banorte-verify/  ``{referencia, amount}``
 
@@ -212,8 +224,7 @@ class AdminBanorteVerifyView(APIView):
         referencia = str(request.data.get('referencia', '') or '').strip()
         amount = parse_amount(request.data.get('amount', ''))
         with db_transaction.atomic():
-            checkout = (BanorteCheckout.objects.select_for_update()
-                        .select_related('payment', 'verified_by').filter(payment_id=pk).first())
+            checkout = checkout_for_verify(pk).first()
             if checkout is None:
                 raise Http404
             payment = checkout.payment
