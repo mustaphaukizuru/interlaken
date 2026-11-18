@@ -70,7 +70,12 @@ export function NotificationsMenu() {
 
   const header = (close: () => void, withClose: boolean) => (
     <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-      <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
+      <span className="flex items-center gap-2">
+        <span className="font-head text-sm font-bold text-ink">Notificaciones</span>
+        {unread > 0 && (
+          <span className="rounded-full bg-coral/10 px-2 py-0.5 text-[11px] font-semibold text-coral-700">{unread} sin leer</span>
+        )}
+      </span>
       <div className="flex items-center gap-3">
         {unread > 0 && (
           <button

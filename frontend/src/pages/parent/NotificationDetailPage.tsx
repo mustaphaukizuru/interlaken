@@ -1,15 +1,15 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, Clock, Send } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { NotificationBody } from '@/components/portal/NotificationBody';
 import { NOTIF_META } from '@/lib/notifications';
 import { portalApi } from '@/services/api';
 
@@ -33,7 +33,6 @@ export default function NotificationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const notifId = Number(id);
   const qc = useQueryClient();
-  const navigate = useNavigate();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['notification', notifId],
@@ -76,9 +75,9 @@ export default function NotificationDetailPage() {
       <PageHeader
         title="Notificación"
         actions={(
-          <Button variant="secondary" onClick={() => navigate('/portal/notificaciones')}>
-            <ArrowLeft size={16} aria-hidden="true" /> Todas
-          </Button>
+          <Link to="/portal/notificaciones" className="btn-outline min-h-[44px]">
+            <ArrowLeft size={16} aria-hidden="true" /> Volver a notificaciones
+          </Link>
         )}
       />
 
@@ -87,7 +86,7 @@ export default function NotificationDetailPage() {
       ) : isLoading || !data ? (
         <Card><ListSkeleton /></Card>
       ) : (
-        <Card>
+        <Card className="mx-auto max-w-3xl">
           <div className="flex items-start gap-3">
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${meta.cls}`}>
               <Icon size={20} aria-hidden="true" />
@@ -107,9 +106,10 @@ export default function NotificationDetailPage() {
             </div>
           </div>
 
-          {/* whitespace-pre-line: notification bodies are composed with real
-              line breaks (balance alerts list the children one per line). */}
-          <p className="mt-5 whitespace-pre-line text-[15px] leading-relaxed text-ink">{data.message}</p>
+          {/* Paragraphs, lists, label/value rows and links from the plain
+              text the backend composes (balance alerts list the children one
+              per line; staff reports list every pending top-up). */}
+          <NotificationBody message={data.message} className="mt-5 border-t border-line pt-5" />
 
           {data.announcement_title && (
             <p className="mt-4 rounded-xl border border-line bg-cream-2 px-4 py-3 text-sm text-muted">
