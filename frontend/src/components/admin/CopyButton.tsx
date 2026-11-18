@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Check, Copy } from 'lucide-react';
+// Icons nothing else imports, so they ship inside this lazy console chunk
+// (Copy/Check are shared chunks: each would add a preload entry to the
+// public entry chunk, which is at its performance budget).
+import { CheckCheck as Check, ClipboardCopy as Copy } from 'lucide-react';
 
 /**
  * Small icon button that copies one value staff paste elsewhere (the número

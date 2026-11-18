@@ -1,16 +1,22 @@
 import { Link } from 'react-router-dom';
-import { formatDistanceStrict } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { ArrowRight, ShieldAlert } from 'lucide-react';
 import { formatMXN } from '@/lib/format';
 
-/** «hace 1 día», «hace 3 horas» since the oldest one was paid. */
+const unit = (n: number, one: string, many: string) => `hace ${n} ${n === 1 ? one : many}`;
+
+/** «hace 1 día», «hace 3 horas», «hace 20 minutos» since the oldest one was
+ *  paid. Hand-rolled: date-fns' relative formatter would pull its locale
+ *  chunks into this page's preload list in the public entry chunk. */
 function waitedFor(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return '';
-  const when = new Date(iso);
-  if (Number.isNaN(when.getTime())) return '';
-  if (now.getTime() - when.getTime() < 60_000) return 'hace un momento';
-  return formatDistanceStrict(when, now, { addSuffix: true, locale: es });
+  const ms = now.getTime() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return '';
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'hace un momento';
+  if (minutes < 60) return unit(minutes, 'minuto', 'minutos');
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return unit(hours, 'hora', 'horas');
+  return unit(Math.floor(hours / 24), 'día', 'días');
 }
 
 /**
