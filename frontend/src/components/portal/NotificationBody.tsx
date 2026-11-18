@@ -31,17 +31,24 @@ function List({ items }: { items: string[] }) {
             <p className="font-semibold text-ink"><Linked text={p.main} /></p>
             {p.details.length > 0 && (
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted">
-                {p.details.map((d, j) => (d.flag ? (
-                  <span key={j} className="inline-flex flex-wrap items-center gap-1.5">
-                    <span className="badge-amber">{d.flag}</span>
-                    {d.text && <span className="text-ink"><Linked text={d.text} /></span>}
-                  </span>
-                ) : (
-                  <span key={j} className="inline-flex items-center gap-2">
-                    {j > 0 && !p.details[j - 1].flag && <span className="text-subtle" aria-hidden="true">·</span>}
-                    <Linked text={d.text} />
-                  </span>
-                )))}
+                {p.details.map((d, j) => {
+                  if (d.flag) {
+                    return (
+                      <span key={j} className="inline-flex flex-wrap items-center gap-1.5">
+                        <span className="badge-amber">{d.flag}</span>
+                        {d.text && <span className="text-ink"><Linked text={d.text} /></span>}
+                      </span>
+                    );
+                  }
+                  // The separator trails its detail, so a wrapped line never starts with «·».
+                  const next = p.details[j + 1];
+                  return (
+                    <span key={j} className="inline-flex items-center gap-2">
+                      <Linked text={d.text} />
+                      {next && !next.flag && <span className="text-subtle" aria-hidden="true">·</span>}
+                    </span>
+                  );
+                })}
               </p>
             )}
           </li>

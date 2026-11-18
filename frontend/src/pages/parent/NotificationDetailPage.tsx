@@ -86,7 +86,7 @@ export default function NotificationDetailPage() {
       ) : isLoading || !data ? (
         <Card><ListSkeleton /></Card>
       ) : (
-        <Card className="mx-auto max-w-3xl">
+        <Card className="max-w-3xl">
           <div className="flex items-start gap-3">
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${meta.cls}`}>
               <Icon size={20} aria-hidden="true" />
