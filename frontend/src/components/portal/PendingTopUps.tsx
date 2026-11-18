@@ -3,16 +3,24 @@ import toast from 'react-hot-toast';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { downloadBlob, paymentsApi } from '@/services/api';
 import { formatMXN } from '@/lib/format';
-import { applyPhrase, DEFAULT_WHATSAPP, formatWhatsapp, whatsappHref } from '@/lib/topupApply';
+import {
+  applyPhrase, DEFAULT_APPLY_TIME, DEFAULT_WHATSAPP, formatClock, formatWhatsapp, sentence, whatsappHref,
+} from '@/lib/topupApply';
 import type { PendingTopUp } from '@/types';
 
 /**
- * Paid card top-ups that are not in the balance yet: the school applies them
- * at the next POS load (school days, 7:30). Shown under the balance so a paid
- * recarga never looks lost, with the same-day route the school offers: send
- * the comprobante by WhatsApp.
+ * Paid card top-ups that are not in the balance yet: the school confirms each
+ * one with the bank and loads it at the cafetería (school days, from the
+ * policy's apply time, 7:30). Shown under the balance so a paid recarga never
+ * looks lost, with the same-day route the school offers: send the
+ * comprobante by WhatsApp.
  */
-export function PendingTopUps({ items, whatsapp = DEFAULT_WHATSAPP }: { items: PendingTopUp[]; whatsapp?: string }) {
+export function PendingTopUps({ items, whatsapp = DEFAULT_WHATSAPP, applyTime = DEFAULT_APPLY_TIME }: {
+  items: PendingTopUp[];
+  whatsapp?: string;
+  /** "07:30": when the school loads paid top-ups (``topup_policy.apply_time``). */
+  applyTime?: string;
+}) {
   if (!items.length) return null;
 
   const downloadReceipt = async (folio: number) => {
@@ -35,7 +43,11 @@ export function PendingTopUps({ items, whatsapp = DEFAULT_WHATSAPP }: { items: P
             </span>
           </p>
           <p className="mt-1 pl-6 text-xs leading-snug text-muted">
-            Pago recibido. Se sumará a su saldo {applyPhrase(t.apply_due_at)}
+            Recibimos su pago. El colegio lo confirma con el banco y lo carga en la cafetería en días hábiles,
+            a partir de las {formatClock(applyTime || DEFAULT_APPLY_TIME)}
+          </p>
+          <p className="mt-1 pl-6 text-xs leading-snug text-muted">
+            {sentence(`Se sumará a su saldo ${applyPhrase(t.apply_due_at)}`)}
             {t.folio ? <> · Folio {t.folio}</> : null}
           </p>
           {(whatsapp || t.folio) && (

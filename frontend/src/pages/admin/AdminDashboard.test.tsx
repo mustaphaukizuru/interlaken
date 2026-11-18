@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
@@ -80,6 +80,28 @@ describe('AdminDashboard', () => {
     const link = await screen.findByRole('link', { name: /3 recargas con tarjeta por aplicar/ });
     expect(link).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
     expect(link).toHaveTextContent('$450.00');
+  });
+
+  it('«Recargas pendientes de verificar»: count, total, oldest wait and the way to the queue', async () => {
+    const dayAgo = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    getDashboard.mockResolvedValue({ data: {
+      ...DASHBOARD, topups_to_verify: 2, topups_to_verify_total: '444.00', topups_to_verify_oldest: dayAgo,
+    } } as never);
+    renderWithProviders(<AdminDashboard />);
+    const card = await screen.findByRole('region', { name: 'Recargas pendientes de verificar' });
+    expect(card).toHaveTextContent('2 recargas');
+    expect(card).toHaveTextContent('$444.00');
+    expect(card).toHaveTextContent('La más antigua: hace 1 día');
+    expect(within(card).getByRole('link', { name: /Verificar ahora/ })).toHaveAttribute('href', '/admin/cafeteria?tab=pos');
+  });
+
+  it('hides the verification card when nothing waits', async () => {
+    getDashboard.mockResolvedValue({ data: {
+      ...DASHBOARD, topups_to_verify: 0, topups_to_verify_total: '0.00', topups_to_verify_oldest: null,
+    } } as never);
+    renderWithProviders(<AdminDashboard />);
+    expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
+    expect(screen.queryByText('Recargas pendientes de verificar')).toBeNull();
   });
 
   it('shows announcements empty state when there are none', async () => {

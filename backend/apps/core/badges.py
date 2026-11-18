@@ -66,7 +66,10 @@ def _compute_badges(user) -> dict:
     from apps.cafeteria.models import TopUpRequest
     from apps.content.forms import FormSubmission
     from apps.legal.models import ArcoRequest
-    from apps.payments.multicobros import online_topups_awaiting_staff
+    from apps.payments.multicobros import (
+        online_topups_awaiting_staff,
+        paid_topups_awaiting_verification,
+    )
 
     counters = {
         'admisiones': ('admisiones', lambda: (
@@ -79,6 +82,9 @@ def _compute_badges(user) -> dict:
             TopUpRequest.objects.filter(status=TopUpRequest.Status.PENDING,
                                         method=TopUpRequest.Method.OFFICE).count()
             + online_topups_awaiting_staff().count())),
+        # «Por verificar»: the part of the above only a MultiCobros check can
+        # move (paid by card, approval not verified), shown apart next to Cafetería.
+        'cafeteria_verificar': ('cafeteria', lambda: paid_topups_awaiting_verification().count()),
         'contrasenas': ('accesos', lambda: PasswordRequest.objects.filter(
             status=PasswordRequest.Status.OPEN).count()),
         'mensajes': ('mensajes', lambda: unhandled_contact_messages(None)),

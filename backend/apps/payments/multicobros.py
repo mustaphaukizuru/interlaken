@@ -330,6 +330,21 @@ def online_topups_awaiting_staff():
     ).distinct()
 
 
+def paid_topups_awaiting_verification():
+    """PAID card top-ups whose real (PRD) approval staff have not matched in
+    MultiCobros yet: nothing puts them in the wallet until someone verifies
+    them, not even the POS mirror. The console's «Por verificar» badge and the
+    dashboard card count these; same rule as ``Payment.needs_bank_verification``."""
+    from apps.cafeteria.services import paid_topups_pending
+
+    return paid_topups_pending().filter(
+        payments__status=Payment.Status.SUCCESS,
+        payments__banorte__mode="PRD",
+        payments__banorte__resultado_payw=BanorteCheckout.Result.APPROVED,
+        payments__banorte__verified_at__isnull=True,
+    ).distinct()
+
+
 def simulated_topup_ids():
     """``TopUpRequest`` ids paid in a Payworks simulation (subquery): never loaded into the POS."""
     return (

@@ -197,6 +197,17 @@ class TopUpRequest(models.Model):
     )
     applied_via = models.CharField(max_length=10, choices=AppliedVia.choices, blank=True)
 
+    # Staff notice «ya está en Loyverse, falta verificarla» (2026-11-18: two
+    # card top-ups sat in Loyverse unverified all morning and the office heard
+    # only from the parent). Set when the POS mirror holds this PAID top-up
+    # because its approval is not verified in MultiCobros yet; the count caps
+    # it at one notice and one reminder (``services.notify_staff_held_unverified``).
+    verify_alert_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Last staff notice that this top-up is in Loyverse but not verified.',
+    )
+    verify_alert_count = models.PositiveSmallIntegerField(default=0)
+
     class Meta:
         verbose_name = 'Solicitud de Recarga'
         verbose_name_plural = 'Solicitudes de Recarga'

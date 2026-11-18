@@ -572,7 +572,7 @@ export default function CafeteriaPage() {
                 )}
               </div>
 
-              <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} />
+              <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} applyTime={policy?.apply_time} />
 
               {left ? (
                 <p className="mt-3 rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-xs leading-snug text-muted">

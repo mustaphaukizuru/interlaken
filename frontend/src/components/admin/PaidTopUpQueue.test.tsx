@@ -22,6 +22,7 @@ vi.mock('react-hot-toast', () => {
 import toast from 'react-hot-toast';
 import { PaidTopUpQueue } from './PaidTopUpQueue';
 import { cafeteriaAdminApi } from '@/services/cafeteriaAdmin';
+import { paymentsApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
 
@@ -154,6 +155,86 @@ describe('PaidTopUpQueue («Por aplicar»)', () => {
     renderWithProviders(<PaidTopUpQueue />);
     expect(await screen.findByRole('button', { name: /Verificar en MultiCobros/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aplicar la recarga de Luis Pérez' })).toBeNull();
+  });
+
+  describe('«Verificar en MultiCobros» (2026-11-18)', () => {
+    const unverifiedRow = { ...row, banorte: { ...row.banorte, verified_at: null, verified_by_name: '', needs_verification: true } };
+    let writeText: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      api.topups.mockResolvedValue(ok({ count: 1, next: null, previous: null, results: [unverifiedRow] }));
+      writeText = vi.fn().mockResolvedValue(undefined);
+    });
+
+    async function verifyIt(response: unknown) {
+      vi.mocked(paymentsApi.verifyBanorte).mockResolvedValue(ok(response));
+      const u = userEvent.setup();
+      renderWithProviders(<PaidTopUpQueue />);
+      await u.click(await screen.findByRole('button', { name: /Verificar en MultiCobros/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Verificar operación en MultiCobros' });
+      await u.type(within(dialog).getByLabelText('Referencia en MultiCobros'), '248233587990');
+      await u.type(within(dialog).getByLabelText('Monto en MultiCobros'), '200');
+      await u.click(within(dialog).getByRole('button', { name: 'Sí, aparece aprobada' }));
+      await waitFor(() => expect(paymentsApi.verifyBanorte).toHaveBeenCalledWith(41, { referencia: '248233587990', amount: '200' }));
+      return { u, dialog };
+    }
+
+    it('says it was verified AND applied, with the new balance', async () => {
+      const { u, dialog } = await verifyIt({
+        payment_id: 41, verified_at: '2026-11-18T15:00:00Z', verified_by_name: 'Caja', apply_state: 'applied', balance: '250.00',
+      });
+      const status = await within(dialog).findByRole('status');
+      expect(status).toHaveTextContent('Verificada y aplicada · nuevo saldo $250.00');
+      expect(status).toHaveTextContent('Luis Pérez');
+      const done = within(dialog).getByRole('button', { name: 'Listo' });
+      await waitFor(() => expect(done).toHaveFocus());
+      await u.click(done);
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    it('says it waits for Loyverse when the money is not there yet', async () => {
+      const { dialog } = await verifyIt({ payment_id: 41, verified_at: 'x', verified_by_name: '', apply_state: 'waiting_pos', balance: null });
+      const status = await within(dialog).findByRole('status');
+      expect(status).toHaveTextContent('Verificada · se aplicará cuando esté cargada en Loyverse');
+      expect(status).toHaveTextContent('Cargue $200.00 al cliente ci09938 en el POS');
+    });
+
+    it('when Loyverse could not be read, still promises the automatic apply', async () => {
+      const { dialog } = await verifyIt({ payment_id: 41, verified_at: 'x', verified_by_name: '', apply_state: 'pos_unknown', balance: null });
+      expect(await within(dialog).findByRole('status')).toHaveTextContent('Verificada · se aplicará cuando esté cargada en Loyverse');
+    });
+
+    it('names the other top-up of the same student that still needs verifying', async () => {
+      const { dialog } = await verifyIt({ payment_id: 41, verified_at: 'x', verified_by_name: '', apply_state: 'waiting_verification', balance: null });
+      expect(await within(dialog).findByRole('status')).toHaveTextContent('falta verificar otra recarga de este alumno');
+    });
+
+    it('an older server answer keeps the old toast and closes', async () => {
+      await verifyIt({ payment_id: 41, verified_at: 'x', verified_by_name: '' });
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Operación verificada en MultiCobros.'));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    it('copies the número de control and Referencia 1 from the row and the dialog', async () => {
+      const u = userEvent.setup();
+      // userEvent installs its own clipboard stub: put ours in after setup.
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      renderWithProviders(<PaidTopUpQueue />);
+      await u.click(await screen.findByRole('button', { name: 'Copiar número de control de Luis Pérez' }));
+      await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('IK41'));
+      await u.click(screen.getByRole('button', { name: 'Copiar Referencia 1 de Luis Pérez' }));
+      await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('PAGO41'));
+      expect(toast.success).toHaveBeenCalledWith('Copiado');
+
+      await u.click(screen.getByRole('button', { name: /Verificar en MultiCobros/ }));
+      const dialog = await screen.findByRole('dialog');
+      await u.click(within(dialog).getByRole('button', { name: 'Copiar número de control' }));
+      await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('IK41'));
+      await u.click(within(dialog).getByRole('button', { name: 'Copiar Referencia 1' }));
+      await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('PAGO41'));
+      // Never a shortcut for what staff must read in MultiCobros themselves.
+      expect(within(dialog).queryByText('248233587990')).toBeNull();
+    });
   });
 
   // The POS mirror only applies a gap that matches exactly (and a verified

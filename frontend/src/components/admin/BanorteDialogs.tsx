@@ -1,17 +1,19 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import { CheckCircle2, Clock } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { CopyButton } from '@/components/admin/CopyButton';
 import { paymentsApi } from '@/services/api';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { CAF_MONEY_VIEWS, CAF_TOPUPS } from '@/hooks/queries/cafeteria';
 import { PAYMENTS_ENTITY } from '@/hooks/queries/payments';
-import type { TopUpLogEntry } from '@/types';
+import type { BanorteVerifyResult, TopUpLogEntry } from '@/types';
 
 const mxn = (v: string | number | null | undefined) => `$${parseFloat(String(v ?? 0)).toFixed(2)}`;
 const when = (d?: string | null) => (d ? format(new Date(d), "d MMM yyyy, HH:mm", { locale: es }) : '-');
@@ -28,8 +30,16 @@ function OperationFacts({ row }: { row: TopUpLogEntry }) {
       <dt className="text-muted">Alumno</dt><dd>{row.student_name}</dd>
       <dt className="text-muted">Monto</dt><dd className="font-semibold">{mxn(row.amount)}</dd>
       <dt className="text-muted">Fecha</dt><dd>{when(b.created_at ?? row.created_at)}</dd>
-      <dt className="text-muted">Referencia 1</dt><dd className="font-mono">PAGO{row.payment_id}</dd>
-      <dt className="text-muted">Número de control</dt><dd className="font-mono">{b.control_number}</dd>
+      <dt className="text-muted">Referencia 1</dt>
+      <dd className="flex items-center gap-1 font-mono">
+        PAGO{row.payment_id}
+        <CopyButton value={`PAGO${row.payment_id}`} label="Referencia 1" className="-my-1" />
+      </dd>
+      <dt className="text-muted">Número de control</dt>
+      <dd className="flex items-center gap-1 font-mono">
+        {b.control_number}
+        <CopyButton value={b.control_number} label="número de control" className="-my-1" />
+      </dd>
       {b.mode !== 'PRD' && (<><dt className="text-muted">Modo</dt><dd>Simulación ({b.mode}), sin cargo real</dd></>)}
     </dl>
   );
@@ -37,7 +47,11 @@ function OperationFacts({ row }: { row: TopUpLogEntry }) {
 
 function useInvalidateMoney() {
   const queryClient = useQueryClient();
-  return () => invalidateEntity(queryClient, CAF_TOPUPS, [...CAF_MONEY_VIEWS, PAYMENTS_ENTITY]);
+  return () => {
+    // Verifying (or reconciling) changes «Por verificar» and the Cafetería count too.
+    void queryClient.invalidateQueries({ queryKey: ['badges'] });
+    return invalidateEntity(queryClient, CAF_TOPUPS, [...CAF_MONEY_VIEWS, PAYMENTS_ENTITY]);
+  };
 }
 
 /** "Verificar en MultiCobros": staff type back the referencia and the amount they
@@ -50,16 +64,62 @@ export function VerifyBanorteDialog({ row, onClose }: { row: TopUpLogEntry | nul
   );
 }
 
+type VerifyOutcome = { applied: boolean; title: string; text: string };
+
+/** What the dialog says after «Sí, aparece aprobada»: the server applies the
+ *  top-up at once when Loyverse already has it. `null`: nothing to add (a
+ *  top-up already in the balance, or an older server). */
+function verifyOutcome(row: TopUpLogEntry, data: BanorteVerifyResult): VerifyOutcome | null {
+  const who = row.student_name;
+  switch (data.apply_state) {
+    case 'applied':
+      return {
+        applied: true,
+        title: `Verificada y aplicada · nuevo saldo ${mxn(data.balance)}`,
+        text: `La recarga de ${mxn(row.amount)} ya está en el saldo de ${who}. Se avisó a la familia.`,
+      };
+    case 'waiting_verification':
+      return {
+        applied: false,
+        title: 'Verificada · falta verificar otra recarga de este alumno',
+        text: `Loyverse ya tiene esta recarga junto con otra de ${who} sin verificar. Verifique esa también en «Por aplicar» y las dos se suman al saldo.`,
+      };
+    case 'waiting_pos':
+      return {
+        applied: false,
+        title: 'Verificada · se aplicará cuando esté cargada en Loyverse',
+        text: `Cargue ${mxn(row.amount)} al cliente ${row.loyverse_code || 'del alumno'} en el POS. La app la aplica sola en unos minutos.`,
+      };
+    case 'pos_unknown':
+      return {
+        applied: false,
+        title: 'Verificada · se aplicará cuando esté cargada en Loyverse',
+        text: 'No se pudo consultar Loyverse en este momento. Si ya la cargó en el POS, la app la aplica sola en unos minutos.',
+      };
+    default:
+      return null;
+  }
+}
+
 function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void }) {
   const invalidate = useInvalidateMoney();
   const [referencia, setReferencia] = useState('');
   const [amount, setAmount] = useState('');
+  const [outcome, setOutcome] = useState<VerifyOutcome | null>(null);
+  // The submit button goes away with the form: keep keyboard focus in the dialog.
+  const done = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (outcome) done.current?.focus(); }, [outcome]);
   const verify = useMutation({
     mutationFn: () => paymentsApi.verifyBanorte(row.payment_id!, { referencia: referencia.trim(), amount: amount.trim() }),
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
+      void invalidate();
+      const said = verifyOutcome(row, data);
+      if (said) {
+        setOutcome(said);
+        return;
+      }
       toast.success('Operación verificada en MultiCobros.');
       onClose();
-      void invalidate();
     },
     onError: (err) => toast.error(apiErrorMessage(err, 'No se pudo registrar la verificación.')),
   });
@@ -67,6 +127,26 @@ function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void 
     e.preventDefault();
     if (referencia.trim() && amount.trim()) verify.mutate();
   };
+  if (outcome) {
+    const Icon = outcome.applied ? CheckCircle2 : Clock;
+    return (
+      <div className="space-y-4">
+        <div
+          role="status"
+          className={`flex items-start gap-3 rounded-lg border px-3 py-3 ${outcome.applied ? 'border-green-600/30 bg-green-50' : 'border-amber/40 bg-amber/10'}`}
+        >
+          <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${outcome.applied ? 'text-green-700' : 'text-amber'}`} aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">{outcome.title}</p>
+            <p className="mt-1 text-sm text-muted">{outcome.text}</p>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button ref={done} type="button" size="sm" onClick={onClose}>Listo</Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <form className="space-y-4" onSubmit={submit}>
       <p className="text-sm text-muted">

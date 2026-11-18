@@ -210,6 +210,13 @@ class AdminBanorteVerifyView(APIView):
     amount MultiCobros shows, which must match ours. Only a credited (SUCCESS)
     approval is verified, under a row lock. Required before an online top-up
     may be marked as loaded into the POS. Idempotent once verified.
+
+    Once the verification has committed, a PAID top-up that Loyverse already
+    shows is applied right away (``cafeteria.services.apply_after_verification``,
+    the POS mirror's own path) instead of on the next sync. The response adds
+    ``apply_state`` (``applied`` / ``waiting_verification`` / ``waiting_pos`` /
+    ``pos_unknown`` / ``not_applicable``) and ``balance`` (the new wallet
+    figure when applied).
     """
     admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
@@ -253,10 +260,29 @@ class AdminBanorteVerifyView(APIView):
                        {'banorte_verified': True, 'referencia': checkout.referencia,
                         'amount': f'{payment.amount:.2f}'},
                        actor=request.user, context='payments.banorte.verify')
+        # Committed: now the money may move. Outside the checkout lock, through
+        # the POS mirror's own locks; a failure only leaves it for the next sync.
+        applied = {'apply_state': 'not_applicable', 'balance': None}
+        if payment.status == Payment.Status.SUCCESS and payment.related_topup_id:
+            from apps.cafeteria.services import apply_after_verification
+
+            try:
+                applied = apply_after_verification(payment)
+            except Exception:  # noqa: BLE001 — the verification itself stands
+                logger.exception('apply after verification failed payment=%s', pk)
+                applied = {'apply_state': 'pos_unknown', 'balance': None}
+        # «Por verificar» just changed: the console refetches the badges now,
+        # so the 30 s cache of whoever verified must not answer the old count.
+        from django.core.cache import cache
+
+        from apps.core.badges import BADGE_CACHE_KEY
+
+        cache.delete(BADGE_CACHE_KEY.format(pk=request.user.pk))
         return Response({
             'payment_id': pk,
             'verified_at': checkout.verified_at,
             'verified_by_name': checkout.verified_by.full_name if checkout.verified_by_id else '',
+            **applied,
         })
 
 
