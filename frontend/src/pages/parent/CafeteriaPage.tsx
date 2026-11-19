@@ -21,6 +21,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { ChildSwitcher } from '@/components/portal/ChildSwitcher';
 import CafeteriaCategoriesCard from '@/components/portal/CafeteriaCategoriesCard';
 import { PendingTopUps } from '@/components/portal/PendingTopUps';
+import { BalanceWithPending, PendingProjectionNote } from '@/components/portal/BalanceWithPending';
 import { CardholderStep } from '@/components/portal/CardholderStep';
 import { EMPTY_CARDHOLDER, cardholderErrors, type Cardholder } from '@/lib/cardholder';
 import { useSelectedChildStore } from '@/store/selectedChildStore';
@@ -37,7 +38,10 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
-import { applyNotice, applyPhrase, DEFAULT_WHATSAPP, isScheduled, pendingCoversLowBalance, sentence } from '@/lib/topupApply';
+import {
+  applyNotice, applyPhrase, DEFAULT_WHATSAPP, formatCents, isScheduled, pendingCoversLowBalance, projectBalance, sentence,
+} from '@/lib/topupApply';
+import { formatMXN } from '@/lib/format';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TX_TYPES = ['purchase', 'topup', 'refund'] as const;
@@ -528,7 +532,7 @@ export default function CafeteriaPage() {
       {balancesLoading ? (
         <div className="space-y-4" aria-busy="true" aria-label="Cargando cafetería">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[0, 1].map((i) => <div key={i} className="skeleton h-[200px] rounded-xl2" />)}
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[260px] rounded-xl2" />)}
           </div>
           <Card><ListSkeleton rows={4} /></Card>
         </div>
@@ -550,9 +554,10 @@ export default function CafeteriaPage() {
           const isLow = typeof b.is_low_balance === 'boolean'
             ? b.is_low_balance
             : parseFloat(b.balance) <= parseFloat(b.low_balance_threshold ?? '20');
+          // Not while paid card top-ups on their way cover the alert level (same rule as the e-mail).
+          const showLow = isLow && !pendingCoversLowBalance(b.balance, b.low_balance_threshold, b.pending_topups);
           const left = b.student.is_active === false;
           const notLinked = !b.student.loyverse_id;
-          const bal = parseFloat(b.balance);
           const isSelected = childId === b.student.id;
           return (
             <Card
@@ -567,25 +572,31 @@ export default function CafeteriaPage() {
                   <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
                   <p className="truncate text-xs text-muted">{b.student.tipo === 'personal' ? (b.student.puesto_label || 'Personal del colegio') : `${b.student.grade} · Grupo ${b.student.group}`}</p>
                 </div>
-                {/* Not while paid card top-ups on their way cover the alert level (same rule as the e-mail). */}
-                {isLow && !pendingCoversLowBalance(b.balance, b.low_balance_threshold, b.pending_topups) && (
-                  <Badge variant="warning">Saldo bajo</Badge>
-                )}
+                {showLow && <Badge variant="warning">Saldo bajo</Badge>}
               </div>
 
+              {/* The real balance and, while paid top-ups wait for the 7:30 load,
+                  «$150.00 → $350.00»; the line goes full width under the row,
+                  the list below says the same per top-up (so no toggle here). */}
               <div className="mt-4 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-subtle">Saldo</p>
-                  <p className={`font-head text-2xl font-bold ${isLow ? 'text-amber' : 'text-ink'}`}>
-                    ${bal.toFixed(2)}
-                  </p>
-                </div>
+                <BalanceWithPending
+                  className="min-w-0 flex-1"
+                  balance={b.balance}
+                  pending={b.pending_topups}
+                  low={showLow}
+                  note={false}
+                />
                 {b.last_synced && (
-                  <p className="pb-1 text-right text-[11px] leading-tight text-subtle">
+                  <p className="shrink-0 pb-1 text-right text-[11px] leading-tight text-subtle">
                     Actualizado<br />{format(new Date(b.last_synced), 'd MMM HH:mm', { locale: es })}
                   </p>
                 )}
               </div>
+              <PendingProjectionNote
+                balance={b.balance}
+                pending={b.pending_topups}
+                className="mt-1.5 text-xs leading-snug text-muted"
+              />
 
               <PendingTopUps items={b.pending_topups ?? []} whatsapp={whatsapp} applyTime={policy?.apply_time} />
 
@@ -741,11 +752,16 @@ export default function CafeteriaPage() {
                 value={selectedStudent ?? ''}
                 onChange={(e) => setSelectedStudent(Number(e.target.value) || null)}
               >
-                {(balances ?? []).filter(canTopUp).map((b) => (
-                  <option key={b.student.id} value={b.student.id}>
-                    {b.student.user.full_name} · saldo ${parseFloat(b.balance).toFixed(2)}
-                  </option>
-                ))}
+                {(balances ?? []).filter(canTopUp).map((b) => {
+                  // An <option> holds text only: the projection in words, no arrow.
+                  const ahead = projectBalance(b.balance, b.pending_topups);
+                  return (
+                    <option key={b.student.id} value={b.student.id}>
+                      {b.student.user.full_name} · saldo {formatMXN(b.balance)}
+                      {ahead ? `, ${formatCents(ahead.total)} con ${ahead.count === 1 ? 'la recarga pagada' : 'las recargas pagadas'}` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>
