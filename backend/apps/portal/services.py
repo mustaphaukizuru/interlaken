@@ -304,20 +304,45 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     if not roles:
         return 0
 
-    user_ids = list(audience_users(announcement.audience).values_list('id', flat=True))
+    audience = audience_users(announcement.audience)
+    user_ids = list(audience.values_list('id', flat=True))
     if not user_ids:
         return 0
 
     message = Truncator(announcement.body or '').chars(280)
     kind = notif_type or Notification.NotifType.INFO
+    # Accounts that turned in-app notices off, or muted this category, still
+    # get their row (it carries the email and push they keep on), hidden from
+    # the bell: never shown, created read. Urgent alerts are never muted.
+    muted = in_app_muted_ids(audience, kind)
     Notification.objects.bulk_create(
         [Notification(user_id=uid, notif_type=kind,
                       title=announcement.title, message=message,
-                      announcement=announcement)
+                      announcement=announcement,
+                      in_app=uid not in muted, is_read=uid in muted)
          for uid in user_ids],
         batch_size=500,
     )
     return len(user_ids)
+
+
+def in_app_muted_ids(users, notif_type) -> set[int]:
+    """Ids of ``users`` (a queryset) whose preferences keep a ``notif_type``
+    notice out of the app: ``NotificationPreference.wants('in_app', …)`` is
+    False (channel off or category muted). Never an urgent type. One query;
+    accounts that never saved preferences have everything on."""
+    from django.db.models import Q
+
+    from apps.accounts.models import NotificationPreference
+
+    if notif_type in NotificationPreference.URGENT_TYPES:
+        return set()
+    muted = Q(in_app_enabled=False)
+    field = NotificationPreference.CATEGORY_FIELD.get(notif_type)
+    if field:
+        muted |= Q(**{field: False})
+    return set(NotificationPreference.objects.filter(muted, user__in=users.values('pk'))
+               .values_list('user_id', flat=True))
 
 
 # A publish request (comunicado or emergency broadcast) emails the first rows of
@@ -785,12 +810,14 @@ def _deliver(n, prefs: dict, max_attempts: int) -> str:
         # personal address each hold a row; the first row that sends to the
         # address claims it, the others leave it out (their in-app copy stays).
         emails = _claim_emails(n, emails)
+    # A comunicado links to its notification, unless the row is hidden from
+    # the app (the account turned in-app notices off): then to the portal.
+    deep_link = f'/portal/notificaciones/{n.pk}' if ann and n.in_app else None
     email_status = Delivery.SKIPPED
     if emails:
         from .emailing import notification_content
         content = notification_content(user=n.user, notif_type=kind, title=n.title, message=n.message,
-                                       comunicado=ann is not None,
-                                       url=f'/portal/notificaciones/{n.pk}' if ann else None)
+                                       comunicado=ann is not None, url=deep_link)
         ok = send_email(subject=n.title, message=n.message, recipients=emails, content=content)
         email_status = Delivery.SENT if ok else Delivery.FAILED
         if ann is not None:
@@ -801,7 +828,7 @@ def _deliver(n, prefs: dict, max_attempts: int) -> str:
     # after a failed email never pushes a second time.
     push_status = Delivery.SENT if n.push_status == Delivery.SENT else Delivery.SKIPPED
     if n.push_status != Delivery.SENT and (ann is None or ann.push_enabled):
-        url = f'/portal/notificaciones/{n.pk}' if ann else '/portal'
+        url = deep_link or '/portal'
         delivered = sum(send_web_push(t, n.title, n.message, url=url)
                         for t in targets if wants(t, 'push', kind, prefs))
         push_status = Delivery.SENT if delivered else Delivery.SKIPPED

@@ -82,6 +82,13 @@ class Notification(models.Model):
     title      = models.CharField(max_length=200)
     message    = models.TextField()
     is_read    = models.BooleanField(default=False)
+    # False on a comunicado row of an account that turned off in-app notices
+    # (or muted the comunicados category) in its Avisos tab: the row still
+    # carries the email and push it keeps on, but never shows in the bell,
+    # the counters or the list (it is created read). Urgent alerts are always
+    # True. ``db_default`` so a row inserted by code that predates the column
+    # (during a deploy) is visible, as before.
+    in_app     = models.BooleanField(default=True, db_default=True)
     # Set on announcement fan-out rows: lets the dispatcher deep-link the push
     # to /portal/comunicados/<id> and honor the comunicado's push_enabled
     # toggle. SET_NULL so deleting a comunicado never erases the notification.

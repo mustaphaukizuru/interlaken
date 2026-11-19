@@ -618,7 +618,8 @@ DELIVERY_EXPORT_COLUMNS = [
     Col('user_email', 'Correo', getter=lambda n: n.user.email, width=30),
     Col('user_role', 'Rol', getter=lambda n: n.user.get_role_display(), width=12),
     Col('created_at', 'Notificado', fmt='datetime', width=18),
-    Col('is_read', 'Leído', fmt='bool', width=8),
+    Col('is_read', 'Leído', getter=lambda n: n.is_read and n.in_app, fmt='bool', width=8),
+    Col('in_app', 'En el portal', getter=lambda n: n.in_app, fmt='bool', width=10),
     Col('acknowledged', 'Enterado', getter=lambda n: getattr(n, 'ack_at', None), fmt='datetime', width=18),
     Col('email_status', 'Correo (estado)', getter=lambda n: n.get_email_status_display(), width=14),
     Col('push_status', 'Push (estado)', getter=lambda n: n.get_push_status_display(), width=14),
@@ -658,7 +659,9 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Notification.objects.filter(user=self.request.user)
+        # A comunicado row the account keeps out of the app (in_app=False,
+        # its Avisos tab) is never listed.
+        qs = Notification.objects.filter(user=self.request.user, in_app=True)
         # /portal/notificaciones filters (BACKLOG P1-B3).
         p = self.request.query_params
         if p.get('unread') in ('1', 'true'):
@@ -718,7 +721,8 @@ class NotificationDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).select_related('announcement')
+        return (Notification.objects.filter(user=self.request.user, in_app=True)
+                .select_related('announcement'))
 
 
 class NotificationMarkReadView(APIView):
@@ -727,7 +731,7 @@ class NotificationMarkReadView(APIView):
 
     def _mark(self, request, pk):
         try:
-            notif = Notification.objects.get(pk=pk, user=request.user)
+            notif = Notification.objects.get(pk=pk, user=request.user, in_app=True)
             notif.is_read = True
             notif.save(update_fields=['is_read'])
             return Response({'detail': 'Marcada como leída.'})
@@ -747,7 +751,7 @@ class NotificationMarkAllReadView(APIView):
 
     def post(self, request):
         updated = (Notification.objects
-                   .filter(user=request.user, is_read=False)
+                   .filter(user=request.user, is_read=False, in_app=True)
                    .update(is_read=True))
         return Response({'marked': updated})
 
@@ -839,7 +843,8 @@ class AnnouncementDeliveryView(APIView):
             'announcement': announcement.id,
             'recipients': qs.count(),
             'pending_dispatch': qs.filter(delivered_at__isnull=True).count(),
-            'read': qs.filter(is_read=True).count(),
+            # Hidden rows (in-app off) are created read: not a reading.
+            'read': qs.filter(is_read=True, in_app=True).count(),
             'acknowledged': announcement.reads.filter(acknowledged_at__isnull=False).count(),
             'requires_ack': announcement.requires_ack,
             'email': by['email'],
