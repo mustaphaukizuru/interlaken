@@ -3,7 +3,8 @@ import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { apiErrorMessage } from '@/lib/apiErrors';
-import type { BulkActionDef, BulkRequest, BulkResult } from '@/services/api';
+import type { BulkActionDef, BulkFailure, BulkRequest, BulkResult } from '@/services/api';
+import { BULK_MAX_IDS } from '@/services/dataOps';
 import type { RowKey } from '@/hooks/useRowSelection';
 
 interface Props {
@@ -32,9 +33,38 @@ interface Props {
   subject?: string;
   /** A row's name in the per-row results ("Reserva de Ana López"), in place of "#12". */
   rowName?: (id: RowKey) => string | undefined;
+  /**
+   * Continue by itself the rows a commit could not reach before the server's
+   * time budget (`not_reached_ids`), one request after another, with
+   * «Procesando N de M…» (`action.progressVerb`) and «Detener». Rows that
+   * failed for a real reason are never retried by themselves. Off by default.
+   */
+  autoContinue?: boolean;
 }
 
 type Phase = 'planning' | 'plan' | 'plan-error' | 'running' | 'done';
+
+/** A row still pending when the person pressed «Detener» (or a continuation failed). */
+const STOPPED = 'Sin procesar: se detuvo antes de llegar a esta fila. Pulse «Reintentar fallidas» para continuar.';
+
+const addCounts = (a?: Record<string, number>, b?: Record<string, number>) => {
+  if (!a && !b) return undefined;
+  const out: Record<string, number> = { ...(a ?? {}) };
+  for (const [k, n] of Object.entries(b ?? {})) out[k] = (out[k] ?? 0) + n;
+  return out;
+};
+
+/** One summary across the requests of a run that continued by itself (`failed`: real failures only). */
+function mergeResults(prev: BulkResult | null, next: BulkResult, failed: BulkFailure[], requested: number): BulkResult {
+  if (!prev) return { ...next, requested, failed };
+  return {
+    ...prev,
+    ok: prev.ok + next.ok,
+    skipped: [...prev.skipped, ...next.skipped],
+    failed: [...prev.failed, ...failed],
+    outcomes: addCounts(prev.outcomes, next.outcomes),
+  };
+}
 
 const singularIfOne = (noun: string, n: number) => (n === 1 ? noun.replace(/s$/, '') : noun);
 
@@ -65,7 +95,7 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan, subject, rowName }: Props) {
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan, subject, rowName, autoContinue = false }: Props) {
   // The title keeps the count the dialog opened with: `onDone` usually clears
   // the selection, which must not turn "Cambiar grupo: 2 alumnos" into "0 alumnos".
   const [opened, setOpened] = useState<{ n: number; all: boolean } | null>(null);
@@ -94,13 +124,14 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
           onClose={onClose}
           extraPayload={extraPayload}
           rowName={rowName}
+          autoContinue={autoContinue}
         />
       )}
     </Modal>
   );
 }
 
-function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, payload: basePayload, extraPayload: aliasPayload, execute, onDone, renderPlan, onClose, rowName }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, payload: basePayload, extraPayload: aliasPayload, execute, onDone, renderPlan, onClose, rowName, autoContinue }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
   // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
   const p = (stem: string, n: number) => `${stem}${gender === 'm' ? 'o' : 'a'}${n === 1 ? '' : 's'}`;
   const [phase, setPhase] = useState<Phase>('planning');
@@ -170,7 +201,90 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
     return p;
   };
 
+  // autoContinue: «Procesando N de M…» across requests, «Detener» between them.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [stopping, setStopping] = useState(false);
+  const stopRef = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+
+  /**
+   * Commit, then send again only the rows the server did not reach
+   * (`not_reached_ids`, at most BULK_MAX_IDS per request) until none is left
+   * or «Detener». A row that failed for a real reason stays failed: only
+   * «Reintentar fallidas» sends it again. One summary at the end.
+   */
+  const commitContinuing = async (subset?: RowKey[]) => {
+    setPhase('running');
+    setError('');
+    setStopping(false);
+    stopRef.current = false;
+    const body = payload();
+    let total = subset ? subset.length : (plan?.requested ?? snapshot.ids.length);
+    let queue: RowKey[] = subset ? [...subset] : [];
+    let merged: BulkResult | null = null;
+    let left: BulkFailure[] = [];
+    setProgress({ done: 0, total });
+    for (let first = !subset; first || queue.length > 0; first = false) {
+      const sent = first ? null : queue.slice(0, BULK_MAX_IDS);
+      const rest = first ? [] : queue.slice(BULK_MAX_IDS);
+      let r: BulkResult;
+      try {
+        r = await execute(sent
+          ? { action: action.name, ids: sent, all_matching: false, payload: body, dry_run: false }
+          : { ...base, payload: body, dry_run: false });
+      } catch (e) {
+        if (!alive.current) return;
+        const message = apiErrorMessage(e, 'No se pudo aplicar la acción.');
+        if (!merged) {
+          setProgress(null);
+          setError(message);
+          setPhase('plan');
+          return;
+        }
+        left = queue.map((id) => ({ id, error: `Sin procesar: ${message}` }));
+        break;
+      }
+      if (!alive.current) return;
+      const pending = new Set((r.not_reached_ids ?? []).map(String));
+      const real = r.failed.filter((f) => !pending.has(String(f.id)));
+      left = [...r.failed.filter((f) => pending.has(String(f.id))), ...rest.map((id) => ({ id, error: STOPPED }))];
+      // The first answer counts the rows for real (all_matching is resolved by the server).
+      if (!merged) total = r.requested + rest.length;
+      merged = mergeResults(merged, r, real, total);
+      queue = left.map((f) => f.id);
+      setProgress({ done: total - queue.length, total });
+      if (stopRef.current) {
+        left = left.map((f) => ({ id: f.id, error: STOPPED }));
+        break;
+      }
+    }
+    if (!merged) return;
+    const final: BulkResult = {
+      ...merged,
+      failed: [...merged.failed, ...left],
+      not_reached: left.length || undefined,
+      not_reached_ids: left.length ? left.map((f) => f.id) : undefined,
+    };
+    setProgress(null);
+    setResult(final);
+    setPhase('done');
+    onDone?.(final);
+  };
+
+  const stop = () => {
+    stopRef.current = true;
+    setStopping(true);
+  };
+
   const commit = (subset?: RowKey[]) => {
+    if (autoContinue) {
+      void commitContinuing(subset);
+      return;
+    }
     setPhase('running');
     setError('');
     const body: BulkRequest = subset
@@ -288,8 +402,36 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
 
           {error && <p className="text-sm text-coral-700" role="alert">{error}</p>}
 
+          {autoContinue && phase === 'running' && progress && (
+            <div className="space-y-1.5">
+              <p role="status" className="text-sm font-medium text-ink">
+                {action.progressVerb ?? 'Procesando'} {progress.done.toLocaleString('es-MX')} de {progress.total.toLocaleString('es-MX')}…
+                {stopping && <span className="block text-xs font-normal text-muted">Se detendrá al terminar el lote en curso.</span>}
+              </p>
+              <div
+                role="progressbar"
+                aria-label="Avance"
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.done}
+                className="h-1.5 overflow-hidden rounded-full bg-cream-2"
+              >
+                <div
+                  className="h-full rounded-full bg-purple transition-[width] duration-300"
+                  style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
-            <Button ref={cancelRef} type="button" variant="secondary" size="sm" onClick={onClose} disabled={phase === 'running'}>Cancelar</Button>
+            {autoContinue && phase === 'running' ? (
+              <Button type="button" variant="secondary" size="sm" onClick={stop} disabled={stopping}>
+                {stopping ? 'Deteniendo…' : 'Detener'}
+              </Button>
+            ) : (
+              <Button ref={cancelRef} type="button" variant="secondary" size="sm" onClick={onClose} disabled={phase === 'running'}>Cancelar</Button>
+            )}
             <Button
               ref={confirmRef}
               type="button"

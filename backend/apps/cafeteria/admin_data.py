@@ -1098,6 +1098,15 @@ class AdminTopUpExportView(AdminExportMixin, AdminTopUpLogView):
 TOPUP_ENTITY = "cafeteria.topuprequest"
 # Rows per transaction for the bulk «Aplicar (ya cargadas en POS)» (see the view).
 APPLY_PAID_CHUNK = 5
+# Seconds that bulk keeps starting rows, checked before EVERY row (each one
+# reads Loyverse). Worst case for one request: no row starts after 20 s; the
+# last one reads Loyverse for at most 14 s (services._GUARD_TIMEOUT, one
+# attempt), its database work and the chunk's commit take about 1 s, then the
+# family notices of the up to 5 rows of that chunk go out (about 2 s each with
+# a healthy mail server): 20 + 14 + 1 + 10 = 45 s, under gunicorn's 60 s. The
+# dialog continues the rows not reached by itself, so a smaller budget only
+# means more, shorter requests.
+APPLY_PAID_BUDGET_SECONDS = 20
 
 
 def _apply_plan(topup, payload):
@@ -1223,6 +1232,8 @@ TOPUP_ACTIONS = {
             handler=_apply_paid_handler,
             plan=_apply_paid_plan,
             side_effects="per_row",
+            time_budget=APPLY_PAID_BUDGET_SECONDS,
+            budget_per_row=True,
         ),
     )
 }

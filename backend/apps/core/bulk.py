@@ -30,7 +30,12 @@ core/bulk.py — the one bulk-action contract for admin lists (Data Ops C5).
   Such actions set a small ``chunk`` (10).
 * A commit stops starting new chunks after ``TIME_BUDGET_SECONDS`` (gunicorn
   kills a worker at 60 s): the rows not reached come back in ``failed`` with
-  ``NOT_REACHED``, so «Reintentar fallidas» continues where it stopped.
+  ``NOT_REACHED`` (their ids also in ``not_reached_ids``), so «Reintentar
+  fallidas», or a dialog that continues by itself, picks up where it stopped.
+  An action whose rows each wait on an outside service sets
+  ``budget_per_row`` (the budget is then checked before every row, so a chunk
+  of slow rows stops part way and commits what it did) and may set a smaller
+  ``time_budget``. The first row of a call always runs: every call progresses.
 * ``requires_note`` is enforced on the commit only: the dialog shows the dry
   run first and asks for the note after it.
 """
@@ -128,6 +133,12 @@ class BulkAction:
     audit_action: str = "update"
     # Rows per transaction when smaller than the view's (EMAIL_CHUNK for emailing actions).
     chunk: int | None = None
+    # Seconds a commit keeps starting work (``TIME_BUDGET_SECONDS`` when None).
+    time_budget: float | None = None
+    # Check the budget before every row, not only between chunks: for a
+    # handler that waits on an outside service per row, where one chunk of
+    # slow rows could outlive the worker by itself.
+    budget_per_row: bool = False
 
     def __post_init__(self):
         if self.side_effects not in SIDE_EFFECTS:
@@ -317,15 +328,19 @@ def run_bulk(
     outcomes: dict[str, int] = {}
     if action.chunk:
         chunk = min(chunk, action.chunk)
+    budget = TIME_BUDGET_SECONDS if action.time_budget is None else action.time_budget
     started = time.monotonic()
     chunks = list(chunked(ids, chunk))
+    not_reached: list[int] = []
+
+    def spent() -> bool:
+        # A dry run has no budget: it only reads.
+        return not dry_run and time.monotonic() - started > budget
 
     for index, chunk_ids in enumerate(chunks):
-        if not dry_run and index and time.monotonic() - started > TIME_BUDGET_SECONDS:
+        if index and spent():
             # Stop before the worker is killed; the rest is one «Reintentar» away.
-            for later in chunks[index:]:
-                result["failed"].extend({"id": pk, "error": NOT_REACHED} for pk in later)
-            result["not_reached"] = sum(len(later) for later in chunks[index:])
+            not_reached = [later_pk for later in chunks[index:] for later_pk in later]
             break
         committed_effects: list = []
         with transaction.atomic():
@@ -333,7 +348,14 @@ def run_bulk(
             if not dry_run:
                 rows = rows.select_for_update(of=("self",))
             by_pk = {row.pk: row for row in rows}
-            for pk in chunk_ids:
+            for position, pk in enumerate(chunk_ids):
+                if action.budget_per_row and position and spent():
+                    # Part way through the chunk: the rows done so far commit
+                    # with it below; the rest were never touched.
+                    not_reached = chunk_ids[position:] + [
+                        later_pk for later in chunks[index + 1 :] for later_pk in later
+                    ]
+                    break
                 instance = by_pk.get(pk)
                 if instance is None:
                     result["failed"].append({"id": pk, "error": "No encontrado."})
@@ -366,6 +388,13 @@ def run_bulk(
                     result["failed"].append({"id": pk, "error": message})
         # The chunk is committed: now the emails can name what it wrote.
         _run_after_commit(committed_effects, entity, action.name)
+        if not_reached:
+            break
+
+    if not_reached:
+        result["failed"].extend({"id": pk, "error": NOT_REACHED} for pk in not_reached)
+        result["not_reached"] = len(not_reached)
+        result["not_reached_ids"] = not_reached
 
     if outcomes:
         result["outcomes"] = outcomes

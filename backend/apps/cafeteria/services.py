@@ -8,7 +8,9 @@ Notes for maintainers:
   frozen at import — see spec R5) so scheduled management commands and env
   changes take effect without a reload.
 - Each call builds a short-lived ``requests.Session`` with connect/read timeouts
-  and transport-level retries (429/5xx).
+  and transport-level retries (429/5xx). The one exception is the read behind
+  the money guard (``loyverse_points_for_guard``): one attempt on a short
+  budget, because a snapshot fallback exists and a bulk apply runs it per row.
 - Per spec **R1** the Loyverse ``total_points`` field is effectively read-only,
   so the local ``CafeteriaBalance`` row is the source of truth for credits.
   ``add_points_to_customer`` credits that row **atomically and idempotently**
@@ -18,6 +20,8 @@ Notes for maintainers:
 """
 import logging
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
@@ -36,6 +40,22 @@ logger = logging.getLogger(__name__)
 # (connect, read) timeouts in seconds.
 _TIMEOUT = (5, 15)
 
+# The guard's read (``loyverse_points_for_guard``): ONE attempt, (connect, read)
+# in seconds. Connect 3 s: a healthy handshake from the VPS takes well under
+# 0.5 s, and 3 s still survives one lost SYN (Linux resends it after 1 s).
+# Read 5 s: a customer read normally answers in under a second; slower than
+# that, Loyverse is degraded and the snapshot every mirror pass refreshes (at
+# most 5 minutes old) is the better answer. No retries: the default session's
+# 3 retries with backoff, each up to 5 + 15 s, cost ~83 s per read (more when a
+# 429 asks to wait), which a bulk «Aplicar» pays per row inside a 60 s worker.
+# Worst case: the connect timeout applies per address tried (api.loyverse.com
+# answers with 3), so 3 x 3 s + 5 s = 14 s; the DNS lookup is outside both.
+_GUARD_TIMEOUT = (3, 5)
+# Set only while ``loyverse_points_for_guard`` reads; every other call keeps
+# the retrying ``_TIMEOUT`` session. A context variable (not a parameter) so
+# the guard still calls ``get_customer_by_id(id)`` exactly as before.
+_READ_BUDGET: ContextVar[tuple[int, int] | None] = ContextVar('loyverse_read_budget', default=None)
+
 
 class LoyverseError(Exception):
     pass
@@ -45,24 +65,38 @@ def _base_url() -> str:
     return settings.LOYVERSE_BASE_URL
 
 
-def _session() -> requests.Session:
+@contextmanager
+def _guard_read_budget():
+    """Make the Loyverse reads inside one short attempt (``_GUARD_TIMEOUT``)."""
+    token = _READ_BUDGET.set(_GUARD_TIMEOUT)
+    try:
+        yield
+    finally:
+        _READ_BUDGET.reset(token)
+
+
+def _session(*, retries: bool = True) -> requests.Session:
     """Build a fresh, retrying session with the *current* token.
 
     Reading the token here (not at import) means rotating ``LOYVERSE_API_TOKEN``
     in the environment is picked up on the next call — important for cron-run
-    management commands (spec R5).
+    management commands (spec R5). ``retries=False`` (the guard's read only)
+    makes exactly one attempt: a timeout, a 429 or a 5xx fails at once.
     """
     token = settings.LOYVERSE_API_TOKEN
     if not token:
         raise LoyverseError('LOYVERSE_API_TOKEN is not configured.')
 
-    retry = Retry(
-        total=3,
-        backoff_factor=0.5,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=frozenset(['GET', 'POST', 'PATCH']),
-        raise_on_status=False,
-    )
+    if retries:
+        retry = Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(['GET', 'POST', 'PATCH']),
+            raise_on_status=False,
+        )
+    else:
+        retry = Retry(total=0, raise_on_status=False)
     session = requests.Session()
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('https://', adapter)
@@ -77,9 +111,10 @@ def _session() -> requests.Session:
 def _get(endpoint, params=None):
     """Generic GET against the Loyverse API."""
     url = f'{_base_url()}{endpoint}'
+    budget = _READ_BUDGET.get()
     try:
-        with _session() as session:
-            resp = session.get(url, params=params, timeout=_TIMEOUT)
+        with _session(retries=budget is None) as session:
+            resp = session.get(url, params=params, timeout=budget or _TIMEOUT)
             resp.raise_for_status()
             return resp.json()
     except requests.RequestException as e:
@@ -1976,13 +2011,19 @@ def loyverse_points_for_guard(student):
     every mirror pass refreshes. ``None`` when the student is not linked or the
     customer is gone from Loyverse (the mirror then has nothing to credit), or
     when nothing at all is known.
+
+    The live read is one attempt on ``_GUARD_TIMEOUT`` (at most 14 s, usually
+    under one): a slow Loyverse falls back to the snapshot instead of holding
+    the caller (a bulk «Aplicar» reads once per row) for the retrying
+    session's ~83 s. What the callers do with the points is unchanged.
     """
     from apps.cafeteria.models import LoyverseProfile
 
     if not student.loyverse_id:
         return None
     try:
-        return get_balance_from_customer(get_customer_by_id(student.loyverse_id))
+        with _guard_read_budget():
+            return get_balance_from_customer(get_customer_by_id(student.loyverse_id))
     except LoyverseError as exc:
         profile = (LoyverseProfile.objects.filter(loyverse_id=student.loyverse_id)
                    .only('total_points', 'missing_since').first())
