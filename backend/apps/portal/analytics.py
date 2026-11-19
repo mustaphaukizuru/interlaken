@@ -134,17 +134,21 @@ def build_payload(days=30):
     # ── Circulars: distinct eligible readers / eligible audience ──
     # Staff cafetería logins (role student, tipo personal: 2026-11-18) count
     # as «Personal», never as students (apps.accounts.people).
-    from apps.accounts.people import personal_user_ids, staff_only_login_q
-    active_users = User.objects.filter(is_active=True)
-    staff_logins = active_users.filter(staff_only_login_q()).count()
-    role_counts = dict(active_users.values_list('role').annotate(n=Count('id')))
+    from apps.accounts.people import personal_user_ids
+    family_roles = (User.Role.PARENT, User.Role.STUDENT)
+    with_wallet = Q(pk__in=personal_user_ids())
+    n = User.objects.filter(is_active=True).aggregate(   # one query, as before
+        parents=Count('id', filter=Q(role=User.Role.PARENT)),
+        students=Count('id', filter=Q(role=User.Role.STUDENT)),
+        staff=Count('id', filter=Q(role=User.Role.STAFF)),
+        staff_logins=Count('id', filter=Q(role=User.Role.STUDENT) & with_wallet),
+        family_staff=Count('id', filter=Q(role__in=family_roles) & with_wallet),
+    )
     eligible_by_audience = {
-        Announcement.Audience.ALL: sum(role_counts.get(r, 0) for r in
-                                       (User.Role.PARENT, User.Role.STUDENT, User.Role.STAFF)),
-        Announcement.Audience.PARENTS: role_counts.get(User.Role.PARENT, 0),
-        Announcement.Audience.STUDENTS: role_counts.get(User.Role.STUDENT, 0) - staff_logins,
-        Announcement.Audience.STAFF: role_counts.get(User.Role.STAFF, 0) + active_users.filter(
-            role__in=(User.Role.PARENT, User.Role.STUDENT), pk__in=personal_user_ids()).count(),
+        Announcement.Audience.ALL: n['parents'] + n['students'] + n['staff'],
+        Announcement.Audience.PARENTS: n['parents'],
+        Announcement.Audience.STUDENTS: n['students'] - n['staff_logins'],
+        Announcement.Audience.STAFF: n['staff'] + n['family_staff'],
     }
     active_anns = list(Announcement.objects.filter(is_active=True)
                        .annotate(readers=Count('reads__user', distinct=True)))

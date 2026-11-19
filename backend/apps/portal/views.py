@@ -57,17 +57,18 @@ def audiences_for_user(user):
     otherwise a parent-role family silently misses 'Alumnos' avisos and a
     student-role family misses 'Padres' ones. Staff/admin oversee every audience.
     """
-    from apps.accounts.people import is_staff_only_login, own_cafeteria_account
-
     audiences = [Announcement.Audience.ALL]
     role = getattr(user, 'role', None)
     if role in (User.Role.PARENT, User.Role.STUDENT):
         # A staff member's cafetería login reads «Personal», never the family
-        # comunicados (the same rule as the fan-out: services.audience_users).
-        if is_staff_only_login(user):
+        # comunicados; a parent who is also staff reads both (the same rule as
+        # the fan-out: services.audience_users). ``visible_announcements``
+        # applies the same rule inside its own SQL (no extra query).
+        staff_wallet = _staff_wallet(user).exists()
+        if staff_wallet and role == User.Role.STUDENT:
             return audiences + [Announcement.Audience.STAFF]
         audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS]
-        if own_cafeteria_account(user) is not None:
+        if staff_wallet:
             audiences.append(Announcement.Audience.STAFF)
     elif role == User.Role.STAFF:
         audiences.append(Announcement.Audience.STAFF)
@@ -77,12 +78,34 @@ def audiences_for_user(user):
     return audiences
 
 
+def _staff_wallet(user):
+    """The staff cafetería account whose login is ``user`` (2026-11-18)."""
+    return StudentProfile.objects.filter(user_id=getattr(user, 'pk', None),
+                                         tipo=StudentProfile.Tipo.PERSONAL)
+
+
+def _audience_q(user) -> Q:
+    """``audiences_for_user`` as one SQL condition: for a family login the
+    staff-wallet test is an EXISTS in the same query, so the comunicados lists
+    cost no extra round trip."""
+    role = getattr(user, 'role', None)
+    if role not in (User.Role.PARENT, User.Role.STUDENT):
+        return Q(audience__in=audiences_for_user(user))
+    a = Announcement.Audience
+    staff_wallet = Exists(_staff_wallet(user))
+    family = Q(audience__in=[a.PARENTS, a.STUDENTS])
+    if role == User.Role.STUDENT:
+        family &= ~Q(staff_wallet)
+    return Q(audience=a.ALL) | family | (Q(audience=a.STAFF) & Q(staff_wallet))
+
+
 def visible_announcements(user):
     """The comunicados ``user`` may see or act on outside the console: active,
-    for their audience and published (``published_q``). A comunicado scheduled
-    for later is invisible here until its time, as it is in the fan-out."""
+    for their audience (``audiences_for_user``) and published (``published_q``).
+    A comunicado scheduled for later is invisible here until its time, as it
+    is in the fan-out."""
     return (Announcement.objects
-            .filter(is_active=True, audience__in=audiences_for_user(user))
+            .filter(_audience_q(user), is_active=True)
             .filter(published_q()))
 
 
