@@ -450,6 +450,7 @@ describe('AdminStudents · Personal tab (staff cafetería accounts, 2026-11-18)'
     expect(await screen.findByText('Rosa Lince')).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toContain('tipo=personal');
     expect(screen.getByRole('columnheader', { name: /Puesto/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^Código/ })).toBeInTheDocument();
     expect(screen.getByText('Docente')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Familia/ })).toBeNull();
     expect(screen.getByRole('button', { name: /Nuevo personal/ })).toBeInTheDocument();

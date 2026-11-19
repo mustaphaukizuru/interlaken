@@ -216,7 +216,7 @@ export default function AdminStudents() {
     // What the office compares against Loyverse: the code exactly as the POS spells it (ci09932).
     // Under the matrícula by default, so the table leaves room for the balance on a laptop.
     {
-      id: 'student_id', header: 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted',
+      id: 'student_id', header: personal ? 'Código' : 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted',
       cell: (s) => (
         <>
           {s.student_id}
