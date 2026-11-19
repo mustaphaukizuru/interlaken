@@ -10,6 +10,8 @@ import io
 import time
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory, ParentFactory, StudentProfileFactory
@@ -201,3 +203,154 @@ class TestBudget:
         existing.refresh_from_db()
         assert existing.user.first_name == "Nombre0"
         assert elapsed < 20, f"commit took {elapsed:.1f}s"
+
+
+class TestQueryBudget:
+    """Lookups are loaded for the whole file at once (2026-11-18): a 2,000-row
+    file used to cost several queries per row, which against the managed
+    database could outlive gunicorn's 60 s worker. The number of queries no
+    longer depends on how many rows the file has, except for the writes."""
+
+    @staticmethod
+    def _rows(n, start=0):
+        return [
+            f"Q{i},Nombre{i},Apellido{i},1° Primaria,A,,,Tutor {i},tutor{i}@example.com,555"
+            for i in range(start, start + n)
+        ]
+
+    @staticmethod
+    def _run(client, lines, dry_run="1"):
+        with CaptureQueriesContext(connection) as ctx:
+            resp = _post(client, _csv(*lines), dry_run=dry_run)
+        assert resp.status_code == 200, resp.content
+        sql = [q["sql"].lstrip().upper() for q in ctx.captured_queries]
+        return sql, resp.json()
+
+    @staticmethod
+    def _roster(n):
+        """Half the rows already exist (with their self link), every 4th tutor too.
+
+        Bulk-created: the factories hash a password per user, which would make
+        this setup take minutes."""
+        students = User.objects.bulk_create(
+            User(
+                email=f"q{i}@alumnos.interlaken.edu.mx",
+                first_name=f"Viejo{i}",
+                last_name="Alumno",
+                role=User.Role.STUDENT,
+                password="!",
+            )
+            for i in range(0, n, 2)
+        )
+        profiles = StudentProfile.objects.bulk_create(
+            StudentProfile(user=u, student_id=f"Q{i}", grade="3° Primaria", group="A")
+            for i, u in zip(range(0, n, 2), students, strict=True)
+        )
+        StudentProfile.parents.through.objects.bulk_create(
+            StudentProfile.parents.through(studentprofile_id=p.pk, user_id=p.user_id)
+            for p in profiles
+        )
+        User.objects.bulk_create(
+            User(
+                email=f"tutor{i}@example.com",
+                first_name="Tutor",
+                last_name=str(i),
+                role=User.Role.PARENT,
+                password="!",
+            )
+            for i in range(0, n, 4)
+        )
+
+    def test_dry_run_costs_the_same_for_10_and_200_rows(self, admin):
+        self._roster(200)
+        small, body_small = self._run(admin, self._rows(10))
+        large, body_large = self._run(admin, self._rows(200))
+        assert body_small["counts"] == {"crear": 5, "actualizar": 5, "omitir": 0, "error": 0}
+        assert body_large["counts"] == {"crear": 100, "actualizar": 100, "omitir": 0, "error": 0}
+        assert len(large) == len(small), (len(small), len(large))
+
+    def test_a_reimport_with_nothing_to_write_costs_the_same(self, admin):
+        _post(admin, _csv(*self._rows(200)), dry_run="0")
+        small, _ = self._run(admin, self._rows(10), dry_run="0")
+        large, body = self._run(admin, self._rows(200), dry_run="0")
+        assert body["counts"]["omitir"] == 200
+        assert len(large) == len(small), (len(small), len(large))
+
+    @staticmethod
+    def _selects(run):
+        return [q for q in run if q.startswith("SELECT")]
+
+    def test_commit_of_new_rows_reads_the_same_for_10_and_200(self, admin):
+        """New rows still write per row (user, profile, guardian link, audit),
+        but every read was made up front: the SELECT count does not grow."""
+        User.objects.bulk_create(
+            User(
+                email=f"tutor{i}@example.com",
+                first_name="Tutor",
+                last_name=str(i),
+                role=User.Role.PARENT,
+                password="!",
+            )
+            for i in range(1000, 1400, 3)
+        )
+        small, _ = self._run(admin, self._rows(10, start=1000), dry_run="0")
+        large, body = self._run(admin, self._rows(200, start=1200), dry_run="0")
+        assert body["counts"] == {"crear": 200, "actualizar": 0, "omitir": 0, "error": 0}
+        assert len(self._selects(large)) == len(self._selects(small))
+        per_row = (len(large) - len(small)) / 190
+        assert per_row <= 12, f"{per_row:.1f} queries per new row"
+
+    def test_updated_rows_cost_only_their_writes(self, admin):
+        """An update's only reads are the audit trail's before-image of what it
+        changes (the user's name, the profile's grade): two per row, never a lookup."""
+        self._roster(420)  # Q0, Q2 ... Q418 exist
+        rows = [r for i in range(0, 420, 2) for r in self._rows(1, start=i)]
+        small, _ = self._run(admin, rows[:10], dry_run="0")
+        large, body = self._run(admin, rows[10:], dry_run="0")
+        assert body["counts"] == {"crear": 0, "actualizar": 200, "omitir": 0, "error": 0}
+        extra_reads = len(self._selects(large)) - len(self._selects(small))
+        assert extra_reads == 2 * 190, extra_reads
+        per_row = (len(large) - len(small)) / 190
+        assert per_row <= 12, f"{per_row:.1f} queries per updated row"
+
+    def test_results_match_the_row_by_row_lookups(self, admin):
+        """Batching changes the cost, not the answer: case-insensitive matrícula
+        and tutor email, staff codes refused, collisions caught."""
+        staff = StudentProfileFactory(student_id="EMP-07", tipo=StudentProfile.Tipo.PERSONAL)
+        pupil = StudentProfileFactory(student_id="ab12")
+        pupil.parents.add(pupil.user)
+        tutor = ParentFactory(email="Mama.Ruiz@Example.com")
+        User.objects.create_user(email="z9@alumnos.interlaken.edu.mx", password=None, role="parent")
+        body = _post(
+            admin,
+            _csv(
+                "AB12,Ana,Ruiz,2° Primaria,,,,,mama.ruiz@example.com,",
+                f"{staff.student_id.lower()},Pedro,Paz,1° Primaria,,,,,,",
+                "Z9,Zoe,Zea,1° Primaria,,,,,,",
+            ),
+        ).json()
+        rows = {r["key"]: r for r in body["rows"]}
+        assert rows["AB12"]["action"] == "actualizar"
+        assert "personal del colegio" in rows["emp-07"]["errors"][0]
+        assert "ya existe" in rows["Z9"]["errors"][0]
+        committed = _post(
+            admin, _csv("AB12,Ana,Ruiz,2° Primaria,,,,,mama.ruiz@example.com,"), dry_run="0"
+        ).json()
+        assert committed["counts"]["actualizar"] == 1
+        assert tutor in StudentProfile.objects.get(pk=pupil.pk).parents.all()
+        again = _post(admin, _csv("AB12,Ana,Ruiz,2° Primaria,,,,,MAMA.RUIZ@example.com,")).json()
+        assert again["counts"]["omitir"] == 1
+
+    def test_siblings_share_one_new_tutor(self, admin):
+        """The tutor created by the first sibling is the one the second links to."""
+        body = _post(
+            admin,
+            _csv(
+                "S1,Ana,Paz,1° Primaria,,,,Luz Paz,luz@example.com,555",
+                "S2,Beto,Paz,3° Primaria,,,,Luz Paz,LUZ@example.com,555",
+            ),
+            dry_run="0",
+        ).json()
+        assert body["counts"]["crear"] == 2
+        tutor = User.objects.get(email__iexact="luz@example.com")
+        assert set(tutor.children.values_list("student_id", flat=True)) == {"S1", "S2"}
