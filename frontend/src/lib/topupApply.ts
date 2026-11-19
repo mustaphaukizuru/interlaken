@@ -111,3 +111,22 @@ export function applyNotice(policy?: Pick<TopUpPolicy, 'apply_time' | 'whatsapp'
 
 /** True when card top-ups wait for the POS load (the default). */
 export const isScheduled = (policy?: Pick<TopUpPolicy, 'mode'> | null) => (policy?.mode ?? 'scheduled') === 'scheduled';
+
+/** "123.45" → 12345 (whole cents, so sums never drift). */
+const cents = (value: string | number | null | undefined) => Math.round(Number(value ?? 0) * 100) || 0;
+
+/**
+ * True when the paid card top-ups on their way bring the balance to or above
+ * the family's low-balance level. Same rule as the alert e-mail (backend
+ * `pending_covers_low_balance`): the family already paid, so «Saldo bajo»
+ * would only alarm them. Nothing pending → false, the balance speaks alone.
+ */
+export function pendingCoversLowBalance(
+  balance: string | number,
+  threshold: string | number | null | undefined,
+  pending: ReadonlyArray<{ amount: string }> = [],
+): boolean {
+  const onTheWay = pending.reduce((sum, t) => sum + cents(t.amount), 0);
+  if (onTheWay <= 0) return false;
+  return cents(balance) + onTheWay >= cents(threshold ?? '20');
+}

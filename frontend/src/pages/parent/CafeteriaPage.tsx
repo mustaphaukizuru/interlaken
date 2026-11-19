@@ -36,7 +36,7 @@ import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { LIVE } from '@/lib/live';
 import { LiveBadge } from '@/components/ui/LiveBadge';
 import { fieldErrorsOrNull } from '@/lib/apiErrors';
-import { applyNotice, applyPhrase, DEFAULT_WHATSAPP, isScheduled, sentence } from '@/lib/topupApply';
+import { applyNotice, applyPhrase, DEFAULT_WHATSAPP, isScheduled, pendingCoversLowBalance, sentence } from '@/lib/topupApply';
 
 const TX_PAGE_SIZE = 20;  // matches DRF PAGE_SIZE on MyTransactionsView
 const TX_TYPES = ['purchase', 'topup', 'refund'] as const;
@@ -555,7 +555,10 @@ export default function CafeteriaPage() {
                   <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
                   <p className="truncate text-xs text-muted">{b.student.grade} · Grupo {b.student.group}</p>
                 </div>
-                {isLow && <Badge variant="warning">Saldo bajo</Badge>}
+                {/* Not while paid card top-ups on their way cover the alert level (same rule as the e-mail). */}
+                {isLow && !pendingCoversLowBalance(b.balance, b.low_balance_threshold, b.pending_topups) && (
+                  <Badge variant="warning">Saldo bajo</Badge>
+                )}
               </div>
 
               <div className="mt-4 flex items-end justify-between gap-3">
