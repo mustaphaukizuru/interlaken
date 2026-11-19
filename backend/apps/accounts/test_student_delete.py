@@ -343,6 +343,7 @@ class TestDuplicateOnCreate:
         assert resp.status_code == 400
         assert resp.data["existing"] == {
             "id": existing.id, "name": "Ana Ruiz", "student_id": "09111", "status": "active", "archived": False,
+            "tipo": "alumno",
         }
 
     def test_says_when_that_record_is_archived(self, admin_client):

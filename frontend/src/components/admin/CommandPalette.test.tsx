@@ -73,7 +73,8 @@ describe('CommandPalette', () => {
     // The palette input is a combobox now (aria-activedescendant wiring).
     await userEvent.type(screen.getByRole('combobox'), 'ana');
 
-    await waitFor(() => expect(students).toHaveBeenCalledWith({ q: 'ana' }));
+    // Ctrl+K finds pupils and staff cafetería accounts alike.
+    await waitFor(() => expect(students).toHaveBeenCalledWith({ q: 'ana', tipo: 'todos' }));
     expect(bookings).toHaveBeenCalledWith({ q: 'ana' });
 
     expect(await screen.findByText('Ana García')).toBeInTheDocument();

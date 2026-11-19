@@ -281,6 +281,8 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     student_id   = serializers.IntegerField(source='student.id', read_only=True)
     student_name = serializers.CharField(source='student.user.full_name', read_only=True)
     student_code = serializers.CharField(source='student.student_id', read_only=True)
+    # «Personal» tag on staff cafetería accounts (2026-11-18).
+    student_tipo = serializers.CharField(source='student.tipo', read_only=True)
     method_display = serializers.CharField(source='get_method_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     gateway        = serializers.SerializerMethodField()
@@ -308,7 +310,7 @@ class TopUpLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = TopUpRequest
         fields = [
-            'id', 'student_id', 'student_name', 'student_code', 'amount',
+            'id', 'student_id', 'student_name', 'student_code', 'student_tipo', 'amount',
             'method', 'method_display', 'status', 'status_display',
             'gateway', 'payment_status', 'gateway_tx_id', 'payment_id', 'banorte',
             'created_at', 'processed_at',

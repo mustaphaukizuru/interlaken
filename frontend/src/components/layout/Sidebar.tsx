@@ -3,7 +3,7 @@ import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, BarChart3, LayoutDashboard } from 'lucide-react';
+import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, BarChart3, LayoutDashboard, Coffee } from 'lucide-react';
 import { navGroupsByRole, type NavGroup, type Role } from './navConfig';
 import { canOpen, consoleHome } from '@/lib/areas';
 import { useBadges } from '@/hooks/useBadges';
@@ -43,12 +43,26 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
     : role === 'staff'
       ? [{ heading: 'Consola', items: [{ icon: LayoutDashboard, label: user.staff_title || 'Mi consola', to: home }] }]
       : [];
+  // A console user who also eats at the cafetería (their own staff wallet).
+  const myCafe: NavGroup[] = user?.cafeteria_account && (user.role === 'admin' || user.role === 'staff')
+    ? [{ heading: 'Mi cuenta', items: [{ icon: Coffee, label: 'Mi cafetería', to: '/portal/mi-cafeteria' }] }]
+    : [];
+  // A staff member whose only login is the portal one (a «Personal del
+  // colegio» cafetería account): the portal reads «Personal», not «Familia».
+  // (The family portal renders with role «parent» for every family login.)
+  const staffPortal = (role === 'parent' || role === 'student')
+    && user?.role === 'student' && user.cafeteria_account?.tipo === 'personal';
   const groups = [
     ...(role === 'staff' ? bridge : []),
     ...(navGroupsByRole[role] ?? navGroupsByRole.parent)
       .map((g) => ({ ...g, items: g.items.filter((item) => canOpen(user, item.to)) }))
-      .filter((g) => g.items.length > 0),
+      .filter((g) => g.items.length > 0)
+      .map((g) => (!staffPortal ? g : {
+        heading: g.heading === 'Familia' ? 'Personal' : g.heading,
+        items: g.items.map((item) => (item.to === '/portal/cafeteria' ? { ...item, label: 'Mi cafetería' } : item)),
+      })),
     ...(role === 'admin' ? bridge : []),
+    ...myCafe,
   ];
   const asideRef = useRef<HTMLElement>(null);
   const touchX = useRef<number | null>(null);
@@ -128,7 +142,7 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
           </div>
           <div>
             <div className="font-head text-[9px] font-bold uppercase tracking-[1.8px] text-purple/55">Portal</div>
-            <div className="font-head text-[13px] font-bold tracking-[0.5px] text-ink">{ROLE_LABEL[role] ?? role}</div>
+            <div className="font-head text-[13px] font-bold tracking-[0.5px] text-ink">{staffPortal ? 'Personal' : (ROLE_LABEL[role] ?? role)}</div>
           </div>
         </div>
       )}

@@ -31,6 +31,9 @@ import { ImportDialog } from '@/components/admin/ImportDialog';
 import { ReconcileBanorteDialog, VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
 import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
 import { AppliedTodayList, ApplyPaidDialog, PaidTopUpQueue } from '@/components/admin/PaidTopUpQueue';
+import { PersonalTag } from '@/components/admin/PersonalTag';
+import { RowActionsMenu, type RowMenuItem } from '@/components/admin/RowActionsMenu';
+import { ARCHIVE_ACTION, DELETE_ACTION, RESTORE_ACTION, removalPlanNote } from '@/components/admin/studentActions';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
 import { cafeteriaApi, downloadBlob, type LoyverseCustomer } from '@/services/api';
 import { adjustmentImportApi, type AdminTransaction, type ReconcileRowV2, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
@@ -45,9 +48,12 @@ import {
   useTopUpsBulk, useTopUpsExport, useTopUpsList, useTransactionsExport, useTransactionsList,
 } from '@/hooks/queries/cafeteria';
 import { apiErrorMessage } from '@/lib/apiErrors';
+import { isAdmin } from '@/lib/areas';
+import { gradeOrPuesto, PERSON_STATUS_OPTIONS, PERSON_TIPO_OPTIONS, personStatusParam } from '@/lib/people';
+import { useStudentsBulk } from '@/hooks/queries/students';
+import { useAuthStore } from '@/store/authStore';
 import { LIVE } from '@/lib/live';
 import { GRADES } from '@/lib/grades';
-import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { CUSTOMER_KIND, TOPUP_METHOD, TOPUP_STATUS, TX_TYPE, isCardTopUp, options } from '@/lib/status/cafeteria';
 import { PAYMENT_FAILURE, gatewayLabel } from '@/lib/status/payment';
 import type { CafeteriaBalance, TopUpLogEntry } from '@/types';
@@ -65,7 +71,7 @@ const TABS: { key: Tab; label: string; icon: typeof Coffee }[] = [
 ];
 
 /** Every per-tab URL param; switching tabs drops them all. */
-const TAB_PARAMS = ['q', 'estado', 'tipo', 'page', 'orden', 'grado', 'grupo', 'desde', 'hasta', 'metodo', 'saldo', 'vinculo', 'alumno', 'solo', 'revisar'];
+const TAB_PARAMS = ['q', 'estado', 'tipo', 'persona', 'page', 'orden', 'grado', 'grupo', 'desde', 'hasta', 'metodo', 'saldo', 'vinculo', 'alumno', 'solo', 'revisar'];
 
 const fmtDate = (d: string | null | undefined) =>
   d ? format(new Date(d), 'd MMM yyyy, HH:mm', { locale: es }) : '—';
@@ -79,7 +85,10 @@ function clean(params: Record<string, string | number | undefined | null>): List
 }
 
 const GRADE_OPTIONS = GRADES.map((g) => ({ value: g, label: g }));
-const STUDENT_STATUS_OPTIONS = Object.entries(STUDENT_STATUS).map(([value, m]) => ({ value, label: m.label }));
+// A8 (2026-11-18): every person-based list opens on active people; bajas,
+// archivados and «Todos» are in the Estado select, pupils or staff in Persona.
+const ESTADO_SELECT = { key: 'estado', label: 'Estado', options: PERSON_STATUS_OPTIONS, allLabel: 'Activos' };
+const PERSONA_SELECT = { key: 'persona', label: 'Persona', options: PERSON_TIPO_OPTIONS, allLabel: 'Alumnos y personal' };
 
 /** Sort state in the URL (`orden`), like every other filter. */
 function useUrlSort(): [SortState, (next: SortState) => void] {
@@ -241,7 +250,12 @@ function balanceColumns(name: string): Column<CafeteriaBalance>[] {
   return [
     {
       id: 'student', header: 'Alumno', sortKey: 'student', hideable: false, minWidth: 180, className: 'font-medium text-ink',
-      cell: (b) => <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>,
+      cell: (b) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <Link to={`/admin/cafeteria/${b.student.id}`} className="hover:text-brand-700">{b.student.user.full_name}</Link>
+          {b.student.tipo === 'personal' && <PersonalTag />}
+        </span>
+      ),
     },
     {
       id: 'state', header: 'Estado', minWidth: 110,
@@ -252,7 +266,7 @@ function balanceColumns(name: string): Column<CafeteriaBalance>[] {
     },
     { id: 'balance', header: name, sortKey: 'balance', align: 'right', hideable: false, minWidth: 100, className: 'font-semibold text-ink', cell: (b) => mxn(b.balance) },
     { id: 'threshold', header: 'Umbral', sortKey: 'threshold', align: 'right', defaultHidden: name === 'Saldo', className: 'text-muted', cell: (b) => mxn(b.low_balance_threshold ?? '20') },
-    { id: 'grade', header: 'Grado', sortKey: 'grade', className: 'text-muted whitespace-nowrap', cell: (b) => `${b.student.grade} ${b.student.group}`.trim() },
+    { id: 'grade', header: 'Grado', label: 'Grado o puesto', sortKey: 'grade', className: 'text-muted whitespace-nowrap', cell: (b) => gradeOrPuesto(b.student) },
     {
       // The POS code under the matrícula when it is spelled differently (ci09932), as in Alumnos.
       id: 'matricula', header: 'Matrícula', className: 'whitespace-nowrap text-muted',
@@ -278,7 +292,8 @@ function RosterTab() {
   const saldo = get('saldo');
   const vinculo = get('vinculo');
   const filters = clean({
-    q: get('q'), status: get('estado'), grade: get('grado'), group: get('grupo'),
+    q: get('q'), student_status: personStatusParam(get('estado')), tipo: get('persona'),
+    grade: get('grado'), group: get('grupo'),
     low_balance: saldo === 'bajo' ? 'true' : saldo === 'normal' ? 'false' : undefined,
     unlinked: vinculo === 'sin' ? 'true' : vinculo === 'con' ? 'false' : undefined,
     ordering: serializeSort(sort),
@@ -356,6 +371,18 @@ function RosterTab() {
   const fetchExport = exporter((p) => exportBalances.mutateAsync(p), filters, selection);
   const validThreshold = threshold !== '' && Number(threshold) >= 0;
 
+  // A9: the Alumnos «Archivar» / «Eliminar» (same endpoint, rules and
+  // confirmations: erase only what has nothing to keep, archive the rest).
+  const admin = isAdmin(useAuthStore((st) => st.user));
+  const studentsBulk = useStudentsBulk();
+  const [removing, setRemoving] = useState<{ action: BulkActionDef; row: CafeteriaBalance } | null>(null);
+  const lifecycleItems = (b: CafeteriaBalance): RowMenuItem[] => [
+    b.student.archived_at
+      ? { key: 'restore', label: 'Restaurar', icon: RESTORE_ACTION.icon, onSelect: () => setRemoving({ action: RESTORE_ACTION, row: b }) }
+      : { key: 'archive', label: 'Archivar', icon: ARCHIVE_ACTION.icon, onSelect: () => setRemoving({ action: ARCHIVE_ACTION, row: b }) },
+    { key: 'delete', label: 'Eliminar', icon: DELETE_ACTION.icon, danger: true, onSelect: () => setRemoving({ action: DELETE_ACTION, row: b }) },
+  ];
+
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
@@ -403,10 +430,11 @@ function RosterTab() {
         selection={selection}
         toolbar={(
           <FilterBar
-            search={{ placeholder: 'Alumno, matrícula, código Loyverse o correo del tutor…', label: 'Buscar alumno, matrícula o código Loyverse' }}
+            search={{ placeholder: 'Nombre, matrícula, código Loyverse o correo del tutor…', label: 'Buscar alumno, matrícula o código Loyverse' }}
             selects={[
+              ESTADO_SELECT,
+              PERSONA_SELECT,
               { key: 'grado', label: 'Grado', options: GRADE_OPTIONS, allLabel: 'Todos los grados' },
-              { key: 'estado', label: 'Estado del alumno', options: STUDENT_STATUS_OPTIONS, allLabel: 'Todos los estados' },
               { key: 'saldo', label: 'Saldo', options: [{ value: 'bajo', label: 'Saldo bajo' }, { value: 'normal', label: 'Normal' }], allLabel: 'Cualquier saldo' },
               { key: 'vinculo', label: 'Loyverse', options: [{ value: 'sin', label: 'Sin vincular' }, { value: 'con', label: 'Vinculados' }], allLabel: 'Vinculados o no' },
             ]}
@@ -448,6 +476,7 @@ function RosterTab() {
             >
               <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </Link>
+            {admin && <RowActionsMenu label={`Más acciones para ${b.student.user.full_name}`} items={lifecycleItems(b)} />}
           </>
         )}
         empty={{ icon: Coffee, title: filters.q ? 'Sin resultados' : 'Sin saldos registrados', description: 'Ajuste la búsqueda o los filtros.' }}
@@ -485,6 +514,21 @@ function RosterTab() {
         onDone={() => selection.onClear()}
         renderPlan={() => (pending?.name === 'set_threshold' ? <p className="text-xs">Nuevo umbral: {mxn(threshold)}.</p> : null)}
       />
+      <BulkConfirmDialog
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        action={removing?.action ?? null}
+        payload={removing?.action.payload}
+        entityLabel="alumnos"
+        gender="m"
+        ids={removing ? [removing.row.student.id] : []}
+        allMatching={false}
+        subject={removing?.row.student.user.full_name}
+        filters={{}}
+        execute={(body) => studentsBulk.mutateAsync(body)}
+        renderPlan={removalPlanNote(removing?.action)}
+        onDone={() => { setRemoving(null); void refreshBalances(); }}
+      />
     </Card>
   );
 }
@@ -495,7 +539,10 @@ const TX_COLUMNS: Column<AdminTransaction>[] = [
     id: 'student', header: 'Alumno', sortKey: 'student', minWidth: 170, className: 'font-medium text-ink',
     cell: (t) => (
       <span className="block">
-        <Link to={`/admin/cafeteria/${t.student_id}`} className="hover:text-brand-700">{t.student_name}</Link>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <Link to={`/admin/cafeteria/${t.student_id}`} className="hover:text-brand-700">{t.student_name}</Link>
+          {t.student_tipo === 'personal' && <PersonalTag />}
+        </span>
         <span className="block text-xs text-subtle">{t.student_code}</span>
       </span>
     ),
@@ -516,6 +563,8 @@ function MovementsTab() {
   const student = get('alumno');
   const filters = clean({
     q: get('q'), type: get('tipo'), student, from: get('desde'), to: get('hasta'), ordering: serializeSort(sort),
+    // A link from a person's page shows all their movements, whatever their status.
+    student_status: student ? undefined : personStatusParam(get('estado')), tipo: get('persona'),
   });
   const { data, isLoading, isError, refetch } = useTransactionsList({ page, ...filters });
   const count = data?.count ?? 0;
@@ -566,6 +615,7 @@ function MovementsTab() {
           <FilterBar
             search={{ placeholder: 'Alumno, matrícula, descripción o recibo…', label: 'Buscar movimientos' }}
             tabs={{ paramKey: 'tipo', options: options(TX_TYPE), allLabel: 'Todos', label: 'Filtrar por tipo' }}
+            selects={student ? [] : [ESTADO_SELECT, PERSONA_SELECT]}
             dateRange={{ idPrefix: 'caf-mov' }}
             extraChips={student ? [{ key: 'alumno', label: `Alumno: #${student}`, onClear: () => set({ alumno: null, page: null }) }] : []}
           >
@@ -1027,7 +1077,7 @@ function ReconcileTab() {
             toolbar={(
               <FilterBar
                 search={{ placeholder: 'Alumno, matrícula o código Loyverse…', label: 'Buscar en la reconciliación' }}
-                selects={[{ key: 'grado', label: 'Grado', options: GRADE_OPTIONS, allLabel: 'Todos los grados' }]}
+                selects={[PERSONA_SELECT, { key: 'grado', label: 'Grado', options: GRADE_OPTIONS, allLabel: 'Todos los grados' }]}
               >
                 <ExportMenu filenamePrefix="reconciliacion_cafeteria" selectedCount={selection.count} fetch={fetchExport} />
               </FilterBar>
@@ -1084,7 +1134,7 @@ function LowBalanceTab() {
   const { get } = useUrlFilters();
   const [page, setPage] = useUrlPage();
   const [sort, onSort] = useUrlSort();
-  const filters = clean({ q: get('q'), grade: get('grado'), group: get('grupo'), ordering: serializeSort(sort) });
+  const filters = clean({ q: get('q'), grade: get('grado'), group: get('grupo'), tipo: get('persona'), ordering: serializeSort(sort) });
   const { data, isLoading, isError, refetch } = useLowBalanceList({ page, ...filters });
   const count = data?.count ?? 0;
   const selection = useRowSelection(count, JSON.stringify(filters));
@@ -1093,7 +1143,7 @@ function LowBalanceTab() {
 
   return (
     <Card>
-      {count > 0 && <p className="mb-3 text-sm text-muted">{count} alumno(s) por debajo del umbral.</p>}
+      {count > 0 && <p className="mb-3 text-sm text-muted">{count} persona(s) activa(s) por debajo del umbral.</p>}
       <DataTable<CafeteriaBalance>
         tableId="cafeteria-low-balance"
         columns={balanceColumns('Saldo').map((c) => (c.id === 'threshold' ? { ...c, defaultHidden: false } : c.id === 'balance' ? { ...c, className: 'font-semibold text-amber' } : c))}

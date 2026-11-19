@@ -17,6 +17,7 @@ from apps.core.permissions import (
     IsAdmin,
     IsAdminOrStaff,
     IsParentOrAdmin,
+    IsParentOrAdminOrAccountHolder,
     IsStaffOrAdmin,
     is_admin_or_django_staff,
 )
@@ -66,5 +67,20 @@ def test_views_use_the_shared_classes():
     from apps.cafeteria import views as cafeteria_views
     from apps.portal import analytics
 
-    assert cafeteria_views.IsParentOrAdmin is IsParentOrAdmin
+    # Top-up and the family export use the shared class, widened only for
+    # the caller's own staff cafetería account (2026-11-18): no local copy.
+    assert cafeteria_views.IsParentOrAdminOrAccountHolder is IsParentOrAdminOrAccountHolder
+    assert issubclass(IsParentOrAdminOrAccountHolder, IsParentOrAdmin)
+    assert cafeteria_views.TopUpRequestCreateView.permission_classes == [IsParentOrAdminOrAccountHolder]
     assert analytics.StaffAnalyticsView.permission_classes == [IsStaffOrAdmin]
+
+
+def test_account_holder_adds_only_own_cafeteria_accounts():
+    from apps.accounts.factories import StudentProfileFactory
+
+    teacher = UserFactory(role=User.Role.STAFF)
+    assert _allowed(IsParentOrAdminOrAccountHolder, AnonymousUser()) is False
+    assert _allowed(IsParentOrAdminOrAccountHolder, teacher) is False
+    StudentProfileFactory(user=teacher, tipo="personal", grade="")
+    assert _allowed(IsParentOrAdminOrAccountHolder, teacher) is True
+    assert _allowed(IsParentOrAdmin, teacher) is False      # the base class is unchanged

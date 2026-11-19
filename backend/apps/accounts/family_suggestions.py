@@ -113,8 +113,10 @@ def parse_key(key) -> list[int]:
 
 
 def candidates_qs():
+    # Pupils only: a staff cafetería account is never anyone's sibling.
     return (StudentProfile.objects
-            .filter(status=StudentProfile.Status.ACTIVE, user__archived_at__isnull=True)
+            .filter(status=StudentProfile.Status.ACTIVE, user__archived_at__isnull=True,
+                    tipo=StudentProfile.Tipo.ALUMNO)
             .select_related('user', 'family', 'loyverse_profile')
             .prefetch_related(Prefetch('parents', queryset=User.objects.only('id', 'email', 'role'))))
 

@@ -74,6 +74,16 @@ def classify_customer(customer: dict) -> str:
     return 'other'
 
 
+def _bound_kind(student, customer: dict) -> str:
+    """The ``kind`` stored for a customer: ``student`` when it backs a pupil,
+    what the card itself says otherwise. A staff cafetería account
+    (``tipo='personal'``) keeps its card's own kind (``staff``), so the
+    «Clientes Loyverse» tab never calls a staff card a pupil."""
+    if student is not None and not getattr(student, 'is_personal', False):
+        return 'student'
+    return classify_customer(customer)
+
+
 def parse_customer_snapshot(customer: dict) -> dict:
     """Map a raw Loyverse customer object to LoyverseProfile field values.
 
@@ -115,8 +125,7 @@ def upsert_loyverse_profile(student, customer: dict):
     values = parse_customer_snapshot(customer)
     values['synced_at'] = timezone.now()
     values['student'] = student
-    values['kind'] = (LoyverseProfile.Kind.STUDENT if student is not None
-                      else classify_customer(customer))
+    values['kind'] = _bound_kind(student, customer)
     values['missing_since'] = None
     uuid = values.pop('loyverse_id')
     if not uuid:
@@ -163,7 +172,7 @@ def refresh_all_profiles(customers, *, mark_missing=True):
         # An empty matrícula must not match a customer with a blank
         # customer_code (''.strip() == '') — that would bind an unrelated
         # customer to the student.
-        code = (s.student_id or '').strip()
+        code = (s.student_id or '').strip().lower()
         if code:
             by_code.setdefault(code, s)
 
@@ -184,11 +193,11 @@ def refresh_all_profiles(customers, *, mark_missing=True):
             continue
         seen_ids.add(uuid)
         report['total'] += 1
-        code = (c.get('customer_code') or '').strip()
+        code = (c.get('customer_code') or '').strip().lower()
         student = by_id.get(uuid) or (by_code.get(code) if code else None)
         if student is not None and student.pk in seen_students:
             student = None
-        kind = 'student' if student is not None else classify_customer(c)
+        kind = _bound_kind(student, c)
 
         prev = existing.get(uuid)
         if (prev is not None
@@ -214,6 +223,8 @@ def refresh_all_profiles(customers, *, mark_missing=True):
         else:
             report['matched'] += 1
             seen_students.add(student.pk)
+            if student.is_personal:
+                report['staff'] += 1     # a staff card, now backing a staff account
 
     if unchanged:
         LoyverseProfile.objects.filter(loyverse_id__in=unchanged).update(synced_at=now)

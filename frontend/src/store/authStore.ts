@@ -34,6 +34,8 @@ export interface User {
   staff_areas?: string[];
   /** Job title of a staff account ("Secretaría", "Recepción"...). */
   staff_title?: string;
+  /** The caller's own staff cafetería account (drives «Mi cafetería»), else null. */
+  cafeteria_account?: import('@/types').CafeteriaAccount | null;
 }
 
 interface AuthState {

@@ -15,6 +15,12 @@ export function AccountMenu() {
   const { user } = useAuthStore();
   const role = user?.role ?? 'parent';
   const home = homePath(user);
+  // A staff member's portal-only login (role student + a «Personal del
+  // colegio» cafetería account) reads as their puesto, never «Alumno».
+  const staffAccount = role === 'student' && user?.cafeteria_account?.tipo === 'personal' ? user.cafeteria_account : null;
+  const roleText = staffAccount
+    ? (staffAccount.puesto && staffAccount.puesto !== 'sin_asignar' ? staffAccount.puesto_label : 'Personal del colegio')
+    : (role === 'staff' && user?.staff_title) || (ROLE_LABEL[role] ?? role);
 
   return (
     <Dropdown
@@ -32,7 +38,7 @@ export function AccountMenu() {
             <div className="text-[13px] font-semibold text-ink">
               {user?.first_name} {user?.last_name}
             </div>
-            <div className="text-[12px] text-subtle">{(role === 'staff' && user?.staff_title) || (ROLE_LABEL[role] ?? role)}</div>
+            <div className="text-[12px] text-subtle">{roleText}</div>
           </div>
           <Avatar user={user} size={36} rounded="rounded-[10px]" />
           <ChevronDown size={15} className={`text-subtle transition-transform ${open ? 'rotate-180' : ''}`} />

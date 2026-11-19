@@ -51,6 +51,17 @@ describe('AdminDashboard', () => {
     getStaffAnalytics.mockResolvedValue({ data: null } as never);
   });
 
+  it('shows the pupils and the staff wallet totals apart', async () => {
+    getDashboard.mockResolvedValue({ data: {
+      ...DASHBOARD, cafeteria_total_balance: '23700.50', cafeteria_students_balance: '3200.50',
+      cafeteria_staff_balance: '20500.00', total_staff_accounts: 3,
+    } } as never);
+    renderWithProviders(<AdminDashboard />, { route: '/admin' });
+    expect(await screen.findByText('Saldo alumnos')).toBeInTheDocument();
+    expect(screen.getByText(/Saldo personal: \$20,500\.00 \(3 cuentas\)/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('$3,200.50')).toBeInTheDocument());
+  });
+
   it('shows KPI counts including pending registrations', async () => {
     getDashboard.mockResolvedValue({ data: DASHBOARD } as never);
 
@@ -58,7 +69,8 @@ describe('AdminDashboard', () => {
 
     // KPIs re-cut for the cafetería-only money path (BACKLOG P1-H5)
     expect(await screen.findByText('Alumnos activos')).toBeInTheDocument();
-    expect(screen.getByText('Saldo total cafetería')).toBeInTheDocument();
+    // Pupils and staff wallets apart (2026-11-18).
+    expect(screen.getByText('Saldo alumnos')).toBeInTheDocument();
     expect(screen.getByText('Admisiones en cola')).toBeInTheDocument();
     expect(screen.getByText('Cobrado este mes')).toBeInTheDocument();
     expect(screen.getByText('Visitas hoy')).toBeInTheDocument();

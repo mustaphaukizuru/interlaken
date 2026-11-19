@@ -84,7 +84,10 @@ export default function AdminDashboard() {
             ) : (
               [
                 <StatCard key="a" title="Alumnos activos" value={data?.total_students ?? 0} icon={Users} color="purple" subtitle={data?.stale_links ? `${data.stale_links} sin cliente en Loyverse` : undefined} />,
-                <StatCard key="b" title="Saldo total cafetería" value={formatMXN(data?.cafeteria_total_balance ?? 0)} icon={Coffee} color="green" />,
+                // Pupils and staff apart (2026-11-18): the staff wallets (three
+                // institutional ones above $20,000) would distort the pupils' figure.
+                <StatCard key="b" title="Saldo alumnos" value={formatMXN(data?.cafeteria_students_balance ?? data?.cafeteria_total_balance ?? 0)} icon={Coffee} color="green"
+                  subtitle={data?.cafeteria_staff_balance != null ? `Saldo personal: ${formatMXN(data.cafeteria_staff_balance)}${data.total_staff_accounts ? ` (${data.total_staff_accounts} ${data.total_staff_accounts === 1 ? 'cuenta' : 'cuentas'})` : ''}` : undefined} />,
                 <StatCard key="c" title="Saldos bajos" value={data?.low_balance_count ?? 0} icon={AlertTriangle} color="amber" subtitle="alumnos activos en cafetería bajo su umbral" />,
                 <StatCard key="d" title="Recargas por aplicar" value={data?.pending_topups ?? 0} icon={Coffee} color="coral" subtitle={data?.pending_topups_online != null ? `${data.pending_topups_office ?? 0} en caja · ${data.pending_topups_online} con tarjeta por verificar o cargar en POS` : 'pagos en caja'} />,
                 <StatCard key="e" title="Cobrado este mes" value={formatMXN(data?.total_revenue ?? 0)} icon={CreditCard} color="green" subtitle="recargas en línea" />,

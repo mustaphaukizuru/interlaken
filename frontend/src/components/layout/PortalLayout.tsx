@@ -26,6 +26,8 @@ const EXPLICIT_TITLES: Record<string, string> = {
   '/portal': 'Inicio',
   '/portal/pagos': 'Pagos',
   '/portal/cafeteria': 'Cafetería',
+  '/portal/mi-cafeteria': 'Mi cafetería',
+  '/portal/mi-cafeteria/credencial': 'Credencial',
   '/portal/credencial': 'Credencial',
   '/portal/inscripciones': 'Inscripciones',
   '/portal/comunicados': 'Comunicados',

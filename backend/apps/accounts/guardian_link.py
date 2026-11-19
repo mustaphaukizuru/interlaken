@@ -114,6 +114,10 @@ class StudentGuardiansView(APIView):
 
     def post(self, request, pk):
         student = get_object_or_404(StudentProfile.objects.select_related('user'), pk=pk)
+        if student.is_personal:
+            # A guardian would see (and be notified of) a staff member's wallet.
+            return Response(error_body('El personal del colegio no tiene tutores.'),
+                            status=status.HTTP_400_BAD_REQUEST)
         email = (request.data.get('email') or '').strip().lower()
         if not email or '@' not in email:
             return Response(

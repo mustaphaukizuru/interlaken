@@ -16,7 +16,11 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
 import { CopyButton } from '@/components/admin/CopyButton';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { PersonalTag } from '@/components/admin/PersonalTag';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
+import { PERSON_STATUS_OPTIONS, PERSON_TIPO_OPTIONS, personStatusParam } from '@/lib/people';
 import { idsParam, type BulkResult, type ExportFormat } from '@/services/dataOps';
 import { cafeteriaAdminApi, type TopUpBulkResult } from '@/services/cafeteriaAdmin';
 import { useRowSelection } from '@/hooks/useRowSelection';
@@ -58,9 +62,21 @@ function useInvalidateMoney() {
  */
 export function PaidTopUpQueue() {
   const [page, setPage] = useState(1);
-  const filters = { needs_apply: 1, ordering: 'apply_due_at' };
+  // A8: active people by default; bajas, archivados and «Personal» on demand.
+  const { get, set } = useUrlFilters();
+  const studentStatus = personStatusParam(get('estado'));
+  const tipo = get('persona') || undefined;
+  const filters = {
+    needs_apply: 1, ordering: 'apply_due_at',
+    ...(studentStatus ? { student_status: studentStatus } : {}),
+    ...(tipo ? { tipo } : {}),
+  };
   const { data, isLoading, isError, refetch } = useTopUpsList({ page, ...filters }, LIVE);
   const count = data?.count ?? 0;
+  // Money is never hidden silently: paid top-ups of people who are not active
+  // any more are counted while the default filter leaves them out.
+  const { data: inactive } = useTopUpsList({ page: 1, page_size: 1, needs_apply: 1, student_status: 'inactive' }, LIVE);
+  const hiddenInactive = studentStatus === 'active' ? inactive?.count ?? 0 : 0;
   const selection = useRowSelection(count, 'apply');
   const bulk = useTopUpsBulk();
   const exportTopups = useTopUpsExport();
@@ -70,6 +86,10 @@ export function PaidTopUpQueue() {
   const [verifying, setVerifying] = useState<TopUpLogEntry | null>(null);
   const overdue = (data?.results ?? []).filter((d) => d.apply_overdue).length;
 
+  // B2 (2026-11-18): fits a 1440 px screen with no sideways scroll. The
+  // columns staff act on stay (due, amount, Loyverse/App, Banorte with its
+  // copy buttons, actions); who paid, the codes and the folio sit under the
+  // name instead of three more columns.
   const columns: Column<TopUpLogEntry>[] = [
     {
       id: 'due', header: 'Se aplica', hideable: false, className: 'whitespace-nowrap',
@@ -82,35 +102,40 @@ export function PaidTopUpQueue() {
       ),
     },
     {
-      id: 'student', header: 'Alumno', minWidth: 170, className: 'font-medium text-ink',
+      id: 'student', header: 'Alumno y pago', minWidth: 200, className: 'text-ink',
       cell: (d) => (
-        <span className="block">
-          <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">{d.student_name}</Link>
-          <span className="block text-xs text-subtle">{d.student_code}</span>
+        <span className="block break-words">
+          <span className="flex flex-wrap items-center gap-1.5 font-medium">
+            <Link to={`/admin/cafeteria/${d.student_id}`} className="hover:text-brand-700">{d.student_name}</Link>
+            {d.student_tipo === 'personal' && <PersonalTag />}
+          </span>
+          <span className="block text-xs text-subtle">
+            {d.student_code}
+            {d.loyverse_code && d.loyverse_code !== d.student_code && <> · Loyverse <span className="font-mono text-ink">{d.loyverse_code}</span></>}
+            {d.payment_id != null && <> · Folio <span className="font-mono text-ink">{d.payment_id}</span></>}
+          </span>
+          {d.payer && (
+            <span className="mt-1 block text-xs text-subtle">
+              Pagó <span className="font-medium text-ink">{d.payer.name || d.payer.email}</span>
+              {d.payer.name && <span className="block break-all">{d.payer.email}</span>}
+              {(d.payer.phone || d.payer.card_brand) && (
+                <span className="block">
+                  {d.payer.phone && <span>{d.payer.phone}</span>}
+                  {d.payer.phone && d.payer.card_brand && ' · '}
+                  {d.payer.card_brand && <span>{d.payer.card_brand}</span>}
+                </span>
+              )}
+            </span>
+          )}
         </span>
       ),
     },
+    { id: 'amount', header: 'Monto', align: 'right', hideable: false, className: 'whitespace-nowrap font-semibold text-ink', cell: (d) => mxn(d.amount) },
     {
-      id: 'payer', header: 'Pagó', minWidth: 190,
-      cell: (d) => (d.payer ? (
-        <span className="block text-xs">
-          <span className="block font-medium text-ink">{d.payer.name || d.payer.email}</span>
-          <span className="block text-subtle">{d.payer.email}</span>
-          {d.payer.phone && <span className="block text-subtle">{d.payer.phone}</span>}
-          {d.payer.card_brand && <span className="block text-subtle">{d.payer.card_brand}</span>}
-        </span>
-      ) : <span className="text-xs text-subtle">—</span>),
-    },
-    {
-      id: 'loyverse', header: 'Cliente Loyverse', className: 'font-mono text-xs text-ink',
-      cell: (d) => d.loyverse_code || <span className="font-sans text-subtle">—</span>,
-    },
-    { id: 'amount', header: 'Monto', align: 'right', hideable: false, className: 'font-semibold text-ink', cell: (d) => mxn(d.amount) },
-    {
-      id: 'pos', header: 'Loyverse / App', minWidth: 150,
+      id: 'pos', header: 'Loyverse / App', minWidth: 130,
       cell: (d) => (
         <span className="block text-xs text-muted">
-          {d.loyverse_points != null ? `${mxn(d.loyverse_points)} / ${mxn(d.wallet_balance)}` : '—'}
+          <span className="whitespace-nowrap">{d.loyverse_points != null ? `${mxn(d.loyverse_points)} / ${mxn(d.wallet_balance)}` : '—'}</span>
           {gapIsThisTopUp(d) && (d.banorte?.needs_verification ? (
             <span className="mt-0.5 block font-semibold text-amber">Ya está en Loyverse: verifíquela en MultiCobros para que se aplique</span>
           ) : (
@@ -119,9 +144,8 @@ export function PaidTopUpQueue() {
         </span>
       ),
     },
-    { id: 'folio', header: 'Folio', className: 'font-mono text-xs text-ink', cell: (d) => d.payment_id ?? '—' },
     {
-      id: 'bank', header: 'Banorte', minWidth: 150, cell: (d) => (
+      id: 'bank', header: 'Banorte', minWidth: 140, cell: (d) => (
         d.banorte?.needs_verification ? (
           // What staff search in MultiCobros, one tap away.
           <span className="block">
@@ -168,6 +192,17 @@ export function PaidTopUpQueue() {
         </div>
         <ExportMenu filenamePrefix="recargas_por_aplicar" selectedCount={selection.count} fetch={fetchExport} />
       </div>
+      {hiddenInactive > 0 && (
+        <div role="note" className="mb-3 flex flex-col gap-2 rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-2.5 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <strong>{hiddenInactive} recarga{hiddenInactive === 1 ? '' : 's'} pagada{hiddenInactive === 1 ? '' : 's'}</strong> de
+            personas que ya no están activas no se muestra{hiddenInactive === 1 ? '' : 'n'} con el filtro «Activos».
+          </span>
+          <button type="button" className="font-semibold text-purple underline-offset-2 hover:underline" onClick={() => { set({ estado: 'inactive' }); setPage(1); }}>
+            Ver
+          </button>
+        </div>
+      )}
       <DataTable<TopUpLogEntry>
         tableId="cafeteria-pos-apply"
         columns={columns}
@@ -196,10 +231,12 @@ export function PaidTopUpQueue() {
           />
         )}
         rowActions={(d) => (
-          <div className="flex flex-wrap justify-end gap-2">
+          // Stacked, one short label each: the column stays narrow.
+          <div className="flex flex-col items-stretch gap-1.5">
             {d.banorte?.needs_verification ? (
-              <Button size="sm" variant="secondary" onClick={() => setVerifying(d)}>
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Verificar en MultiCobros
+              <Button size="sm" variant="secondary" onClick={() => setVerifying(d)} title="Verificar en MultiCobros"
+                aria-label={`Verificar en MultiCobros la recarga de ${d.student_name}`}>
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Verificar
               </Button>
             ) : (
               <Button size="sm" onClick={() => setApplying(d)} aria-label={`Aplicar la recarga de ${d.student_name}`}>
@@ -210,6 +247,14 @@ export function PaidTopUpQueue() {
               <Undo2 className="h-3.5 w-3.5" aria-hidden="true" /> Devolver
             </Button>
           </div>
+        )}
+        toolbar={(
+          <FilterBar
+            selects={[
+              { key: 'estado', label: 'Estado', options: PERSON_STATUS_OPTIONS, allLabel: 'Activos' },
+              { key: 'persona', label: 'Persona', options: PERSON_TIPO_OPTIONS, allLabel: 'Alumnos y personal' },
+            ]}
+          />
         )}
         empty={{ icon: CheckCircle2, title: 'Nada por aplicar', description: 'Todas las recargas con tarjeta ya están en el saldo de los alumnos.' }}
       />

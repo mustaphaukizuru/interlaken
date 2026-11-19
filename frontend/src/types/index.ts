@@ -18,6 +18,39 @@ export interface User {
   staff_areas?: string[];
   /** Job title of a staff account ("Secretaría", "Recepción"...). */
   staff_title?: string;
+  /**
+   * The caller's own staff cafetería account (only on /accounts/me/ and the
+   * login answer): drives «Mi cafetería». Null for everyone without one.
+   */
+  cafeteria_account?: CafeteriaAccount | null;
+}
+
+/** A staff member's own cafetería wallet holder (StudentProfile tipo=personal). */
+export interface CafeteriaAccount {
+  id: number;
+  tipo: PersonTipo;
+  puesto: StaffPuesto | '';
+  puesto_label: string;
+  is_active: boolean;
+  linked: boolean;
+}
+
+/** Pupil or staff member: who a cafetería wallet belongs to (2026-11-18). */
+export type PersonTipo = 'alumno' | 'personal';
+
+export type StaffPuesto =
+  | 'sin_asignar' | 'direccion' | 'coordinacion' | 'docente' | 'administracion'
+  | 'apoyo_escolar' | 'mantenimiento' | 'seguridad' | 'cafeteria' | 'otro';
+
+/** What saving a person did with Loyverse (A7): shown by the form. */
+export interface LoyverseLinkOutcome {
+  status: 'linked' | 'already_linked' | 'not_found' | 'duplicate_code' | 'duplicate_email'
+    | 'conflict' | 'taken' | 'unreachable' | 'error';
+  message: string;
+  balance?: string;
+  customer_code?: string;
+  matched_by?: string;
+  replayed?: number;
 }
 
 export interface StudentProfile {
@@ -29,6 +62,12 @@ export interface StudentProfile {
   grade: string;
   group: string;
   loyverse_id: string;
+  /** `personal` = a staff member's cafetería account (no grade; a puesto). */
+  tipo?: PersonTipo;
+  puesto?: StaffPuesto | '';
+  puesto_label?: string;
+  /** Present on create/update answers when the save looked the person up in Loyverse. */
+  loyverse_link?: LoyverseLinkOutcome;
   enrollment_date?: string | null;
   is_active?: boolean;
   status?: 'active' | 'on_leave' | 'graduated' | 'withdrawn';
@@ -166,6 +205,8 @@ export interface TopUpLogEntry {
   student_id: number;
   student_name: string;
   student_code: string;
+  /** `personal` = a staff member's cafetería account («Personal» tag). */
+  student_tipo?: PersonTipo;
   amount: string;
   method: 'online' | 'office';
   method_display: string;
@@ -386,7 +427,7 @@ export interface Booking {
 
 export interface DashboardData {
   children_count?: number;
-  children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string }>;
+  children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string; tipo?: PersonTipo; puesto_label?: string }>;
   /** `pending_topups`: paid card top-ups not applied yet (school's 7:30 POS load). */
   cafeteria_balances?: Array<{ student?: number; student_name: string; balance: string; low: boolean; last_synced: string; pending_topups?: string }>;
   recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
@@ -404,6 +445,12 @@ export interface DashboardData {
   pending_payments?: number;
   total_revenue?: string;
   cafeteria_total_balance?: string;
+  /** Pupils' wallets only (2026-11-18): the staff ones are counted apart. */
+  cafeteria_students_balance?: string;
+  /** Staff cafetería accounts' wallets (institutional ones hold large sums). */
+  cafeteria_staff_balance?: string;
+  /** Active staff cafetería accounts (tipo personal). */
+  total_staff_accounts?: number;
   low_balance_count?: number;
   /** Active students whose Loyverse customer is gone (leavers to withdraw). */
   stale_links?: number;

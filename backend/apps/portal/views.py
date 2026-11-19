@@ -45,7 +45,7 @@ from .serializers import (
     NotificationDetailSerializer,
     NotificationSerializer,
 )
-from .services import INLINE_DISPATCH_LIMIT, _audience_roles, emergency_broadcast, fanout_and_stamp
+from .services import INLINE_DISPATCH_LIMIT, audience_users, emergency_broadcast, fanout_and_stamp
 
 
 def audiences_for_user(user):
@@ -60,7 +60,16 @@ def audiences_for_user(user):
     audiences = [Announcement.Audience.ALL]
     role = getattr(user, 'role', None)
     if role in (User.Role.PARENT, User.Role.STUDENT):
+        # A staff member's cafetería login reads «Personal», never the family
+        # comunicados; a parent who is also staff reads both (the same rule as
+        # the fan-out: services.audience_users). ``visible_announcements``
+        # applies the same rule inside its own SQL (no extra query).
+        staff_wallet = _staff_wallet(user).exists()
+        if staff_wallet and role == User.Role.STUDENT:
+            return audiences + [Announcement.Audience.STAFF]
         audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS]
+        if staff_wallet:
+            audiences.append(Announcement.Audience.STAFF)
     elif role == User.Role.STAFF:
         audiences.append(Announcement.Audience.STAFF)
     elif role == User.Role.ADMIN:
@@ -69,12 +78,34 @@ def audiences_for_user(user):
     return audiences
 
 
+def _staff_wallet(user):
+    """The staff cafetería account whose login is ``user`` (2026-11-18)."""
+    return StudentProfile.objects.filter(user_id=getattr(user, 'pk', None),
+                                         tipo=StudentProfile.Tipo.PERSONAL)
+
+
+def _audience_q(user) -> Q:
+    """``audiences_for_user`` as one SQL condition: for a family login the
+    staff-wallet test is an EXISTS in the same query, so the comunicados lists
+    cost no extra round trip."""
+    role = getattr(user, 'role', None)
+    if role not in (User.Role.PARENT, User.Role.STUDENT):
+        return Q(audience__in=audiences_for_user(user))
+    a = Announcement.Audience
+    staff_wallet = Exists(_staff_wallet(user))
+    family = Q(audience__in=[a.PARENTS, a.STUDENTS])
+    if role == User.Role.STUDENT:
+        family &= ~Q(staff_wallet)
+    return Q(audience=a.ALL) | family | (Q(audience=a.STAFF) & Q(staff_wallet))
+
+
 def visible_announcements(user):
     """The comunicados ``user`` may see or act on outside the console: active,
-    for their audience and published (``published_q``). A comunicado scheduled
-    for later is invisible here until its time, as it is in the fan-out."""
+    for their audience (``audiences_for_user``) and published (``published_q``).
+    A comunicado scheduled for later is invisible here until its time, as it
+    is in the fan-out."""
     return (Announcement.objects
-            .filter(is_active=True, audience__in=audiences_for_user(user))
+            .filter(_audience_q(user), is_active=True)
             .filter(published_q()))
 
 
@@ -161,6 +192,9 @@ class DashboardView(APIView):
                         'grade': s.grade,
                         'group': s.group,
                         'student_id': s.student_id,
+                        # A staff member's own cafetería account (2026-11-18).
+                        'tipo': s.tipo,
+                        'puesto_label': s.get_puesto_display(),
                     }
                     for s in students
                 ],
@@ -204,21 +238,33 @@ class DashboardView(APIView):
                 status=Payment.Status.SUCCESS, created_at__year=now.year, created_at__month=now.month,
             ).aggregate(total=Sum('amount'))['total'] or 0
             active_balances = CafeteriaBalance.objects.filter(student__is_active=True)
+            # One query for both wallet totals (2026-11-18): the staff wallets
+            # (three institutional ones hold over $20,000) would distort the
+            # pupils' figure, so the card shows them apart.
+            pupil = StudentProfile.Tipo.ALUMNO
+            totals = active_balances.aggregate(
+                all=Sum('balance'),
+                pupils=Sum('balance', filter=Q(student__tipo=pupil)),
+                staff=Sum('balance', filter=~Q(student__tipo=pupil)))
             data = {
-                'total_students': StudentProfile.objects.filter(is_active=True).count(),
+                'total_students': StudentProfile.objects.filter(is_active=True, tipo=pupil).count(),
+                'total_staff_accounts': StudentProfile.objects.filter(
+                    is_active=True, tipo=StudentProfile.Tipo.PERSONAL).count(),
                 'total_users': User.objects.count(),
                 'pending_preregistrations': PreRegistration.objects.filter(status='pending').count(),
                 'pending_registrations': Registration.objects.filter(status='submitted').count(),
                 'pending_payments': Payment.objects.filter(status=Payment.Status.PENDING).count(),
                 'total_revenue': str(month_revenue),
-                'cafeteria_total_balance': str(active_balances.aggregate(t=Sum('balance'))['t'] or 0),
-                # Wallets in use and under their threshold (not every $0 wallet
-                # of a child who never buys): see cafeteria.low_balance_queryset.
-                'low_balance_count': low_balance_queryset().count(),
+                'cafeteria_total_balance': str(totals['all'] or 0),
+                'cafeteria_students_balance': str(totals['pupils'] or 0),
+                'cafeteria_staff_balance': str(totals['staff'] or 0),
+                # Pupils' wallets in use and under their threshold (not every
+                # $0 wallet of a child who never buys): low_balance_queryset.
+                'low_balance_count': low_balance_queryset().filter(student__tipo=pupil).count(),
                 # Still "active" in the app but their Loyverse customer is gone:
                 # leavers the office has not withdrawn yet (Vincular Loyverse).
                 'stale_links': StudentProfile.objects.filter(
-                    is_active=True, loyverse_missing_since__isnull=False).count(),
+                    is_active=True, tipo=pupil, loyverse_missing_since__isnull=False).count(),
                 **_pending_topup_counts(),
                 'visits_today': Booking.objects.filter(slot__date=now.date()).exclude(status='cancelled').count()
                 if hasattr(Booking, 'slot') else 0,
@@ -708,8 +754,7 @@ class AnnouncementRecipientCountView(APIView):
                     or Announcement.Audience.ALL).strip()
         if audience not in Announcement.Audience.values:
             return Response(error_body('Audiencia no válida.'), status=400)
-        roles = _audience_roles().get(audience, [])
-        count = User.objects.filter(is_active=True, role__in=roles).count()
+        count = audience_users(audience).count()
         return Response({'audience': audience, 'count': count})
 
 

@@ -26,9 +26,10 @@ from apps.accounts.family import can_access_student, family_students
 from apps.accounts.models import StudentProfile, User
 from apps.core.audit import record
 from apps.core.exceptions import error_body
+from apps.core.flags import truthy
 from apps.core.listing import apply_date_range, day_end_exclusive, day_start
 from apps.core.ordering import apply_ordering
-from apps.core.permissions import IsAdmin, IsParentOrAdmin
+from apps.core.permissions import IsAdmin, IsParentOrAdminOrAccountHolder
 from apps.core.ratelimit import ratelimit
 from apps.core.throttling import SharedScopedRateThrottle
 
@@ -77,9 +78,27 @@ def _can_manage_student_cafeteria(user, student: StudentProfile) -> bool:
     """
     if user.role == User.Role.ADMIN:
         return True
+    if getattr(student, 'user_id', None) == user.pk:
+        return True       # the caller's own cafetería account («Mi cafetería»)
     if user.role in (User.Role.PARENT, User.Role.STUDENT):
         return can_access_student(user, student)
     return False
+
+
+def _mine(request) -> bool:
+    """``?mine=1``: «Mi cafetería» (2026-11-18). The caller's OWN cafetería
+    account only, whatever its role, so a console user (an admin, or staff
+    with console areas) who also eats at the cafetería sees their own wallet
+    instead of the admin-wide view. It narrows, never widens: it can only
+    ever return the profile whose login is the caller."""
+    return truthy(request.query_params.get('mine', ''))
+
+
+def _own_accounts(user):
+    """The cafetería account whose login is ``user`` (at most one)."""
+    if user is None or not getattr(user, 'pk', None):
+        return StudentProfile.objects.none()
+    return StudentProfile.objects.filter(user_id=user.pk)
 
 
 def _student_param(request):
@@ -108,6 +127,9 @@ class MyBalanceView(APIView):
 
     def get(self, request):
         user = request.user
+
+        if _mine(request):
+            return self._balances(list(_own_accounts(user)), include_spend=True)
 
         if user.role == User.Role.STUDENT:
             family = list(family_students(user))
@@ -140,7 +162,10 @@ class MyBalanceView(APIView):
             # and admins have the paginated /cafeteria/admin/balances/.
             students = list(family_students(user))
             include_spend = True
+        return self._balances(students, include_spend=include_spend)
 
+    @staticmethod
+    def _balances(students, *, include_spend):
         # Constant query count regardless of family size: create any missing
         # wallet rows in one INSERT … ON CONFLICT, then fetch them in one query.
         CafeteriaBalance.objects.bulk_create(
@@ -180,7 +205,12 @@ class MyTransactionsView(generics.ListAPIView):
         params = self.request.query_params
         student_id = _student_param(self.request)
 
-        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        if _mine(self.request):
+            my_students = _own_accounts(user)
+            if student_id:
+                my_students = my_students.filter(id=student_id)
+            qs = CafeteriaTransaction.objects.filter(student__in=my_students)
+        elif user.role in (User.Role.PARENT, User.Role.STUDENT):
             my_students = family_students(user)
             if student_id:
                 my_students = my_students.filter(id=student_id)
@@ -223,7 +253,9 @@ class MySpendingTrendView(APIView):
             days = 30
         days = max(7, min(days, 90))
 
-        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        if _mine(request):
+            students = _own_accounts(user)
+        elif user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students(user)
         elif user.role == User.Role.ADMIN:
             students = StudentProfile.objects.all()
@@ -279,7 +311,8 @@ class UpdateLowBalanceThresholdView(APIView):
         user = request.user
         student = get_object_or_404(StudentProfile, pk=student_pk)
 
-        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        # Families for their children; anyone for their own cafetería account.
+        if user.role in (User.Role.PARENT, User.Role.STUDENT) or student.user_id == user.pk:
             if not _can_manage_student_cafeteria(user, student):
                 return Response(error_body('No autorizado para este alumno.'), status=403)
         elif user.role != User.Role.ADMIN:
@@ -308,7 +341,8 @@ class UpdateSpendLimitsView(APIView):
         user = request.user
         student = get_object_or_404(StudentProfile, pk=student_pk)
 
-        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        # Families for their children; anyone for their own cafetería account.
+        if user.role in (User.Role.PARENT, User.Role.STUDENT) or student.user_id == user.pk:
             if not _can_manage_student_cafeteria(user, student):
                 return Response(error_body('No autorizado para este alumno.'), status=403)
         elif user.role != User.Role.ADMIN:
@@ -349,7 +383,9 @@ class MySpendingCategoriesView(APIView):
             days = 30
         days = max(7, min(days, 90))
 
-        if user.role in (User.Role.PARENT, User.Role.STUDENT):
+        if _mine(request):
+            students = _own_accounts(user)
+        elif user.role in (User.Role.PARENT, User.Role.STUDENT):
             students = family_students(user)
         elif user.role == User.Role.ADMIN:
             students = StudentProfile.objects.all()
@@ -414,10 +450,13 @@ class MySpendingCategoriesView(APIView):
         })
 
 
-def _family_students_qs(user):
+def _family_students_qs(user, *, mine=False):
     """StudentProfiles the caller may see: the family's students (parent or
-    school-email student login), all (admin). Same scoping as the other 'my'
+    school-email student login), all (admin), or only the caller's own
+    account with ``mine`` («Mi cafetería»). Same scoping as the other 'my'
     cafetería endpoints."""
+    if mine:
+        return _own_accounts(user)
     if user.role in (User.Role.PARENT, User.Role.STUDENT):
         return family_students(user)
     if user.role == User.Role.ADMIN:
@@ -435,7 +474,7 @@ class MyCardsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        students = _family_students_qs(request.user)
+        students = _family_students_qs(request.user, mine=_mine(request))
         # Staff credencial view (BACKLOG P1-A9): the console asks for one
         # student (admins, and staff with the Alumnos or Cafetería area).
         from apps.core.areas import has_area
@@ -484,7 +523,7 @@ class MyLoyverseHistoryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        students = _family_students_qs(request.user)
+        students = _family_students_qs(request.user, mine=_mine(request))
         student_id = _student_param(request)
         if student_id:
             students = students.filter(id=student_id)
@@ -673,7 +712,7 @@ class TopUpRequestCreateView(generics.CreateAPIView):
     result (``POST /payments/banorte/result/``) — never here.
     """
     serializer_class = TopUpRequestSerializer
-    permission_classes = [IsParentOrAdmin]
+    permission_classes = [IsParentOrAdminOrAccountHolder]
     # Per-user payment-initiation bound (shared scope with payments/finance);
     # the ip decorator above stays as the cross-account per-IP backstop.
     throttle_classes = [SharedScopedRateThrottle]
@@ -1539,9 +1578,10 @@ class ParentExportView(MyTransactionsView):
     student's own profile) and the filters and ordering in one place, so the
     download is exactly the list the family is looking at. Capped at 10,000
     rows (413 above), throttled under ``portal-export`` and audited with
-    ``record_export``. Staff are refused (``IsParentOrAdmin``).
+    ``record_export``. Staff are refused (``IsParentOrAdmin``), unless they
+    download their own cafetería account (``?mine=1``).
     """
-    permission_classes = [IsParentOrAdmin]
+    permission_classes = [IsParentOrAdminOrAccountHolder]
     pagination_class = None
     throttle_classes = [SharedScopedRateThrottle]
     throttle_scope = 'portal-export'
@@ -1606,7 +1646,9 @@ class MyStatementPdfView(APIView):
 
         user = request.user
         student_id = _student_param(request)
-        if user.role == User.Role.ADMIN:
+        if _mine(request):
+            qs_students = _own_accounts(user)
+        elif user.role == User.Role.ADMIN:
             qs_students = StudentProfile.objects.all()
         else:
             qs_students = family_students(user)
@@ -1804,6 +1846,9 @@ class AdminBulkTopUpView(APIView):
             group = str(data.get('group') or '').strip()
             if not grade and not group:
                 return Response({'detail': 'Elija grado/grupo o una lista de alumnos.'}, status=400)
+            # A grade/group top-up (a beca, an event) is for pupils: never a
+            # staff cafetería account, whatever its (empty) grade says.
+            qs = qs.filter(tipo=StudentProfile.Tipo.ALUMNO)
             if grade:
                 qs = qs.filter(grade=grade)
             if group:

@@ -3030,7 +3030,11 @@ def sync_health() -> dict:
     from apps.cafeteria.models import CafeteriaTransaction, LoyverseSyncState, UnmatchedReceipt
 
     state = LoyverseSyncState.load()
-    active = StudentProfile.objects.filter(is_active=True)
+    # Pupils: the panel's «X de Y alumnos activos». Staff cafetería accounts
+    # are counted apart (``active_staff`` / ``linked_staff``).
+    everyone = StudentProfile.objects.filter(is_active=True)
+    active = everyone.filter(tipo=StudentProfile.Tipo.ALUMNO)
+    staff = everyone.filter(tipo=StudentProfile.Tipo.PERSONAL)
     week_ago = timezone.now() - timedelta(days=7)
     last_tx = CafeteriaTransaction.objects.order_by('-date').first()
     ok, error = loyverse_reachable()
@@ -3060,6 +3064,8 @@ def sync_health() -> dict:
         'backup': OpsStatus.get('backup'),
         'active_students': active.count(),
         'linked_students': active.exclude(loyverse_id='').count(),
+        'active_staff': staff.count(),
+        'linked_staff': staff.exclude(loyverse_id='').count(),
         'last_transaction_at': last_tx.date if last_tx else None,
         'transactions_last_7d': CafeteriaTransaction.objects.filter(date__gte=week_ago).count(),
         'purchases_last_7d': CafeteriaTransaction.objects.filter(
@@ -3096,6 +3102,189 @@ def _leaver_row(s, *, loyverse_code):
     }
 
 
+def _customer_index(customers) -> dict:
+    """Lookup tables over a Loyverse customer list, shared by the roster link
+    pass and the link-on-save (A7), so both apply one matching rule.
+
+    Codes are compared case-insensitively (A6): ``by_code`` is keyed the way
+    pupils store their matrícula (``ci09938`` → ``09938``), ``by_raw_code`` by
+    the code as written (staff: ``jperez``; a leading «ci» is kept). The
+    first customer wins a key; repeats are listed in ``dup_*``.
+    """
+    from apps.accounts.people import code_key
+
+    idx = {'by_code': {}, 'by_raw_code': {}, 'by_email': {},
+           'dup_codes': set(), 'dup_raw_codes': set(), 'dup_emails': set()}
+    for c in customers:
+        raw = c.get('customer_code')
+        for table, dups, key in (('by_code', 'dup_codes', code_key(raw)),
+                                 ('by_raw_code', 'dup_raw_codes', code_key(raw, 'personal'))):
+            if not key:
+                continue
+            if key in idx[table]:
+                idx[dups].add(key)
+            else:
+                idx[table][key] = c
+        email = (c.get('email') or '').strip().lower()
+        if email:
+            if email in idx['by_email']:
+                idx['dup_emails'].add(email)
+            else:
+                idx['by_email'][email] = c
+    return idx
+
+
+def _match_customer(profile, idx, *, strict=False):
+    """``(customer, matched_by)`` for ``profile`` in ``idx``, ``(None, reason)``
+    when there is none.
+
+    Pupils match by matrícula, then email. Staff (``tipo='personal'``) match by
+    email first, then code: two staff codes in Loyverse are typos of the email
+    (``jprez`` for jperez@), and an email is one person. With ``strict`` (the
+    link-on-save path) a code or email two customers share matches nobody:
+    ``reason`` is ``'duplicate_code'`` / ``'duplicate_email'``. The roster pass
+    keeps its historical first-customer-wins rule and reports duplicates.
+    """
+    from apps.accounts.people import code_key
+
+    personal = profile.is_personal
+    email = (getattr(profile.user, 'email', '') or '').strip().lower()
+    if personal:
+        code, table, dups = code_key(profile.student_id, 'personal'), 'by_raw_code', 'dup_raw_codes'
+    else:
+        code, table, dups = code_key(profile.student_id), 'by_code', 'dup_codes'
+
+    def by_email():
+        if not email:
+            return None, None
+        if strict and email in idx['dup_emails']:
+            return None, 'duplicate_email'
+        c = idx['by_email'].get(email)
+        return (c, 'correo') if c is not None else (None, None)
+
+    def by_code():
+        if not code:
+            return None, None
+        if strict and code in idx[dups]:
+            return None, 'duplicate_code'
+        c = idx[table].get(code)
+        return (c, 'código') if c is not None else (None, None)
+
+    first, second = (by_email, by_code) if personal else (by_code, by_email)
+    cust, how = first()
+    if cust is None:
+        problem = how
+        cust, how = second()
+        if cust is None:
+            return None, problem or how
+    return cust, how
+
+
+LINK_MESSAGES = {
+    'unreachable': 'No se pudo consultar Loyverse; se vinculará en la próxima sincronización.',
+    'not_found': 'No se encontró en Loyverse. Revise el código y el correo; se vinculará en la '
+                 'próxima sincronización si coinciden.',
+    'duplicate_code': 'Hay dos clientes con ese código en Loyverse; no se vinculó. Corrija el '
+                      'código en Loyverse.',
+    'duplicate_email': 'Hay dos clientes con ese correo en Loyverse; no se vinculó. Corrija el '
+                       'correo en Loyverse.',
+    'conflict': 'Ya está vinculado a otro cliente de Loyverse; no se cambió el vínculo. '
+                'Cámbielo desde «Vincular Loyverse» si es necesario.',
+}
+
+
+def link_profile_on_save(profile, *, actor=None, customers=None) -> dict:
+    """Link one person to their Loyverse customer right after it is saved (A7).
+
+    Read-only against Loyverse (``get_all_customers``, or ``customers`` when
+    given). Same rules and safety as the roster pass: pupils by matrícula then
+    email, staff by email then code, case-insensitive; a code or email two
+    customers share links nobody; a person already linked to a DIFFERENT
+    customer is never silently repointed; a customer already backing another
+    person is left alone. On a new link the snapshot is stored, the opening
+    balance is seeded once (``sync_student_balance``, seed-once rule) and the
+    parked receipts of that customer are replayed.
+
+    Returns ``{status, message, balance?, customer_code?, matched_by?,
+    replayed?}``; ``status`` is ``linked`` | ``already_linked`` |
+    ``not_found`` | ``duplicate_code`` | ``duplicate_email`` | ``conflict`` |
+    ``taken`` | ``unreachable``. Never raises for a Loyverse failure: the
+    person stays saved and links on the next sync.
+    """
+    from django.db import IntegrityError
+
+    from apps.accounts.models import StudentProfile
+    from apps.cafeteria.loyverse_profile import upsert_loyverse_profile
+    from apps.core.audit import record
+
+    def out(status, **extra):
+        return {'status': status, 'message': extra.pop('message', LINK_MESSAGES.get(status, '')),
+                **extra}
+
+    if customers is None:
+        try:
+            customers = get_all_customers()
+        except LoyverseError as exc:
+            logger.info('Link on save: Loyverse unreachable for profile %s: %s', profile.pk, exc)
+            return out('unreachable')
+    profile = StudentProfile.objects.select_related('user').get(pk=profile.pk)
+    cust, how = _match_customer(profile, _customer_index(customers), strict=True)
+    if cust is None:
+        return out(how if how in ('duplicate_code', 'duplicate_email') else 'not_found')
+
+    uuid = cust.get('id') or ''
+    code = (cust.get('customer_code') or '').strip()
+    if profile.loyverse_id and profile.loyverse_id != uuid:
+        return out('conflict')
+    holder = (StudentProfile.objects.filter(loyverse_id=uuid).exclude(pk=profile.pk)
+              .select_related('user').first())
+    if holder is not None:
+        return out('taken', message=f'Ese cliente de Loyverse ({code or uuid}) ya está vinculado '
+                                    f'a {holder.user.full_name}; no se vinculó.')
+
+    already = profile.loyverse_id == uuid
+    replayed = 0
+    if not already:
+        try:
+            with transaction.atomic():
+                locked = StudentProfile.objects.select_for_update().get(pk=profile.pk)
+                if locked.loyverse_id and locked.loyverse_id != uuid:
+                    return out('conflict')
+                locked.loyverse_id = uuid
+                locked.loyverse_missing_since = None
+                locked.save(update_fields=['loyverse_id', 'loyverse_missing_since'])
+        except IntegrityError:
+            return out('taken', message='Ese cliente de Loyverse ya está vinculado a otra persona; '
+                                        'no se vinculó.')
+        profile.loyverse_id = uuid
+        record('update', profile, {'loyverse_id': ['', uuid], 'matched_by': how,
+                                   'customer_code': code},
+               actor=actor, context='portal: vínculo con Loyverse al guardar')
+    try:
+        upsert_loyverse_profile(profile, cust)
+    except Exception:  # noqa: BLE001 - reference data; the link stands
+        logger.exception('Loyverse snapshot failed for profile %s', profile.pk)
+    try:
+        balance = sync_student_balance(profile)
+    except LoyverseError:
+        balance = _stored_balance(profile)    # seeded later by the sync_balances cron
+    if not already:
+        # Parked purchases of this card become history (replayed or absorbed).
+        replay = replay_unmatched_receipts(loyverse_ids=[uuid])
+        replayed = replay.get('replayed', 0) + replay.get('absorbed', 0)
+    status = 'already_linked' if already else 'linked'
+    return out(status, message=f'Vinculado a Loyverse ✓ · saldo ${balance:,.2f}',
+               balance=f'{balance:.2f}', customer_code=code, matched_by=how, replayed=replayed)
+
+
+def _stored_balance(profile) -> Decimal:
+    """The wallet balance as stored (0 when no wallet row exists yet)."""
+    from apps.cafeteria.models import CafeteriaBalance
+
+    cb = CafeteriaBalance.objects.filter(student=profile).only('balance').first()
+    return cb.balance if cb is not None else Decimal('0')
+
+
 def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> dict:
     """Match Loyverse ``customers`` to students and backfill ``loyverse_id``.
 
@@ -3118,24 +3307,16 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
     """
     from apps.accounts.models import StudentProfile
 
-    by_code, by_email, dup_codes = {}, {}, set()
-    for c in customers:
-        # Same normalisation as the import: Loyverse says ci09938, the app 09938.
-        code = _matricula(c.get('customer_code'))
-        if code:
-            if code in by_code:
-                dup_codes.add(code)
-            else:
-                by_code[code] = c
-        email = (c.get('email') or '').strip().lower()
-        if email and email not in by_email:
-            by_email[email] = c
+    idx = _customer_index(customers)
 
     report = {
         'customers': len(customers), 'students': 0,
         'linked': 0, 'already_linked': 0, 'skipped_conflict': 0,
         'unmatched_students': [], 'possible_leavers': [], 'unmatched_customer_count': 0,
-        'duplicate_codes': sorted(dup_codes), 'commit': commit, 'changes': [],
+        'duplicate_codes': sorted(idx['dup_codes']), 'commit': commit, 'changes': [],
+        # Staff cafetería accounts (tipo=personal) are linked like pupils but
+        # never reported as leavers: they carry no grade code.
+        'unmatched_staff': 0,
     }
 
     matched_ids = set()
@@ -3144,17 +3325,14 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
     report['students'] = students.count()
 
     for s in students:
-        code = _matricula(s.student_id)
-        email = (s.user.email or '').strip().lower()
-
-        cust, matched_by = by_code.get(code), 'código'
-        if cust is None and email:
-            cust, matched_by = by_email.get(email), 'correo'
+        cust, matched_by = _match_customer(s, idx)
         if cust is None:
             # An active student with no Loyverse customer is, in practice, a
             # leaver: the school deletes the customer when a student goes and
             # nothing else tells the app.
-            if len(report['unmatched_students']) < ROSTER_ROWS_CAP:
+            if s.is_personal:
+                report['unmatched_staff'] += 1
+            elif len(report['unmatched_students']) < ROSTER_ROWS_CAP:
                 report['unmatched_students'].append(
                     _leaver_row(s, loyverse_code=s.student_id))
             continue
@@ -3162,7 +3340,8 @@ def link_students_to_loyverse(customers, *, overwrite=False, commit=False) -> di
         uuid = cust.get('id')
         matched_ids.add(uuid)
         raw_code = (cust.get('customer_code') or '').strip() or s.student_id
-        if not _has_grade_code(cust) and len(report['possible_leavers']) < ROSTER_ROWS_CAP:
+        if (not s.is_personal and not _has_grade_code(cust)
+                and len(report['possible_leavers']) < ROSTER_ROWS_CAP):
             report['possible_leavers'].append(_leaver_row(s, loyverse_code=raw_code))
 
         if s.loyverse_id == uuid:

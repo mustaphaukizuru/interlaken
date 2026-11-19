@@ -68,6 +68,8 @@ export default function ParentDashboard() {
   const children = data?.children ?? [];
   const needsFamilyLink = Boolean(data?.needs_family_link) || (!isLoading && !isError && children.length === 0);
   const selectedChild = children.find((c) => c.id === childId) ?? children[0];
+  // A staff member's own cafetería login (2026-11-18): no siblings to add, a puesto instead.
+  const staffOnly = children.length > 0 && children.every((c) => c.tipo === 'personal');
   const balances = data?.cafeteria_balances ?? [];
   // Each child is its own wallet: the hero shows the SELECTED child's balance,
   // never a sum of siblings (the per-child tiles above show every child).
@@ -199,10 +201,12 @@ export default function ParentDashboard() {
               <ChildSwitcher students={children} />
             </div>
           )}
-          <Link to="/portal/perfil?tab=hijos"
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-purple hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
-            <UserPlus className="h-4 w-4" aria-hidden="true" /> Agregar otro hijo
-          </Link>
+          {!staffOnly && (
+            <Link to="/portal/perfil?tab=hijos"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-purple hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+              <UserPlus className="h-4 w-4" aria-hidden="true" /> Agregar otro hijo
+            </Link>
+          )}
         </div>
       )}
 
@@ -242,12 +246,16 @@ export default function ParentDashboard() {
           )}
         </Reveal>
         <Reveal delay={70}>
-          <StatCard
-            title="Alumnos"
-            value={data?.children_count ?? children.length}
-            icon={GraduationCap}
-            color="purple"
-          />
+          {staffOnly ? (
+            <StatCard title="Personal del colegio" value={children[0].puesto_label || 'Sin asignar'} icon={GraduationCap} color="purple" />
+          ) : (
+            <StatCard
+              title="Alumnos"
+              value={data?.children_count ?? children.length}
+              icon={GraduationCap}
+              color="purple"
+            />
+          )}
         </Reveal>
       </div>
 

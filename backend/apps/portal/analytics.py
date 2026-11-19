@@ -131,20 +131,30 @@ def build_payload(days=30):
     # ── Document review queue (1 query) ──
     docs_in_review = RegistrationDocument.objects.filter(is_verified=False).count()
 
-    # ── Circulars: distinct eligible readers / eligible audience (2 queries) ──
-    audience_roles = {
-        Announcement.Audience.ALL:      [User.Role.PARENT, User.Role.STUDENT, User.Role.STAFF],
-        Announcement.Audience.PARENTS:  [User.Role.PARENT],
-        Announcement.Audience.STUDENTS: [User.Role.STUDENT],
-        Announcement.Audience.STAFF:    [User.Role.STAFF],
+    # ── Circulars: distinct eligible readers / eligible audience ──
+    # Staff cafetería logins (role student, tipo personal: 2026-11-18) count
+    # as «Personal», never as students (apps.accounts.people).
+    from apps.accounts.people import personal_user_ids
+    family_roles = (User.Role.PARENT, User.Role.STUDENT)
+    with_wallet = Q(pk__in=personal_user_ids())
+    n = User.objects.filter(is_active=True).aggregate(   # one query, as before
+        parents=Count('id', filter=Q(role=User.Role.PARENT)),
+        students=Count('id', filter=Q(role=User.Role.STUDENT)),
+        staff=Count('id', filter=Q(role=User.Role.STAFF)),
+        staff_logins=Count('id', filter=Q(role=User.Role.STUDENT) & with_wallet),
+        family_staff=Count('id', filter=Q(role__in=family_roles) & with_wallet),
+    )
+    eligible_by_audience = {
+        Announcement.Audience.ALL: n['parents'] + n['students'] + n['staff'],
+        Announcement.Audience.PARENTS: n['parents'],
+        Announcement.Audience.STUDENTS: n['students'] - n['staff_logins'],
+        Announcement.Audience.STAFF: n['staff'] + n['family_staff'],
     }
-    role_counts = dict(User.objects.filter(is_active=True)
-                       .values_list('role').annotate(n=Count('id')))
     active_anns = list(Announcement.objects.filter(is_active=True)
                        .annotate(readers=Count('reads__user', distinct=True)))
     rates = []
     for ann in active_anns:
-        eligible = sum(role_counts.get(r, 0) for r in audience_roles.get(ann.audience, []))
+        eligible = eligible_by_audience.get(ann.audience, 0)
         if eligible:
             rates.append(min(ann.readers / eligible, 1.0))
     read_rate = round(sum(rates) / len(rates), 3) if rates else None
@@ -176,13 +186,19 @@ def build_payload(days=30):
         {'step': 'inscrito', 'label': 'Inscritos', 'count': funnel_enrolled},
     ]
     # ── Cafetería adoption: active students with a wallet, used in period, online top-ups ──
-    active_students = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE).count()
-    with_wallet = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE).count()
-    used = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.PURCHASE)
+    # Pupils only: a staff wallet (tipo personal) is not a student adopting it.
+    pupil = StudentProfile.Tipo.ALUMNO
+    active_students = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE, tipo=pupil).count()
+    with_wallet = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE,
+                                                  student__tipo=pupil).count()
+    used = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.PURCHASE,
+                                                student__tipo=pupil)
             .values('student').distinct().count())
-    topped_up = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.TOPUP)
+    topped_up = (CafeteriaTransaction.objects.filter(date__gte=since, transaction_type=CafeteriaTransaction.TxType.TOPUP,
+                                                     student__tipo=pupil)
                  .values('student').distinct().count())
-    low = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE, balance__lte=F('low_balance_threshold')).count()
+    low = CafeteriaBalance.objects.filter(student__status=StudentProfile.Status.ACTIVE, student__tipo=pupil,
+                                          balance__lte=F('low_balance_threshold')).count()
     adoption = {
         'active_students': active_students,
         'with_wallet': with_wallet,

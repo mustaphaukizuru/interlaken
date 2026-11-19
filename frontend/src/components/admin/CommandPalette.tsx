@@ -186,7 +186,7 @@ function PalettePanel({ onClose }: { onClose: () => void }) {
 
   const students = useQuery({
     queryKey: ['palette-students', q],
-    queryFn: async () => asList<StudentProfile>((await portalApi.getStudents({ q })).data),
+    queryFn: async () => asList<StudentProfile>((await portalApi.getStudents({ q, tipo: 'todos' })).data),
     enabled,
     staleTime: 30_000,
   });

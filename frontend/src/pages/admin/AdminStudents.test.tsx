@@ -40,7 +40,8 @@ describe('AdminStudents states', () => {
     // The leavers notice and the Archivados count run their own queries: only the roster itself fails here.
     let roster = 0;
     mockedStudents.mockImplementation(async (params) => {
-      if (params?.linked === 'missing' || params?.archived === '1') return { data: { results: [], count: 0 } } as never;
+      // The «Personal» tab's count (tipo=personal) is its own query too.
+      if (params?.linked === 'missing' || params?.archived === '1' || params?.tipo === 'personal') return { data: { results: [], count: 0 } } as never;
       roster += 1;
       if (roster === 1) throw new Error('network down');
       return { data: { results: [], count: 0 } } as never;
@@ -420,5 +421,45 @@ describe('AdminStudents · Vincular como hermanos (bulk)', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Ana López/ }));
     await userEvent.click(screen.getByRole('button', { name: /Vincular como hermanos/ }));
     expect(toast.error).toHaveBeenCalledWith('Elija al menos dos alumnos para vincularlos como hermanos.');
+  });
+});
+
+describe('AdminStudents · Personal tab (staff cafetería accounts, 2026-11-18)', () => {
+  const staffRow = {
+    id: 51, student_id: 'rlince', loyverse_code: 'rlince', grade: '', group: '', tipo: 'personal',
+    puesto: 'docente', puesto_label: 'Docente', status: 'active', is_active: true, balance: '35.00',
+    user: { id: 61, first_name: 'Rosa', last_name: 'Lince', full_name: 'Rosa Lince', email: 'rlince@interlaken.com.mx' },
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubViewport(1280);
+    useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', first_name: 'A', last_name: 'B', full_name: 'A B', role: 'admin', avatar: '', whatsapp: '' }, accessToken: 't', isAuthenticated: true });
+  });
+
+  it('the pupils list never asks for staff; the Personal tab lists them with their puesto', async () => {
+    mockedStudents.mockImplementation(async (params) => (params?.tipo === 'personal'
+      ? { data: { results: [staffRow], count: 1 } }
+      : { data: { results: [], count: 0 } }) as never);
+    renderWithProviders(<><AdminStudents /><LocationProbe /></>, { route: '/admin/alumnos' });
+    await waitFor(() => expect(mockedStudents).toHaveBeenCalled());
+    const roster = mockedStudents.mock.calls.find(([p]) => p?.page_size === undefined)![0];
+    expect(roster?.tipo).toBeUndefined();                       // server default: pupils only
+    expect(await screen.findByRole('tab', { name: /Personal\s*1/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: /Personal/ }));
+    expect(await screen.findByText('Rosa Lince')).toBeInTheDocument();
+    expect(screen.getByTestId('location').textContent).toContain('tipo=personal');
+    expect(screen.getByRole('columnheader', { name: /Puesto/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^Código/ })).toBeInTheDocument();
+    expect(screen.getByText('Docente')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Familia/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Nuevo personal/ })).toBeInTheDocument();
+  });
+
+  it('an admin finds «Importar personal desde Loyverse» in Más acciones', async () => {
+    mockedStudents.mockResolvedValue({ data: { results: [], count: 0 } } as never);
+    renderWithProviders(<AdminStudents />, { route: '/admin/alumnos?tipo=personal' });
+    await userEvent.click(await screen.findByRole('button', { name: /Más acciones/ }));
+    expect(screen.getByRole('menuitem', { name: 'Importar personal desde Loyverse' })).toBeInTheDocument();
   });
 });

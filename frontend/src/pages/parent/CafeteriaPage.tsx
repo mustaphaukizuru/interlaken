@@ -26,6 +26,7 @@ import { EMPTY_CARDHOLDER, cardholderErrors, type Cardholder } from '@/lib/cardh
 import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { useAuthStore } from '@/store/authStore';
 import { cafeteriaApi, downloadBlob, paymentsApi } from '@/services/api';
+import { useMineScope } from '@/lib/cafeteriaScope';
 import type { CafeteriaBalance, CafeteriaTransaction, CheckoutStart } from '@/types';
 import { closeBanorteLightbox, openBanorteLightbox, type BanorteEvent } from '@/lib/banorteCheckout';
 import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
@@ -92,6 +93,8 @@ function topupErrorMessage(err: unknown): string {
 
 export default function CafeteriaPage() {
   const queryClient = useQueryClient();
+  // «Mi cafetería»: the caller's own staff wallet only (?mine=1 on every call).
+  const mine = useMineScope();
   const storedChildId = useSelectedChildStore((s) => s.childId);
   const setChildId = useSelectedChildStore((s) => s.setChildId);
   const [topupAmount, setTopupAmount] = useState('');
@@ -159,10 +162,11 @@ export default function CafeteriaPage() {
   const ordering = serializeSort(sort) ?? undefined;
 
   const { data: balances, isLoading: balancesLoading, isError: balancesError, refetch: refetchBalances, dataUpdatedAt: balancesUpdatedAt, isFetching: balancesFetching } = useQuery<CafeteriaBalance[]>({
-    queryKey: ['cafeteria-balances'],
+    // Its own key in «Mi cafetería», so a console user's two views never share a cache.
+    queryKey: mine ? ['cafeteria-balances', 'mine'] : ['cafeteria-balances'],
     ...LIVE,
     queryFn: async () => {
-      const { data } = await cafeteriaApi.getMyBalance();
+      const { data } = await cafeteriaApi.getMyBalance(mine);
       return Array.isArray(data) ? data : [data];
     },
   });
@@ -199,12 +203,13 @@ export default function CafeteriaPage() {
     from: filterFrom || undefined,
     to: filterTo || undefined,
     ordering,
+    ...(mine ? { mine: 1 as const } : {}),
   };
 
   const { data: txData, isLoading: txLoading, isError: txError, refetch: refetchTx } = useQuery<{
     results: CafeteriaTransaction[]; count: number;
   }>({
-    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, ordering, page],
+    queryKey: ['cafeteria-transactions', filterStudent, filterType, filterFrom, filterTo, ordering, page, mine],
     ...LIVE,
     // The history only renders once balances are known (and ?alumno= can be
     // validated against them).
@@ -442,7 +447,7 @@ export default function CafeteriaPage() {
     if (!statementStudent) return;
     try {
       const month = format(new Date(), 'yyyy-MM');
-      const { data } = await cafeteriaApi.statementPdf(statementStudent, month);
+      const { data } = await cafeteriaApi.statementPdf(statementStudent, month, mine);
       downloadBlob(data, `estado-cuenta-cafeteria-${month}.pdf`);
     } catch {
       toast.error('No se pudo generar el estado de cuenta.');
@@ -486,12 +491,14 @@ export default function CafeteriaPage() {
   // Only offer the "Recargar saldo" shortcut when some child is actually
   // linked to Loyverse (otherwise there is no top-up section to jump to).
   const anyLinked = (balances ?? []).some(canTopUp);
+  // A staff member's own wallet (2026-11-18): «Mi cafetería», no «Grupo».
+  const ownWallet = mine || (!!balances?.length && balances.every((b) => b.student.tipo === 'personal'));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Cafetería</h1>
+          <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{ownWallet ? 'Mi cafetería' : 'Cafetería'}</h1>
           <p className="mt-1 text-fluid-sm text-muted">
             {scheduled
               ? 'Consulte el saldo y los movimientos. Una recarga con tarjeta se suma al saldo cuando el colegio la carga en la caja de cafetería (días hábiles, 7:30 a.m.).'
@@ -503,6 +510,11 @@ export default function CafeteriaPage() {
             <Button variant="secondary" size="sm" onClick={downloadStatement} className="min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40">
               <Download className="w-3 h-3" /> Estado de cuenta (PDF)
             </Button>
+          )}
+          {mine && (
+            <Link to="/portal/mi-cafeteria/credencial" className="btn-outline min-h-[44px] text-sm sm:min-h-[36px]">
+              Mi credencial
+            </Link>
           )}
           <LiveBadge
             updatedAt={balancesUpdatedAt}
@@ -553,7 +565,7 @@ export default function CafeteriaPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">{b.student.user.full_name}</p>
-                  <p className="truncate text-xs text-muted">{b.student.grade} · Grupo {b.student.group}</p>
+                  <p className="truncate text-xs text-muted">{b.student.tipo === 'personal' ? (b.student.puesto_label || 'Personal del colegio') : `${b.student.grade} · Grupo ${b.student.group}`}</p>
                 </div>
                 {/* Not while paid card top-ups on their way cover the alert level (same rule as the e-mail). */}
                 {isLow && !pendingCoversLowBalance(b.balance, b.low_balance_threshold, b.pending_topups) && (

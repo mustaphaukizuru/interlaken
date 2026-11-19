@@ -50,7 +50,7 @@ def suggested_cycle() -> str:
 
 def grades_from_loyverse(active_qs=None) -> bool:
     """True when (nearly) every active student is linked to a Loyverse customer."""
-    qs = active_qs if active_qs is not None else StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE)
+    qs = active_qs if active_qs is not None else _pupils().filter(status=StudentProfile.Status.ACTIVE)
     total = qs.count()
     if total == 0:
         return False
@@ -58,9 +58,15 @@ def grades_from_loyverse(active_qs=None) -> bool:
     return linked / total >= 0.9
 
 
+def _pupils():
+    """The cycle rollover is for pupils: a staff cafetería account
+    (``tipo='personal'``) is never promoted, graduated or counted here."""
+    return StudentProfile.objects.filter(tipo=StudentProfile.Tipo.ALUMNO)
+
+
 def build_preview() -> dict:
     from apps.content.models import SiteSettings
-    active = StudentProfile.objects.filter(status=StudentProfile.Status.ACTIVE)
+    active = _pupils().filter(status=StudentProfile.Status.ACTIVE)
     moves: dict[str, dict] = {}
     graduates = 0
     for grade in active.values_list('grade', flat=True):
@@ -69,7 +75,7 @@ def build_preview() -> dict:
             graduates += 1
         m = moves.setdefault(grade, {'from': grade, 'to': nxt or 'Egresado', 'count': 0})
         m['count'] += 1
-    skipped = StudentProfile.objects.exclude(status=StudentProfile.Status.ACTIVE).count()
+    skipped = _pupils().exclude(status=StudentProfile.Status.ACTIVE).count()
     settings_obj = SiteSettings.load()
     return {
         # When the roster is linked to Loyverse, grades come from the import
@@ -127,7 +133,8 @@ class SchoolYearRunView(APIView):
         promote = (not synced) if raw in (None, '') else bool(raw) and raw not in ('false', 'False', '0', 0)
         promoted = graduated = 0
         with transaction.atomic():
-            for sp in StudentProfile.objects.select_for_update().filter(status=StudentProfile.Status.ACTIVE).select_related('user'):
+            for sp in (_pupils().select_for_update().filter(status=StudentProfile.Status.ACTIVE)
+                       .select_related('user')):
                 nxt = next_grade(sp.grade)
                 if nxt is None:
                     # Graduation is always applied: it is the status change the
@@ -142,7 +149,9 @@ class SchoolYearRunView(APIView):
                     promoted += 1
             thresholds = 0
             if reset_threshold is not None:
-                thresholds = CafeteriaBalance.objects.update(low_balance_threshold=reset_threshold)
+                # Pupils' wallets: a staff member's own threshold is theirs.
+                thresholds = CafeteriaBalance.objects.filter(
+                    student__tipo=StudentProfile.Tipo.ALUMNO).update(low_balance_threshold=reset_threshold)
             previous = settings_obj.school_year
             settings_obj.school_year = new_cycle
             settings_obj.last_rollover_at = timezone.now()

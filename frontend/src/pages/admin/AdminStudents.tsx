@@ -1,8 +1,9 @@
 import { Fragment, useMemo, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, House, type LucideIcon } from 'lucide-react';
+import { Users, FileUp, Link2, Download, Plus, MoreHorizontal, RefreshCw, GraduationCap, UsersRound, UserCog, Wallet, Eye, Pencil, ArrowRight, AlertTriangle, House, Briefcase, type LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ImportLoyverseModal } from '@/components/admin/ImportLoyverseModal';
+import { ImportStaffModal } from '@/components/admin/ImportStaffModal';
 import { LinkLoyverseModal } from '@/components/admin/LinkLoyverseModal';
 import { StudentFormModal } from '@/components/admin/StudentFormModal';
 import { ExportMenu } from '@/components/admin/ExportMenu';
@@ -115,7 +116,12 @@ export default function AdminStudents() {
   const canDelete = isAdmin(me);
   // Secretaría without the cafetería area was bounced from that link silently.
   const canCafeteria = canOpen(me, '/admin/cafeteria');
+  // «Alumnos» / «Personal» (2026-11-18): staff cafetería accounts are never
+  // in the pupils' list; their own tab lists them with their puesto.
+  const personal = get('tipo') === 'personal';
+  const tipoParam = personal ? 'personal' : undefined;
   const filters: Omit<StudentsListParams, 'page'> = {
+    tipo: tipoParam,
     q: get('q') || undefined,
     status: estado === ALL_STATUSES || estado === ARCHIVED ? undefined : estado || 'active',
     archived: estado === ARCHIVED ? '1' : undefined,
@@ -130,10 +136,17 @@ export default function AdminStudents() {
   const grupo = get('grupo');
 
   const { data, isLoading, isError, refetch } = useStudentsList({ page, ...filters });
-  const { data: missing } = useStudentsList({ page: 1, page_size: 1, status: 'active', linked: MISSING });
+  const { data: missing } = useStudentsList({ page: 1, page_size: 1, status: 'active', linked: MISSING, tipo: tipoParam });
   const missingCount = missing?.count ?? 0;
-  const { data: archivedList } = useStudentsList({ page: 1, page_size: 1, archived: '1' });
+  const { data: archivedList } = useStudentsList({ page: 1, page_size: 1, archived: '1', tipo: tipoParam });
   const archivedCount = archivedList?.count ?? 0;
+  // The other tab's size, for its label (one tiny page-size-1 query).
+  const { data: otherTab } = useStudentsList({ page: 1, page_size: 1, status: 'active', tipo: personal ? undefined : 'personal' });
+  const otherCount = otherTab?.count;
+  const switchTipo = (next: 'alumno' | 'personal') => set({
+    tipo: next === 'personal' ? 'personal' : null,
+    estado: null, nivel: null, grado: null, grupo: null, acceso: null, vinculado: null, q: null, page: null, orden: null,
+  });
   const viewingArchived = estado === ARCHIVED;
   const isLg = useMediaQuery('(min-width: 1024px)');
   const exportStudents = useStudentsExport();
@@ -147,6 +160,7 @@ export default function AdminStudents() {
   const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
   const [importOpen, setImportOpen] = useState(false);
   const [importLoyverseOpen, setImportLoyverseOpen] = useState(false);
+  const [importStaffOpen, setImportStaffOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [editing, setEditing] = useState<RosterStudent | null>(null);
   const [picking, setPicking] = useState<BulkActionDef | null>(null);
@@ -175,7 +189,10 @@ export default function AdminStudents() {
   ];
   const bulkActions: BulkActionDef[] = viewingArchived
     ? [RESTORE_ACTION, ...(canDelete ? [DELETE_ACTION] : [])]
-    : [FAMILY_ACTION, ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS];
+    : personal
+      // Staff: no families, grades or groups (a puesto instead).
+      ? [ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS.filter((a) => ['status', 'sync_loyverse'].includes(a.name))]
+      : [FAMILY_ACTION, ARCHIVE_ACTION, ...(canDelete ? [DELETE_ACTION] : []), ...BULK_ACTIONS];
 
   const columns = useMemo<Column<RosterStudent>[]>(() => [
     {
@@ -199,7 +216,7 @@ export default function AdminStudents() {
     // What the office compares against Loyverse: the code exactly as the POS spells it (ci09932).
     // Under the matrícula by default, so the table leaves room for the balance on a laptop.
     {
-      id: 'student_id', header: 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted',
+      id: 'student_id', header: personal ? 'Código' : 'Matrícula', sortKey: 'student_id', minWidth: 100, className: 'text-muted',
       cell: (s) => (
         <>
           {s.student_id}
@@ -208,8 +225,12 @@ export default function AdminStudents() {
       ),
     },
     { id: 'loyverse_code', header: 'Código Loyverse', defaultHidden: true, minWidth: 120, className: 'font-mono text-xs text-muted', cell: (s) => s.loyverse_code || s.student_id },
-    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s) => s.grade },
-    { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s) => s.group || '—' },
+    ...(personal
+      ? [{ id: 'puesto', header: 'Puesto', minWidth: 140, className: 'text-muted', cell: (s: RosterStudent) => s.puesto_label || 'Sin asignar' }]
+      : [
+        { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 120, className: 'text-muted', cell: (s: RosterStudent) => s.grade },
+        { id: 'group', header: 'Grupo', sortKey: 'group', minWidth: 70, className: 'text-muted', cell: (s: RosterStudent) => s.group || '—' },
+      ]),
     {
       id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
       cell: (s) => {
@@ -233,10 +254,10 @@ export default function AdminStudents() {
       id: 'balance', header: 'Saldo', sortKey: 'balance', align: 'right', minWidth: 100, className: 'font-medium text-ink',
       cell: (s) => (s.balance === undefined || s.balance === null ? '—' : formatMXN(s.balance)),
     },
-    {
+    ...(personal ? [] : [{
       // Siblings grouped by the office (Familias): the family opens filtered on its name.
       id: 'family', header: 'Familia', minWidth: 150,
-      cell: (s) => (s.family ? (
+      cell: (s: RosterStudent) => (s.family ? (
         <Link to={`/admin/familias?q=${encodeURIComponent(s.family.name)}`} title={`Ver ${s.family.name}`}
           onClick={(e) => e.stopPropagation()}
           className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
@@ -244,8 +265,9 @@ export default function AdminStudents() {
           <span className="truncate">{s.family.name}</span>
         </Link>
       ) : '—'),
-    },
-    { id: 'email', header: 'Correo', defaultHidden: true, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
+    }]),
+    // A staff member signs in with this address: shown by default in «Personal».
+    { id: 'email', header: 'Correo', defaultHidden: !personal, minWidth: 180, className: 'text-xs text-subtle', cell: (s) => s.user.email },
     {
       id: 'enrollment_date', header: 'Ingreso', sortKey: 'enrollment_date', defaultHidden: true, minWidth: 110, className: 'whitespace-nowrap text-xs text-subtle',
       cell: (s) => shortDate(s.enrollment_date),
@@ -256,7 +278,7 @@ export default function AdminStudents() {
       cell: (s) => (s.user.last_login ? shortDate(s.user.last_login) : <span className="text-coral-600">Nunca</span>),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [twoPane, selectedId]);
+  ], [twoPane, selectedId, personal]);
 
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
     exportStudents.mutateAsync({
@@ -306,6 +328,8 @@ export default function AdminStudents() {
   const SECONDARY = [
     { key: 'import', label: 'Importar archivo', icon: FileUp, run: () => setImportOpen(true) },
     { key: 'loyverse', label: 'Importar desde Loyverse', icon: Download, run: () => setImportLoyverseOpen(true) },
+    // A3: admins only (the endpoint refuses everyone else).
+    ...(canDelete ? [{ key: 'staff', label: 'Importar personal desde Loyverse', icon: Briefcase, run: () => setImportStaffOpen(true) }] : []),
     { key: 'link', label: 'Vincular Loyverse', icon: Link2, run: () => setLinkOpen(true) },
   ];
   const anyFilter = !!estado || Object.entries(filters).some(([k, v]) => k !== 'ordering' && k !== 'status' && v);
@@ -355,7 +379,7 @@ export default function AdminStudents() {
           actions={(
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className="btn-pink" onClick={() => setCreateOpen(true)}>
-                <Plus size={16} aria-hidden="true" /> Nuevo alumno
+                <Plus size={16} aria-hidden="true" /> {personal ? 'Nuevo personal' : 'Nuevo alumno'}
               </button>
               <ExportMenu filenamePrefix="alumnos" selectedCount={selection.count} fetch={fetchExport} />
               <Dropdown
@@ -386,7 +410,7 @@ export default function AdminStudents() {
           )}
         />
 
-        <StudentFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => refetch()} />
+        <StudentFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => refetch()} defaultTipo={personal ? 'personal' : 'alumno'} />
         <StudentFormModal open={!!editing} student={editing} onClose={() => setEditing(null)} onSaved={() => refetch()} />
         <ImportDialog
           open={importOpen}
@@ -407,7 +431,38 @@ export default function AdminStudents() {
           onDone={() => selection.onClear()}
         />
         <ImportLoyverseModal open={importLoyverseOpen} onClose={() => setImportLoyverseOpen(false)} onImported={() => refetch()} />
+        {importStaffOpen && <ImportStaffModal open onClose={() => setImportStaffOpen(false)} onImported={() => { void refetch(); switchTipo('personal'); }} />}
         <LinkLoyverseModal open={linkOpen} onClose={() => setLinkOpen(false)} onLinked={() => refetch()} />
+
+        {/* Pupils and staff cafetería accounts live in two lists (A4). */}
+        <div role="tablist" aria-label="Tipo de registro" className="inline-flex gap-1 rounded-xl bg-cream-2 p-1">
+          {([['alumno', 'Alumnos', Users], ['personal', 'Personal', Briefcase]] as const).map(([value, label, Icon]) => {
+            const on = (value === 'personal') === personal;
+            const n = on ? undefined : otherCount;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => !on && switchTipo(value)}
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 sm:min-h-[38px] ${
+                  on ? 'bg-white text-purple shadow-sm ring-1 ring-purple/15' : 'text-muted hover:text-ink'
+                }`}
+              >
+                <Icon size={16} aria-hidden="true" /> {label}
+                {n !== undefined && <span className="rounded-full bg-white/70 px-1.5 text-xs font-medium text-subtle">{n.toLocaleString('es-MX')}</span>}
+              </button>
+            );
+          })}
+        </div>
+        {personal && (
+          <p className="-mt-3 text-sm text-muted">
+            Personal del colegio que compra en cafetería: mismo saldo, recargas, estado de cuenta y credencial que los alumnos.
+            No cuentan como alumnos ni reciben comunicados de familias.
+            {canDelete && <> Para traer al personal de Loyverse use <button type="button" className="font-semibold text-purple underline-offset-2 hover:underline" onClick={() => setImportStaffOpen(true)}>Importar personal desde Loyverse</button>.</>}
+          </p>
+        )}
 
         {/* The note leaves once nobody is left to review (the table says «Sin resultados»). */}
         {vinculado === MISSING ? (isLoading || count > 0) && (
@@ -437,8 +492,10 @@ export default function AdminStudents() {
           </Link>
         )}
 
-        <Card title={`${count.toLocaleString('es-MX')} ${count === 1 ? 'alumno' : 'alumnos'}`}>
-          <p role="status" aria-live="polite" className="sr-only">{count} alumnos encontrados</p>
+        <Card title={personal
+          ? `${count.toLocaleString('es-MX')} ${count === 1 ? 'persona del personal' : 'personas del personal'}`
+          : `${count.toLocaleString('es-MX')} ${count === 1 ? 'alumno' : 'alumnos'}`}>
+          <p role="status" aria-live="polite" className="sr-only">{count} {personal ? 'personas del personal' : 'alumnos'} encontrados</p>
           <DataTable<RosterStudent>
             tableId="students"
             columns={columns}
@@ -491,28 +548,34 @@ export default function AdminStudents() {
             )}
             toolbar={(
               <FilterBar
-                search={{ placeholder: 'Buscar por nombre, matrícula, correo o grado…', label: 'Buscar alumnos' }}
+                search={personal
+                  ? { placeholder: 'Buscar por nombre, código o correo…', label: 'Buscar personal' }
+                  : { placeholder: 'Buscar por nombre, matrícula, correo o grado…', label: 'Buscar alumnos' }}
                 tabs={{ paramKey: 'estado', options: statusTabs, allLabel: null, defaultValue: 'active', label: 'Filtrar por estado' }}
                 selects={[
-                  { key: 'nivel', label: 'Nivel', options: NIVELES.map(([value, label]) => ({ value, label })), allLabel: 'Todos los niveles' },
-                  {
-                    key: 'grado', label: 'Grado', allLabel: 'Todos los grados',
-                    options: GRADES.filter((g) => !nivel || g.toLowerCase().includes(nivel)).map((g) => ({ value: g, label: g })),
-                  },
+                  ...(personal ? [] : [
+                    { key: 'nivel', label: 'Nivel', options: NIVELES.map(([value, label]) => ({ value, label })), allLabel: 'Todos los niveles' },
+                    {
+                      key: 'grado', label: 'Grado', allLabel: 'Todos los grados',
+                      options: GRADES.filter((g) => !nivel || g.toLowerCase().includes(nivel)).map((g) => ({ value: g, label: g })),
+                    },
+                  ]),
                   { key: 'acceso', label: 'Acceso al portal', options: ACCESS_OPTIONS, allLabel: 'Acceso: todos' },
                   { key: 'vinculado', label: 'Loyverse', options: LINKED_OPTIONS, allLabel: 'Loyverse: todos' },
                 ]}
                 extraChips={grupo ? [{ key: 'grupo', label: `Grupo: ${grupo}`, onClear: () => set({ grupo: null, page: null }) }] : []}
               >
-                <input
-                  className="input-field w-24"
-                  aria-label="Grupo"
-                  placeholder="Grupo"
-                  maxLength={5}
-                  autoComplete="off"
-                  value={grupo}
-                  onChange={(e) => set({ grupo: e.target.value.toUpperCase() || null, page: null })}
-                />
+                {!personal && (
+                  <input
+                    className="input-field w-24"
+                    aria-label="Grupo"
+                    placeholder="Grupo"
+                    maxLength={5}
+                    autoComplete="off"
+                    value={grupo}
+                    onChange={(e) => set({ grupo: e.target.value.toUpperCase() || null, page: null })}
+                  />
+                )}
               </FilterBar>
             )}
             bulkBar={(
@@ -531,7 +594,18 @@ export default function AdminStudents() {
                 exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="alumnos" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
               />
             )}
-            empty={{
+            empty={personal ? {
+              icon: Briefcase,
+              title: viewingArchived ? 'No hay personal archivado' : anyFilter ? 'Sin resultados' : 'Sin personal registrado',
+              description: anyFilter || viewingArchived
+                ? 'Nadie del personal coincide con los filtros.'
+                : 'El personal que compra en cafetería aparecerá aquí.',
+              action: anyFilter || viewingArchived || !canDelete ? undefined : (
+                <button type="button" className="btn-outline" onClick={() => setImportStaffOpen(true)}>
+                  <Download size={16} aria-hidden="true" /> Importar personal desde Loyverse
+                </button>
+              ),
+            } : {
               icon: Users,
               title: viewingArchived ? 'No hay alumnos archivados' : anyFilter ? 'Sin resultados' : 'Sin alumnos',
               description: viewingArchived

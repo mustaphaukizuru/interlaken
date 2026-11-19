@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Coffee } from 'lucide-react';
 import { cafeteriaApi } from '@/services/api';
+import { useMineScope } from '@/lib/cafeteriaScope';
 import { fmtMXN } from '@/lib/chartTheme';
 import { SectionEmpty } from '@/components/ui/SectionCard';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -26,10 +27,11 @@ const styleFor = (c: string) => CATEGORY_STYLE[c] ?? CATEGORY_STYLE.Otros;
  */
 export default function CafeteriaCategoriesCard({ student }: { student?: number | 'all' }) {
   const scoped = student && student !== 'all' ? student : undefined;
+  const mine = useMineScope();
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['cafeteria-spending-categories', 30, scoped ?? 'all'],
-    queryFn: async () => (await cafeteriaApi.getSpendingCategories(30, scoped)).data as CategoriesResp,
+    queryKey: mine ? ['cafeteria-spending-categories', 30, scoped ?? 'all', 'mine'] : ['cafeteria-spending-categories', 30, scoped ?? 'all'],
+    queryFn: async () => (await cafeteriaApi.getSpendingCategories(30, scoped, mine)).data as CategoriesResp,
     staleTime: 1000 * 60 * 5,
   });
 

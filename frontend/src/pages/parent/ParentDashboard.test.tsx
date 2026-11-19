@@ -138,6 +138,21 @@ describe('ParentDashboard', () => {
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
   });
 
+  it('a staff member’s own login: no «Agregar otro hijo», the puesto instead of «Alumnos»', async () => {
+    getDashboard.mockResolvedValue({
+      data: {
+        ...LINKED_DATA,
+        children_count: 1,
+        children: [{ id: 21, name: 'Rosa Lince', grade: '', group: '', student_id: 'rlince', tipo: 'personal', puesto_label: 'Docente' }],
+        cafeteria_balances: [{ student: 21, student_name: 'Rosa Lince', balance: '50.00', low: false, last_synced: '2026-11-18T00:00:00Z' }],
+      },
+    } as never);
+    renderPage();
+    expect(await screen.findByText('Personal del colegio')).toBeInTheDocument();
+    expect(screen.getByText('Docente')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Agregar otro hijo/ })).toBeNull();
+  });
+
   it('per-child quick top-ups open the wizard for that child (?hijo=)', async () => {
     getDashboard.mockResolvedValue({
       data: {
