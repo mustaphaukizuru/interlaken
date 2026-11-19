@@ -572,7 +572,7 @@ def _sale_outcome(row: FileRow, checkout: BanorteCheckout, *, approved_elsewhere
         if checkout.resultado_payw == BanorteCheckout.Result.APPROVED and not approved_elsewhere:
             out.outcome = "no_aprobada_en_multicobros"
             out.message = (
-                f"Aquí consta aprobada, pero MultiCobros la muestra {label.lower()} "
+                f"En la plataforma consta aprobada, pero MultiCobros la muestra {label.lower()} "
                 f"({row.resultado or '-'}). No la cargue en el POS y avise a dirección."
             )
         else:
@@ -581,7 +581,7 @@ def _sale_outcome(row: FileRow, checkout: BanorteCheckout, *, approved_elsewhere
         return out
     if payment.status == Payment.Status.REFUNDED:
         out.outcome = "devolucion"
-        out.message = "Este pago ya se devolvió aquí: no lo cargue en el POS."
+        out.message = "Este pago ya se devolvió en la plataforma: no lo cargue en el POS."
         return out
     diffs = _differences(row, checkout)
     if diffs:
@@ -596,7 +596,7 @@ def _sale_outcome(row: FileRow, checkout: BanorteCheckout, *, approved_elsewhere
         elif checkout.resultado_payw != BanorteCheckout.Result.APPROVED or not checkout.referencia:
             out.outcome = "diferencia"
             out.message = (
-                "Aquí está acreditada sin la aprobación completa de Banorte. No la cargue en "
+                "En la plataforma está acreditada sin la aprobación completa de Banorte. No la cargue en "
                 "el POS y avise a dirección."
             )
         else:
@@ -607,8 +607,8 @@ def _sale_outcome(row: FileRow, checkout: BanorteCheckout, *, approved_elsewhere
         reason = review_reason(payment, checkout) or payment.failure_label() or "sin respuesta"
         out.outcome = "por_conciliar"
         out.message = (
-            f"MultiCobros la muestra aprobada, pero aquí quedó sin acreditar ({reason}). "
-            "Confírmela con «Conciliar con MultiCobros»."
+            f"MultiCobros la muestra aprobada, pero en la plataforma no se acreditó: {reason}. "
+            "Revísela y confírmela con «Conciliar»."
         )
         out.prefill = {
             "referencia": row.referencia,
@@ -627,7 +627,7 @@ def _sale_outcome(row: FileRow, checkout: BanorteCheckout, *, approved_elsewhere
         return out
     out.outcome = "diferencia"
     out.message = (
-        f"MultiCobros la muestra aprobada, pero aquí el pago está «{payment.get_status_display()}» "
+        f"MultiCobros la muestra aprobada, pero en la plataforma el pago está «{payment.get_status_display()}» "
         f"({payment.failure_label() or 'resultado final'}). No lo cargue en el POS y avise a "
         "dirección."
     )
