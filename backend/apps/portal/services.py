@@ -296,7 +296,6 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     """
     from django.utils.text import Truncator
 
-    from apps.accounts.models import User
     from apps.portal.models import Notification
 
     if not getattr(announcement, 'is_active', False):
@@ -383,7 +382,6 @@ def emergency_broadcast(
     """
     from django.utils.text import Truncator
 
-    from apps.accounts.models import User
     from apps.portal.models import Announcement, Notification
 
     title = (title or '').strip()

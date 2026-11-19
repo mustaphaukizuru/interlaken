@@ -20,7 +20,6 @@ from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
-from .staff_import import ImportStaffLoyverseView
 from .merge import GuardianMergePreviewView, GuardianMergeView
 from .notify_email import NotifyEmailConfirmView, NotifyEmailVerifyView, NotifyEmailView
 from .password_requests import (
@@ -37,6 +36,7 @@ from .security import (
     TotpEnableView,
     TotpSetupView,
 )
+from .staff_import import ImportStaffLoyverseView
 from .staff_users import (
     StaffActivityView,
     StaffBulkView,

@@ -14,7 +14,12 @@ from django.urls import reverse
 from apps.accounts.factories import AdminFactory, StudentProfileFactory, UserFactory
 from apps.accounts.models import StudentProfile, User
 from apps.accounts.staff_import import import_staff_from_loyverse
-from apps.cafeteria.models import CafeteriaBalance, CafeteriaTransaction, LoyverseProfile, UnmatchedReceipt
+from apps.cafeteria.models import (
+    CafeteriaBalance,
+    CafeteriaTransaction,
+    LoyverseProfile,
+    UnmatchedReceipt,
+)
 from apps.cafeteria.services import LoyverseError
 from apps.core.models import AuditLog
 
