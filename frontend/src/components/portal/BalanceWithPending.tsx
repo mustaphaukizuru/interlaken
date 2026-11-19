@@ -152,7 +152,7 @@ export function PendingProjectionNote({ balance, pending, expandable = false, cl
 
   return (
     <div className={className}>
-      <p aria-hidden="true">{projectionSummary(projection)}</p>
+      <p aria-hidden="true" className="text-pretty">{projectionSummary(projection)}</p>
       {several && (
         <>
           <button
@@ -168,7 +168,7 @@ export function PendingProjectionNote({ balance, pending, expandable = false, cl
           </button>
           <ul id={listId} hidden={!open} className="space-y-1 border-l-2 border-line pl-2.5">
             {projection.steps.map((step) => (
-              <li key={step.phrase}>{projectionStepLine(step)}</li>
+              <li key={step.phrase} className="text-pretty">{projectionStepLine(step)}</li>
             ))}
           </ul>
         </>
