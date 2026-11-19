@@ -58,6 +58,7 @@ from .services import (
     get_balance_from_customer,
     get_customer_by_id,
     mirror_pos_topups,
+    pending_covers_low_balance,
     record_receipts,
     refund_transaction,
     sync_all_balances,
@@ -473,8 +474,12 @@ class MyCardsView(APIView):
     Loyverse profile stats (visits, first/last visit; its ``total_spent`` is
     cash/card only, so the family page no longer shows it).
 
-    ``student.tipo``/``puesto``/``puesto_label`` let a staff member's card
-    read as their puesto, never «Alumno»."""
+    ``is_low_balance`` stays the raw ``balance <= threshold``;
+    ``low_balance_alert`` is the «Saldo bajo» the family should see: off while
+    the paid top-ups on their way reach the alert level (same rule as the
+    cafetería page, the dashboard and the alert e-mail), so the threshold
+    never travels. ``student.tipo``/``puesto``/``puesto_label`` let a staff
+    member's card read as their puesto, never «Alumno»."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -502,6 +507,7 @@ class MyCardsView(APIView):
             loyverse = getattr(s, 'loyverse_profile', None)
             code = ((loyverse.customer_code if loyverse else '')
                     or s.student_id or '')
+            on_the_way = sum((Decimal(t['amount']) for t in pending.get(s.pk, [])), Decimal('0'))
             cards.append({
                 'student': {
                     'id': s.id,
@@ -518,6 +524,8 @@ class MyCardsView(APIView):
                 'linked': bool(s.loyverse_id),
                 'balance': str(balance.balance),
                 'is_low_balance': balance.is_low_balance,
+                'low_balance_alert': balance.is_low_balance
+                and not pending_covers_low_balance(balance, on_the_way),
                 'pending_topups': pending.get(s.pk, []),
                 'points': str(loyverse.total_points) if loyverse else None,
                 'consumption': consumption.get(s.pk, NO_CONSUMPTION),

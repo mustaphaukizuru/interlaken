@@ -141,3 +141,30 @@ describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-1
     expect(within(dialog).queryByText(/Alumno/)).toBeNull();
   });
 });
+
+describe('CredencialPage «Saldo bajo» follows the paid top-ups on their way', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const low = { ...CARD, balance: '10.00', is_low_balance: true };
+
+  it('hidden while a paid top-up covers the level (the server says so)', async () => {
+    getCards.mockResolvedValue({ data: [{
+      ...low, low_balance_alert: false,
+      pending_topups: [{ id: 3, amount: '40.00', paid_at: '2030-01-04T22:00:00Z', apply_due_at: '2030-01-07T13:30:00Z', folio: 3 }],
+    }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('$50.00')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo bajo')).toBeNull();
+  });
+
+  it('shown when the paid top-ups do not reach it', async () => {
+    getCards.mockResolvedValue({ data: [{ ...low, low_balance_alert: true }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo bajo')).toBeInTheDocument();
+  });
+
+  it('an older API without the flag: the raw one', async () => {
+    getCards.mockResolvedValue({ data: [low] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo bajo')).toBeInTheDocument();
+  });
+});

@@ -22,6 +22,9 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
   const roleLine = staff
     ? (s.puesto && s.puesto !== 'sin_asignar' && s.puesto_label) || 'Personal del colegio'
     : [s.grade, s.group && `Grupo ${s.group}`].filter(Boolean).join(' · ');
+  // «Saldo bajo» as on the cafetería page and the dashboard: not while paid
+  // top-ups on their way reach the alert level (older APIs: the raw flag).
+  const low = card.low_balance_alert ?? card.is_low_balance;
 
   // Focus management for the full-screen view (same pattern as Modal): move
   // focus to the close button on open, restore it to the opener on close.
@@ -71,7 +74,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             <span className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-white/85">
               <Coffee className="h-3.5 w-3.5" /> Credencial de cafetería
             </span>
-            {card.is_low_balance && (
+            {low && (
               <span className="rounded-full bg-amber-300/90 px-2 py-0.5 text-[10.5px] font-bold text-amber-900">
                 Saldo bajo
               </span>

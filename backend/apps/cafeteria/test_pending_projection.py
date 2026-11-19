@@ -26,7 +26,7 @@ from apps.accounts.factories import (
     StudentUserFactory,
 )
 from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
-from apps.payments.models import Payment
+from apps.payments.models import BanorteCheckout, Payment
 
 pytestmark = pytest.mark.django_db
 
@@ -204,3 +204,93 @@ class TestCard:
             return len(ctx.captured_queries)
 
         assert queries(1) == queries(3)
+
+
+class TestCardLowBalance:
+    """«Saldo bajo» on the card follows the cafetería page, the dashboard and
+    the alert e-mail: off while paid top-ups on their way reach the level.
+    ``is_low_balance`` stays raw for older clients."""
+
+    def card_for(self, api_client, *, balance, threshold="50.00", paid_amounts=()):
+        parent = ParentFactory()
+        kid = child(parent, balance=balance)
+        CafeteriaBalance.objects.filter(student=kid).update(
+            low_balance_threshold=Decimal(threshold)
+        )
+        for amount in paid_amounts:
+            paid(kid, amount)
+        return cards(api_client, parent)[kid.pk]
+
+    @pytest.mark.parametrize(
+        "balance, paid_amounts, raw, alert",
+        [
+            ("10.00", ["40.00"], True, False),  # 10 + 40 = 50, the level: covered
+            ("10.00", ["39.99"], True, True),  # one cent short: «Saldo bajo» stays
+            ("10.00", ["20.00", "20.00"], True, False),  # two top-ups add up
+            ("10.00", [], True, True),  # nothing on its way: the balance decides
+            ("80.00", [], False, False),
+        ],
+    )
+    def test_alert_honours_paid_top_ups(self, api_client, balance, paid_amounts, raw, alert):
+        card = self.card_for(api_client, balance=balance, paid_amounts=paid_amounts)
+        assert (card["is_low_balance"], card["low_balance_alert"]) == (raw, alert)
+
+    def test_a_refunded_top_up_does_not_cover(self, api_client):
+        parent = ParentFactory()
+        kid = child(parent, balance="10.00")
+        CafeteriaBalance.objects.filter(student=kid).update(low_balance_threshold=Decimal("50.00"))
+        paid(kid, "100.00", payment_status=Payment.Status.REFUNDED)
+        card = cards(api_client, parent)[kid.pk]
+        assert card["low_balance_alert"] is True and card["pending_topups"] == []
+
+
+class TestSimulationsInALiveInstallation:
+    """A Payworks simulation moved no money: in a live installation it is
+    neither on its way (no arrow) nor covers «Saldo bajo», on every view,
+    exactly like ``pending_paid_totals`` and the alert e-mail."""
+
+    @pytest.fixture(autouse=True)
+    def live(self, settings):
+        settings.PAYMENTS_LIVE = True
+
+    def family(self, mode):
+        parent = ParentFactory()
+        kid = child(parent, balance="10.00")
+        CafeteriaBalance.objects.filter(student=kid).update(low_balance_threshold=Decimal("50.00"))
+        _, payment = paid(kid, "200.00")
+        BanorteCheckout.objects.create(
+            payment=payment,
+            control_number=f"IK{payment.pk:06d}",
+            mode=mode,
+            resultado_payw="A",
+            referencia="123456",
+        )
+        return parent, kid
+
+    def views(self, api_client, parent, kid):
+        card = cards(api_client, parent)[kid.pk]
+        row = dashboard_rows(api_client, parent)[kid.pk]
+        api_client.force_authenticate(parent)
+        balance = next(
+            b
+            for b in api_client.get(reverse("cafeteria-balance")).data
+            if b["student"]["id"] == kid.pk
+        )
+        return card, row, balance
+
+    def test_simulation_is_left_out_everywhere(self, api_client):
+        parent, kid = self.family("AUT")
+        card, row, balance = self.views(api_client, parent, kid)
+        assert card["pending_topups"] == [] and card["low_balance_alert"] is True
+        assert row["pending_topup_items"] == [] and row["pending_topups"] == "0.00"
+        assert row["low"] is True
+        assert balance["pending_topups"] == []
+
+    def test_real_approval_counts_everywhere(self, api_client):
+        parent, kid = self.family("PRD")
+        card, row, balance = self.views(api_client, parent, kid)
+        assert [t["amount"] for t in card["pending_topups"]] == ["200.00"]
+        assert card["low_balance_alert"] is False
+        assert [t["amount"] for t in row["pending_topup_items"]] == ["200.00"]
+        assert row["low"] is False
+        assert [t["amount"] for t in balance["pending_topups"]] == ["200.00"]

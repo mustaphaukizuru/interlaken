@@ -152,26 +152,27 @@ def build_pending_topups_map(students) -> dict:
     mode): shown next to the balance with the promised load time, so a paid
     recarga is never "lost" between the bank and the POS. ``folio`` is the
     payment id printed on the comprobante.
-    """
-    from apps.cafeteria.services import paid_topups_pending
-    from apps.payments.models import Payment
 
-    topups = list(paid_topups_pending().filter(student__in=students)
-                  .order_by('processed_at', 'pk'))
-    if not topups:
-        return {}
-    folios = dict(Payment.objects.filter(related_topup__in=topups, status=Payment.Status.SUCCESS)
-                  .order_by('created_at', 'pk').values_list('related_topup_id', 'pk'))
-    out: dict = {}
-    for t in topups:
-        out.setdefault(t.student_id, []).append({
+    The very rows the low-balance rule counts (``services.pending_paid_totals``):
+    refunds left out and, in a live installation, Payworks simulations too
+    (no money moved), so the «$150.00 → $350.00» projection and the hidden
+    «Saldo bajo» always agree with the alert e-mail.
+    """
+    from django.db.models import QuerySet
+
+    from apps.cafeteria.services import _paid_topups_by_student
+
+    ids = students.values('pk') if isinstance(students, QuerySet) else [s.pk for s in students]
+    return {
+        sid: [{
             'id': t.pk,
             'amount': f'{t.amount:.2f}',
             'paid_at': t.processed_at.isoformat() if t.processed_at else None,
             'apply_due_at': t.apply_due_at.isoformat() if t.apply_due_at else None,
-            'folio': folios.get(t.pk),
-        })
-    return out
+            'folio': payment.pk,
+        } for t, payment in entries]
+        for sid, entries in _paid_topups_by_student(ids).items()
+    }
 
 
 class CafeteriaBalanceSerializer(serializers.ModelSerializer):

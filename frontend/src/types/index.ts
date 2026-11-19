@@ -172,7 +172,10 @@ export interface CafeteriaCard {
   code: string;            // matrícula the POS scans (QR/barcode payload)
   linked: boolean;
   balance: string;
+  /** Raw `balance <= threshold`; the card shows `low_balance_alert`. */
   is_low_balance: boolean;
+  /** «Saldo bajo» as the family sees it: off while paid top-ups on their way reach the level. */
+  low_balance_alert?: boolean;
   /** Paid card top-ups not in the balance yet (school's 7:30 POS load). */
   pending_topups?: PendingTopUp[];
   points: string | null;
