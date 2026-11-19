@@ -3263,7 +3263,9 @@ def link_profile_on_save(profile, *, actor=None, customers=None) -> dict:
     except LoyverseError:
         balance = _stored_balance(profile)    # seeded later by the sync_balances cron
     if not already:
-        replayed = replay_unmatched_receipts(loyverse_ids=[uuid]).get('replayed', 0)
+        # Parked purchases of this card become history (replayed or absorbed).
+        replay = replay_unmatched_receipts(loyverse_ids=[uuid])
+        replayed = replay.get('replayed', 0) + replay.get('absorbed', 0)
     status = 'already_linked' if already else 'linked'
     return out(status, message=f'Vinculado a Loyverse ✓ · saldo ${balance:,.2f}',
                balance=f'{balance:.2f}', customer_code=code, matched_by=how, replayed=replayed)

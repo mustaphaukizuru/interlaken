@@ -20,6 +20,7 @@ from .guardian_link import StudentGuardianDetailView, StudentGuardiansView
 from .import_students import ImportStudentsTemplateView, ImportStudentsView
 from .loyverse_import import ImportLoyverseView
 from .loyverse_link import LinkLoyverseView
+from .staff_import import ImportStaffLoyverseView
 from .merge import GuardianMergePreviewView, GuardianMergeView
 from .notify_email import NotifyEmailConfirmView, NotifyEmailVerifyView, NotifyEmailView
 from .password_requests import (
@@ -61,6 +62,8 @@ urlpatterns = [
          name='import-students-template'),
     path('admin/import-loyverse/', ImportLoyverseView.as_view(), name='import-loyverse'),
     path('admin/link-loyverse/',   LinkLoyverseView.as_view(),   name='link-loyverse'),
+    path('admin/import-staff-loyverse/', ImportStaffLoyverseView.as_view(),
+         name='import-staff-loyverse'),
     # Portal student editor (ownership map: people are edited in the portal only).
     path('admin/students/', AdminStudentCreateView.as_view(), name='admin-student-create'),
     path('admin/guardians/merge/preview/', GuardianMergePreviewView.as_view(), name='guardian-merge-preview'),
