@@ -99,6 +99,11 @@
     transition: transform var(--transition);
   }
   .skip-link:focus { transform: translateY(0); }
+
+  /* Portal/console frame: a box that clips and can never be scrolled, not even
+     by focus(), scrollIntoView() or a skip link (`hidden` can be). `hidden`
+     first for browsers without `clip` (Safari < 16). */
+  .frame-clip { overflow: hidden; overflow: clip; }
 }
 
 /* Honor reduced-motion globally: neutralize animations, transitions, smooth scroll. */
