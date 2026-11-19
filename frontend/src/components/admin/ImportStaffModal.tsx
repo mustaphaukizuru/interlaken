@@ -30,6 +30,8 @@ export interface StaffRow {
   note: string;
   existing: { id: number | null; name: string; student_id: string; tipo: string; grade: string; role: string } | null;
   done?: boolean;
+  /** After a commit: the office left this row out («Importar» or «Convertir a Personal» unticked). */
+  skipped?: boolean;
 }
 
 export interface StaffImportReport {
@@ -42,6 +44,8 @@ export interface StaffImportReport {
   attached: number;
   linked: number;
   converted: number;
+  /** Rows the office left out (not written). */
+  skipped: number;
   balance_seeded: string;
   recovered_receipts: number;
   errors: { code: string; name: string; error: string }[];
@@ -64,7 +68,15 @@ const FLAG: Record<Flag, string> = {
   codigo_distinto: 'Código distinto al correo',
   consola: 'Tiene consola',
 };
+/** What a flag means, said once under the badges of its row. */
+const FLAG_HELP: Partial<Record<Flag, string>> = {
+  codigo_distinto: 'El código de Loyverse no coincide con el correo; se vincula por correo.',
+};
 type View = 'all' | Action | Flag;
+
+/** Rows a commit writes unless the office unticks «Importar» (conversions have their own box). */
+const IMPORTABLE: ReadonlySet<Action> = new Set<Action>(['crear', 'vincular_cuenta', 'vincular']);
+const importable = (r: StaffRow) => IMPORTABLE.has(r.action);
 
 const fmtDay = (iso: string | null) => (iso ? format(new Date(iso), 'd MMM yyyy', { locale: es }) : '—');
 
@@ -72,8 +84,9 @@ const fmtDay = (iso: string | null) => (iso ? format(new Date(iso), 'd MMM yyyy'
  * «Importar personal desde Loyverse» (A3 + A5, admins only): the review of
  * every «ZP-» card first, then the import. Staff link by email first; a record
  * created as a pupil is offered «Convertir a Personal» (kept wallet and
- * history) and converted only when ticked; their parked purchases become
- * history and the result says how many.
+ * history) and converted only when ticked. Every other row is imported unless
+ * its «Importar» box is unticked (a placeholder card, someone who left). The
+ * parked purchases become history and the result says how many.
  */
 export function ImportStaffModal({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported?: () => void }) {
   return (
@@ -92,6 +105,8 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
   const [query, setQuery] = useState('');
   const [view, setView] = useState<View>('all');
   const [convert, setConvert] = useState<Set<number>>(new Set());
+  /** Loyverse ids of the importable rows the office unticked (all ticked at first). */
+  const [skip, setSkip] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -123,12 +138,25 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
       !q || [r.name, r.loyverse_name, r.code, r.email].some((v) => (v || '').toLowerCase().includes(q))));
   }, [rows, view, query]);
 
-  const willWrite = (counts?.crear ?? 0) + (counts?.vincular_cuenta ?? 0) + (counts?.vincular ?? 0) + convert.size;
+  const toImport = useMemo(() => rows.filter(importable), [rows]);
+  const leftOut = toImport.filter((r) => skip.has(r.loyverse_id)).map((r) => r.loyverse_id);
+  const willImport = toImport.length - leftOut.length;
+  const willWrite = willImport + convert.size;
+  const shownToImport = visible.filter(importable);
+  const filtered = visible.length < rows.length;
+  /** «Marcar todos» / «Ninguno»: the importable rows on screen (all of them unless filtered). */
+  const markShown = (include: boolean) => setSkip((prev) => {
+    const next = new Set(prev);
+    shownToImport.forEach((r) => { if (include) next.delete(r.loyverse_id); else next.add(r.loyverse_id); });
+    return next;
+  });
 
   async function commit() {
     setPhase('committing');
     try {
-      const { data } = await api.post<StaffImportReport>(ENDPOINT, { commit: '1', convert: [...convert] });
+      const { data } = await api.post<StaffImportReport>(ENDPOINT, {
+        commit: '1', convert: [...convert], ...(leftOut.length ? { skip: leftOut } : {}),
+      });
       setResult(data);
       setPhase('done');
       toast.success('Personal importado desde Loyverse.');
@@ -199,11 +227,32 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
         ))}
       </div>
 
+      {toImport.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-cream px-3 py-2 text-sm">
+          <p className="text-muted" aria-live="polite">
+            <strong className="text-ink">{willImport}</strong> de {toImport.length} marcada{toImport.length === 1 ? '' : 's'} para importar
+            {leftOut.length > 0 && <>; {leftOut.length} se queda{leftOut.length === 1 ? '' : 'n'} fuera</>}.
+          </p>
+          <div className="flex items-center gap-1" role="group" aria-label={filtered ? 'Marcar las personas mostradas' : 'Marcar a todo el personal'}>
+            <button type="button" onClick={() => markShown(true)} disabled={shownToImport.length === 0}
+              className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-purple hover:bg-purple/10 disabled:opacity-40">
+              Marcar todos{filtered ? ' (mostrados)' : ''}
+            </button>
+            <span className="text-subtle" aria-hidden="true">/</span>
+            <button type="button" onClick={() => markShown(false)} disabled={shownToImport.length === 0}
+              className="min-h-[36px] rounded-lg px-2 text-xs font-semibold text-purple hover:bg-purple/10 disabled:opacity-40">
+              Ninguno{filtered ? ' (mostrados)' : ''}
+            </button>
+          </div>
+        </div>
+      )}
+
       <DataTable<StaffRow>
         wrapClassName="max-h-[46vh]"
         rows={visible}
         rowKey={(r) => r.loyverse_id}
         rowLabel={(r) => r.name}
+        rowClassName={(r) => (importable(r) && skip.has(r.loyverse_id) ? 'opacity-60' : '')}
         caption="Personal en Loyverse"
         itemLabel="personas"
         empty={{ icon: ListChecks, title: 'Nadie coincide con la búsqueda' }}
@@ -239,13 +288,34 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
           },
           {
             id: 'action', header: 'Qué pasará', minWidth: 260,
-            cell: (r) => (
+            cell: (r) => {
+              const out = importable(r) && skip.has(r.loyverse_id);
+              return (
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-1">
-                  <Badge variant={ACTION[r.action].variant}>{ACTION[r.action].label}</Badge>
-                  {r.flags.map((f) => <Badge key={f} variant={f === 'consola' ? 'info' : 'neutral'}>{FLAG[f]}</Badge>)}
+                  {out
+                    ? <Badge variant="neutral">No se importará</Badge>
+                    : <Badge variant={ACTION[r.action].variant}>{ACTION[r.action].label}</Badge>}
+                  {r.flags.map((f) => <Badge key={f} variant={f === 'consola' ? 'info' : f === 'sin_actividad' ? 'warning' : 'neutral'}>{FLAG[f]}</Badge>)}
                 </div>
+                {r.flags.map((f) => FLAG_HELP[f] && <p key={f} className="text-xs text-muted">{FLAG_HELP[f]}</p>)}
                 {r.note && <p className="text-xs text-muted">{r.note}</p>}
+                {importable(r) && (
+                  <label className="flex min-h-[36px] cursor-pointer items-center gap-2 text-sm font-semibold text-ink">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-purple"
+                      aria-label={`Importar a ${r.name}`}
+                      checked={!out}
+                      onChange={(e) => setSkip((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.delete(r.loyverse_id); else next.add(r.loyverse_id);
+                        return next;
+                      })}
+                    />
+                    Importar
+                  </label>
+                )}
                 {r.action === 'convertir' && r.existing?.id && (
                   <label className="flex min-h-[36px] cursor-pointer items-center gap-2 text-sm font-semibold text-purple">
                     <input
@@ -262,7 +332,8 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
                   </label>
                 )}
               </div>
-            ),
+              );
+            },
           },
         ]}
       />
@@ -275,8 +346,9 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
         </p>
         <div className="flex shrink-0 gap-2">
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-          {willWrite > 0 ? (
-            <Button onClick={commit}><Briefcase className="h-4 w-4" aria-hidden="true" /> Importar {willWrite}</Button>
+          {toImport.length > 0 || counts.convertir > 0 ? (
+            // Disabled with 0: everything is unticked, nothing would be written.
+            <Button onClick={commit} disabled={willWrite === 0}><Briefcase className="h-4 w-4" aria-hidden="true" /> Importar {willWrite}</Button>
           ) : (
             <p className="flex items-center gap-1.5 text-sm text-green-dark"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Todo al día</p>
           )}
@@ -287,21 +359,36 @@ function ImportStaffBody({ onClose, onImported }: { onClose: () => void; onImpor
 }
 
 function ImportResult({ result, onClose }: { result: StaffImportReport; onClose: () => void }) {
+  const skipped = result.skipped ?? 0;
+  const errors = result.errors.length;
   const lines = [
     [result.created, 'creado(s)'],
     [result.attached, 'agregado(s) a una cuenta existente'],
     [result.linked, 'vinculado(s)'],
     [result.converted, 'convertido(s) a Personal'],
+    [skipped, 'omitido(s)'],
   ].filter(([n]) => Number(n) > 0) as [number, string][];
+  // Every outcome with its number, zeros included: what was written and what was not.
+  const stats: { label: string; value: number; tone: 'primary' | 'muted' | 'warn' }[] = [
+    { label: 'Creados', value: result.created, tone: result.created ? 'primary' : 'muted' },
+    { label: 'Agregados a una cuenta existente', value: result.attached, tone: result.attached ? 'primary' : 'muted' },
+    ...(result.linked ? [{ label: 'Vinculados', value: result.linked, tone: 'primary' as const }] : []),
+    { label: 'Convertidos a Personal', value: result.converted, tone: result.converted ? 'primary' : 'muted' },
+    { label: 'Omitidos (sin marcar)', value: skipped, tone: 'muted' },
+    { label: 'Con error', value: errors, tone: errors ? 'warn' : 'muted' },
+  ];
   return (
     <div className="space-y-4">
       <div role="status" className="flex items-start gap-2.5 rounded-xl border border-green-600/25 bg-green-50 px-4 py-3 text-sm text-green-800">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
         <div className="space-y-1">
           <p className="font-semibold">{lines.length ? lines.map(([n, w]) => `${n} ${w}`).join(', ') : 'Nada que importar'}.</p>
-          <p>Saldo inicial copiado de Loyverse: {formatMXN(result.balance_seeded)}.</p>
           <p>{result.recovered_receipts} compra(s) anteriores ahora aparecen en su historial (antes «sin alumno vinculado»).</p>
+          <p>Saldo inicial copiado de Loyverse: {formatMXN(result.balance_seeded)}.</p>
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="group" aria-label="Resultado por fila">
+        {stats.map((s) => <Stat key={s.label} label={s.label} value={s.value} tone={s.tone} />)}
       </div>
       {result.errors.length > 0 && (
         <div role="alert" className="rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-3 text-sm text-ink">

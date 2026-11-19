@@ -2,7 +2,9 @@
 accounts/staff_import.py — «Importar personal desde Loyverse» (A3 + A5, 2026-11-18).
 
 POST /api/v1/accounts/admin/import-staff-loyverse/  (admin only)
-  body: ``commit`` 1|0 (default 0: the review), ``convert`` [profile ids]
+  body: ``commit`` 1|0 (default 0: the review), ``convert`` [profile ids],
+  ``skip`` [Loyverse customer ids the office left out: a placeholder card, a
+  person who no longer works there]
 
 Every staff card in Loyverse is named «ZP-…» (no pupil's is). The roster import
 skips them on purpose, so their purchases park as «sin alumno vinculado»
@@ -21,7 +23,9 @@ as colegio@, or a parent: attached, role untouched), else a new login
 (``role='student'``: portal only, never the console). A matching record that
 is a PUPIL (created by hand as one) is offered «Convertir a Personal» and is
 converted only when its id is in ``convert``. A person already linked to a
-different card is never repointed.
+different card is never repointed. A row whose card is in ``skip`` is not
+written at all; the result counts it under ``skipped`` with the conversions
+left unticked.
 """
 from __future__ import annotations
 
@@ -180,9 +184,26 @@ def _seed_once(profile, points: Decimal) -> Decimal:
     return points
 
 
-def import_staff_from_loyverse(customers, *, commit=False, convert_ids=(), actor=None) -> dict:
+def _customer_ids(values) -> set[str]:
+    """The Loyverse customer ids in a request list (``skip``): text or whole
+    numbers, trimmed, at most 100 characters (``LoyverseProfile.loyverse_id``);
+    anything else is ignored, as ``convert`` ignores what is not an id."""
+    ids = set()
+    for value in values or ():
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            continue
+        text = str(value).strip()
+        if text and len(text) <= 100:
+            ids.add(text)
+    return ids
+
+
+def import_staff_from_loyverse(customers, *, commit=False, convert_ids=(), skip_ids=(),
+                               actor=None) -> dict:
     """The review (``commit=False``) or the import. Returns the plan plus, on
-    commit, ``created``, ``attached``, ``linked``, ``converted``,
+    commit, ``created``, ``attached``, ``linked``, ``converted``, ``skipped``
+    (rows the office left out: a card in ``skip_ids``, or a «Convertir a
+    Personal» left unticked; marked ``skipped`` and never written),
     ``balance_seeded``, ``errors`` and ``replay`` (A5: the parked purchases now
     in each person's history)."""
     from apps.cafeteria.loyverse_profile import upsert_loyverse_profile
@@ -193,19 +214,23 @@ def import_staff_from_loyverse(customers, *, commit=False, convert_ids=(), actor
 
     report = plan_staff_import(customers)
     report.update({'commit': commit, 'created': 0, 'attached': 0, 'linked': 0, 'converted': 0,
-                   'balance_seeded': '0.00', 'errors': [], 'replay': None,
+                   'skipped': 0, 'balance_seeded': '0.00', 'errors': [], 'replay': None,
                    'recovered_receipts': 0})
     if not commit:
         return report
 
     wanted = {int(i) for i in convert_ids or () if str(i).isdigit()}
+    left_out = _customer_ids(skip_ids)
     by_id = {c['id']: c for c in customers if c.get('id')}
     seeded, linked_ids = Decimal('0'), []
     for row in report['rows']:
         action = row['action']
         if action in (UP_TO_DATE, CONFLICT, SKIP):
             continue
-        if action == CONVERT and (row['existing'] or {}).get('id') not in wanted:
+        if row['loyverse_id'] in left_out or (
+                action == CONVERT and (row['existing'] or {}).get('id') not in wanted):
+            row['done'], row['skipped'] = False, True
+            report['skipped'] += 1
             continue
         cust = by_id[row['loyverse_id']]
         try:
@@ -234,8 +259,8 @@ def import_staff_from_loyverse(customers, *, commit=False, convert_ids=(), actor
         replay = replay_unmatched_receipts(loyverse_ids=linked_ids)
         report['replay'] = replay
         report['recovered_receipts'] = replay.get('replayed', 0) + replay.get('absorbed', 0)
-    summary = {k: report[k] for k in ('created', 'attached', 'linked', 'converted', 'balance_seeded',
-                                      'recovered_receipts')}
+    summary = {k: report[k] for k in ('created', 'attached', 'linked', 'converted', 'skipped',
+                                      'balance_seeded', 'recovered_receipts')}
     summary['errors'] = len(report['errors'])
     from apps.cafeteria.models import LoyverseSyncState
     record('update', LoyverseSyncState.load(), summary, actor=actor, context='import:personal')
@@ -300,10 +325,13 @@ class ImportStaffLoyverseView(APIView):
         convert = request.data.get('convert') or []
         if not isinstance(convert, list):
             convert = [convert]
+        skip = request.data.get('skip') or []
+        if not isinstance(skip, list):
+            skip = [skip]
         try:
             customers = get_all_customers()
         except LoyverseError as e:
             return Response(error_body(f'No se pudo conectar con Loyverse: {e}'),
                             status=status.HTTP_502_BAD_GATEWAY)
         return Response(import_staff_from_loyverse(
-            customers, commit=commit, convert_ids=convert, actor=request.user))
+            customers, commit=commit, convert_ids=convert, skip_ids=skip, actor=request.user))
