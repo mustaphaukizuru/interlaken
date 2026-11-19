@@ -29,7 +29,9 @@ def delivery_users(user) -> list[User]:
         return []
     targets: list[User] = [user]
     profile = getattr(user, 'student_profile', None) if getattr(user, 'role', None) == User.Role.STUDENT else None
-    if profile is not None:
+    # A staff member's cafetería login (tipo='personal') is its own addressee:
+    # whatever ``parents`` holds, nothing addressed to it reaches a "guardian".
+    if profile is not None and getattr(profile, 'tipo', None) != 'personal':
         for guardian in profile.parents.filter(is_active=True).order_by('pk'):
             if guardian.pk != user.pk:
                 targets.append(guardian)

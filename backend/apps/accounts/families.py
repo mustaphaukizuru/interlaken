@@ -179,6 +179,12 @@ def _resolve_students(student_ids) -> list[StudentProfile]:
     missing = [i for i in ids if i not in found]
     if missing:
         raise FamilyError('Alguno de los alumnos ya no existe. Actualice la página.')
+    staff = [s for s in found.values() if s.is_personal]
+    if staff:
+        # A family login sees every student of its family: a staff wallet
+        # must never become visible to a family (2026-11-18).
+        raise FamilyError(f'{staff[0].user.full_name} es personal del colegio; '
+                          f'el personal no se agrupa en familias.')
     return [found[i] for i in ids]
 
 

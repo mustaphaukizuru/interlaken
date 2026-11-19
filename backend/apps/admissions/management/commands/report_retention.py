@@ -27,7 +27,7 @@ class Command(BaseCommand):
             status=PreRegistration.Status.REJECTED, updated_at__lte=cutoff)
         rejected_regs = Registration.objects.filter(
             status=Registration.Status.REJECTED, updated_at__lte=cutoff)
-        withdrawn = StudentProfile.objects.filter(is_active=False)
+        withdrawn = StudentProfile.objects.filter(is_active=False, tipo=StudentProfile.Tipo.ALUMNO)
 
         self.stdout.write(self.style.WARNING(
             'Retention report (REPORT ONLY — nothing was deleted):'))

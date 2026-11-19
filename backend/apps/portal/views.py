@@ -45,7 +45,7 @@ from .serializers import (
     NotificationDetailSerializer,
     NotificationSerializer,
 )
-from .services import INLINE_DISPATCH_LIMIT, _audience_roles, emergency_broadcast, fanout_and_stamp
+from .services import INLINE_DISPATCH_LIMIT, audience_users, emergency_broadcast, fanout_and_stamp
 
 
 def audiences_for_user(user):
@@ -57,10 +57,18 @@ def audiences_for_user(user):
     otherwise a parent-role family silently misses 'Alumnos' avisos and a
     student-role family misses 'Padres' ones. Staff/admin oversee every audience.
     """
+    from apps.accounts.people import is_staff_only_login, own_cafeteria_account
+
     audiences = [Announcement.Audience.ALL]
     role = getattr(user, 'role', None)
     if role in (User.Role.PARENT, User.Role.STUDENT):
+        # A staff member's cafetería login reads «Personal», never the family
+        # comunicados (the same rule as the fan-out: services.audience_users).
+        if is_staff_only_login(user):
+            return audiences + [Announcement.Audience.STAFF]
         audiences += [Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS]
+        if own_cafeteria_account(user) is not None:
+            audiences.append(Announcement.Audience.STAFF)
     elif role == User.Role.STAFF:
         audiences.append(Announcement.Audience.STAFF)
     elif role == User.Role.ADMIN:
@@ -708,8 +716,7 @@ class AnnouncementRecipientCountView(APIView):
                     or Announcement.Audience.ALL).strip()
         if audience not in Announcement.Audience.values:
             return Response(error_body('Audiencia no válida.'), status=400)
-        roles = _audience_roles().get(audience, [])
-        count = User.objects.filter(is_active=True, role__in=roles).count()
+        count = audience_users(audience).count()
         return Response({'audience': audience, 'count': count})
 
 

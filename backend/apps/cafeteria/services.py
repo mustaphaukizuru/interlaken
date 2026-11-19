@@ -3030,7 +3030,11 @@ def sync_health() -> dict:
     from apps.cafeteria.models import CafeteriaTransaction, LoyverseSyncState, UnmatchedReceipt
 
     state = LoyverseSyncState.load()
-    active = StudentProfile.objects.filter(is_active=True)
+    # Pupils: the panel's «X de Y alumnos activos». Staff cafetería accounts
+    # are counted apart (``active_staff`` / ``linked_staff``).
+    everyone = StudentProfile.objects.filter(is_active=True)
+    active = everyone.filter(tipo=StudentProfile.Tipo.ALUMNO)
+    staff = everyone.filter(tipo=StudentProfile.Tipo.PERSONAL)
     week_ago = timezone.now() - timedelta(days=7)
     last_tx = CafeteriaTransaction.objects.order_by('-date').first()
     ok, error = loyverse_reachable()
@@ -3060,6 +3064,8 @@ def sync_health() -> dict:
         'backup': OpsStatus.get('backup'),
         'active_students': active.count(),
         'linked_students': active.exclude(loyverse_id='').count(),
+        'active_staff': staff.count(),
+        'linked_staff': staff.exclude(loyverse_id='').count(),
         'last_transaction_at': last_tx.date if last_tx else None,
         'transactions_last_7d': CafeteriaTransaction.objects.filter(date__gte=week_ago).count(),
         'purchases_last_7d': CafeteriaTransaction.objects.filter(

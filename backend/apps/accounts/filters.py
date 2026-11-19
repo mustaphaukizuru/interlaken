@@ -36,11 +36,17 @@ def _yes_no(value) -> bool | None:
 ARCHIVED_TAB = ("archivadas", "archived")
 
 
+# ``tipo`` of the roster (2026-11-18): pupils by default; «Personal» lists the
+# staff cafetería accounts; ``todos`` both (the Ctrl+K palette).
+TIPO_ALL = ("todos", "all")
+
+
 class StudentFilterSet(django_filters.FilterSet):
     """``status|estado``, ``access|acceso``, ``level|nivel``, ``grade|grado``,
-    ``group|grupo``, ``linked|vinculado``, ``enrolled_from``/``enrolled_to`` and
-    ``archived|archivados``: archived students are left out unless it is ``1``,
-    which lists only them."""
+    ``group|grupo``, ``linked|vinculado``, ``enrolled_from``/``enrolled_to``,
+    ``archived|archivados`` (archived students are left out unless it is ``1``,
+    which lists only them) and ``tipo`` (``alumno`` by default, ``personal``
+    for staff cafetería accounts, ``todos`` for both)."""
 
     status = django_filters.CharFilter(method="filter_status")
     estado = django_filters.CharFilter(method="filter_status")
@@ -65,7 +71,13 @@ class StudentFilterSet(django_filters.FilterSet):
     def qs(self):
         params = self.data or {}
         archived = _yes_no(params.get("archived") or params.get("archivados"))
-        return super().qs.filter(user__archived_at__isnull=not archived)
+        qs = super().qs.filter(user__archived_at__isnull=not archived)
+        tipo = str(params.get("tipo") or "").strip().lower()
+        if tipo in TIPO_ALL:
+            return qs
+        if tipo != StudentProfile.Tipo.PERSONAL:
+            tipo = StudentProfile.Tipo.ALUMNO   # the Alumnos list: pupils only
+        return qs.filter(tipo=tipo)
 
     def filter_status(self, qs, name, value):
         return qs.filter(status=value) if value in StudentProfile.Status.values else qs

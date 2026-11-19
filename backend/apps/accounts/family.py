@@ -74,6 +74,11 @@ def family_notify_recipients(student: StudentProfile) -> list[User]:
     guardians are not notified twice.
     """
     owner = getattr(student, 'user', None)
+    if getattr(student, 'is_personal', False):
+        # A staff cafetería account (2026-11-18): its notices (purchase, low
+        # balance, top-up) go to the person only, whatever role their login
+        # has (a console user keeps admin/staff), never to a guardian.
+        return [owner] if owner is not None and owner.is_active else []
     if owner is None:
         return [g for g in student.parents.filter(is_active=True).order_by('pk')]
     users = delivery_users(owner)
@@ -88,7 +93,7 @@ def family_alert_logins(student: StudentProfile) -> list[User]:
 
     Empty when the student has no family. Order: by pk, for stable fan-out.
     """
-    if not getattr(student, 'family_id', None):
+    if not getattr(student, 'family_id', None) or getattr(student, 'is_personal', False):
         return []
     already = {u.pk for u in family_notify_recipients(student)}
     out: dict[int, User] = {}

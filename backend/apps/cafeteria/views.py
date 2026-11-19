@@ -1804,6 +1804,9 @@ class AdminBulkTopUpView(APIView):
             group = str(data.get('group') or '').strip()
             if not grade and not group:
                 return Response({'detail': 'Elija grado/grupo o una lista de alumnos.'}, status=400)
+            # A grade/group top-up (a beca, an event) is for pupils: never a
+            # staff cafetería account, whatever its (empty) grade says.
+            qs = qs.filter(tipo=StudentProfile.Tipo.ALUMNO)
             if grade:
                 qs = qs.filter(grade=grade)
             if group:

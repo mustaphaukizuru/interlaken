@@ -25,6 +25,8 @@ export interface StudentsListParams {
   linked?: string;
   /** `1` lists only archived students; otherwise they are left out. */
   archived?: string;
+  /** Pupils by default; `personal` = staff cafetería accounts, `todos` = both. */
+  tipo?: string;
   enrolled_from?: string;
   enrolled_to?: string;
   [key: string]: string | number | undefined;

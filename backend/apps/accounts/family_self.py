@@ -87,7 +87,9 @@ def find_child(term: str) -> StudentProfile | None:
     term = (term or '').strip()
     if not term:
         return None
-    base = StudentProfile.objects.select_related('user', 'family')
+    # Pupils only: a family can never reach a staff cafetería account.
+    base = (StudentProfile.objects.filter(tipo=StudentProfile.Tipo.ALUMNO)
+            .select_related('user', 'family'))
     if '@' in term:
         return base.filter(user__email__iexact=term).first()
     code = normalize_matricula(term) if is_ci_code(term) else term

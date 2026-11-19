@@ -162,6 +162,11 @@ class StudentImport:
             return
         existing = self.student(matricula)
         email_alumno = data.get("email_alumno") or ""
+        if existing is not None and existing.is_personal:
+            # A staff cafetería account is edited in Alumnos → Personal, never
+            # turned back into a pupil by a roster file.
+            row.error(f"La matrícula {matricula} es de personal del colegio, no de un alumno.")
+            return
         if existing is None:
             email = email_alumno or synthetic_email(matricula)
             if self.user(email) is not None:

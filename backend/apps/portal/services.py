@@ -253,6 +253,35 @@ def _audience_roles():
     return _AUDIENCE_ROLES
 
 
+def audience_users(audience):
+    """Active users a comunicado for ``audience`` reaches: ``_audience_roles``,
+    with staff cafetería logins (2026-11-18) moved where they belong.
+
+    A staff member who only has a cafetería account signs in with a
+    ``role='student'`` login, so by role alone they would get the family
+    comunicados (Padres / Alumnos). They are left out of those and join
+    «Personal» instead; a parent who is also staff keeps the family ones and
+    gets «Personal» too. «Todos» is unchanged. One queryset, used by the
+    fan-out, the WhatsApp blast and the composer's recipient count, so the
+    three can never disagree.
+    """
+    from django.db.models import Q
+
+    from apps.accounts.models import User
+    from apps.accounts.people import personal_user_ids, staff_only_login_q
+    from apps.portal.models import Announcement
+
+    roles = _audience_roles().get(audience, [])
+    q = Q(role__in=roles)
+    if audience in (Announcement.Audience.PARENTS, Announcement.Audience.STUDENTS):
+        q &= ~staff_only_login_q()
+    elif audience == Announcement.Audience.STAFF:
+        q |= Q(role__in=[User.Role.PARENT, User.Role.STUDENT], pk__in=personal_user_ids())
+    if not roles and audience != Announcement.Audience.STAFF:
+        return User.objects.none()
+    return User.objects.filter(q, is_active=True)
+
+
 def fanout_announcement(announcement, *, notif_type=None) -> int:
     """Create an in-app ``Notification`` for every active user in the
     announcement's audience, so a newly published comunicado actually alerts the
@@ -276,9 +305,7 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     if not roles:
         return 0
 
-    user_ids = list(
-        User.objects.filter(is_active=True, role__in=roles)
-        .values_list('id', flat=True))
+    user_ids = list(audience_users(announcement.audience).values_list('id', flat=True))
     if not user_ids:
         return 0
 
@@ -383,9 +410,8 @@ def emergency_broadcast(
 
     whatsapp_sent = 0
     if whatsapp:
-        roles = _audience_roles().get(audience, [])
         qs = (
-            User.objects.filter(is_active=True, role__in=roles)
+            audience_users(audience)
             .exclude(whatsapp='')
             .order_by('id')[:whatsapp_limit]
         )
