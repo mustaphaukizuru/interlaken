@@ -141,3 +141,58 @@ class TestEndpoint:
         api_client.force_authenticate(user=AdminFactory())
         with patch('apps.cafeteria.services.get_all_customers', side_effect=LoyverseError('x')):
             assert api_client.post(URL, {}, format='json').status_code == 502
+
+
+class TestLeaveRowsOut:
+    """The office unticks «Importar» on a placeholder card or someone who left (2026-11-19)."""
+
+    def test_a_skipped_card_is_not_written_and_is_reported(self, store):
+        _park('R-9', 'u-nadie')
+        report = import_staff_from_loyverse(store, commit=True, skip_ids=['u-nadie'])
+        assert (report['created'], report['skipped']) == (3, 1)
+        assert not StudentProfile.objects.filter(loyverse_id='u-nadie').exists()
+        assert not User.objects.filter(email='ndsur@interlaken.com.mx').exists()
+        assert not LoyverseProfile.objects.filter(loyverse_id='u-nadie').exists()
+        rows = {r['loyverse_id']: r for r in report['rows']}
+        assert rows['u-nadie']['skipped'] is True and rows['u-nadie']['done'] is False
+        assert rows['u-rosa']['done'] is True and 'skipped' not in rows['u-rosa']
+        # Its parked purchase stays parked: nobody was linked to that card.
+        assert UnmatchedReceipt.objects.get(receipt_number='R-9').resolved_at is None
+        summary = AuditLog.objects.filter(context='import:personal').latest('pk').changes
+        assert summary['skipped'] == 1 and summary['created'] == 3
+
+    def test_a_conversion_left_unticked_counts_as_skipped(self, store, tomas):
+        report = import_staff_from_loyverse(store, commit=True)
+        assert report['skipped'] == 1 and report['converted'] == 0
+        tomas.refresh_from_db()
+        assert tomas.tipo == 'alumno'
+
+    def test_skip_wins_over_convert(self, store, tomas):
+        report = import_staff_from_loyverse(store, commit=True, convert_ids=[tomas.pk],
+                                            skip_ids=['u-tomas'])
+        assert (report['converted'], report['skipped']) == (0, 1)
+        tomas.refresh_from_db()
+        assert tomas.tipo == 'alumno'
+
+    def test_the_review_ignores_skip(self, store):
+        report = import_staff_from_loyverse(store, skip_ids=['u-rosa'])
+        assert report['skipped'] == 0 and report['counts']['crear'] == 4
+        assert not StudentProfile.objects.exists()
+
+    def test_only_real_ids_count(self, store):
+        noise = [None, {'id': 'u-rosa'}, ['u-rosa'], True, '   ', 'u-rosa' * 20, 4.5, 123]
+        report = import_staff_from_loyverse(store, commit=True, skip_ids=[*noise, ' u-nadie '])
+        assert (report['created'], report['skipped']) == (3, 1)
+        assert StudentProfile.objects.filter(loyverse_id='u-rosa').exists()
+
+    def test_endpoint_takes_a_list_or_a_single_id(self, api_client, store):
+        api_client.force_authenticate(user=AdminFactory())
+        with patch('apps.cafeteria.services.get_all_customers', return_value=store):
+            done = api_client.post(URL, {'commit': 1, 'skip': ['u-nadie', 'u-caja']},
+                                   format='json')
+            assert done.status_code == 200, done.data
+            assert (done.data['created'], done.data['skipped']) == (2, 2)
+            again = api_client.post(URL, {'commit': 1, 'skip': 'u-caja'}, format='json')
+        assert (again.data['created'], again.data['skipped']) == (1, 1)
+        assert again.data['counts']['al_dia'] == 2
+        assert not StudentProfile.objects.filter(loyverse_id='u-caja').exists()

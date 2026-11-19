@@ -6,5 +6,6 @@ export const APPLY_PAID_ACTION: BulkActionDef = {
   name: 'apply_paid',
   label: 'Aplicar (ya cargadas en POS)',
   planVerb: 'Se aplicarán al saldo, si Loyverse ya las muestra,',
+  progressVerb: 'Aplicando',
   icon: Wallet,
 };

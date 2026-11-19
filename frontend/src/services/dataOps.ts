@@ -176,6 +176,12 @@ export interface BulkResult {
   warnings?: BulkWarning[];
   /** Rows per outcome when an action ends differently per row: `{erased: 16, archived: 19}`. */
   outcomes?: Record<string, number>;
+  /**
+   * Rows the commit did not reach before its time budget ran out (also in
+   * `failed`, with the server's «Sin procesar…» message). Absent when it finished.
+   */
+  not_reached?: number;
+  not_reached_ids?: Array<string | number>;
 }
 
 export type BulkFetcher = (body: BulkRequest) => Promise<AxiosResponse<BulkResult>>;
@@ -209,5 +215,7 @@ export interface BulkActionDef {
   notifyOption?: boolean;
   /** es-MX verb phrase for the plan: "Se confirmarán", "Se cancelarán". */
   planVerb?: string;
+  /** es-MX gerund for the progress of a dialog that continues by itself: "Aplicando" (default "Procesando"). */
+  progressVerb?: string;
   icon?: LucideIcon;
 }

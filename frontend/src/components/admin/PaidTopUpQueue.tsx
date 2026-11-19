@@ -268,6 +268,9 @@ export function PaidTopUpQueue() {
         filters={filters}
         execute={(body) => bulk.mutateAsync(body)}
         onDone={() => selection.onClear()}
+        // Each row reads Loyverse first: the server stops near its time budget
+        // and the dialog sends the rest by itself until all are done.
+        autoContinue
         renderPlan={(plan: BulkResult) => {
           const total = (plan as TopUpBulkResult).total;
           return (
