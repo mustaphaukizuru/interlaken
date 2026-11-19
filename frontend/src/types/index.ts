@@ -169,6 +169,8 @@ export interface CafeteriaCard {
   linked: boolean;
   balance: string;
   is_low_balance: boolean;
+  /** Paid card top-ups not in the balance yet (school's 7:30 POS load). */
+  pending_topups?: PendingTopUp[];
   points: string | null;
   consumption: CafeteriaConsumption;
   loyverse: LoyverseProfile | null;
@@ -428,8 +430,9 @@ export interface Booking {
 export interface DashboardData {
   children_count?: number;
   children?: Array<{ id: number; name: string; grade: string; group: string; student_id: string; tipo?: PersonTipo; puesto_label?: string }>;
-  /** `pending_topups`: paid card top-ups not applied yet (school's 7:30 POS load). */
-  cafeteria_balances?: Array<{ student?: number; student_name: string; balance: string; low: boolean; last_synced: string; pending_topups?: string }>;
+  /** `pending_topups`: total of the paid card top-ups not applied yet (school's 7:30 POS load);
+   *  `pending_topup_items`: the same top-ups one by one, with their promised load. */
+  cafeteria_balances?: Array<{ student?: number; student_name: string; balance: string; low: boolean; last_synced: string; pending_topups?: string; pending_topup_items?: PendingTopUp[] }>;
   recent_payments?: Array<{ id: number; type: string; amount: string; status: string; date: string }>;
   /** True when the family account has no linked StudentProfile yet. */
   needs_family_link?: boolean;
