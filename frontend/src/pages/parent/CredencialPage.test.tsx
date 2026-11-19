@@ -73,3 +73,30 @@ describe('CredencialPage activity: «Consumo registrado» (owner, 2026-11-08)', 
     expect(within(consumo).getByText('Sin compras registradas')).toBeInTheDocument();
   });
 });
+
+describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const face = () => screen.getByText('Código Loyverse').closest('.rounded-xl3') as HTMLElement;
+
+  it('the card shows the real balance, the projection, and the line on white', async () => {
+    getCards.mockResolvedValue({ data: [{
+      ...CARD,
+      pending_topups: [{ id: 3, amount: '200.00', paid_at: '2030-01-04T22:00:00Z', apply_due_at: '2030-01-07T13:30:00Z', folio: 3 }],
+    }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo en caja')).toBeInTheDocument();
+    expect(within(face()).getByText('$120.00')).toBeInTheDocument();
+    expect(within(face()).getByText('$320.00')).toBeInTheDocument();
+    expect(within(face()).getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(face().querySelector('.sr-only')).toHaveTextContent('Saldo actual $120.00. Con la recarga pagada de $200.00 será $320.00');
+  });
+
+  it('nothing pending: «Saldo» and the figure, as before', async () => {
+    getCards.mockResolvedValue({ data: [{ ...CARD, pending_topups: [] }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo')).toBeInTheDocument();
+    expect(within(face()).getByText('$120.00')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo en caja')).toBeNull();
+    expect(within(face()).queryByText(/pagada/)).toBeNull();
+  });
+});

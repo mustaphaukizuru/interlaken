@@ -3,9 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Coffee, Maximize2, X, Sun } from 'lucide-react';
 import { Barcode } from '@/components/ui/Barcode';
 import type { CafeteriaCard } from '@/types';
-import { formatMXN } from '@/lib/format';
-
-const money = formatMXN;
+import { BalanceWithPending, PendingProjectionNote } from '@/components/portal/BalanceWithPending';
 
 /**
  * Digital cafetería card — the student's phone becomes their POS card. Shows
@@ -78,12 +76,11 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             <p className="text-[13px] text-white/80">{gradeLine || 'Alumno'}</p>
           </div>
 
-          <div className="relative mt-5 flex items-end justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Saldo</p>
-              <p className="font-head text-2xl font-bold leading-none">{money(card.balance)}</p>
-            </div>
-            <div className="text-right">
+          {/* flex-wrap: with a paid top-up on its way («$150.00 → $350.00») the
+              code moves under the balance on narrow phones instead of squeezing it. */}
+          <div className="relative mt-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+            <BalanceWithPending variant="credential" className="min-w-0" balance={card.balance} pending={card.pending_topups} />
+            <div className="ml-auto text-right">
               {/* The code is the Loyverse spelling (ci09932), the same one the POS
                   scans and the office reads on the register: label it as such. */}
               <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Código Loyverse</p>
@@ -94,6 +91,12 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
 
         {/* Scan strip */}
         <div className="bg-white px-5 py-4 text-center">
+          {/* The projection's line, on white so it keeps its contrast. */}
+          <PendingProjectionNote
+            balance={card.balance}
+            pending={card.pending_topups}
+            className="mb-3 text-[12.5px] leading-snug text-muted"
+          />
           {card.code ? (
             <>
               <Barcode value={card.code} height={58} className="mx-auto max-w-full" />
