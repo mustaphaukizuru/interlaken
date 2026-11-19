@@ -13,6 +13,8 @@ vi.mock('@/services/api', () => ({
     adminDeleteAnnouncement: vi.fn(),
     adminEmergencyBroadcast: vi.fn(),
     getAnnouncementRecipientCount: vi.fn(),
+    getAnnouncementDelivery: vi.fn(),
+    resendAnnouncementFailed: vi.fn(),
   },
 }));
 
@@ -36,6 +38,7 @@ const exportList = vi.mocked(announcementsAdminApi.export);
 const create = vi.mocked(portalApi.adminCreateAnnouncement);
 const broadcast = vi.mocked(portalApi.adminEmergencyBroadcast);
 const recipientCount = vi.mocked(portalApi.getAnnouncementRecipientCount);
+const delivery = vi.mocked(portalApi.getAnnouncementDelivery);
 const toastSuccess = vi.mocked(toast.success);
 const toastError = vi.mocked(toast.error);
 
@@ -59,7 +62,7 @@ describe('AdminAnnouncements', () => {
     list.mockResolvedValue({ data: { count: 1, next: null, previous: null, results: [SAMPLE] } } as never);
     create.mockResolvedValue({ data: {} } as never);
     broadcast.mockResolvedValue({
-      data: { notified: 12, dispatched: 4, whatsapp_sent: 0 },
+      data: { announcement_id: 9, notified: 12, dispatched: 4, whatsapp_queued: 0, whatsapp_configured: true },
     } as never);
   });
 
@@ -214,6 +217,58 @@ describe('AdminAnnouncements', () => {
     expect(toastSuccess).toHaveBeenCalledWith(
       'Aviso urgente enviado: 12 notificados, 4 por correo/push.',
     );
+  });
+
+  it('the WhatsApp blast goes out in the background: the toast says so and the delivery report follows it', async () => {
+    const user = userEvent.setup();
+    broadcast.mockResolvedValueOnce({
+      data: { announcement_id: 9, notified: 12, dispatched: 4, whatsapp_queued: 3, whatsapp_configured: true },
+    } as never);
+    const report = (whatsapp: Record<string, number>) => ({
+      data: { announcement: 9, recipients: 12, pending_dispatch: 8, read: 0, email: { sent: 4, pending: 8, skipped: 0, failed: 0 },
+        push: { sent: 0, pending: 8, skipped: 4, failed: 0 }, whatsapp, failed: [] },
+    }) as never;
+    delivery
+      .mockResolvedValueOnce(report({ sent: 1, pending: 2, skipped: 0, failed: 0 }))
+      .mockResolvedValue(report({ sent: 3, pending: 0, skipped: 0, failed: 0 }));
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+
+    await user.click(screen.getByRole('button', { name: /Aviso urgente/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Suspensión' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'No hay clases.' } });
+    await user.click(within(dialog).getByLabelText(/También WhatsApp/i));
+    await user.click(within(dialog).getByLabelText(/Confirmo que este aviso es urgente/i));
+    await user.click(within(dialog).getByRole('button', { name: /Enviar aviso urgente/i }));
+
+    await waitFor(() => expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ whatsapp: true })));
+    expect(toastSuccess).toHaveBeenCalledWith(
+      'Aviso urgente enviado: 12 notificados, 4 por correo/push. Enviando WhatsApp a 3 contactos…',
+    );
+    const entrega = await screen.findByRole('dialog', { name: 'Entrega: Suspensión' });
+    expect(await within(entrega).findByText('Enviando a 3 contactos… 1 de 3 procesados.')).toBeInTheDocument();
+    expect(delivery).toHaveBeenCalledWith(9);
+    // Polled while numbers are pending, then the final count.
+    expect(await within(entrega).findByText('WhatsApp terminado: 3 de 3 enviados.', {}, { timeout: 5000 })).toBeInTheDocument();
+  });
+
+  it('says so when WhatsApp was asked for but is not configured', async () => {
+    const user = userEvent.setup();
+    broadcast.mockResolvedValueOnce({
+      data: { announcement_id: 9, notified: 12, dispatched: 4, whatsapp_queued: 0, whatsapp_configured: false },
+    } as never);
+    renderWithProviders(<AdminAnnouncements />, { route: '/admin/comunicados' });
+    await screen.findByText('Junta de padres');
+    await user.click(screen.getByRole('button', { name: /Aviso urgente/i }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Título$/i), { target: { value: 'Alerta' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Mensaje$/i), { target: { value: 'Detalle' } });
+    await user.click(within(dialog).getByLabelText(/También WhatsApp/i));
+    await user.click(within(dialog).getByLabelText(/Confirmo que este aviso es urgente/i));
+    await user.click(within(dialog).getByRole('button', { name: /Enviar aviso urgente/i }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('WhatsApp no está configurado: el aviso no se envió por WhatsApp.'));
+    expect(delivery).not.toHaveBeenCalled();
   });
 
   it('surfaces backend error text from emergency broadcast', async () => {

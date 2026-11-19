@@ -25,8 +25,10 @@ from django.utils import timezone
 from apps.core.bulk import EMAIL_CHUNK, BulkAction, BulkSkip
 from apps.core.exporting import Col, ExportSpec
 from apps.core.importing import ImportCol, ImportRow, ImportSpec, parse_choice, parse_date_es
+from apps.core.transitions import is_reverse
 
 from .models import AvailabilitySlot, Booking, VisitType
+from .services.status import ENTITY as STATUS_ENTITY
 from .services.status import change_booking_status, occupied_seats, plan_booking_status
 
 VISIT_TYPE_LABEL = {"individual": "Individual", "open_class": "Puertas Abiertas"}
@@ -145,18 +147,36 @@ SLOT_EXPORT = ExportSpec(
 
 
 # ── bulk: bookings ────────────────────────────────────────
+# The outcome a bulk move names for a row whose move undoes a recorded
+# attendance («Asistió» ↔ «No asistió»): the dry run counts them so the dialog
+# asks for the note the transition table requires, the commit counts them again.
+CORRECTION = "correction"
+
+
 def _booking_action(name: str, label_es: str, target: str, *, requires_note=False) -> BulkAction:
-    """A bulk status move that runs the exact single-row service."""
+    """A bulk status move that runs the exact single-row service.
+
+    Corrections need a note (``REVERSE_TRANSITIONS``). The dialog asks for it
+    after the dry run, so the plan checks the table and the capacity only and
+    names each correction (``outcomes: {"correction": n}``); the commit still
+    enforces the note row by row, so a correction sent without one fails.
+    """
 
     def plan(instance, payload):
-        plan_booking_status(instance, target, note=str(payload.get("note") or ""))
+        plan_booking_status(instance, target, note=None)
+        if is_reverse(STATUS_ENTITY, instance.status, target):
+            return CORRECTION
+        return None
 
     def handler(instance, payload, actor):
         notify = payload.get("notify", True) not in (False, "false", "0", 0)
         previous = change_booking_status(
             instance, target, note=str(payload.get("note") or ""), notify=notify
         )
-        return {"status": [previous, target]}
+        changes = {"status": [previous, target]}
+        if is_reverse(STATUS_ENTITY, previous, target):
+            changes["outcome"] = CORRECTION
+        return changes
 
     return BulkAction(
         name=name,

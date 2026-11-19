@@ -173,6 +173,73 @@ describe('AdminBookings: reservas', () => {
     })));
   });
 
+  it('bulk «Asistió» over a «No asistió» visit asks for the note, sends it and names each row in the result', async () => {
+    // Dry run: Ana is a plain move, Dani (no_show) a correction. Commit: Ana
+    // goes through, Dani fails (as the server would without a note).
+    api.bulkBookings.mockImplementation(async (body) => ({
+      data: body.dry_run
+        ? { action: 'attended', requested: 2, ok: 2, failed: [], skipped: [], dry_run: true, outcomes: { correction: 1 } }
+        : { action: 'attended', requested: 2, ok: 1, failed: [{ id: 4, error: 'El horario ya no tiene cupo suficiente.' }], skipped: [], dry_run: false, outcomes: {} },
+    }) as never);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Seleccionar reserva de Ana/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Seleccionar reserva de Dani/ }));
+    const bar = await screen.findByRole('region', { name: 'Acciones en lote' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Asistió' }));
+    const dialog = await screen.findByRole('dialog');
+    const note = await within(dialog).findByLabelText('Motivo (obligatorio)');
+    expect(within(dialog).getByRole('note')).toHaveTextContent('1 de estas reservas ya está marcada como «No asistió». Cambiarla a «Asistió» es una corrección');
+    const commit = within(dialog).getByRole('button', { name: 'Asistió (2)' });
+    expect(commit).toBeDisabled();
+    await userEvent.type(note, 'Se registró antes de que llegara');
+    await userEvent.click(commit);
+    await waitFor(() => expect(api.bulkBookings).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: 'attended', ids: [1, 4], dry_run: false, payload: { note: 'Se registró antes de que llegara' },
+    })));
+    const failed = await within(dialog).findByRole('list', { name: 'Filas fallidas' });
+    expect(failed).toHaveTextContent('Dani (15 oct 2026)El horario ya no tiene cupo suficiente.');
+  });
+
+  it('bulk «Asistió» with no correction in the selection asks for nothing', async () => {
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Seleccionar reserva de Ana/ }));
+    const bar = await screen.findByRole('region', { name: 'Acciones en lote' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Asistió' }));
+    const dialog = await screen.findByRole('dialog');
+    const commit = await within(dialog).findByRole('button', { name: 'Asistió (1)' });
+    expect(within(dialog).queryByLabelText('Motivo (obligatorio)')).not.toBeInTheDocument();
+    await userEvent.click(commit);
+    await waitFor(() => expect(api.bulkBookings).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: 'attended', ids: [1], dry_run: false, payload: {},
+    })));
+  });
+
+  it('at 1280 px the contact goes under the tutor (no sideways scroll); at 1440 it has its column', async () => {
+    const { unmount } = renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    expect(screen.queryByRole('columnheader', { name: 'Contacto' })).not.toBeInTheDocument();
+    const anaRow = screen.getByRole('row', { name: /Ana/ });
+    const tutor = within(anaRow).getAllByRole('cell').find((c) => c.textContent?.startsWith('Ana'))!;
+    expect(tutor).toHaveTextContent('Anaana@test.mx5512345678');
+    unmount();
+
+    stubViewport(1440);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    expect(screen.getByRole('columnheader', { name: 'Contacto' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Tutor/ })).toBeInTheDocument();
+  });
+
+  it('phone cards keep a Contacto line of their own', async () => {
+    stubViewport(390);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findAllByText('Ana');
+    const contact = document.querySelector('td[data-label="Contacto"]');
+    expect(contact).toHaveTextContent('ana@test.mx');
+  });
+
   it('exports the current view with the same filters', async () => {
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas?q=ana&estado=confirmed&orden=parent' });
     await screen.findByText('Ana');

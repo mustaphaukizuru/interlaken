@@ -50,6 +50,36 @@ describe('BulkConfirmDialog', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('14 reservas procesadas.'));
   });
 
+  it('asks for the note only when the dry run counts rows that need it (noteWhen), and keeps it for the retry', async () => {
+    const execute = vi
+      .fn<(body: BulkRequest) => Promise<BulkResult>>()
+      .mockResolvedValueOnce({ action: 'attended', requested: 3, ok: 3, failed: [], skipped: [], dry_run: true, outcomes: { correction: 2 } })
+      .mockResolvedValueOnce({ action: 'attended', requested: 3, ok: 2, failed: [{ id: 3, error: 'Sin conexión' }], skipped: [], dry_run: false, outcomes: { correction: 2 } })
+      .mockResolvedValueOnce({ action: 'attended', requested: 1, ok: 1, failed: [], skipped: [], dry_run: false });
+    const action = {
+      name: 'attended', label: 'Asistió',
+      noteWhen: { outcome: 'correction', explain: (n: number) => `${n} son correcciones.`, done: (n: number) => `Incluye ${n} correcciones.` },
+    };
+    renderWithProviders(
+      <BulkConfirmDialog open onClose={() => {}} entityLabel="reservas" ids={[1, 2, 3]} action={action} execute={execute}
+        rowName={(id) => (id === 3 ? 'Carla (15 oct 2026)' : undefined)} />,
+    );
+    const confirm = await screen.findByRole('button', { name: 'Asistió (3)' });
+    expect(confirm).toBeDisabled();
+    expect(screen.getByRole('note')).toHaveTextContent('2 son correcciones.');
+    const note = screen.getByLabelText('Motivo (obligatorio)');
+    expect(note).toHaveAccessibleDescription('2 son correcciones. Mínimo 3 caracteres.');
+    await waitFor(() => expect(note).toHaveFocus());
+    await userEvent.type(note, 'Error de captura');
+    await userEvent.click(confirm);
+    expect(await screen.findByRole('status')).toHaveTextContent('Incluye 2 correcciones.');
+    expect(execute.mock.calls[1][0]).toMatchObject({ dry_run: false, payload: { note: 'Error de captura' } });
+    expect(screen.getByRole('list', { name: 'Filas fallidas' })).toHaveTextContent('Carla (15 oct 2026)Sin conexión');
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar fallidas (1)' }));
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(3));
+    expect(execute.mock.calls[2][0]).toMatchObject({ ids: [3], payload: { note: 'Error de captura' } });
+  });
+
   it('lists per-row failures and retries only the failed ids', async () => {
     const execute = vi
       .fn<(body: BulkRequest) => Promise<BulkResult>>()

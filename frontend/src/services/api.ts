@@ -112,7 +112,18 @@ export interface DeliveryReport {
   requires_ack?: boolean;
   email: Record<string, number>;
   push: Record<string, number>;
+  /** The emergency broadcast's WhatsApp blast (sent after the response); null without one. */
+  whatsapp?: Record<string, number> | null;
   failed: { id: number; user: string; email: string; attempts: number; error: string }[];
+}
+
+/** What the emergency broadcast answers: the WhatsApp blast is only recorded, then sent in the background. */
+export interface EmergencyBroadcastResult {
+  announcement_id: number;
+  notified: number;
+  dispatched: number;
+  whatsapp_queued: number;
+  whatsapp_configured: boolean;
 }
 
 export interface GuardianWrite {
@@ -1107,7 +1118,7 @@ export const portalApi = {
     message: string;
     audience: string;
     whatsapp?: boolean;
-  }) => api.post('/portal/admin/broadcast/', data),
+  }) => api.post<EmergencyBroadcastResult>('/portal/admin/broadcast/', data),
 
   // Web push opt-in/out (subscription persisted per user+device).
   subscribePush: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>

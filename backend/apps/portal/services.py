@@ -304,20 +304,45 @@ def fanout_announcement(announcement, *, notif_type=None) -> int:
     if not roles:
         return 0
 
-    user_ids = list(audience_users(announcement.audience).values_list('id', flat=True))
+    audience = audience_users(announcement.audience)
+    user_ids = list(audience.values_list('id', flat=True))
     if not user_ids:
         return 0
 
     message = Truncator(announcement.body or '').chars(280)
     kind = notif_type or Notification.NotifType.INFO
+    # Accounts that turned in-app notices off, or muted this category, still
+    # get their row (it carries the email and push they keep on), hidden from
+    # the bell: never shown, created read. Urgent alerts are never muted.
+    muted = in_app_muted_ids(audience, kind)
     Notification.objects.bulk_create(
         [Notification(user_id=uid, notif_type=kind,
                       title=announcement.title, message=message,
-                      announcement=announcement)
+                      announcement=announcement,
+                      in_app=uid not in muted, is_read=uid in muted)
          for uid in user_ids],
         batch_size=500,
     )
     return len(user_ids)
+
+
+def in_app_muted_ids(users, notif_type) -> set[int]:
+    """Ids of ``users`` (a queryset) whose preferences keep a ``notif_type``
+    notice out of the app: ``NotificationPreference.wants('in_app', …)`` is
+    False (channel off or category muted). Never an urgent type. One query;
+    accounts that never saved preferences have everything on."""
+    from django.db.models import Q
+
+    from apps.accounts.models import NotificationPreference
+
+    if notif_type in NotificationPreference.URGENT_TYPES:
+        return set()
+    muted = Q(in_app_enabled=False)
+    field = NotificationPreference.CATEGORY_FIELD.get(notif_type)
+    if field:
+        muted |= Q(**{field: False})
+    return set(NotificationPreference.objects.filter(muted, user__in=users.values('pk'))
+               .values_list('user_id', flat=True))
 
 
 # A publish request (comunicado or emergency broadcast) emails the first rows of
@@ -375,13 +400,14 @@ def emergency_broadcast(
     3. Immediately dispatches a first batch of ``dispatch_limit`` email+push
        sends; the ``dispatch_notifications`` cron finishes the rest within 5
        minutes.
-    4. Optionally WhatsApp-blasts users who have a number (capped, fail-soft).
+    4. Optionally records the WhatsApp blast (one pending row per number,
+       capped) and sends it AFTER the response (``send_whatsapp_later``): a
+       Cloud API call can take 10 s, so a blast inside the request could hit
+       gunicorn's 60 s limit. The cron finishes what a killed thread left.
 
     Returns counts for the admin UI. Never raises into the view for channel
     failures — only validation errors should surface as 400s.
     """
-    from django.utils.text import Truncator
-
     from apps.portal.models import Announcement, Notification
 
     title = (title or '').strip()
@@ -406,36 +432,202 @@ def emergency_broadcast(
     notified = stats['notified']
     dispatched = stats['dispatched']
 
-    whatsapp_sent = 0
-    if whatsapp:
-        qs = (
-            audience_users(audience)
-            .exclude(whatsapp='')
-            .order_by('id')[:whatsapp_limit]
-        )
-        body = f'{title}\n\n{Truncator(message).chars(400)}'
+    whatsapp_queued = 0
+    whatsapp_ready = whatsapp_configured()
+    if whatsapp and whatsapp_ready:
         try:
-            from apps.whatsapp.services import send_text
-        except Exception:  # pragma: no cover
-            send_text = None
-            logger.exception('WhatsApp import failed during emergency broadcast')
-        if send_text:
-            for user in qs:
-                wa = (user.whatsapp or '').strip()
-                if not wa:
-                    continue
-                try:
-                    if send_text(wa, body):
-                        whatsapp_sent += 1
-                except Exception:
-                    logger.warning('Emergency WhatsApp failed for %s', user, exc_info=True)
+            whatsapp_queued = queue_whatsapp(announcement, limit=whatsapp_limit)
+        except Exception:  # pragma: no cover - the in-app and email part already went out
+            logger.exception('Announcement %s WhatsApp queue failed', announcement.pk)
+        if whatsapp_queued:
+            send_whatsapp_later(announcement.pk)
+    elif whatsapp:
+        logger.info('Emergency broadcast %s: WhatsApp requested but the Cloud API is not configured',
+                    announcement.pk)
 
     return {
         'announcement_id': announcement.id,
         'notified': notified,
         'dispatched': dispatched,
-        'whatsapp_sent': whatsapp_sent,
+        # Recorded now, sent after the response (progress: the delivery report).
+        'whatsapp_queued': whatsapp_queued,
+        'whatsapp_configured': whatsapp_ready,
     }
+
+
+# ── WhatsApp blast (emergency broadcast) ──────────────────────────────────────
+# A thread sends the blast after the response; it gives up after this long and
+# the 5-minute cron finishes the rest (100 numbers x 10 s timeout = 17 min worst case).
+WHATSAPP_THREAD_SECONDS = 15 * 60
+# A WhatsApp row that failed this many times is closed as failed.
+WHATSAPP_MAX_ATTEMPTS = 3
+# An emergency message that waited this long (cron down) is no longer sent:
+# «no habrá clases mañana» a day late would only confuse.
+WHATSAPP_MAX_AGE = timedelta(hours=24)
+
+
+def normalize_phone(raw: str) -> str:
+    """Dedupe key of a phone number: its digits, the last 10 when longer
+    (``+52 1 55 1234 5678``, ``5215512345678`` and ``55 1234 5678`` are one
+    number). '' when it holds fewer than 8 digits (not a usable number)."""
+    import re
+
+    digits = re.sub(r'\D', '', raw or '')
+    if len(digits) < 8:
+        return ''
+    return digits[-10:]
+
+
+def whatsapp_configured() -> bool:
+    """True when the WhatsApp Cloud API credentials are set (sends are real)."""
+    return bool(getattr(settings, 'WHATSAPP_TOKEN', '') and getattr(settings, 'WHATSAPP_PHONE_ID', ''))
+
+
+def queue_whatsapp(announcement, *, limit: int = 100) -> int:
+    """Record one pending WhatsApp delivery per distinct number of the
+    comunicado's audience (``audience_users``), oldest accounts first, at most
+    ``limit`` numbers. Siblings' logins that share a number get ONE message.
+    Idempotent: a number already recorded for this comunicado is not added
+    twice. Returns the rows recorded."""
+    from apps.portal.models import AnnouncementDelivery
+
+    rows, seen = [], set()
+    users = (audience_users(announcement.audience).exclude(whatsapp='')
+             .order_by('id').values_list('id', 'whatsapp'))
+    for user_id, number in users.iterator():
+        key = normalize_phone(number)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        rows.append(AnnouncementDelivery(
+            announcement=announcement, channel=AnnouncementDelivery.Channel.WHATSAPP,
+            address=key, send_to=number.strip(), user_id=user_id))
+        if len(rows) >= limit:
+            break
+    if not rows:
+        return 0
+    AnnouncementDelivery.objects.bulk_create(rows, ignore_conflicts=True)
+    return AnnouncementDelivery.objects.filter(
+        announcement=announcement, channel=AnnouncementDelivery.Channel.WHATSAPP).count()
+
+
+def run_in_background(fn, *, name: str) -> None:
+    """Run ``fn`` in a daemon thread that closes its own database connection.
+
+    Only for work recorded as pending rows first: nothing here survives a
+    worker restart, so the 5-minute cron must be able to finish it. Tests
+    replace this with a synchronous call.
+    """
+    import threading
+
+    from django.db import connections
+
+    def target():
+        try:
+            fn()
+        except Exception:  # noqa: BLE001 - logged; the cron finishes the rows
+            logger.exception('Background task %s failed', name)
+        finally:
+            connections.close_all()
+
+    threading.Thread(target=target, name=name, daemon=True).start()
+
+
+def send_whatsapp_later(announcement_id: int) -> None:
+    """Send this comunicado's pending WhatsApp rows after the response.
+
+    Started once the request's transaction commits, so the thread sees the
+    rows it has to send.
+    """
+    from django.db import transaction
+
+    def start():
+        run_in_background(
+            lambda: dispatch_pending_whatsapp(announcement_id=announcement_id,
+                                              time_budget=WHATSAPP_THREAD_SECONDS),
+            name=f'whatsapp-broadcast-{announcement_id}')
+
+    transaction.on_commit(start)
+
+
+def _whatsapp_body(announcement) -> str:
+    from django.utils.text import Truncator
+
+    return f'{announcement.title}\n\n{Truncator(announcement.body or "").chars(400)}'
+
+
+def dispatch_pending_whatsapp(*, limit: int = 500, announcement_id: int | None = None,
+                              time_budget: float | None = None) -> int:
+    """Send pending WhatsApp deliveries; returns the messages accepted.
+
+    Each row is claimed on its own (``SELECT … FOR UPDATE SKIP LOCKED`` in a
+    short transaction, the same pattern as ``dispatch_pending_notifications``)
+    and stamped in that transaction: the after-response thread and the cron
+    never send the same row, and a row whose sender died stays pending for the
+    next cron run. A failed send is retried by the next runs, up to
+    ``WHATSAPP_MAX_ATTEMPTS``; rows older than ``WHATSAPP_MAX_AGE`` are closed
+    as skipped without sending. Without Cloud API credentials nothing is sent
+    (the rows wait, then expire).
+    """
+    from django.db import transaction
+
+    from apps.portal.models import AnnouncementDelivery, Notification
+
+    Status = Notification.Delivery
+    now = timezone.now()
+    pending = AnnouncementDelivery.objects.filter(
+        channel=AnnouncementDelivery.Channel.WHATSAPP, status=Status.PENDING)
+    if announcement_id is not None:
+        pending = pending.filter(announcement_id=announcement_id)
+    pending.filter(created_at__lt=now - WHATSAPP_MAX_AGE).update(
+        status=Status.SKIPPED, last_error='Caducó sin enviarse')
+    if not whatsapp_configured():
+        return 0
+    ids = list(pending.order_by('created_at', 'pk').values_list('pk', flat=True)[:limit])
+    if not ids:
+        return 0
+
+    from apps.portal.models import Announcement
+    from apps.whatsapp.services import send_text
+
+    bodies: dict[int, str] = {}  # announcement pk → message, read once per pass
+
+    def body_of(announcement_id):
+        if announcement_id not in bodies:
+            bodies[announcement_id] = _whatsapp_body(
+                Announcement.objects.only('title', 'body').get(pk=announcement_id))
+        return bodies[announcement_id]
+
+    started = time.monotonic()
+    sent = 0
+    for pk in ids:
+        if time_budget is not None and time.monotonic() - started >= time_budget:
+            break  # the rest waits for the next cron run
+        try:
+            with transaction.atomic():
+                # Only this row is locked (no join): the comunicado itself stays
+                # editable while its blast goes out.
+                row = (AnnouncementDelivery.objects.select_for_update(skip_locked=True)
+                       .filter(pk=pk, status=Status.PENDING).first())
+                if row is None:
+                    continue  # another sender has it, or already sent it
+                try:
+                    ok = bool(send_text(row.send_to, body_of(row.announcement_id)))
+                    error = '' if ok else 'WhatsApp rechazó el envío'
+                except Exception as exc:  # noqa: BLE001 - counts as a failed attempt
+                    logger.warning('WhatsApp delivery %s raised', pk, exc_info=True)
+                    ok, error = False, f'Error al enviar: {type(exc).__name__}'
+                attempts = row.attempts + 1
+                status = (Status.SENT if ok
+                          else Status.FAILED if attempts >= WHATSAPP_MAX_ATTEMPTS else Status.PENDING)
+                AnnouncementDelivery.objects.filter(pk=pk).update(
+                    status=status, attempts=attempts, last_error=error[:200],
+                    sent_at=timezone.now() if ok else None)
+        except Exception:  # noqa: BLE001 - one bad row must not stop the others
+            logger.exception('dispatch_pending_whatsapp: delivery %s raised', pk)
+            continue
+        sent += int(ok)
+    return sent
 
 
 # Rows of one notice queued for each family member together (the bulk top-up's
@@ -490,7 +682,8 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7, *, a
     actually reaches inboxes without blocking the publish request. Every
     target is emailed / pushed only on the channels its own preferences keep
     on (urgent warnings always), and one notice reaches each address once
-    (``_has_own_copy``, ``own_copy_reach``).
+    (``_has_own_copy``, ``own_copy_reach``; for a comunicado also across
+    siblings' rows that share an address, ``_claim_emails``).
 
     Each row is claimed on its own (``SELECT … FOR UPDATE SKIP LOCKED`` in a
     short transaction) and stamped ``delivered_at`` as soon as it is handled:
@@ -547,6 +740,46 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7, *, a
     return sent
 
 
+def _claim_emails(n, emails: list[str]) -> list[str]:
+    """The addresses of ``emails`` this comunicado row may send to.
+
+    Each address is claimed once per comunicado (``AnnouncementDelivery``,
+    unique on comunicado + channel + lowercased address) by the account whose
+    row sends to it first. A retry of that row keeps its claim; an address a
+    deleted account claimed but never received is taken over. Runs inside the
+    row's claim transaction: if the send is rolled back, so is the claim. On
+    PostgreSQL a second dispatcher inserting the same address waits for the
+    first to commit, then finds it taken.
+    """
+    from apps.portal.models import AnnouncementDelivery, Notification
+
+    by_key: dict[str, str] = {}
+    for addr in emails:
+        by_key.setdefault(addr.strip().lower(), addr)
+    claims = AnnouncementDelivery.objects.filter(
+        announcement_id=n.announcement_id, channel=AnnouncementDelivery.Channel.EMAIL,
+        address__in=list(by_key))
+    AnnouncementDelivery.objects.bulk_create(
+        [AnnouncementDelivery(announcement_id=n.announcement_id,
+                              channel=AnnouncementDelivery.Channel.EMAIL,
+                              address=key, send_to=addr, user_id=n.user_id)
+         for key, addr in by_key.items()],
+        ignore_conflicts=True)
+    claims.filter(user__isnull=True).exclude(status=Notification.Delivery.SENT).update(user_id=n.user_id)
+    mine = set(claims.filter(user_id=n.user_id).values_list('address', flat=True))
+    return [addr for key, addr in by_key.items() if key in mine]
+
+
+def _stamp_email_claims(n, emails: list[str], status: str) -> None:
+    from apps.portal.models import AnnouncementDelivery
+
+    sent = status == 'sent'
+    (AnnouncementDelivery.objects
+     .filter(announcement_id=n.announcement_id, channel=AnnouncementDelivery.Channel.EMAIL,
+             user_id=n.user_id, address__in=[a.strip().lower() for a in emails])
+     .update(status=status, attempts=n.attempts + 1, sent_at=timezone.now() if sent else None))
+
+
 def _deliver(n, prefs: dict, max_attempts: int) -> str:
     """Email + push one claimed row and stamp it in the same transaction.
 
@@ -572,21 +805,30 @@ def _deliver(n, prefs: dict, max_attempts: int) -> str:
     # warnings reach everyone (NotificationPreference.wants).
     emails = [addr for addr in mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
               if addr.lower() not in covered]
+    if emails and ann is not None:
+        # One email per address and comunicado: siblings whose logins share a
+        # personal address each hold a row; the first row that sends to the
+        # address claims it, the others leave it out (their in-app copy stays).
+        emails = _claim_emails(n, emails)
+    # A comunicado links to its notification, unless the row is hidden from
+    # the app (the account turned in-app notices off): then to the portal.
+    deep_link = f'/portal/notificaciones/{n.pk}' if ann and n.in_app else None
     email_status = Delivery.SKIPPED
     if emails:
         from .emailing import notification_content
         content = notification_content(user=n.user, notif_type=kind, title=n.title, message=n.message,
-                                       comunicado=ann is not None,
-                                       url=f'/portal/notificaciones/{n.pk}' if ann else None)
+                                       comunicado=ann is not None, url=deep_link)
         ok = send_email(subject=n.title, message=n.message, recipients=emails, content=content)
         email_status = Delivery.SENT if ok else Delivery.FAILED
+        if ann is not None:
+            _stamp_email_claims(n, emails, email_status)
     # Comunicado rows deep-link the push to the notification (bitácora 10: the
     # family portal has no comunicados page) and honor the comunicado's
     # 'Enviar notificación push' toggle; standalone rows keep /portal. A retry
     # after a failed email never pushes a second time.
     push_status = Delivery.SENT if n.push_status == Delivery.SENT else Delivery.SKIPPED
     if n.push_status != Delivery.SENT and (ann is None or ann.push_enabled):
-        url = f'/portal/notificaciones/{n.pk}' if ann else '/portal'
+        url = deep_link or '/portal'
         delivered = sum(send_web_push(t, n.title, n.message, url=url)
                         for t in targets if wants(t, 'push', kind, prefs))
         push_status = Delivery.SENT if delivered else Delivery.SKIPPED

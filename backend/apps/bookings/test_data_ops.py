@@ -297,6 +297,56 @@ class TestBookingBulk:
             S.NO_SHOW,
         }
 
+    def test_dry_run_counts_the_corrections_so_the_dialog_asks_for_the_note(self, admin_client):
+        """«Marcar asistió» on a mixed selection: the dry run names the rows
+        already marked «No asistió» (corrections) instead of failing them, so
+        the dialog can ask for the note; nothing is written."""
+        slot = _slot()
+        fresh = _booking(slot, "A")
+        wrong = _booking(slot, "B", status=S.NO_SHOW)
+        also_wrong = _booking(slot, "C", status=S.NO_SHOW)
+        done = _booking(slot, "D", status=S.ATTENDED)
+        ids = [fresh.pk, wrong.pk, also_wrong.pk, done.pk]
+        resp = self._post(admin_client, action="attended", ids=ids, dry_run=True)
+        assert resp.status_code == 200
+        assert resp.data["ok"] == 3 and resp.data["failed"] == []
+        assert resp.data["outcomes"] == {"correction": 2}
+        assert [s["id"] for s in resp.data["skipped"]] == [done.pk]  # already «Asistió»
+        assert Booking.objects.filter(status=S.NO_SHOW).count() == 2
+
+    def test_commit_without_the_note_fails_only_the_corrections(self, admin_client):
+        """The backend stays the source of truth: a correction sent without a
+        note fails row by row, the plain moves of the same call go through."""
+        slot = _slot()
+        fresh = _booking(slot, "A")
+        wrong = _booking(slot, "B", status=S.NO_SHOW)
+        resp = self._post(admin_client, action="attended", ids=[fresh.pk, wrong.pk])
+        assert resp.data["ok"] == 1
+        assert [f["id"] for f in resp.data["failed"]] == [wrong.pk]
+        assert "motivo" in resp.data["failed"][0]["error"]
+        fresh.refresh_from_db()
+        wrong.refresh_from_db()
+        assert (fresh.status, wrong.status) == (S.ATTENDED, S.NO_SHOW)
+
+    def test_commit_with_the_note_corrects_and_audits_it(self, admin_client):
+        slot = _slot()
+        fresh = _booking(slot, "A")
+        wrong = _booking(slot, "B", status=S.ATTENDED)
+        resp = self._post(
+            admin_client,
+            action="no_show",
+            ids=[fresh.pk, wrong.pk],
+            payload={"note": "Se registró en la visita equivocada"},
+        )
+        assert resp.data["ok"] == 2 and resp.data["failed"] == []
+        assert resp.data["outcomes"] == {"correction": 1}
+        assert set(
+            Booking.objects.filter(pk__in=[fresh.pk, wrong.pk]).values_list("status", flat=True)
+        ) == {S.NO_SHOW}
+        entry = AuditLog.objects.get(object_type="bookings.booking", object_id=str(wrong.pk))
+        assert entry.changes["status"] == ["attended", "no_show"]
+        assert entry.changes["note"] == "Se registró en la visita equivocada"
+
     def test_all_matching_uses_list_filters(self, admin_client):
         slot = _slot(capacity=20)
         for i in range(3):

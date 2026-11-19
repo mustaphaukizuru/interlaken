@@ -23,7 +23,7 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
 import { RowActionsMenu } from '@/components/admin/RowActionsMenu';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
-import { useRowSelection } from '@/hooks/useRowSelection';
+import { useRowSelection, type RowKey } from '@/hooks/useRowSelection';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
   BOOKINGS_ENTITY, SLOTS_ENTITY, slotsImportApi, useBookingAction, useBookingsBulk, useBookingsExport, useBookingsList,
@@ -330,12 +330,7 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
   },
   {
     id: 'contact', header: 'Contacto', minWidth: 170,
-    cell: (b) => (
-      <>
-        <FitText text={b.parent_email} max={240} className="text-muted" />
-        <div className="text-xs text-subtle">{b.parent_phone}</div>
-      </>
-    ),
+    cell: (b) => <BookingContact booking={b} />,
   },
   { id: 'attendees', header: 'Asistentes', sortKey: 'attendees', align: 'right', minWidth: 100, cell: (b) => b.num_attendees },
   { id: 'source', header: 'Origen', defaultHidden: true, minWidth: 120, className: 'text-muted', cell: (b) => SOURCE_LABEL[b.source] ?? b.source },
@@ -345,12 +340,55 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
   },
 ];
 
+function BookingContact({ booking: b }: { booking: Booking }) {
+  return (
+    <>
+      <FitText text={b.parent_email} max={240} className="text-muted" />
+      <div className="text-xs text-subtle">{b.parent_phone}</div>
+    </>
+  );
+}
+
+/**
+ * Laptops (768 to 1439 px): the email and phone go under the tutor's name
+ * instead of in their own column, so the table fits a 1280 px screen
+ * without scrolling sideways and nothing is hidden. Phones keep their cards
+ * (one label per value) and wide screens the Contacto column.
+ */
+const BOOKING_COLUMNS_FOLDED: Column<Booking>[] = BOOKING_COLUMNS
+  .filter((c) => c.id !== 'contact')
+  .map((c) => (c.id !== 'parent' ? c : {
+    ...c,
+    cell: (b: Booking) => (
+      <>
+        <div>{b.parent_name}</div>
+        <div className="mt-0.5 font-normal"><BookingContact booking={b} /></div>
+      </>
+    ),
+  }));
+
+/** Bulk «Asistió» / «No asistió» over visits already marked the other way is
+ *  a correction: the dry run counts them (`outcomes.correction`) and the
+ *  dialog asks for the motive the single-row NoteDialog asks for. */
+const correctionNote = (from: string, to: string): NonNullable<BulkActionDef['noteWhen']> => ({
+  outcome: 'correction',
+  explain: (n) => (n === 1
+    ? `1 de estas reservas ya está marcada como «${from}». Cambiarla a «${to}» es una corrección: indique el motivo, quedará en la bitácora.`
+    : `${n} de estas reservas ya están marcadas como «${from}». Cambiarlas a «${to}» es una corrección: indique el motivo, quedará en la bitácora.`),
+  done: (n) => (n === 1
+    ? 'Incluye 1 corrección, registrada con su motivo en la bitácora.'
+    : `Incluye ${n} correcciones, registradas con su motivo en la bitácora.`),
+});
+
 const BOOKING_BULK: BulkActionDef[] = [
   { name: 'confirm', label: 'Confirmar', icon: bulkIcon(Check), notifyOption: true, planVerb: 'Se confirmarán' },
-  { name: 'attended', label: 'Asistió', icon: bulkIcon(UserCheck), planVerb: 'Se registrará la asistencia de' },
-  { name: 'no_show', label: 'No asistió', icon: bulkIcon(UserX), planVerb: 'Se registrará la inasistencia de' },
+  { name: 'attended', label: 'Asistió', icon: bulkIcon(UserCheck), planVerb: 'Se registrará la asistencia de', noteWhen: correctionNote('No asistió', 'Asistió') },
+  { name: 'no_show', label: 'No asistió', icon: bulkIcon(UserX), planVerb: 'Se registrará la inasistencia de', noteWhen: correctionNote('Asistió', 'No asistió') },
   { name: 'cancel', label: 'Cancelar', icon: bulkIcon(Ban), danger: true, planVerb: 'Se cancelarán' },
 ];
+
+/** "Ana López (12 dic 2026)": how the bulk results name a reservation. */
+const bookingName = (b: Booking) => `${b.parent_name} (${fmtDate(b.slot_date)})`;
 
 interface NoteAsk { booking: Booking; act: BookingAction; title: string; message: string; confirmLabel: string }
 
@@ -496,8 +534,19 @@ function BookingsView() {
   const bulk = useBookingsBulk();
   const action = useBookingAction();
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
+  // Names of the rows on screen when a bulk action opens: the per-row results
+  // keep them after the list refetches (a corrected row may leave the filter).
+  const [bulkNames, setBulkNames] = useState<Map<RowKey, string>>(() => new Map());
+  const openBulk = (a: BulkActionDef) => {
+    setBulkNames(new Map(rows.map((b) => [b.id, bookingName(b)])));
+    setBulkAction(a);
+  };
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
   const [noteAsk, setNoteAsk] = useState<NoteAsk | null>(null);
+  // 768 to 1439 px: contact folded under the tutor (BOOKING_COLUMNS_FOLDED).
+  const isTable = useMediaQuery('(min-width: 768px)');
+  const isWide = useMediaQuery('(min-width: 1440px)');
+  const columns = isTable && !isWide ? BOOKING_COLUMNS_FOLDED : BOOKING_COLUMNS;
 
   const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
@@ -515,7 +564,7 @@ function BookingsView() {
       <DataTable<Booking>
         tableId="bookings"
         caption="Reservas de visitas"
-        columns={BOOKING_COLUMNS}
+        columns={columns}
         rows={rows}
         rowKey={(b) => b.id}
         rowLabel={(b) => `reserva de ${b.parent_name} del ${fmtDate(b.slot_date)}`}
@@ -562,7 +611,7 @@ function BookingsView() {
             onClear={selection.onClear}
             itemLabel="reservas"
             actions={BOOKING_BULK}
-            onAction={setBulkAction}
+            onAction={openBulk}
             busy={bulk.isPending}
             exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="visitas" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
           />
@@ -580,6 +629,7 @@ function BookingsView() {
         filters={filters}
         execute={(body) => bulk.mutateAsync(body)}
         onDone={(r) => { if (r.ok) selection.onClear(); }}
+        rowName={(id) => bulkNames.get(id)}
       />
 
       <ConfirmDialog

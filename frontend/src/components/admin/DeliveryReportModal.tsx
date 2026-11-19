@@ -16,6 +16,7 @@ interface Props {
 }
 
 const LABEL: Record<string, string> = { sent: 'Enviados', pending: 'Pendientes', skipped: 'Omitidos', failed: 'Fallidos' };
+const WHATSAPP_POLL_MS = 3000;
 
 /** Per-channel delivery report for one comunicado with "resend failed" (BACKLOG P1-C6). */
 export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
@@ -24,6 +25,9 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
     queryKey: ['announcement-delivery', announcementId],
     queryFn: async () => (await portalApi.getAnnouncementDelivery(announcementId!)).data,
     enabled: !!announcementId,
+    // The emergency WhatsApp blast goes out after the response: follow it
+    // while numbers are still pending, then stop.
+    refetchInterval: (query) => ((query.state.data?.whatsapp?.pending ?? 0) > 0 ? WHATSAPP_POLL_MS : false),
   });
   const resend = useMutation({
     mutationFn: () => portalApi.resendAnnouncementFailed(announcementId!),
@@ -46,6 +50,7 @@ export function DeliveryReportModal({ announcementId, title, onClose }: Props) {
           </dl>
           <Channel name="Correo" counts={data.email} />
           <Channel name="Push" counts={data.push} />
+          {data.whatsapp && <WhatsAppChannel counts={data.whatsapp} />}
           {data.failed.length > 0 && (
             <div className="rounded-xl border border-coral/30 bg-coral-50/50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -100,6 +105,23 @@ function Channel({ name, counts }: { name: string; counts: Record<string, number
       </div>
       <p className="mt-1 text-xs text-subtle">
         {(['sent', 'pending', 'skipped', 'failed'] as const).map((k) => `${LABEL[k]} ${counts[k] ?? 0}`).join(' · ')}
+      </p>
+    </div>
+  );
+}
+
+/** The emergency WhatsApp blast: the bar, plus a live line while it is still going out. */
+function WhatsAppChannel({ counts }: { counts: Record<string, number> }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const pending = counts.pending ?? 0;
+  const done = total - pending;
+  return (
+    <div>
+      <Channel name="WhatsApp" counts={counts} />
+      <p className="mt-1 text-xs font-semibold text-ink" role="status">
+        {pending > 0
+          ? `Enviando a ${total} contacto${total === 1 ? '' : 's'}… ${done} de ${total} procesados.`
+          : `WhatsApp terminado: ${counts.sent ?? 0} de ${total} enviados.`}
       </p>
     </div>
   );
