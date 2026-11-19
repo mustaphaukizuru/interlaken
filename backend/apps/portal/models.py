@@ -135,6 +135,10 @@ class AnnouncementDelivery(models.Model):
       ``dispatch_notifications`` cron finishes whatever a killed thread left
       pending. Each row is claimed with ``SELECT … FOR UPDATE SKIP LOCKED``,
       so the thread and the cron never send the same row twice.
+    * ``email``: the claim of one address by the comunicado row that emails
+      it first (``services._claim_emails``). Siblings whose logins share a
+      personal address each hold a notification row of the comunicado, but
+      the address gets one email; ``user`` is the account whose row owns it.
     """
 
     class Channel(models.TextChoices):

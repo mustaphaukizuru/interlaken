@@ -657,7 +657,8 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7, *, a
     actually reaches inboxes without blocking the publish request. Every
     target is emailed / pushed only on the channels its own preferences keep
     on (urgent warnings always), and one notice reaches each address once
-    (``_has_own_copy``, ``own_copy_reach``).
+    (``_has_own_copy``, ``own_copy_reach``; for a comunicado also across
+    siblings' rows that share an address, ``_claim_emails``).
 
     Each row is claimed on its own (``SELECT … FOR UPDATE SKIP LOCKED`` in a
     short transaction) and stamped ``delivered_at`` as soon as it is handled:
@@ -714,6 +715,46 @@ def dispatch_pending_notifications(limit: int = 500, max_age_days: int = 7, *, a
     return sent
 
 
+def _claim_emails(n, emails: list[str]) -> list[str]:
+    """The addresses of ``emails`` this comunicado row may send to.
+
+    Each address is claimed once per comunicado (``AnnouncementDelivery``,
+    unique on comunicado + channel + lowercased address) by the account whose
+    row sends to it first. A retry of that row keeps its claim; an address a
+    deleted account claimed but never received is taken over. Runs inside the
+    row's claim transaction: if the send is rolled back, so is the claim. On
+    PostgreSQL a second dispatcher inserting the same address waits for the
+    first to commit, then finds it taken.
+    """
+    from apps.portal.models import AnnouncementDelivery, Notification
+
+    by_key: dict[str, str] = {}
+    for addr in emails:
+        by_key.setdefault(addr.strip().lower(), addr)
+    claims = AnnouncementDelivery.objects.filter(
+        announcement_id=n.announcement_id, channel=AnnouncementDelivery.Channel.EMAIL,
+        address__in=list(by_key))
+    AnnouncementDelivery.objects.bulk_create(
+        [AnnouncementDelivery(announcement_id=n.announcement_id,
+                              channel=AnnouncementDelivery.Channel.EMAIL,
+                              address=key, send_to=addr, user_id=n.user_id)
+         for key, addr in by_key.items()],
+        ignore_conflicts=True)
+    claims.filter(user__isnull=True).exclude(status=Notification.Delivery.SENT).update(user_id=n.user_id)
+    mine = set(claims.filter(user_id=n.user_id).values_list('address', flat=True))
+    return [addr for key, addr in by_key.items() if key in mine]
+
+
+def _stamp_email_claims(n, emails: list[str], status: str) -> None:
+    from apps.portal.models import AnnouncementDelivery
+
+    sent = status == 'sent'
+    (AnnouncementDelivery.objects
+     .filter(announcement_id=n.announcement_id, channel=AnnouncementDelivery.Channel.EMAIL,
+             user_id=n.user_id, address__in=[a.strip().lower() for a in emails])
+     .update(status=status, attempts=n.attempts + 1, sent_at=timezone.now() if sent else None))
+
+
 def _deliver(n, prefs: dict, max_attempts: int) -> str:
     """Email + push one claimed row and stamp it in the same transaction.
 
@@ -739,6 +780,11 @@ def _deliver(n, prefs: dict, max_attempts: int) -> str:
     # warnings reach everyone (NotificationPreference.wants).
     emails = [addr for addr in mailboxes_of([t for t in targets if wants(t, 'email', kind, prefs)])
               if addr.lower() not in covered]
+    if emails and ann is not None:
+        # One email per address and comunicado: siblings whose logins share a
+        # personal address each hold a row; the first row that sends to the
+        # address claims it, the others leave it out (their in-app copy stays).
+        emails = _claim_emails(n, emails)
     email_status = Delivery.SKIPPED
     if emails:
         from .emailing import notification_content
@@ -747,6 +793,8 @@ def _deliver(n, prefs: dict, max_attempts: int) -> str:
                                        url=f'/portal/notificaciones/{n.pk}' if ann else None)
         ok = send_email(subject=n.title, message=n.message, recipients=emails, content=content)
         email_status = Delivery.SENT if ok else Delivery.FAILED
+        if ann is not None:
+            _stamp_email_claims(n, emails, email_status)
     # Comunicado rows deep-link the push to the notification (bitácora 10: the
     # family portal has no comunicados page) and honor the comunicado's
     # 'Enviar notificación push' toggle; standalone rows keep /portal. A retry
