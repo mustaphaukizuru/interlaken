@@ -29,8 +29,24 @@ import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from zoneinfo import ZoneInfo
 
 from django.utils import timezone
+
+# ── Dates on documents ───────────────────────────────────────────────────────
+SCHOOL_TZ = ZoneInfo('America/Mexico_City')
+_MONTHS_SHORT = ('ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic')
+
+
+def short_datetime(dt) -> str:
+    """«18 nov 2026, 13:47»: the console tables' short form (es-MX month,
+    24-hour clock), always in Mexico City time whatever the server's zone.
+    '' for None, so a missing date never prints «None»."""
+    if not dt:
+        return ''
+    local = timezone.localtime(dt, SCHOOL_TZ) if timezone.is_aware(dt) else dt
+    return f'{local.day} {_MONTHS_SHORT[local.month - 1]} {local.year}, {local:%H:%M}'
+
 
 # ── Page sizes (points) ──────────────────────────────────────────────────────
 PAGE_SIZES = {'letter': (612.0, 792.0), 'a4': (595.28, 841.89)}

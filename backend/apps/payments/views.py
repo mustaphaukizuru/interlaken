@@ -557,8 +557,8 @@ class PaymentReceiptView(APIView):
         from django.http import HttpResponse
         from django.shortcuts import get_object_or_404
 
-        from apps.core.exports import as_download, fmt_dt
-        from apps.core.pdf_document import receipt_pdf
+        from apps.core.exports import as_download
+        from apps.core.pdf_document import receipt_pdf, short_datetime
 
         from .services import payments_visible_to
 
@@ -587,10 +587,11 @@ class PaymentReceiptView(APIView):
             if topup.status == TopUpRequest.Status.PAID and topup.apply_due_at:
                 apply_lines = [f'Saldo: por aplicar ({format_apply_at(topup.apply_due_at)})']
             elif topup.applied_at:
-                apply_lines = [f'Saldo: aplicado el {fmt_dt(topup.applied_at)}']
+                apply_lines = [f'Saldo: aplicado el {short_datetime(topup.applied_at)}']
         lines = [
             f'Folio: {p.id}',
-            f'Fecha: {fmt_dt(p.created_at)}',
+            # «18 nov 2026, 13:47», Mexico City time (not «2026-11-18 13:47»).
+            f'Fecha: {short_datetime(p.created_at)}',
             f'Estado: {p.get_status_display()}',
             *apply_lines,
             '',
