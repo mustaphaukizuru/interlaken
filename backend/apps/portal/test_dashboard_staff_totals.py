@@ -42,3 +42,12 @@ class TestDashboard:
         assert Decimal(data['cafeteria_students_balance']) == Decimal('150')
         assert Decimal(data['cafeteria_staff_balance']) == Decimal('20500')
         assert Decimal(data['cafeteria_total_balance']) == Decimal('20650')
+
+
+def test_family_dashboard_tells_a_staff_wallet_apart(api_client):
+    """A staff member's own login: its one «child» says it is staff, with the puesto."""
+    s = staff_account()
+    wallet(s, '50')
+    api_client.force_authenticate(user=s.user)
+    child = api_client.get(reverse('dashboard')).data['children'][0]
+    assert (child['tipo'], child['puesto_label']) == ('personal', 'Docente')

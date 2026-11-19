@@ -169,6 +169,9 @@ class DashboardView(APIView):
                         'grade': s.grade,
                         'group': s.group,
                         'student_id': s.student_id,
+                        # A staff member's own cafetería account (2026-11-18).
+                        'tipo': s.tipo,
+                        'puesto_label': s.get_puesto_display(),
                     }
                     for s in students
                 ],
