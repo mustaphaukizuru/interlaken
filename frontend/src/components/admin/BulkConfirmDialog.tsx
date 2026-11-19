@@ -30,6 +30,8 @@ interface Props {
   extraPayload?: Record<string, unknown>;
   /** Names the one row a row action opened the dialog for, in place of "1 alumno". */
   subject?: string;
+  /** A row's name in the per-row results ("Reserva de Ana López"), in place of "#12". */
+  rowName?: (id: RowKey) => string | undefined;
 }
 
 type Phase = 'planning' | 'plan' | 'plan-error' | 'running' | 'done';
@@ -63,7 +65,7 @@ function groupReasons(items: { reason: string }[]): { reason: string; n: number 
  * "Reintentar fallidas". Reverse transitions ask for a note; actions that
  * notify families expose the checkbox.
  */
-export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan, subject }: Props) {
+export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender = 'f', ids, allMatching = false, filters, payload, extraPayload, execute, onDone, renderPlan, subject, rowName }: Props) {
   // The title keeps the count the dialog opened with: `onDone` usually clears
   // the selection, which must not turn "Cambiar grupo: 2 alumnos" into "0 alumnos".
   const [opened, setOpened] = useState<{ n: number; all: boolean } | null>(null);
@@ -91,13 +93,14 @@ export function BulkConfirmDialog({ open, onClose, action, entityLabel, gender =
           renderPlan={renderPlan}
           onClose={onClose}
           extraPayload={extraPayload}
+          rowName={rowName}
         />
       )}
     </Modal>
   );
 }
 
-function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, payload: basePayload, extraPayload: aliasPayload, execute, onDone, renderPlan, onClose }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
+function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, filters, payload: basePayload, extraPayload: aliasPayload, execute, onDone, renderPlan, onClose, rowName }: Omit<Props, 'open' | 'action'> & { action: BulkActionDef }) {
   // es-MX participles agree with the entity noun: "reservas procesadas", "pagos procesados".
   const p = (stem: string, n: number) => `${stem}${gender === 'm' ? 'o' : 'a'}${n === 1 ? '' : 's'}`;
   const [phase, setPhase] = useState<Phase>('planning');
@@ -145,18 +148,23 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Rows the dry run says need the note (`noteWhen`): a bulk «Asistió» over
+  // visits already marked «No asistió» is a correction, audited with a motive.
+  const noteRows = action.noteWhen ? (plan?.outcomes?.[action.noteWhen.outcome] ?? 0) : 0;
+  const needsNote = !!action.requiresNote || noteRows > 0;
+
   // Focus follows the phase: the field to fill first when there is one; for a
   // destructive action Cancelar, so a stray Enter never confirms it; else the confirm button.
   useEffect(() => {
     if (phase !== 'plan') return;
-    const target = action.requiresNote ? noteRef.current
+    const target = needsNote ? noteRef.current
       : typedRef.current ?? (action.danger ? cancelRef.current : confirmRef.current);
     target?.focus();
-  }, [phase, action.requiresNote, action.danger]);
+  }, [phase, needsNote, action.danger]);
 
   const payload = (): Record<string, unknown> => {
     const p: Record<string, unknown> = { ...(snapshot.extra ?? {}) };
-    if (action.requiresNote) p.note = note.trim();
+    if (needsNote) p.note = note.trim();
     if (action.notifyOption) p.notify = notify;
     if (action.requireText) p.confirm = action.requireText;
     return p;
@@ -175,7 +183,9 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
 
   const verb = action.planVerb ?? `Se aplicará «${action.label}» a`;
   const willRun = plan ? plan.requested - plan.skipped.length - plan.failed.length : 0;
-  const noteMissing = !!action.requiresNote && note.trim().length < 3;
+  const noteMissing = needsNote && note.trim().length < 3;
+  const doneNoteRows = action.noteWhen ? (result?.outcomes?.[action.noteWhen.outcome] ?? 0) : 0;
+  const nameOf = (id: RowKey) => rowName?.(id) ?? `#${id}`;
   const typedMissing = !!action.requireText && typed.trim() !== action.requireText;
   const skipGroups = plan ? groupReasons(plan.skipped) : [];
 
@@ -232,8 +242,13 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
             </div>
           </div>
 
-          {action.requiresNote && (
+          {needsNote && (
             <div>
+              {!action.requiresNote && action.noteWhen && (
+                <p id="bulk-note-why" className="mb-2 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-ink" role="note">
+                  {action.noteWhen.explain(noteRows)}
+                </p>
+              )}
               <label htmlFor="bulk-note" className="label">Motivo (obligatorio)</label>
               <textarea
                 id="bulk-note"
@@ -242,7 +257,7 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Se guardará en la bitácora de auditoría."
-                aria-describedby="bulk-note-hint"
+                aria-describedby={!action.requiresNote && action.noteWhen ? 'bulk-note-why bulk-note-hint' : 'bulk-note-hint'}
               />
               <p id="bulk-note-hint" className="mt-1 text-xs text-muted">Mínimo 3 caracteres.</p>
             </div>
@@ -309,14 +324,26 @@ function BulkConfirmBody({ action, entityLabel, gender = 'f', ids, allMatching, 
                 {result.skipped.length > 0 && <>, {result.skipped.length} {p('omitid', result.skipped.length)}</>}
                 {result.failed.length > 0 && <>, <strong className="text-coral-700">{result.failed.length} {p('fallid', result.failed.length)}</strong></>}.
               </p>
+              {doneNoteRows > 0 && action.noteWhen?.done && <p className="mt-1">{action.noteWhen.done(doneNoteRows)}</p>}
             </div>
           </div>
           {result.failed.length > 0 && (
             <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line bg-cream-2 p-2 text-xs" aria-label="Filas fallidas">
               {result.failed.map((f) => (
                 <li key={String(f.id)} className="flex gap-2">
-                  <span className="font-mono text-subtle">#{f.id}</span>
+                  <span className={rowName ? 'font-semibold text-ink' : 'font-mono text-subtle'}>{nameOf(f.id)}</span>
                   <span className="text-ink">{f.error}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* With row names the skipped rows are listed too: each row's result in one place. */}
+          {rowName && result.skipped.length > 0 && (
+            <ul className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-line p-2 text-xs" aria-label="Filas omitidas">
+              {result.skipped.map((s) => (
+                <li key={String(s.id)} className="flex gap-2">
+                  <span className="font-semibold text-ink">{nameOf(s.id)}</span>
+                  <span className="text-muted">{s.reason}</span>
                 </li>
               ))}
             </ul>

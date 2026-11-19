@@ -199,6 +199,12 @@ export interface BulkActionDef {
   danger?: boolean;
   /** Reverse transitions need a note (audited with it). */
   requiresNote?: boolean;
+  /**
+   * A note only some rows need: when the dry run counts rows under
+   * `outcome` (e.g. `correction`: «No asistió» → «Asistió»), the dialog says
+   * why with `explain(n)` and asks for the note before the commit.
+   */
+  noteWhen?: { outcome: string; explain: (n: number) => string; done?: (n: number) => string };
   /** Show the "Notificar a las familias" checkbox (sent as payload.notify). */
   notifyOption?: boolean;
   /** es-MX verb phrase for the plan: "Se confirmarán", "Se cancelarán". */

@@ -23,7 +23,7 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
 import { RowActionsMenu } from '@/components/admin/RowActionsMenu';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
-import { useRowSelection } from '@/hooks/useRowSelection';
+import { useRowSelection, type RowKey } from '@/hooks/useRowSelection';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
   BOOKINGS_ENTITY, SLOTS_ENTITY, slotsImportApi, useBookingAction, useBookingsBulk, useBookingsExport, useBookingsList,
@@ -345,12 +345,28 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
   },
 ];
 
+/** Bulk «Asistió» / «No asistió» over visits already marked the other way is
+ *  a correction: the dry run counts them (`outcomes.correction`) and the
+ *  dialog asks for the motive the single-row NoteDialog asks for. */
+const correctionNote = (from: string, to: string): NonNullable<BulkActionDef['noteWhen']> => ({
+  outcome: 'correction',
+  explain: (n) => (n === 1
+    ? `1 de estas reservas ya está marcada como «${from}». Cambiarla a «${to}» es una corrección: indique el motivo, quedará en la bitácora.`
+    : `${n} de estas reservas ya están marcadas como «${from}». Cambiarlas a «${to}» es una corrección: indique el motivo, quedará en la bitácora.`),
+  done: (n) => (n === 1
+    ? 'Incluye 1 corrección, registrada con su motivo en la bitácora.'
+    : `Incluye ${n} correcciones, registradas con su motivo en la bitácora.`),
+});
+
 const BOOKING_BULK: BulkActionDef[] = [
   { name: 'confirm', label: 'Confirmar', icon: bulkIcon(Check), notifyOption: true, planVerb: 'Se confirmarán' },
-  { name: 'attended', label: 'Asistió', icon: bulkIcon(UserCheck), planVerb: 'Se registrará la asistencia de' },
-  { name: 'no_show', label: 'No asistió', icon: bulkIcon(UserX), planVerb: 'Se registrará la inasistencia de' },
+  { name: 'attended', label: 'Asistió', icon: bulkIcon(UserCheck), planVerb: 'Se registrará la asistencia de', noteWhen: correctionNote('No asistió', 'Asistió') },
+  { name: 'no_show', label: 'No asistió', icon: bulkIcon(UserX), planVerb: 'Se registrará la inasistencia de', noteWhen: correctionNote('Asistió', 'No asistió') },
   { name: 'cancel', label: 'Cancelar', icon: bulkIcon(Ban), danger: true, planVerb: 'Se cancelarán' },
 ];
+
+/** "Ana López (12 dic 2026)": how the bulk results name a reservation. */
+const bookingName = (b: Booking) => `${b.parent_name} (${fmtDate(b.slot_date)})`;
 
 interface NoteAsk { booking: Booking; act: BookingAction; title: string; message: string; confirmLabel: string }
 
@@ -496,6 +512,13 @@ function BookingsView() {
   const bulk = useBookingsBulk();
   const action = useBookingAction();
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
+  // Names of the rows on screen when a bulk action opens: the per-row results
+  // keep them after the list refetches (a corrected row may leave the filter).
+  const [bulkNames, setBulkNames] = useState<Map<RowKey, string>>(() => new Map());
+  const openBulk = (a: BulkActionDef) => {
+    setBulkNames(new Map(rows.map((b) => [b.id, bookingName(b)])));
+    setBulkAction(a);
+  };
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
   const [noteAsk, setNoteAsk] = useState<NoteAsk | null>(null);
 
@@ -562,7 +585,7 @@ function BookingsView() {
             onClear={selection.onClear}
             itemLabel="reservas"
             actions={BOOKING_BULK}
-            onAction={setBulkAction}
+            onAction={openBulk}
             busy={bulk.isPending}
             exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="visitas" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
           />
@@ -580,6 +603,7 @@ function BookingsView() {
         filters={filters}
         execute={(body) => bulk.mutateAsync(body)}
         onDone={(r) => { if (r.ok) selection.onClear(); }}
+        rowName={(id) => bulkNames.get(id)}
       />
 
       <ConfirmDialog
