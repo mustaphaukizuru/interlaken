@@ -355,3 +355,85 @@ describe('ParentDashboard', () => {
     expect(screen.queryByText(/Cuenta sin alumno vinculado/i)).toBeNull();
   });
 });
+
+describe('ParentDashboard: paid top-ups on their way (owner, 2026-11-19)', () => {
+  const MONDAY = '2030-01-07T13:30:00Z';
+  const TUESDAY = '2030-01-08T13:30:00Z';
+  const item = (id: number, amount: string, apply_due_at: string | null = MONDAY) =>
+    ({ id, amount, paid_at: '2030-01-04T22:00:00Z', apply_due_at, folio: id });
+  const one = (balance: Record<string, unknown>) => ({
+    ...LINKED_DATA,
+    children_count: 1,
+    children: [LINKED_DATA.children[0]],
+    cafeteria_balances: [{ ...LINKED_DATA.cafeteria_balances[0], low: false, ...balance }],
+  });
+  const hero = () => screen.getByText('Recarga rápida').closest('.card') as HTMLElement;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: { ...SAMPLE_USER }, accessToken: 'test', isAuthenticated: true });
+    useSelectedChildStore.setState({ childId: null });
+  });
+
+  it('the hero keeps the real balance and shows where it is heading', async () => {
+    getDashboard.mockResolvedValue({ data: one({ balance: '150.00', pending_topups: '200.00', pending_topup_items: [item(7, '200.00')] }) } as never);
+    renderPage();
+    expect(await screen.findByText('Saldo en caja')).toBeInTheDocument();
+    expect(within(hero()).getByText('$150.00')).toBeInTheDocument();
+    expect(within(hero()).getByText('$350.00')).toBeInTheDocument();
+    expect(within(hero()).getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(hero().querySelector('.sr-only')).toHaveTextContent(
+      'Saldo actual $150.00. Con la recarga pagada de $200.00 será $350.00 a partir del lunes 7 de enero a las 7:30 a.m.');
+    // The old amber «pagado, por aplicar» link is replaced by the line.
+    expect(screen.queryByText(/pagado, por aplicar/)).toBeNull();
+  });
+
+  it('several load days: one summary and «Ver detalle» on the hero', async () => {
+    getDashboard.mockResolvedValue({ data: one({
+      balance: '150.00', pending_topups: '300.00', pending_topup_items: [item(7, '100.00'), item(8, '200.00', TUESDAY)],
+    }) } as never);
+    renderPage();
+    expect(await screen.findByText(/2 recargas pagadas por \$300\.00 · todo disponible el martes 8 de enero/)).toBeInTheDocument();
+    const toggle = within(hero()).getByRole('button', { name: 'Ver detalle de las recargas pagadas' });
+    await userEvent.click(toggle);
+    expect(within(hero()).getByText('El lunes 7 de enero a las 7:30 a.m.: $250.00 · recarga de $100.00 pagada')).toBeVisible();
+  });
+
+  it('two children: only the tile and hero of the one with a paid top-up change', async () => {
+    getDashboard.mockResolvedValue({ data: {
+      ...LINKED_DATA,
+      cafeteria_balances: [
+        { ...LINKED_DATA.cafeteria_balances[0], low: false, pending_topups: '200.00', pending_topup_items: [item(7, '200.00')] },
+        { ...LINKED_DATA.cafeteria_balances[1], pending_topups: '0.00', pending_topup_items: [] },
+      ],
+    } } as never);
+    renderPage();
+    const tiles = within(await screen.findByRole('list', { name: 'Saldo por alumno' }));
+    const [luis, sofia] = tiles.getAllByRole('listitem');
+    expect(within(luis).getByText('$20.00')).toBeInTheDocument();
+    expect(within(luis).getByText('$220.00')).toBeInTheDocument();
+    expect(within(luis).getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(within(sofia).getByText('$180.00')).toBeInTheDocument();
+    expect(sofia.querySelector('.sr-only')).toBeNull();
+    expect(within(sofia).queryByText(/pagada/)).toBeNull();
+    // Tiles keep the quick top-ups at the bottom, aligned across the row.
+    expect(luis.className).toMatch(/flex-col/);
+    expect(within(hero()).getByText('Saldo en caja de Luis')).toBeInTheDocument();
+  });
+
+  it('an older API with only the total still shows the projection, without a date', async () => {
+    getDashboard.mockResolvedValue({ data: one({ balance: '150.00', pending_topups: '200.00' }) } as never);
+    renderPage();
+    expect(await screen.findByText('Recarga de $200.00 pagada · disponible el siguiente día hábil a las 7:30 a.m.')).toBeInTheDocument();
+    expect(within(hero()).getByText('$350.00')).toBeInTheDocument();
+  });
+
+  it('nothing pending: the hero reads as before', async () => {
+    getDashboard.mockResolvedValue({ data: one({ balance: '150.00', pending_topups: '0.00', pending_topup_items: [] }) } as never);
+    renderPage();
+    expect(await screen.findByText('Saldo Cafetería')).toBeInTheDocument();
+    expect(within(hero()).getByText('$150.00')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo en caja')).toBeNull();
+    expect(hero().querySelector('.sr-only')).toBeNull();
+  });
+});

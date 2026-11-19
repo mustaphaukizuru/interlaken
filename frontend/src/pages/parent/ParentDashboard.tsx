@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   Coffee, AlertTriangle, GraduationCap, ArrowRight, UserCircle,
-  MessageCircle, QrCode, Plus, RefreshCw, Clock,
+  MessageCircle, QrCode, Plus, RefreshCw,
   UserPlus,
 } from 'lucide-react';
 import { StatCard } from '@/components/ui/StatCard';
@@ -18,7 +18,8 @@ import { useSelectedChildStore } from '@/store/selectedChildStore';
 import { portalApi } from '@/services/api';
 import { PushOptIn } from '@/components/portal/PushOptIn';
 import { InstallHint } from '@/components/portal/InstallHint';
-import type { DashboardData } from '@/types';
+import { BalanceWithPending } from '@/components/portal/BalanceWithPending';
+import type { DashboardData, PendingTopUp } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { LIVE } from '@/lib/live';
@@ -30,6 +31,18 @@ const CafeteriaCategoriesCard = lazy(() => import('@/components/portal/Cafeteria
 
 /** Dashboard quick top-up amounts; CafeteriaPage reads `?recarga=<amount>`. */
 const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
+
+type DashboardBalance = NonNullable<DashboardData['cafeteria_balances']>[number];
+
+/**
+ * The paid card top-ups on their way to this wallet, one by one with their
+ * promised load (`pending_topup_items`). An older API sent only the total:
+ * then one row with no date ("el siguiente día hábil a las 7:30 a.m.").
+ */
+function pendingOf(b: DashboardBalance): Pick<PendingTopUp, 'amount' | 'apply_due_at'>[] {
+  if (b.pending_topup_items) return b.pending_topup_items;
+  return parseFloat(b.pending_topups || '0') > 0 ? [{ amount: b.pending_topups as string, apply_due_at: null }] : [];
+}
 
 /** es-MX time-of-day greeting. Exported for tests. */
 export function greetingForHour(hour: number): string {
@@ -118,8 +131,8 @@ export default function ParentDashboard() {
         /* Per-card skeletons mirroring the final layout: hero + stat, quick actions, section cards. */
         <div aria-busy="true" aria-label="Cargando panel">
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-[18px]">
-            <div className="skeleton h-[176px] rounded-xl2 sm:col-span-2" />
-            <div className="skeleton h-[176px] rounded-xl2" />
+            <div className="skeleton h-[200px] rounded-xl2 sm:col-span-2" />
+            <div className="skeleton h-[200px] rounded-xl2" />
           </div>
           <div className="mb-6 grid gap-4 sm:grid-cols-2">
             {[0, 1].map((i) => <div key={i} className="skeleton h-[92px] rounded-xl2" />)}
@@ -178,10 +191,12 @@ export default function ParentDashboard() {
       {balances.length > 1 && (
         <ul className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Saldo por alumno">
           {balances.map((b) => (
-            <li key={b.student ?? b.student_name} className={`rounded-2xl border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
+            <li key={b.student ?? b.student_name} className={`flex flex-col rounded-2xl border p-4 ${b.low ? 'border-amber/40 bg-amber/[0.06]' : 'border-line bg-white'}`}>
               <p className="truncate text-sm font-semibold text-ink">{b.student_name}</p>
-              <p className={`mt-1 font-head text-2xl font-extrabold ${b.low ? 'text-amber' : 'text-ink'}`}>${parseFloat(b.balance).toFixed(2)}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              {/* `low` already honours the paid top-ups on their way (backend). */}
+              <BalanceWithPending variant="tile" label={null} balance={b.balance} pending={pendingOf(b)} low={b.low} />
+              {/* mt-auto: the quick top-ups line up across the row whatever each tile says. */}
+              <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
                 {[100, 200].map((amt) => (
                   <Link key={amt} to={`/portal/cafeteria?recarga=${amt}${b.student ? `&hijo=${b.student}` : ''}`} aria-label={`Recargar $${amt} a ${b.student_name}`} className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-purple transition-colors hover:border-purple/40 active:scale-[0.98]">+${amt}</Link>
                 ))}
@@ -218,8 +233,8 @@ export default function ParentDashboard() {
               childId={selectedBalance.student}
               name={selectedBalance.student_name}
               several={children.length > 1}
-              amount={parseFloat(selectedBalance.balance || '0')}
-              pending={parseFloat(selectedBalance.pending_topups || '0')}
+              balance={selectedBalance.balance || '0'}
+              pending={pendingOf(selectedBalance)}
               low={!!selectedBalance.low}
             />
           ) : hasCafeteria ? (
@@ -308,8 +323,11 @@ export default function ParentDashboard() {
  * `?recarga=<monto>&hijo=<id>` so its top-up modal opens for this child with
  * the amount prefilled (no payment logic here).
  */
-function CafeteriaSaldoCard({ childId, name, several, amount, pending = 0, low }: {
-  childId?: number; name: string; several: boolean; amount: number; pending?: number; low: boolean;
+function CafeteriaSaldoCard({ childId, name, several, balance, pending, low }: {
+  childId?: number; name: string; several: boolean; balance: string;
+  /** Paid card top-ups waiting for the 7:30 POS load: «$150.00 → $350.00». */
+  pending: Pick<PendingTopUp, 'amount' | 'apply_due_at'>[];
+  low: boolean;
 }) {
   const first = name.split(' ')[0] || name;
   const hijo = childId ? `hijo=${childId}` : '';
@@ -317,21 +335,17 @@ function CafeteriaSaldoCard({ childId, name, several, amount, pending = 0, low }
   return (
     <div className="card flex h-full flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[13px] font-medium text-muted">{several ? `Saldo de ${first}` : 'Saldo Cafetería'}</p>
-          <p className={`mt-1 font-head text-[clamp(26px,8vw,36px)] font-extrabold leading-[1.1] tracking-[-1px] ${low ? 'text-amber' : 'text-ink'}`}>
-            ${amount.toFixed(2)}
-          </p>
-          {several && <p className="mt-0.5 text-[12px] text-subtle">{name}</p>}
-          {pending > 0 && (
-            <Link
-              to={page}
-              className="mt-1.5 inline-flex items-center gap-1.5 rounded text-[12.5px] font-semibold text-amber hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
-            >
-              <Clock size={13} aria-hidden="true" /> ${pending.toFixed(2)} pagado, por aplicar (7:30 a.m.)
-            </Link>
-          )}
-        </div>
+        <BalanceWithPending
+          variant="hero"
+          className="min-w-0 flex-1"
+          balance={balance}
+          pending={pending}
+          low={low}
+          label={several ? `Saldo de ${first}` : 'Saldo Cafetería'}
+          pendingLabel={several ? `Saldo en caja de ${first}` : 'Saldo en caja'}
+          caption={several ? <p className="mt-0.5 text-[12px] text-subtle">{name}</p> : undefined}
+          expandable
+        />
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${low ? 'bg-amber/10 text-amber' : 'bg-green-50 text-green-dark'}`}>
           <Coffee size={22} aria-hidden="true" />
         </span>
