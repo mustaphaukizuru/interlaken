@@ -23,18 +23,59 @@ describe('StudentFormModal', () => {
     expect(createStudent).not.toHaveBeenCalled();
   });
 
-  it('creates a student with an uppercased matrícula and blank email', async () => {
+  it('creates a student with the matrícula as typed (A6: no forced uppercase) and blank email', async () => {
     createStudent.mockResolvedValue({ data: { id: 9, user: { email: 'a1@alumnos.interlaken.edu.mx' } } } as never);
     const onClose = vi.fn();
     renderWithProviders(<StudentFormModal open onClose={onClose} />);
     await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Ana');
     await userEvent.type(screen.getByLabelText(/apellidos/i), 'Pérez');
+    expect(screen.getByLabelText(/matrícula o código loyverse/i)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/matrícula/i), 'a1');
     await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');
     await userEvent.click(screen.getByRole('button', { name: /crear alumno/i }));
     await waitFor(() => expect(createStudent).toHaveBeenCalledTimes(1));
-    expect(createStudent.mock.calls[0][0]).toMatchObject({ first_name: 'Ana', student_id: 'A1', grade: '1° Primaria', email: '', enrollment_date: null });
+    expect(createStudent.mock.calls[0][0]).toMatchObject({ tipo: 'alumno', first_name: 'Ana', student_id: 'a1', grade: '1° Primaria', email: '', enrollment_date: null });
+    expect(createStudent.mock.calls[0][0]).not.toHaveProperty('puesto');
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('creates a staff member with a puesto instead of a grade, then shows the Loyverse outcome', async () => {
+    createStudent.mockResolvedValue({ data: {
+      id: 12, tipo: 'personal', user: { full_name: 'Rosa Lince Vela', email: 'rlince@interlaken.com.mx' },
+      loyverse_link: { status: 'linked', message: 'Vinculado a Loyverse ✓ · saldo $35.00', customer_code: 'rlince', matched_by: 'correo' },
+    } } as never);
+    const onClose = vi.fn();
+    renderWithProviders(<StudentFormModal open onClose={onClose} />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Personal del colegio' }));
+    expect(screen.getByRole('heading', { name: 'Nuevo personal del colegio' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/grado/i)).toBeNull();
+    expect(screen.queryByLabelText(/^grupo/i)).toBeNull();
+    await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Rosa');
+    await userEvent.type(screen.getByLabelText(/apellidos/i), 'Lince Vela');
+    await userEvent.type(screen.getByLabelText(/^código loyverse/i), 'rlince');
+    await userEvent.selectOptions(screen.getByLabelText(/puesto/i), 'docente');
+    await userEvent.type(screen.getByLabelText(/correo escolar/i), 'rlince@interlaken.com.mx');
+    await userEvent.click(screen.getByRole('button', { name: /crear personal/i }));
+    await waitFor(() => expect(createStudent).toHaveBeenCalledTimes(1));
+    expect(createStudent.mock.calls[0][0]).toMatchObject({ tipo: 'personal', puesto: 'docente', student_id: 'rlince', grade: '', group: '' });
+    expect(await screen.findByText('Vinculado a Loyverse ✓ · saldo $35.00')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Listo' }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('says when Loyverse has no such customer', async () => {
+    createStudent.mockResolvedValue({ data: {
+      id: 13, tipo: 'alumno', user: { full_name: 'Leo Vela' },
+      loyverse_link: { status: 'not_found', message: 'No se encontró en Loyverse. Revise el código y el correo.' },
+    } } as never);
+    renderWithProviders(<StudentFormModal open onClose={() => {}} />);
+    await userEvent.type(screen.getByLabelText(/^nombre\(s\)/i), 'Leo');
+    await userEvent.type(screen.getByLabelText(/apellidos/i), 'Vela');
+    await userEvent.type(screen.getByLabelText(/matrícula/i), '55501');
+    await userEvent.selectOptions(screen.getByLabelText(/grado/i), '1° Primaria');
+    await userEvent.click(screen.getByRole('button', { name: /crear alumno/i }));
+    expect(await screen.findByRole('status')).toHaveTextContent('No se encontró en Loyverse');
   });
 
   it('shows DRF field errors next to the field', async () => {

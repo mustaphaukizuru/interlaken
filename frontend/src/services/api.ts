@@ -128,9 +128,13 @@ export interface StudentWrite {
   first_name: string;
   last_name: string;
   email?: string;
+  /** «Matrícula o código Loyverse», kept as typed (A6). */
   student_id: string;
+  /** Pupils only; empty for staff (tipo `personal`). */
   grade: string;
   group?: string;
+  tipo?: import('@/types').PersonTipo;
+  puesto?: import('@/types').StaffPuesto | '';
   enrollment_date?: string | null;
   is_active?: boolean;
   status?: StudentStatus;
