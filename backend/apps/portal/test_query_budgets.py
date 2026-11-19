@@ -73,9 +73,10 @@ class TestAdminAnnouncementsBudget:
 # audit insert are counted.
 # count + annotated rows + audit insert.
 ANNOUNCEMENTS_EXPORT_BUDGET = 3
-# announcement + (email, push) status counts + failed rows + recipients
-# + pending + read + acknowledged counts: fixed, whatever the audience size.
-DELIVERY_BUDGET = 8
+# announcement + (email, push) status counts + failed rows + WhatsApp status
+# counts + recipients + pending + read + acknowledged counts: fixed, whatever
+# the audience size.
+DELIVERY_BUDGET = 9
 # announcement + count + rows (user joined, ack subquery) + audit insert.
 DELIVERY_EXPORT_BUDGET = 4
 # family comunicados: count + annotated page.

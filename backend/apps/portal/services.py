@@ -375,13 +375,14 @@ def emergency_broadcast(
     3. Immediately dispatches a first batch of ``dispatch_limit`` email+push
        sends; the ``dispatch_notifications`` cron finishes the rest within 5
        minutes.
-    4. Optionally WhatsApp-blasts users who have a number (capped, fail-soft).
+    4. Optionally records the WhatsApp blast (one pending row per number,
+       capped) and sends it AFTER the response (``send_whatsapp_later``): a
+       Cloud API call can take 10 s, so a blast inside the request could hit
+       gunicorn's 60 s limit. The cron finishes what a killed thread left.
 
     Returns counts for the admin UI. Never raises into the view for channel
     failures — only validation errors should surface as 400s.
     """
-    from django.utils.text import Truncator
-
     from apps.portal.models import Announcement, Notification
 
     title = (title or '').strip()
@@ -406,36 +407,202 @@ def emergency_broadcast(
     notified = stats['notified']
     dispatched = stats['dispatched']
 
-    whatsapp_sent = 0
-    if whatsapp:
-        qs = (
-            audience_users(audience)
-            .exclude(whatsapp='')
-            .order_by('id')[:whatsapp_limit]
-        )
-        body = f'{title}\n\n{Truncator(message).chars(400)}'
+    whatsapp_queued = 0
+    whatsapp_ready = whatsapp_configured()
+    if whatsapp and whatsapp_ready:
         try:
-            from apps.whatsapp.services import send_text
-        except Exception:  # pragma: no cover
-            send_text = None
-            logger.exception('WhatsApp import failed during emergency broadcast')
-        if send_text:
-            for user in qs:
-                wa = (user.whatsapp or '').strip()
-                if not wa:
-                    continue
-                try:
-                    if send_text(wa, body):
-                        whatsapp_sent += 1
-                except Exception:
-                    logger.warning('Emergency WhatsApp failed for %s', user, exc_info=True)
+            whatsapp_queued = queue_whatsapp(announcement, limit=whatsapp_limit)
+        except Exception:  # pragma: no cover - the in-app and email part already went out
+            logger.exception('Announcement %s WhatsApp queue failed', announcement.pk)
+        if whatsapp_queued:
+            send_whatsapp_later(announcement.pk)
+    elif whatsapp:
+        logger.info('Emergency broadcast %s: WhatsApp requested but the Cloud API is not configured',
+                    announcement.pk)
 
     return {
         'announcement_id': announcement.id,
         'notified': notified,
         'dispatched': dispatched,
-        'whatsapp_sent': whatsapp_sent,
+        # Recorded now, sent after the response (progress: the delivery report).
+        'whatsapp_queued': whatsapp_queued,
+        'whatsapp_configured': whatsapp_ready,
     }
+
+
+# ── WhatsApp blast (emergency broadcast) ──────────────────────────────────────
+# A thread sends the blast after the response; it gives up after this long and
+# the 5-minute cron finishes the rest (100 numbers x 10 s timeout = 17 min worst case).
+WHATSAPP_THREAD_SECONDS = 15 * 60
+# A WhatsApp row that failed this many times is closed as failed.
+WHATSAPP_MAX_ATTEMPTS = 3
+# An emergency message that waited this long (cron down) is no longer sent:
+# «no habrá clases mañana» a day late would only confuse.
+WHATSAPP_MAX_AGE = timedelta(hours=24)
+
+
+def normalize_phone(raw: str) -> str:
+    """Dedupe key of a phone number: its digits, the last 10 when longer
+    (``+52 1 55 1234 5678``, ``5215512345678`` and ``55 1234 5678`` are one
+    number). '' when it holds fewer than 8 digits (not a usable number)."""
+    import re
+
+    digits = re.sub(r'\D', '', raw or '')
+    if len(digits) < 8:
+        return ''
+    return digits[-10:]
+
+
+def whatsapp_configured() -> bool:
+    """True when the WhatsApp Cloud API credentials are set (sends are real)."""
+    return bool(getattr(settings, 'WHATSAPP_TOKEN', '') and getattr(settings, 'WHATSAPP_PHONE_ID', ''))
+
+
+def queue_whatsapp(announcement, *, limit: int = 100) -> int:
+    """Record one pending WhatsApp delivery per distinct number of the
+    comunicado's audience (``audience_users``), oldest accounts first, at most
+    ``limit`` numbers. Siblings' logins that share a number get ONE message.
+    Idempotent: a number already recorded for this comunicado is not added
+    twice. Returns the rows recorded."""
+    from apps.portal.models import AnnouncementDelivery
+
+    rows, seen = [], set()
+    users = (audience_users(announcement.audience).exclude(whatsapp='')
+             .order_by('id').values_list('id', 'whatsapp'))
+    for user_id, number in users.iterator():
+        key = normalize_phone(number)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        rows.append(AnnouncementDelivery(
+            announcement=announcement, channel=AnnouncementDelivery.Channel.WHATSAPP,
+            address=key, send_to=number.strip(), user_id=user_id))
+        if len(rows) >= limit:
+            break
+    if not rows:
+        return 0
+    AnnouncementDelivery.objects.bulk_create(rows, ignore_conflicts=True)
+    return AnnouncementDelivery.objects.filter(
+        announcement=announcement, channel=AnnouncementDelivery.Channel.WHATSAPP).count()
+
+
+def run_in_background(fn, *, name: str) -> None:
+    """Run ``fn`` in a daemon thread that closes its own database connection.
+
+    Only for work recorded as pending rows first: nothing here survives a
+    worker restart, so the 5-minute cron must be able to finish it. Tests
+    replace this with a synchronous call.
+    """
+    import threading
+
+    from django.db import connections
+
+    def target():
+        try:
+            fn()
+        except Exception:  # noqa: BLE001 - logged; the cron finishes the rows
+            logger.exception('Background task %s failed', name)
+        finally:
+            connections.close_all()
+
+    threading.Thread(target=target, name=name, daemon=True).start()
+
+
+def send_whatsapp_later(announcement_id: int) -> None:
+    """Send this comunicado's pending WhatsApp rows after the response.
+
+    Started once the request's transaction commits, so the thread sees the
+    rows it has to send.
+    """
+    from django.db import transaction
+
+    def start():
+        run_in_background(
+            lambda: dispatch_pending_whatsapp(announcement_id=announcement_id,
+                                              time_budget=WHATSAPP_THREAD_SECONDS),
+            name=f'whatsapp-broadcast-{announcement_id}')
+
+    transaction.on_commit(start)
+
+
+def _whatsapp_body(announcement) -> str:
+    from django.utils.text import Truncator
+
+    return f'{announcement.title}\n\n{Truncator(announcement.body or "").chars(400)}'
+
+
+def dispatch_pending_whatsapp(*, limit: int = 500, announcement_id: int | None = None,
+                              time_budget: float | None = None) -> int:
+    """Send pending WhatsApp deliveries; returns the messages accepted.
+
+    Each row is claimed on its own (``SELECT … FOR UPDATE SKIP LOCKED`` in a
+    short transaction, the same pattern as ``dispatch_pending_notifications``)
+    and stamped in that transaction: the after-response thread and the cron
+    never send the same row, and a row whose sender died stays pending for the
+    next cron run. A failed send is retried by the next runs, up to
+    ``WHATSAPP_MAX_ATTEMPTS``; rows older than ``WHATSAPP_MAX_AGE`` are closed
+    as skipped without sending. Without Cloud API credentials nothing is sent
+    (the rows wait, then expire).
+    """
+    from django.db import transaction
+
+    from apps.portal.models import AnnouncementDelivery, Notification
+
+    Status = Notification.Delivery
+    now = timezone.now()
+    pending = AnnouncementDelivery.objects.filter(
+        channel=AnnouncementDelivery.Channel.WHATSAPP, status=Status.PENDING)
+    if announcement_id is not None:
+        pending = pending.filter(announcement_id=announcement_id)
+    pending.filter(created_at__lt=now - WHATSAPP_MAX_AGE).update(
+        status=Status.SKIPPED, last_error='Caducó sin enviarse')
+    if not whatsapp_configured():
+        return 0
+    ids = list(pending.order_by('created_at', 'pk').values_list('pk', flat=True)[:limit])
+    if not ids:
+        return 0
+
+    from apps.portal.models import Announcement
+    from apps.whatsapp.services import send_text
+
+    bodies: dict[int, str] = {}  # announcement pk → message, read once per pass
+
+    def body_of(announcement_id):
+        if announcement_id not in bodies:
+            bodies[announcement_id] = _whatsapp_body(
+                Announcement.objects.only('title', 'body').get(pk=announcement_id))
+        return bodies[announcement_id]
+
+    started = time.monotonic()
+    sent = 0
+    for pk in ids:
+        if time_budget is not None and time.monotonic() - started >= time_budget:
+            break  # the rest waits for the next cron run
+        try:
+            with transaction.atomic():
+                # Only this row is locked (no join): the comunicado itself stays
+                # editable while its blast goes out.
+                row = (AnnouncementDelivery.objects.select_for_update(skip_locked=True)
+                       .filter(pk=pk, status=Status.PENDING).first())
+                if row is None:
+                    continue  # another sender has it, or already sent it
+                try:
+                    ok = bool(send_text(row.send_to, body_of(row.announcement_id)))
+                    error = '' if ok else 'WhatsApp rechazó el envío'
+                except Exception as exc:  # noqa: BLE001 - counts as a failed attempt
+                    logger.warning('WhatsApp delivery %s raised', pk, exc_info=True)
+                    ok, error = False, f'Error al enviar: {type(exc).__name__}'
+                attempts = row.attempts + 1
+                status = (Status.SENT if ok
+                          else Status.FAILED if attempts >= WHATSAPP_MAX_ATTEMPTS else Status.PENDING)
+                AnnouncementDelivery.objects.filter(pk=pk).update(
+                    status=status, attempts=attempts, last_error=error[:200],
+                    sent_at=timezone.now() if ok else None)
+        except Exception:  # noqa: BLE001 - one bad row must not stop the others
+            logger.exception('dispatch_pending_whatsapp: delivery %s raised', pk)
+            continue
+        sent += int(ok)
+    return sent
 
 
 # Rows of one notice queued for each family member together (the bulk top-up's

@@ -37,7 +37,14 @@ from apps.core.throttling import SharedScopedRateThrottle
 from apps.core.transitions import assert_transition
 from apps.payments.models import Payment
 
-from .models import Announcement, AnnouncementComment, AnnouncementRead, Notification, published_q
+from .models import (
+    Announcement,
+    AnnouncementComment,
+    AnnouncementDelivery,
+    AnnouncementRead,
+    Notification,
+    published_q,
+)
 from .serializers import (
     AnnouncementAdminSerializer,
     AnnouncementCommentSerializer,
@@ -814,6 +821,14 @@ class AnnouncementDeliveryView(APIView):
              'attempts': n.attempts, 'error': n.last_error}
             for n in qs.filter(email_status=Notification.Delivery.FAILED).order_by('id')[:200]
         ]
+        # The emergency broadcast's WhatsApp blast, sent after the response:
+        # null when the comunicado had none, else the per-status counts (the
+        # console polls them while some are pending).
+        wa_counts = dict(AnnouncementDelivery.objects
+                         .filter(announcement=announcement, channel=AnnouncementDelivery.Channel.WHATSAPP)
+                         .values_list('status').annotate(c=Count('id')).values_list('status', 'c'))
+        whatsapp = ({k: wa_counts.get(k, 0) for k in Notification.Delivery.values}
+                    if wa_counts else None)
         return Response({
             'announcement': announcement.id,
             'recipients': qs.count(),
@@ -823,6 +838,7 @@ class AnnouncementDeliveryView(APIView):
             'requires_ack': announcement.requires_ack,
             'email': by['email'],
             'push': by['push'],
+            'whatsapp': whatsapp,
             'failed': failed,
         })
 

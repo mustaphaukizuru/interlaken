@@ -59,7 +59,7 @@ export default function AdminAnnouncements() {
   // ?nuevo=1 deep link from the header quick actions (P1-E8).
   const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get('nuevo') === '1');
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
-  const [report, setReport] = useState<Announcement | null>(null);
+  const [report, setReport] = useState<Pick<Announcement, 'id' | 'title'> | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
   // The emergency broadcast (every family, every channel) is admin-only;
   // Comunicados staff write regular notices.
@@ -141,15 +141,9 @@ export default function AdminAnnouncements() {
   });
 
   const broadcast = useMutation({
-    mutationFn: () =>
-      portalApi.adminEmergencyBroadcast({
-        title: alertForm.title.trim(),
-        message: alertForm.message.trim(),
-        audience: alertForm.audience,
-        whatsapp: alertForm.whatsapp,
-      }),
-    onSuccess: (resp) => {
-      const d = resp.data as { notified: number; dispatched: number; whatsapp_sent: number };
+    mutationFn: (body: Parameters<typeof portalApi.adminEmergencyBroadcast>[0]) => portalApi.adminEmergencyBroadcast(body),
+    onSuccess: (resp, sent) => {
+      const d = resp.data;
       void invalidate();
       setAlertOpen(false);
       setAlertConfirm(false);
@@ -157,9 +151,17 @@ export default function AdminAnnouncements() {
       toast.success(
         `Aviso urgente enviado: ${d.notified} notificados` +
           (d.dispatched ? `, ${d.dispatched} por correo/push` : '') +
-          (d.whatsapp_sent ? `, ${d.whatsapp_sent} por WhatsApp` : '') +
-          '.',
+          '.' +
+          // The WhatsApp blast is only recorded here and goes out in the
+          // background: the delivery report opens and follows it.
+          (d.whatsapp_queued ? ` Enviando WhatsApp a ${d.whatsapp_queued} contacto${d.whatsapp_queued === 1 ? '' : 's'}…` : ''),
       );
+      if (sent.whatsapp && !d.whatsapp_configured) {
+        toast.error('WhatsApp no está configurado: el aviso no se envió por WhatsApp.');
+      } else if (sent.whatsapp && !d.whatsapp_queued) {
+        toast('Ningún destinatario tiene WhatsApp registrado.');
+      }
+      if (d.whatsapp_queued) setReport({ id: d.announcement_id, title: sent.title });
     },
     onError: (e: unknown) => toast.error(apiErrorMessage(e, 'No se pudo enviar el aviso urgente.')),
   });
@@ -456,7 +458,7 @@ export default function AdminAnnouncements() {
               onChange={(e) => setAlertForm((f) => ({ ...f, whatsapp: e.target.checked }))}
               className="h-4 w-4 rounded border-line text-purple focus-visible:ring-2 focus-visible:ring-purple/40"
             />
-            También WhatsApp (solo números registrados; requiere Cloud API)
+            También WhatsApp (solo números registrados, uno por número; requiere Cloud API). Se envía en segundo plano y el avance se ve en «Entrega».
           </label>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink">
             <input
@@ -473,7 +475,12 @@ export default function AdminAnnouncements() {
             </Button>
             <Button
               variant="danger"
-              onClick={() => broadcast.mutate()}
+              onClick={() => broadcast.mutate({
+                title: alertForm.title.trim(),
+                message: alertForm.message.trim(),
+                audience: alertForm.audience,
+                whatsapp: alertForm.whatsapp,
+              })}
               loading={broadcast.isPending}
               disabled={
                 !alertConfirm

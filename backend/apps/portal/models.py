@@ -123,6 +123,52 @@ class Notification(models.Model):
         return f'{self.user.email} — {self.title}'
 
 
+class AnnouncementDelivery(models.Model):
+    """One send of a comunicado to one address on one channel.
+
+    The unique ``(announcement, channel, address)`` makes every send of a
+    comunicado idempotent per recipient address:
+
+    * ``whatsapp``: the emergency broadcast's WhatsApp blast. The publish
+      request records one ``pending`` row per normalized phone and returns;
+      a thread sends them after the response and the 5-minute
+      ``dispatch_notifications`` cron finishes whatever a killed thread left
+      pending. Each row is claimed with ``SELECT … FOR UPDATE SKIP LOCKED``,
+      so the thread and the cron never send the same row twice.
+    """
+
+    class Channel(models.TextChoices):
+        EMAIL = 'email', 'Correo'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+
+    announcement = models.ForeignKey(
+                       Announcement, on_delete=models.CASCADE, related_name='deliveries')
+    channel      = models.CharField(max_length=10, choices=Channel.choices)
+    # Normalized key (lowercased email, last 10 digits of a phone): the dedupe key.
+    address      = models.CharField(max_length=254)
+    # What is actually sent to (the address as the account holds it).
+    send_to      = models.CharField(max_length=254)
+    user         = models.ForeignKey(
+                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                       related_name='+')
+    status       = models.CharField(max_length=8, choices=Notification.Delivery.choices,
+                                    default=Notification.Delivery.PENDING)
+    attempts     = models.PositiveSmallIntegerField(default=0)
+    last_error   = models.CharField(max_length=200, blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    sent_at      = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Envío de comunicado'
+        verbose_name_plural = 'Envíos de comunicados'
+        constraints = [models.UniqueConstraint(
+            fields=['announcement', 'channel', 'address'], name='uniq_announcement_delivery')]
+        indexes = [models.Index(fields=['channel', 'status', 'created_at'])]
+
+    def __str__(self):
+        return f'{self.announcement_id} → {self.channel}:{self.address} ({self.status})'
+
+
 class PushSubscription(models.Model):
     """One browser/device Web-Push subscription for a user (opt-in)."""
     user       = models.ForeignKey(
