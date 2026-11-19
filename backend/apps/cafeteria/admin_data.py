@@ -184,8 +184,40 @@ def _safe_balance(student):
 
 
 # ── filters ───────────────────────────────────────────────
-class BalanceFilter(django_filters.FilterSet):
-    """``grade``, ``group``, ``status`` (student lifecycle), ``low_balance``, ``unlinked``."""
+# Who a row belongs to (A8, 2026-11-18), on every person-based cafetería list:
+# ``student_status`` = a lifecycle status, ``archived``, ``inactive`` (anything
+# but active) or ``all``; ``tipo`` = ``alumno`` | ``personal``. Absent = all,
+# as before: the console sends ``student_status=active`` by default.
+STUDENT_STATUS_ARCHIVED, STUDENT_STATUS_INACTIVE = "archived", "inactive"
+
+
+class PersonFilterSet(django_filters.FilterSet):
+    student_status = django_filters.CharFilter(method="filter_student_status")
+    tipo = django_filters.CharFilter(method="filter_tipo")
+
+    person_prefix = "student__"
+
+    def filter_student_status(self, qs, name, value):
+        value = (value or "").strip()
+        p = self.person_prefix
+        if value in StudentProfile.Status.values:
+            return qs.filter(**{f"{p}status": value})
+        if value == STUDENT_STATUS_ARCHIVED:
+            return qs.filter(**{f"{p}user__archived_at__isnull": False})
+        if value == STUDENT_STATUS_INACTIVE:
+            return qs.exclude(**{f"{p}status": StudentProfile.Status.ACTIVE})
+        return qs  # ``all`` or unknown: every status
+
+    def filter_tipo(self, qs, name, value):
+        value = (value or "").strip()
+        if value in StudentProfile.Tipo.values:
+            return qs.filter(**{f"{self.person_prefix}tipo": value})
+        return qs
+
+
+class BalanceFilter(PersonFilterSet):
+    """``grade``, ``group``, ``status`` (student lifecycle), ``low_balance``, ``unlinked``,
+    plus ``student_status`` and ``tipo`` (``PersonFilterSet``)."""
 
     grade = django_filters.CharFilter(field_name="student__grade")
     group = django_filters.CharFilter(field_name="student__group", lookup_expr="iexact")
@@ -220,7 +252,7 @@ class StudentFilter(django_filters.FilterSet):
         fields: list[str] = []
 
 
-class TransactionFilter(django_filters.FilterSet):
+class TransactionFilter(PersonFilterSet):
     type = django_filters.ChoiceFilter(
         field_name="transaction_type", choices=CafeteriaTransaction.TxType.choices
     )
@@ -240,7 +272,7 @@ class AdjustmentFilter(django_filters.FilterSet):
         fields: list[str] = []
 
 
-class TopUpFilter(django_filters.FilterSet):
+class TopUpFilter(PersonFilterSet):
     status = django_filters.ChoiceFilter(choices=TopUpRequest.Status.choices)
     method = django_filters.ChoiceFilter(choices=TopUpRequest.Method.choices)
     student = django_filters.NumberFilter(field_name="student_id")
@@ -936,6 +968,7 @@ class AdminAdjustmentTemplateView(ImportTemplateView):
 class AdminTransactionSerializer(CafeteriaTransactionSerializer):
     student_name = serializers.CharField(source="student.user.full_name", read_only=True)
     student_code = serializers.CharField(source="student.student_id", read_only=True)
+    student_tipo = serializers.CharField(source="student.tipo", read_only=True)
     loyverse_code = serializers.SerializerMethodField()
     type_display = serializers.CharField(source="get_transaction_type_display", read_only=True)
 
@@ -943,6 +976,7 @@ class AdminTransactionSerializer(CafeteriaTransactionSerializer):
         fields = CafeteriaTransactionSerializer.Meta.fields + [
             "student_name",
             "student_code",
+            "student_tipo",
             "loyverse_code",
             "type_display",
         ]

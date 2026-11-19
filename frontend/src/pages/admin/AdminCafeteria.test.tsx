@@ -14,6 +14,8 @@ vi.mock('@/services/api', () => ({
     bulkTopUp: vi.fn(),
   },
   paymentsApi: { verifyBanorte: vi.fn(), reconcileBanorte: vi.fn() },
+  // A9: Archivar / Eliminar reuse the roster's bulk endpoint.
+  portalApi: { studentsBulk: vi.fn(), getStudents: vi.fn(), exportStudents: vi.fn() },
   downloadBlob: vi.fn(),
 }));
 
@@ -46,7 +48,8 @@ vi.mock('react-hot-toast', () => {
 
 import toast from 'react-hot-toast';
 import AdminCafeteria from './AdminCafeteria';
-import { cafeteriaApi, paymentsApi } from '@/services/api';
+import { cafeteriaApi, paymentsApi, portalApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import { adjustmentImportApi, cafeteriaAdminApi } from '@/services/cafeteriaAdmin';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
@@ -107,6 +110,51 @@ beforeEach(() => {
   });
   markLoaded.mockResolvedValue(ok({ needs_pos_load: false }));
   markUnloaded.mockResolvedValue(ok({ needs_pos_unload: false }));
+});
+
+describe('AdminCafeteria people filters and staff accounts (A8 + A9, 2026-11-18)', () => {
+  const staffRow = () => ({
+    ...balanceRow(9, ['Rosa', 'Lince'], '35.00'),
+    student: { ...balanceRow(9, ['Rosa', 'Lince'], '35.00').student, grade: '', group: '', tipo: 'personal', puesto: 'docente', puesto_label: 'Docente' },
+  });
+
+  it('opens on active people, tags staff rows and shows their puesto', async () => {
+    api.balances.mockResolvedValue(page([balanceRow(1, ['Ana', 'Alvarez'], '20.00'), staffRow()]));
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria' });
+    expect(await screen.findByText('Rosa Lince')).toBeInTheDocument();
+    expect(api.balances).toHaveBeenCalledWith(expect.objectContaining({ student_status: 'active' }));
+    expect(screen.getByText('Personal')).toBeInTheDocument();
+    expect(screen.getByText('Docente')).toBeInTheDocument();
+  });
+
+  it('«Todos los estados» and «Solo personal» reach the API', async () => {
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria?estado=todos&persona=personal' });
+    await waitFor(() => expect(api.balances).toHaveBeenCalled());
+    const calls = api.balances.mock.calls;
+    const params = calls[calls.length - 1][0] as Record<string, unknown>;
+    expect(params.student_status).toBeUndefined();
+    expect(params.tipo).toBe('personal');
+  });
+
+  it('an admin archives from the row menu with the Alumnos dialog and endpoint', async () => {
+    useAuthStore.setState({ user: { id: 1, email: 'a@x.mx', first_name: 'A', last_name: 'B', full_name: 'A B', role: 'admin', avatar: '', whatsapp: '' }, accessToken: 't', isAuthenticated: true });
+    vi.mocked(portalApi.studentsBulk).mockResolvedValue(ok({ dry_run: true, matched: 1, ok: 1, skipped: [], failed: [] }));
+    api.balances.mockResolvedValue(page([balanceRow(1, ['Ana', 'Alvarez'], '0.00')]));
+    const u = userEvent.setup();
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria' });
+    await u.click(await screen.findByRole('button', { name: 'Más acciones para Ana Alvarez' }));
+    expect(screen.getByRole('menuitem', { name: /Eliminar/ })).toBeInTheDocument();
+    await u.click(screen.getByRole('menuitem', { name: /Archivar/ }));
+    await waitFor(() => expect(portalApi.studentsBulk).toHaveBeenCalledWith(expect.objectContaining({ action: 'archive', ids: [101], dry_run: true })));
+  });
+
+  it('no lifecycle menu for staff with the cafetería area', async () => {
+    useAuthStore.setState({ user: { id: 2, email: 'c@x.mx', first_name: 'C', last_name: 'D', full_name: 'C D', role: 'staff', staff_areas: ['cafeteria'], avatar: '', whatsapp: '' }, accessToken: 't', isAuthenticated: true });
+    api.balances.mockResolvedValue(page([balanceRow(1, ['Ana', 'Alvarez'], '0.00')]));
+    renderWithProviders(<AdminCafeteria />, { route: '/admin/cafeteria' });
+    expect(await screen.findByText('Ana Alvarez')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Más acciones para Ana Alvarez' })).toBeNull();
+  });
 });
 
 describe('AdminCafeteria Saldos (DataTable v2 + server filters)', () => {

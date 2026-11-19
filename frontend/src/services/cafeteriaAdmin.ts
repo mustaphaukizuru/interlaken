@@ -17,6 +17,8 @@ export interface AdminTransaction extends Omit<CafeteriaTransaction, 'transactio
   transaction_type: 'purchase' | 'topup' | 'refund' | 'adjustment';
   student_name: string;
   student_code: string;
+  /** `personal` = a staff member's cafetería account («Personal» tag). */
+  student_tipo?: import('@/types').PersonTipo;
   loyverse_code: string;
   type_display: string;
 }
