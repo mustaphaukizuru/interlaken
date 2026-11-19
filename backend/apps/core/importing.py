@@ -192,6 +192,11 @@ class ImportSpec:
     # What an «actualizar» row will change, shown as a warning in the preview.
     update_note: Callable[[dict, Any], str | None] | None = None
     key_of: Callable[[dict], str] | None = None
+    # Called once with every parsed row's data, before any ``validate_row``:
+    # a spec that checks rows against the database loads all of it here in a
+    # constant number of queries instead of one or more per row (a 2,000-row
+    # file against the managed database otherwise outlives the 60 s worker).
+    prepare: Callable[[list[dict]], None] | None = None
     max_rows: int = MAX_ROWS
     max_bytes: int = MAX_BYTES
     duplicates_block: bool = True
@@ -442,9 +447,15 @@ def validate(rows, spec: ImportSpec, *, headers=None, fmt: str = "csv") -> Impor
                     row.error(f"{col.header}: {message}.")
         row.data = data
         row.key = _row_key(spec, data)
-        if spec.validate_row is not None:
-            spec.validate_row(data, row)
         report_rows.append(row)
+
+    # Whole-file lookups first, then the per-row checks (same order of messages
+    # within a row as before: parse errors, then validate_row, then duplicates).
+    if spec.prepare is not None:
+        spec.prepare([row.data for row in report_rows])
+    if spec.validate_row is not None:
+        for row in report_rows:
+            spec.validate_row(row.data, row)
 
     # In-file duplicates: the LATER row is flagged, the first one stands.
     for key_fields in spec.dedupe_keys:

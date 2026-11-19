@@ -14,6 +14,14 @@ cd "$(dirname "$0")"
 dump="${1:-}"
 mode="${2:-drill}"
 [[ -f "$dump" ]] || { echo "uso: $0 <dump.sql.gz> [--into-live]" >&2; exit 2; }
+# An off-site copy is GPG ciphertext: decrypt it first, on the computer that
+# holds the private key (docs/DEPLOY_HOSTINGER_VPS.md, "Off-site copy"):
+#   gpg --decrypt db-AAAA-MM-DD-HHMM.sql.gz.gpg > db-AAAA-MM-DD-HHMM.sql.gz
+if [[ "$dump" == *.gpg ]]; then
+  echo "$dump está cifrado. Descífrelo primero con la llave privada:" >&2
+  echo "  gpg --decrypt $(basename "$dump") > $(basename "${dump%.gpg}")" >&2
+  exit 2
+fi
 set -a; # shellcheck disable=SC1091
 source .env; set +a
 : "${DB_NAME:?DB_NAME missing in .env}"; : "${DB_USER:?}"; : "${DB_PASSWORD:?}"

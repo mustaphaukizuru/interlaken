@@ -3039,8 +3039,10 @@ def sync_health() -> dict:
     last_tx = CafeteriaTransaction.objects.order_by('-date').first()
     ok, error = loyverse_reachable()
 
+    from apps.core.backups import offsite_configured
     from apps.core.models import OpsStatus
 
+    backup = OpsStatus.get('backup')
     return {
         # Roster-wide picture from the last full mirror pass (cron / Sincronizar
         # todos): drift, stale links, unlinked customers, parked receipts.
@@ -3060,8 +3062,13 @@ def sync_health() -> dict:
         'last_webhook_at': state.last_webhook_at,
         'last_webhook_type': state.last_webhook_type,
         # Nightly backup marker, reported in by deploy/backup-db.sh via
-        # `manage.py record_backup` (the container cannot see /var/backups).
-        'backup': OpsStatus.get('backup'),
+        # `manage.py record_backup` (the container cannot see /var/backups),
+        # with the encrypted off-site copy's outcome (`offsite_backup`).
+        'backup': backup,
+        # False = «sin copia externa»: no BACKUP_S3_* bucket and no BACKUP_REMOTE.
+        'backup_offsite_configured': offsite_configured(backup or {}),
+        # Monthly restore drill (deploy/restore-db.sh → record_restore_drill).
+        'restore_drill': OpsStatus.get('restore_drill'),
         'active_students': active.count(),
         'linked_students': active.exclude(loyverse_id='').count(),
         'active_staff': staff.count(),

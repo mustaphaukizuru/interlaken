@@ -333,6 +333,23 @@ if AWS_STORAGE_BUCKET_NAME:
     AWS_QUERYSTRING_AUTH = True       # signed, expiring URLs for private objects
     AWS_QUERYSTRING_EXPIRE = env.int('AWS_QUERYSTRING_EXPIRE', default=3600)
 
+# ── OFF-SITE DATABASE BACKUPS (dedicated, private) ────────
+# deploy/backup-db.sh encrypts each nightly dump to deploy/backup-public-key.asc
+# and `manage.py offsite_backup` uploads ONLY that ciphertext to this bucket.
+# A bucket of its own on purpose, never the media bucket above (AWS_*): the
+# site serves media, so that bucket may be public. Nothing here falls back to
+# AWS_* or to default_storage (apps/core/backup_storage.py). Empty bucket = no
+# off-site copy; the console then says «sin copia externa». Setup (Cloudflare
+# R2 or Backblaze B2): docs/DEPLOY_HOSTINGER_VPS.md, "Off-site copy".
+BACKUP_S3_BUCKET = env('BACKUP_S3_BUCKET', default='')
+BACKUP_S3_ENDPOINT_URL = env('BACKUP_S3_ENDPOINT_URL', default='')
+BACKUP_S3_ACCESS_KEY_ID = env('BACKUP_S3_ACCESS_KEY_ID', default='')
+BACKUP_S3_SECRET_ACCESS_KEY = env('BACKUP_S3_SECRET_ACCESS_KEY', default='')
+BACKUP_S3_REGION = env('BACKUP_S3_REGION', default='')
+BACKUP_S3_PREFIX = env('BACKUP_S3_PREFIX', default='interlaken-db')
+# Encrypted dumps kept in the bucket (newest by name); older ones are deleted.
+BACKUP_S3_KEEP = env.int('BACKUP_S3_KEEP', default=30)
+
 # ── EMAIL ─────────────────────────────────────────────────
 # Env-driven so the documented EMAIL_BACKEND key works (development.py still
 # forces the console backend locally).

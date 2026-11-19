@@ -4,7 +4,7 @@ import { invalidateEntity } from '@/hooks/queries/keys';
 import { STUDENTS_ENTITY, STUDENTS_RELATED } from '@/hooks/queries/studentKeys';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, HelpCircle, Link2Off, ListChecks, PlugZap, RefreshCw, Scale, Timer, Users, Zap, DatabaseBackup } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CloudUpload, HelpCircle, History, Link2Off, ListChecks, PlugZap, RefreshCw, Scale, Timer, Users, Zap, DatabaseBackup } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -27,6 +27,20 @@ const STALE_HOURS = 1;
 const WEBHOOK_STALE_HOURS = 30;
 /** Nightly at 02:30; anything older than a day and a bit is a missed night. */
 const BACKUP_STALE_HOURS = 30;
+/** The encrypted off-site copy is made right after the nightly dump: same window. */
+const OFFSITE_STALE_HOURS = 30;
+/** The restore drill runs the first Sunday of each month; same as `check_backup_fresh`. */
+const DRILL_STALE_DAYS = 40;
+
+/** restore-db.sh reports "users 391,students 387,ledger 12,pages 8": say it in Spanish. */
+const DRILL_COUNT_WORDS: Record<string, string> = {
+  users: 'usuarios', students: 'alumnos', ledger: 'movimientos', pages: 'páginas',
+};
+function drillCounts(detail: string): string {
+  const parts = detail.split(',').map((p) => p.trim().match(/^(\w+)\s+(\d+)$/));
+  if (!detail.trim() || parts.some((m) => !m || !DRILL_COUNT_WORDS[m[1]])) return detail.trim();
+  return parts.map((m) => `${Number(m![2]).toLocaleString('es-MX')} ${DRILL_COUNT_WORDS[m![1]]}`).join(', ');
+}
 /** The roster sync runs daily at 06:07; a day plus slack is a missed morning.
  *  Same threshold as `check_sync_fresh --max-roster-age-hours`. */
 const ROSTER_STALE_HOURS = 30;
@@ -69,6 +83,17 @@ export function buildChecks(h: SyncHealth): Check[] {
   const hookStale = hookHours === null || hookHours > WEBHOOK_STALE_HOURS;
   const backupHours = hoursSince(h.backup?.ok ? h.backup.at : null);
   const backupStale = backupHours === null || backupHours > BACKUP_STALE_HOURS;
+  // Older servers do not send the flag: an off-site stamp then means it is configured.
+  const offsiteConfigured = h.backup_offsite_configured ?? !!h.backup?.offsite;
+  const offsiteAt = h.backup?.offsite_at ?? null;
+  const offsiteHours = hoursSince(offsiteAt);
+  // The server writes the reason mid-sentence ("no se pudo subir..."); here it opens one.
+  const rawOffsiteError = h.backup?.offsite_error?.trim() ?? '';
+  const offsiteError = rawOffsiteError.charAt(0).toUpperCase() + rawOffsiteError.slice(1);
+  const offsiteStale = offsiteHours === null || offsiteHours > OFFSITE_STALE_HOURS;
+  const drill = h.restore_drill ?? null;
+  const drillHours = hoursSince(drill?.at ?? null);
+  const drillStale = drillHours === null || drillHours > DRILL_STALE_DAYS * 24;
   const audit = h.wallet_audit;
   const drifting = audit?.drifting ?? 0;
   const driftTotal = Math.abs(parseFloat(audit?.drift_total ?? '0'));
@@ -196,16 +221,60 @@ export function buildChecks(h: SyncHealth): Check[] {
     {
       key: 'backup',
       icon: DatabaseBackup,
-      tone: backupStale ? 'bad' : h.backup?.offsite ? 'ok' : 'warn',
+      // The local nightly dump only; the off-site copy and the drill have their own lights.
+      tone: backupStale ? 'bad' : 'ok',
       label: backupStale
         ? (h.backup && !h.backup.ok ? 'El respaldo de anoche falló' : 'Sin respaldo reciente')
-        : h.backup?.offsite ? 'Respaldo nocturno al día' : 'Respaldo nocturno al día, sin copia externa',
+        : `Respaldo nocturno ${ago(h.backup?.at ?? null)}`,
       detail: backupStale
         ? `Último respaldo correcto: ${ago(h.backup?.ok ? h.backup.at : null)}. Mientras tanto no existe una copia reciente de los datos.`
-        : `${Math.round((h.backup?.size ?? 0) / 1024)} KB, ${ago(h.backup?.at ?? null)}`
-          + (h.backup?.offsite
-            ? `; copia externa ${ago(h.backup.offsite_at)}.`
-            : '. Solo existe en el propio servidor: configure el almacenamiento externo para tener una copia fuera.'),
+        : `${Math.round((h.backup?.size ?? 0) / 1024)} KB, guardado en el servidor. Corre cada noche a las 02:30.`,
+    },
+    {
+      key: 'offsite',
+      icon: CloudUpload,
+      // Not configured is a decision still to make (amber); configured but old or
+      // failed means the copy the school counts on is not there (red).
+      tone: !offsiteConfigured ? 'warn' : offsiteError || offsiteStale ? 'bad' : 'ok',
+      label: !offsiteConfigured
+        ? 'Sin copia externa'
+        : offsiteError
+          ? 'La copia externa falló'
+          : offsiteAt === null
+            ? 'Aún no hay copia externa'
+            : offsiteStale ? 'Sin copia externa reciente' : `Copia externa ${ago(offsiteAt)}`,
+      detail: !offsiteConfigured
+        ? 'El respaldo solo existe en el propio servidor: si el servidor se pierde, se pierde con él. '
+          + 'Configure un bucket privado para la copia cifrada (BACKUP_S3_* en deploy/.env, ver '
+          + 'docs/DEPLOY_HOSTINGER_VPS.md).'
+          + (rawOffsiteError ? ` Último intento: ${rawOffsiteError}.` : '')
+        : offsiteError
+          ? `${offsiteError}. Última copia correcta: ${ago(offsiteAt)}. Revise /var/log/interlaken/backup.log en el servidor.`
+          : offsiteAt === null
+            ? 'Está configurada, pero todavía no se ha guardado ninguna. Se hace cada noche justo después del respaldo.'
+            : offsiteStale
+              ? `Última copia correcta: ${ago(offsiteAt)}. Debe hacerse cada noche justo después del respaldo.`
+              : 'Cifrada con la llave del colegio antes de salir del servidor: solo se abre con la llave privada.',
+    },
+    {
+      key: 'drill',
+      icon: History,
+      // No drill yet is amber (the first one runs on its own); a failed or stopped drill is red.
+      tone: !drill ? 'warn' : !drill.ok || drillStale ? 'bad' : 'ok',
+      label: !drill
+        ? 'Sin prueba de restauración registrada'
+        : !drill.ok
+          ? 'La prueba de restauración falló'
+          : drillStale ? 'La prueba de restauración dejó de correr' : `Respaldo restaurable (prueba ${ago(drill.at)})`,
+      detail: !drill
+        ? 'Corre sola el primer domingo de cada mes a las 04:00: restaura el respaldo más reciente en una '
+          + 'base aparte, cuenta los registros y la borra. Aún no ha reportado ninguna.'
+        : !drill.ok
+          ? `${ago(drill.at)}: ${drill.detail || 'sin detalle'}. Revise /var/log/interlaken/restore-drill.log en el servidor.`
+          : drillStale
+            ? `Última prueba ${ago(drill.at)}. Debe correr el primer domingo de cada mes: revise el crontab del servidor.`
+            : `Se restauró ${drill.dump || 'el respaldo'} en una base aparte`
+              + (drill.detail ? `: ${drillCounts(drill.detail)}.` : '.'),
     },
   ];
 }

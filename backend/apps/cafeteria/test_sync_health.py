@@ -121,6 +121,22 @@ class TestSyncHealth:
         assert data['last_webhook_at'] is not None
         assert data['last_webhook_type'] == 'receipts.update'
         assert data['backup']['ok'] is True and data['backup']['offsite'] is None
+        # «Sin copia externa» (no BACKUP_S3_*), and no restore drill reported yet.
+        assert data['backup_offsite_configured'] is False
+        assert data['restore_drill'] is None
+
+    def test_offsite_and_drill_lights(self, api_client, monkeypatch, settings):
+        from apps.core.models import OpsStatus
+        monkeypatch.setattr('apps.cafeteria.services.loyverse_reachable', lambda: (True, ''))
+        settings.BACKUP_S3_BUCKET = 'colegio-respaldos'
+        OpsStatus.set('restore_drill', {'ok': True, 'at': timezone.now().isoformat(),
+                                        'dump': 'db-x.sql.gz', 'detail': 'users 3'})
+        api_client.force_authenticate(AdminFactory())
+
+        data = api_client.get(URL).json()
+
+        assert data['backup_offsite_configured'] is True
+        assert data['restore_drill']['ok'] is True and data['restore_drill']['dump'] == 'db-x.sql.gz'
 
     def test_the_poll_stamps_when_it_ran_even_with_nothing_to_do(self, api_client, monkeypatch):
         """last_poll_at is the "cron alive" signal: it must move on every run,

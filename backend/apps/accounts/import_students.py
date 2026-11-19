@@ -30,6 +30,8 @@ audited with ``context='import:students'`` and one summary row closes the run.
 
 from __future__ import annotations
 
+from django.db.models.functions import Lower, Upper
+
 from apps.core.importing import (
     ImportCol,
     ImportRow,
@@ -128,29 +130,106 @@ COLUMNS = [
 
 
 class StudentImport:
-    """Per-request lookups with small caches, so a 2,000-row file costs one
-    query per distinct matrícula / email instead of three per row."""
+    """Per-request lookups, loaded for the whole file at once.
+
+    ``prepare`` (called by the import engine before any row check) reads the
+    profiles of every matrícula, every user any row may name (alumno, tutor and
+    the synthetic school address) and the existing guardian links in three
+    queries. A 2,000-row file used to cost several queries per row, which
+    against the managed database (a few ms each, through the pooler) could
+    outlive gunicorn's 60 s timeout. The dry run is now a constant number of
+    queries; the commit adds only the writes themselves.
+
+    The single-row lookups below stay as the fallback for anything ``prepare``
+    did not see, so results are the same either way. Matrícula and email keep
+    their case-insensitive matching (``iexact`` before, ``Upper``/``Lower``
+    keys now).
+    """
 
     def __init__(self):
         self._students: dict[str, StudentProfile | None] = {}
         self._users: dict[str, User | None] = {}
+        # profile pk -> {user pk: lowercased email} of its linked guardians.
+        self._links: dict[int, dict[int, str]] = {}
+
+    # -- whole-file lookups ----------------------------------------------
+    def prepare(self, rows: list[dict]) -> None:
+        matriculas = {d["matricula"] for d in rows if d.get("matricula")}
+        emails = set()
+        for d in rows:
+            for key in ("email_alumno", "email_padre"):
+                if d.get(key):
+                    emails.add(d[key])
+            if d.get("matricula"):
+                emails.add(synthetic_email(d["matricula"]))
+
+        # The database folds case for the filter, Python for the dict key, so
+        # one engine's notion of case (SQLite folds ASCII only) cannot hide a match.
+        wanted = {m.upper() for m in matriculas}
+        found: dict[str, StudentProfile] = {}
+        if wanted:
+            profiles = (
+                StudentProfile.objects.select_related("user")
+                .annotate(_key=Upper("student_id"))
+                .filter(_key__in=wanted | matriculas)
+                .order_by("pk")
+            )
+            for profile in profiles:
+                found.setdefault(profile.student_id.upper(), profile)  # lowest pk, like .first()
+        for key in wanted:
+            self._students[key] = found.get(key)
+
+        lowered = {e.lower() for e in emails}
+        if lowered:
+            users = User.objects.annotate(_email=Lower("email")).filter(_email__in=lowered | emails)
+            for user in users:
+                self._users[user.email.lower()] = user
+        for email in lowered:
+            self._users.setdefault(email, None)
+
+        pks = [p.pk for p in found.values()]
+        for pk in pks:
+            self._links[pk] = {}
+        if pks:
+            links = StudentProfile.parents.through.objects.filter(studentprofile_id__in=pks)
+            for pk, user_id, email in links.values_list(
+                "studentprofile_id", "user_id", "user__email"
+            ):
+                self._links[pk][user_id] = (email or "").lower()
 
     # -- lookups ---------------------------------------------------------
     def student(self, matricula: str) -> StudentProfile | None:
-        if matricula not in self._students:
-            self._students[matricula] = (
+        key = matricula.upper()
+        if key not in self._students:
+            self._students[key] = (
                 StudentProfile.objects.select_related("user")
                 .filter(student_id__iexact=matricula)
                 .order_by("pk")
                 .first()
             )
-        return self._students[matricula]
+        return self._students[key]
 
     def user(self, email: str) -> User | None:
         key = email.lower()
         if key not in self._users:
             self._users[key] = User.objects.filter(email__iexact=key).first()
         return self._users[key]
+
+    def guardians(self, profile: StudentProfile) -> dict[int, str]:
+        """``{user pk: lowercased email}`` of the users linked to ``profile``."""
+        if profile.pk not in self._links:
+            self._links[profile.pk] = {
+                pk: (email or "").lower()
+                for pk, email in profile.parents.values_list("pk", "email")
+            }
+        return self._links[profile.pk]
+
+    def _remember_user(self, user: User) -> None:
+        self._users[user.email.lower()] = user
+
+    def _forget_user(self, user: User) -> None:
+        if self._users.get(user.email.lower()) is user:
+            self._users[user.email.lower()] = None
 
     # -- spec hooks ------------------------------------------------------
     def validate_row(self, data: dict, row: ImportRow) -> None:
@@ -191,76 +270,98 @@ class StudentImport:
         if existing is None:
             return None
         user = existing.user
+        linked = self.guardians(existing)
         unchanged = (
             user.first_name == data["nombre"]
             and user.last_name == data["apellidos"]
             and existing.grade == data["grado"]
             and (not data.get("grupo") or existing.group == data["grupo"])
             and (not data.get("loyverse_id") or existing.loyverse_id == data["loyverse_id"])
-            and existing.parents.filter(pk=user.pk).exists()
+            and user.pk in linked
         )
         if unchanged and data.get("email_padre"):
-            unchanged = existing.parents.filter(email__iexact=data["email_padre"]).exists()
+            unchanged = data["email_padre"].lower() in linked.values()
         return "Sin cambios." if unchanged else None
 
     # -- writes ----------------------------------------------------------
+    # Each row runs in its own savepoint (core.importing.commit). A row that
+    # fails rolls back what it created, so it also takes it back out of the
+    # caches; later rows then see exactly what the database holds.
     def create(self, data: dict, actor) -> StudentProfile:
         matricula = data["matricula"]
         email = data.get("email_alumno") or synthetic_email(matricula)
-        if User.objects.filter(email__iexact=email).exists():
+        if self.user(email) is not None:
             raise ValueError(f"El correo del alumno ya existe: {email}.")
-        user = User.objects.create_user(
-            email=email,
-            password=None,
-            first_name=data["nombre"],
-            last_name=data["apellidos"],
-            role=User.Role.STUDENT,
-        )
-        profile = StudentProfile.objects.create(
-            user=user,
-            student_id=matricula,
-            grade=data["grado"],
-            group=data.get("grupo") or "",
-            loyverse_id=data.get("loyverse_id") or "",
-        )
-        # School-email family login: the alumno is its own guardian.
-        profile.parents.add(user)
-        self._link_parent(profile, data, actor)
+        created: list[User] = []
+        try:
+            user = User.objects.create_user(
+                email=email,
+                password=None,
+                first_name=data["nombre"],
+                last_name=data["apellidos"],
+                role=User.Role.STUDENT,
+            )
+            created.append(user)
+            self._remember_user(user)
+            profile = StudentProfile.objects.create(
+                user=user,
+                student_id=matricula,
+                grade=data["grado"],
+                group=data.get("grupo") or "",
+                loyverse_id=data.get("loyverse_id") or "",
+            )
+            self._links[profile.pk] = {}
+            parent = self._parent_for(profile, data, actor, created)
+            # School-email family login: the alumno is its own guardian.
+            self._link(profile, user, parent)
+        except Exception:
+            for made in created:
+                self._forget_user(made)
+            raise
         return profile
 
     def update(self, profile: StudentProfile, data: dict, actor) -> StudentProfile:
         user = profile.user
-        user_fields = [
-            f
-            for f, v in (("first_name", data["nombre"]), ("last_name", data["apellidos"]))
-            if getattr(user, f) != v
-        ]
-        if user_fields:
-            user.first_name, user.last_name = data["nombre"], data["apellidos"]
-            user.save(update_fields=user_fields)
-        fields = []
-        if profile.grade != data["grado"]:
-            profile.grade = data["grado"]
-            fields.append("grade")
-        if data.get("grupo") and profile.group != data["grupo"]:
-            profile.group = data["grupo"]
-            fields.append("group")
-        if data.get("loyverse_id") and profile.loyverse_id != data["loyverse_id"]:
-            profile.loyverse_id = data["loyverse_id"]
-            fields.append("loyverse_id")
-        if fields:
-            profile.save(update_fields=fields)
-        profile.parents.add(user)
-        self._link_parent(profile, data, actor)
+        links_before = dict(self.guardians(profile))
+        created: list[User] = []
+        try:
+            user_fields = [
+                f
+                for f, v in (("first_name", data["nombre"]), ("last_name", data["apellidos"]))
+                if getattr(user, f) != v
+            ]
+            if user_fields:
+                user.first_name, user.last_name = data["nombre"], data["apellidos"]
+                user.save(update_fields=user_fields)
+            fields = []
+            if profile.grade != data["grado"]:
+                profile.grade = data["grado"]
+                fields.append("grade")
+            if data.get("grupo") and profile.group != data["grupo"]:
+                profile.group = data["grupo"]
+                fields.append("group")
+            if data.get("loyverse_id") and profile.loyverse_id != data["loyverse_id"]:
+                profile.loyverse_id = data["loyverse_id"]
+                fields.append("loyverse_id")
+            if fields:
+                profile.save(update_fields=fields)
+            parent = self._parent_for(profile, data, actor, created)
+            self._link(profile, user, parent)
+        except Exception:
+            for made in created:
+                self._forget_user(made)
+            self._links[profile.pk] = links_before
+            raise
         return profile
 
-    def _link_parent(self, profile: StudentProfile, data: dict, actor) -> None:
+    def _parent_for(self, profile: StudentProfile, data: dict, actor, created: list[User]):
+        """The guardian ``email_padre`` names (created when new), or None."""
         from apps.core.audit import record
 
         email = data.get("email_padre") or ""
         if not email:
-            return
-        parent = User.objects.filter(email__iexact=email).first()
+            return None
+        parent = self.user(email)
         if parent is None:
             first, last = _split_name(data.get("nombre_padre") or "Padre/Tutor")
             parent = User.objects.create_user(
@@ -271,6 +372,8 @@ class StudentImport:
                 role=User.Role.PARENT,
                 whatsapp=data.get("telefono_padre") or "",
             )
+            created.append(parent)
+            self._remember_user(parent)
             record(
                 "create",
                 parent,
@@ -280,7 +383,18 @@ class StudentImport:
             )
         elif parent.role != User.Role.PARENT and parent.pk != profile.user_id:
             raise ValueError(f"El correo {email} no pertenece a un padre/tutor.")
-        profile.parents.add(parent)
+        return parent
+
+    def _link(self, profile: StudentProfile, *users) -> None:
+        """Link ``users`` as guardians, writing only the links that are missing."""
+        linked = self.guardians(profile)
+        missing = [
+            u for u in dict.fromkeys(u for u in users if u is not None) if u.pk not in linked
+        ]
+        if missing:
+            profile.parents.add(*missing)
+            for u in missing:
+                linked[u.pk] = u.email.lower()
 
     def spec(self) -> ImportSpec:
         return ImportSpec(
@@ -289,6 +403,7 @@ class StudentImport:
             columns=COLUMNS,
             dedupe_keys=[("matricula",), ("email_alumno",)],
             key_of=lambda d: d.get("matricula") or "",
+            prepare=self.prepare,
             db_match=self.db_match,
             validate_row=self.validate_row,
             skip_reason=self.skip_reason,
@@ -299,7 +414,8 @@ class StudentImport:
 
 class ImportStudentsView(ImportView):
     """POST .../admin/students/import/ — dry run by default; see the module docstring."""
-    admin_area = 'alumnos'
+
+    admin_area = "alumnos"
 
     template_url = TEMPLATE_URL
 
@@ -309,7 +425,8 @@ class ImportStudentsView(ImportView):
 
 class ImportStudentsTemplateView(ImportTemplateView):
     """GET .../admin/students/import/template/?fmt=csv|xlsx"""
-    admin_area = 'alumnos'
+
+    admin_area = "alumnos"
 
     def get_spec(self) -> ImportSpec:
         return StudentImport().spec()
