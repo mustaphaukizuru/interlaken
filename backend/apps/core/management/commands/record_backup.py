@@ -26,21 +26,22 @@ class Command(BaseCommand):
 
     def handle(self, *args, **o):
         previous = OpsStatus.get('backup') or {}
-        marker = {
+        # The off-site fields belong to offsite_backup, which runs right after
+        # this: carry them over untouched (a local run, good or failed, must not
+        # erase when the last off-site copy happened or why the last one failed).
+        marker = {k: v for k, v in previous.items() if k.startswith('offsite')}
+        marker.update({
             'at': timezone.now().isoformat(),
             'ok': bool(o['ok']),
             'path': o['path'],
             'size': o['size'],
             'target': o['target'],
-            # A failed run must not erase the last good off-site stamp.
-            'offsite': o['offsite'] or (previous.get('offsite') if not o['ok'] else None),
-            'offsite_at': previous.get('offsite_at') if not o['offsite'] else timezone.now().isoformat(),
-        }
-        if o['ok'] and not o['offsite']:
-            # Successful local dump but no off-box copy yet this run: keep the
-            # previous off-site info so the panel can still say when it last happened.
-            marker['offsite'] = previous.get('offsite')
-            marker['offsite_at'] = previous.get('offsite_at')
+        })
+        if o['offsite']:
+            marker['offsite'] = o['offsite']
+            marker['offsite_at'] = timezone.now().isoformat()
+        marker.setdefault('offsite', None)
+        marker.setdefault('offsite_at', None)
         OpsStatus.set('backup', marker)
         self.stdout.write(('backup recorded: ok' if o['ok'] else 'backup recorded: FAILED')
                           + (f" {o['path']} ({o['size'] // 1024} KB)" if o['path'] else ''))

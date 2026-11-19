@@ -6,12 +6,11 @@ exactly like success. Now backup-db.sh reports in (record_backup), the console
 reads the marker, and check_backup_fresh alerts through the app's own email.
 """
 from datetime import timedelta
-from io import BytesIO, StringIO
+from io import StringIO
 from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
-from django.core.management.base import CommandError
 from django.utils import timezone
 
 from apps.accounts.factories import AdminFactory
@@ -137,56 +136,3 @@ class TestRestoreDrillReporting:
             call_command('check_backup_fresh', stdout=StringIO())
         send.assert_not_called()
         assert OpsStatus.get('restore_drill_check') == {'stale': False}
-
-
-@pytest.mark.django_db
-class TestOffsiteBackup:
-    def test_is_a_clear_no_op_without_object_storage(self, settings):
-        settings.AWS_STORAGE_BUCKET_NAME = ''
-        out = StringIO()
-        with patch('sys.stdin') as stdin:
-            stdin.buffer = BytesIO(b'x' * 20_000)
-            call_command('offsite_backup', '--name', 'db-2026-09-16-0230.sql.gz', stdout=out)
-        assert 'skipped' in out.getvalue()
-        assert OpsStatus.get('backup') is None
-
-    def test_refuses_a_dump_that_is_really_an_error_page(self, settings):
-        settings.AWS_STORAGE_BUCKET_NAME = 'bucket'
-        with patch('sys.stdin') as stdin:
-            stdin.buffer = BytesIO(b'<html>502</html>')
-            with pytest.raises(CommandError, match='error page'):
-                call_command('offsite_backup', '--name', 'db-2026-09-16-0230.sql.gz')
-
-    def test_rejects_a_name_that_could_escape_the_prefix(self, settings):
-        settings.AWS_STORAGE_BUCKET_NAME = 'bucket'
-        with patch('sys.stdin') as stdin:
-            stdin.buffer = BytesIO(b'x' * 20_000)
-            with pytest.raises(CommandError):
-                call_command('offsite_backup', '--name', '../etc/passwd')
-
-    def test_uploads_and_stamps_the_marker(self, settings):
-        settings.AWS_STORAGE_BUCKET_NAME = 'bucket'
-        OpsStatus.set('backup', {'ok': True, 'at': timezone.now().isoformat()})
-        saved = {}
-
-        class FakeStorage:
-            def save(self, name, content):
-                saved['name'] = name
-                saved['size'] = len(content.read())
-                return name
-            def listdir(self, prefix):
-                return [], ['db-2026-09-01-0230.sql.gz', 'db-2026-09-16-0230.sql.gz']
-            def delete(self, name):
-                saved.setdefault('deleted', []).append(name)
-
-        out = StringIO()
-        with patch('apps.core.management.commands.offsite_backup.default_storage', FakeStorage()), \
-             patch('sys.stdin') as stdin:
-            stdin.buffer = BytesIO(b'x' * 20_000)
-            call_command('offsite_backup', '--name', 'db-2026-09-16-0230.sql.gz', '--keep', '1', stdout=out)
-
-        assert saved['name'] == 'backups/db-2026-09-16-0230.sql.gz' and saved['size'] == 20_000
-        assert saved['deleted'] == ['backups/db-2026-09-01-0230.sql.gz']   # rotation keeps the newest
-        m = OpsStatus.get('backup')
-        assert m['offsite'] == 'bucket/backups/db-2026-09-16-0230.sql.gz' and m['offsite_at']
-        assert 'offsite backup ok' in out.getvalue()

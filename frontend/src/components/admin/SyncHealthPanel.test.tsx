@@ -34,8 +34,12 @@ const base: SyncHealth = {
   last_webhook_type: 'receipts.update',
   backup: {
     at: new Date().toISOString(), ok: true, path: '/var/backups/interlaken/db-x.sql.gz',
-    size: 257_355, target: 'external (supabase)', offsite: 'bucket/backups/db-x.sql.gz',
-    offsite_at: new Date().toISOString(),
+    size: 257_355, target: 'external (supabase)', offsite: 'colegio-respaldos/interlaken-db/db-x.sql.gz.gpg',
+    offsite_at: new Date().toISOString(), offsite_error: null, offsite_error_at: null,
+  },
+  backup_offsite_configured: true,
+  restore_drill: {
+    at: new Date().toISOString(), ok: true, dump: 'db-x.sql.gz', detail: 'users 391,students 387,ledger 12,pages 8',
   },
   wallet_audit: {
     at: new Date().toISOString(), compared: 10, in_sync: 10, credited: 0, drifting: 0,
@@ -99,13 +103,47 @@ describe('buildChecks — real-time and backup lights', () => {
     expect(check({ last_webhook_at: null }, 'webhook').tone).toBe('warn');
   });
 
-  it('backup: green with an off-site copy, amber without one, red when stale or failed', () => {
+  it('backup: the local nightly dump, red when stale or failed', () => {
     expect(check({}, 'backup').tone).toBe('ok');
-    expect(check({ backup: { ...base.backup!, offsite: null, offsite_at: null } }, 'backup').tone).toBe('warn');
+    expect(check({}, 'backup').label).toMatch(/^Respaldo nocturno hace/);
     expect(check({ backup: { ...base.backup!, at: hoursAgo(50) } }, 'backup').tone).toBe('bad');
     expect(check({ backup: { ...base.backup!, ok: false } }, 'backup').tone).toBe('bad');
     expect(check({ backup: null }, 'backup').tone).toBe('bad');
     expect(check({ backup: { ...base.backup!, ok: false } }, 'backup').label).toMatch(/falló/);
+    // The local light no longer turns amber for a missing off-site copy: that has its own light.
+    expect(check({ backup_offsite_configured: false }, 'backup').tone).toBe('ok');
+  });
+
+  it('off-site: «sin copia externa» in amber until a bucket is configured', () => {
+    const c = check({ backup_offsite_configured: false, backup: { ...base.backup!, offsite: null, offsite_at: null } }, 'offsite');
+    expect(c.tone).toBe('warn');
+    expect(c.label).toBe('Sin copia externa');
+    expect(c.detail).toMatch(/BACKUP_S3_/);
+  });
+
+  it('off-site: green when fresh, red when configured but old, missing or failed', () => {
+    expect(check({}, 'offsite').tone).toBe('ok');
+    expect(check({}, 'offsite').label).toMatch(/^Copia externa hace/);
+    expect(check({ backup: { ...base.backup!, offsite_at: hoursAgo(50) } }, 'offsite').tone).toBe('bad');
+    const never = check({ backup: { ...base.backup!, offsite: null, offsite_at: null } }, 'offsite');
+    expect([never.tone, never.label]).toEqual(['bad', 'Aún no hay copia externa']);
+    const failed = check({ backup: { ...base.backup!, offsite_error: 'no se pudo subir (AccessDenied)' } }, 'offsite');
+    expect([failed.tone, failed.label]).toEqual(['bad', 'La copia externa falló']);
+    expect(failed.detail).toMatch(/^No se pudo subir \(AccessDenied\)/);
+  });
+
+  it('off-site: an older server without the flag still reads its stamp', () => {
+    const { backup_offsite_configured: _omit, ...older } = base;
+    expect(buildChecks(older as SyncHealth).find((c) => c.key === 'offsite')!.tone).toBe('ok');
+  });
+
+  it('restore drill: counts in Spanish when it passed, amber before the first, red when failed or stopped', () => {
+    const ok = check({}, 'drill');
+    expect(ok.tone).toBe('ok');
+    expect(ok.detail).toContain('391 usuarios, 387 alumnos, 12 movimientos, 8 páginas');
+    expect(check({ restore_drill: null }, 'drill').tone).toBe('warn');
+    expect(check({ restore_drill: { ...base.restore_drill!, ok: false, detail: 'la restauración se detuvo (código 3)' } }, 'drill').label).toMatch(/falló/);
+    expect(check({ restore_drill: { ...base.restore_drill!, at: hoursAgo(45 * 24) } }, 'drill').label).toMatch(/dejó de correr/);
   });
 });
 

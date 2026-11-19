@@ -19,12 +19,14 @@ Apagado mientras `SENTRY_DSN` y `VITE_SENTRY_DSN` estén vacíos en `/opt/interl
 
 ## 3. Respaldos y simulacro de restauración
 
-- Respaldo diario 02:30 (`backup-db.sh`, retención 30 días en `/var/backups/interlaken`).
-- Copia fuera del servidor: `.github/workflows/db-backup.yml`, diario, 30 días como artifact de GitHub, **cifrada con GPG** a `deploy/backup-public-key.asc`. El repositorio es público y cualquier usuario de GitHub puede descargar sus artifacts, así que el job cifra antes de subir y se niega a subir un archivo que siga siendo gzip legible. La llave privada **no está en GitHub**: la guarda el administrador (gestor de contraseñas) y hay una copia en el VPS en `/root/.interlaken-backup-PRIVATE-key.asc` (solo root). Sin ella las copias de GitHub no sirven; no la pegue en chats ni correos. Para usar una copia de GitHub:
+- Respaldo diario 02:30 (`backup-db.sh`, retención 30 días en `/var/backups/interlaken`, legible solo por el usuario del respaldo).
+- Copia fuera del servidor, **siempre cifrada con GPG** a `deploy/backup-public-key.asc`: justo después del respaldo, `backup-db.sh` cifra el volcado y sube **solo el archivo cifrado** (`db-AAAA-MM-DD-HHMM.sql.gz.gpg`) a un bucket privado dedicado (`BACKUP_S3_*` en `deploy/.env`; nunca el bucket de archivos del sitio). Se conservan los 30 más recientes. Hasta configurarlo, la consola muestra «Sin copia externa». Cómo crear el bucket y la llave de acceso, y cómo restaurar desde la copia externa: docs/DEPLOY_HOSTINGER_VPS.md, sección *Off-site copy*.
+- Segunda copia independiente: `.github/workflows/db-backup.yml` (artifact de GitHub de 30 días, cifrado igual). Está **desactivado**; encenderlo es decisión del dueño.
+- La llave privada **no está en GitHub**: la guarda el administrador (gestor de contraseñas) y hay una copia en el VPS en `/root/.interlaken-backup-PRIVATE-key.asc` (solo root). Sin ella las copias externas no sirven; no la pegue en chats ni correos. Para usar una copia externa:
   ```bash
   gpg --import interlaken-backup-PRIVATE-key.asc      # una sola vez por máquina
-  gpg --decrypt interlaken-db-AAAAMMDD-HHMMSS.sql.gz.gpg > db.sql.gz
-  ./restore-db.sh db.sql.gz                           # simulacro; --into-live para la real
+  gpg --decrypt db-AAAA-MM-DD-HHMM.sql.gz.gpg > db-AAAA-MM-DD-HHMM.sql.gz
+  ./restore-db.sh db-AAAA-MM-DD-HHMM.sql.gz          # simulacro; --into-live para la real
   ```
 - **Simulacro mensual** (cron, primer domingo 04:00): `restore-db.sh <último dump>` restaura en una base temporal, imprime conteos (usuarios, alumnos, movimientos, páginas) y la borra. Cada corrida se registra en la app (`record_restore_drill`): si falla, correo inmediato a los administradores; si deja de correr más de 40 días, `check_backup_fresh` avisa una vez. Un respaldo que no restaura no es respaldo: del 04-10 al 29-10-2026 fallaba en silencio porque el dump (solo esquema `public`) no trae las extensiones `unaccent` y `pg_trgm`; `restore-db.sh` ahora las recrea alrededor del esquema, y borra la base temporal con `WITH (FORCE)` porque el pooler de Supabase deja una conexión abierta.
 - Restauración real (pérdida de datos, migración fallida):
@@ -62,7 +64,7 @@ Horas de la Ciudad de México (el reloj del servidor debe estar en esa zona, ver
 | Cada 5 min | sync Loyverse, `cms_schedule` (páginas y comunicados programados) |
 | Cada 10 min (GitHub) | `uptime.yml`: DNS, `/healthz`, `/login`, certificado |
 | Cada hora :50 | `check_loyverse_webhook` |
-| Diario 02:30 / 06:15 | respaldo DB (VPS y GitHub cifrado) / recordatorios, alertas de saldo, pagos vencidos, despacho de notificaciones |
+| Diario 02:30 / 06:15 | respaldo DB en el VPS y su copia externa cifrada (`BACKUP_S3_*`) / recordatorios, alertas de saldo, pagos vencidos, despacho de notificaciones |
 | Diario 05:42 / 06:07 | `sync_purchases --since-days 7` (repaso de recibos) / `sync_roster` (roster desde Loyverse: altas, grado, nombre, código; ver §7b) |
 | Semanal dom 05:00 | `purge_retention --apply` |
 | Mensual 1er dom 04:00 | `restore-db.sh` (simulacro) |
@@ -108,16 +110,27 @@ mismo canal de los comunicados (el servidor no tiene `mail`) y pone la luz en
 rojo.
 
 **Copia fuera del servidor.** Un respaldo que solo existe en la máquina que
-protege no es un respaldo. El script sube cada volcado al almacenamiento de
-objetos de la app (Supabase Storage, compatible con S3) en cuanto existan en
-`deploy/.env`:
+protege no es un respaldo. El script cifra cada volcado con la llave pública
+del colegio y sube **solo el archivo cifrado** a un bucket privado que no se usa
+para nada más, configurado con `BACKUP_S3_*` en `deploy/.env` (Cloudflare R2 o
+Backblaze B2; pasos en docs/DEPLOY_HOSTINGER_VPS.md, *Off-site copy*). Ya no usa
+el almacenamiento de archivos del sitio (`AWS_*`): hasta el 18-11-2026 lo
+hacía, y con ese bucket configurado el volcado habría quedado sin cifrar junto
+a las imágenes del sitio. La app rechaza cualquier archivo que no esté cifrado
+para la llave del colegio.
 
-    AWS_STORAGE_BUCKET_NAME=<bucket privado>
-    AWS_S3_ENDPOINT_URL=https://<proyecto>.supabase.co/storage/v1/s3
-    AWS_ACCESS_KEY_ID=...   AWS_SECRET_ACCESS_KEY=...   (Supabase → Storage → S3 Connection)
+En la consola hay tres luces:
 
-Hasta entonces la luz dice "sin copia externa". Los volcados quedan en
-`backups/` dentro del bucket; se conservan los 30 más recientes.
+| Luz | Verde | Ámbar | Rojo |
+|---|---|---|---|
+| *Respaldo nocturno* | el respaldo local tiene menos de 30 h | | falló o tiene más de 30 h |
+| *Copia externa* | la copia cifrada tiene menos de 30 h | «Sin copia externa»: no hay `BACKUP_S3_*` | configurada, pero falló, no existe o tiene más de 30 h |
+| *Prueba de restauración* | el simulacro mensual pasó hace menos de 40 días | aún no se ha registrado ninguno | falló o dejó de correr |
+
+Con la copia externa configurada, `check_backup_fresh` (07:45) también envía
+correo a los administradores si la copia tiene más de 26 h, si nunca se ha
+hecho o si el último intento falló: una vez por problema y luego semanal
+mientras siga.
 
 
 ## 7. Cafetería: cómo saber que los saldos coinciden con Loyverse

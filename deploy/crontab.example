@@ -111,13 +111,17 @@ CRON_TZ=America/Mexico_City
 # Shout if last night's backup did not land. Silence from a backup job looks
 # exactly like success, which is how the previous one failed for five nights.
 # The VPS has no `mail`, so the alarm goes through the app's own email pipeline
-# (the same one that sends comunicados) and lights up the console.
+# (the same one that sends comunicados) and lights up the console. Once an
+# off-site copy is configured it also alarms when that copy is over a day old
+# or its last attempt failed.
 45 7 * * * cd $COMPOSE && docker compose exec -T app python manage.py check_backup_fresh >> /var/log/interlaken/backup.log 2>&1
 
-# The off-box copy (Supabase S3) is done by backup-db.sh itself right after the
-# dump; it is a no-op until AWS_STORAGE_BUCKET_NAME + keys are set in .env.
-# A second, independent off-site copy is .github/workflows/db-backup.yml
-# (GPG-encrypted to deploy/backup-public-key.asc; the repo is public).
+# The off-box copy is made by backup-db.sh itself right after the dump: it
+# encrypts the dump to deploy/backup-public-key.asc and uploads ONLY that
+# ciphertext to a dedicated private bucket (BACKUP_S3_* in .env; never the
+# media bucket). Until BACKUP_S3_* is set the console says «sin copia externa».
+# .github/workflows/db-backup.yml (GPG-encrypted too) is a second, independent
+# copy; it is disabled until the owner decides to turn it on.
 
 # ── Log rotation so the files above cannot fill the disk ────────────────────
 0 3 * * 0 find /var/log/interlaken -name '*.log' -size +50M -exec truncate -s 0 {} \;

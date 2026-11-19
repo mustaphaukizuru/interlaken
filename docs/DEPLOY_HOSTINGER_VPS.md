@@ -510,35 +510,148 @@ Three separate things need backing up, and only one of them is handled for you.
 
 | What | Where it lives | Who backs it up |
 |---|---|---|
-| School data (parents, payments, ledger) | the external database (or `pgdata` here, if you moved it) | two: `deploy/backup-db.sh` on this box, and the `db-backup` GitHub workflow off-site, both nightly |
+| School data (parents, payments, ledger) | the external database (or `pgdata` here, if you moved it) | `deploy/backup-db.sh` on this box, nightly, plus its **encrypted** off-site copy to a private bucket once `BACKUP_S3_*` is set (below) |
 | Uploaded documents | the `media` Docker volume on this VPS | **nobody, until you set this up** |
 | TLS certificate | the `caddy_data` volume | re-issued automatically if lost |
 
-**Two backups, on purpose.** The `db-backup` GitHub workflow dumps the managed
-database nightly and keeps the gzip as a build artifact for 30 days — somewhere
-that is not this VPS, which is the only property that helps when the VPS is what
-failed. It opens an issue if it fails, so a silent stop is not possible. It only
-works while the database is reachable from the internet: if you ever move the
-database onto this box, delete that workflow, because from then on the cron
-below is the only thing that can take a dump at all.
-
-**And the backup that runs from this box.** `backup-db.sh` (installed by the
-crontab in Step 9) dumps whichever database the app is actually using — it reads
+**The backup that runs from this box.** `backup-db.sh` (installed by the
+crontab in Step 9) dumps whichever database the app is actually using: it reads
 `DB_HOST` the same way the app does, so it cannot end up backing up the wrong,
 empty one. It always runs pg_dump from a Postgres 17 image so client and server
 versions match (a mismatch is what silently broke the previous GitHub Actions
 backup for five nights), refuses to rotate old copies away behind a
-suspiciously small dump, and a second cron entry emails you if a night passes
-with no backup at all. Set `BACKUP_REMOTE` in `deploy/.env` to copy each dump
-off the box — an on-box backup does not survive the failure it exists for.
+suspiciously small dump, keeps 30 days in `/var/backups/interlaken` (readable
+only by the backup user), and a second cron entry emails you if a night passes
+with no backup at all. An on-box backup does not survive the failure it exists
+for, so set up the off-site copy below.
 
-Restore one:
+The `db-backup` GitHub workflow is a second, independent copy (GPG-encrypted
+too, as a 30-day artifact). It is **disabled**; turning it on is the owner's
+decision. It only works while the database is reachable from the internet: if
+the database ever moves onto this box, delete that workflow.
+
+Restore one (test first, then for real; details in docs/OPS-RUNBOOK.md §3):
 
 ```bash
 cd /opt/interlaken/deploy
-gunzip -c /var/backups/interlaken/db-<date>.sql.gz | docker compose exec -T db psql -U <DB_USER> -d <DB_NAME>
-docker compose restart app
+./restore-db.sh /var/backups/interlaken/db-<date>.sql.gz              # drill: scratch database, counts, dropped
+./restore-db.sh /var/backups/interlaken/db-<date>.sql.gz --into-live  # asks you to type RESTAURAR
 ```
+
+### Off-site copy (encrypted, private bucket)
+
+Every night, right after the dump, `backup-db.sh`:
+
+1. encrypts the dump to `deploy/backup-public-key.asc` (the school's public
+   key; the private key is not needed on this path and must never be in the
+   repository);
+2. checks the result is not readable gzip and is a GPG message for that key;
+3. hands **only that encrypted file** to `manage.py offsite_backup`, which
+   uploads it to a bucket used for nothing else, checks the copy is there with
+   the right size, keeps the newest 30, and reports to the console.
+
+The plaintext dump never leaves the box. The app refuses to upload a plain
+gzip, a file encrypted to another key, or anything under another name, and it
+never uses the media bucket (`AWS_*`): if `BACKUP_S3_BUCKET` is the media
+bucket's name it refuses. If `gpg` or the key file is missing, nothing is
+uploaded and the console says why.
+
+Until this is set up, Administración → Cafetería → *Estado de la
+sincronización* shows the amber light «Sin copia externa».
+
+**1. Create a private bucket.** Cloudflare R2 is the recommendation (10 GB
+free, no fees to download a copy back); Backblaze B2 works the same way.
+
+- R2: Cloudflare dashboard → *R2 Object Storage* → *Create bucket*, any name
+  (for example `colegio-respaldos`). Leave it private: do not enable the public
+  `r2.dev` URL and do not connect a custom domain. The account's S3 endpoint is
+  shown on the R2 overview page: `https://<account id>.r2.cloudflarestorage.com`.
+- B2: *Buckets* → *Create a Bucket*, *Files in Bucket are*: **Private**. The
+  endpoint is shown on the bucket (`https://s3.<region>.backblazeb2.com`).
+
+Use this bucket for backups only. The CMS media library must get its own.
+
+**2. Create an access key limited to that bucket.** It needs to read, write and
+delete objects in that one bucket (delete is for keeping only the newest 30).
+
+- R2: *R2 Object Storage* → *Manage API tokens* → *Create API token*,
+  permission **Object Read & Write**, *Apply to specific buckets only* → the
+  backup bucket. Copy the *Access Key ID* and *Secret Access Key* (shown once).
+- B2: *Application Keys* → *Add a New Application Key*, *Allow access to
+  Bucket(s)*: only the backup bucket, *Type of Access*: Read and Write. The
+  *keyID* is the access key id, the *applicationKey* is the secret.
+
+**3. Paste the five lines into `/opt/interlaken/deploy/.env`** (`nano .env`,
+or build it on your computer and `scp` it, as in Step 4):
+
+```bash
+BACKUP_S3_BUCKET=colegio-respaldos
+BACKUP_S3_ENDPOINT_URL=https://<account id>.r2.cloudflarestorage.com
+BACKUP_S3_ACCESS_KEY_ID=<access key id>
+BACKUP_S3_SECRET_ACCESS_KEY=<secret access key>
+BACKUP_S3_REGION=auto
+```
+
+`BACKUP_S3_REGION` is `auto` for R2; for B2 it is the region inside the
+endpoint (for example `us-west-004`). Then recreate the app container so it
+reads the new lines (a few seconds):
+
+```bash
+cd /opt/interlaken/deploy && docker compose up -d app
+```
+
+**4. Run the backup once and watch the light turn green.**
+
+```bash
+cd /opt/interlaken/deploy && ./backup-db.sh; echo "exit $?"
+```
+
+It should end with `offsite upload verified: db-<date>.sql.gz.gpg`, then
+`offsite backup ok: colegio-respaldos/interlaken-db/db-<date>.sql.gz.gpg` and
+`exit 0`. Reload the console: the light reads «Copia externa hace menos de un
+minuto» in green. If it reads «La copia externa falló», its text says why
+(`AccessDenied`: the key or its bucket permission; `Could not connect`: the
+endpoint). Fix `.env`, run `docker compose up -d app` and the backup again.
+
+From then on the 07:45 check (`check_backup_fresh`) emails the admins when the
+off-site copy is more than a day old or the last attempt failed (once per
+problem, then weekly while it lasts).
+
+**Restore from an off-site copy** (the server or its disk is gone). Do this
+on the computer that holds the school's PRIVATE key, never on a shared one:
+
+```bash
+gpg --import interlaken-backup-PRIVATE-key.asc                  # once per computer
+# download the newest db-<date>.sql.gz.gpg from the bucket (dashboard → bucket → Download)
+gpg --decrypt db-<date>.sql.gz.gpg > db-<date>.sql.gz
+scp db-<date>.sql.gz <user>@<server>:/var/backups/interlaken/  # the rebuilt server
+```
+
+Then on the server, drill first and restore for real only after the counts
+look right:
+
+```bash
+cd /opt/interlaken/deploy
+./restore-db.sh /var/backups/interlaken/db-<date>.sql.gz
+./restore-db.sh /var/backups/interlaken/db-<date>.sql.gz --into-live
+```
+
+Delete the decrypted `db-<date>.sql.gz` from your computer afterwards: it is
+every family's data in the clear. (`restore-db.sh` refuses a `.gpg` file and
+prints the `gpg --decrypt` line to run first.)
+
+Good to know:
+
+- The access key on this server can delete objects in the backup bucket (it
+  has to, to keep only 30). If you want copies that even a compromised server
+  cannot delete, turn on Object Lock (B2) or a bucket lock rule (R2) for, say,
+  30 days. Rotation then only logs `rotation skipped` until a copy ages out.
+- An extra copy made by the host itself is still possible with
+  `BACKUP_REMOTE` (an rclone remote or an scp target); it also receives only
+  the `.gpg` file, and its result shows in the same console light.
+- Rotating the GPG key means replacing `deploy/backup-public-key.asc`, the
+  fingerprint in `deploy/backup-encrypt.sh` and `BACKUP_KEY_IDS` in
+  `backend/apps/core/backups.py` together; a test fails if they disagree.
 
 **Uploaded documents are the gap.** Admission documents are legally retained,
 and a Docker volume on a single VPS is one failed disk away from gone. Back the

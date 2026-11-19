@@ -98,7 +98,8 @@ class OpsStatus(models.Model):
     see /var/backups). Scripts report in through management commands; the
     admin console reads it. Keys are free-form JSON so a new marker never needs
     a migration: {"backup": {"at": iso, "ok": bool, "path": str, "size": int,
-    "target": str, "offsite": str|null}}.
+    "target": str, "offsite": str|null, "offsite_at": iso|null,
+    "offsite_error": str|null, ...}} (the off-site fields: apps/core/backups.py).
     """
     data = models.JSONField(default=dict, blank=True)
     updated_at = models.DateTimeField(auto_now=True)

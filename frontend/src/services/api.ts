@@ -472,8 +472,15 @@ export interface SyncHealth {
   /** Reported in by deploy/backup-db.sh; null until the first run after this ships. */
   backup: {
     at: string; ok: boolean; path: string; size: number; target: string;
+    /** Encrypted off-site copy (`offsite_backup`): where and when the last good one went. */
     offsite: string | null; offsite_at: string | null;
+    /** Why the last off-site attempt failed; null after a good one. */
+    offsite_error?: string | null; offsite_error_at?: string | null;
   } | null;
+  /** False = «sin copia externa» (no BACKUP_S3_* bucket and no BACKUP_REMOTE). Older servers omit it. */
+  backup_offsite_configured?: boolean;
+  /** Monthly restore drill (deploy/restore-db.sh); null until the first one reports. */
+  restore_drill?: { at: string; ok: boolean; dump: string; detail: string } | null;
   /** Roster-wide picture from the last full POS-mirror pass (cron / Sincronizar todos). */
   wallet_audit: WalletAudit | null;
   /** Active students whose Loyverse customer no longer exists (leavers to withdraw). */

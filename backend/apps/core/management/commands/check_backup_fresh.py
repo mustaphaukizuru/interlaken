@@ -6,16 +6,25 @@ so the alarm could never fire: silence from a backup job looks exactly like
 success, which is how a previous one failed for five nights. This one goes
 through the app's own email pipeline (the same one comunicados use) and also
 flips the marker the console reads, so it is visible even if email is down.
+
+It also watches the encrypted off-site copy (offsite_backup), but only once
+one is configured (BACKUP_S3_* or BACKUP_REMOTE): then a copy older than a
+day, none at all, or a failed last attempt emails the admins, once per
+distinct problem and weekly while it lasts (apps.payments.ops_alerts). Without
+one the console keeps saying «sin copia externa» and nobody is emailed daily
+about a decision the school has not made yet.
 """
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.core.backups import offsite_configured
 from apps.core.models import OpsStatus
 
 MAX_AGE_HOURS = 26   # nightly at 02:30, checked at 07:45: one missed night trips it
 MAX_DRILL_AGE_DAYS = 40   # restore drill runs the first Sunday of each month: 35 days at most
+OFFSITE_ALERT_KEY = 'backup_offsite_alert'
 
 
 def _admin_emails() -> list[str]:
@@ -36,6 +45,7 @@ class Command(BaseCommand):
     def handle(self, *args, **o):
         self._check_restore_drill(o['no_email'])
         marker = OpsStatus.get('backup') or {}
+        self._check_offsite(marker, o['max_age_hours'], o['no_email'])
         last_ok = parse_datetime(marker.get('at') or '') if marker.get('ok') else None
         age_h = (timezone.now() - last_ok).total_seconds() / 3600 if last_ok else None
         stale = age_h is None or age_h > o['max_age_hours']
@@ -111,3 +121,58 @@ class Command(BaseCommand):
         if sent:
             OpsStatus.set('restore_drill_check', {'stale': True, 'alerted_at': timezone.now().isoformat()})
         self.stdout.write(f'drill alert email {"sent" if sent else "NOT sent"} to {len(recipients)} admin(s)')
+
+    def _check_offsite(self, marker: dict, max_age_hours: int, no_email: bool) -> None:
+        """Alarm when a configured off-site copy is missing, old, or last failed."""
+        from apps.payments import ops_alerts
+
+        if not offsite_configured(marker):
+            OpsStatus.set('backup_offsite_check', {'at': timezone.now().isoformat(),
+                                                   'configured': False, 'stale': False})
+            ops_alerts.clear_alert(OFFSITE_ALERT_KEY)
+            self.stdout.write('off-site copy: not configured (sin copia externa)')
+            return
+
+        at = parse_datetime(marker.get('offsite_at') or '')
+        age_h = (timezone.now() - at).total_seconds() / 3600 if at else None
+        error = (marker.get('offsite_error') or '').strip()
+        problems, fingerprint = [], []
+        if error:
+            problems.append(f'el último intento de copia externa falló: {error}')
+            fingerprint.append(f'failed:{error[:120]}')
+        if age_h is None:
+            problems.append('todavía no existe ninguna copia externa')
+            fingerprint.append('never')
+        elif age_h > max_age_hours:
+            problems.append(f'la última copia externa correcta tiene {age_h:.0f} h')
+            fingerprint.append('stale')
+
+        OpsStatus.set('backup_offsite_check', {
+            'at': timezone.now().isoformat(),
+            'configured': True,
+            'stale': bool(problems),
+            'age_hours': round(age_h, 1) if age_h is not None else None,
+        })
+        if not problems:
+            ops_alerts.clear_alert(OFFSITE_ALERT_KEY)
+            self.stdout.write(f'off-site copy fresh: {age_h:.1f} h old')
+            return
+
+        detail = '; '.join(problems)
+        self.stdout.write(self.style.ERROR(f'OFF-SITE COPY: {detail}'))
+        # Once per distinct problem, then weekly while it lasts: the age is left
+        # out of the fingerprint so a copy that stays broken is not emailed daily.
+        key = '|'.join(fingerprint)
+        if no_email or not ops_alerts.should_alert(OFFSITE_ALERT_KEY, key):
+            return
+        addressed = ops_alerts.email_admins(
+            'Interlaken: la copia externa del respaldo no está al día',
+            f'La copia cifrada del respaldo que se guarda fuera del servidor no está al día: {detail}.\n\n'
+            'El respaldo local del servidor no se ve afectado, pero si el servidor se pierde no habría '
+            'una copia reciente en otro lugar. Revise Administración → Cafetería → Estado de la '
+            'sincronización, en el servidor /var/log/interlaken/backup.log, y las variables BACKUP_S3_* '
+            'de deploy/.env (docs/DEPLOY_HOSTINGER_VPS.md, "Off-site copy").',
+        )
+        if addressed:
+            ops_alerts.mark_alerted(OFFSITE_ALERT_KEY, key)
+        self.stdout.write(f'off-site alert email {"sent" if addressed else "NOT sent"} to {addressed} admin(s)')

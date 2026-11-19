@@ -56,6 +56,10 @@ def _test_settings(settings):
                  "BANORTE_TERMINAL_ID", "BANORTE_MERCHANT_CITY", "BANORTE_CERT",
                  "BANORTE_CERT_PATH"):
         setattr(settings, name, "")
+    # And the off-site backup bucket: no test may ever reach a real one.
+    for name in ("BACKUP_S3_BUCKET", "BACKUP_S3_ENDPOINT_URL", "BACKUP_S3_ACCESS_KEY_ID",
+                 "BACKUP_S3_SECRET_ACCESS_KEY", "BACKUP_S3_REGION"):
+        setattr(settings, name, "")
     settings.RATELIMIT_ENABLE = False
     settings.AXES_ENABLED = False
     settings.STORAGES = {
