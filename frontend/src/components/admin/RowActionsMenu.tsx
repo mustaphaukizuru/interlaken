@@ -9,6 +9,8 @@ export interface RowMenuItem {
   onSelect: () => void;
   /** Destructive: coral text, and a divider above it so it never sits next to a safe action. */
   danger?: boolean;
+  /** Full accessible name when the short label needs the row's context ("Cancelar la reserva de Ana"). */
+  ariaLabel?: string;
 }
 
 const WIDTH = 224;
@@ -122,6 +124,7 @@ export function RowActionsMenu({ label, items }: { label: string; items: RowMenu
                 <button
                   type="button"
                   role="menuitem"
+                  aria-label={it.ariaLabel}
                   onClick={() => { setOpen(false); it.onSelect(); }}
                   className={`flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 ${
                     it.danger ? 'text-coral-700 hover:bg-coral-50' : 'text-ink hover:bg-cream-2'
