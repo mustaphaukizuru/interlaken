@@ -36,6 +36,11 @@ class UserSerializer(serializers.ModelSerializer):
         granted = user_areas(instance)
         data['staff_areas'] = [key for key in AREAS if key in granted]
         data['staff_title'] = instance.staff_title
+        # The caller's own staff cafetería account (or null): the SPA shows
+        # «Mi cafetería» from it. Direct-user views only (one query), like prefs.
+        if self.context.get('include_prefs'):
+            from .people import cafeteria_account_payload
+            data['cafeteria_account'] = cafeteria_account_payload(instance)
         return data
 
     def get_has_usable_password(self, obj):
@@ -60,10 +65,14 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     age = serializers.ReadOnlyField()
     loyverse_code = serializers.SerializerMethodField()
     archived_at = serializers.DateTimeField(source='user.archived_at', read_only=True)
+    # Staff cafetería accounts (2026-11-18): ``tipo`` alumno|personal, and the
+    # staff member's ``puesto`` (empty for pupils) with its label.
+    puesto_label = serializers.CharField(source='get_puesto_display', read_only=True)
 
     class Meta:
         model = StudentProfile
         fields = ['id', 'user', 'student_id', 'loyverse_code', 'grade', 'group', 'loyverse_id',
+                  'tipo', 'puesto', 'puesto_label',
                   'enrollment_date', 'is_active', 'status', 'archived_at',
                   'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
                   'blood_type', 'allergies', 'medical_notes']

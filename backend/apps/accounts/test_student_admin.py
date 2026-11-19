@@ -22,7 +22,11 @@ class TestCreate:
             'grade': '1° Primaria', 'group': 'B',
         }, format='json')
         assert resp.status_code == 201, resp.data
-        p = StudentProfile.objects.get(student_id='A123')
+        # A6 (2026-11-18): the code is kept as typed (no forced uppercase);
+        # every lookup is case-insensitive.
+        p = StudentProfile.objects.get(student_id__iexact='A123')
+        assert p.student_id == 'a123' and p.tipo == 'alumno'
+        assert resp.data['loyverse_link']['status'] == 'unreachable'
         assert p.user.email == 'a123@alumnos.interlaken.edu.mx'
         assert p.user.role == 'student'
         assert not p.user.has_usable_password()

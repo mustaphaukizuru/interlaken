@@ -35,7 +35,8 @@ from .student_delete import (
     restore_student,
 )
 
-EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'enrollment_date', 'is_active', 'loyverse_id', 'status',
+EDITABLE_PROFILE = ('student_id', 'grade', 'group', 'tipo', 'puesto', 'enrollment_date', 'is_active',
+                    'loyverse_id', 'status',
                     'birth_date', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
                     'blood_type', 'allergies', 'medical_notes')
 SENSITIVE = ('blood_type', 'allergies', 'medical_notes')
@@ -62,9 +63,16 @@ class StudentWriteSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     email = serializers.EmailField(required=False, allow_blank=True)
+    # «Matrícula o código Loyverse» (A6): written as the office types it, in
+    # any case. Pupils keep normalize_matricula (``ci09932`` → ``09932``).
     student_id = serializers.CharField(max_length=20)
-    grade = serializers.CharField(max_length=20)
+    # A pupil needs a grade; a staff member (``tipo='personal'``) has a
+    # ``puesto`` instead. Checked in ``validate``.
+    grade = serializers.CharField(max_length=20, required=False, allow_blank=True)
     group = serializers.CharField(max_length=5, required=False, allow_blank=True)
+    tipo = serializers.ChoiceField(choices=StudentProfile.Tipo.choices, required=False)
+    puesto = serializers.ChoiceField(choices=StudentProfile.Puesto.choices, required=False,
+                                     allow_blank=True)
     enrollment_date = serializers.DateField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False)
     status = serializers.ChoiceField(choices=StudentProfile.Status.choices, required=False)
@@ -88,20 +96,8 @@ class StudentWriteSerializer(serializers.Serializer):
                 f.required = False
 
     def validate_student_id(self, value):
-        # Spelled like every other matrícula input (importers, Loyverse,
-        # admissions): «CI09932» is stored as «09932», never as a second student.
-        from apps.core.matricula import normalize_matricula
-
-        value = normalize_matricula(value).upper()
-        if not value:
-            raise serializers.ValidationError('Escriba la matrícula.')
-        qs = StudentProfile.objects.filter(student_id=value)
-        current = self.context.get('profile')
-        if current is not None:
-            qs = qs.exclude(pk=current.pk)
-        if qs.exists():
-            raise serializers.ValidationError('Ya existe un alumno con esa matrícula.')
-        return value
+        # Normalised per tipo in ``validate`` (a staff code is kept as written).
+        return (value or '').strip()
 
     def validate_email(self, value):
         value = (value or '').strip().lower()
@@ -111,9 +107,58 @@ class StudentWriteSerializer(serializers.Serializer):
         current = self.context.get('profile')
         if current is not None:
             qs = qs.exclude(pk=current.user_id)
-        if qs.exists():
-            raise serializers.ValidationError('Ese correo ya está registrado.')
+        existing = qs.first()
+        if existing is not None:
+            # A staff member whose address already has an account (a console
+            # user such as colegio@, or a parent) keeps it: the cafetería
+            # account is attached to that login (AdminStudentCreateView).
+            attachable = (current is None
+                          and self.initial_data.get('tipo') == StudentProfile.Tipo.PERSONAL
+                          and not StudentProfile.objects.filter(user_id=existing.pk).exists())
+            if not attachable:
+                raise serializers.ValidationError('Ese correo ya está registrado.')
         return value
+
+    def validate(self, attrs):
+        from .people import normalize_code
+
+        current = self.context.get('profile')
+        default_tipo = current.tipo if current is not None else StudentProfile.Tipo.ALUMNO
+        tipo = attrs.get('tipo') or default_tipo
+        personal = tipo == StudentProfile.Tipo.PERSONAL
+        if 'student_id' in attrs or current is None:
+            # Spelled like every other matrícula input (importers, Loyverse,
+            # admissions): «CI09932» is stored as «09932», never as a second
+            # student. Compared case-insensitively: «JPEREZ» is «jperez».
+            code = normalize_code(attrs.get('student_id'), tipo)
+            if not code:
+                raise serializers.ValidationError(
+                    {'student_id': ['Escriba la matrícula o el código Loyverse.']})
+            qs = StudentProfile.objects.filter(student_id__iexact=code)
+            if current is not None:
+                qs = qs.exclude(pk=current.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {'student_id': ['Ya existe un alumno con esa matrícula.']})
+            attrs['student_id'] = code
+        tipo_changed = current is None or current.tipo != tipo
+        if personal:
+            # A staff member has no grade or group: never promoted, counted or
+            # targeted by grade.
+            attrs['grade'] = ''
+            attrs['group'] = ''
+            if 'puesto' in attrs or tipo_changed:
+                attrs['puesto'] = attrs.get('puesto') or StudentProfile.Puesto.SIN_ASIGNAR
+        else:
+            needs_grade = tipo_changed or 'grade' in attrs
+            grade = attrs['grade'] if 'grade' in attrs else (current.grade if current else '')
+            if needs_grade and not (grade or '').strip():
+                raise serializers.ValidationError({'grade': ['Seleccione el grado.']})
+            if tipo_changed:
+                attrs['puesto'] = ''
+            else:
+                attrs.pop('puesto', None)
+        return attrs
 
 
 def _changes(before: dict, after: dict) -> dict:
@@ -132,18 +177,36 @@ def _snapshot(profile: StudentProfile) -> dict:
     return snap
 
 
-def _existing_student(student_id) -> dict | None:
+def _existing_student(student_id, tipo=StudentProfile.Tipo.ALUMNO) -> dict | None:
     """The record that already holds ``student_id``, archived ones included, so the
-    form can offer to open or restore it instead of creating a second copy."""
-    from apps.core.matricula import normalize_matricula
+    form can offer to open or restore it instead of creating a second copy.
+    Case-insensitive (A6): «JPEREZ» and «jperez» are one code."""
+    from .people import normalize_code
 
-    sid = normalize_matricula(str(student_id or '')).upper()
-    profile = (StudentProfile.objects.filter(student_id=sid).select_related('user').first()
+    sid = normalize_code(str(student_id or ''), tipo)
+    profile = (StudentProfile.objects.filter(student_id__iexact=sid).select_related('user').first()
                if sid else None)
     if profile is None:
         return None
     return {'id': profile.id, 'name': profile.user.full_name, 'student_id': profile.student_id,
-            'status': profile.status, 'archived': profile.user.archived_at is not None}
+            'status': profile.status, 'archived': profile.user.archived_at is not None,
+            'tipo': profile.tipo}
+
+
+def _link_on_save(profile, actor) -> dict:
+    """Link ``profile`` to its Loyverse customer now (A7) and return the
+    outcome the form shows. Never raises: the person is already saved."""
+    import logging
+
+    from apps.cafeteria.services import link_profile_on_save
+
+    try:
+        return link_profile_on_save(profile, actor=actor)
+    except Exception:  # noqa: BLE001 - the save already succeeded
+        logging.getLogger(__name__).exception('Link on save failed for profile %s', profile.pk)
+        return {'status': 'error',
+                'message': 'No se pudo vincular con Loyverse ahora; se vinculará en la '
+                           'próxima sincronización.'}
 
 
 class AdminStudentCreateView(APIView):
@@ -156,35 +219,50 @@ class AdminStudentCreateView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request):
-        existing = _existing_student(request.data.get('student_id'))
+        tipo = request.data.get('tipo') or StudentProfile.Tipo.ALUMNO
+        existing = _existing_student(request.data.get('student_id'), tipo)
         if existing is not None:
             return Response({'student_id': ['Ya existe un alumno con esa matrícula.'], 'existing': existing},
                             status=status.HTTP_400_BAD_REQUEST)
         ser = StudentWriteSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
+        personal = d.get('tipo') == StudentProfile.Tipo.PERSONAL
         email = d.get('email') or f"{d['student_id'].lower()}@{STUDENT_EMAIL_DOMAIN}"
-        if User.objects.filter(email__iexact=email).exists():
+        # A staff member whose address already has an account keeps it (and its
+        # role: a console user stays one); validate_email let through only a
+        # login that holds no cafetería account yet.
+        attach = User.objects.filter(email__iexact=email).first() if personal else None
+        if attach is None and User.objects.filter(email__iexact=email).exists():
             return Response({'email': ['Ese correo ya está registrado.']}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            user = User.objects.create_user(
-                email=email, password=None,
-                first_name=d['first_name'].strip(), last_name=d['last_name'].strip(),
-                role=User.Role.STUDENT)
-            user.set_unusable_password()
-            user.save(update_fields=['password'])
+            if attach is not None:
+                user = attach
+            else:
+                user = User.objects.create_user(
+                    email=email, password=None,
+                    first_name=d['first_name'].strip(), last_name=d['last_name'].strip(),
+                    role=User.Role.STUDENT)
+                user.set_unusable_password()
+                user.save(update_fields=['password'])
             profile = StudentProfile.objects.create(
-                user=user, student_id=d['student_id'], grade=d['grade'].strip(),
+                user=user, student_id=d['student_id'], grade=(d.get('grade') or '').strip(),
                 group=(d.get('group') or '').strip(), loyverse_id=(d.get('loyverse_id') or '').strip(),
+                tipo=d.get('tipo') or StudentProfile.Tipo.ALUMNO, puesto=d.get('puesto') or '',
                 enrollment_date=d.get('enrollment_date'), is_active=d.get('is_active', True))
             if 'status' in d:
                 profile.save(update_fields=profile.apply_status(d['status']))
-            profile.parents.add(user)  # school-email family login sees its own file
+            if not personal:
+                profile.parents.add(user)  # school-email family login sees its own file
             # StudentProfile is auto-audited by core.audit signals; add the actor context.
             record('create', profile, {'via': 'portal', 'snapshot': _snapshot(profile)},
-                   actor=request.user, context='portal: alta de alumno')
-        return Response(_student_payload(profile, request.user),
+                   actor=request.user,
+                   context='portal: alta de personal' if personal else 'portal: alta de alumno')
+        # A7: look the person up in Loyverse right away (read-only), after the
+        # commit so a slow Loyverse never holds a row lock.
+        link = _link_on_save(profile, request.user)
+        return Response({**_student_payload(profile, request.user), 'loyverse_link': link},
                         status=status.HTTP_201_CREATED)
 
 
@@ -249,7 +327,14 @@ class AdminStudentUpdateView(APIView):
             if changes:
                 record('update', profile, {'via': 'portal', **changes},
                        actor=request.user, context='portal: edición de alumno')
-        return Response(_student_payload(profile, request.user))
+        link = None
+        if 'student_id' in changes or 'email' in changes:
+            # A7: a new code or address may now match a Loyverse customer.
+            link = _link_on_save(profile, request.user)
+        payload = _student_payload(profile, request.user)
+        if link is not None:
+            payload['loyverse_link'] = link
+        return Response(payload)
 
 
 # ── bulk actions (Data Ops C5) ─────────────────────────────

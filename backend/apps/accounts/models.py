@@ -197,8 +197,38 @@ class FamilyLinkCode(models.Model):
 
 
 class StudentProfile(models.Model):
-    """Extended profile for student users."""
+    """Extended profile for student users, and the cafetería wallet holder.
+
+    ``tipo`` (2026-11-18): school staff eat at the cafetería with the same
+    Loyverse card, wallet, card top-ups, statement and credential as pupils,
+    so a staff member is a ``StudentProfile`` with ``tipo='personal'`` (and a
+    ``puesto`` instead of a grade). Every student-only rule (counts, the
+    Alumnos list, promotion, family comunicados, admissions, leaver
+    detection, guardian notices) leaves them out: see ``apps.accounts.people``.
+    """
+
+    class Tipo(models.TextChoices):
+        ALUMNO = 'alumno', 'Alumno'
+        PERSONAL = 'personal', 'Personal del colegio'
+
+    class Puesto(models.TextChoices):
+        SIN_ASIGNAR = 'sin_asignar', 'Sin asignar'
+        DIRECCION = 'direccion', 'Dirección'
+        COORDINACION = 'coordinacion', 'Coordinación'
+        DOCENTE = 'docente', 'Docente'
+        ADMINISTRACION = 'administracion', 'Administración'
+        APOYO_ESCOLAR = 'apoyo_escolar', 'Apoyo escolar (psicología, enfermería)'
+        MANTENIMIENTO = 'mantenimiento', 'Mantenimiento e intendencia'
+        SEGURIDAD = 'seguridad', 'Seguridad'
+        CAFETERIA = 'cafeteria', 'Cafetería'
+        OTRO = 'otro', 'Otro'
+
     user          = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
+    tipo          = models.CharField('Tipo', max_length=10, choices=Tipo.choices, default=Tipo.ALUMNO,
+                                     db_index=True)
+    # Staff only (``tipo='personal'``); empty for pupils.
+    puesto        = models.CharField('Puesto', max_length=20, choices=Puesto.choices, blank=True,
+                                     default='')
     student_id    = models.CharField(max_length=20, unique=True)        # School ID / card number
     grade         = models.CharField(max_length=20)                     # e.g. "3° Primaria"
     group         = models.CharField(max_length=5, blank=True)          # e.g. "A"
@@ -277,7 +307,14 @@ class StudentProfile(models.Model):
         ]
 
     def __str__(self):
+        if self.is_personal:
+            return f'{self.user.full_name} — Personal ({self.get_puesto_display() or "Sin asignar"})'
         return f'{self.user.full_name} — {self.grade} {self.group}'
+
+    @property
+    def is_personal(self) -> bool:
+        """A staff member's cafetería account (not a pupil)."""
+        return self.tipo == self.Tipo.PERSONAL
 
     @property
     def age(self):
