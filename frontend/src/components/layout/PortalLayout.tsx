@@ -127,7 +127,12 @@ function PortalShell({ role }: Props) {
 
   return (
     <MobileNavContext.Provider value={{ open, toggle, close, scrolled }}>
-      <div className="flex h-[100dvh] flex-col overflow-hidden bg-cream">
+      {/* The frame is exactly the viewport and never scrolls: `relative` makes it
+          the containing block of every absolutely positioned descendant and
+          `frame-clip` clips them, so nothing (a table's sr-only <caption>, a
+          menu near the bottom) can make the page taller than the screen and
+          slide the whole console up, leaving an empty band underneath. */}
+      <div className="frame-clip relative flex h-[100dvh] flex-col bg-cream">
         <OfflineBanner />
         <div className="flex min-h-0 flex-1">
         <a href="#contenido" className="skip-link">Saltar al contenido</a>
@@ -147,12 +152,14 @@ function PortalShell({ role }: Props) {
         <CommandPalette />
 
         {/* Main — sidebar + header stay fixed; only this content column scrolls */}
-        <main id="contenido" className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main id="contenido" className="frame-clip flex min-w-0 flex-1 flex-col">
           <AppHeader />
+          {/* `relative`: page content positions against this column, so it
+              scrolls with the content instead of stretching the document. */}
           <div
             ref={scrollRef}
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
-            className="flex-1 overflow-y-auto overflow-x-hidden"
+            className="relative flex-1 overflow-y-auto overflow-x-hidden"
           >
             <div className="mx-auto w-full max-w-[1320px] 2xl:max-w-[1680px] px-[clamp(16px,4vw,32px)] pt-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
               <RouteTransition><Outlet /></RouteTransition>

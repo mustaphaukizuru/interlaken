@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyNotice, applyPhrase, formatClock, formatWhatsapp, sentence, whatsappHref } from './topupApply';
+import { applyNotice, applyPhrase, formatClock, formatWhatsapp, pendingCoversLowBalance, sentence, whatsappHref } from './topupApply';
 
 // 2030-01-07 is a Monday; 13:30Z is 7:30 in Mexico City (UTC-6).
 const MONDAY_0730 = '2030-01-07T13:30:00Z';
@@ -36,5 +36,21 @@ describe('topupApply', () => {
   it('drops the WhatsApp sentence when the school has none configured', () => {
     expect(applyNotice({ apply_time: '07:30', whatsapp: '' })).toBe(
       'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m.');
+  });
+
+  it('counts paid top-ups on their way against the low-balance level, like the alert e-mail', () => {
+    const t = (amount: string) => ({ amount });
+    // Nothing pending: the balance alone decides (the page keeps «Saldo bajo»).
+    expect(pendingCoversLowBalance('5.00', '20.00', [])).toBe(false);
+    expect(pendingCoversLowBalance('5.00', '20.00')).toBe(false);
+    // Covers it exactly or more: no badge.
+    expect(pendingCoversLowBalance('5.00', '20.00', [t('15.00')])).toBe(true);
+    expect(pendingCoversLowBalance('-40.00', '20.00', [t('50.00'), t('10.00')])).toBe(true);
+    // Not enough yet: still low.
+    expect(pendingCoversLowBalance('5.00', '20.00', [t('14.99')])).toBe(false);
+    // Cents never drift (0.1 + 0.2 style sums).
+    expect(pendingCoversLowBalance('0.10', '0.30', [t('0.20')])).toBe(true);
+    // Missing threshold falls back to the $20 default.
+    expect(pendingCoversLowBalance('0.00', null, [t('20.00')])).toBe(true);
   });
 });

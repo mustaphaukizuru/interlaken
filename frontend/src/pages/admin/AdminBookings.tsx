@@ -21,8 +21,10 @@ import { FilterBar } from '@/components/admin/FilterBar';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
+import { RowActionsMenu } from '@/components/admin/RowActionsMenu';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import {
   BOOKINGS_ENTITY, SLOTS_ENTITY, slotsImportApi, useBookingAction, useBookingsBulk, useBookingsExport, useBookingsList,
   useSlotDelete, useSlotsBulk, useSlotsExport, useSlotsList, useSlotUpdate,
@@ -287,9 +289,23 @@ function NoteDialog({
 }
 
 // ── Reservas ──────────────────────────────────────────────
+/**
+ * Text that takes the room the table can give it, up to `max` px, and ends in
+ * an ellipsis (full text on hover) instead of widening the table: the
+ * `minmax(0,1fr)` track adds nothing to the column's minimum width, so at
+ * 1440 px the row still fits, and a wide screen shows the whole value.
+ */
+function FitText({ text, max, className = '' }: { text: string; max: number; className?: string }) {
+  return (
+    <span className="grid grid-cols-[minmax(0,1fr)]" style={{ maxWidth: max }}>
+      <span className={`truncate ${className}`.trim()} title={text}>{text}</span>
+    </span>
+  );
+}
+
 const BOOKING_COLUMNS: Column<Booking>[] = [
   {
-    id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 130, className: 'whitespace-nowrap',
+    id: 'date', header: 'Fecha', sortKey: 'date', hideable: false, minWidth: 116, className: 'whitespace-nowrap',
     cell: (b) => (
       <>
         <div className="font-medium text-ink">{fmtDate(b.slot_date)}</div>
@@ -297,14 +313,14 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
       </>
     ),
   },
-  { id: 'parent', header: 'Tutor', sortKey: 'parent', hideable: false, minWidth: 160, className: 'font-medium text-ink', cell: (b) => b.parent_name },
+  { id: 'parent', header: 'Tutor', sortKey: 'parent', hideable: false, minWidth: 140, className: 'font-medium text-ink', cell: (b) => b.parent_name },
   {
     id: 'status', header: 'Estado', sortKey: 'status', minWidth: 120,
     cell: (b) => { const m = bookingStatusMeta(b.status); return <Badge variant={m.variant}>{m.label}</Badge>; },
   },
-  { id: 'type', header: 'Tipo', minWidth: 130, cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
+  { id: 'type', header: 'Tipo', minWidth: 110, cell: (b) => <Badge variant="neutral">{VISIT_TYPE_LABEL[b.visit_type] ?? b.visit_type}</Badge> },
   {
-    id: 'child', header: 'Alumno', sortKey: 'child', minWidth: 140, className: 'text-muted',
+    id: 'child', header: 'Alumno', sortKey: 'child', minWidth: 120, className: 'text-muted',
     cell: (b) => (
       <>
         {b.child_name || '—'}
@@ -313,10 +329,10 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
     ),
   },
   {
-    id: 'contact', header: 'Contacto', minWidth: 190,
+    id: 'contact', header: 'Contacto', minWidth: 170,
     cell: (b) => (
       <>
-        <div className="max-w-[240px] truncate text-muted" title={b.parent_email}>{b.parent_email}</div>
+        <FitText text={b.parent_email} max={240} className="text-muted" />
         <div className="text-xs text-subtle">{b.parent_phone}</div>
       </>
     ),
@@ -338,7 +354,11 @@ const BOOKING_BULK: BulkActionDef[] = [
 
 interface NoteAsk { booking: Booking; act: BookingAction; title: string; message: string; confirmLabel: string }
 
-/** Row actions: only the moves the transition table allows from the row's status. */
+/** Row actions: only the moves the transition table allows from the row's status.
+ *  Wide screens show the row's next step as an icon and every other move in
+ *  «⋯», so the table fits without scrolling sideways; below lg the DataTable
+ *  already folds the cell into a menu, where each move is a labelled button.
+ *  Accessible names are the same in both. */
 function BookingRowActions({
   booking, busyAct, onAct, onCancel, onNote,
 }: {
@@ -348,49 +368,106 @@ function BookingRowActions({
   onCancel: (b: Booking) => void;
   onNote: (ask: NoteAsk) => void;
 }) {
+  const isLg = useMediaQuery('(min-width: 1024px)');
   const s = booking.status as BookingStatus;
   const who = booking.parent_name;
   const busy = busyAct !== undefined;
-  const icon = (act: BookingAction, Icon: typeof Check) =>
-    busyAct === act ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Icon className="h-4 w-4" aria-hidden="true" />;
+  const moves: RowMove[] = [];
+  if (canMove(s, 'confirmed')) {
+    moves.push({ act: 'confirm', label: 'Confirmar', ariaLabel: `Confirmar la reserva de ${who}`, Icon: Check,
+      tone: 'hover:bg-green-50 hover:text-green-600', run: () => onAct(booking, 'confirm') });
+  }
+  if (canMove(s, 'attended')) {
+    moves.push({ act: 'attended', label: 'Asistió', ariaLabel: `Marcar que ${who} asistió`, Icon: UserCheck,
+      tone: 'hover:bg-brand-50 hover:text-brand-600',
+      run: () => (s === 'no_show'
+        ? onNote({ booking, act: 'attended', title: 'Corregir: sí asistió', confirmLabel: 'Marcar asistió', message: `La visita de ${who} está marcada como «No asistió». Indique por qué se corrige.` })
+        : onAct(booking, 'attended')) });
+  }
+  if (canMove(s, 'no_show')) {
+    moves.push({ act: 'no_show', label: 'No asistió', ariaLabel: `Marcar que ${who} no asistió`, Icon: UserX,
+      tone: 'hover:bg-coral-50 hover:text-coral-600',
+      run: () => (s === 'attended'
+        ? onNote({ booking, act: 'no_show', title: 'Corregir: no asistió', confirmLabel: 'Marcar no asistió', message: `La visita de ${who} está marcada como «Asistió». Indique por qué se corrige.` })
+        : onAct(booking, 'no_show')) });
+  }
+  if (canMove(s, 'cancelled')) {
+    moves.push({ act: 'cancel', label: 'Cancelar', ariaLabel: `Cancelar la reserva de ${who}`, Icon: X, danger: true,
+      tone: 'hover:bg-coral-50 hover:text-coral-600', run: () => onCancel(booking) });
+  }
+  if (canMove(s, 'pending')) {
+    moves.push({ act: 'reopen', label: 'Reabrir', ariaLabel: `Reabrir la reserva de ${who}`, Icon: RotateCcw,
+      tone: 'hover:bg-brand-50 hover:text-brand-600',
+      run: () => onNote({ booking, act: 'reopen', title: 'Reabrir reserva', confirmLabel: 'Reabrir', message: `La reserva de ${who} volverá a «Pendiente» si el horario aún tiene cupo para ${booking.num_attendees} persona(s).` }) });
+  }
+  return (
+    <RowMoves
+      moves={moves}
+      isLg={isLg}
+      busy={busy}
+      busyAct={busyAct}
+      menuLabel={`Más acciones para la reserva de ${who}`}
+    />
+  );
+}
+
+/** One row move, shared by the reservations and the schedules tables. */
+interface RowMove {
+  act: string;
+  label: string;
+  ariaLabel: string;
+  Icon: LucideIcon;
+  /** Hover colors of the icon button. */
+  tone: string;
+  danger?: boolean;
+  run: () => void;
+}
+
+const ROW_MOVE_BTN =
+  'inline-flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:cursor-not-allowed disabled:opacity-50';
+
+/** Primary move as an icon + the rest in «⋯» (lg+); every move labelled below lg. */
+function RowMoves({ moves, isLg, busy, busyAct, menuLabel }: {
+  moves: RowMove[];
+  isLg: boolean;
+  busy: boolean;
+  busyAct?: string;
+  menuLabel: string;
+}) {
+  if (moves.length === 0) return null;
+  const icon = (m: RowMove) =>
+    busyAct === m.act ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <m.Icon className="h-4 w-4" aria-hidden="true" />;
+  if (!isLg) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {moves.map((m) => (
+          <button key={m.act} type="button" aria-label={m.ariaLabel} disabled={busy} onClick={m.run}
+            className={`${ROW_MOVE_BTN} ${m.danger ? 'text-coral-700 hover:bg-coral-50' : 'text-ink hover:bg-cream-2'}`}>
+            {icon(m)} {m.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  const [primary, ...rest] = moves;
   return (
     <div className="flex items-center gap-1">
-      {canMove(s, 'confirmed') && (
-        <button type="button" title="Confirmar" aria-label={`Confirmar la reserva de ${who}`} disabled={busy}
-          onClick={() => onAct(booking, 'confirm')} className={`${ICON_BTN} hover:bg-green-50 hover:text-green-600`}>
-          {icon('confirm', Check)}
-        </button>
-      )}
-      {canMove(s, 'attended') && (
-        <button type="button" title="Asistió" aria-label={`Marcar que ${who} asistió`} disabled={busy}
-          onClick={() => (s === 'no_show'
-            ? onNote({ booking, act: 'attended', title: 'Corregir: sí asistió', confirmLabel: 'Marcar asistió', message: `La visita de ${who} está marcada como «No asistió». Indique por qué se corrige.` })
-            : onAct(booking, 'attended'))}
-          className={`${ICON_BTN} hover:bg-brand-50 hover:text-brand-600`}>
-          {icon('attended', UserCheck)}
-        </button>
-      )}
-      {canMove(s, 'no_show') && (
-        <button type="button" title="No asistió" aria-label={`Marcar que ${who} no asistió`} disabled={busy}
-          onClick={() => (s === 'attended'
-            ? onNote({ booking, act: 'no_show', title: 'Corregir: no asistió', confirmLabel: 'Marcar no asistió', message: `La visita de ${who} está marcada como «Asistió». Indique por qué se corrige.` })
-            : onAct(booking, 'no_show'))}
-          className={`${ICON_BTN} hover:bg-coral-50 hover:text-coral-600`}>
-          {icon('no_show', UserX)}
-        </button>
-      )}
-      {canMove(s, 'cancelled') && (
-        <button type="button" title="Cancelar" aria-label={`Cancelar la reserva de ${who}`} disabled={busy}
-          onClick={() => onCancel(booking)} className={`${ICON_BTN} hover:bg-coral-50 hover:text-coral-600`}>
-          {icon('cancel', X)}
-        </button>
-      )}
-      {canMove(s, 'pending') && (
-        <button type="button" title="Reabrir" aria-label={`Reabrir la reserva de ${who}`} disabled={busy}
-          onClick={() => onNote({ booking, act: 'reopen', title: 'Reabrir reserva', confirmLabel: 'Reabrir', message: `La reserva de ${who} volverá a «Pendiente» si el horario aún tiene cupo para ${booking.num_attendees} persona(s).` })}
-          className={`${ICON_BTN} hover:bg-brand-50 hover:text-brand-600`}>
-          {icon('reopen', RotateCcw)}
-        </button>
+      <button type="button" title={primary.label} aria-label={primary.ariaLabel} disabled={busy}
+        onClick={primary.run} className={`${ICON_BTN} ${primary.tone}`}>
+        {icon(primary)}
+      </button>
+      {rest.length > 0 ? (
+        <RowActionsMenu
+          label={menuLabel}
+          items={rest.map((m) => ({
+            key: m.act, label: m.label, ariaLabel: m.ariaLabel, icon: m.Icon, danger: m.danger,
+            // A save in flight on this row: the menu stays, the second click does nothing.
+            onSelect: () => { if (!busy) m.run(); },
+          }))}
+        />
+      ) : (
+        // Keeps every primary icon in one column when a row has nothing else.
+        <span className="h-9 w-9 flex-shrink-0" aria-hidden="true" />
       )}
     </div>
   );
@@ -551,9 +628,9 @@ const SLOT_COLUMNS: Column<AdminSlot>[] = [
     id: 'booked', header: 'Reservados', sortKey: 'booked', align: 'right', minWidth: 110,
     cell: (s) => <span className={s.is_full ? 'font-semibold text-coral-700' : ''}>{s.booked_count}/{s.capacity}</span>,
   },
-  { id: 'type', header: 'Tipo', sortKey: 'type', minWidth: 130, cell: (s) => <Badge variant="neutral">{VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type}</Badge> },
-  { id: 'title', header: 'Evento', minWidth: 140, truncate: 220, className: 'text-muted', cell: (s) => s.title },
-  { id: 'location', header: 'Lugar', minWidth: 140, truncate: 220, className: 'text-muted', cell: (s) => s.location },
+  { id: 'type', header: 'Tipo', sortKey: 'type', minWidth: 110, cell: (s) => <Badge variant="neutral">{VISIT_TYPE_LABEL[s.visit_type] ?? s.visit_type}</Badge> },
+  { id: 'title', header: 'Evento', minWidth: 140, className: 'text-muted', cell: (s) => (s.title ? <FitText text={s.title} max={220} /> : '') },
+  { id: 'location', header: 'Lugar', minWidth: 140, className: 'text-muted', cell: (s) => (s.location ? <FitText text={s.location} max={220} /> : '') },
   { id: 'capacity', header: 'Cupo', sortKey: 'capacity', align: 'right', minWidth: 80, defaultHidden: true, cell: (s) => s.capacity },
 ];
 
@@ -601,6 +678,7 @@ function SlotsView() {
   const exporter = useSlotsExport();
   const bulk = useSlotsBulk();
   const update = useSlotUpdate();
+  const isLg = useMediaQuery('(min-width: 1024px)');
   const del = useSlotDelete();
   const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
   const [deleteFor, setDeleteFor] = useState<AdminSlot | null>(null);
@@ -660,23 +738,25 @@ function SlotsView() {
           resizable
           pinFirstColumn
           selection={selection}
-          rowActions={(s) => (
-            <div className="flex items-center gap-1">
-              <button type="button" title={s.is_active ? 'Desactivar' : 'Activar'}
-                aria-label={`${s.is_active ? 'Desactivar' : 'Activar'} el horario del ${fmtDate(s.date)} a las ${hhmm(s.start_time)}`}
-                disabled={update.isPending && update.variables?.id === s.id}
-                onClick={() => toggle(s)} className={`${ICON_BTN} hover:bg-brand-50 hover:text-brand-600`}>
-                {update.isPending && update.variables?.id === s.id
-                  ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  : s.is_active ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-              </button>
-              <button type="button" title="Eliminar"
-                aria-label={`Eliminar el horario del ${fmtDate(s.date)} a las ${hhmm(s.start_time)}`}
-                onClick={() => setDeleteFor(s)} className={`${ICON_BTN} hover:bg-coral-50 hover:text-coral-600`}>
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-          )}
+          rowActions={(s) => {
+            const when = `el horario del ${fmtDate(s.date)} a las ${hhmm(s.start_time)}`;
+            const toggling = update.isPending && update.variables?.id === s.id;
+            const verb = s.is_active ? 'Desactivar' : 'Activar';
+            return (
+              <RowMoves
+                isLg={isLg}
+                busy={toggling}
+                busyAct={toggling ? 'toggle' : undefined}
+                menuLabel={`Más acciones para ${when}`}
+                moves={[
+                  { act: 'toggle', label: verb, ariaLabel: `${verb} ${when}`, Icon: s.is_active ? EyeOff : Eye,
+                    tone: 'hover:bg-brand-50 hover:text-brand-600', run: () => toggle(s) },
+                  { act: 'delete', label: 'Eliminar', ariaLabel: `Eliminar ${when}`, Icon: Trash2, danger: true,
+                    tone: 'hover:bg-coral-50 hover:text-coral-600', run: () => setDeleteFor(s) },
+                ]}
+              />
+            );
+          }}
           toolbar={(
             <FilterBar
               search={{ placeholder: 'Evento o lugar…', label: 'Buscar horarios' }}

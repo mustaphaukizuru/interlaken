@@ -124,13 +124,17 @@ describe('AdminStaffUsers: puesto y áreas de la consola', () => {
     })));
   });
 
-  it('edits the areas of a staff account from «Acceso»', async () => {
+  it('edits the areas of a staff account from «⋯» → «Puesto y áreas»', async () => {
     vi.mocked(portalApi.updateStaff).mockResolvedValue({ data: berta } as never);
     vi.mocked(portalApi.listStaff).mockResolvedValue({ data: { count: 2, next: null, previous: null, results: [
       me, { ...berta, staff_title: 'Recepción', staff_areas: ['visitas', 'mensajes'] },
     ] } } as never);
     renderWithProviders(<AdminStaffUsers />, { route: '/admin/usuarios' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Puesto y áreas de berta@x.mx' }));
+    // «Editar» is the one visible action; «Puesto y áreas» is in «⋯», with the same accessible name.
+    expect(await screen.findByRole('button', { name: 'Editar berta@x.mx' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Puesto y áreas de berta@x.mx' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para berta@x.mx' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Puesto y áreas de berta@x.mx' }));
     const dialog = await screen.findByRole('dialog', { name: 'Puesto y áreas de la consola' });
     expect(within(dialog).getByLabelText('Puesto')).toHaveValue('recepcion');
     await userEvent.click(within(dialog).getByLabelText('Comunicados y calendario'));

@@ -503,6 +503,32 @@ describe('CafeteriaPage scheduled application of card top-ups', () => {
     expect(decodeURIComponent(wa.getAttribute('href') ?? '')).toContain('Folio: 41');
   });
 
+  it('drops «Saldo bajo» while a paid top-up on its way covers the alert level, like the e-mail', async () => {
+    const low = { ...account, balance: '10.00', low_balance_threshold: '50.00', is_low_balance: true };
+    const pending = (amount: string) => [{ id: 7, amount, paid_at: '2030-01-04T22:00:00Z', apply_due_at: '2030-01-07T13:30:00Z', folio: 41 }];
+
+    // $10 + $40 on its way = $50, the alert level: no badge.
+    mockedBalance.mockResolvedValue({ data: [{ ...low, pending_topups: pending('40.00') }] } as never);
+    const first = renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    expect(await screen.findByText(/Recarga por aplicar · \$40\.00/)).toBeInTheDocument();
+    expect(screen.queryByText('Saldo bajo', { exact: true })).not.toBeInTheDocument();
+    // The balance itself still reads as it is: not spendable yet.
+    expect(screen.getByText('$10.00')).toBeInTheDocument();
+    first.unmount();
+
+    // $10 + $39.99 stays under it: the badge stays.
+    mockedBalance.mockResolvedValue({ data: [{ ...low, pending_topups: pending('39.99') }] } as never);
+    const second = renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    expect(await screen.findByText(/Recarga por aplicar · \$39\.99/)).toBeInTheDocument();
+    expect(screen.getByText('Saldo bajo', { exact: true })).toBeInTheDocument();
+    second.unmount();
+
+    // Nothing on its way: the balance alone decides.
+    mockedBalance.mockResolvedValue({ data: [{ ...low, pending_topups: [] }] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    expect(await screen.findByText('Saldo bajo', { exact: true })).toBeInTheDocument();
+  });
+
   it('tells the family before paying when the balance will be applied', async () => {
     mockedBalance.mockResolvedValue({ data: [account] } as never);
     const u = userEvent.setup();

@@ -99,17 +99,37 @@ describe('AdminBookings: reservas', () => {
   it('offers only the moves the transition table allows, including no-show', async () => {
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
     await screen.findByText('Ana');
-    // pending: confirm, attended, no_show, cancel; no reopen.
+    // pending: «Confirmar» is the visible step; attended, no_show and cancel wait in «⋯»; no reopen.
     expect(screen.getByRole('button', { name: 'Confirmar la reserva de Ana' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Marcar que Ana no asistió' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reabrir la reserva de Ana' })).not.toBeInTheDocument();
-    // confirmed: no confirm; no-show is available (it used to exist only in the week view).
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Ana' }));
+    const anaMenu = screen.getByRole('menu', { name: 'Más acciones para la reserva de Ana' });
+    expect(within(anaMenu).getAllByRole('menuitem').map((m) => m.getAttribute('aria-label'))).toEqual([
+      'Marcar que Ana asistió', 'Marcar que Ana no asistió', 'Cancelar la reserva de Ana',
+    ]);
+    expect(screen.queryByRole('menuitem', { name: 'Reabrir la reserva de Ana' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    // confirmed: no confirm; «Asistió» is visible, no-show (it used to exist only in the week view) is in «⋯».
     expect(screen.queryByRole('button', { name: 'Confirmar la reserva de Beto' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar que Beto no asistió' }));
+    expect(screen.getByRole('button', { name: 'Marcar que Beto asistió' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones para la reserva de Beto' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Marcar que Beto no asistió' }));
     await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(2, 'no_show', {}));
-    // cancelled: only reopen.
+    // cancelled: only reopen, visible, and no «⋯» with nothing in it.
     expect(screen.queryByRole('button', { name: 'Confirmar la reserva de Carla' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reabrir la reserva de Carla' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Más acciones para la reserva de Carla' })).not.toBeInTheDocument();
+  });
+
+  it('below lg every move is a labelled button in the row menu, with the same names', async () => {
+    stubViewport(800);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findAllByText('Ana');
+    await userEvent.click(screen.getByRole('button', { name: /^Acciones de reserva de Ana/ }));
+    for (const name of ['Confirmar la reserva de Ana', 'Marcar que Ana asistió', 'Marcar que Ana no asistió', 'Cancelar la reserva de Ana']) {
+      expect(screen.getByRole('button', { name })).toBeVisible();
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar que Ana asistió' }));
+    await waitFor(() => expect(api.bookingAction).toHaveBeenCalledWith(1, 'attended', {}));
   });
 
   it('reopen and the no-show correction ask for a note and send it', async () => {

@@ -28,6 +28,7 @@ from apps.core.pdf_document import (
     ellipsize,
     receipt_pdf,
     render_document_pdf,
+    short_datetime,
     text_width,
     wrap,
 )
@@ -153,7 +154,7 @@ def test_receipt_is_laid_out_from_label_value_lines(monkeypatch):
     seen = {}
     monkeypatch.setattr(pdf_document, 'render_document_pdf', lambda doc, **kw: seen.update(doc=doc, **kw) or b'%PDF')
     receipt_pdf('Comprobante de pago', [
-        'Folio: 9', 'Fecha: 2026-11-18 13:47', 'Estado: Exitoso', '',
+        'Folio: 9', 'Fecha: 18 nov 2026, 13:47', 'Estado: Exitoso', '',
         'Concepto: Recarga de cafetería', 'Alumno: Ana Peña', 'Pagó: Luis Peña (luis@ejemplo.mx)', '',
         'Monto: $350.00 MXN', 'Pasarela: Banorte', 'Referencia bancaria: 248233587990', '',
         'Este comprobante acredita una recarga de saldo de cafetería. No es un CFDI;',
@@ -196,6 +197,40 @@ def test_receipt_endpoint_returns_the_branded_comprobante(api_client, settings):
     for text in ('Comprobante de pago', f'Folio {p.pk}', 'PAGADO', '$350.00 MXN', 'Lucía Peña',
                  'Recarga de cafetería', 'No es un CFDI;', 'facturas@ejemplo.mx.'):
         assert has_text(pdf, text) or text in pdf.decode('cp1252'), text
+
+
+def test_short_datetime_is_spanish_and_in_mexico_city_time():
+    # 19:47 UTC is 13:47 in Mexico City (UTC-6): the console tables' short form, 24 h.
+    assert short_datetime(datetime(2026, 11, 18, 19, 47, tzinfo=ZoneInfo('UTC'))) == '18 nov 2026, 13:47'
+    # Past midnight UTC is still the evening before in Mexico City.
+    assert short_datetime(datetime(2026, 11, 19, 3, 5, tzinfo=ZoneInfo('UTC'))) == '18 nov 2026, 21:05'
+    assert short_datetime(datetime(2026, 9, 1, 8, 0, tzinfo=MX)) == '1 sep 2026, 08:00'
+    assert short_datetime(datetime(2027, 1, 2, 0, 0, tzinfo=MX)) == '2 ene 2027, 00:00'
+    # Whatever zone the request runs in.
+    with timezone.override(ZoneInfo('Asia/Tokyo')):
+        assert short_datetime(datetime(2026, 11, 18, 19, 47, tzinfo=ZoneInfo('UTC'))) == '18 nov 2026, 13:47'
+    assert short_datetime(None) == ''
+
+
+@pytest.mark.django_db
+def test_receipt_dates_read_in_spanish_mexico_city_time(api_client):
+    parent = ParentFactory()
+    kid = StudentProfileFactory(parents=[parent])
+    topup = TopUpRequest.objects.create(
+        student=kid, amount=Decimal('200'), method=TopUpRequest.Method.ONLINE, status=TopUpRequest.Status.COMPLETED,
+        applied_at=datetime(2026, 11, 19, 13, 30, tzinfo=ZoneInfo('UTC')))           # 07:30 in Mexico City
+    p = Payment.objects.create(user=parent, payment_type=Payment.Type.CAFETERIA, amount=Decimal('200.00'),
+                               related_topup=topup, status=Payment.Status.SUCCESS,
+                               created_at=datetime(2026, 11, 18, 19, 47, tzinfo=ZoneInfo('UTC')))  # 13:47
+    api_client.force_authenticate(parent)
+    r = api_client.get(reverse('payment-receipt', args=[p.pk]))
+    assert r.status_code == 200 and f'comprobante_{p.pk}.pdf' in r['Content-Disposition']
+    pdf = r.content
+    assert_well_formed(pdf)
+    assert has_text(pdf, '18 nov 2026, 13:47')
+    assert has_text(pdf, 'aplicado el 19 nov 2026, 07:30')
+    # Never the ISO form or the UTC clock.
+    assert b'2026-11-18' not in pdf and not has_text(pdf, '19:47')
 
 
 @pytest.mark.django_db
