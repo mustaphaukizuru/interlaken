@@ -13,16 +13,30 @@ import { apiErrorMessage } from '@/lib/apiErrors';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import { CAF_MONEY_VIEWS, CAF_TOPUPS } from '@/hooks/queries/cafeteria';
 import { PAYMENTS_ENTITY } from '@/hooks/queries/payments';
-import type { BanorteVerifyResult, TopUpLogEntry } from '@/types';
+import type { BanorteOperation, BanorteVerifyResult, TopUpLogEntry } from '@/types';
+
+/** What the MultiCobros dialogs read of a payment: a deposit-log row, or a row
+ *  of «Subir reporte de MultiCobros» (which knows only these fields). */
+export type BanorteRow = Pick<TopUpLogEntry, 'payment_id' | 'student_name' | 'amount' | 'created_at'> & {
+  loyverse_code?: string;
+  banorte: (Pick<BanorteOperation, 'control_number' | 'mode'> & Partial<BanorteOperation>) | null;
+};
+
+/** The values read in the MultiCobros report, offered (never sent) as the form's start. */
+export interface ReconcilePrefill {
+  referencia: string;
+  codigo_aut: string;
+  amount: string;
+}
 
 const mxn = (v: string | number | null | undefined) => `$${parseFloat(String(v ?? 0)).toFixed(2)}`;
 const when = (d?: string | null) => (d ? format(new Date(d), "d MMM yyyy, HH:mm", { locale: es }) : '-');
 
 /** Where staff look an operation up (same words as docs/BANORTE-INTEGRATION.md). */
-const MULTICOBROS_PATH = 'MultiCobros → Analítica → Reportes → Transacciones Payworks 2';
+export const MULTICOBROS_PATH = 'MultiCobros → Analítica → Reportes → Transacciones Payworks 2';
 
 /** What staff need to find the operation in MultiCobros: date, PAGO id (Referencia 1), control number. */
-function OperationFacts({ row }: { row: TopUpLogEntry }) {
+function OperationFacts({ row }: { row: BanorteRow }) {
   const b = row.banorte;
   if (!b) return null;
   return (
@@ -45,7 +59,7 @@ function OperationFacts({ row }: { row: TopUpLogEntry }) {
   );
 }
 
-function useInvalidateMoney() {
+export function useInvalidateMoney() {
   const queryClient = useQueryClient();
   return () => {
     // Verifying (or reconciling) changes «Por verificar» and the Cafetería count too.
@@ -173,18 +187,27 @@ function VerifyForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void 
 export function ReconcileBanorteDialog({ row, onClose }: { row: TopUpLogEntry | null; onClose: () => void }) {
   return (
     <Modal open={!!row} onClose={onClose} title="Conciliar con MultiCobros" maxWidth={520}>
-      {row && <ReconcileForm row={row} onClose={onClose} />}
+      {row && <ReconcileBanorteForm row={row} onClose={onClose} />}
     </Modal>
   );
 }
 
-function ReconcileForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => void }) {
+/** The «Conciliar con MultiCobros» form itself. «Subir reporte de MultiCobros»
+ *  shows it inside its own dialog with `prefill` (the report's values, still
+ *  editable and checked by the server like typed ones); `onDone` runs after
+ *  the server accepted it, before `onClose`. */
+export function ReconcileBanorteForm({ row, onClose, prefill, onDone }: {
+  row: BanorteRow;
+  onClose: () => void;
+  prefill?: ReconcilePrefill;
+  onDone?: () => void;
+}) {
   const invalidate = useInvalidateMoney();
   const b = row.banorte;
   const [outcome, setOutcome] = useState<'approved' | 'not_found'>('approved');
-  const [referencia, setReferencia] = useState('');
-  const [codigoAut, setCodigoAut] = useState('');
-  const [amount, setAmount] = useState('');
+  const [referencia, setReferencia] = useState(prefill?.referencia ?? '');
+  const [codigoAut, setCodigoAut] = useState(prefill?.codigo_aut ?? '');
+  const [amount, setAmount] = useState(prefill?.amount ?? '');
   const [note, setNote] = useState('');
   const reconcile = useMutation({
     mutationFn: () => paymentsApi.reconcileBanorte(row.payment_id!, outcome === 'approved'
@@ -196,6 +219,7 @@ function ReconcileForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
         toast.success(`Pago conciliado: ${mxn(row.amount)} de ${row.student_name} quedó en «Por aplicar». Cárguelo en el POS.`);
       } else if (outcome === 'approved') toast.success(`Pago conciliado: se acreditaron ${mxn(row.amount)} a ${row.student_name}.`);
       else toast.success('Marcada como «No aparece en MultiCobros».');
+      onDone?.();
       onClose();
       void invalidate();
     },
@@ -217,6 +241,11 @@ function ReconcileForm({ row, onClose }: { row: TopUpLogEntry; onClose: () => vo
         En {MULTICOBROS_PATH}, búsquelo por número de control o por Referencia 1.
       </p>
       <OperationFacts row={row} />
+      {prefill && (
+        <p className="rounded-lg border border-brand-600/20 bg-brand-50 px-3 py-2 text-xs text-ink">
+          Los datos vienen del reporte de MultiCobros que subió. Revíselos antes de conciliar.
+        </p>
+      )}
       {b?.last_error && <p className="text-xs text-amber">Detalle: {b.last_error}</p>}
       <fieldset className="space-y-1">
         <legend className="label">¿Qué muestra MultiCobros?</legend>

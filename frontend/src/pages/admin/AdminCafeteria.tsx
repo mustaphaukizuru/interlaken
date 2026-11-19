@@ -30,6 +30,7 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog } from '@/components/admin/ImportDialog';
 import { ReconcileBanorteDialog, VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
 import { CardRefundConfirm } from '@/components/admin/CardRefundConfirm';
+import { MulticobrosUploadButton } from '@/components/admin/MulticobrosUploadButton';
 import { AppliedTodayList, ApplyPaidDialog, PaidTopUpQueue } from '@/components/admin/PaidTopUpQueue';
 import { PersonalTag } from '@/components/admin/PersonalTag';
 import { RowActionsMenu, type RowMenuItem } from '@/components/admin/RowActionsMenu';
@@ -787,6 +788,7 @@ function DepositsTab() {
             ]}
             dateRange={{ idPrefix: 'caf-dep' }}
           >
+            <MulticobrosUploadButton />
             <ExportMenu filenamePrefix="depositos_cafeteria" selectedCount={selection.count} fetch={fetchExport} />
           </FilterBar>
         )}

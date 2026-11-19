@@ -16,6 +16,7 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ExportMenu } from '@/components/admin/ExportMenu';
 import { VerifyBanorteDialog } from '@/components/admin/BanorteDialogs';
 import { CopyButton } from '@/components/admin/CopyButton';
+import { MulticobrosUploadButton } from '@/components/admin/MulticobrosUploadButton';
 import { FilterBar } from '@/components/admin/FilterBar';
 import { PersonalTag } from '@/components/admin/PersonalTag';
 import { APPLY_PAID_ACTION } from '@/components/admin/paidTopUpActions';
@@ -189,8 +190,15 @@ export function PaidTopUpQueue() {
             portal nunca muestra dinero que la caja no tiene. Si la familia envía el comprobante por WhatsApp
             para usarlo hoy, búsquela por folio y cárguela en ese momento.
           </p>
+          <p className="mt-1 text-sm text-muted">
+            ¿Varias «Sin verificar»? Exporte el día en MultiCobros y use «Subir reporte de MultiCobros»: se
+            verifican juntas las que coinciden.
+          </p>
         </div>
-        <ExportMenu filenamePrefix="recargas_por_aplicar" selectedCount={selection.count} fetch={fetchExport} />
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <MulticobrosUploadButton />
+          <ExportMenu filenamePrefix="recargas_por_aplicar" selectedCount={selection.count} fetch={fetchExport} />
+        </div>
       </div>
       {hiddenInactive > 0 && (
         <div role="note" className="mb-3 flex flex-col gap-2 rounded-xl border border-amber/40 bg-amber/[0.08] px-4 py-2.5 text-sm text-ink sm:flex-row sm:items-center sm:justify-between">
