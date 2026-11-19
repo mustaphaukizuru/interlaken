@@ -36,6 +36,9 @@ from .filters import (
 from .gateways.banorte import interpret_result
 from .gateways.base import PaymentEvent
 from .models import BanorteCheckout, Payment
+
+# Re-exported: the verification lock lives with its rule in ``multicobros``.
+from .multicobros import checkout_for_verify  # noqa: F401
 from .serializers import AdminPaymentSerializer, PaymentInitiateSerializer, PaymentSerializer
 from .settlement import settle
 
@@ -190,18 +193,6 @@ class BanorteResultView(APIView):
                          'detail': body.get('detail', '')}, status=http_status)
 
 
-def checkout_for_verify(pk):
-    """The checkout of payment ``pk``, row-locked for «Verificar en MultiCobros».
-
-    Locks the checkout and its payment only. ``verified_by`` is empty until
-    someone verifies, so it is a LEFT JOIN, and PostgreSQL refuses FOR UPDATE
-    on the nullable side of an outer join: until 2026-11-18 every verification
-    was a 500 in production (SQLite, which the tests use, ignores row locks).
-    """
-    return (BanorteCheckout.objects.select_for_update(of=('self', 'payment'))
-            .select_related('payment', 'verified_by').filter(payment_id=pk))
-
-
 class AdminBanorteVerifyView(APIView):
     """POST /api/v1/payments/admin/<pk>/banorte-verify/  ``{referencia, amount}``
 
@@ -217,6 +208,9 @@ class AdminBanorteVerifyView(APIView):
     ``apply_state`` (``applied`` / ``waiting_verification`` / ``waiting_pos`` /
     ``pos_unknown`` / ``not_applicable``) and ``balance`` (the new wallet
     figure when applied).
+
+    The rule itself is ``multicobros.verify_approval``, so another way to
+    verify (a MultiCobros report upload) cannot drift from this one.
     """
     admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
@@ -224,60 +218,20 @@ class AdminBanorteVerifyView(APIView):
     def post(self, request, pk):
         from django.http import Http404
 
-        from apps.core.audit import record
+        from .multicobros import VerifyError, apply_verified, forget_badges, verify_approval
 
-        from .multicobros import parse_amount
-
-        referencia = str(request.data.get('referencia', '') or '').strip()
-        amount = parse_amount(request.data.get('amount', ''))
-        with db_transaction.atomic():
-            checkout = checkout_for_verify(pk).first()
-            if checkout is None:
-                raise Http404
-            payment = checkout.payment
-            if checkout.verified_at is None:
-                if checkout.resultado_payw != BanorteCheckout.Result.APPROVED:
-                    return Response(error_body('Solo se verifican operaciones aprobadas.'),
-                                    status=400)
-                if payment.status != Payment.Status.SUCCESS:
-                    return Response(error_body(
-                        'Solo se verifican pagos acreditados (este está '
-                        f'«{payment.get_status_display()}»).', code='not_success'), status=400)
-                if not referencia or referencia != checkout.referencia:
-                    return Response(error_body(
-                        'La referencia no coincide con la de este pago. Revise que buscó el '
-                        'número de control correcto en MultiCobros.', code='reference_mismatch'),
-                        status=400)
-                if amount is None or amount != payment.amount:
-                    return Response(error_body(
-                        f'El monto no coincide con el del pago (${payment.amount:.2f}). '
-                        'No lo cargue en el POS y avise a dirección.', code='amount_mismatch'),
-                        status=400)
-                checkout.verified_at = timezone.now()
-                checkout.verified_by = request.user
-                checkout.save(update_fields=['verified_at', 'verified_by'])
-                record('update', payment,
-                       {'banorte_verified': True, 'referencia': checkout.referencia,
-                        'amount': f'{payment.amount:.2f}'},
-                       actor=request.user, context='payments.banorte.verify')
+        try:
+            result = verify_approval(pk, referencia=request.data.get('referencia', ''),
+                                     amount=request.data.get('amount', ''), actor=request.user)
+        except VerifyError as exc:
+            if exc.status == 404:
+                raise Http404 from None
+            return Response(error_body(str(exc), code=exc.code), status=exc.status)
+        checkout, payment = result.checkout, result.payment
         # Committed: now the money may move. Outside the checkout lock, through
         # the POS mirror's own locks; a failure only leaves it for the next sync.
-        applied = {'apply_state': 'not_applicable', 'balance': None}
-        if payment.status == Payment.Status.SUCCESS and payment.related_topup_id:
-            from apps.cafeteria.services import apply_after_verification
-
-            try:
-                applied = apply_after_verification(payment)
-            except Exception:  # noqa: BLE001 — the verification itself stands
-                logger.exception('apply after verification failed payment=%s', pk)
-                applied = {'apply_state': 'pos_unknown', 'balance': None}
-        # «Por verificar» just changed: the console refetches the badges now,
-        # so the 30 s cache of whoever verified must not answer the old count.
-        from django.core.cache import cache
-
-        from apps.core.badges import BADGE_CACHE_KEY
-
-        cache.delete(BADGE_CACHE_KEY.format(pk=request.user.pk))
+        applied = apply_verified(payment)
+        forget_badges(request.user)
         return Response({
             'payment_id': pk,
             'verified_at': checkout.verified_at,

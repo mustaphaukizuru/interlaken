@@ -74,12 +74,14 @@ def _get(qs):
 
 def _payment_checks() -> list[LockedQuery]:
     from apps.payments.models import BanorteCheckout, Payment
-    from apps.payments.views import checkout_for_verify
+    from apps.payments.multicobros import checkout_for_verify
 
     return [
         LockedQuery(
-            "Verificar en MultiCobros (checkout + pago)",
-            "apps/payments/views.py checkout_for_verify",
+            # One lock for both ways in: the per-payment dialog and the report
+            # upload verify through the same ``verify_approval``.
+            "Verificar en MultiCobros, uno por uno o con el reporte (checkout + pago)",
+            "apps/payments/multicobros.py checkout_for_verify (verify_approval)",
             lambda: _first(checkout_for_verify(MISSING)),
         ),
         LockedQuery(

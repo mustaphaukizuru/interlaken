@@ -1349,7 +1349,7 @@ def notify_staff_held_unverified(held, now=None) -> int:
     return len(claimed)
 
 
-def apply_after_verification(payment) -> dict:
+def apply_after_verification(payment, *, quick_read=False) -> dict:
     """Right after «Verificar en MultiCobros»: apply the top-up now when
     Loyverse already holds it, instead of waiting for the next 5-minute pass.
 
@@ -1368,7 +1368,14 @@ def apply_after_verification(payment) -> dict:
     verified; the 2026-11-18 $200 + $244 case), ``waiting_pos`` (Loyverse
     does not show it yet), ``pos_unknown`` (Loyverse could not be read) or
     ``not_applicable`` (not a paid card top-up waiting for its POS load).
+
+    ``quick_read`` reads the Loyverse card in one short attempt
+    (``_GUARD_TIMEOUT``, at most 14 s) instead of the retrying session's
+    ~83 s: «Subir reporte de MultiCobros» applies many top-ups in one request.
+    What is applied is unchanged; a slow Loyverse is just ``pos_unknown``.
     """
+    from contextlib import nullcontext
+
     from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
     from apps.payments.models import Payment
 
@@ -1384,7 +1391,8 @@ def apply_after_verification(payment) -> dict:
     if not student.loyverse_id:
         return {'apply_state': 'waiting_pos', 'balance': None}
     try:
-        customer = get_customer_by_id(student.loyverse_id)
+        with _guard_read_budget() if quick_read else nullcontext():
+            customer = get_customer_by_id(student.loyverse_id)
     except LoyverseError as exc:
         logger.warning('Apply after verification of payment #%s: Loyverse read failed (%s); '
                        'the next sync applies it.', payment.pk, exc)

@@ -52,14 +52,14 @@ def test_every_money_query_runs_on_this_database():
 def test_verbose_lists_every_query():
     out, _ = _run("-v", "2")
     assert "Verificar en MultiCobros" in out
-    assert "apps/payments/views.py checkout_for_verify" in out
+    assert "apps/payments/multicobros.py checkout_for_verify" in out
     assert out.count("  ok    ") == len(all_checks())
 
 
 def test_the_money_paths_are_covered():
     sources = " | ".join(c.source for c in all_checks())
     for expected in (
-        "apps/payments/views.py checkout_for_verify",
+        "apps/payments/multicobros.py checkout_for_verify",
         "apps/payments/views.py BanorteResultView.post",
         "apps/payments/settlement.py apply_event",
         "apps/payments/multicobros.py _locked",
