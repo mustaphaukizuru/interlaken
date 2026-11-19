@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions, status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -209,8 +210,8 @@ class AdminBanorteVerifyView(APIView):
     ``pos_unknown`` / ``not_applicable``) and ``balance`` (the new wallet
     figure when applied).
 
-    The rule itself is ``multicobros.verify_approval``, so another way to
-    verify (a MultiCobros report upload) cannot drift from this one.
+    The rule itself is ``multicobros.verify_approval``, shared with «Subir
+    reporte de MultiCobros» (``AdminMulticobrosUploadView``).
     """
     admin_area = 'cafeteria'
     permission_classes = [IsAdmin]
@@ -238,6 +239,62 @@ class AdminBanorteVerifyView(APIView):
             'verified_by_name': checkout.verified_by.full_name if checkout.verified_by_id else '',
             **applied,
         })
+
+
+class AdminMulticobrosUploadView(APIView):
+    """POST /api/v1/payments/admin/multicobros-upload/  multipart ``file`` (+ ``dry_run``)
+
+    «Subir reporte de MultiCobros»: the day's export from MultiCobros
+    (Transacciones Payworks 2, ``.xlsx`` or ``.csv``, 2 MB / 5,000 rows). With
+    ``dry_run`` (the default) it answers the preview: one outcome per file row
+    plus the approvals the file does not list (see ``multicobros_report``).
+    ``dry_run=0`` re-reads the same file and verifies every ``verificar`` row
+    through ``multicobros.verify_approval``, the rule of «Verificar en
+    MultiCobros», then applies them like the dialog (``apply_state`` per row).
+    Nothing else changes: a ``por_conciliar`` row is confirmed one by one in
+    «Conciliar con MultiCobros». The file is read in memory only and never
+    stored or logged; the answer never carries card data (last 4 digits at most).
+    """
+    admin_area = 'cafeteria'
+    permission_classes = [IsAdmin]
+    throttle_classes = [SharedScopedRateThrottle]
+    throttle_scope = 'admin-import'
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        from apps.core.exceptions import PayloadTooLarge
+        from apps.core.importing import truthy
+
+        from . import multicobros_report as mr
+        from .multicobros import forget_badges
+
+        try:
+            length = int(request.META.get('CONTENT_LENGTH') or 0)
+        except ValueError:
+            length = 0
+        if length > mr.MAX_BODY_BYTES:
+            # Refused before the body is read: nothing of it is parsed or stored.
+            raise PayloadTooLarge(detail='El archivo excede el límite de 2 MB.')
+        # Memory only, never a temporary file (set before request.data is read).
+        request._request.upload_handlers = [mr.MemoryOnlyUploadHandler(request._request)]
+        upload = request.FILES.get('file')
+        if upload is None:
+            return Response(error_body(
+                'Adjunte el reporte exportado de MultiCobros (.xlsx o .csv) en el campo «file».',
+                code='file_required'), status=400)
+        dry_run = truthy(request.data.get('dry_run'), True)
+        try:
+            rows = mr.parse_report(upload)
+        except mr.ReportError as exc:
+            return Response(error_body(str(exc), code=exc.code, **exc.extra), status=400)
+        finally:
+            upload.close()
+        report = mr.analyze(rows)
+        del rows
+        if not dry_run:
+            report = mr.commit(report, request.user)
+            forget_badges(request.user)
+        return Response(report.as_dict())
 
 
 class AdminBanorteReconcileView(APIView):
