@@ -111,6 +111,7 @@ def _payment_checks() -> list[LockedQuery]:
 
 
 def _cafeteria_checks() -> list[LockedQuery]:
+    from apps.accounts.models import StudentProfile
     from apps.cafeteria.models import CafeteriaBalance, TopUpRequest
     from apps.payments.models import Payment
 
@@ -158,7 +159,8 @@ def _cafeteria_checks() -> list[LockedQuery]:
             "Saldo del monedero (get_or_create / get)",
             "apps/cafeteria/services.py _record_receipt, sync_student_balance, "
             "complete_online_topup, apply_paid_topup, add_points_to_customer, adjust_balance, "
-            "reconcile_to_loyverse, refund_transaction, reverse_phantom_topup",
+            "reconcile_to_loyverse, refund_transaction, reverse_phantom_topup; "
+            "apps/accounts/staff_import.py _seed_once",
             lambda: _get(CafeteriaBalance.objects.select_for_update().filter(student_id=MISSING)),
         ),
         LockedQuery(
@@ -173,6 +175,19 @@ def _cafeteria_checks() -> list[LockedQuery]:
                 TopUpRequest.objects.select_for_update()
                 .select_related("student")
                 .filter(pk=MISSING)
+            ),
+        ),
+        # Staff cafetería accounts (2026-11-18): the wallet's Loyverse link.
+        LockedQuery(
+            "Vincular a Loyverse al guardar (alumno)",
+            "apps/cafeteria/services.py link_profile_on_save",
+            lambda: _get(StudentProfile.objects.select_for_update().filter(pk=MISSING)),
+        ),
+        LockedQuery(
+            "Importar personal: vincular o convertir (alumno + usuario)",
+            "apps/accounts/staff_import.py _apply_row",
+            lambda: _get(
+                StudentProfile.objects.select_for_update().select_related("user").filter(pk=MISSING)
             ),
         ),
     ]
