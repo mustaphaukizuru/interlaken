@@ -132,6 +132,23 @@ describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-1
     expect(within(face()).queryByText(/Alumno|Sin asignar/)).toBeNull();
   });
 
+  it('a portal-only staff login: the page speaks to the holder, never of «el alumno»', async () => {
+    getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(screen.getByRole('heading', { level: 1, name: 'Mi credencial de cafetería' })).toBeInTheDocument();
+    expect(screen.getByText('Muestre el código en caja para que le cobren de su saldo.')).toBeInTheDocument();
+    expect(screen.queryByText(/identificar al alumno/)).toBeNull();
+  });
+
+  it('a family keeps the family heading', async () => {
+    getCards.mockResolvedValue({ data: [CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(screen.getByRole('heading', { level: 1, name: 'Credencial de cafetería' })).toBeInTheDocument();
+    expect(screen.getByText(/identificar al alumno/)).toBeInTheDocument();
+  });
+
   it('the full-screen scan view says the same', async () => {
     getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
     renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
