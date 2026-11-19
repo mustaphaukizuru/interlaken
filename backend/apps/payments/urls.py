@@ -14,6 +14,8 @@ urlpatterns = [
     path('admin/',      views.AdminPaymentsView.as_view(),    name='admin-payments'),
     path('admin/export/', views.AdminPaymentsExportView.as_view(), name='admin-payments-export'),
     path('admin/summary/', views.AdminPaymentsSummaryView.as_view(), name='admin-payments-summary'),
+    path('admin/multicobros-upload/', views.AdminMulticobrosUploadView.as_view(),
+         name='admin-payment-multicobros-upload'),
     path('admin/<int:pk>/banorte-verify/', views.AdminBanorteVerifyView.as_view(),
          name='admin-payment-banorte-verify'),
     path('admin/<int:pk>/banorte-reconcile/', views.AdminBanorteReconcileView.as_view(),

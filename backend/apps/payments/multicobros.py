@@ -19,6 +19,13 @@ close them here:
 
 ``review_reason`` is the shared rule of what needs that check, used by the
 ``banorte_pending_report`` email and the admin deposit log.
+
+A browser-reported approval that WAS credited still has to be matched in
+MultiCobros before the money goes into the POS: ``verify_approval`` is that
+rule («Verificar en MultiCobros»), shared by the per-payment dialog
+(``AdminBanorteVerifyView``) and the report upload
+(``multicobros_report``), so the two can never drift. ``apply_verified``
+is what both run once the verification has committed.
 """
 
 from __future__ import annotations
@@ -312,6 +319,150 @@ def reconcile_not_found(payment_id, *, note: str, actor) -> ReconcileResult:
     return ReconcileResult(payment, "closed")
 
 
+# ── Verificar en MultiCobros ─────────────────────────────────
+
+
+def checkout_for_verify(pk):
+    """The checkout of payment ``pk``, row-locked for «Verificar en MultiCobros».
+
+    Locks the checkout and its payment only. ``verified_by`` is empty until
+    someone verifies, so it is a LEFT JOIN, and PostgreSQL refuses FOR UPDATE
+    on the nullable side of an outer join: until 2026-11-18 every verification
+    was a 500 in production (SQLite, which the tests use, ignores row locks).
+    """
+    return (
+        BanorteCheckout.objects.select_for_update(of=("self", "payment"))
+        .select_related("payment", "verified_by")
+        .filter(payment_id=pk)
+    )
+
+
+class VerifyError(ValueError):
+    """A verification the server refuses. ``status`` is the HTTP status; a
+    ``code`` of ``None`` answers without one (the dialog's oldest message)."""
+
+    def __init__(self, message: str, *, status: int = 400, code: str | None = None):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+
+
+@dataclass
+class VerifyResult:
+    checkout: BanorteCheckout
+    payment: Payment
+    newly_verified: bool  # False: it was already verified (idempotent)
+
+
+def same_auth_code(ours, theirs) -> bool:
+    """Payworks authorization codes compared as MultiCobros shows them: case,
+    spaces and leading zeros ignored (a spreadsheet drops "012345"'s zero)."""
+
+    def norm(value):
+        return str(value or "").strip().upper().lstrip("0")
+
+    return norm(ours) == norm(theirs)
+
+
+def verify_approval(
+    payment_id, *, referencia, amount, actor, codigo_aut=None, via: str = ""
+) -> VerifyResult:
+    """«Verificar en MultiCobros»: staff saw this credited approval in MultiCobros.
+
+    Under the ``checkout_for_verify`` row lock: only an approved (Payworks A),
+    credited (SUCCESS) operation is verified, and only when the referencia and
+    the amount MultiCobros shows equal ours (and the authorization code, when
+    the caller read one and we stored one). Sets ``verified_at``/``verified_by``
+    and audits it once; already verified is a no-op (``newly_verified=False``).
+    Raises ``VerifyError`` (nothing written) otherwise. Moves no money: the
+    caller runs ``apply_verified`` after this has committed.
+    """
+    from apps.core.audit import record
+
+    referencia = str(referencia or "").strip()
+    amount = parse_amount(amount)
+    with transaction.atomic():
+        checkout = checkout_for_verify(payment_id).first()
+        if checkout is None:
+            raise VerifyError("Pago no encontrado.", status=404, code="payment_not_found")
+        payment = checkout.payment
+        if checkout.verified_at is not None:
+            return VerifyResult(checkout, payment, False)
+        if checkout.resultado_payw != BanorteCheckout.Result.APPROVED:
+            raise VerifyError("Solo se verifican operaciones aprobadas.")
+        if payment.status != Payment.Status.SUCCESS:
+            raise VerifyError(
+                "Solo se verifican pagos acreditados (este está "
+                f"«{payment.get_status_display()}»).",
+                code="not_success",
+            )
+        if not referencia or referencia != checkout.referencia:
+            raise VerifyError(
+                "La referencia no coincide con la de este pago. Revise que buscó el "
+                "número de control correcto en MultiCobros.",
+                code="reference_mismatch",
+            )
+        if amount is None or amount != payment.amount:
+            raise VerifyError(
+                f"El monto no coincide con el del pago (${payment.amount:.2f}). "
+                "No lo cargue en el POS y avise a dirección.",
+                code="amount_mismatch",
+            )
+        if (
+            codigo_aut is not None
+            and checkout.codigo_aut
+            and not same_auth_code(checkout.codigo_aut, codigo_aut)
+        ):
+            raise VerifyError(
+                "El número de autorización no coincide con el de este pago. "
+                "No lo cargue en el POS y avise a dirección.",
+                code="auth_code_mismatch",
+            )
+        checkout.verified_at = timezone.now()
+        checkout.verified_by = actor
+        checkout.save(update_fields=["verified_at", "verified_by"])
+        changes = {
+            "banorte_verified": True,
+            "referencia": checkout.referencia,
+            "amount": f"{payment.amount:.2f}",
+        }
+        if via:
+            changes["via"] = via
+        record("update", payment, changes, actor=actor, context="payments.banorte.verify")
+    return VerifyResult(checkout, payment, True)
+
+
+def apply_verified(payment, *, quick_read: bool = False) -> dict:
+    """After a verification committed: apply the top-up now when Loyverse already
+    holds it (``cafeteria.services.apply_after_verification``, the POS mirror's
+    own path). Never raises: a failure leaves it for the next sync
+    (``pos_unknown``). ``quick_read`` reads Loyverse in one short attempt (the
+    report upload applies many in one request)."""
+    applied = {"apply_state": "not_applicable", "balance": None}
+    if payment.status == Payment.Status.SUCCESS and payment.related_topup_id:
+        from apps.cafeteria.services import apply_after_verification
+
+        try:
+            if quick_read:
+                applied = apply_after_verification(payment, quick_read=True)
+            else:
+                applied = apply_after_verification(payment)
+        except Exception:  # noqa: BLE001 (the verification itself stands)
+            logger.exception("apply after verification failed payment=%s", payment.pk)
+            applied = {"apply_state": "pos_unknown", "balance": None}
+    return applied
+
+
+def forget_badges(user) -> None:
+    """«Por verificar» just changed: the console refetches the badges now, so
+    the 30 s cache of whoever verified must not answer the old count."""
+    from django.core.cache import cache
+
+    from apps.core.badges import BADGE_CACHE_KEY
+
+    cache.delete(BADGE_CACHE_KEY.format(pk=getattr(user, "pk", 0)))
+
+
 # ── POS and refunds ──────────────────────────────────────────
 
 
@@ -337,12 +488,16 @@ def paid_topups_awaiting_verification():
     dashboard card count these; same rule as ``Payment.needs_bank_verification``."""
     from apps.cafeteria.services import paid_topups_pending
 
-    return paid_topups_pending().filter(
-        payments__status=Payment.Status.SUCCESS,
-        payments__banorte__mode="PRD",
-        payments__banorte__resultado_payw=BanorteCheckout.Result.APPROVED,
-        payments__banorte__verified_at__isnull=True,
-    ).distinct()
+    return (
+        paid_topups_pending()
+        .filter(
+            payments__status=Payment.Status.SUCCESS,
+            payments__banorte__mode="PRD",
+            payments__banorte__resultado_payw=BanorteCheckout.Result.APPROVED,
+            payments__banorte__verified_at__isnull=True,
+        )
+        .distinct()
+    )
 
 
 def simulated_topup_ids():

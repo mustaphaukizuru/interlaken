@@ -56,7 +56,8 @@ Code map:
 | One attempt per payment (control number, encrypted key, result) | `BanorteCheckout` in `backend/apps/payments/models.py` |
 | Money movement (idempotent, locked) | `backend/apps/payments/settlement.py` |
 | Result endpoint, staff verification and reconciliation endpoints | `backend/apps/payments/views.py` |
-| What needs a MultiCobros check, "Conciliar con MultiCobros" | `backend/apps/payments/multicobros.py` |
+| What needs a MultiCobros check, "Conciliar con MultiCobros", the "Verificar en MultiCobros" rule (`verify_approval`) | `backend/apps/payments/multicobros.py` |
+| "Subir reporte de MultiCobros" (parse the export, one outcome per row, verify the matches) | `backend/apps/payments/multicobros_report.py`, `frontend/src/components/admin/MulticobrosUploadDialog.tsx` |
 | Lightbox loader | `frontend/src/lib/banorteCheckout.ts` |
 | Parent top-up | `frontend/src/pages/parent/CafeteriaPage.tsx` |
 | Staff verification (POS queue) and reconciliation (Depósitos) | `frontend/src/pages/admin/AdminCafeteria.tsx`, `frontend/src/components/admin/BanorteDialogs.tsx` |
@@ -292,6 +293,31 @@ as a portal notification and by email (`topup_apply_report`).
    leaves the top-up in **Cargar en POS** until it is marked loaded.
 3. If the operation does not appear in MultiCobros, or the amount differs, do
    not load it and tell the direction.
+
+**Many at once: «Subir reporte de MultiCobros»** (button in «Por aplicar» and
+in Depósitos). In MultiCobros go to Analítica → Reportes → Transacciones
+Payworks 2, choose the dates (yesterday and today, say) and export
+(`MovimientosPayworks_export_<n>.xlsx`, or .csv). Upload it: the preview lists
+one result per operation before anything changes. **Verificar N pagos**
+verifies the real (PRD) approved sales whose amount, referencia and
+authorization code equal ours, through exactly the rule of step 1 (same
+checks, same lock, same audit row plus `via: multicobros-upload`), and
+applies at once the ones Loyverse already holds. Nothing else changes:
+
+- *Diferencia* (amount, referencia, authorization, PAGO id or state differ) and
+  *No aprobada en MultiCobros*: never verified; do not load them and tell the
+  direction.
+- *Banorte no muestra* (`no_aparece`): an approval of ours inside the file's
+  dates that the file does not list. Do not load it.
+- *Requiere conciliación* (`por_conciliar`): MultiCobros shows an approved sale
+  the app never received (expired, replaced, bank timeout). «Conciliar» opens
+  the usual dialog pre-filled with the report's values; staff confirm each one.
+- Refunds and cancellations of our payments, declined attempts, sales of other
+  channels and simulations are listed for information only.
+
+The file is read in memory, never stored or logged; the answer carries at most
+the last 4 card digits. A report of another afiliación is refused whole. Caps:
+2 MB and 5,000 operations; .xls is refused (export .xlsx or .csv).
 4. **Same-day requests.** A family that needs the money today sends its
    comprobante by WhatsApp. Search the folio in Depósitos (`folio 123` or just
    `123`), load it in Loyverse right away and it applies within minutes.
