@@ -555,9 +555,13 @@ export interface WalletAudit {
   unmatched_points: string;
 }
 
+// «Mi cafetería» (2026-11-18): `mine` asks for the caller's OWN cafetería
+// account only, whatever its role (a console user who also eats there).
+const MINE = { mine: 1 } as const;
+
 export const cafeteriaApi = {
-  getMyBalance: () =>
-    api.get('/cafeteria/balance/'),
+  getMyBalance: (mine?: boolean) =>
+    mine ? api.get('/cafeteria/balance/', { params: MINE }) : api.get('/cafeteria/balance/'),
 
   getTransactions: (params?: {
     page?: number;
@@ -567,6 +571,7 @@ export const cafeteriaApi = {
     to?: string;
     /** `date` | `amount` | `type` | `balance`, `-` prefix = descending. */
     ordering?: string;
+    mine?: 1;
   }) =>
     api.get('/cafeteria/transactions/', { params }),
 
@@ -577,29 +582,31 @@ export const cafeteriaApi = {
     }),
 
   // Spend grouped by coarse category (Bebidas / Comida / Snacks / Otros).
-  getSpendingCategories: (days = 30, student?: number) =>
+  getSpendingCategories: (days = 30, student?: number, mine?: boolean) =>
     api.get<{
       days: number;
       total: number;
       categories: { category: string; total: number; count: number; pct: number }[];
     }>('/cafeteria/spending-categories/', {
-      params: { days, ...(student ? { student } : {}) },
+      params: { days, ...(student ? { student } : {}), ...(mine ? MINE : {}) },
     }),
 
   // Digital student card(s): identity + code (QR/barcode) + balance + Loyverse stats.
   /** Admin: one student's card (staff credencial view). */
   getStudentCard: (studentId: number) =>
     api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/', { params: { student: studentId } }),
-  getCards: () => api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/'),
+  getCards: (mine?: boolean) => mine
+    ? api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/', { params: MINE })
+    : api.get<import('@/types').CafeteriaCard[]>('/cafeteria/cards/'),
 
   // Read-only recent purchases pulled live from Loyverse (does not touch the ledger).
-  getLoyverseHistory: (student?: number, limit = 20) =>
+  getLoyverseHistory: (student?: number, limit = 20, mine?: boolean) =>
     api.get<{
       linked: boolean;
       error?: string;
       receipts: import('@/types').LoyverseHistoryReceipt[];
     }>('/cafeteria/loyverse-history/', {
-      params: { limit, ...(student ? { student } : {}) },
+      params: { limit, ...(student ? { student } : {}), ...(mine ? MINE : {}) },
     }),
 
   // Family sets the saldo-bajo warning level for one of their children.
@@ -630,10 +637,11 @@ export const cafeteriaApi = {
     }>('/cafeteria/refresh/'),
 
   /** Family history file (CSV/Excel): same student/type/from/to/ordering as `getTransactions`. */
-  exportMyTransactions: (params: { fmt: 'csv' | 'xlsx'; student?: number; type?: string; from?: string; to?: string; ordering?: string }) =>
+  exportMyTransactions: (params: { fmt: 'csv' | 'xlsx'; student?: number; type?: string; from?: string; to?: string; ordering?: string; mine?: 1 }) =>
     api.get<Blob>('/cafeteria/export/', { params, responseType: 'blob' }),
   /** Monthly statement PDF (BACKLOG P4-3). */
-  statementPdf: (student: number, month: string) => api.get('/cafeteria/statement/', { params: { student, month }, responseType: 'blob' }),
+  statementPdf: (student: number, month: string, mine?: boolean) =>
+    api.get('/cafeteria/statement/', { params: { student, month, ...(mine ? MINE : {}) }, responseType: 'blob' }),
   /** Admin bulk top-up by grado/grupo (BACKLOG P4-3). */
   bulkTopUp: (data: { amount: number; reason: string; grade?: string; group?: string; preview?: boolean; batch_id?: string }) => api.post('/cafeteria/admin/bulk-topup/', data),
 

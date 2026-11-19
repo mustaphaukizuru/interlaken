@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import StudentCard from '@/components/portal/StudentCard';
 import { cafeteriaApi } from '@/services/api';
+import { useMineScope } from '@/lib/cafeteriaScope';
 import type { CafeteriaCard, LoyverseHistoryReceipt } from '@/types';
 import { formatMXN } from '@/lib/format';
 
@@ -33,9 +34,11 @@ function Stat({ icon: Icon, label, value, hint }: { icon: typeof Store; label: s
 }
 
 export default function CredencialPage() {
+  // «Mi cafetería»: the caller's own staff card only.
+  const mine = useMineScope();
   const { data: cards, isLoading, isError, refetch } = useQuery<CafeteriaCard[]>({
-    queryKey: ['cafeteria-cards'],
-    queryFn: async () => (await cafeteriaApi.getCards()).data,
+    queryKey: mine ? ['cafeteria-cards', 'mine'] : ['cafeteria-cards'],
+    queryFn: async () => (await cafeteriaApi.getCards(mine)).data,
   });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -52,7 +55,7 @@ export default function CredencialPage() {
     refetch: refetchHistory,
   } = useQuery({
     queryKey: ['loyverse-history', studentId],
-    queryFn: async () => (await cafeteriaApi.getLoyverseHistory(studentId)).data,
+    queryFn: async () => (await cafeteriaApi.getLoyverseHistory(studentId, 20, mine)).data,
     enabled: !!studentId && !!active?.linked,
     staleTime: 1000 * 60 * 5,
   });
@@ -61,8 +64,13 @@ export default function CredencialPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">Credencial de cafetería</h1>
-        <p className="mt-1 text-fluid-sm text-muted">Muestra el código en caja para identificar al alumno y cobrar de su saldo.</p>
+        {mine && (
+          <Link to="/portal/mi-cafeteria" className="mb-2 inline-flex text-sm font-semibold text-purple hover:underline">← Mi cafetería</Link>
+        )}
+        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{mine ? 'Mi credencial de cafetería' : 'Credencial de cafetería'}</h1>
+        <p className="mt-1 text-fluid-sm text-muted">{mine
+          ? 'Muestre el código en caja para que le cobren de su saldo.'
+          : 'Muestra el código en caja para identificar al alumno y cobrar de su saldo.'}</p>
       </div>
 
       {isError ? (

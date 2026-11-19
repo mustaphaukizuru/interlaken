@@ -3,7 +3,7 @@ import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import Logo from '@/components/ui/Logo';
-import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, BarChart3, LayoutDashboard } from 'lucide-react';
+import { Users, LogOut, PanelLeftClose, PanelLeftOpen, ChevronUp, ChevronDown, BarChart3, LayoutDashboard, Coffee } from 'lucide-react';
 import { navGroupsByRole, type NavGroup, type Role } from './navConfig';
 import { canOpen, consoleHome } from '@/lib/areas';
 import { useBadges } from '@/hooks/useBadges';
@@ -43,12 +43,17 @@ export default function Sidebar({ role, open = false, onNavigate }: SidebarProps
     : role === 'staff'
       ? [{ heading: 'Consola', items: [{ icon: LayoutDashboard, label: user.staff_title || 'Mi consola', to: home }] }]
       : [];
+  // A console user who also eats at the cafetería (their own staff wallet).
+  const myCafe: NavGroup[] = user?.cafeteria_account && (user.role === 'admin' || user.role === 'staff')
+    ? [{ heading: 'Mi cuenta', items: [{ icon: Coffee, label: 'Mi cafetería', to: '/portal/mi-cafeteria' }] }]
+    : [];
   const groups = [
     ...(role === 'staff' ? bridge : []),
     ...(navGroupsByRole[role] ?? navGroupsByRole.parent)
       .map((g) => ({ ...g, items: g.items.filter((item) => canOpen(user, item.to)) }))
       .filter((g) => g.items.length > 0),
     ...(role === 'admin' ? bridge : []),
+    ...myCafe,
   ];
   const asideRef = useRef<HTMLElement>(null);
   const touchX = useRef<number | null>(null);

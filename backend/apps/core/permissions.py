@@ -87,3 +87,21 @@ class IsParentOrAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
         return _authenticated(user) and _role(user) in (PARENT, STUDENT, ADMIN)
+
+
+class IsParentOrAdminOrAccountHolder(IsParentOrAdmin):
+    """``IsParentOrAdmin``, plus anyone who holds a cafetería account
+    themselves (2026-11-18): a staff member whose login is a console account
+    (role ``staff``) tops up and downloads their OWN wallet from «Mi
+    cafetería». The view still checks the object (own-account scoping); this
+    grants nothing else."""
+
+    def has_permission(self, request, view):
+        if super().has_permission(request, view):
+            return True
+        user = request.user
+        if not _authenticated(user):
+            return False
+        from apps.accounts.models import StudentProfile
+
+        return StudentProfile.objects.filter(user_id=user.pk).exists()
