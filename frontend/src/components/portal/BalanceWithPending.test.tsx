@@ -44,7 +44,7 @@ describe('BalanceWithPending', () => {
     );
     // The word «pagada» is always written: nothing relies on colour alone.
     expect(screen.getByText('Recarga de $200.00 pagada · disponible mañana a las 7:30 a.m.')).toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/—/);
+    expect(container.textContent).not.toMatch(/\u2014/); // no em-dash in any copy
   });
 
   it('several top-ups on the same day: their sum, one line', () => {
