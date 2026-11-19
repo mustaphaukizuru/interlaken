@@ -104,6 +104,13 @@
      by focus(), scrollIntoView() or a skip link (`hidden` can be). `hidden`
      first for browsers without `clip` (Safari < 16). */
   .frame-clip { overflow: hidden; overflow: clip; }
+
+  /* Public site: while a route has nothing to show yet (CmsOverride first asks
+     whether the school published a CMS version), the empty page still fills
+     the screen. Otherwise the footer paints right under the header and the
+     content then throws it below the fold: Lighthouse measured CLS 0.32-0.41
+     on /admisiones/costos. CSS on purpose: no bytes in the shared JS. */
+  main#contenido > .route-enter:empty { min-height: 100vh; }
 }
 
 /* Honor reduced-motion globally: neutralize animations, transitions, smooth scroll. */

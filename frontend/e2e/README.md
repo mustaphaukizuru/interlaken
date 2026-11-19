@@ -13,6 +13,7 @@ and admin/portal data are stubbed with `page.route` so runs are deterministic.
 | `cafeteria.spec.ts` | Top-up from CafeteriaPage and from the dashboard quick chip (`?recarga=200`), gateway choice in the POST payload, stubbed hosted-page redirect, return page success/failed/processing states |
 | `admin.spec.ts` | Comunicado publish from the admin console; the parent portal no longer shows comunicados (bitácora punto 10) |
 | `console-frame.spec.ts` | The console never slides up: wheel, End, focus() and scrollIntoView() near the bottom of /admin/pagos leave the document and the frame unscrolled (1919×937 and 390×844) |
+| `layout-shift.spec.ts` | /admisiones/costos: with the CMS check held open the footer stays below the fold, and the page loads with layout shift < 0.1 |
 | `visual.spec.ts` | `toHaveScreenshot` baselines at 390×844 and 1280×800 for home, costos, admisiones, login, parent dashboard (stubbed) |
 
 ## Running locally
