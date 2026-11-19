@@ -6,6 +6,7 @@
  * day at 7:30, or right away when the family sends its comprobante by WhatsApp.
  * Dates are shown in the school's time zone whatever the parent's device says.
  */
+import { formatMXN } from '@/lib/format';
 import type { TopUpPolicy } from '@/types';
 
 export const SCHOOL_TZ = 'America/Mexico_City';
@@ -129,4 +130,128 @@ export function pendingCoversLowBalance(
   const onTheWay = pending.reduce((sum, t) => sum + cents(t.amount), 0);
   if (onTheWay <= 0) return false;
   return cents(balance) + onTheWay >= cents(threshold ?? '20');
+}
+
+/**
+ * `applyPhrase` without the weekday and date for today and tomorrow, for the
+ * short line under a balance: "hoy a las 7:30 a.m.", "mañana a las 7:30 a.m.",
+ * "el lunes 23 de noviembre a las 7:30 a.m." (other days keep their date).
+ */
+export function applyPhraseShort(iso: string | null | undefined, now: Date = new Date()): string {
+  const phrase = applyPhrase(iso, now);
+  return phrase.startsWith('mañana ') ? `mañana a las ${formatClock(new Date(iso as string))}` : phrase;
+}
+
+/** "el lunes …" → "a partir del lunes …"; "en la próxima carga" → "a partir de la próxima carga". */
+const fromWhen = (phrase: string) => {
+  if (phrase.startsWith('el ')) return `a partir del ${phrase.slice(3)}`;
+  if (phrase.startsWith('en ')) return `a partir de ${phrase.slice(3)}`;
+  return `a partir de ${phrase}`;
+};
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Whole cents → "$1,234.50" (the portal's one money format). */
+export const formatCents = (centsValue: number) => formatMXN(centsValue / 100);
+const money = formatCents;
+
+/** Paid top-ups loaded the same day and time, and the balance once they are in. */
+export interface ProjectionStep {
+  /** What these top-ups add, in cents. */
+  amount: number;
+  count: number;
+  /** "mañana viernes 20 de noviembre a las 7:30 a.m." (full, for screen readers). */
+  phrase: string;
+  /** "mañana a las 7:30 a.m." (short, for the visible line). */
+  short: string;
+  /** The balance after this step, in cents. */
+  total: number;
+}
+
+export interface BalanceProjection {
+  /** The real balance (what the cashier has in Loyverse), in cents. */
+  balance: number;
+  /** Everything paid and waiting, in cents. */
+  pending: number;
+  /** The balance once every paid top-up is loaded, in cents. */
+  total: number;
+  count: number;
+  /** In load order; more than one only when the load dates differ. */
+  steps: ProjectionStep[];
+}
+
+/**
+ * Where a wallet is heading while paid card top-ups wait for the POS load:
+ * the real balance stays the balance, the projection only adds what is paid.
+ * In whole cents ($0.10 + $0.20 is $0.30, never $0.30000000000000004), the
+ * same arithmetic as `pendingCoversLowBalance`. Null when nothing is pending,
+ * so the balance speaks alone. The list must be the backend's PAID online
+ * top-ups (`pending_topups`): refunded or applied ones are never in it.
+ */
+export function projectBalance(
+  balance: string | number,
+  pending: ReadonlyArray<{ amount: string; apply_due_at: string | null }> | null | undefined,
+  now: Date = new Date(),
+): BalanceProjection | null {
+  const due = (iso: string | null) => {
+    const t = iso ? new Date(iso).getTime() : NaN;
+    return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+  };
+  const items = (pending ?? [])
+    .map((t) => ({ amount: cents(t.amount), apply_due_at: t.apply_due_at }))
+    .filter((t) => t.amount > 0)
+    .sort((a, b) => due(a.apply_due_at) - due(b.apply_due_at));
+  if (!items.length) return null;
+  const start = cents(balance);
+  const steps: ProjectionStep[] = [];
+  let running = start;
+  for (const t of items) {
+    running += t.amount;
+    const phrase = applyPhrase(t.apply_due_at, now);
+    const last = steps[steps.length - 1];
+    if (last && last.phrase === phrase) {
+      last.amount += t.amount;
+      last.count += 1;
+      last.total = running;
+    } else {
+      steps.push({ amount: t.amount, count: 1, phrase, short: applyPhraseShort(t.apply_due_at, now), total: running });
+    }
+  }
+  return { balance: start, pending: running - start, total: running, count: items.length, steps };
+}
+
+/** "Recarga de $200.00 pagada" / "2 recargas pagadas por $300.00". */
+const paidLabel = (count: number, amount: number) => (count === 1
+  ? `Recarga de ${money(amount)} pagada`
+  : `${count} recargas pagadas por ${money(amount)}`);
+
+/**
+ * The one short line under the projected balance:
+ * "Recarga de $200.00 pagada · disponible mañana a las 7:30 a.m.",
+ * "2 recargas pagadas por $300.00 · disponibles mañana a las 7:30 a.m." or,
+ * when they load on different days, when all of it is there:
+ * "2 recargas pagadas por $300.00 · todo disponible el lunes 23 de noviembre a las 7:30 a.m.".
+ */
+export function projectionSummary(p: BalanceProjection): string {
+  const last = p.steps[p.steps.length - 1];
+  const when = p.steps.length > 1 ? `todo disponible ${last.short}` : `${p.count > 1 ? 'disponibles' : 'disponible'} ${last.short}`;
+  return `${paidLabel(p.count, p.pending)} · ${when}`;
+}
+
+/** One line per load day (several days only): "Mañana a las 7:30 a.m.: $250.00 · recarga de $100.00 pagada". */
+export function projectionStepLine(step: ProjectionStep): string {
+  return `${capitalize(step.short)}: ${money(step.total)} · ${paidLabel(step.count, step.amount).replace(/^R/, 'r')}`;
+}
+
+/**
+ * The sentence screen readers get instead of the arrow: «Saldo actual $150.00.
+ * Con la recarga pagada de $200.00 será $350.00 a partir de mañana viernes 20
+ * de noviembre a las 7:30 a.m.»
+ */
+export function projectionSentence(p: BalanceProjection): string {
+  const last = p.steps[p.steps.length - 1];
+  const paid = p.count === 1
+    ? `la recarga pagada de ${money(p.pending)}`
+    : `las ${p.count} recargas pagadas por ${money(p.pending)}`;
+  return `Saldo actual ${money(p.balance)}. ${sentence(`Con ${paid} será ${money(p.total)} ${fromWhen(last.phrase)}`)}`;
 }

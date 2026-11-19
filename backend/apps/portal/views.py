@@ -220,6 +220,10 @@ class DashboardView(APIView):
                             b, pending_amount.get(b.student_id, Decimal('0'))),
                         'last_synced': b.last_synced,
                         'pending_topups': pending_total.get(b.student_id, '0.00'),
+                        # Each one with its promised POS load, so the hero can
+                        # say «$150.00 → $350.00 a partir de mañana 7:30»
+                        # (the same rows as above: no extra query).
+                        'pending_topup_items': pending.get(b.student_id, []),
                     }
                     for b in balances
                 ],

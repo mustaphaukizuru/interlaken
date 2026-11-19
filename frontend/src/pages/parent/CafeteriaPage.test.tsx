@@ -529,6 +529,64 @@ describe('CafeteriaPage scheduled application of card top-ups', () => {
     expect(await screen.findByText('Saldo bajo', { exact: true })).toBeInTheDocument();
   });
 
+  const topup = (id: number, amount: string, apply_due_at = '2030-01-07T13:30:00Z') =>
+    ({ id, amount, paid_at: '2030-01-04T22:00:00Z', apply_due_at, folio: id });
+  const card = () => document.getElementById('saldos-cafeteria') as HTMLElement;
+
+  it('shows the real balance and, next to it, where it is heading (owner, 2026-11-19)', async () => {
+    mockedBalance.mockResolvedValue({ data: [{ ...account, pending_topups: [topup(7, '200.00')] }] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+
+    await screen.findByText(/Recarga por aplicar · \$200\.00/);
+    const saldos = within(card());
+    expect(saldos.getByText('Saldo en caja')).toBeInTheDocument();
+    expect(saldos.getByText('$150.00')).toBeInTheDocument();
+    expect(saldos.getByText('$350.00')).toBeInTheDocument();
+    expect(saldos.getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(card().querySelector('.sr-only')).toHaveTextContent(
+      'Saldo actual $150.00. Con la recarga pagada de $200.00 será $350.00 a partir del lunes 7 de enero a las 7:30 a.m.');
+    // The list under it already details each top-up: no second toggle here.
+    expect(saldos.queryByRole('button', { name: /Ver detalle/ })).toBeNull();
+  });
+
+  it('the top-up picker says it in words', async () => {
+    mockedBalance.mockResolvedValue({ data: [{ ...account, pending_topups: [topup(7, '200.00')] }] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria?recarga=200' });
+    const dialog = await screen.findByRole('dialog', { name: 'Recargar cafetería' });
+    expect(within(dialog).getByRole('option')).toHaveTextContent(
+      'Emma Quintana · saldo $150.00, $350.00 con la recarga pagada');
+  });
+
+  it('two children: only the one with a paid top-up shows the arrow', async () => {
+    const sibling = {
+      ...account, id: 3, balance: '80.00', pending_topups: [],
+      student: { ...account.student, id: 12, loyverse_id: 'loy-leo', user: { full_name: 'Leo Quintana' } },
+    };
+    mockedBalance.mockResolvedValue({ data: [{ ...account, pending_topups: [topup(7, '200.00')] }, sibling] } as never);
+    const first = renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    // The first child is selected: its card carries the projection.
+    await waitFor(() => expect(within(card()).getByText('$350.00')).toBeInTheDocument());
+    expect(within(card()).getByText('Emma Quintana')).toBeInTheDocument();
+    first.unmount();
+
+    useSelectedChildStore.setState({ childId: 12 });
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    await waitFor(() => expect(within(card()).getByText('Leo Quintana')).toBeInTheDocument());
+    expect(within(card()).getByText('Saldo')).toBeInTheDocument();
+    expect(within(card()).getByText('$80.00')).toBeInTheDocument();
+    expect(within(card()).queryByText('Saldo en caja')).toBeNull();
+    expect(card().querySelector('.sr-only')).toBeNull();
+  });
+
+  it('nothing pending: the balance reads exactly as before', async () => {
+    mockedBalance.mockResolvedValue({ data: [{ ...account, pending_topups: [] }] } as never);
+    renderWithProviders(<CafeteriaPage />, { route: '/portal/cafeteria' });
+    await waitFor(() => expect(within(card()).getByText('$150.00')).toBeInTheDocument());
+    expect(within(card()).getByText('Saldo')).toBeInTheDocument();
+    expect(within(card()).queryByText(/pagada/)).toBeNull();
+    expect(card().querySelector('.sr-only')).toBeNull();
+  });
+
   it('tells the family before paying when the balance will be applied', async () => {
     mockedBalance.mockResolvedValue({ data: [account] } as never);
     const u = userEvent.setup();

@@ -73,3 +73,115 @@ describe('CredencialPage activity: «Consumo registrado» (owner, 2026-11-08)', 
     expect(within(consumo).getByText('Sin compras registradas')).toBeInTheDocument();
   });
 });
+
+describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const face = () => screen.getByText('Código Loyverse').closest('.rounded-xl3') as HTMLElement;
+
+  it('the card shows the real balance, the projection, and the line on white', async () => {
+    getCards.mockResolvedValue({ data: [{
+      ...CARD,
+      pending_topups: [{ id: 3, amount: '200.00', paid_at: '2030-01-04T22:00:00Z', apply_due_at: '2030-01-07T13:30:00Z', folio: 3 }],
+    }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo en caja')).toBeInTheDocument();
+    expect(within(face()).getByText('$120.00')).toBeInTheDocument();
+    expect(within(face()).getByText('$320.00')).toBeInTheDocument();
+    expect(within(face()).getByText('Recarga de $200.00 pagada · disponible el lunes 7 de enero a las 7:30 a.m.')).toBeInTheDocument();
+    expect(face().querySelector('.sr-only')).toHaveTextContent('Saldo actual $120.00. Con la recarga pagada de $200.00 será $320.00');
+  });
+
+  it('nothing pending: «Saldo» and the figure, as before', async () => {
+    getCards.mockResolvedValue({ data: [{ ...CARD, pending_topups: [] }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo')).toBeInTheDocument();
+    expect(within(face()).getByText('$120.00')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo en caja')).toBeNull();
+    expect(within(face()).queryByText(/pagada/)).toBeNull();
+  });
+});
+
+describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-11-19)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const face = () => screen.getByText('Código Loyverse').closest('.rounded-xl3') as HTMLElement;
+  const staff = (puesto: string, puesto_label: string) => ({
+    ...CARD,
+    student: { ...CARD.student, name: 'Caja Ejemplo', grade: '', group: '', tipo: 'personal' as const, puesto: puesto as never, puesto_label },
+  });
+
+  it('a pupil keeps grade and group', async () => {
+    getCards.mockResolvedValue({ data: [{ ...CARD, student: { ...CARD.student, tipo: 'alumno' as const, puesto: '' as const, puesto_label: '' } }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('4° · Grupo A')).toBeInTheDocument();
+  });
+
+  it('staff with a puesto: the puesto, no grade, no group', async () => {
+    getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('Docente')).toBeInTheDocument();
+    expect(within(face()).queryByText(/Alumno|Grupo/)).toBeNull();
+  });
+
+  it('staff without a puesto: «Personal del colegio», never «Sin asignar»', async () => {
+    getCards.mockResolvedValue({ data: [staff('sin_asignar', 'Sin asignar')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('Personal del colegio')).toBeInTheDocument();
+    expect(within(face()).queryByText(/Alumno|Sin asignar/)).toBeNull();
+  });
+
+  it('a portal-only staff login: the page speaks to the holder, never of «el alumno»', async () => {
+    getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(screen.getByRole('heading', { level: 1, name: 'Mi credencial de cafetería' })).toBeInTheDocument();
+    expect(screen.getByText('Muestre el código en caja para que le cobren de su saldo.')).toBeInTheDocument();
+    expect(screen.queryByText(/identificar al alumno/)).toBeNull();
+  });
+
+  it('a family keeps the family heading', async () => {
+    getCards.mockResolvedValue({ data: [CARD] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(screen.getByRole('heading', { level: 1, name: 'Credencial de cafetería' })).toBeInTheDocument();
+    expect(screen.getByText(/identificar al alumno/)).toBeInTheDocument();
+  });
+
+  it('the full-screen scan view says the same', async () => {
+    getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
+    (await screen.findByRole('button', { name: /Mostrar en pantalla completa/ })).click();
+    const dialog = await screen.findByRole('dialog', { name: 'Código para escanear en caja' });
+    expect(within(dialog).getByText('Docente')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Alumno/)).toBeNull();
+  });
+});
+
+describe('CredencialPage «Saldo bajo» follows the paid top-ups on their way', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const low = { ...CARD, balance: '10.00', is_low_balance: true };
+
+  it('hidden while a paid top-up covers the level (the server says so)', async () => {
+    getCards.mockResolvedValue({ data: [{
+      ...low, low_balance_alert: false,
+      pending_topups: [{ id: 3, amount: '40.00', paid_at: '2030-01-04T22:00:00Z', apply_due_at: '2030-01-07T13:30:00Z', folio: 3 }],
+    }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('$50.00')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo bajo')).toBeNull();
+  });
+
+  it('shown when the paid top-ups do not reach it', async () => {
+    getCards.mockResolvedValue({ data: [{ ...low, low_balance_alert: true }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo bajo')).toBeInTheDocument();
+  });
+
+  it('an older API without the flag: the raw one', async () => {
+    getCards.mockResolvedValue({ data: [low] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    expect(await screen.findByText('Saldo bajo')).toBeInTheDocument();
+  });
+});

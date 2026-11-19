@@ -58,6 +58,7 @@ from .services import (
     get_balance_from_customer,
     get_customer_by_id,
     mirror_pos_topups,
+    pending_covers_low_balance,
     record_receipts,
     refund_transaction,
     sync_all_balances,
@@ -467,10 +468,18 @@ def _family_students_qs(user, *, mine=False):
 class MyCardsView(APIView):
     """GET /api/v1/cafeteria/cards/ — digital cafetería card(s) for the caller's
     children: identity + the Loyverse code the POS scans (for the on-screen
-    QR/barcode) + live balance + ``consumption`` (``{total, since}``: the
+    QR/barcode) + live balance + ``pending_topups`` (paid card top-ups not
+    loaded into the POS yet, see ``build_pending_topups_map``) + ``consumption`` (``{total, since}``: the
     "Consumo registrado" from our ledger, see ``build_consumption_map``) + the
     Loyverse profile stats (visits, first/last visit; its ``total_spent`` is
-    cash/card only, so the family page no longer shows it)."""
+    cash/card only, so the family page no longer shows it).
+
+    ``is_low_balance`` stays the raw ``balance <= threshold``;
+    ``low_balance_alert`` is the «Saldo bajo» the family should see: off while
+    the paid top-ups on their way reach the alert level (same rule as the
+    cafetería page, the dashboard and the alert e-mail), so the threshold
+    never travels. ``student.tipo``/``puesto``/``puesto_label`` let a staff
+    member's card read as their puesto, never «Alumno»."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -489,12 +498,16 @@ class MyCardsView(APIView):
             [CafeteriaBalance(student=s) for s in students], ignore_conflicts=True)
         balances = {b.student_id: b for b in CafeteriaBalance.objects.filter(student__in=students)}
         consumption = build_consumption_map(students)
+        # Paid card top-ups still to load into the POS, so the card can show
+        # where the balance is heading (one or two queries for any family).
+        pending = build_pending_topups_map(students)
         cards = []
         for s in students:
             balance = balances.get(s.pk) or CafeteriaBalance(student=s)
             loyverse = getattr(s, 'loyverse_profile', None)
             code = ((loyverse.customer_code if loyverse else '')
                     or s.student_id or '')
+            on_the_way = sum((Decimal(t['amount']) for t in pending.get(s.pk, [])), Decimal('0'))
             cards.append({
                 'student': {
                     'id': s.id,
@@ -502,11 +515,18 @@ class MyCardsView(APIView):
                     'grade': s.grade,
                     'group': s.group,
                     'student_id': s.student_id,
+                    # A staff member's own cafetería account (2026-11-18).
+                    'tipo': s.tipo,
+                    'puesto': s.puesto,
+                    'puesto_label': s.get_puesto_display(),
                 },
                 'code': code,                       # QR/barcode payload
                 'linked': bool(s.loyverse_id),
                 'balance': str(balance.balance),
                 'is_low_balance': balance.is_low_balance,
+                'low_balance_alert': balance.is_low_balance
+                and not pending_covers_low_balance(balance, on_the_way),
+                'pending_topups': pending.get(s.pk, []),
                 'points': str(loyverse.total_points) if loyverse else None,
                 'consumption': consumption.get(s.pk, NO_CONSUMPTION),
                 'loyverse': LoyverseProfileSerializer(loyverse).data if loyverse else None,

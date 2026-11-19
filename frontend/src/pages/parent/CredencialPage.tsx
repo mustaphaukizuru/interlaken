@@ -60,6 +60,9 @@ export default function CredencialPage() {
     staleTime: 1000 * 60 * 5,
   });
   const receipts: LoyverseHistoryReceipt[] = history?.receipts ?? [];
+  // A staff member's own credential (portal-only staff login, or «Mi
+  // credencial» from the console) speaks to the holder, never of «el alumno».
+  const ownCard = mine || (!!cards?.length && cards.every((c) => c.student.tipo === 'personal'));
 
   return (
     <div className="space-y-6">
@@ -67,8 +70,8 @@ export default function CredencialPage() {
         {mine && (
           <Link to="/portal/mi-cafeteria" className="mb-2 inline-flex text-sm font-semibold text-purple hover:underline">← Mi cafetería</Link>
         )}
-        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{mine ? 'Mi credencial de cafetería' : 'Credencial de cafetería'}</h1>
-        <p className="mt-1 text-fluid-sm text-muted">{mine
+        <h1 className="font-head text-fluid-xl font-bold leading-tight tracking-[-0.3px] text-ink">{ownCard ? 'Mi credencial de cafetería' : 'Credencial de cafetería'}</h1>
+        <p className="mt-1 text-fluid-sm text-muted">{ownCard
           ? 'Muestre el código en caja para que le cobren de su saldo.'
           : 'Muestra el código en caja para identificar al alumno y cobrar de su saldo.'}</p>
       </div>
@@ -80,7 +83,9 @@ export default function CredencialPage() {
       ) : !cards?.length ? (
         <Card>
           <EmptyState icon={Coffee} title="Sin credencial de cafetería"
-            description="El colegio debe vincular al alumno con el servicio de cafetería (Loyverse) para generar su credencial."
+            description={mine
+              ? 'El colegio debe vincular su cuenta con el servicio de cafetería (Loyverse) para generar su credencial.'
+              : 'El colegio debe vincular al alumno con el servicio de cafetería (Loyverse) para generar su credencial.'}
             action={
               <Link to="/contacto" className="btn-secondary text-sm">
                 Contactar al colegio
