@@ -35,14 +35,27 @@ describe('Sidebar «Mi cafetería»', () => {
     expect(screen.getByRole('link', { name: /Mi cafetería/ })).toBeInTheDocument();
   });
 
-  it('never for an account without one, nor for a family login (its «Cafetería» is the wallet)', () => {
+  it('never for an account without one', () => {
     useAuthStore.setState({ user: base, accessToken: 't', isAuthenticated: true });
-    const { unmount } = renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
+    renderWithProviders(<Sidebar role="admin" />, { route: '/admin' });
     expect(screen.queryByRole('link', { name: /Mi cafetería/ })).toBeNull();
-    unmount();
+  });
+
+  it('a staff member\'s portal-only login reads «Personal»: its own wallet is the portal «Cafetería»', () => {
     useAuthStore.setState({ user: { ...base, role: 'student', cafeteria_account: account }, accessToken: 't', isAuthenticated: true });
     renderWithProviders(<Sidebar role="parent" />, { route: '/portal' });
-    expect(screen.queryByRole('link', { name: /Mi cafetería/ })).toBeNull();
+    // The family wallet page, relabelled; no console-style /portal/mi-cafeteria entry.
+    expect(screen.getByRole('link', { name: /^Mi cafetería/ })).toHaveAttribute('href', '/portal/cafeteria');
+    expect(screen.queryByRole('link', { name: /^Cafetería/ })).toBeNull();
+    expect(screen.getAllByText('Personal').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Familia')).toBeNull();
+  });
+
+  it('a family login is unchanged: «Familia» and «Cafetería»', () => {
+    useAuthStore.setState({ user: { ...base, role: 'parent' }, accessToken: 't', isAuthenticated: true });
+    renderWithProviders(<Sidebar role="parent" />, { route: '/portal' });
     expect(screen.getByRole('link', { name: /^Cafetería/ })).toHaveAttribute('href', '/portal/cafeteria');
+    expect(screen.getAllByText('Familia').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Personal')).toBeNull();
   });
 });
