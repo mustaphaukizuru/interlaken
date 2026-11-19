@@ -212,21 +212,33 @@ class DashboardView(APIView):
                 status=Payment.Status.SUCCESS, created_at__year=now.year, created_at__month=now.month,
             ).aggregate(total=Sum('amount'))['total'] or 0
             active_balances = CafeteriaBalance.objects.filter(student__is_active=True)
+            # One query for both wallet totals (2026-11-18): the staff wallets
+            # (three institutional ones hold over $20,000) would distort the
+            # pupils' figure, so the card shows them apart.
+            pupil = StudentProfile.Tipo.ALUMNO
+            totals = active_balances.aggregate(
+                all=Sum('balance'),
+                pupils=Sum('balance', filter=Q(student__tipo=pupil)),
+                staff=Sum('balance', filter=~Q(student__tipo=pupil)))
             data = {
-                'total_students': StudentProfile.objects.filter(is_active=True).count(),
+                'total_students': StudentProfile.objects.filter(is_active=True, tipo=pupil).count(),
+                'total_staff_accounts': StudentProfile.objects.filter(
+                    is_active=True, tipo=StudentProfile.Tipo.PERSONAL).count(),
                 'total_users': User.objects.count(),
                 'pending_preregistrations': PreRegistration.objects.filter(status='pending').count(),
                 'pending_registrations': Registration.objects.filter(status='submitted').count(),
                 'pending_payments': Payment.objects.filter(status=Payment.Status.PENDING).count(),
                 'total_revenue': str(month_revenue),
-                'cafeteria_total_balance': str(active_balances.aggregate(t=Sum('balance'))['t'] or 0),
-                # Wallets in use and under their threshold (not every $0 wallet
-                # of a child who never buys): see cafeteria.low_balance_queryset.
-                'low_balance_count': low_balance_queryset().count(),
+                'cafeteria_total_balance': str(totals['all'] or 0),
+                'cafeteria_students_balance': str(totals['pupils'] or 0),
+                'cafeteria_staff_balance': str(totals['staff'] or 0),
+                # Pupils' wallets in use and under their threshold (not every
+                # $0 wallet of a child who never buys): low_balance_queryset.
+                'low_balance_count': low_balance_queryset().filter(student__tipo=pupil).count(),
                 # Still "active" in the app but their Loyverse customer is gone:
                 # leavers the office has not withdrawn yet (Vincular Loyverse).
                 'stale_links': StudentProfile.objects.filter(
-                    is_active=True, loyverse_missing_since__isnull=False).count(),
+                    is_active=True, tipo=pupil, loyverse_missing_since__isnull=False).count(),
                 **_pending_topup_counts(),
                 'visits_today': Booking.objects.filter(slot__date=now.date()).exclude(status='cancelled').count()
                 if hasattr(Booking, 'slot') else 0,
