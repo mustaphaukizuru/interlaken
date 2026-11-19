@@ -14,7 +14,14 @@ import { BalanceWithPending, PendingProjectionNote } from '@/components/portal/B
 export default function StudentCard({ card }: { card: CafeteriaCard }) {
   const [full, setFull] = useState(false);
   const s = card.student;
-  const gradeLine = [s.grade, s.group && `Grupo ${s.group}`].filter(Boolean).join(' · ');
+  // A staff member's own account (tipo «personal») reads as its puesto, with
+  // no grade or group: never «Alumno».
+  const staff = s.tipo === 'personal';
+  // The puesto once the office set one, else «Personal del colegio» (as the
+  // account menu does; inline so lib/people stays out of the shared graph).
+  const roleLine = staff
+    ? (s.puesto && s.puesto !== 'sin_asignar' && s.puesto_label) || 'Personal del colegio'
+    : [s.grade, s.group && `Grupo ${s.group}`].filter(Boolean).join(' · ');
 
   // Focus management for the full-screen view (same pattern as Modal): move
   // focus to the close button on open, restore it to the opener on close.
@@ -73,7 +80,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
 
           <div className="relative mt-5">
             <p className="font-head text-xl font-bold leading-tight">{s.name}</p>
-            <p className="text-[13px] text-white/80">{gradeLine || 'Alumno'}</p>
+            <p className="text-[13px] text-white/80">{roleLine || 'Alumno'}</p>
           </div>
 
           {/* flex-wrap: with a paid top-up on its way («$150.00 → $350.00») the
@@ -110,7 +117,9 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
             </>
           ) : (
             <p className="py-4 text-[12.5px] text-muted">
-              Este alumno aún no está vinculado a cafetería. Contacta al colegio para activarlo.
+              {staff
+                ? 'Esta cuenta aún no está vinculada a cafetería. Contacta al colegio para activarla.'
+                : 'Este alumno aún no está vinculado a cafetería. Contacta al colegio para activarlo.'}
             </p>
           )}
         </div>
@@ -144,7 +153,7 @@ export default function StudentCard({ card }: { card: CafeteriaCard }) {
 
           <div className="relative z-10 text-center">
             <p className="font-head text-lg font-bold text-ink">{s.name}</p>
-            <p className="text-sm text-muted">{gradeLine}</p>
+            <p className="text-sm text-muted">{roleLine}</p>
           </div>
 
           <Barcode value={card.code} height={130} fontSize={22} className="relative z-10 w-full max-w-md" />

@@ -24,3 +24,23 @@ def test_parent_cannot_peek_with_student_param(api_client):
     api_client.force_authenticate(user=parent)
     resp = api_client.get(reverse('cafeteria-cards'), {'student': other.pk})
     assert [c['student']['id'] for c in resp.data] == [mine.pk]
+
+
+# A staff member's own cafetería account never reads «Alumno» (2026-11-19):
+# the card carries tipo/puesto so the credential shows the puesto instead.
+STAFF = {'tipo': 'personal', 'grade': '', 'group': ''}
+
+
+@pytest.mark.parametrize('kw, expected', [
+    ({}, ('alumno', '', '')),
+    ({**STAFF, 'puesto': 'docente'}, ('personal', 'docente', 'Docente')),
+    ({**STAFF, 'puesto': 'sin_asignar'}, ('personal', 'sin_asignar', 'Sin asignar')),
+], ids=['alumno', 'personal-con-puesto', 'personal-sin-asignar'])
+def test_card_says_whether_it_is_a_pupil_or_staff(api_client, kw, expected):
+    parent = ParentFactory()
+    account = StudentProfileFactory(parents=[parent], **kw)
+    api_client.force_authenticate(user=parent)
+    [card] = api_client.get(reverse('cafeteria-cards')).data
+    student = card['student']
+    assert student['id'] == account.pk
+    assert (student['tipo'], student['puesto'], student['puesto_label']) == expected

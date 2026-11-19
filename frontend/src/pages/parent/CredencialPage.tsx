@@ -80,7 +80,9 @@ export default function CredencialPage() {
       ) : !cards?.length ? (
         <Card>
           <EmptyState icon={Coffee} title="Sin credencial de cafetería"
-            description="El colegio debe vincular al alumno con el servicio de cafetería (Loyverse) para generar su credencial."
+            description={mine
+              ? 'El colegio debe vincular su cuenta con el servicio de cafetería (Loyverse) para generar su credencial.'
+              : 'El colegio debe vincular al alumno con el servicio de cafetería (Loyverse) para generar su credencial.'}
             action={
               <Link to="/contacto" className="btn-secondary text-sm">
                 Contactar al colegio

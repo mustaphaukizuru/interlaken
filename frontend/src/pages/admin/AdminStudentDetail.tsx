@@ -78,7 +78,7 @@ function CredencialCard({ studentId }: { studentId: number }) {
         <div className="print-only-card">
           <StudentCard card={card} />
           {!card.linked && (
-            <p className="mt-3 text-xs text-coral-600">Sin vínculo con Loyverse: el código mostrado es la matrícula. Vincule al alumno desde Cafetería para que el POS lo reconozca.</p>
+            <p className="mt-3 text-xs text-coral-600">Sin vínculo con Loyverse: el código mostrado es la matrícula. {card.student.tipo === 'personal' ? 'Vincule la cuenta' : 'Vincule al alumno'} desde Cafetería para que el POS lo reconozca.</p>
           )}
         </div>
       )}

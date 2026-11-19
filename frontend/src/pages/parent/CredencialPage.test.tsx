@@ -100,3 +100,44 @@ describe('CredencialPage: paid top-ups on their way (owner, 2026-11-19)', () => 
     expect(within(face()).queryByText(/pagada/)).toBeNull();
   });
 });
+
+describe('CredencialPage: a staff member’s card never reads «Alumno» (2026-11-19)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const face = () => screen.getByText('Código Loyverse').closest('.rounded-xl3') as HTMLElement;
+  const staff = (puesto: string, puesto_label: string) => ({
+    ...CARD,
+    student: { ...CARD.student, name: 'Caja Ejemplo', grade: '', group: '', tipo: 'personal' as const, puesto: puesto as never, puesto_label },
+  });
+
+  it('a pupil keeps grade and group', async () => {
+    getCards.mockResolvedValue({ data: [{ ...CARD, student: { ...CARD.student, tipo: 'alumno' as const, puesto: '' as const, puesto_label: '' } }] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('4° · Grupo A')).toBeInTheDocument();
+  });
+
+  it('staff with a puesto: the puesto, no grade, no group', async () => {
+    getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('Docente')).toBeInTheDocument();
+    expect(within(face()).queryByText(/Alumno|Grupo/)).toBeNull();
+  });
+
+  it('staff without a puesto: «Personal del colegio», never «Sin asignar»', async () => {
+    getCards.mockResolvedValue({ data: [staff('sin_asignar', 'Sin asignar')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
+    await screen.findByText('Código Loyverse');
+    expect(within(face()).getByText('Personal del colegio')).toBeInTheDocument();
+    expect(within(face()).queryByText(/Alumno|Sin asignar/)).toBeNull();
+  });
+
+  it('the full-screen scan view says the same', async () => {
+    getCards.mockResolvedValue({ data: [staff('docente', 'Docente')] } as never);
+    renderWithProviders(<CredencialPage />, { route: '/portal/mi-cafeteria/credencial' });
+    (await screen.findByRole('button', { name: /Mostrar en pantalla completa/ })).click();
+    const dialog = await screen.findByRole('dialog', { name: 'Código para escanear en caja' });
+    expect(within(dialog).getByText('Docente')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Alumno/)).toBeNull();
+  });
+});

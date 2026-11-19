@@ -164,7 +164,11 @@ export interface CafeteriaConsumption {
 
 /** Digital cafetería card for one child (from /cafeteria/cards/). */
 export interface CafeteriaCard {
-  student: { id: number; name: string; grade: string; group: string; student_id: string };
+  student: {
+    id: number; name: string; grade: string; group: string; student_id: string;
+    /** A staff member's own cafetería account reads as its puesto, never «Alumno». */
+    tipo?: PersonTipo; puesto?: StaffPuesto | ''; puesto_label?: string;
+  };
   code: string;            // matrícula the POS scans (QR/barcode payload)
   linked: boolean;
   balance: string;

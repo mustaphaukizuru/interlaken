@@ -471,7 +471,10 @@ class MyCardsView(APIView):
     loaded into the POS yet, see ``build_pending_topups_map``) + ``consumption`` (``{total, since}``: the
     "Consumo registrado" from our ledger, see ``build_consumption_map``) + the
     Loyverse profile stats (visits, first/last visit; its ``total_spent`` is
-    cash/card only, so the family page no longer shows it)."""
+    cash/card only, so the family page no longer shows it).
+
+    ``student.tipo``/``puesto``/``puesto_label`` let a staff member's card
+    read as their puesto, never «Alumno»."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -506,6 +509,10 @@ class MyCardsView(APIView):
                     'grade': s.grade,
                     'group': s.group,
                     'student_id': s.student_id,
+                    # A staff member's own cafetería account (2026-11-18).
+                    'tipo': s.tipo,
+                    'puesto': s.puesto,
+                    'puesto_label': s.get_puesto_display(),
                 },
                 'code': code,                       # QR/barcode payload
                 'linked': bool(s.loyverse_id),
