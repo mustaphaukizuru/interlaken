@@ -330,12 +330,7 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
   },
   {
     id: 'contact', header: 'Contacto', minWidth: 170,
-    cell: (b) => (
-      <>
-        <FitText text={b.parent_email} max={240} className="text-muted" />
-        <div className="text-xs text-subtle">{b.parent_phone}</div>
-      </>
-    ),
+    cell: (b) => <BookingContact booking={b} />,
   },
   { id: 'attendees', header: 'Asistentes', sortKey: 'attendees', align: 'right', minWidth: 100, cell: (b) => b.num_attendees },
   { id: 'source', header: 'Origen', defaultHidden: true, minWidth: 120, className: 'text-muted', cell: (b) => SOURCE_LABEL[b.source] ?? b.source },
@@ -344,6 +339,33 @@ const BOOKING_COLUMNS: Column<Booking>[] = [
     cell: (b) => shortDateTime(b.created_at),
   },
 ];
+
+function BookingContact({ booking: b }: { booking: Booking }) {
+  return (
+    <>
+      <FitText text={b.parent_email} max={240} className="text-muted" />
+      <div className="text-xs text-subtle">{b.parent_phone}</div>
+    </>
+  );
+}
+
+/**
+ * Laptops (768 to 1439 px): the email and phone go under the tutor's name
+ * instead of in their own column, so the table fits a 1280 px screen
+ * without scrolling sideways and nothing is hidden. Phones keep their cards
+ * (one label per value) and wide screens the Contacto column.
+ */
+const BOOKING_COLUMNS_FOLDED: Column<Booking>[] = BOOKING_COLUMNS
+  .filter((c) => c.id !== 'contact')
+  .map((c) => (c.id !== 'parent' ? c : {
+    ...c,
+    cell: (b: Booking) => (
+      <>
+        <div>{b.parent_name}</div>
+        <div className="mt-0.5 font-normal"><BookingContact booking={b} /></div>
+      </>
+    ),
+  }));
 
 /** Bulk «Asistió» / «No asistió» over visits already marked the other way is
  *  a correction: the dry run counts them (`outcomes.correction`) and the
@@ -521,6 +543,10 @@ function BookingsView() {
   };
   const [cancelFor, setCancelFor] = useState<Booking | null>(null);
   const [noteAsk, setNoteAsk] = useState<NoteAsk | null>(null);
+  // 768 to 1439 px: contact folded under the tutor (BOOKING_COLUMNS_FOLDED).
+  const isTable = useMediaQuery('(min-width: 768px)');
+  const isWide = useMediaQuery('(min-width: 1440px)');
+  const columns = isTable && !isWide ? BOOKING_COLUMNS_FOLDED : BOOKING_COLUMNS;
 
   const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
@@ -538,7 +564,7 @@ function BookingsView() {
       <DataTable<Booking>
         tableId="bookings"
         caption="Reservas de visitas"
-        columns={BOOKING_COLUMNS}
+        columns={columns}
         rows={rows}
         rowKey={(b) => b.id}
         rowLabel={(b) => `reserva de ${b.parent_name} del ${fmtDate(b.slot_date)}`}

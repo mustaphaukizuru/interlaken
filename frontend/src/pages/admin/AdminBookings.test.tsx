@@ -216,6 +216,30 @@ describe('AdminBookings: reservas', () => {
     })));
   });
 
+  it('at 1280 px the contact goes under the tutor (no sideways scroll); at 1440 it has its column', async () => {
+    const { unmount } = renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    expect(screen.queryByRole('columnheader', { name: 'Contacto' })).not.toBeInTheDocument();
+    const anaRow = screen.getByRole('row', { name: /Ana/ });
+    const tutor = within(anaRow).getAllByRole('cell').find((c) => c.textContent?.startsWith('Ana'))!;
+    expect(tutor).toHaveTextContent('Anaana@test.mx5512345678');
+    unmount();
+
+    stubViewport(1440);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findByText('Ana');
+    expect(screen.getByRole('columnheader', { name: 'Contacto' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Tutor/ })).toBeInTheDocument();
+  });
+
+  it('phone cards keep a Contacto line of their own', async () => {
+    stubViewport(390);
+    renderWithProviders(<AdminBookings />, { route: '/admin/visitas' });
+    await screen.findAllByText('Ana');
+    const contact = document.querySelector('td[data-label="Contacto"]');
+    expect(contact).toHaveTextContent('ana@test.mx');
+  });
+
   it('exports the current view with the same filters', async () => {
     renderWithProviders(<AdminBookings />, { route: '/admin/visitas?q=ana&estado=confirmed&orden=parent' });
     await screen.findByText('Ana');
