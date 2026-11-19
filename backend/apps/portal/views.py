@@ -17,7 +17,7 @@ from apps.accounts.family import family_students
 from apps.accounts.models import StudentProfile, User
 from apps.admissions.models import PreRegistration, Registration
 from apps.cafeteria.models import CafeteriaBalance
-from apps.cafeteria.services import low_balance_queryset
+from apps.cafeteria.services import low_balance_queryset, pending_covers_low_balance
 from apps.content.ops import audit_value, bool_filter, delete_action, delete_keep_pk, tri_state
 from apps.core.audit import record, record_export
 from apps.core.bulk import AdminBulkView, BulkAction
@@ -176,10 +176,11 @@ class DashboardView(APIView):
             # the hero card must not look like the payment vanished.
             from apps.cafeteria.serializers import build_pending_topups_map
             pending = build_pending_topups_map(students) if students else {}
-            pending_total = {
-                sid: f"{sum((Decimal(t['amount']) for t in rows), Decimal('0')):.2f}"
+            pending_amount = {
+                sid: sum((Decimal(t['amount']) for t in rows), Decimal('0'))
                 for sid, rows in pending.items()
             }
+            pending_total = {sid: f'{amount:.2f}' for sid, amount in pending_amount.items()}
             # Same visibility as payments_visible_to, but reusing the in-hand
             # students list instead of re-joining the guardian M2M per row.
             recent_payments = (
@@ -211,7 +212,12 @@ class DashboardView(APIView):
                         'student': b.student_id,
                         'student_name': b.student.user.full_name,
                         'balance': str(b.balance),
-                        'low': b.is_low_balance,
+                        # «Saldo bajo», unless paid card top-ups on their way
+                        # cover the alert level: the same rule as the family
+                        # cafetería card and the low-balance email, from the
+                        # top-ups already read above (no query per child).
+                        'low': b.is_low_balance and not pending_covers_low_balance(
+                            b, pending_amount.get(b.student_id, Decimal('0'))),
                         'last_synced': b.last_synced,
                         'pending_topups': pending_total.get(b.student_id, '0.00'),
                     }
