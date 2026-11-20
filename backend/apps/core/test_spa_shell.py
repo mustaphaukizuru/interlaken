@@ -114,6 +114,8 @@ def test_unknown_paths_are_real_404s_and_spam_paths_410(client, built_site):
         assert h['robots'] == ['noindex'] and h['title'] == ['Página no encontrada · Colegio Interlaken']
         assert '<div id="root"></div>' in r.content.decode()  # the SPA still renders its 404 page
     assert client.get('/testmama/tag/manualidades').status_code == 410
+    assert client.get('/testmama/tag/manualidades/').status_code == 410   # one hop, no slash 301 first
+    assert client.get('/wp-content/uploads/x.jpg').status_code == 410
 
 
 @pytest.mark.django_db

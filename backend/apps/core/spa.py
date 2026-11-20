@@ -223,6 +223,12 @@ def spa_index(request):
     query = request.META.get('QUERY_STRING', '')
     path = normalize(raw)
     is_app = any(path == p.rstrip('/') or path.startswith(p if p.endswith('/') else p + '/') for p in APP_PREFIXES)
+    gone = any(path == g.rstrip('/') or path.startswith(g.rstrip('/') + '/') for g in GONE_PREFIXES)
+
+    # 0. Spam a previous owner left indexed: 410 straight away, slash or not (a
+    #    301 to the slash-less form first only cost Google one more fetch).
+    if gone:
+        return _render(apply_head(doc.replace(MARKER, '', 1), NOT_FOUND_HEAD, path), 410, path)
 
     # 1. One URL per public page: /contacto/ → /contacto (the SPA serves both, Google
     #    saw two). Consoles and the portal are left alone: bookmarks like /admin/ work as before.
@@ -265,5 +271,4 @@ def spa_index(request):
         return _render(apply_head(doc, head, path), 200, path)
 
     # 6. Nothing here.
-    gone = any(path == g.rstrip('/') or path.startswith(g.rstrip('/') + '/') for g in GONE_PREFIXES)
-    return _render(apply_head(doc, NOT_FOUND_HEAD, path), 410 if gone else 404, path)
+    return _render(apply_head(doc, NOT_FOUND_HEAD, path), 404, path)
