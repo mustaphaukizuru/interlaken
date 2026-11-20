@@ -144,7 +144,7 @@ export const sections = [
       showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
       subtitle: 'Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.',
       primary: { label: 'Inicie su pre-registro', href: '/pre-registro' },
-      secondary: { label: 'Cafetería', href: '/login' },
+      secondary: { label: 'Portal Cafetería', href: '/login' },
       poster: '/assets/court-wide.webp', posterAlt: 'Campus Colegio Interlaken', video: '',
     },
   }),
