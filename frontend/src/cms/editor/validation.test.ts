@@ -46,7 +46,7 @@ describe('validateFields', () => {
   });
 
   it('collects the library images of a block', () => {
-    expect(imageIdsIn(fields, { image: 4, items: [{ photo: 5 }, { photo: '/assets/a.webp' }] })).toEqual([4, 5]);
+    expect(imageIdsIn(fields, { image: 4, items: [{ photo: 5 }, { photo: '/assets/facade.webp' }] })).toEqual([4, 5]);
   });
 });
 
