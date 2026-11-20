@@ -84,6 +84,7 @@ changes, no backend changes, no migration.
 | `AddBlockModal.tsx`, `VersionsModal.tsx` | Moved unchanged out of the editor |
 | `EditorOnboarding.tsx`, `useOnboarding.ts` | First-visit guide |
 | `useLeaveGuard.ts` | beforeunload plus console link interception (BrowserRouter has no blocker) |
+| `publishApi.ts` | Publish or withdraw with `confirm_legacy`, kept out of `services/api.ts` (which ships with public pages) |
 | `pageList.ts`, `PageListGroup.tsx` | «Contenido» rows, filters and groups |
 
 `AdminPageEditor.tsx` keeps the page state, the mutations and the
