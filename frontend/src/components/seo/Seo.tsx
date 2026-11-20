@@ -22,12 +22,15 @@ export interface SeoProps {
   description?: string;
   canonical?: string;
   image?: string;
-  /** Suppress appending "· Colegio Interlaken" to the title. */
+  /** Suppress appending "· Colegio Interlaken" to the title (a title that already names the school never gets it twice). */
   bareTitle?: boolean;
   /** Optional JSON-LD object(s) rendered as <script type="application/ld+json">. */
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   children?: React.ReactNode;
 }
+
+/** «Costos · Colegio Interlaken» already carries the site name: appending it again doubled it. */
+const namesSite = (title: string) => title.toLowerCase().includes(SITE_NAME.toLowerCase());
 
 export function Seo({
   title,
@@ -40,7 +43,7 @@ export function Seo({
 }: SeoProps) {
   const fullTitle = !title
     ? DEFAULT_TITLE
-    : bareTitle
+    : bareTitle || namesSite(title)
       ? title
       : `${title} · ${SITE_NAME}`;
   const path = typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') : '';

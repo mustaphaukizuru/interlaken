@@ -1283,6 +1283,8 @@ export interface CmsPageAdmin {
   review_note?: string;
   publish_at?: string | null;
   unpublish_at?: string | null;
+  /** SEO fields that still hold the old seed_cms values; loading the design drops them. */
+  seed_seo?: { title?: string; description?: string };
   updated_at: string;
   /** Contract C1 (optional until the backend ships it): the draft is one of the
    *  old generic seeds (seed_cms); publishing it would replace the designed page. */

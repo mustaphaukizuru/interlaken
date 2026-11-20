@@ -31,7 +31,8 @@ interface DialogProps {
   /** False for pages without a design template (nothing to load). */
   canLoad: boolean;
   onLoadDesign: () => void;
-  onPublishAnyway: () => void;
+  /** Omitted when the action can't go ahead anyway (a staff approval request). */
+  onPublishAnyway?: () => void;
   publishing?: boolean;
 }
 
@@ -52,9 +53,11 @@ export function LegacyDraftDialog({ open, onClose, pageTitle, canLoad, onLoadDes
           {canLoad && (
             <Button onClick={onLoadDesign}><LayoutTemplate size={16} aria-hidden="true" /> Cargar el diseño actual</Button>
           )}
-          <Button variant="ghost" className="!text-coral-700 hover:!bg-coral-50" onClick={onPublishAnyway} loading={publishing}>
-            <Upload size={16} aria-hidden="true" /> Publicar de todos modos
-          </Button>
+          {onPublishAnyway && (
+            <Button variant="ghost" className="!text-coral-700 hover:!bg-coral-50" onClick={onPublishAnyway} loading={publishing}>
+              <Upload size={16} aria-hidden="true" /> Publicar de todos modos
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
       </div>

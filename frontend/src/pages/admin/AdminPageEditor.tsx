@@ -20,6 +20,7 @@ import { contentApi, type CmsPageAdmin, type PageIssue } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cmsBase, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps } from '@/cms/editor/helpers';
+import { withoutSeedSeo } from '@/cms/seedSeo';
 import { useAuthStore } from '@/store/authStore';
 import { AddBlockModal } from '@/cms/editor/shell/AddBlockModal';
 import { BlockList } from '@/cms/editor/shell/BlockList';
@@ -103,7 +104,7 @@ export default function AdminPageEditor() {
   const [device, setDevice] = useState<Device>('desktop');
   const [pane, setPane] = useState<EditorPane>('edit');
   // «Versiones» from the page list opens the dialog right away (?versiones=1).
-  const [dialog, setDialog] = useState<null | 'add' | 'versions' | 'seo' | 'schedule' | 'unpublish' | 'reset' | 'reject' | 'legacy'>(() => (isAdmin && params.get('versiones') ? 'versions' : null));
+  const [dialog, setDialog] = useState<null | 'add' | 'versions' | 'seo' | 'schedule' | 'unpublish' | 'reset' | 'reject' | 'legacy' | 'legacy-review'>(() => (isAdmin && params.get('versiones') ? 'versions' : null));
   const [rejectNote, setRejectNote] = useState('');
   const [issues, setIssues] = useState<PageIssue[] | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -246,7 +247,11 @@ export default function AdminPageEditor() {
       setDialog(null); setRejectNote('');
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
     },
-    onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : apiFieldErrors(e).detail || 'No se pudo enviar.'),
+    onError: (e) => {
+      // Contract C1: an old generic seed draft can't go to Dirección for approval either.
+      if (isLegacySeedRefusal(e)) { setDialog('legacy-review'); return; }
+      toast.error(e instanceof SaveBlocked ? blockedMessage() : apiFieldErrors(e).detail || 'No se pudo enviar.');
+    },
   });
 
   const checks = useMutation({
@@ -349,6 +354,9 @@ export default function AdminPageEditor() {
     const original = originalBlocks(page?.slug ?? '');
     if (!original) return;
     update(original);
+    // The design brings its own SEO: what the old seed_cms left there goes with the old blocks.
+    const seo = withoutSeedSeo(draft.current.meta.seo, page?.seed_seo);
+    if (seo !== draft.current.meta.seo) updateMeta({ seo });
     setSelected(null);
     setLegacyResolved(true);
   };
@@ -705,13 +713,13 @@ export default function AdminPageEditor() {
         }}
       />
       <LegacyDraftDialog
-        open={dialog === 'legacy'}
+        open={dialog === 'legacy' || dialog === 'legacy-review'}
         onClose={() => setDialog(null)}
         pageTitle={pageTitle}
         canLoad={!!original}
         publishing={publish.isPending}
         onLoadDesign={() => { loadDesign(); setDialog(null); toast.success('Diseño actual cargado. Revise sus cambios y publique cuando esté lista.'); }}
-        onPublishAnyway={() => publish.mutate({ action: 'publish', confirmLegacy: true })}
+        onPublishAnyway={dialog === 'legacy' ? () => publish.mutate({ action: 'publish', confirmLegacy: true }) : undefined}
       />
       <Modal open={dialog === 'reject'} onClose={() => setDialog(null)} title="Pedir cambios al editor" maxWidth={480}>
         <div className="space-y-3">

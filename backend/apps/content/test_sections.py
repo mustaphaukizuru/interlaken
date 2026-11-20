@@ -46,7 +46,7 @@ def test_public_payload_strips_hidden_blocks_and_serves_alt(admin_user, client, 
     page.publish(admin_user)
     data = client.get(reverse('cms-page', args=['inicio'])).json()
     assert [b['id'] for b in data['blocks']] == ['h']
-    assert data['media'] == {str(asset.pk): {'alt': 'Fachada', 'width': 10, 'height': 5}}
+    assert data['media'] == {str(asset.pk): {'alt': 'Fachada', 'width': 10, 'height': 5, 'variants': []}}
     assert asset.pk in referenced_media_ids()
 
 
