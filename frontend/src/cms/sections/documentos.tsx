@@ -15,7 +15,7 @@ import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Badge } from '@/components/ui/Badge';
 import { admissionsApi, type DocumentsListing } from '@/services/api';
-import { exchangeOnce } from '@/components/admissions/RegisterWizard';
+import { exchangeOnce } from '@/lib/inviteExchange';
 import { useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
 import { asLink, CmsAnchor, defineModule, f, inGroup, sectionsOf } from './kit';

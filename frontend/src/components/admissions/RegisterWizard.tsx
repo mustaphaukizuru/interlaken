@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
 import { admissionsApi } from '@/services/api';
+import { exchangeOnce } from '@/lib/inviteExchange';
 
 const GRADES = [
   'Preescolar 1°', 'Preescolar 2°', 'Preescolar 3°',
@@ -71,18 +72,6 @@ const fillText = (text: string, values: Record<string, string>) => text.replace(
 function withNode(text: string, key: string, node: ReactNode): ReactNode {
   const parts = text.split(`{${key}}`);
   return parts.map((part, i) => <span key={i}>{i > 0 && node}{part}</span>);
-}
-
-/**
- * The invitation token is single-use: its exchange runs once per token for the
- * life of the tab, even if the wizard remounts (the page swaps in the school's
- * published copy after painting the built-in one, docs/cms/full-coverage.md).
- */
-const exchanges = new Map<string, ReturnType<typeof admissionsApi.exchangeAccess>>();
-export function exchangeOnce(rid: number, token: string): ReturnType<typeof admissionsApi.exchangeAccess> {
-  const key = `${rid}:${token}`;
-  if (!exchanges.has(key)) exchanges.set(key, admissionsApi.exchangeAccess(rid, token));
-  return exchanges.get(key)!;
 }
 
 export type WizardView = 'form' | 'other';
