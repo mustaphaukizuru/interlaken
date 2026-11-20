@@ -1,5 +1,5 @@
 """
-content/table_block.py — limits of the generic «Tabla» block.
+content/table_block.py: limits of the generic «Tabla» block.
 
 The block stores ``{columns: [{label, align?, format?}], rows: [[cell, ...]],
 highlight: row index | None}``. Its limits come from the frontend registry

@@ -1,5 +1,5 @@
 /**
- * /admin/costos — «Costos y precios» (docs/cms/price-tables.md). The figures
+ * /admin/costos: «Costos y precios» (docs/cms/price-tables.md). The figures
  * of /admisiones/costos and the Admisiones estimator, edited like a
  * spreadsheet: one tab per price card, as the public page groups them. Changes
  * stay in the editor (each tab marks its own) until «Guardar cambios», which

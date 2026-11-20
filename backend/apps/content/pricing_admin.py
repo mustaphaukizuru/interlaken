@@ -1,5 +1,5 @@
 """
-content/pricing_admin.py — «Costos y precios» in the console (/admin/costos).
+content/pricing_admin.py: «Costos y precios» in the console (/admin/costos).
 
 The figures of /admisiones/costos and of the Admisiones estimator live in six
 models (models.py: TuitionCost and the five PricingRow tables). Until now only
