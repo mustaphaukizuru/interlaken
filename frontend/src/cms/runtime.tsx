@@ -36,22 +36,6 @@ export function useTokens(): (text: unknown) => string {
   return useCallback((text: unknown) => (typeof text === 'string' ? applyTokens(text, s) : text == null ? '' : String(text)), [s]);
 }
 
-/* ── Editor preview ──────────────────────────────────────────────────────── */
-
-const PreviewContext = createContext(false);
-
-/** Set by the editor's live preview (cms/editor/EditableBlocks). */
-export function CmsPreviewProvider({ children }: { children: ReactNode }) {
-  return <PreviewContext.Provider value>{children}</PreviewContext.Provider>;
-}
-
-/**
- * True inside the editor preview. Sections that carry application logic
- * (sign-in, invitation links) render a sample state there instead of running
- * it: the editor must never sign anyone in, redirect or spend a token.
- */
-export const useCmsPreview = () => useContext(PreviewContext);
-
 /* ── Images ──────────────────────────────────────────────────────────────── */
 
 type MediaMeta = Record<string, { alt?: string; width?: number | null; height?: number | null }>;

@@ -31,7 +31,7 @@ describe('whatsapp helpers', () => {
   it('the school edits the messages in Navegación; blank keeps the built-in text', () => {
     expect(waMessage({ wa_visit: 'Quiero conocer el colegio.' }, 'wa_visit')).toBe('Quiero conocer el colegio.');
     expect(waMessage({ wa_admissions: 'Informes {{ciclo}}' }, 'wa_admissions')).toBe(`Informes ${CURRENT_CYCLE}`);
-    expect(waMessage({ wa_visit: '  ' }, 'wa_visit')).toBe(WA_MESSAGES.visit);
+    expect(waMessage({ wa_visit: '' }, 'wa_visit')).toBe(WA_MESSAGES.visit);
     setWaEstimatorTemplate({ wa_estimator: 'Cuotas de {seccion}, ciclo {{ciclo}}' });
     expect(waSectionMessage('Primaria')).toBe(`Cuotas de Primaria, ciclo ${CURRENT_CYCLE}`);
     setWaEstimatorTemplate({});

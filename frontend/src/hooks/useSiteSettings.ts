@@ -1,9 +1,8 @@
-import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { contentApi } from '@/services/api';
 import { SITE_DEFAULTS } from '@/lib/siteContact';
 import type { SiteSettings } from '@/types/content';
-import { siteText, type SiteTextKey } from '@/lib/siteChrome';
+import { siteTexts, type SiteTextKey } from '@/lib/siteChrome';
 
 /**
  * Admin-editable site contact/social data (CMS Phase 1). Renders the
@@ -21,10 +20,9 @@ export function useSiteSettings(): SiteSettings {
 }
 
 /**
- * `text(key, builtIn)`: a site-wide text edited in Navegación → «Textos del
- * sitio» (SiteSettings.chrome), or the built-in copy while it is blank.
+ * The site-wide texts of `builtIn` as edited in Navegación → «Textos del
+ * sitio» (SiteSettings.chrome); a blank one keeps its built-in copy.
  */
-export function useSiteText(): (key: SiteTextKey, builtIn: string) => string {
-  const { chrome } = useSiteSettings();
-  return useCallback((key: SiteTextKey, builtIn: string) => siteText(chrome, key, builtIn), [chrome]);
+export function useSiteTexts<T extends Partial<Record<SiteTextKey, string>>>(builtIn: T): T {
+  return siteTexts(useSiteSettings().chrome, builtIn);
 }

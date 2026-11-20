@@ -26,7 +26,8 @@ import { contentApi, type BulkActionDef, type SiteRedirect } from '@/services/ap
 import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
-import { CHROME_KEYS, mergeChrome, resolveChrome, type SiteChrome } from '@/lib/siteChrome';
+import { resolveChrome, type SiteChrome } from '@/lib/siteChrome';
+import { CHROME_KEYS, mergeChrome } from '@/lib/chromeMerge';
 import { SiteTextsEditor } from '@/components/admin/SiteTextsEditor';
 import { apiFieldErrors } from '@/lib/apiErrors';
 

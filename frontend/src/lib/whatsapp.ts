@@ -32,10 +32,10 @@ export function waMessage(chrome: unknown, key: keyof typeof WA_DEFAULTS): strin
   return withCycle(siteText(chrome, key, WA_DEFAULTS[key]));
 }
 
-/** Prefilled messages per conversion context with the built-in copy. */
+/** Prefilled messages per conversion context with the built-in copy (pure: dropped when unused). */
 export const WA_MESSAGES = {
-  admissionsInfo: waMessage(null, 'wa_admissions'),
-  visit: waMessage(null, 'wa_visit'),
+  admissionsInfo: /* @__PURE__ */ waMessage(null, 'wa_admissions'),
+  visit: /* @__PURE__ */ waMessage(null, 'wa_visit'),
 } as const;
 
 /*

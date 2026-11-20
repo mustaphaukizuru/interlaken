@@ -12,7 +12,7 @@ import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { isExternalHref, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteText, withYear, type ChromeButton } from '@/lib/siteChrome';
+import { isExternalHref, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteTexts, withYear, type ChromeButton } from '@/lib/siteChrome';
 import { setWaEstimatorTemplate, waMessage } from '@/lib/whatsapp';
 import { saveOfflineCopy } from '@/lib/offlineCopy';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
@@ -177,9 +177,9 @@ export function PublicLayout() {
   const settings = useSiteSettings();
   const chrome = resolveChrome(settings.chrome);
   // Navegación → «Textos del sitio»: blank = the built-in text.
-  const text = (key: Parameters<typeof siteText>[1], builtIn: string) => siteText(settings.chrome, key, builtIn);
-  const contactLabel = text('nav_contact', LAYOUT_TEXT_DEFAULTS.nav_contact);
-  const footerContact = text('footer_contact', LAYOUT_TEXT_DEFAULTS.footer_contact);
+  const text = siteTexts(settings.chrome, LAYOUT_TEXT_DEFAULTS);
+  const contactLabel = text.nav_contact;
+  const footerContact = text.footer_contact;
   const LEGAL = legalLinks(settings.chrome);
   // The cost estimator and the offline page read the edited copy outside React.
   useEffect(() => { setWaEstimatorTemplate(settings.chrome); saveOfflineCopy(settings.chrome); }, [settings.chrome]);
@@ -237,7 +237,7 @@ export function PublicLayout() {
     // (see lib/motion.tsx), keeping framer out of the portal's initial chunks.
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
-      <a href="#contenido" className="skip-link">{text('skip_link', LAYOUT_TEXT_DEFAULTS.skip_link)}</a>
+      <a href="#contenido" className="skip-link">{text.skip_link}</a>
       <SiteNoticeBanner />
       {/* Preheader — solo escritorio/tablet. Petición del colegio (2026-08-21):
           teléfono a la izquierda, correo a la derecha; sin redes sociales. */}
@@ -545,11 +545,7 @@ export function PublicLayout() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
             <span>{withYear(chrome.footer_copyright).map((part, i) => <Fragment key={i}>{part}</Fragment>)}</span>
             <div className="flex items-center gap-4">
-              {LEGAL.map((l) => (
-                isExternalHref(l.href)
-                  ? <a key={l.label + l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">{l.label}</a>
-                  : <Link key={l.label + l.href} to={l.href} className="hover:text-white transition-colors">{l.label}</Link>
-              ))}
+              {LEGAL.map((l) => <ChromeLink key={l.label + l.href} button={l} className="hover:text-white transition-colors" />)}
               <span className="text-white/70">{chrome.footer_note}</span>
             </div>
           </div>

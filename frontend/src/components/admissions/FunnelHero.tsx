@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Blob } from '@/components/ui/Blob';
-import { useSiteText } from '@/hooks/useSiteSettings';
+import { useSiteTexts } from '@/hooks/useSiteSettings';
 
 const FUNNEL_STEPS = [
   { n: '01', key: 'funnel_1', label: 'Pre-Registro', to: '/pre-registro' },
@@ -56,7 +56,7 @@ export function FunnelHero({
   label = `Ciclo Escolar ${CURRENT_CYCLE} · Admisiones`,
 }: FunnelHeroProps) {
   const active = STEP_INDEX[step];
-  const text = useSiteText();
+  const text = useSiteTexts(FUNNEL_DEFAULTS);
 
   return (
     <section className="relative overflow-hidden bg-dark text-white">
@@ -112,14 +112,14 @@ export function FunnelHero({
                     ) : (
                       <span className={current ? 'text-pink' : ''}>{s.n}</span>
                     )}
-                    {current ? text('funnel_now', FUNNEL_DEFAULTS.funnel_now) : done ? text('funnel_done', FUNNEL_DEFAULTS.funnel_done) : text('funnel_next', FUNNEL_DEFAULTS.funnel_next)}
+                    {current ? text.funnel_now : done ? text.funnel_done : text.funnel_next}
                   </span>
                   <span
                     className={`mt-0.5 block text-sm font-semibold ${
                       current ? 'text-white' : 'text-white/75'
                     }`}
                   >
-                    {text(s.key, s.label)}
+                    {text[s.key]}
                   </span>
                 </Link>
               </li>

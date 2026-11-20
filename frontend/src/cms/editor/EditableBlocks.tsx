@@ -8,7 +8,7 @@ import { Suspense, type KeyboardEvent, type MouseEvent } from 'react';
 import { EyeOff } from 'lucide-react';
 import { BlockView } from '../BlockRenderer';
 import { blockSpec, type Block } from '../blocks/registry';
-import { CmsPreviewProvider } from '../runtime';
+import { CmsPreviewProvider } from '../preview';
 
 export function EditableBlocks({ blocks, selectedId, onSelect }: { blocks: Block[]; selectedId?: string | null; onSelect?: (id: string) => void }) {
   return (

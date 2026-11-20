@@ -12,14 +12,8 @@ import { siteText } from '@/lib/siteChrome';
 export const PASSWORD_REQUEST_MESSAGE =
   'Hola, necesito que me recuerden o restablezcan la contraseña de mi acceso al portal de familias.';
 
-/** The login card's line (editable in Contenido → Iniciar sesión). */
-export const PASSWORD_INLINE_DEFAULTS = {
-  before: '¿Olvidó su contraseña? Solicítela al colegio por',
-  whatsapp: 'WhatsApp',
-  or: 'o',
-  email: 'correo',
-  after: 'Un administrador le enviará una nueva.',
-};
+/** The inline line's words; the login page passes them (Contenido → Iniciar sesión). */
+export interface PasswordInlineCopy { before: string; whatsapp: string; or: string; email: string; after: string }
 
 interface Props {
   /** Compact inline variant for the login card; default is a full card body. */
@@ -27,7 +21,7 @@ interface Props {
   /** Email of the person asking, prefilled into the mail body when known. */
   email?: string;
   /** Inline variant copy (the login page passes the school's edited text). */
-  copy?: Partial<typeof PASSWORD_INLINE_DEFAULTS>;
+  copy?: PasswordInlineCopy;
 }
 
 export function PasswordHelp({ variant = 'card', email, copy }: Props) {
@@ -36,10 +30,10 @@ export function PasswordHelp({ variant = 'card', email, copy }: Props) {
   const request = siteText(s.chrome, 'wa_password', PASSWORD_REQUEST_MESSAGE);
   const wa = s.whatsapp_number ? waHref(s.whatsapp_number, request) : null;
   const body = email ? `${request}\n\nCorreo de acceso: ${email}` : request;
-  const c = { ...PASSWORD_INLINE_DEFAULTS, ...Object.fromEntries(Object.entries(copy ?? {}).filter(([, v]) => typeof v === 'string' && v.trim())) };
   const mailto = `mailto:${s.contact_email}?subject=${encodeURIComponent('Solicitud de contraseña del portal')}&body=${encodeURIComponent(body)}`;
 
-  if (variant === 'inline') {
+  if (variant === 'inline' && copy) {
+    const c = copy;
     return (
       <p className="mt-3.5 text-center text-[12px] leading-relaxed text-subtle">
         {c.before}{' '}

@@ -19,14 +19,23 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
-import { LAYOUT_TEXT_DEFAULTS, LEGAL_LINKS_DEFAULT, mergeChrome, type FooterLink, type SiteTextKey } from '@/lib/siteChrome';
+import { LAYOUT_TEXT_DEFAULTS, LEGAL_LINKS_DEFAULT, type FooterLink, type SiteTextKey } from '@/lib/siteChrome';
+import { mergeChrome } from '@/lib/chromeMerge';
 import { WA_DEFAULTS } from '@/lib/whatsapp';
-import { OFFLINE_DEFAULTS } from '@/lib/offlineCopy';
-import { COOKIE_DEFAULTS } from '@/components/CookieConsent';
+import { COOKIE_DEFAULTS } from '@/components/CookieBanner';
 import { FLOAT_DEFAULTS } from '@/components/ui/WhatsAppFloat';
 import { PASSWORD_REQUEST_MESSAGE } from '@/components/portal/PasswordHelp';
 import { PRIVACY_NOTE_DEFAULTS } from '@/components/ui/PrivacyNote';
 import { FUNNEL_DEFAULTS } from '@/components/admissions/FunnelHero';
+
+/** The built-in text of public/offline.html (keep both in sync). */
+export const OFFLINE_DEFAULTS = {
+  offline_title: 'Sin conexión a',
+  offline_accent: 'internet',
+  offline_text: 'No pudimos cargar esta página. Verifique su conexión Wi-Fi o de datos móviles e intente de nuevo. Cuando la conexión regrese, el portal se mostrará normalmente.',
+  offline_retry: 'Reintentar',
+  offline_home: 'Ir al portal',
+} as const;
 
 interface TextField { key: SiteTextKey; label: string; builtIn: string; max: number; long?: boolean; hint?: string }
 interface TextGroup { id: string; title: string; where: string; fields: TextField[]; links?: boolean }
@@ -104,7 +113,7 @@ export const SITE_TEXT_GROUPS: TextGroup[] = [
 export const SITE_TEXT_KEYS: string[] = [...SITE_TEXT_GROUPS.flatMap((g) => g.fields.map((fd) => fd.key)), 'legal_links'];
 
 type Texts = Partial<Record<SiteTextKey, string>>;
-const validHref = (h: string) => /^(\/|https:\/\/|mailto:|tel:)/.test(h.trim());
+const validHref = (h: string) => /^(\/|https:\/\/)/.test(h.trim());
 const sameLinks = (a: FooterLink[], b: FooterLink[]) => JSON.stringify(a) === JSON.stringify(b);
 
 /** What gets stored: only texts that differ from the original (blank = original). */

@@ -9,9 +9,9 @@ vi.mock('@/services/api', () => ({
 
 import { contentApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { mergeChrome, CHROME_KEYS } from '@/lib/siteChrome';
+import { mergeChrome, CHROME_KEYS } from '@/lib/chromeMerge';
 import { SiteTextsEditor, SITE_TEXT_KEYS, sitePatch } from './SiteTextsEditor';
-import { COOKIE_DEFAULTS } from '@/components/CookieConsent';
+import { COOKIE_DEFAULTS } from '@/components/CookieBanner';
 import { LEGAL_LINKS_DEFAULT } from '@/lib/siteChrome';
 
 const get = vi.mocked(contentApi.adminGetSettings);
@@ -54,8 +54,8 @@ describe('site texts (Navegación)', () => {
     renderWithProviders(<SiteTextsEditor />, { route: '/admin/navegacion' });
     await user.click(await screen.findByText('Pie de página'));
     await user.click(screen.getByRole('button', { name: /Agregar enlace/ }));
-    await user.type(screen.getAllByLabelText('Texto del enlace').at(-1)!, 'Reglamento');
-    await user.type(screen.getAllByLabelText('Enlace (ruta o URL)').at(-1)!, 'javascript:alert(1)');
+    await user.type(screen.getAllByLabelText('Texto del enlace').slice(-1)[0], 'Reglamento');
+    await user.type(screen.getAllByLabelText('Enlace (ruta o URL)').slice(-1)[0], 'javascript:alert(1)');
     await user.click(screen.getByRole('button', { name: 'Guardar textos' }));
     expect(await screen.findByText('El enlace debe empezar con / o con https://.')).toBeInTheDocument();
     expect(update).not.toHaveBeenCalled();

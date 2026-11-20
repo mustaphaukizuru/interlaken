@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { CalendarCheck, KeyRound, X } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
-import { siteText } from '@/lib/siteChrome';
+import { siteTexts } from '@/lib/siteChrome';
 import { PASSWORD_REQUEST_MESSAGE } from '@/components/portal/PasswordHelp';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
@@ -11,6 +11,7 @@ import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 /** Built-in copy; Navegación → «Textos del sitio» edits it (SiteSettings.chrome). */
 export const FLOAT_DEFAULTS = {
   wa_float: 'Hola, me gustaría obtener más información sobre el Colegio Interlaken.',
+  wa_password: PASSWORD_REQUEST_MESSAGE,
   float_whatsapp: 'WhatsApp',
   float_visit: 'Agendar visita',
   float_password: 'Recuperar contraseña',
@@ -25,6 +26,7 @@ export const FLOAT_DEFAULTS = {
  */
 export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: boolean }) {
   const { whatsapp_number, chrome } = useSiteSettings();
+  const text = siteTexts(chrome, FLOAT_DEFAULTS);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -42,15 +44,15 @@ export function WhatsAppFloat({ stickyCtaVisible = true }: { stickyCtaVisible?: 
     <div className={wrap}>
       {open && (
         <div role="menu" aria-label="Contacto rápido" className="flex flex-col items-end gap-2">
-          <a role="menuitem" href={waHref(whatsapp_number, siteText(chrome, 'wa_float', FLOAT_DEFAULTS.wa_float))} target="_blank" rel="noopener noreferrer" className={item}
+          <a role="menuitem" href={waHref(whatsapp_number, text.wa_float)} target="_blank" rel="noopener noreferrer" className={item}
             onClick={() => { trackEvent(ConversionEvent.WhatsappCta, { context: 'burbuja_flotante' }); setOpen(false); }}>
-            <WhatsAppIcon className="h-4 w-4 text-green-600" /> {siteText(chrome, 'float_whatsapp', FLOAT_DEFAULTS.float_whatsapp)}
+            <WhatsAppIcon className="h-4 w-4 text-green-600" /> {text.float_whatsapp}
           </a>
           <Link role="menuitem" to="/agendar-visita" className={item} onClick={() => setOpen(false)}>
-            <CalendarCheck className="h-4 w-4 text-purple" aria-hidden="true" /> {siteText(chrome, 'float_visit', FLOAT_DEFAULTS.float_visit)}
+            <CalendarCheck className="h-4 w-4 text-purple" aria-hidden="true" /> {text.float_visit}
           </Link>
-          <a role="menuitem" href={waHref(whatsapp_number, siteText(chrome, 'wa_password', PASSWORD_REQUEST_MESSAGE))} target="_blank" rel="noopener noreferrer" className={item} onClick={() => setOpen(false)}>
-            <KeyRound className="h-4 w-4 text-coral" aria-hidden="true" /> {siteText(chrome, 'float_password', FLOAT_DEFAULTS.float_password)}
+          <a role="menuitem" href={waHref(whatsapp_number, text.wa_password)} target="_blank" rel="noopener noreferrer" className={item} onClick={() => setOpen(false)}>
+            <KeyRound className="h-4 w-4 text-coral" aria-hidden="true" /> {text.float_password}
           </a>
         </div>
       )}
