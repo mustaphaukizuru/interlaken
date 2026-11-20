@@ -31,6 +31,8 @@ services:
         # Baked into the SPA bundle at build time, not read at runtime.
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_GA4_MEASUREMENT_ID: ${VITE_GA4_MEASUREMENT_ID:-}
+        VITE_PLAUSIBLE_DOMAIN: ${VITE_PLAUSIBLE_DOMAIN:-}
         # Sentry release tags (the deployed commit), exported by deploy.sh and
         # empty when built any other way. Build args, not runtime env: the
         # image carries its own commit, so a rollback reports the right one.
@@ -147,6 +149,9 @@ services:
       # Caddy fails to start on an empty value here, which takes the whole site
       # down, so compose refuses to come up instead of half-starting.
       TLS_EMAIL: ${TLS_EMAIL:?set TLS_EMAIL in deploy/.env}
+      # Old domains redirected page by page (Caddyfile). Empty in .env becomes a
+      # dummy http-only name here, so Caddy never sees an empty site address.
+      LEGACY_DOMAINS: ${LEGACY_DOMAINS:-http://legacy.invalid}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # Certificates and the ACME account key live here. Losing this volume

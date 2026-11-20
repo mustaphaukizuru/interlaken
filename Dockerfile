@@ -31,6 +31,14 @@ ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 # this stage on every deploy, for nothing while Sentry is off.
 ARG VITE_GIT_SHA=
 ENV VITE_GIT_SHA=$VITE_GIT_SHA
+# Web analytics (src/services/analytics.ts): a GA4 measurement ID (G-…) or a
+# Plausible domain. Loaded only after the visitor accepts the cookie banner;
+# both empty = no analytics and no banner. Without these ARGs the values in
+# deploy/.env never reached the bundle, which is why production had none.
+ARG VITE_GA4_MEASUREMENT_ID=
+ENV VITE_GA4_MEASUREMENT_ID=$VITE_GA4_MEASUREMENT_ID
+ARG VITE_PLAUSIBLE_DOMAIN=
+ENV VITE_PLAUSIBLE_DOMAIN=$VITE_PLAUSIBLE_DOMAIN
 RUN npm run build   # → frontend/dist (assets reference /static/)
 
 # ── Stage 2: Django + gunicorn ──────────────────────────────────────────────

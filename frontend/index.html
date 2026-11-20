@@ -15,38 +15,56 @@
     <meta name="description" content="Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con más de cuatro décadas de trayectoria." />
     <link rel="canonical" href="https://interlaken.edu.mx/" />
 
-    <!-- Structured data: School / EducationalOrganization / LocalBusiness.
-         Static so it's always in the initial HTML for the Rich Results test. -->
+    <!-- Site-wide structured data (Organization + WebSite). Static so it is in
+         the raw HTML of every URL. The address, phone, pin and hours MUST match
+         the Google Business Profile and src/lib/siteMeta.ts ORG word for word
+         (siteMeta.test.ts checks it). -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": ["School", "EducationalOrganization", "LocalBusiness"],
-      "@id": "https://interlaken.edu.mx/#organization",
-      "name": "Colegio Interlaken",
-      "legalName": "Colegio Interlaken",
-      "url": "https://interlaken.edu.mx",
-      "logo": "https://interlaken.edu.mx/assets/logo-horizontal.png",
-      "image": "https://interlaken.edu.mx/og-image.png",
-      "description": "Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con más de cuatro décadas de trayectoria.",
-      "telephone": "+52-55-5379-1188",
-      "email": "colegio@interlaken.edu.mx",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Tlalnepantla de Baz",
-        "addressLocality": "Tlalnepantla de Baz",
-        "addressRegion": "Estado de México",
-        "postalCode": "54000",
-        "addressCountry": "MX"
-      },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": 19.5407,
-        "longitude": -99.1955
-      },
-      "sameAs": [
-        "https://www.facebook.com/colegiointerlaken"
-      ],
-      "areaServed": "Tlalnepantla de Baz, Estado de México"
+      "@graph": [
+        {
+          "@type": ["School", "LocalBusiness"],
+          "@id": "https://interlaken.edu.mx/#organization",
+          "name": "Colegio Interlaken",
+          "alternateName": ["Interlaken", "Colegio Interlaken Tlalnepantla"],
+          "url": "https://interlaken.edu.mx/",
+          "logo": "https://interlaken.edu.mx/assets/logo-horizontal.png",
+          "image": "https://interlaken.edu.mx/og-image.png",
+          "description": "Colegio bilingüe en Tlalnepantla, Estado de México, fundado en 1981: preescolar, primaria y secundaria con reconocimiento de la SEP.",
+          "foundingDate": "1981",
+          "telephone": "+52-55-5379-1188",
+          "email": "info@interlaken.com.mx",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Av. de los Reyes 67, Residencial El Dorado",
+            "addressLocality": "Tlalnepantla de Baz",
+            "addressRegion": "Estado de México",
+            "postalCode": "54020",
+            "addressCountry": "MX"
+          },
+          "geo": { "@type": "GeoCoordinates", "latitude": 19.5557298, "longitude": -99.206715 },
+          "hasMap": "https://maps.app.goo.gl/Xd241Sht8TmrMHUe6",
+          "openingHoursSpecification": [{
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            "opens": "07:30",
+            "closes": "15:00"
+          }],
+          "areaServed": { "@type": "City", "name": "Tlalnepantla de Baz" },
+          "knowsLanguage": ["es", "en"],
+          "sameAs": ["https://www.facebook.com/colegiointerlaken"]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://interlaken.edu.mx/#website",
+          "url": "https://interlaken.edu.mx/",
+          "name": "Colegio Interlaken",
+          "alternateName": "Interlaken",
+          "inLanguage": "es-MX",
+          "publisher": { "@id": "https://interlaken.edu.mx/#organization" }
+        }
+      ]
     }
     </script>
 
