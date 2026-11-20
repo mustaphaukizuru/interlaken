@@ -160,6 +160,31 @@ def test_stale_save_gets_409_with_who_and_when(api_client, admin_user, staff_use
     assert api_client.patch(url, {'title': 'Ada escribió'}, format='json').status_code == 200
 
 
+def test_every_editor_save_carries_and_returns_the_revision(admin_client, admin_user):
+    """What the editor («shell» branch) does: draft_revision on every PATCH (blocks, title, SEO,
+    schedule), the next revision taken from each PATCH response, never from a re-fetch."""
+    page = Page.objects.create(slug='costos', title='Costos', draft_blocks=GENERIC)
+    url = reverse('admin-page-detail', args=[page.pk])
+    rev = admin_client.get(url).data['draft_revision']
+    future = (timezone.now() + dt.timedelta(days=3)).isoformat()
+    for change in ({'draft_blocks': [GENERIC[0]]}, {'title': 'Costos y becas'}, {'seo': {'title': 'Costos'}},
+                   {'publish_at': future}, {'unpublish_at': None, 'publish_at': None}):
+        r = admin_client.patch(url, {**change, 'draft_revision': rev}, format='json')
+        assert r.status_code == 200, (change, r.data)
+        assert r.data['draft_revision'] == rev + 1 and r.data['draft_updated_by'] == 'Ada Admin'
+        rev = r.data['draft_revision']
+    # A schedule change from a stale editor is a conflict like any other save.
+    r = admin_client.patch(url, {'publish_at': future, 'draft_revision': rev - 1}, format='json')
+    assert r.status_code == 409 and r.data['code'] == 'draft_conflict' and r.data['draft_revision'] == rev
+    page.refresh_from_db()
+    assert page.publish_at is None
+    # draft_revision: null is the same as not sending it.
+    assert admin_client.patch(url, {'title': 'Costos', 'draft_revision': None}, format='json').data['draft_revision'] == rev + 1
+    # The legacy override in the exact body the editor sends.
+    r = admin_client.post(reverse('admin-page-publish', args=[page.pk]), {'action': 'publish', 'confirm_legacy': True}, format='json')
+    assert r.status_code == 200 and r.data['legacy_seed'] is False
+
+
 def test_migration_0028_backfills_draft_updated_at():
     from importlib import import_module
 
