@@ -80,7 +80,7 @@ const BY_KIND: Partial<Record<FieldKind, string>> = {
   icon: 'El dibujo pequeño que acompaña al texto.',
   color: 'Color de acento de esta parte: líneas, íconos y fondos suaves.',
   items: 'Use «Agregar» para sumar uno; las flechas cambian el orden y «Duplicar» copia uno parecido.',
-  toggle: 'Active o desactive esta opción.',
+  toggle: 'Marque la casilla para mostrarlo en la página; desmárquela para ocultarlo.',
   select: 'Elija una opción de la lista.',
   richtext: 'Escriba como en un procesador de textos: seleccione el texto y elija negritas, lista, subtítulo o enlace.',
   form: 'Elija el formulario que se muestra en esta parte.',
@@ -216,6 +216,7 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
     successText: 'Lo que ve la familia al enviar: qué sigue.',
   },
   'home.hero': {
+    showLogo: 'Muestra el logo del colegio sobre la foto o el video de portada.',
     title: 'El título grande de la portada (primera línea).',
     titleAccent: 'Segunda línea del título, en color degradado.',
     posterAlt: 'Qué se ve en la foto de portada, para quien no puede verla.',
