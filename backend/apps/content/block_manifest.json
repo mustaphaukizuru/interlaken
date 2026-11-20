@@ -543,10 +543,10 @@
         "photos": "Fotos",
         "photos[].image": "Foto",
         "photos[].caption": "Pie de foto",
-        "photos[].category": "Categoría",
+        "photos[].category": "Filtro",
         "filters": "Filtros",
-        "filters[].key": "Clave",
-        "filters[].label": "Texto del botón"
+        "filters[].label": "Texto del botón",
+        "filters[].key": "Clave"
       }
     },
     "galeria.hero": {

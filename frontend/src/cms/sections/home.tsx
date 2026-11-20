@@ -123,7 +123,7 @@ function HomeStatsView({ items }: { items?: StatItem[] }) {
   );
 }
 
-const levelItem = [f.text('name', 'Nombre', { required: true }), f.image('image', 'Foto'), f.color('color'), f.textarea('text', 'Descripción'), f.text('href', 'Enlace'), f.text('linkLabel', 'Texto del enlace', { hint: 'Vacío = «Conocer <nombre>».' })];
+const levelItem = [f.text('name', 'Nombre', { required: true }), f.image('image', 'Foto'), f.color('color'), f.textarea('text', 'Descripción'), f.href('href', 'Enlace'), f.text('linkLabel', 'Texto del enlace', { hint: 'Vacío = «Conocer <nombre>».' })];
 
 export const sections = [
   section({

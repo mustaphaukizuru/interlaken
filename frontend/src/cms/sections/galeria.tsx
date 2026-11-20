@@ -285,11 +285,11 @@ export const sections = [
       f.items('photos', 'Fotos', [
         f.image('image', 'Foto', { required: true }),
         f.text('caption', 'Pie de foto'),
-        f.text('category', 'Categoría', { hint: 'La clave de uno de los filtros, p. ej. vida o instalaciones.' }),
+        f.select('category', 'Filtro', [], { optionsFrom: { list: 'filters', value: 'key', label: 'label' } }),
       ]),
       f.items('filters', 'Filtros', [
-        f.text('key', 'Clave', { required: true, hint: 'La clave «todas» muestra todas las fotos. El primer filtro es el que se ve al abrir la página.' }),
         f.text('label', 'Texto del botón', { required: true }),
+        f.text('key', 'Clave', { required: true, advanced: true, slugFrom: { field: 'label', keep: ['todas'] } }),
       ]),
     ],
     defaults: {

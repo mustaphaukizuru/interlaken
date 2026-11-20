@@ -8,7 +8,7 @@ import { PricingSections, PRICING_COPY, type PricingCopy } from '@/components/pu
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { FieldSpec } from '../blocks/registry';
 import { imageSrc, imageSrcSet, useTokens } from '../runtime';
-import { defineModule, f, sectionsOf } from './kit';
+import { defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('costos');
 
@@ -39,12 +39,13 @@ function CostosPricesView(p: Partial<PricingCopy>) {
   return <PricingSections copy={p} />;
 }
 
-/** Label, title and subtitle of one price card. */
-const card = (key: string, name: string): FieldSpec[] => [
+/** Label, title and subtitle of one price card (one group in the editor). */
+const card = (key: string, name: string, extra: FieldSpec[] = []): FieldSpec[] => grouped(name, [
   f.text(`${key}Label`, `${name}: etiqueta`),
   f.text(`${key}Title`, `${name}: título`),
   f.text(`${key}Subtitle`, `${name}: subtítulo`),
-];
+  ...extra,
+]);
 
 export const sections = [
   section({
@@ -62,28 +63,34 @@ export const sections = [
     type: 'prices', label: 'Costos · Tablas de precios', description: 'Cuotas, colegiaturas, seguros, extraescolares y estancia. Los precios se editan en Ajustes, Costos; aquí solo los textos que los acompañan.',
     component: CostosPricesView,
     fields: [
-      f.text('structureTitle', 'Título de la explicación del pago'),
-      f.items('structure', 'Cómo se estructura el pago', [f.text('title', 'Concepto', { required: true }), f.text('text', 'Explicación')]),
-      ...card('fees', 'Inscripción'),
-      f.text('newTag', 'Pestaña de nuevo ingreso'),
-      f.text('returningTag', 'Pestaña de reinscripción'),
+      ...grouped('Cómo se paga', [
+        f.text('structureTitle', 'Título de la explicación del pago'),
+        f.items('structure', 'Cómo se estructura el pago', [f.text('title', 'Concepto', { required: true }), f.text('text', 'Explicación')]),
+      ]),
+      ...card('fees', 'Inscripción', [f.text('newTag', 'Pestaña de nuevo ingreso'), f.text('returningTag', 'Pestaña de reinscripción')]),
       ...card('tuition', 'Colegiaturas'),
       ...card('insurance', 'Seguros'),
       ...card('extras', 'Extraescolares'),
       ...card('daycare', 'Estancia'),
-      f.text('policiesTitle', 'Título de las políticas de pago'),
-      f.textarea('noteText', 'Nota: texto'),
-      f.textarea('noteStrong', 'Nota: texto en negritas'),
-      f.text('noteLinkLead', 'Nota: texto antes del enlace'),
-      f.link('noteLink', 'Nota: enlace'),
-      f.text('ctaTitle', 'Llamado final: título'),
-      f.textarea('ctaText', 'Llamado final: texto', { hint: 'Puede usar {{ciclo}}.' }),
-      f.link('ctaPrimary', 'Llamado final: botón principal'),
-      f.link('ctaSecondary', 'Llamado final: botón secundario'),
-      f.text('emptyTitle', 'Sin precios publicados: título'),
-      f.textarea('emptyText', 'Sin precios publicados: texto'),
-      f.link('emptyPrimary', 'Sin precios publicados: botón principal'),
-      f.link('emptySecondary', 'Sin precios publicados: botón secundario'),
+      ...grouped('Políticas y nota final', [
+        f.text('policiesTitle', 'Título de las políticas de pago'),
+        f.textarea('noteText', 'Nota: texto'),
+        f.textarea('noteStrong', 'Nota: texto en negritas'),
+        f.text('noteLinkLead', 'Nota: texto antes del enlace'),
+        f.link('noteLink', 'Nota: enlace'),
+      ]),
+      ...grouped('Llamado final', [
+        f.text('ctaTitle', 'Llamado final: título'),
+        f.textarea('ctaText', 'Llamado final: texto'),
+        f.link('ctaPrimary', 'Llamado final: botón principal'),
+        f.link('ctaSecondary', 'Llamado final: botón secundario'),
+      ]),
+      ...grouped('Si aún no hay precios publicados', [
+        f.text('emptyTitle', 'Sin precios publicados: título'),
+        f.textarea('emptyText', 'Sin precios publicados: texto'),
+        f.link('emptyPrimary', 'Sin precios publicados: botón principal'),
+        f.link('emptySecondary', 'Sin precios publicados: botón secundario'),
+      ]),
     ],
     defaults: { ...PRICING_COPY },
   }),

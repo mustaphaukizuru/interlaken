@@ -22,7 +22,7 @@ import { CostEstimator } from '@/components/admissions/CostEstimator';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, isExternal, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, headingFields, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, sectionsOf } from './kit';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ CalendarDays, ClipboardList, FileText });
@@ -585,17 +585,21 @@ export const sections = [
     type: 'docs_cta', label: 'Admisiones · Documentos y pre-registro', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado al pre-registro.',
     component: AdmDocsCtaView,
     fields: [
-      f.text('docsTitle', 'Documentos: título'),
-      f.text('docsSummary', 'Documentos: resumen', { hint: '{total} = número de documentos; {online} = cuántos tienen enlace a un trámite en línea.' }),
-      f.items('docs', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.url('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')]),
-      f.textarea('docsNote', 'Documentos: nota al pie'),
-      f.image('image', 'Foto del llamado'),
-      f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
-      f.text('badge', 'Insignia', { hint: 'Puede usar {{ciclo}}.' }),
-      f.text('title', 'Título del llamado'),
-      f.textarea('text', 'Texto del llamado'),
-      f.link('primary', 'Botón principal'),
-      f.link('secondary', 'Botón secundario'),
+      ...grouped('Documentos requeridos', [
+        f.text('docsTitle', 'Documentos: título'),
+        f.text('docsSummary', 'Documentos: resumen'),
+        f.items('docs', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.href('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')]),
+        f.textarea('docsNote', 'Documentos: nota al pie'),
+      ]),
+      ...grouped('Llamado al pre-registro', [
+        f.image('image', 'Foto del llamado'),
+        f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
+        f.text('badge', 'Insignia'),
+        f.text('title', 'Título del llamado'),
+        f.textarea('text', 'Texto del llamado'),
+        f.link('primary', 'Botón principal'),
+        f.link('secondary', 'Botón secundario'),
+      ]),
     ],
     defaults: {
       docsTitle: 'Documentos requeridos', docsSummary: '{total} documentos · {online} con trámite oficial en línea',
