@@ -88,8 +88,8 @@ export const PRICING_COPY: PricingCopy = {
 /** Number badge colours of the «¿Cómo se estructura el pago?» steps, in order. */
 const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
 
-/** Card shell shared by every pricing section. */
-function PriceCard({ tone, icon: Icon, label, title, subtitle, children }: {
+/** Card shell shared by every pricing section (and the generic «Tabla» block's card style). */
+export function PriceCard({ tone, icon: Icon, label, title, subtitle, children }: {
   tone: 'green' | 'purple' | 'coral' | 'pink';
   icon: any; label: string; title: string; subtitle?: string;
   children: React.ReactNode;

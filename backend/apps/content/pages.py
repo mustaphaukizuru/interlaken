@@ -39,6 +39,7 @@ from apps.core.listing import AdminListMixin
 from apps.core.permissions import IsAdmin, IsAdminOrStaff
 
 from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, tri_state
+from .table_block import table_problem
 
 PAGE_CACHE = 'cms:page:{slug}'
 HEAD_CACHE = 'cms:head:{slug}'
@@ -69,6 +70,7 @@ BLOCK_SCHEMAS: dict[str, dict[str, str]] = {
     'calendar':     {},
     'sep_incorporation': {},
     'open_school_events': {},
+    'table':        {'table': 'dict'},                      # {columns, rows, highlight}; limits: table_block.py
 }
 _PY = {'str': str, 'int': int, 'list': list, 'dict': dict, 'bool': bool, 'num': (int, float), 'image': (int, str)}
 
@@ -111,6 +113,10 @@ def validate_blocks(blocks) -> list[dict]:
         for name, kind in schema.items():
             if name not in props or not isinstance(props[name], _PY[kind]):
                 raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} ({b["type"]}): falta "{name}".'})
+        for name, limits in (manifest().get(b['type'], {}).get('tables') or {}).items():
+            problem = table_problem(props.get(name), limits) if name in props else None
+            if problem:
+                raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} ({b["type"]}): {problem}'})
         block = {'id': str(b.get('id') or uuid.uuid4().hex[:8])[:40], 'type': b['type'], 'props': props}
         if b.get('hidden') is True:
             block['hidden'] = True

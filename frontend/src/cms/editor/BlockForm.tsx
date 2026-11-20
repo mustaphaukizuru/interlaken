@@ -6,6 +6,7 @@ import type { Block, FieldSpec } from '../blocks/registry';
 import { blockSpec, withDefaults } from '../blocks/registry';
 import { CMS_ICONS, ICON_OPTIONS } from '../icons';
 import { COLOR_OPTIONS } from '../runtime';
+import { CustomField } from './customFields';
 
 /** `field` names the top-level prop that changed (undo groups consecutive edits of one field). */
 type Props = { block: Block; onChange: (props: Record<string, unknown>, field: string) => void };
@@ -158,7 +159,8 @@ function Field({ spec, value, onChange, idPrefix }: { spec: FieldSpec; value: un
       );
     }
     default:
-      return null;
+      // Kinds with editors of their own: the «Tabla» grid, «Editar precios» (./customFields).
+      return <CustomField spec={spec} value={value} onChange={onChange} />;
   }
 }
 
