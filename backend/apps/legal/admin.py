@@ -1,7 +1,6 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
-from apps.admissions.models import Registration
 
 from .models import ArcoRequest, ConsentRecord, PrivacyNoticeVersion
 
@@ -22,24 +21,20 @@ class ArcoRequestAdmin(ModelAdmin):
 
 @admin.register(PrivacyNoticeVersion)
 class PrivacyNoticeVersionAdmin(ModelAdmin):
-    list_display = ('version', 'title', 'effective_date', 'is_active', 'created_at')
+    list_display = ('version', 'title', 'effective_date', 'is_active', 'published_at', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('version', 'title')
     ordering = ('-effective_date',)
-    readonly_fields = ('created_at',)
+    readonly_fields = ('created_at', 'published_at')
     # Once a version has been in force (active, or accepted by anyone) its text
     # is legal evidence of what people agreed to: it is frozen and cannot be
     # deleted. Publish a new version instead. «Vigente» stays editable so it
     # can be retired when the next version goes live.
-    FROZEN_FIELDS = ('version', 'title', 'body', 'integral_notice_url', 'effective_date', 'created_at')
+    FROZEN_FIELDS = ('version', 'title', 'body', 'integral_notice_url', 'effective_date', 'created_at', 'published_at')
 
     @staticmethod
     def is_published(obj) -> bool:
-        return bool(obj and obj.pk and (
-            obj.is_active
-            or obj.consent_records.exists()
-            or Registration.objects.filter(privacy_notice_version=obj).exists()
-        ))
+        return bool(obj and obj.was_published)
 
     def get_readonly_fields(self, request, obj=None):
         if self.is_published(obj):
