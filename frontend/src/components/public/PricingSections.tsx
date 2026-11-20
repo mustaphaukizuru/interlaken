@@ -38,20 +38,25 @@ interface PricingBundle {
 const mxn = formatPrice;
 
 /**
- * The explanatory copy around the price tables. The figures come from the API
- * (Ajustes, Costos); this text is editable from the CMS `costos.prices`
- * section. Any key left out keeps today's text, so the generic
- * `pricing_table` block renders exactly as before.
+ * The copy around and inside the price tables: card titles, notes, column
+ * headers and the fixed labels («/ mes», «/ año»...). The figures come from
+ * the API (console «Costos y precios», /admin/costos); this text is editable
+ * from the CMS `costos.prices` section. Any key left out keeps today's text,
+ * so the generic `pricing_table` block renders exactly as before.
  */
 export interface PricingCopy {
   emptyTitle: string; emptyText: string; emptyPrimary: CmsLink; emptySecondary: CmsLink;
   structureTitle: string; structure: { title?: string; text?: string }[];
   feesLabel: string; feesTitle: string; feesSubtitle: string; newTag: string; returningTag: string;
-  tuitionLabel: string; tuitionTitle: string; tuitionSubtitle: string;
+  colLevel: string; colAdmin: string; colNew: string; colReturning: string;
+  tuitionLabel: string; tuitionTitle: string; tuitionSubtitle: string; perMonth: string; perYear: string; daycareMonthly: string;
   insuranceLabel: string; insuranceTitle: string; insuranceSubtitle: string;
   extrasLabel: string; extrasTitle: string; extrasSubtitle: string;
   daycareLabel: string; daycareTitle: string; daycareSubtitle: string;
   policiesTitle: string;
+  /** Policies that mention one of these words (comma separated, accents ignored) stand out. */
+  policyHighlight: string;
+  errorTitle: string; errorText: string;
   noteText: string; noteStrong: string; noteLinkLead: string; noteLink: CmsLink;
   ctaTitle: string; ctaText: string; ctaPrimary: CmsLink; ctaSecondary: CmsLink;
 }
@@ -70,11 +75,16 @@ export const PRICING_COPY: PricingCopy = {
   ],
   feesLabel: 'Pago único', feesTitle: 'Inscripción y reinscripción', feesSubtitle: 'Se divide en 4 parcialidades, de enero a abril',
   newTag: 'Nuevo ingreso', returningTag: 'Alumnos Interlaken',
+  colLevel: 'Nivel', colAdmin: 'Gastos administrativos', colNew: 'Inscripción', colReturning: 'Reinscripción',
   tuitionLabel: 'Mensual', tuitionTitle: 'Colegiaturas', tuitionSubtitle: '11 mensualidades, de agosto a junio',
+  perMonth: '/ mes', perYear: '/ año', daycareMonthly: '/mes',
   insuranceLabel: 'Anual · obligatorio', insuranceTitle: 'Seguros y credenciales', insuranceSubtitle: 'Contratación obligatoria para todos los alumnos',
   extrasLabel: 'Anualidad', extrasTitle: 'Extraescolares', extrasSubtitle: '10 parcialidades de septiembre a junio · se definen en agosto',
   daycareLabel: 'Horario extendido', daycareTitle: 'Estancia', daycareSubtitle: 'Costo diario, con tarifa mensual opcional',
   policiesTitle: 'Políticas de pago',
+  policyHighlight: 'recargo, devolución',
+  errorTitle: 'No fue posible cargar los costos',
+  errorText: 'Intente de nuevo más tarde o contáctenos para recibir la información del ciclo.',
   noteText: 'Información de referencia: los costos los publica la administración y pueden actualizarse cada ciclo escolar.',
   noteStrong: 'Inscripciones y colegiaturas se pagan directamente con el colegio, no en este sitio.',
   noteLinkLead: 'Para becas, hermanos o planes de pago,',
@@ -84,6 +94,15 @@ export const PRICING_COPY: PricingCopy = {
   ctaPrimary: { label: 'Iniciar pre-registro', href: '/pre-registro' },
   ctaSecondary: { label: 'Agendar visita', href: '/agendar-visita' },
 };
+
+/** Lower case, accents removed: «Devolución» and «devolucion» match. */
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** `matches(text)`: does the policy mention one of the comma-separated words? */
+export function policyMatcher(words: string): (text: string) => boolean {
+  const list = fold(words).split(',').map((w) => w.trim()).filter(Boolean);
+  return (text) => { const f = fold(text); return list.some((w) => f.includes(w)); };
+}
 
 /** Number badge colours of the «¿Cómo se estructura el pago?» steps, in order. */
 const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
@@ -153,6 +172,8 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
   const estancia = data?.daycare ?? [];
   const policies = data?.policies ?? [];
   const isEmpty = tuition.length === 0 && (data?.enrollment_fees ?? []).length === 0;
+  const highlighted = policyMatcher(t(c.policyHighlight));
+  const feeCol = modality === 'nuevo_ingreso' ? t(c.colNew) : t(c.colReturning);
 
   return (
     <>
@@ -166,8 +187,8 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
             <div className="flex min-h-[584px] flex-col justify-center">
             {isError ? (
               <ErrorState
-                title="No fue posible cargar los costos"
-                description="Intente de nuevo más tarde o contáctenos para recibir la información del ciclo."
+                title={t(c.errorTitle)}
+                description={t(c.errorText)}
                 onRetry={() => refetch()}
               />
             ) : isLoading ? (
@@ -235,14 +256,14 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <caption className="sr-only">
-                      {modality === 'nuevo_ingreso' ? t(c.newTag) : t(c.returningTag)}: gastos administrativos y {modality === 'nuevo_ingreso' ? 'inscripción' : 'reinscripción'} por nivel
+                      {modality === 'nuevo_ingreso' ? t(c.newTag) : t(c.returningTag)}: {t(c.colAdmin).toLowerCase()} y {feeCol.toLowerCase()} por {t(c.colLevel).toLowerCase()}
                     </caption>
                     <thead>
                       <tr className="border-b border-ink/5 text-[11px] text-muted sm:text-xs sm:uppercase sm:tracking-wide">
-                        <th scope="col" className="px-3 py-2.5 text-left font-semibold sm:px-5">Nivel</th>
-                        <th scope="col" className="px-2 py-2.5 text-right font-semibold sm:px-3">Gastos administrativos</th>
+                        <th scope="col" className="px-3 py-2.5 text-left font-semibold sm:px-5">{t(c.colLevel)}</th>
+                        <th scope="col" className="px-2 py-2.5 text-right font-semibold sm:px-3">{t(c.colAdmin)}</th>
                         <th scope="col" className="px-3 py-2.5 text-right font-semibold sm:px-5">
-                          {modality === 'nuevo_ingreso' ? 'Inscripción' : 'Reinscripción'}
+                          {feeCol}
                         </th>
                       </tr>
                     </thead>
@@ -268,7 +289,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                 >
                   <ul>
                     {tuition.map((r) => (
-                      <Row key={r.section} left={r.section} right={mxn(r.colegiatura)} rightMuted="/ mes" />
+                      <Row key={r.section} left={r.section} right={mxn(r.colegiatura)} rightMuted={t(c.perMonth)} />
                     ))}
                   </ul>
                 </PriceCard>
@@ -280,8 +301,8 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     subtitle={t(c.insuranceSubtitle)}
                   >
                     <ul>
-                      {seguros.map((c) => (
-                        <Row key={c.name} left={c.name} right={mxn(c.cost)} />
+                      {seguros.map((s) => (
+                        <Row key={s.name} left={s.name} right={mxn(s.cost)} />
                       ))}
                     </ul>
                   </PriceCard>
@@ -298,7 +319,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   >
                     <ul>
                       {extras.map((e) => (
-                        <Row key={e.name} left={e.name} sub={e.levels} right={mxn(e.annual_cost)} rightMuted="/ año" />
+                        <Row key={e.name} left={e.name} sub={e.levels} right={mxn(e.annual_cost)} rightMuted={t(c.perYear)} />
                       ))}
                     </ul>
                   </PriceCard>
@@ -319,7 +340,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                           right={mxn(d.daily_cost)}
                           rightMuted={
                             d.monthly_cost
-                              ? `· ${mxn(d.monthly_cost)} /mes${d.monthly_note ? ` (${d.monthly_note.toLowerCase()})` : ''}`
+                              ? `· ${mxn(d.monthly_cost)} ${t(c.daycareMonthly)}${d.monthly_note ? ` (${d.monthly_note.toLowerCase()})` : ''}`
                               : d.monthly_note ? `· ${d.monthly_note}` : undefined
                           }
                         />
@@ -335,15 +356,15 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   {c.policiesTitle && <h2 className="font-head text-lg font-bold text-ink">{t(c.policiesTitle)}</h2>}
                   <ul className="mt-3 space-y-2.5">
                     {policies.map((p) => {
-                      const highlighted = /recargo|devoluci/i.test(p.text);
+                      const strong = highlighted(p.text);
                       return (
                         <li key={p.order} className="flex items-start gap-2.5 text-sm">
                           <Info
                             size={16}
-                            className={`mt-0.5 flex-shrink-0 ${highlighted ? 'text-amber' : 'text-purple'}`}
+                            className={`mt-0.5 flex-shrink-0 ${strong ? 'text-amber' : 'text-purple'}`}
                             aria-hidden="true"
                           />
-                          <span className={highlighted ? 'font-medium text-ink' : 'text-muted'}>{p.text}</span>
+                          <span className={strong ? 'font-medium text-ink' : 'text-muted'}>{p.text}</span>
                         </li>
                       );
                     })}
