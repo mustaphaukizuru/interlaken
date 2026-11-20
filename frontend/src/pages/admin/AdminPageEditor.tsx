@@ -15,6 +15,9 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { EditableBlocks } from '@/cms/editor/EditableBlocks';
+import { PageErrorSummary } from '@/cms/editor/PageErrorSummary';
+import { requestFieldFocus } from '@/cms/editor/fieldFocus';
+import { fieldErrorsFrom, fieldErrorsFromIssues, type CmsFieldError } from '@/cms/editor/validation';
 import { allSections as allSectionSpecs, templateFor } from '@/cms/sections';
 import { GROUP_LABELS, loadAllGroups } from '@/cms/sections/loaders';
 import { MediaPicker } from '@/components/admin/MediaPicker';
@@ -64,6 +67,8 @@ export default function AdminPageEditor() {
   const [showSeo, setShowSeo] = useState(false);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Structured server errors (save, publish, checks): next to each field and in the summary.
+  const [fieldErrors, setFieldErrors] = useState<CmsFieldError[]>([]);
   const loadedFor = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const propsRef = useRef<HTMLDivElement>(null);
@@ -97,7 +102,7 @@ export default function AdminPageEditor() {
       ? { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }
       : { draft_blocks: blocks, title: meta.title, seo: meta.seo }),
     onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); },
-    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
+    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); setFieldErrors(fieldErrorsFrom(e)); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
   });
 
   // Autosave 1.5 s after the last change.
@@ -112,10 +117,11 @@ export default function AdminPageEditor() {
     mutationFn: async (action: 'publish' | 'unpublish') => { if (dirty) await save.mutateAsync(); return contentApi.adminPublishPage(pageId, action); },
     onSuccess: (res, action) => {
       toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');
+      setFieldErrors([]);
       setConfirmUnpublish(false);
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); qc.invalidateQueries({ queryKey: ['cms-page'] });
     },
-    onError: (e) => { const f = apiFieldErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
+    onError: (e) => { const f = apiFieldErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); setFieldErrors(fieldErrorsFrom(e)); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
   });
 
   const review = useMutation({
@@ -130,7 +136,7 @@ export default function AdminPageEditor() {
 
   const checks = useMutation({
     mutationFn: async () => { if (dirty) await save.mutateAsync(); return contentApi.adminPageChecks(pageId); },
-    onSuccess: ({ data }) => { setIssues(data.issues); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
+    onSuccess: ({ data }) => { setIssues(data.issues); setFieldErrors(fieldErrorsFromIssues(data.issues)); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
     onError: () => toast.error('No se pudo revisar la página.'),
   });
 
@@ -179,6 +185,8 @@ export default function AdminPageEditor() {
     setSelected(b.id);
   };
   const selectFromPreview = (id: string) => { selectSource.current = 'preview'; setSelected(id); };
+  /** Error summary / checks list: open the section's form and focus the field. */
+  const jumpToField = (id: string, field?: string) => { selectSource.current = 'preview'; setSelected(id); requestFieldFocus(id, field ?? ''); };
   const updateMeta = (patch: Partial<typeof meta>) => { setMeta((m) => ({ ...m, ...patch })); setDirty(true); };
   const selectedBlock = useMemo(() => blocks.find((b) => b.id === selected) ?? null, [blocks, selected]);
   const selectedIdx = blocks.findIndex((b) => b.id === selected);
@@ -280,6 +288,7 @@ export default function AdminPageEditor() {
           <Button size="sm" onClick={() => { update(original); setSelected(null); }}>Cargar el diseño actual</Button>
         </div>
       )}
+      <PageErrorSummary blocks={blocks} serverErrors={fieldErrors} onJump={jumpToField} />
       {issues && issues.length > 0 && (
         <div className="mb-4 rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
           <div className="mb-2 flex items-center justify-between">
@@ -290,7 +299,7 @@ export default function AdminPageEditor() {
             {issues.map((i, k) => (
               <li key={k} className="flex items-start gap-2">
                 {i.level === 'error' ? <AlertTriangle size={16} className="mt-0.5 shrink-0 text-coral-600" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />}
-                {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => setSelected(i.block_id)}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
+                {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => jumpToField(i.block_id as string, i.field)}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
               </li>
             ))}
           </ul>
@@ -356,7 +365,7 @@ export default function AdminPageEditor() {
                 <p className="mb-3 text-xs text-muted">{blockSpec(selectedBlock.type)?.description}</p>
                 {selectedBlock.hidden && <p className="mb-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink">Este bloque está oculto: se conserva aquí pero no aparece en el sitio.</p>}
                 {(errors.blocks || errors.draft_blocks) && <p className="mb-2 text-sm text-coral-600">{errors.blocks || errors.draft_blocks}</p>}
-                <BlockForm block={selectedBlock} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
+                <BlockForm block={selectedBlock} serverErrors={fieldErrors.filter((x) => x.block_id === selectedBlock.id)} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
               </>
             ) : <p className="text-sm text-muted">Seleccione un bloque en la lista o haga clic en la vista previa para editarlo.</p>}
           </div>
