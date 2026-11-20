@@ -222,6 +222,13 @@ def spa_index(request):
     raw = request.path
     query = request.META.get('QUERY_STRING', '')
     path = normalize(raw)
+    # 0. The service worker precaches /index.html and Workbox serves it for "/"
+    #    (directoryIndex). It must answer 200 with the home page: a 404 here fails
+    #    every service-worker install, so returning visitors keep the previous
+    #    release's cached home page and code (prod, 2026-11-20). Same page as "/",
+    #    whose canonical it carries.
+    if path == '/index.html':
+        path = '/'
     is_app = any(path == p.rstrip('/') or path.startswith(p if p.endswith('/') else p + '/') for p in APP_PREFIXES)
     gone = any(path == g.rstrip('/') or path.startswith(g.rstrip('/') + '/') for g in GONE_PREFIXES)
 
