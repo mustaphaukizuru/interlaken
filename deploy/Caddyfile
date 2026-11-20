@@ -13,9 +13,72 @@
 # metadata and structured data, so serving both names would split search
 # ranking and produce two URLs for every page. Its own certificate is issued
 # here too, otherwise visitors typing www would hit a TLS warning before the
-# redirect could ever run.
-www.{$PORTAL_DOMAIN} {
+# redirect could ever run. The http:// address is listed explicitly so
+# http://www goes to https://apex in ONE hop (Caddy's automatic HTTPS redirect
+# went http://www → https://www → https://apex).
+www.{$PORTAL_DOMAIN}, http://www.{$PORTAL_DOMAIN} {
 	redir https://{$PORTAL_DOMAIN}{uri} permanent
+}
+
+# ── Old domains (interlaken.com.mx, colegiointerlaken.edu.mx) ───────────────
+# Once their A records point at this server, every old URL answers ONE 301 to
+# the matching page here, so the ranking the old site earned since 2009 moves
+# over instead of ending on a 404 or the home page. LEGACY_DOMAINS (deploy/.env)
+# lists each host twice, https and http, e.g.
+#   LEGACY_DOMAINS=interlaken.com.mx, www.interlaken.com.mx, http://interlaken.com.mx, http://www.interlaken.com.mx
+# Unset, the block binds a dummy http-only name and does nothing. Never add a
+# host before its DNS points here: Caddy would retry its certificate forever.
+# MX/TXT records are untouched by this, so Google Workspace mail keeps working.
+{$LEGACY_DOMAINS:http://legacy.invalid} {
+	map {path} {legacy_path} {
+		# Old static site (2017-2026)
+		/index.html          /
+		/index-pre.html      /niveles/preescolar
+		/index-pri.html      /niveles/primaria
+		/index-sec.html      /niveles/secundaria
+		/index-1.html        /admisiones
+		/index-1a.html       /admisiones
+		/index-1b.html       /admisiones/documentacion
+		/index-1c.html       /admisiones/costos
+		/index-2.html        /plataformas
+		/index-2pre.php      /plataformas
+		/index-2pri.php      /plataformas
+		/index-2sec.php      /plataformas
+		/index-21pre.php     /plataformas
+		/index-22pre.php     /plataformas
+		/index-23pre.php     /plataformas
+		/index-2mat.php      /plataformas
+		/index-2precal.php   /niveles/preescolar
+		/index-2prical.php   /niveles/primaria
+		/index-2seccal.php   /niveles/secundaria
+		/index-3.html        /plataformas
+		/index-4.html        /galeria
+		/index-4inst.html    /galeria
+		/index-4eve.html     /galeria
+		/index-5.html        /contacto
+		/index-6.html        /aviso-de-privacidad
+		/index-7.html        /comunidad/facturacion
+		/AvisoPrivacidad.pdf /aviso-de-privacidad
+		# PHP site (2009-2016)
+		/1colegio.php        /nosotros
+		/2preescolar.php     /niveles/preescolar
+		/3primaria.php       /niveles/primaria
+		/4secundaria.php     /niveles/secundaria
+		/5admisiones.php     /admisiones
+		/admisiones.php      /admisiones
+		/6galeria.php        /galeria
+		/12instalaciones.php /galeria
+		/13videos.php        /galeria
+		/7circulares.php     /plataformas
+		/8contacto.php       /contacto
+		/11aviso.php         /aviso-de-privacidad
+		/14registro.php      /pre-registro
+		/actividades.php     /modelo-educativo
+		# Anything else keeps its path: new-style links (/admisiones) land on
+		# the right page, and true leftovers get the new site's honest 404.
+		default              {path}
+	}
+	redir https://{$PORTAL_DOMAIN}{legacy_path} permanent
 }
 
 # ── the site ────────────────────────────────────────────────────────────────
