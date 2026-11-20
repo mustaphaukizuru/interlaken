@@ -99,6 +99,7 @@ const AdminPageEditor = lazy(() => import('./pages/admin/AdminPageEditor'));
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
 const AdminPrivacyNotice = lazy(() => import('./pages/admin/AdminPrivacyNotice'));
 const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
+const AdminPricing = lazy(() => import('./pages/admin/AdminPricing'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const DocumentsUploadPage = cmsRoute('inscripcion-documentos', () => import('./pages/public/DocumentsUploadPage'));
 const AdminStaffUsers = lazy(() => import('./pages/admin/AdminStaffUsers'));
@@ -256,6 +257,7 @@ export default function App() {
               <Route path="contenido" element={<AdminPages />} />
               <Route path="formularios" element={<AdminForms />} />
               <Route path="navegacion" element={<AdminNavigation />} />
+              <Route path="costos" element={<AdminPricing />} />
               <Route path="nuevo-ciclo" element={<AdminSchoolYear />} />
               <Route path="fusionar-cuentas" element={<AdminGuardianMerge />} />
               <Route path="arco" element={<AdminArco />} />

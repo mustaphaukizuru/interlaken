@@ -71,15 +71,22 @@ def _set_meta(html: str, attr: str, name: str, value: str) -> str:
     return pattern.sub(lambda m: m.group(1) + html_lib.escape(value, quote=True) + m.group(2), html, count=1)
 
 
+def full_title(title: str) -> str:
+    """«Costos · Colegio Interlaken»: the site name once, never twice (a title that already
+    names the school, like the home page's, is kept as is; Seo.tsx does the same)."""
+    from apps.content.page_templates import full_title as _full_title
+    return _full_title(title)
+
+
 def apply_head(html: str, head: dict) -> str:
     title = head.get('title')
     desc = head.get('description')
     image = head.get('image')
     if title:
-        full = html_lib.escape(f'{title} · Colegio Interlaken')
-        html = re.sub(r'<title>[^<]*</title>', f'<title>{full}</title>', html, count=1)
-        html = _set_meta(html, 'property', 'og:title', f'{title} · Colegio Interlaken')
-        html = _set_meta(html, 'name', 'twitter:title', f'{title} · Colegio Interlaken')
+        full = full_title(title)
+        html = re.sub(r'<title>[^<]*</title>', lambda _m: f'<title>{html_lib.escape(full)}</title>', html, count=1)
+        html = _set_meta(html, 'property', 'og:title', full)
+        html = _set_meta(html, 'name', 'twitter:title', full)
     if desc:
         for attr, name in (('name', 'description'), ('property', 'og:description'), ('name', 'twitter:description')):
             html = _set_meta(html, attr, name, desc)

@@ -15,6 +15,7 @@ and admin/portal data are stubbed with `page.route` so runs are deterministic.
 | `console-frame.spec.ts` | The console never slides up: wheel, End, focus() and scrollIntoView() near the bottom of /admin/pagos leave the document and the frame unscrolled (1919×937 and 390×844) |
 | `layout-shift.spec.ts` | /admisiones/costos: with the CMS check held open the footer stays below the fold, and the page loads with layout shift < 0.1 |
 | `visual.spec.ts` | `toHaveScreenshot` baselines at 390×844 and 1280×800 for home, costos, admisiones, login, parent dashboard (stubbed) |
+| `public-pages.spec.ts` | CMS visual guard: every designed public page plus the 404, full height at 390 and 1280 px, unpublished (templates) and with every template published from the design through the admin API (zero pre-publish issues asserted). Published must equal defaults in the same run; both must match the committed baselines once they exist ([docs/cms/safe-publish.md](../../docs/cms/safe-publish.md)) |
 
 ## Running locally
 
@@ -59,6 +60,17 @@ baselines on purpose, refresh the linux ones too:
    the first mismatching viewport, so the `visual-diffs` artifact only ever
    shows part of it);
 3. review the PNGs, copy them into `visual.spec.ts-snapshots/`, and commit.
+   The artifact holds both `visual.spec.ts-snapshots/` and
+   `public-pages.spec.ts-snapshots/`; copy each folder over its namesake.
+
+**Public pages (`public-pages.spec.ts`):** while no `*-linux.png` baseline is
+committed, its baseline comparison is skipped (annotated `no-baseline`) and
+every CI run uploads **`public-pages-baselines-linux`**, rendered on the CI
+image from the defaults state. Download it, review, and commit the
+`*-chromium-linux.png` files into `public-pages.spec.ts-snapshots/`; from then
+on the comparison is blocking. Its other check (published from the design
+equals the defaults, same run) needs no baseline and always runs. Never commit
+Windows renders as linux baselines.
 
 ## Visual regression and Lighthouse in CI (BACKLOG P5-3)
 

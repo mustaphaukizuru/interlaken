@@ -443,7 +443,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'iniciar-sesion', path: '/login', title: 'Iniciar sesión', group: 'acceso',
-  seo: { title: 'Iniciar sesión' },
+  seo: { title: 'Iniciar sesión', description: 'Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea.' },
   sections: ['acceso.screen'],
 }];
 
