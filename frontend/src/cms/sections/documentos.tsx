@@ -18,7 +18,7 @@ import { admissionsApi, type DocumentsListing } from '@/services/api';
 import { exchangeOnce } from '@/lib/inviteExchange';
 import { useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
-import { asLink, CmsAnchor, defineModule, f, inGroup, sectionsOf } from './kit';
+import { asLink, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('documentos');
 
@@ -161,18 +161,18 @@ export const sections = [
     description: 'La página del enlace que Admisiones envía para subir documentos. La lista de documentos sale de Admisiones; aquí se editan todos los textos. La vista previa muestra un ejemplo.',
     component: DocumentsView,
     fields: [
-      ...inGroup('Encabezado', [f.text('label', 'Etiqueta superior'), f.text('title', 'Título')]),
-      ...inGroup('Lista', [
+      ...grouped('Encabezado', [f.text('label', 'Etiqueta superior'), f.text('title', 'Título')]),
+      ...grouped('Lista', [
         f.text('childLabel', 'Antes del nombre del alumno'), f.textarea('intro', 'Instrucciones'),
         f.text('noFile', 'Documento sin archivo'), f.text('reasonLabel', 'Antes del motivo de corrección'),
         f.text('statusPending', 'Estado: en revisión'), f.text('statusApproved', 'Estado: aprobado'), f.text('statusRejected', 'Estado: por corregir'),
         f.text('uploadLabel', 'Botón «Subir»'), f.text('replaceLabel', 'Botón «Reemplazar»'),
         f.text('helpText', 'Ayuda: texto'), f.link('contactLink', 'Ayuda: enlace'),
       ]),
-      ...inGroup('Mensajes', [
+      ...grouped('Mensajes', [
         f.text('uploaded', 'Documento subido'), f.text('uploadError', 'No se pudo subir'), f.text('tooBig', 'Archivo muy grande'),
         f.textarea('invalidText', 'Enlace usado o caducado'),
-        f.text('invalidEmail', 'Correo para escribir', { hint: '{{correo}} = el correo de Ajustes. Vacío = sin correo.' }),
+        f.text('invalidEmail', 'Correo para escribir'),
       ]),
     ],
     defaults: {

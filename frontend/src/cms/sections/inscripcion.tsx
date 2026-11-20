@@ -10,7 +10,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { RegisterWizard, type WizardView } from '@/components/admissions/RegisterWizard';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, defineModule, f, inGroup, sectionsOf } from './kit';
+import { asLink, defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('inscripcion');
 
@@ -54,7 +54,7 @@ export const sections = [
   section({
     type: 'hero', label: 'Inscripción · Portada', description: 'Portada oscura con foto, título, subtítulo y los pasos del proceso de admisión. Se oculta en la confirmación y en los avisos de invitación.',
     component: InscripcionHeroView,
-    fields: [f.text('label', 'Etiqueta superior', { hint: 'Puede usar {{ciclo}}.' }), f.text('title', 'Título', { required: true }), f.textarea('subtitle', 'Subtítulo', { hint: 'Puede usar {{ciclo}}.' }), f.image('image', 'Foto de fondo')],
+    fields: [f.text('label', 'Etiqueta superior'), f.text('title', 'Título', { required: true }), f.textarea('subtitle', 'Subtítulo'), f.image('image', 'Foto de fondo')],
     defaults: {
       label: 'Ciclo Escolar {{ciclo}} · Admisiones', title: 'Inscripción en línea',
       subtitle: 'Ciclo Escolar {{ciclo}}. Complete los datos del alumno, adjunte documentos y envíe su solicitud.',
@@ -66,56 +66,56 @@ export const sections = [
     description: 'El formulario de inscripción en tres pasos, también el que abre el enlace de invitación de Admisiones. Aquí se editan todos sus textos; los pasos, los campos, los grados y las reglas no cambian.',
     component: InscripcionWizardView,
     fields: [
-      ...inGroup('Pasos y botones', [
+      ...grouped('Pasos y botones', [
         f.text('step1', 'Paso 1'), f.text('step2', 'Paso 2'), f.text('step3', 'Paso 3'),
         f.text('stepsLabel', 'Nombre de los pasos (lectores de pantalla)'),
         f.text('nextLabel', 'Botón «Siguiente»'), f.text('backLabel', 'Botón «Atrás»'), f.text('submitLabel', 'Botón para enviar'),
         f.text('selectPlaceholder', 'Texto de las listas sin elegir'),
       ]),
-      ...inGroup('Paso 1: alumno y tutor', [
+      ...grouped('Paso 1: alumno y tutor', [
         f.text('studentTitle', 'Alumno: título'), f.text('studentSubtitle', 'Alumno: subtítulo'),
         f.text('firstNameLabel', 'Nombre(s)'), f.text('lastNameLabel', 'Apellidos'), f.text('dobLabel', 'Fecha de nacimiento'),
         f.text('gradeLabel', 'Grado'), f.text('curpLabel', 'CURP'), f.text('nationalityLabel', 'Nacionalidad'),
         f.text('parentTitle', 'Tutor: título'), f.text('parentSubtitle', 'Tutor: subtítulo'),
         f.text('parentNameLabel', 'Nombre del tutor'), f.text('emailLabel', 'Correo'), f.text('phoneLabel', 'Teléfono'),
       ]),
-      ...inGroup('Paso 2: datos adicionales', [
+      ...grouped('Paso 2: datos adicionales', [
         f.text('moreTitle', 'Título'), f.text('moreSubtitle', 'Subtítulo'), f.text('occupationLabel', 'Ocupación del tutor'),
         f.text('parent2Title', 'Segundo tutor: título'), f.text('parent2NameLabel', 'Segundo tutor: nombre'),
         f.text('parent2EmailLabel', 'Segundo tutor: correo'), f.text('parent2PhoneLabel', 'Segundo tutor: teléfono'),
         f.text('emergencyTitle', 'Emergencia: título'), f.text('emergencyNameLabel', 'Emergencia: nombre'),
         f.text('emergencyPhoneLabel', 'Emergencia: teléfono'), f.text('emergencyRelLabel', 'Emergencia: parentesco'),
       ]),
-      ...inGroup('Paso 3: salud y documentos', [
+      ...grouped('Paso 3: salud y documentos', [
         f.text('healthTitle', 'Salud: título'), f.text('bloodLabel', 'Tipo de sangre'), f.text('allergiesLabel', 'Alergias'), f.text('medicalLabel', 'Notas médicas'),
         f.text('docsTitle', 'Documentos: título'), f.text('docsSubtitle', 'Documentos: subtítulo'),
         f.text('docBirthCert', 'Documento: acta de nacimiento'), f.text('docCurp', 'Documento: CURP'), f.text('docPhoto', 'Documento: fotografía'),
         f.text('docReportCard', 'Documento: boleta'), f.text('docProofAddr', 'Documento: comprobante de domicilio'),
         f.text('attachLabel', 'Botón «Adjuntar»'), f.text('removeLabel', 'Botón «Quitar»'),
       ]),
-      ...inGroup('Consentimientos', [
-        f.text('consentMedical', 'Casilla de datos de salud', { hint: 'Es lo que la familia autoriza: cambie el sentido solo con la aprobación de Dirección.' }),
-        f.text('consentPhotos', 'Casilla de fotografías', { hint: 'Es lo que la familia autoriza: cambie el sentido solo con la aprobación de Dirección.' }),
+      ...grouped('Consentimientos', [
+        f.text('consentMedical', 'Casilla de datos de salud'),
+        f.text('consentPhotos', 'Casilla de fotografías'),
         f.text('privacyAccept', 'Casilla del aviso de privacidad'),
       ]),
-      ...inGroup('Mensajes', [
+      ...grouped('Mensajes', [
         f.text('errRequired', 'Campo obligatorio vacío'), f.text('errMissing', 'Aviso: faltan campos'),
         f.text('errStart', 'No se pudo iniciar'), f.text('errSave', 'No se pudieron guardar los datos'),
         f.text('errPrivacy', 'Falta aceptar el aviso'), f.text('errMedicalConsent', 'Falta el consentimiento de salud'),
-        f.text('errUploads', 'Archivos que no subieron', { hint: '{documentos} = la lista de documentos.' }),
-        f.text('errFileType', 'Tipo de archivo no válido', { hint: '{documento} = el documento.' }),
-        f.text('errFileSize', 'Archivo muy grande', { hint: '{documento} = el documento.' }),
+        f.text('errUploads', 'Archivos que no subieron'),
+        f.text('errFileType', 'Tipo de archivo no válido'),
+        f.text('errFileSize', 'Archivo muy grande'),
         f.text('errSubmit', 'No se pudo enviar'),
       ]),
-      ...inGroup('Invitación', [
+      ...grouped('Invitación', [
         f.text('booting', 'Mientras valida la invitación'),
         f.text('invitedTitle', 'Aviso de invitación: título'), f.textarea('invitedText', 'Aviso de invitación: texto'),
         f.text('inviteErrorTitle', 'Invitación no válida: título'), f.textarea('inviteErrorText', 'Invitación no válida: texto'),
         f.link('inviteErrorLink', 'Invitación no válida: botón'),
       ]),
-      ...inGroup('Confirmación y pie', [
+      ...grouped('Confirmación y pie', [
         f.text('successTitle', 'Confirmación: título'),
-        f.textarea('successText', 'Confirmación: texto', { hint: '{nombre} = el nombre del alumno, en negritas.' }),
+        f.textarea('successText', 'Confirmación: texto'),
         f.link('successPrimary', 'Confirmación: botón principal'), f.link('successSecondary', 'Confirmación: botón secundario'),
         f.text('footerText', 'Pie: texto'), f.link('footerLink', 'Pie: enlace'),
       ]),

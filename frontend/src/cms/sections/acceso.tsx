@@ -17,7 +17,7 @@ import { homePath } from '@/lib/areas';
 import type { User } from '@/types';
 import { imageSrc, useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
-import { asLink, asList, CmsAnchor, defineModule, f, inGroup, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('acceso');
 
@@ -367,15 +367,15 @@ export const sections = [
     description: 'La entrada al portal de familias y personal. Aquí se editan todos sus textos, la foto y las cifras del panel; el acceso con correo, contraseña y Google no cambia.',
     component: LoginScreen,
     fields: [
-      ...inGroup('Panel de bienvenida (computadora)', [
+      ...grouped('Panel de bienvenida (computadora)', [
         f.text('label', 'Etiqueta superior'),
         f.text('title', 'Título'),
         f.text('titleAccent', 'Título (segunda línea, en degradado)'),
         f.textarea('text', 'Texto'),
         f.image('image', 'Foto de fondo'),
-        f.items('stats', 'Cifras', [f.text('value', 'Cifra', { hint: '{{anios}} = años del colegio.' }), f.text('label', 'Texto')]),
+        f.items('stats', 'Cifras', [f.text('value', 'Cifra'), f.text('label', 'Texto')]),
       ]),
-      ...inGroup('Tarjeta de acceso', [
+      ...grouped('Tarjeta de acceso', [
         f.text('heading', 'Título'), f.text('subheading', 'Subtítulo'),
         f.text('googleButton', 'Botón de Google'), f.text('googleBusy', 'Aviso mientras entra con Google'),
         f.text('divider', 'Separador'),
@@ -385,14 +385,14 @@ export const sections = [
         f.text('totpLabel', 'Código de verificación: etiqueta'),
         f.text('submitLabel', 'Botón para entrar'), f.text('submittingLabel', 'Botón mientras entra'), f.text('completingLabel', 'Botón mientras termina con Google'),
       ]),
-      ...inGroup('Ayuda y enlaces', [
+      ...grouped('Ayuda y enlaces', [
         f.text('pwBefore', 'Contraseña olvidada: texto'), f.text('pwWhatsapp', 'Contraseña olvidada: enlace de WhatsApp'),
         f.text('pwOr', 'Contraseña olvidada: palabra entre los enlaces'), f.text('pwEmail', 'Contraseña olvidada: enlace de correo'),
         f.text('pwAfter', 'Contraseña olvidada: texto final'),
         f.text('problemsText', '¿Problemas?: texto'), f.link('problemsLink', '¿Problemas?: enlace'),
         f.text('signupText', 'Sin cuenta: texto'), f.link('signupLink', 'Sin cuenta: enlace'),
       ]),
-      ...inGroup('Mensajes de error', [
+      ...grouped('Mensajes de error', [
         f.text('errCredentials', 'Correo o contraseña incorrectos'), f.text('errOffline', 'Sin conexión'),
         f.text('errTooMany', 'Demasiados intentos'), f.text('errUnavailable', 'Servicio no disponible'),
         f.text('errTotp', 'Código de verificación incorrecto'), f.text('errOauthToast', 'Falló la entrada con Google (aviso emergente)'),

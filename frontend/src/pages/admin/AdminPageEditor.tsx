@@ -14,6 +14,9 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
+import { PageErrorSummary } from '@/cms/editor/PageErrorSummary';
+import { requestFieldFocus } from '@/cms/editor/fieldFocus';
+import { fieldErrorsFromIssues } from '@/cms/editor/validation';
 import { templateFor } from '@/cms/sections';
 import { loadAllGroups } from '@/cms/sections/loaders';
 import { contentApi, type CmsPageAdmin, type PageIssue } from '@/services/api';
@@ -107,6 +110,8 @@ export default function AdminPageEditor() {
   const [dialog, setDialog] = useState<null | 'add' | 'versions' | 'seo' | 'schedule' | 'unpublish' | 'reset' | 'reject' | 'legacy' | 'legacy-review'>(() => (isAdmin && params.get('versiones') ? 'versions' : null));
   const [rejectNote, setRejectNote] = useState('');
   const [issues, setIssues] = useState<PageIssue[] | null>(null);
+  // C3: structured errors of the last save, publish or «Revisar», next to each field and in the summary.
+  const [serverErrors, setServerErrors] = useState<BlockFieldError[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [legacyResolved, setLegacyResolved] = useState(false);
   const [localCopy, setLocalCopy] = useState<LocalCopy | null>(null);
@@ -117,6 +122,8 @@ export default function AdminPageEditor() {
   const wroteCopy = useRef(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
+  // A jump to a field (error summary, checks): the field takes the focus, not the form heading.
+  const jumping = useRef(false);
   const formPanel = useRef<HTMLDivElement>(null);
   const editColumn = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -154,7 +161,8 @@ export default function AdminPageEditor() {
       setFieldErrors(f.fields);
       keepLocalCopy();
       toast.error(f.message);
-      showBlockError(f.blockErrors);
+      // An autosave refused: open the section, but do not take the cursor from where the person types.
+      showBlockErrors(f.blockErrors, 'open');
     },
   });
   const { reset: resetSaver } = saver;
@@ -165,12 +173,21 @@ export default function AdminPageEditor() {
     wroteCopy.current = true;
   };
 
-  /** Contract C3 hook (the «fields» branch renders the messages): open the first block with an error. */
-  const showBlockError = (errs: BlockFieldError[]) => {
-    const first = errs[0];
+  /** C3: the errors go next to their fields and into the summary; then open the first one («focus» also puts the cursor there). */
+  const showBlockErrors = (errs: BlockFieldError[], go: 'open' | 'focus') => {
+    setServerErrors(errs);
+    const first = errs.find((e) => e.block_id || typeof e.block_index === 'number');
     if (!first) return;
     const target = (first.block_id && blocks.find((b) => b.id === first.block_id)) || (typeof first.block_index === 'number' ? blocks[first.block_index] : undefined);
-    if (target) select(target.id, 'list');
+    if (!target) return;
+    if (go === 'focus') jumpToField(target.id, first.field);
+    else select(target.id, 'list');
+  };
+  /** Error summary, checks list, failed publish: open the section and focus the field (cms/editor/fieldFocus). */
+  const jumpToField = (blockId: string, field?: string) => {
+    jumping.current = blockId !== selected;
+    select(blockId, 'list');
+    requestFieldFocus(blockId, field ?? '');
   };
 
   const initFrom = useCallback((p: CmsPageAdmin) => {
@@ -223,6 +240,7 @@ export default function AdminPageEditor() {
     onSuccess: (res, { action }) => {
       toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');
       setDialog(null);
+      setServerErrors([]);
       qc.setQueryData(['admin-page', pageId], res.data);
       qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
       qc.invalidateQueries({ queryKey: ['cms-page'] });
@@ -236,7 +254,7 @@ export default function AdminPageEditor() {
       if (data?.issues) setIssues(data.issues);
       toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise las secciones.');
       setFieldErrors(f);
-      showBlockError(blockErrorsFrom(e));
+      showBlockErrors(blockErrorsFrom(e), 'focus');
     },
   });
 
@@ -256,7 +274,7 @@ export default function AdminPageEditor() {
 
   const checks = useMutation({
     mutationFn: async () => { await flushOrThrow(); return contentApi.adminPageChecks(pageId); },
-    onSuccess: ({ data }) => { setIssues(data.issues); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
+    onSuccess: ({ data }) => { setIssues(data.issues); setServerErrors(fieldErrorsFromIssues(data.issues)); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
     onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo revisar la página.'),
   });
 
@@ -371,6 +389,8 @@ export default function AdminPageEditor() {
     if (selectSource.current === 'list' && desktop) {
       previewRef.current?.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(selected)}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
+    // After a jump the form already focused and scrolled to the field (BlockForm, cms/editor/fieldFocus).
+    if (jumping.current) { jumping.current = false; return; }
     if (desktop && editColumn.current) editColumn.current.scrollTop = 0;
     formHeading.current?.focus({ preventScroll: true });
     // Phones and tablets: the form starts right under the sticky bar (its scroll-margin).
@@ -557,7 +577,7 @@ export default function AdminPageEditor() {
         </div>
         {selectedBlock.hidden && <p className="mb-3 flex items-center gap-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink"><EyeOff size={14} aria-hidden="true" /> Esta sección está oculta: se conserva aquí pero no aparece en el sitio.</p>}
         {(fieldErrors.blocks || fieldErrors.draft_blocks) && <p className="mb-2 text-sm text-coral-700" role="alert">{fieldErrors.blocks || fieldErrors.draft_blocks}</p>}
-        <BlockForm block={selectedBlock} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
+        <BlockForm block={selectedBlock} serverErrors={serverErrors.filter((x) => x.block_id === selectedBlock.id)} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
       </div>
   );
 
@@ -611,6 +631,7 @@ export default function AdminPageEditor() {
         {page.review_note && !page.review_requested_at && (
           <p className="rounded-xl border border-coral-600/20 bg-coral-50 px-3 py-2 text-sm text-coral-700" role="status">Dirección pidió cambios: {page.review_note}</p>
         )}
+        <PageErrorSummary blocks={blocks} serverErrors={serverErrors} onJump={jumpToField} />
         {issues && issues.length > 0 && (
           <div className="rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -621,7 +642,7 @@ export default function AdminPageEditor() {
               {issues.map((i, k) => (
                 <li key={k} className="flex items-start gap-2">
                   {i.level === 'error' ? <AlertTriangle size={16} className="mt-0.5 shrink-0 text-coral-600" aria-label="Por corregir" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber" aria-label="Sugerencia" />}
-                  {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => select(i.block_id, 'list')}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
+                  {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => jumpToField(i.block_id as string, i.field)}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
                 </li>
               ))}
             </ul>

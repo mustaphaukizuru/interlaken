@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Maximize2 } from 'lucide-react';
 import { imageSrc, imageSrcSet, useMediaAlt, useTokens } from '../runtime';
-import { asList, defineModule, f, fill, inGroup, Lines, sectionsOf } from './kit';
+import { asList, defineModule, f, fill, grouped, Lines, sectionsOf } from './kit';
 
 const section = sectionsOf('galeria');
 
@@ -294,26 +294,26 @@ export const sections = [
       f.items('photos', 'Fotos', [
         f.image('image', 'Foto', { required: true }),
         f.text('caption', 'Pie de foto'),
-        f.text('category', 'Categoría', { hint: 'La clave de uno de los filtros, p. ej. vida o instalaciones.' }),
+        f.select('category', 'Filtro', [], { optionsFrom: { list: 'filters', value: 'key', label: 'label' } }),
       ]),
       f.items('filters', 'Filtros', [
-        f.text('key', 'Clave', { required: true, hint: 'La clave «todas» muestra todas las fotos. El primer filtro es el que se ve al abrir la página.' }),
         f.text('label', 'Texto del botón', { required: true }),
+        f.text('key', 'Clave', { required: true, advanced: true, slugFrom: { field: 'label', keep: ['todas'] } }),
       ]),
-      ...inGroup('Contador y ampliar', [
-        f.text('countOne', 'Contador: una foto', { hint: 'Va después del número: «1 fotografía».' }),
+      ...grouped('Contador y foto ampliada', [
+        f.text('countOne', 'Contador: una foto'),
         f.text('countMany', 'Contador: varias fotos'),
         f.text('zoomLabel', 'Etiqueta «Ampliar» sobre cada foto'),
+        f.text('position', 'Posición bajo la foto ampliada'),
       ]),
-      ...inGroup('Lectores de pantalla (no se ven)', [
+      ...grouped('Lectores de pantalla (no se ven)', [
         f.text('filterLabel', 'Grupo de filtros'),
-        f.text('zoomAria', 'Botón de cada foto', { hint: '{n} = número de la foto, {total} = cuántas hay.' }),
-        f.text('dialogLabel', 'Foto ampliada', { hint: '{n} y {total} se llenan solos.' }),
+        f.text('zoomAria', 'Botón de cada foto'),
+        f.text('dialogLabel', 'Foto ampliada'),
         f.text('closeLabel', 'Botón para cerrar'),
         f.text('prevLabel', 'Botón anterior'),
         f.text('nextLabel', 'Botón siguiente'),
       ]),
-      f.text('position', 'Posición bajo la foto ampliada', { hint: '{n} = foto actual, {total} = cuántas hay.' }),
     ],
     defaults: {
       photos: PHOTOS,

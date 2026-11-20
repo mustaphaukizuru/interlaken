@@ -20,7 +20,7 @@ const TEMPLATE_MANIFEST = resolve(process.cwd(), '../backend/apps/content/templa
 const PY_KIND: Record<FieldKind, string> = {
   text: 'str', textarea: 'str', richtext: 'str', url: 'str', select: 'str', icon: 'str', color: 'str',
   image: 'image', images: 'list', items: 'list', link: 'dict', toggle: 'bool', number: 'num',
-  table: 'dict', action: 'str',
+  href: 'str', form: 'str', table: 'dict', action: 'str',
 };
 
 function imagePaths(fields: FieldSpec[], prefix = ''): string[] {
@@ -32,6 +32,14 @@ function imagePaths(fields: FieldSpec[], prefix = ''): string[] {
   });
 }
 
+/** Spanish label of every field path (`items[].title`): the backend names fields in its errors with these, never with keys. */
+function fieldLabels(fields: FieldSpec[], prefix = ''): [string, string][] {
+  return fields.flatMap((fs): [string, string][] => [
+    [`${prefix}${fs.key}`, fs.label],
+    ...(fs.kind === 'items' ? fieldLabels(fs.item ?? [], `${prefix}${fs.key}[].`) : []),
+  ]);
+}
+
 function entry(spec: BlockSpec) {
   // «Tabla» fields: the backend enforces their limits (content/table_block.py).
   const tables = Object.fromEntries(spec.fields.filter((fs) => fs.kind === 'table' && fs.limits).map((fs) => [fs.key, fs.limits]));
@@ -41,6 +49,7 @@ function entry(spec: BlockSpec) {
     locked: !!spec.locked,
     required: Object.fromEntries(spec.fields.filter((fs) => fs.required).map((fs) => [fs.key, PY_KIND[fs.kind]])),
     images: imagePaths(spec.fields),
+    labels: Object.fromEntries(fieldLabels(spec.fields)),
     ...(Object.keys(tables).length ? { tables } : {}),
   };
 }

@@ -18,7 +18,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { useCmsImage, useTokens } from '../runtime';
-import { asList, defineModule, f, headingFields, inGroup, Lines, sectionsOf } from './kit';
+import { asList, defineModule, f, grouped, headingFields, Lines, sectionsOf } from './kit';
 
 const section = sectionsOf('contacto');
 
@@ -346,17 +346,19 @@ export const sections = [
     description: 'Datos de contacto, foto de la fachada y formulario de mensajes; el teléfono, el horario, la dirección y el WhatsApp se editan en Ajustes.',
     component: ContactMainView,
     fields: [
-      ...inGroup('Información de contacto', [
+      ...grouped('Datos de contacto', [
         f.text('infoTitle', 'Título de la información'),
         f.text('phoneLabel', 'Etiqueta del teléfono'),
         f.text('hoursLabel', 'Etiqueta del horario'),
+      ]),
+      ...grouped('Foto y botones', [
         f.image('image', 'Foto de la fachada'),
         f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
         f.text('directionsLabel', 'Botón «Cómo llegar»'),
-        f.text('whatsappLabel', 'Botón de WhatsApp', { hint: 'Vacío = sin botón.' }),
+        f.text('whatsappLabel', 'Botón de WhatsApp'),
         f.text('whatsappMessage', 'Mensaje inicial de WhatsApp'),
       ]),
-      ...inGroup('Formulario', [
+      ...grouped('Formulario', [
         f.text('formTitle', 'Título del formulario'),
         f.text('nameLabel', 'Nombre: etiqueta'), f.text('namePlaceholder', 'Nombre: ejemplo dentro del campo'),
         f.text('emailLabel', 'Correo: etiqueta'), f.text('emailPlaceholder', 'Correo: ejemplo dentro del campo'),
@@ -365,7 +367,7 @@ export const sections = [
         f.text('submitLabel', 'Texto del botón de envío'),
         f.text('sending', 'Botón mientras envía'),
       ]),
-      ...inGroup('Mensajes', [
+      ...grouped('Mensajes', [
         f.text('success', 'Mensaje al enviar'),
         f.text('error', 'Mensaje si falla el envío'),
         f.text('errName', 'Falta el nombre'), f.text('errEmail', 'Correo no válido'),
@@ -407,7 +409,7 @@ export const sections = [
     fields: [
       f.text('title', 'Título'),
       f.text('mapsLabel', 'Texto del enlace a Google Maps'),
-      f.url('embed', 'Dirección del mapa incrustado', { hint: 'En Google Maps: Compartir → Incorporar un mapa → copie la dirección que va en src.' }),
+      f.url('embed', 'Dirección del mapa incrustado'),
       f.text('mapTitle', 'Descripción del mapa (accesibilidad)'),
     ],
     defaults: {

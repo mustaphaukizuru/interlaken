@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, CornerDownRight, Plus, RotateCcw, Trash2, Upload } from 'lucide-react';
+import {
+  ArrowDown, ArrowUp, Blocks, BookOpen, CalendarDays, Camera, CircleDollarSign, ClipboardList, CornerDownRight, FileText, GraduationCap,
+  Mail, MapPin, MonitorSmartphone, Pencil, Phone, Plus, Receipt, RotateCcw, Trash2, Upload, UserPlus, Users,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -30,8 +33,14 @@ import { resolveChrome, type SiteChrome } from '@/lib/siteChrome';
 import { CHROME_KEYS, mergeChrome } from '@/lib/chromeMerge';
 import { SiteTextsEditor } from '@/components/admin/SiteTextsEditor';
 import { apiFieldErrors } from '@/lib/apiErrors';
+import { HrefInput } from '@/cms/editor/fields/LinkField';
+import { IconField, type IconChoice } from '@/cms/editor/fields/IconField';
+import { TextField } from '@/cms/editor/fields/TextField';
 
-const ICON_OPTIONS = ['Users', 'BookOpen', 'Camera', 'Blocks', 'Pencil', 'GraduationCap', 'ClipboardList', 'FileText', 'CircleDollarSign', 'UserPlus', 'CalendarDays', 'MonitorSmartphone', 'Receipt', 'Phone', 'Mail', 'MapPin'];
+/** The icons the public menu can draw (components/layout/PublicLayout ICONS), shown with their Spanish names. */
+const NAV_ICON_CHOICES: IconChoice[] = Object.entries({
+  Users, BookOpen, Camera, Blocks, Pencil, GraduationCap, ClipboardList, FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt, Phone, Mail, MapPin,
+}).map(([value, Icon]) => ({ value, Icon }));
 
 /** The built-in menu, offered as the starting point when the CMS menu is empty. */
 export const DEFAULT_MENU: MenuGroup[] = [
@@ -95,7 +104,7 @@ function ChromeEditor() {
           {value.header_buttons.map((b, i) => (
             <div key={i} className="grid items-end gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-[1fr_1.5fr_auto_auto]">
               <Input label="Texto" value={b.label} onChange={(e) => setButton(i, { label: e.target.value })} />
-              <Input label="Enlace" value={b.href} onChange={(e) => setButton(i, { href: e.target.value })} placeholder="/agendar-visita o https://…" />
+              <HrefInput id={`chrome-btn-${i}`} label="Destino" value={b.href} onChange={(href) => setButton(i, { href })} />
               <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={!!b.primary} onChange={(e) => setButton(i, { primary: e.target.checked })} /> Destacado</label>
               <Button type="button" size="sm" variant="ghost" aria-label={`Quitar botón ${b.label}`} onClick={() => set({ header_buttons: value.header_buttons.filter((_, j) => j !== i) })}><Trash2 size={14} aria-hidden="true" /></Button>
             </div>
@@ -109,10 +118,10 @@ function ChromeEditor() {
           <textarea id="chrome-tagline" className="input-field" rows={2} value={value.footer_tagline} onChange={(e) => set({ footer_tagline: e.target.value })} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input label="Derechos reservados" value={value.footer_copyright} onChange={(e) => set({ footer_copyright: e.target.value })} hint="{{anio}} se reemplaza por el año en curso." />
+          <TextField id="chrome-copyright" label="Derechos reservados" value={value.footer_copyright} onChange={(v) => set({ footer_copyright: v })} tokens={['anio']} moreTokens={false} hint="Use «Año en curso» para que el año cambie solo cada enero." />
           <Input label="Nota legal del pie" value={value.footer_note} onChange={(e) => set({ footer_note: e.target.value })} />
           <Input label="Botón de la barra móvil" value={value.sticky_label} onChange={(e) => set({ sticky_label: e.target.value })} />
-          <Input label="Enlace de la barra móvil" value={value.sticky_href} onChange={(e) => set({ sticky_href: e.target.value })} />
+          <HrefInput id="chrome-sticky" label="Destino del botón de la barra móvil" value={value.sticky_href} onChange={(href) => set({ sticky_href: href })} />
         </div>
         {error && <p className="text-sm text-coral-600" role="alert">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2">
@@ -184,16 +193,10 @@ function MenuEditor() {
             </div>
             <ul className="space-y-2">
               {g.items.map((it, ii) => (
-                <li key={ii} className="grid items-end gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-[1fr_1fr_150px_auto]">
+                <li key={ii} className="grid items-end gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_190px_auto]">
                   <Input label="Texto" value={it.label} onChange={(e) => setItem(gi, ii, { label: e.target.value })} />
-                  <Input label="Ruta o URL" value={it.to} onChange={(e) => setItem(gi, ii, { to: e.target.value })} placeholder="/admisiones" />
-                  <div>
-                    <label className="label" htmlFor={`ic-${gi}-${ii}`}>Ícono</label>
-                    <select id={`ic-${gi}-${ii}`} className="input-field" value={it.icon ?? ''} onChange={(e) => setItem(gi, ii, { icon: e.target.value })}>
-                      <option value="">(ninguno)</option>
-                      {ICON_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </div>
+                  <HrefInput id={`menu-to-${gi}-${ii}`} label="Destino" value={it.to} onChange={(to) => setItem(gi, ii, { to })} />
+                  <IconField id={`ic-${gi}-${ii}`} label="Ícono" value={it.icon ?? ''} onChange={(icon) => setItem(gi, ii, { icon })} choices={NAV_ICON_CHOICES} allowNone compact />
                   <div className="flex gap-1 pb-1">
                     <button type="button" aria-label="Subir enlace" disabled={ii === 0} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setGroup(gi, { items: moveAt(g.items, ii, -1) })}><ArrowUp size={14} /></button>
                     <button type="button" aria-label="Bajar enlace" disabled={ii === g.items.length - 1} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => setGroup(gi, { items: moveAt(g.items, ii, 1) })}><ArrowDown size={14} /></button>

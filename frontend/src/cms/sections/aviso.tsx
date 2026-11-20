@@ -256,7 +256,7 @@ export const sections = [
       f.text('note', 'Nota sobre el resumen'),
       f.text('integralLabel', 'Botón del aviso integral'),
       f.text('errorTitle', 'Título si el aviso no carga'),
-      f.textarea('errorText', 'Texto si el aviso no carga', { hint: 'Vacío = «No fue posible cargar el Aviso de Privacidad en este momento…» con el correo de Ajustes.' }),
+      f.textarea('errorText', 'Texto si el aviso no carga'),
     ],
     defaults: {
       cards: [

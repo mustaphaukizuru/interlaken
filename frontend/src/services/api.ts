@@ -1259,7 +1259,11 @@ export interface ArcoListParams { page?: number; q?: string; status?: string; ty
 export interface ArcoListResponse { count: number; next: string | null; previous: string | null; results: ArcoRequest[]; overdue_count: number }
 export interface SiteNotice { id: number; title: string; body: string; link: string; until: string | null }
 
-export interface PageIssue { level: 'error' | 'warning'; code: string; message: string; block_id: string | null }
+export interface PageIssue {
+  level: 'error' | 'warning'; code: string; message: string; block_id: string | null;
+  /** Where, in the editor's words (backend checks.py): section index and label, field path and label, short text for the field. */
+  block_index?: number; block_label?: string; field?: string; field_label?: string; field_message?: string;
+}
 
 export interface MergeUser { id: number; email: string; full_name: string; is_active: boolean; last_login: string | null; has_password: boolean; google: boolean; phone: string; children: { id: number; name: string; grade: string }[] }
 export interface MergePreview { keep: MergeUser; drop: MergeUser; references: Record<string, number> }

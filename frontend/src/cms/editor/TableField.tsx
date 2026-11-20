@@ -14,6 +14,7 @@ import {
 } from '../blocks/table';
 import type { FieldSpec } from '../blocks/registry';
 import { gridKeyDown } from './gridNav';
+import { describedBy, FieldNotes, RequiredMark } from './fields/FieldShell';
 
 const CELL = 'block w-full min-w-[7rem] rounded-md border border-line bg-white px-2 py-1.5 text-base text-ink focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple/20 sm:text-sm';
 const ICON_BTN = 'inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:bg-cream hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-40 sm:h-8 sm:w-8';
@@ -25,8 +26,10 @@ const swap = <T,>(list: T[], i: number, j: number): T[] => {
   return next;
 };
 
-export function TableField({ spec, value, onChange }: { spec: FieldSpec; value: unknown; onChange: (v: TableValue) => void }) {
-  const id = useId();
+/** `id`, `hint`, `error` and `onBlur` come from the section form (BlockForm): its help and its errors next to the grid. */
+export function TableField({ spec, value, onChange, id: fieldId, hint, error, onBlur }: { spec: FieldSpec; value: unknown; onChange: (v: TableValue) => void; id?: string; hint?: string; error?: string; onBlur?: () => void }) {
+  const autoId = useId();
+  const id = fieldId ?? autoId;
   const limits = spec.limits ?? TABLE_LIMITS;
   const table = normalizeTable(value);
   const { columns, rows } = table;
@@ -75,12 +78,18 @@ export function TableField({ spec, value, onChange }: { spec: FieldSpec; value: 
   };
 
   return (
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line p-3">
-      <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}{spec.required ? ' *' : ''}</legend>
+    <fieldset
+      className={`min-w-0 space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`}
+      aria-describedby={describedBy(id, { hint, error })}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onBlur?.(); }}
+    >
+      <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}<RequiredMark required={spec.required} /></legend>
       <p id={`${id}-help`} className="text-xs text-subtle">
         Escriba en las celdas o pegue celdas copiadas de Excel o Google Sheets; en la fila de encabezados se pegan también los títulos.
         Enter y las flechas mueven entre celdas; Alt + ↑ / ↓ mueve la fila.
       </p>
+      {/* The form's error goes right under the instructions, next to the grid it is about. */}
+      <FieldNotes id={id} error={error} />
       {/* Keys and paste bubble up from the cell inputs (the inputs are the interactive elements). */}
       <div role="presentation" className="overflow-x-auto rounded-lg border border-line" onKeyDown={(e) => gridKeyDown(e, { onMoveRow: moveRow })} onPaste={onPaste}>
         <table className="w-full border-collapse text-sm" aria-describedby={`${id}-help`}>
@@ -177,6 +186,7 @@ export function TableField({ spec, value, onChange }: { spec: FieldSpec; value: 
         </ul>
         <p className="mt-2 text-xs text-subtle">Dinero muestra «$6,450.00»; Número, «1,250»; Porcentaje, «5%». Un texto como «Sin costo» se muestra tal cual.</p>
       </details>
+      <FieldNotes id={id} hint={hint} />
     </fieldset>
   );
 }

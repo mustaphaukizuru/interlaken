@@ -27,7 +27,7 @@ import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { AvailabilitySlot } from '@/types';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, inGroup, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('visita');
 
@@ -374,31 +374,31 @@ export const sections = [
     description: 'Calendario con los horarios abiertos, formulario y confirmación; los horarios se editan en Visitas y el WhatsApp en Ajustes.',
     component: VisitBookingView,
     fields: [
-      ...inGroup('Calendario', [
+      ...grouped('Calendario', [
         f.text('pickTitle', 'Título del calendario'),
-        f.text('weekdays', 'Días de la semana', { hint: 'Siete abreviaturas separadas por coma, empezando en lunes.' }),
+        f.text('weekdays', 'Días de la semana'),
         f.text('emptyTitle', 'Sin horarios: título'),
         f.textarea('emptyText', 'Sin horarios: texto'),
         f.text('errorTitle', 'Error al cargar: título'),
         f.textarea('errorText', 'Error al cargar: texto'),
       ]),
-      ...inGroup('Formulario', [
+      ...grouped('Formulario', [
         f.text('formTitle', 'Título del formulario'),
         f.text('pickHint', 'Aviso antes de elegir horario'),
         f.text('nameLabel', 'Nombre: etiqueta'), f.text('emailLabel', 'Correo: etiqueta'), f.text('phoneLabel', 'Teléfono: etiqueta'),
         f.text('childLabel', 'Alumno: etiqueta'), f.text('gradeLabel', 'Grado: etiqueta'),
         f.text('submitLabel', 'Texto del botón de envío'),
       ]),
-      ...inGroup('Mensajes', [
+      ...grouped('Mensajes', [
         f.text('errName', 'Falta el nombre'), f.text('errEmail', 'Correo no válido'), f.text('errPhone', 'Teléfono no válido'),
-        f.text('bookingError', 'Si la reserva no se pudo completar', { hint: 'Si el horario ya se ocupó, el sitio muestra el motivo exacto.' }),
+        f.text('bookingError', 'Si la reserva no se pudo completar'),
       ]),
-      ...inGroup('Confirmación', [
+      ...grouped('Confirmación', [
         f.text('confirmedTitle', 'Título al confirmar'),
         f.textarea('confirmedText', 'Texto al confirmar'),
         f.text('againLabel', 'Botón «Agendar otra visita»'),
       ]),
-      ...inGroup('WhatsApp', [
+      ...grouped('WhatsApp y contacto', [
         f.text('whatsappTitle', 'Recuadro de WhatsApp: título'),
         f.text('whatsappText', 'Recuadro de WhatsApp: texto'),
         f.text('whatsappLabel', 'Botón de WhatsApp'),

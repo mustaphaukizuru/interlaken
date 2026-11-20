@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/Input';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
+import { HrefInput } from '@/cms/editor/fields/LinkField';
+import { hrefProblem } from '@/cms/editor/fields/links';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { LAYOUT_TEXT_DEFAULTS, LEGAL_LINKS_DEFAULT, type FooterLink, type SiteTextKey } from '@/lib/siteChrome';
 import { mergeChrome } from '@/lib/chromeMerge';
@@ -176,7 +178,8 @@ export function SiteTextsEditor() {
     linkList.forEach((l, i) => {
       if (!l.label.trim() && !l.href.trim()) return;
       if (!l.label.trim()) errs[`link-${i}`] = 'Escriba el texto del enlace.';
-      else if (!validHref(l.href)) errs[`link-${i}`] = 'El enlace debe empezar con / o con https://.';
+      else if (!l.href.trim()) errs[`link-${i}`] = 'Elija a dónde lleva el enlace.';
+      else if (hrefProblem(l.href) || !validHref(l.href)) errs[`link-${i}`] = hrefProblem(l.href) || 'Elija una página del sitio o una dirección que empiece con https://.';
     });
     setFieldError(errs);
     if (Object.keys(errs).length) { setError('Revise los enlaces marcados.'); return; }
@@ -242,7 +245,7 @@ export function SiteTextsEditor() {
                     {linkList.map((l, i) => (
                       <div key={i} className="grid items-start gap-2 rounded-lg bg-cream-2 p-2 sm:grid-cols-[1fr_1.4fr_auto]">
                         <Input id={`legal-label-${i}`} label="Texto del enlace" value={l.label} maxLength={60} onChange={(e) => setLink(i, { label: e.target.value })} />
-                        <Input id={`legal-href-${i}`} label="Enlace (ruta o URL)" value={l.href} placeholder="/aviso-de-privacidad o https://…" error={fieldError[`link-${i}`]} onChange={(e) => setLink(i, { href: e.target.value })} />
+                        <HrefInput id={`legal-href-${i}`} label="Destino" kinds={['page', 'web']} value={l.href} error={fieldError[`link-${i}`]} onChange={(href) => setLink(i, { href })} />
                         <Button type="button" variant="ghost" className="min-h-[44px] sm:mt-6" aria-label={`Quitar el enlace ${l.label || i + 1}`} onClick={() => setLinks(linkList.filter((_, j) => j !== i))}><Trash2 size={14} aria-hidden="true" /></Button>
                       </div>
                     ))}

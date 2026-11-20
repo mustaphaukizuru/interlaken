@@ -150,6 +150,20 @@
 @keyframes balance-in { from { opacity: 0; } to { opacity: 1; } }
 
 @layer components {
+  /* ── CMS generic «Texto» block (cms/blocks/generic.tsx) and its visual editor
+     (cms/editor/fields/RichTextEditor): the HTML the editor writes looks the same
+     in both. The `prose` classes it used never applied (no typography plugin), so
+     lists had no bullets and subtitles looked like body text. ── */
+  .cms-rich > * + * { margin-top: 0.75em; }
+  .cms-rich h2 { @apply font-head text-xl font-bold text-ink; margin-top: 1.25em; }
+  .cms-rich h3,
+  .cms-rich h4 { @apply font-head text-lg font-bold text-ink; margin-top: 1em; }
+  .cms-rich ul { list-style: disc; padding-left: 1.5rem; }
+  .cms-rich ol { list-style: decimal; padding-left: 1.5rem; }
+  .cms-rich li + li { margin-top: 0.25em; }
+  .cms-rich a { @apply font-medium text-green-dark underline; }
+  .cms-rich blockquote { @apply border-l-4 border-line pl-4 italic text-muted; }
+
   /* ── Legacy component classes (kept so existing pages stay intact) ── */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-purple px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-mid focus:outline-none focus:ring-2 focus:ring-purple/40 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;

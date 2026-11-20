@@ -17,7 +17,7 @@ import Logo from '@/components/ui/Logo';
 import { api, type NotifyEmailLink } from '@/services/api';
 import { useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
-import { asLink, CmsAnchor, defineModule, f, fill, inGroup, sectionsOf } from './kit';
+import { asLink, CmsAnchor, defineModule, f, fill, grouped, sectionsOf } from './kit';
 
 const section = sectionsOf('correo');
 
@@ -254,11 +254,11 @@ export const sections = [
     description: 'La página que abre el correo «Confirme su correo para avisos». Aquí se editan todos sus textos; la confirmación no cambia. La vista previa muestra un ejemplo antes de confirmar.',
     component: ConfirmEmailView,
     fields: [
-      ...inGroup('Antes de confirmar', [
+      ...grouped('Antes de confirmar', [
         f.text('readyTitle', 'Título'),
-        f.textarea('readyText', 'Texto', { hint: '{quien} = «de su cuenta» o «de <alumno>»; {correo} = el correo, en negritas.' }),
+        f.textarea('readyText', 'Texto'),
         f.text('whoseAccount', '{quien} para la cuenta de un tutor'),
-        f.text('whoseStudent', '{quien} para un alumno', { hint: '{nombre} = el nombre del alumno.' }),
+        f.text('whoseStudent', '{quien} para un alumno'),
         f.text('factStudent', 'Dato: alumno'), f.text('factAccount', 'Dato: cuenta'), f.text('factEmail', 'Dato: correo'),
         f.text('factReceives', 'Dato: qué recibirá'), f.text('factReceivesValue', 'Qué recibirá'), f.text('factExpires', 'Dato: vencimiento'),
         f.textarea('separateAccount', 'Aviso de cuentas separadas'),
@@ -266,21 +266,21 @@ export const sections = [
         f.text('confirmError', 'Si no se pudo confirmar'),
         f.textarea('readyFootnote', 'Nota al pie'),
       ]),
-      ...inGroup('Después de confirmar', [
+      ...grouped('Después de confirmar', [
         f.text('doneTitle', 'Título'),
-        f.textarea('doneText', 'Texto', { hint: '{quien} y {correo} se llenan solos.' }),
+        f.textarea('doneText', 'Texto'),
         f.text('doneClose', 'Nota final'),
       ]),
-      ...inGroup('Enlaces vencidos o no válidos', [
+      ...grouped('Enlaces vencidos o no válidos', [
         f.text('expiredTitle', 'Enlace vencido: título'), f.text('supersededTitle', 'Enlace reemplazado: título'),
         f.text('invalidTitle', 'Enlace no válido: título'),
         f.text('invalidText', 'Texto si el servidor no da el motivo'),
         f.link('portalLink', 'Botón al portal'),
       ]),
-      ...inGroup('Carga y ayuda', [
+      ...grouped('Carga y ayuda', [
         f.text('checking', 'Mientras revisa el enlace'),
         f.text('loadErrorTitle', 'Error al revisar: título'), f.text('loadErrorText', 'Error al revisar: texto'), f.text('retryLabel', 'Botón para reintentar'),
-        f.text('helpText', 'Ayuda al pie'), f.text('helpEmail', 'Correo de ayuda', { hint: '{{correo}} = el correo de Ajustes. Vacío = sin correo.' }),
+        f.text('helpText', 'Ayuda al pie'), f.text('helpEmail', 'Correo de ayuda'),
       ]),
     ],
     defaults: {

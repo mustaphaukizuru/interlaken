@@ -6,6 +6,7 @@ import type { FieldSpec } from '../blocks/registry';
 import type { TableValue } from '../blocks/table';
 import { TableField } from './TableField';
 import { BlockForm } from './BlockForm';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/services/api', () => ({ contentApi: {} }));
 
@@ -85,8 +86,9 @@ describe('TableField', () => {
   });
 
   it('is what BlockForm renders for the Tabla block', () => {
-    render(<BlockForm block={{ id: 'b1', type: 'table', props: { title: 'Cuotas', table: START } }} onChange={vi.fn()} />);
-    expect(screen.getByRole('group', { name: 'Tabla *' })).toBeInTheDocument();
+    // BlockForm reads library images through react-query, so it needs a client.
+    render(<QueryClientProvider client={new QueryClient()}><BlockForm block={{ id: 'b1', type: 'table', props: { title: 'Cuotas', table: START } }} onChange={vi.fn()} /></QueryClientProvider>);
+    expect(screen.getByRole('group', { name: 'Tabla (obligatorio)' })).toBeInTheDocument();
     expect(cell(1, 'Nivel').value).toBe('Primaria');
   });
 });
@@ -99,7 +101,7 @@ describe('«Editar precios» field', () => {
     useAuthStore.setState({ user: { role: 'admin' } as never });
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, 'invalidateQueries');
-    render(<QueryClientProvider client={qc}><CustomField spec={{ key: 'editPrices', label: 'Editar precios', kind: 'action', href: '/admin/costos', hint: 'Las cifras se editan en «Costos y precios».' }} value={undefined} onChange={vi.fn()} /></QueryClientProvider>);
+    render(<QueryClientProvider client={qc}><CustomField spec={{ key: 'editPrices', label: 'Editar precios', kind: 'action', actionHref: '/admin/costos', hint: 'Las cifras se editan en «Costos y precios».' }} value={undefined} onChange={vi.fn()} /></QueryClientProvider>);
     const link = screen.getByRole('link', { name: /Editar precios/ });
     expect(link).toHaveAttribute('href', '/admin/costos');
     expect(link).toHaveAttribute('target', '_blank');
@@ -114,7 +116,7 @@ describe('«Editar precios» field', () => {
     const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
     const { CustomField } = await import('./customFields');
     useAuthStore.setState({ user: { role: 'staff' } as never });
-    render(<QueryClientProvider client={new QueryClient()}><CustomField spec={{ key: 'editPrices', label: 'Editar precios', kind: 'action', href: '/admin/costos' }} value={undefined} onChange={vi.fn()} /></QueryClientProvider>);
+    render(<QueryClientProvider client={new QueryClient()}><CustomField spec={{ key: 'editPrices', label: 'Editar precios', kind: 'action', actionHref: '/admin/costos' }} value={undefined} onChange={vi.fn()} /></QueryClientProvider>);
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText(/las cambia Dirección/)).toBeInTheDocument();
   });

@@ -101,7 +101,7 @@ export const sections = [
     fields: [
       f.items('items', 'Pilares', [f.icon('icon'), f.text('title', 'Título', { required: true }), f.textarea('text', 'Texto')]),
       f.text('ctaTitle', 'Título del recuadro final', { hint: 'Vacío y sin enlaces = sin recuadro.' }),
-      f.items('links', 'Enlaces del recuadro', [f.text('label', 'Texto', { required: true }), f.text('href', 'Enlace', { required: true })]),
+      f.items('links', 'Enlaces del recuadro', [f.text('label', 'Texto', { required: true }), f.href('href', 'Enlace', { required: true })]),
     ],
     defaults: {
       items: [

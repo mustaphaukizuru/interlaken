@@ -10,7 +10,7 @@ import { FACTURACION_FORM_DEFAULTS, FacturacionForm, type FacturacionFormCopy } 
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, inGroup, Lines, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, Lines, sectionsOf } from './kit';
 
 const section = sectionsOf('facturacion');
 
@@ -174,12 +174,12 @@ export const sections = [
     description: 'Formulario de datos fiscales (CFDI); las solicitudes llegan al correo indicado aquí. Se editan todos sus textos; los campos, las reglas y la lista de regímenes del SAT no cambian.',
     component: FacturacionRequestView,
     fields: [
-      ...inGroup('Recuadro', [
+      ...grouped('Recuadro', [
         f.text('title', 'Título'),
         f.text('text', 'Texto antes del correo', { hint: 'Vacío: la página no muestra el correo. Con texto (por ejemplo «Su solicitud llega a») se muestra seguido del correo.' }),
         f.text('email', 'Correo de facturación', { hint: 'Se usa en los mensajes del formulario y, si hay texto arriba, en la página.' }),
       ]),
-      ...inGroup('Formulario', [
+      ...grouped('Formulario', [
         f.text('requiredNote', 'Nota sobre los campos'),
         f.text('studentLabel', 'Alumno: etiqueta'), f.text('razonLabel', 'Razón social: etiqueta'), f.text('razonHint', 'Razón social: ayuda'),
         f.text('rfcLabel', 'RFC: etiqueta'), f.text('cpLabel', 'Código postal: etiqueta'),
@@ -188,12 +188,12 @@ export const sections = [
         f.text('phoneLabel', 'Teléfono: etiqueta'), f.text('phonePlaceholder', 'Teléfono: ejemplo dentro del campo'),
         f.text('submitLabel', 'Texto del botón de envío'),
       ]),
-      ...inGroup('Mensajes', [
+      ...grouped('Mensajes', [
         f.text('errRequired', 'Campo vacío'), f.text('errRfc', 'RFC con longitud incorrecta'),
         f.text('errCp', 'Código postal incorrecto'), f.text('errPhone', 'Teléfono incorrecto'),
-        f.text('errGeneral', 'Si no se pudo enviar', { hint: '{facturas} = el correo de facturación.' }),
+        f.text('errGeneral', 'Si no se pudo enviar'),
         f.text('doneTitle', 'Confirmación: título'),
-        f.textarea('doneText', 'Confirmación: texto', { hint: '{correo} = el correo que escribió la familia; {facturas} = el correo de facturación.' }),
+        f.textarea('doneText', 'Confirmación: texto'),
       ]),
     ],
     defaults: { title: 'Solicitud de facturación', text: '', email: 'facturas@interlaken.com.mx', ...FACTURACION_FORM_DEFAULTS },

@@ -21,7 +21,7 @@ import { ESTIMATOR_COPY, type EstimatorCopy } from '@/components/admissions/esti
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, isExternal, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, headingFields, inGroup, lazySection, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, lazySection, sectionsOf } from './kit';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ CalendarDays, ClipboardList, FileText });
@@ -221,7 +221,7 @@ const ESTIMATOR_SKELETON = (
 );
 
 /** Text fields of the estimator, one field group each call (C4). */
-const estimatorText = (group: string, pairs: [string, string][]) => inGroup(group, pairs.map(([key, label]) => f.text(key, label)));
+const estimatorText = (group: string, pairs: [string, string][]) => grouped(group, pairs.map(([key, label]) => f.text(key, label)));
 
 function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string; title?: string; text?: string } & Partial<EstimatorCopy>) {
   const p = { eyebrow, title, text };
@@ -453,7 +453,8 @@ export const sections = [
         ['insuranceLabel', 'Renglón de seguros'], ['insuranceSub', 'Nota de seguros'], ['noCost', 'Texto cuando no hay cuota'],
       ]),
       f.items('notes', 'Notas', [f.textarea('text', 'Nota', { required: true }), f.select('tone', 'Color del ícono', [{ value: 'purple', label: 'Morado' }, { value: 'amber', label: 'Ámbar (aviso)' }])], { group: 'Notas y botones' }),
-      ...estimatorText('Notas y botones', [['waLabel', 'Botón de WhatsApp'], ['allLabel', 'Enlace a Costos: texto'], ['allHref', 'Enlace a Costos: ruta']]),
+      ...estimatorText('Notas y botones', [['waLabel', 'Botón de WhatsApp'], ['allLabel', 'Enlace a Costos: texto']]),
+      f.href('allHref', 'Enlace a Costos: destino', { group: 'Notas y botones' }),
       ...estimatorText('Si no cargan los precios', [['errorTitle', 'Si no cargan los precios: título'], ['errorText', 'Si no cargan los precios: texto']]),
     ],
     defaults: {
@@ -466,16 +467,20 @@ export const sections = [
     type: 'docs_cta', label: 'Admisiones · Documentos y pre-registro', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado al pre-registro. La lista se edita en la página Documentación.',
     component: AdmDocsCtaView,
     fields: [
-      f.text('docsTitle', 'Documentos: título'),
-      f.text('docsSummary', 'Documentos: resumen', { hint: '{total} = número de documentos; {online} = cuántos tienen enlace a un trámite en línea.' }),
-      f.textarea('docsNote', 'Documentos: nota al pie'),
-      f.image('image', 'Foto del llamado'),
-      f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
-      f.text('badge', 'Insignia', { hint: 'Puede usar {{ciclo}}.' }),
-      f.text('title', 'Título del llamado'),
-      f.textarea('text', 'Texto del llamado'),
-      f.link('primary', 'Botón principal'),
-      f.link('secondary', 'Botón secundario'),
+      ...grouped('Documentos requeridos', [
+        f.text('docsTitle', 'Documentos: título'),
+        f.text('docsSummary', 'Documentos: resumen'),
+        f.textarea('docsNote', 'Documentos: nota al pie'),
+      ]),
+      ...grouped('Llamado al pre-registro', [
+        f.image('image', 'Foto del llamado'),
+        f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
+        f.text('badge', 'Insignia'),
+        f.text('title', 'Título del llamado'),
+        f.textarea('text', 'Texto del llamado'),
+        f.link('primary', 'Botón principal'),
+        f.link('secondary', 'Botón secundario'),
+      ]),
     ],
     defaults: {
       docsTitle: 'Documentos requeridos', docsSummary: '{total} documentos · {online} con trámite oficial en línea',
@@ -493,7 +498,7 @@ export const sections = [
     fields: [
       ...headingFields(),
       f.items('items', 'Preguntas', [f.text('cat', 'Tema', { hint: 'Las preguntas con el mismo tema se agrupan en el filtro.' }), f.text('q', 'Pregunta', { required: true }), f.textarea('a', 'Respuesta')]),
-      ...inGroup('Buscador y filtro', [
+      ...grouped('Buscador y filtro', [
         f.text('search', 'Buscador'), f.text('searchLabel', 'Buscador (lectores de pantalla)'),
         f.text('filterTitle', 'Título del filtro'), f.text('all', 'Filtro «todas»'),
         f.text('count', 'Contador'),

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/services/api', () => ({
-  contentApi: { adminGetSettings: vi.fn(), adminUpdateSettings: vi.fn(), getSettings: vi.fn() },
+  contentApi: { adminGetSettings: vi.fn(), adminUpdateSettings: vi.fn(), getSettings: vi.fn(), adminListPages: vi.fn(async () => ({ data: { results: [] } })) },
 }));
 
 import { contentApi } from '@/services/api';
@@ -49,15 +49,14 @@ describe('site texts (Navegación)', () => {
     expect(update).toHaveBeenCalledWith({ chrome: { footer_note: 'Nota propia', cookie_link: 'Leer el aviso', cookie_accept: 'De acuerdo' } });
   });
 
-  it('refuses a legal link that is not a site path or https and says so next to it', async () => {
+  it('a legal link needs a destination, and says so next to it', async () => {
     const user = userEvent.setup();
     renderWithProviders(<SiteTextsEditor />, { route: '/admin/navegacion' });
     await user.click(await screen.findByText('Pie de página'));
-    await user.click(screen.getByRole('button', { name: /Agregar enlace/ }));
+    await user.click(screen.getByRole('button', { name: /Agregar enlace legal/ }));
     await user.type(screen.getAllByLabelText('Texto del enlace').slice(-1)[0], 'Reglamento');
-    await user.type(screen.getAllByLabelText('Enlace (ruta o URL)').slice(-1)[0], 'javascript:alert(1)');
     await user.click(screen.getByRole('button', { name: 'Guardar textos' }));
-    expect(await screen.findByText('El enlace debe empezar con / o con https://.')).toBeInTheDocument();
+    expect(await screen.findByText('Elija a dónde lleva el enlace.')).toBeInTheDocument();
     expect(update).not.toHaveBeenCalled();
   });
 });

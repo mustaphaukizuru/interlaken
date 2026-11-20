@@ -22,7 +22,7 @@ import { eligibilityGap } from '@/lib/eligibility';
 import { useDraft } from '@/hooks/useDraft';
 import { iconResolver } from '../iconRuntime';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, CmsAnchor, defineModule, f, fill, inGroup, sectionsOf } from './kit';
+import { asLink, CmsAnchor, defineModule, f, fill, grouped, sectionsOf } from './kit';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ CalendarDays, Clock });
@@ -362,39 +362,39 @@ export const sections = [
     description: 'Formulario de pre-registro que llega a Admisiones. Aquí se editan todos sus textos (etiquetas, ejemplos, avisos, botón y confirmación); los campos, los grados y las reglas no cambian.',
     component: PreRegisterFormView,
     fields: [
-      ...inGroup('Datos del alumno', [
+      ...grouped('Datos del alumno', [
         f.text('studentTitle', 'Título'), f.text('studentSubtitle', 'Subtítulo'),
         f.text('childNameLabel', 'Nombre: etiqueta'), f.text('childNamePlaceholder', 'Nombre: ejemplo dentro del campo'),
         f.text('dobLabel', 'Fecha de nacimiento: etiqueta'), f.text('gradeLabel', 'Grado: etiqueta'),
         f.text('selectPlaceholder', 'Texto de las listas sin elegir'),
-        f.textarea('ageHint', 'Aviso de edad', { hint: 'Se ve si la edad no corresponde al grado. {grado}, {edad} (la requerida), {anio} y {tiene} (la del alumno) se llenan solos.' }),
+        f.textarea('ageHint', 'Aviso de edad'),
       ]),
-      ...inGroup('Datos del tutor', [
+      ...grouped('Datos del tutor', [
         f.text('parentTitle', 'Título'), f.text('parentSubtitle', 'Subtítulo'),
         f.text('parentNameLabel', 'Nombre: etiqueta'), f.text('parentNamePlaceholder', 'Nombre: ejemplo dentro del campo'),
         f.text('emailLabel', 'Correo: etiqueta'), f.text('emailPlaceholder', 'Correo: ejemplo dentro del campo'),
         f.text('phoneLabel', 'Teléfono: etiqueta'), f.text('phonePlaceholder', 'Teléfono: ejemplo dentro del campo'),
       ]),
-      ...inGroup('Más información', [
+      ...grouped('Más información', [
         f.text('hearLabel', '«¿Cómo se enteró?»: etiqueta'),
         f.text('hearReferido', 'Respuesta: recomendación'), f.text('hearRedes', 'Respuesta: redes sociales'),
         f.text('hearGoogle', 'Respuesta: Google'), f.text('hearEspectacular', 'Respuesta: anuncio'), f.text('hearOtro', 'Respuesta: otro'),
         f.text('messageLabel', 'Mensaje: etiqueta'), f.text('messagePlaceholder', 'Mensaje: ejemplo dentro del campo'),
         f.text('visitCheck', 'Casilla de visita'), f.text('visitCheckHint', 'Casilla de visita: aclaración'),
       ]),
-      ...inGroup('Mensajes de validación', [
+      ...grouped('Mensajes de validación', [
         f.text('errChildName', 'Falta el nombre del alumno'), f.text('errDob', 'Falta la fecha de nacimiento'),
         f.text('errGrade', 'Falta el grado'), f.text('errParentName', 'Falta el nombre del tutor'),
         f.text('errEmail', 'Correo no válido'), f.text('errPhone', 'Teléfono no válido'),
       ]),
-      ...inGroup('Envío', [
+      ...grouped('Envío', [
         f.text('submitLabel', 'Texto del botón de envío'),
         f.textarea('error', 'Mensaje si falla el envío'),
       ]),
-      ...inGroup('Confirmación', [
+      ...grouped('Confirmación', [
         f.text('successTitle', 'Título'),
         f.textarea('successText', 'Texto'),
-        f.text('visitText', 'Aviso de visita', { hint: 'Se muestra si la familia pidió agendar una visita.' }),
+        f.text('visitText', 'Aviso de visita'),
         f.link('visitLink', 'Enlace para agendar la visita'),
         f.link('primary', 'Botón principal'),
         f.link('secondary', 'Botón secundario'),
