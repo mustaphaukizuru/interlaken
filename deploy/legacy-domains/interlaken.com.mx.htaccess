@@ -1,5 +1,11 @@
 # interlaken.com.mx (Hostinger shared hosting) → interlaken.edu.mx, page by page.
 #
+# DEPLOYED 2026-11-20 (Option A) as a SUPERSET of this file: the live copy also
+# passes /.well-known through, keeps serving /firmas/ (staff e-mail signature
+# images; never redirect them), /documentos and /libros, maps 7 school short
+# links and old page copies (index-7MICH.html…). The live file is the source of
+# truth; this one is the page map it started from.
+#
 # Option A for retiring the old site without touching DNS: upload this file as
 # public_html/.htaccess on the hosting plan of interlaken.com.mx (hPanel → File
 # Manager) and remove any redirect set in hPanel → Domains → Redirects, so this
