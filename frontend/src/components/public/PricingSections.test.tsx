@@ -122,6 +122,6 @@ describe('section specs', () => {
     }
     const prices = costos.sections.find((s) => s.type === 'costos.prices')!;
     const groups = new Set(prices.fields.map((f) => f.group).filter(Boolean));
-    expect([...groups]).toEqual(['Explicación del pago', 'Inscripción y reinscripción', 'Colegiaturas', 'Seguros y credenciales', 'Extraescolares', 'Estancia', 'Políticas de pago', 'Nota y llamado final', 'Sin precios o con error']);
+    expect([...groups]).toEqual(['Cómo se paga', 'Inscripción y reinscripción', 'Colegiaturas', 'Seguros y credenciales', 'Extraescolares', 'Estancia', 'Políticas de pago', 'Nota al final de las tablas', 'Llamado final', 'Si no hay precios o no cargan']);
   });
 });
