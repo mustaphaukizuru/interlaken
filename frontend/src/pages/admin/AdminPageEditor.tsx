@@ -34,6 +34,7 @@ import { LegacyDraftBanner, LegacyDraftDialog } from '@/cms/editor/shell/LegacyD
 import { clearLocalCopy, readLocalCopy, writeLocalCopy, type LocalCopy } from '@/cms/editor/shell/localCopy';
 import type { MenuItem } from '@/cms/editor/shell/MoreMenu';
 import { PreviewPane, type Device } from '@/cms/editor/shell/PreviewPane';
+import { publishPage } from '@/cms/editor/shell/publishApi';
 import { ScheduleDialog, type Schedule } from '@/cms/editor/shell/ScheduleDialog';
 import { SeoDialog } from '@/cms/editor/shell/SeoDialog';
 import { pageState } from '@/cms/editor/shell/status';
@@ -216,7 +217,7 @@ export default function AdminPageEditor() {
   const publish = useMutation({
     mutationFn: async ({ action, confirmLegacy }: { action: 'publish' | 'unpublish'; confirmLegacy?: boolean }) => {
       await flushOrThrow();
-      return contentApi.adminPublishPage(pageId, action, confirmLegacy ? { confirm_legacy: true } : undefined);
+      return publishPage(pageId, action, !!confirmLegacy);
     },
     onSuccess: (res, { action }) => {
       toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');

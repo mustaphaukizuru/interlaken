@@ -1353,9 +1353,7 @@ export const contentApi = {
   adminCreatePage: (data: Partial<CmsPageAdmin>) => api.post<CmsPageAdmin>('/content/admin/pages/', data),
   adminUpdatePage: (id: number, data: Partial<CmsPageAdmin>) => api.patch<CmsPageAdmin>(`/content/admin/pages/${id}/`, data),
   adminDeletePage: (id: number) => api.delete(`/content/admin/pages/${id}/`),
-  /** `confirm_legacy` (contract C1) publishes an old generic seed draft on purpose; without it the backend answers 409 `legacy_seed_draft`. */
-  adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish', opts?: { confirm_legacy?: boolean }) =>
-    api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, opts?.confirm_legacy ? { action, confirm_legacy: true } : { action }),
+  adminPublishPage: (id: number, action: 'publish' | 'unpublish' = 'publish') => api.post<CmsPageAdmin & { version?: number }>(`/content/admin/pages/${id}/publish/`, { action }),
   adminPageVersions: (id: number) => api.get<{ id: number; number: number; author_name: string; created_at: string; blocks: { id: string; type: string; props: Record<string, unknown> }[] }[]>(`/content/admin/pages/${id}/versions/`),
   /** Restores a version INTO THE DRAFT (never publishes; publish separately). Admin only. */
   adminRollbackPage: (id: number, version: number) => api.post<{ restored_from: number; page: CmsPageAdmin }>(`/content/admin/pages/${id}/versions/`, { version }),

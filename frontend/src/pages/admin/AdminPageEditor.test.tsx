@@ -8,7 +8,6 @@ vi.mock('@/services/api', () => ({
   contentApi: {
     adminGetPage: vi.fn(),
     adminUpdatePage: vi.fn(),
-    adminPublishPage: vi.fn(),
     adminPageVersions: vi.fn(),
     adminRollbackPage: vi.fn(),
     adminPageChecks: vi.fn(),
@@ -16,6 +15,7 @@ vi.mock('@/services/api', () => ({
     adminPreviewToken: vi.fn(),
   },
 }));
+vi.mock('@/cms/editor/shell/publishApi', () => ({ publishPage: vi.fn() }));
 let role = 'admin';
 vi.mock('@/store/authStore', () => ({
   useAuthStore: (sel: (s: { user: { id: number; role: string } }) => unknown) => sel({ user: { id: 1, role } }),
@@ -23,6 +23,7 @@ vi.mock('@/store/authStore', () => ({
 
 import toast from 'react-hot-toast';
 import { contentApi } from '@/services/api';
+import { publishPage } from '@/cms/editor/shell/publishApi';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
 import AdminPageEditor from './AdminPageEditor';
@@ -109,6 +110,16 @@ describe('AdminPageEditor action bar', () => {
     // The unsaved draft stays in this browser for the next visit.
     expect(localStorage.getItem('cms-local-copy:7')).toContain('"hidden":true');
   });
+
+  it('a link inside the preview selects its section, even with a save pending', async () => {
+    vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: { ...PAGE, draft_blocks: [{ id: 'a', type: 'rich_text', props: { html: '<p><a href="/contacto">Escríbanos</a></p>' } }] } } as never);
+    renderEditor();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ocultar del sitio' }, { timeout: 8000 }));
+    // The rich text renders from a lazy chunk.
+    await userEvent.click(await screen.findByText('Escríbanos', { selector: 'a' }));
+    expect(screen.getByRole('heading', { name: '1. Texto' })).toBeInTheDocument();
+    expect(screen.queryByText('Lista de páginas')).not.toBeInTheDocument();
+  });
 });
 
 describe('AdminPageEditor versions', () => {
@@ -137,7 +148,7 @@ describe('AdminPageEditor versions', () => {
     const dialog = await screen.findByRole('dialog', { name: /Restaurar la versión 1 en el borrador/ });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Restaurar en el borrador' }));
     await waitFor(() => expect(contentApi.adminRollbackPage).toHaveBeenCalledWith(7, 1));
-    expect(contentApi.adminPublishPage).not.toHaveBeenCalled();
+    expect(publishPage).not.toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('restaurada en el borrador'));
   });
 
@@ -233,41 +244,41 @@ describe('AdminPageEditor contract C1 (old generic seed drafts)', () => {
     expect(screen.getByText('Este borrador se creó con bloques sencillos', { exact: false })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Este borrador usa el formato antiguo' });
-    expect(contentApi.adminPublishPage).not.toHaveBeenCalled();
+    expect(publishPage).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('button', { name: /Cargar el diseño actual/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // Nosotros starts with its photo hero, then its designed sections.
     expect(await screen.findByRole('button', { name: /^1\. Portada con foto/ })).toBeInTheDocument();
-    expect(contentApi.adminPublishPage).not.toHaveBeenCalled();
+    expect(publishPage).not.toHaveBeenCalled();
     await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
     expect(lastPatch().draft_blocks).toEqual(originalBlocks('nosotros'));
   });
 
   it('«Publicar de todos modos» resends with confirm_legacy', async () => {
     vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: { ...LEGACY, legacy_seed: true } } as never);
-    vi.mocked(contentApi.adminPublishPage).mockResolvedValue({ data: { ...LEGACY, status: 'published', published_version_number: 1, version: 1 } } as never);
+    vi.mocked(publishPage).mockResolvedValue({ data: { ...LEGACY, status: 'published', published_version_number: 1, version: 1 } } as never);
     renderEditor();
     await ready();
     await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Este borrador usa el formato antiguo' });
     await userEvent.click(within(dialog).getByRole('button', { name: /Publicar de todos modos/ }));
-    await waitFor(() => expect(contentApi.adminPublishPage).toHaveBeenCalledWith(7, 'publish', { confirm_legacy: true }));
+    await waitFor(() => expect(publishPage).toHaveBeenCalledWith(7, 'publish', true));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('opens the same dialog when the backend answers 409 legacy_seed_draft, and «Cancelar» publishes nothing', async () => {
     // The page is not flagged locally (legacy_seed false), the backend still refuses.
     vi.mocked(contentApi.adminGetPage).mockResolvedValue({ data: { ...PAGE, has_unpublished_changes: true, legacy_seed: false } } as never);
-    vi.mocked(contentApi.adminPublishPage).mockRejectedValue(httpError(409, { code: 'legacy_seed_draft', detail: 'Borrador antiguo.' }));
+    vi.mocked(publishPage).mockRejectedValue(httpError(409, { code: 'legacy_seed_draft', detail: 'Borrador antiguo.' }));
     renderEditor();
     await ready();
     expect(screen.queryByText('Borrador antiguo')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
-    await waitFor(() => expect(contentApi.adminPublishPage).toHaveBeenCalledWith(7, 'publish', undefined));
+    await waitFor(() => expect(publishPage).toHaveBeenCalledWith(7, 'publish', false));
     const dialog = await screen.findByRole('dialog', { name: 'Este borrador usa el formato antiguo' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(contentApi.adminPublishPage).toHaveBeenCalledTimes(1);
+    expect(publishPage).toHaveBeenCalledTimes(1);
     expect(toast.error).not.toHaveBeenCalled();
   });
 
@@ -341,7 +352,7 @@ describe('AdminPageEditor contract C2 (two people on one page)', () => {
     await screen.findByRole('alert', {}, { timeout: 4000 });
     await userEvent.click(screen.getByRole('button', { name: /Publicar/ }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('otra persona guardó cambios')));
-    expect(contentApi.adminPublishPage).not.toHaveBeenCalled();
+    expect(publishPage).not.toHaveBeenCalled();
   });
 });
 

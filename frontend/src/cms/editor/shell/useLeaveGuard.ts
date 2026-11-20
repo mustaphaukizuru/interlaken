@@ -46,6 +46,8 @@ export function useLeaveGuard({ state, flush, beforeLeave }: Options) {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
       if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+      // Links inside the live preview are inert there (a click selects the section).
+      if (a.closest('[data-block-id]')) return;
       const url = new URL(a.href, window.location.href);
       if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
       e.preventDefault();
