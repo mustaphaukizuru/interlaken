@@ -136,10 +136,10 @@ wizards, not public information), `/pago/simulado` (sandbox), portal pages.
 - Testimonios sections: label, title and how many to show are editable.
 - Pre-publish check warns when the share image was deleted from the library.
 
-Kept in code on purpose: form field labels and validation messages, the FAQ search and
-filter controls, the gallery counter and «Ampliar» label, the calendar level filter
-(interface wording, not school information), and the official privacy-notice text
-(versioned in `legal` for consent records).
+Kept in code on purpose at this stage: form field labels and validation messages, the FAQ
+search and filter controls, the gallery counter and «Ampliar» label, the calendar level
+filter, and the official privacy-notice text. All of these became editable afterwards:
+see [cms/full-coverage.md](cms/full-coverage.md) (2026-11-20).
 
 ### How the school edits a page
 
