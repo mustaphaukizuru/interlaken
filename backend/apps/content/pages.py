@@ -410,11 +410,16 @@ def published_head(path: str) -> dict | None:
         if page is None or (page.unpublish_at and page.unpublish_at <= timezone.now()):
             head = {}
         else:
+            from .page_templates import template_seo
+
             seo = (page.published_version.seo if page.published_version else page.seo) or {}
             og = seo.get('og_image')
+            # A designed page without SEO of its own keeps the template's («Costos 2026–2027»),
+            # exactly as the browser does (TemplatePage), so crawlers see the same head.
+            defaults = template_seo(slug)
             head = {
-                'title': (seo.get('title') or '').strip(),
-                'description': (seo.get('description') or '').strip(),
+                'title': (seo.get('title') or '').strip() or defaults['title'],
+                'description': (seo.get('description') or '').strip() or defaults['description'],
                 'image': f'{SITE}/api/v1/content/media/{og}/lg/' if isinstance(og, int) and not isinstance(og, bool) else '',
                 'noindex': bool(seo.get('noindex')),
             }
