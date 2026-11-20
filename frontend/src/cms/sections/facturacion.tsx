@@ -6,11 +6,11 @@
  */
 import type { ReactNode } from 'react';
 import { ArrowUpRight, Info, Mail, ReceiptText } from 'lucide-react';
-import { FacturacionForm } from '@/components/public/FacturacionForm';
+import { FACTURACION_FORM_DEFAULTS, FacturacionForm, type FacturacionFormCopy } from '@/components/public/FacturacionForm';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, Lines, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, inGroup, Lines, sectionsOf } from './kit';
 
 const section = sectionsOf('facturacion');
 
@@ -88,6 +88,7 @@ function FacturacionNoticesView(p: { title?: string; items?: { text?: string }[]
 function FacturacionRequestView(p: { title?: string; text?: string; email?: string }) {
   const t = useTokens();
   const email = t(p.email).trim() || 'facturas@interlaken.com.mx';
+  const formCopy = Object.fromEntries(Object.keys(FACTURACION_FORM_DEFAULTS).map((k) => [k, t((p as Record<string, unknown>)[k])])) as Partial<FacturacionFormCopy>;
   return (
     <CardBand>
       <Reveal delay={70}>
@@ -107,7 +108,7 @@ function FacturacionRequestView(p: { title?: string; text?: string; email?: stri
             </p>
           )}
           <div className="mt-5">
-            <FacturacionForm billingEmail={email} />
+            <FacturacionForm billingEmail={email} copy={formCopy} />
           </div>
         </div>
       </Reveal>
@@ -170,14 +171,32 @@ export const sections = [
   }),
   section({
     type: 'request', label: 'Facturación · Solicitud', locked: true,
-    description: 'Formulario de datos fiscales (CFDI); las solicitudes llegan al correo indicado aquí.',
+    description: 'Formulario de datos fiscales (CFDI); las solicitudes llegan al correo indicado aquí. Se editan todos sus textos; los campos, las reglas y la lista de regímenes del SAT no cambian.',
     component: FacturacionRequestView,
     fields: [
-      f.text('title', 'Título'),
-      f.text('text', 'Texto antes del correo', { hint: 'Vacío: la página no muestra el correo. Con texto (por ejemplo «Su solicitud llega a») se muestra seguido del correo.' }),
-      f.text('email', 'Correo de facturación', { hint: 'Se usa en los mensajes del formulario y, si hay texto arriba, en la página.' }),
+      ...inGroup('Recuadro', [
+        f.text('title', 'Título'),
+        f.text('text', 'Texto antes del correo', { hint: 'Vacío: la página no muestra el correo. Con texto (por ejemplo «Su solicitud llega a») se muestra seguido del correo.' }),
+        f.text('email', 'Correo de facturación', { hint: 'Se usa en los mensajes del formulario y, si hay texto arriba, en la página.' }),
+      ]),
+      ...inGroup('Formulario', [
+        f.text('requiredNote', 'Nota sobre los campos'),
+        f.text('studentLabel', 'Alumno: etiqueta'), f.text('razonLabel', 'Razón social: etiqueta'), f.text('razonHint', 'Razón social: ayuda'),
+        f.text('rfcLabel', 'RFC: etiqueta'), f.text('cpLabel', 'Código postal: etiqueta'),
+        f.text('regimenLabel', 'Régimen: etiqueta'), f.text('regimenPlaceholder', 'Régimen: texto sin elegir'),
+        f.text('emailLabel', 'Correo: etiqueta'), f.text('emailPlaceholder', 'Correo: ejemplo dentro del campo'),
+        f.text('phoneLabel', 'Teléfono: etiqueta'), f.text('phonePlaceholder', 'Teléfono: ejemplo dentro del campo'),
+        f.text('submitLabel', 'Texto del botón de envío'),
+      ]),
+      ...inGroup('Mensajes', [
+        f.text('errRequired', 'Campo vacío'), f.text('errRfc', 'RFC con longitud incorrecta'),
+        f.text('errCp', 'Código postal incorrecto'), f.text('errPhone', 'Teléfono incorrecto'),
+        f.text('errGeneral', 'Si no se pudo enviar', { hint: '{facturas} = el correo de facturación.' }),
+        f.text('doneTitle', 'Confirmación: título'),
+        f.textarea('doneText', 'Confirmación: texto', { hint: '{correo} = el correo que escribió la familia; {facturas} = el correo de facturación.' }),
+      ]),
     ],
-    defaults: { title: 'Solicitud de facturación', text: '', email: 'facturas@interlaken.com.mx' },
+    defaults: { title: 'Solicitud de facturación', text: '', email: 'facturas@interlaken.com.mx', ...FACTURACION_FORM_DEFAULTS },
   }),
   section({
     type: 'download', label: 'Facturación · Descargar facturas', description: 'Recuadro con el enlace al portal de pagos para descargar facturas.',

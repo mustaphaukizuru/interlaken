@@ -2,7 +2,12 @@
  * Documentación para el Examen de Valoración (Admisiones).
  * Fuente única para /admisiones y /admisiones/documentacion. Donde existe un
  * trámite oficial en línea se enlaza directo para facilitarlo a las familias.
+ *
+ * In the CMS the list is edited once, in the Documentación page («Documentos
+ * requeridos» section); Admisiones shows that same list (useAdmissionDocs).
+ * The array below is the built-in list both start from.
  */
+import { usePublishedPage } from '@/cms/published';
 export interface AdmissionDoc {
   label: string;
   href?: string;
@@ -35,3 +40,14 @@ export function docsSummary(template: string, docs: AdmissionDoc[]): string {
 
 /** The list above as CMS `items` defaults (every key present so the editor shows the fields). */
 export const ADMISSION_DOC_ITEMS = ADMISSION_DOCS.map((d) => ({ label: d.label, href: d.href ?? '', linkLabel: d.linkLabel ?? '' }));
+
+/**
+ * The admission documents as the school edited them: the list of the
+ * published Documentación page, else the built-in list. Admisiones calls it,
+ * so one edit shows in both places.
+ */
+export function useAdmissionDocs(): AdmissionDoc[] {
+  const { data } = usePublishedPage('documentacion');
+  const items = data?.blocks?.find((b) => b.type === 'documentacion.list')?.props?.items;
+  return Array.isArray(items) ? (items as AdmissionDoc[]) : ADMISSION_DOC_ITEMS;
+}

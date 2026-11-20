@@ -101,12 +101,12 @@ export const sections = [
     },
   }),
   section({
-    type: 'list', label: 'Documentación · Documentos requeridos', description: 'Lista de documentos con enlaces a los trámites oficiales y un llamado al pre-registro.',
+    type: 'list', label: 'Documentación · Documentos requeridos', description: 'Lista de documentos con enlaces a los trámites oficiales y un llamado al pre-registro. Esta lista es la única: Admisiones muestra la misma al publicar esta página.',
     component: DocsListView,
     fields: [
       f.text('title', 'Título de la lista'),
       f.text('summary', 'Resumen', { hint: '{total} = número de documentos; {online} = cuántos tienen enlace a un trámite en línea.' }),
-      f.items('items', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.url('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')]),
+      f.items('items', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.url('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')], { hint: 'También se muestran en Admisiones.' }),
       f.text('ctaTitle', 'Llamado: título'),
       f.textarea('ctaText', 'Llamado: texto'),
       f.link('cta', 'Llamado: botón'),

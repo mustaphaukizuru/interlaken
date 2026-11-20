@@ -27,7 +27,7 @@ import { MonthCalendar } from '@/components/ui/MonthCalendar';
 import { FunnelHero } from '@/components/admissions/FunnelHero';
 import type { AvailabilitySlot } from '@/types';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, inGroup, sectionsOf } from './kit';
 
 const section = sectionsOf('visita');
 
@@ -72,10 +72,11 @@ function VisitStepsView(p: { items?: { text?: string }[]; link?: CmsLink }) {
 }
 
 /* ── Reserva (bloqueado) ────────────────────────────────────────────────── */
+// Rules stay in code; each message is the prop that words it (errName...).
 const schema = z.object({
-  parent_name:  z.string().min(3, 'Nombre requerido'),
-  parent_email: z.string().email('Correo inválido'),
-  parent_phone: z.string().min(10, 'Teléfono inválido'),
+  parent_name:  z.string().min(3, 'errName'),
+  parent_email: z.string().email('errEmail'),
+  parent_phone: z.string().min(10, 'errPhone'),
   child_name:   z.string().optional(),
   child_grade:  z.string().optional(),
 });
@@ -91,9 +92,13 @@ interface BookingProps {
   emptyTitle?: string; emptyText?: string; errorTitle?: string; errorText?: string;
   whatsappTitle?: string; whatsappText?: string; whatsappLabel?: string; whatsappMessage?: string;
   contactLabel?: string;
+  [copy: string]: unknown;
 }
 function VisitBookingView(p: BookingProps) {
   const t = useTokens();
+  const c = (key: string) => t(p[key]);
+  const err = (e?: { message?: string }) => (e?.message ? c(e.message) || e.message : undefined);
+  const weekdays = c('weekdays').split(',').map((d) => d.trim()).filter(Boolean);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [confirmed, setConfirmed] = useState<AvailabilitySlot | null>(null);
@@ -159,7 +164,7 @@ function VisitBookingView(p: BookingProps) {
     } catch (err: any) {
       toast.error(
         err?.response?.data?.detail ??
-          'No fue posible completar la reserva. Intente de nuevo.',
+          (c('bookingError') || 'No fue posible completar la reserva. Intente de nuevo.'),
       );
     }
   };
@@ -239,6 +244,7 @@ function VisitBookingView(p: BookingProps) {
                     days={calendarDays}
                     selectedDate={selectedDate}
                     countLabel="horarios"
+                    weekdays={weekdays.length === 7 ? weekdays : undefined}
                     onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }}
                   />
 
@@ -299,11 +305,11 @@ function VisitBookingView(p: BookingProps) {
                     )}
                   </div>
 
-                  <Input label="Nombre completo" error={errors.parent_name?.message} className={inputClass} {...register('parent_name')} />
-                  <Input label="Correo electrónico" type="email" inputMode="email" autoComplete="email" error={errors.parent_email?.message} className={inputClass} {...register('parent_email')} />
-                  <Input label="Teléfono / WhatsApp" type="tel" inputMode="tel" autoComplete="tel" error={errors.parent_phone?.message} className={inputClass} {...register('parent_phone')} />
-                  <Input label="Nombre del alumno (opcional)" className={inputClass} {...register('child_name')} />
-                  <Input label="Grado de interés (opcional)" className={inputClass} {...register('child_grade')} />
+                  <Input label={c('nameLabel')} error={err(errors.parent_name)} className={inputClass} {...register('parent_name')} />
+                  <Input label={c('emailLabel')} type="email" inputMode="email" autoComplete="email" error={err(errors.parent_email)} className={inputClass} {...register('parent_email')} />
+                  <Input label={c('phoneLabel')} type="tel" inputMode="tel" autoComplete="tel" error={err(errors.parent_phone)} className={inputClass} {...register('parent_phone')} />
+                  <Input label={c('childLabel')} className={inputClass} {...register('child_name')} />
+                  <Input label={c('gradeLabel')} className={inputClass} {...register('child_grade')} />
 
                   <PrivacyNote />
 
@@ -368,22 +374,37 @@ export const sections = [
     description: 'Calendario con los horarios abiertos, formulario y confirmación; los horarios se editan en Visitas y el WhatsApp en Ajustes.',
     component: VisitBookingView,
     fields: [
-      f.text('pickTitle', 'Título del calendario'),
-      f.text('formTitle', 'Título del formulario'),
-      f.text('pickHint', 'Aviso antes de elegir horario'),
-      f.text('submitLabel', 'Texto del botón de envío'),
-      f.text('confirmedTitle', 'Título al confirmar'),
-      f.textarea('confirmedText', 'Texto al confirmar'),
-      f.text('againLabel', 'Botón «Agendar otra visita»'),
-      f.text('emptyTitle', 'Sin horarios: título'),
-      f.textarea('emptyText', 'Sin horarios: texto'),
-      f.text('errorTitle', 'Error al cargar: título'),
-      f.textarea('errorText', 'Error al cargar: texto'),
-      f.text('whatsappTitle', 'Recuadro de WhatsApp: título'),
-      f.text('whatsappText', 'Recuadro de WhatsApp: texto'),
-      f.text('whatsappLabel', 'Botón de WhatsApp'),
-      f.text('whatsappMessage', 'Mensaje inicial de WhatsApp'),
-      f.text('contactLabel', 'Botón de contacto (si no hay WhatsApp)'),
+      ...inGroup('Calendario', [
+        f.text('pickTitle', 'Título del calendario'),
+        f.text('weekdays', 'Días de la semana', { hint: 'Siete abreviaturas separadas por coma, empezando en lunes.' }),
+        f.text('emptyTitle', 'Sin horarios: título'),
+        f.textarea('emptyText', 'Sin horarios: texto'),
+        f.text('errorTitle', 'Error al cargar: título'),
+        f.textarea('errorText', 'Error al cargar: texto'),
+      ]),
+      ...inGroup('Formulario', [
+        f.text('formTitle', 'Título del formulario'),
+        f.text('pickHint', 'Aviso antes de elegir horario'),
+        f.text('nameLabel', 'Nombre: etiqueta'), f.text('emailLabel', 'Correo: etiqueta'), f.text('phoneLabel', 'Teléfono: etiqueta'),
+        f.text('childLabel', 'Alumno: etiqueta'), f.text('gradeLabel', 'Grado: etiqueta'),
+        f.text('submitLabel', 'Texto del botón de envío'),
+      ]),
+      ...inGroup('Mensajes', [
+        f.text('errName', 'Falta el nombre'), f.text('errEmail', 'Correo no válido'), f.text('errPhone', 'Teléfono no válido'),
+        f.text('bookingError', 'Si la reserva no se pudo completar', { hint: 'Si el horario ya se ocupó, el sitio muestra el motivo exacto.' }),
+      ]),
+      ...inGroup('Confirmación', [
+        f.text('confirmedTitle', 'Título al confirmar'),
+        f.textarea('confirmedText', 'Texto al confirmar'),
+        f.text('againLabel', 'Botón «Agendar otra visita»'),
+      ]),
+      ...inGroup('WhatsApp', [
+        f.text('whatsappTitle', 'Recuadro de WhatsApp: título'),
+        f.text('whatsappText', 'Recuadro de WhatsApp: texto'),
+        f.text('whatsappLabel', 'Botón de WhatsApp'),
+        f.text('whatsappMessage', 'Mensaje inicial de WhatsApp'),
+        f.text('contactLabel', 'Botón de contacto (si no hay WhatsApp)'),
+      ]),
     ],
     defaults: {
       pickTitle: 'Elija una fecha y horario', formTitle: 'Sus datos', pickHint: 'Seleccione un horario para continuar',
@@ -394,6 +415,11 @@ export const sections = [
       whatsappTitle: '¿Prefiere agendar por WhatsApp?', whatsappText: 'Escríbanos y con gusto coordinamos su visita.',
       whatsappLabel: 'Reservar por WhatsApp', whatsappMessage: 'Hola, me gustaría agendar una visita individual al Colegio Interlaken.',
       contactLabel: 'Contactar al colegio',
+      weekdays: 'Lun, Mar, Mié, Jue, Vie, Sáb, Dom',
+      nameLabel: 'Nombre completo', emailLabel: 'Correo electrónico', phoneLabel: 'Teléfono / WhatsApp',
+      childLabel: 'Nombre del alumno (opcional)', gradeLabel: 'Grado de interés (opcional)',
+      errName: 'Nombre requerido', errEmail: 'Correo inválido', errPhone: 'Teléfono inválido',
+      bookingError: 'No fue posible completar la reserva. Intente de nuevo.',
     },
   }),
 ];

@@ -13,7 +13,7 @@ import Logo from '@/components/ui/Logo';
 import { HeroVideo } from '@/components/public/HeroVideo';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, headingFields, lazySection, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, headingFields, inGroup, lazySection, sectionsOf } from './kit';
 import { withMotion } from './motion';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
@@ -252,10 +252,21 @@ export const sections = [
   section({
     type: 'lead', label: 'Inicio · Solicite informes', description: 'Formulario corto (nombre y correo) que llega a Mensajes.',
     component: lazySection(below, 'HomeLead'),
-    fields: [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.text('button', 'Texto del botón'), f.text('success', 'Mensaje al enviar'), f.text('subject', 'Asunto en Mensajes')],
+    fields: [
+      ...inGroup('Textos', [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.text('button', 'Texto del botón'), f.text('success', 'Mensaje al enviar')]),
+      ...inGroup('Formulario', [f.text('nameLabel', 'Etiqueta del nombre'), f.text('emailLabel', 'Etiqueta del correo'), f.text('sending', 'Botón mientras envía')]),
+      ...inGroup('Avisos', [f.text('sentToast', 'Aviso emergente al enviar'), f.text('errorToast', 'Aviso emergente si falla')]),
+      ...inGroup('Aviso de privacidad', [f.textarea('privacyText', 'Texto antes del enlace'), f.text('privacyLink', 'Texto del enlace')]),
+      ...inGroup('Lo que llega a Mensajes', [f.text('subject', 'Asunto en Mensajes'), f.text('message', 'Mensaje en Mensajes', { hint: '{nombre} = el nombre que escribió la familia.' })]),
+    ],
     defaults: {
       title: 'Solicite informes', text: 'Déjenos sus datos y un asesor le compartirá costos, fechas y todo lo que necesita saber sobre Interlaken.',
       button: 'Solicitar', success: '¡Solicitud recibida! Le contactaremos pronto.', subject: 'Solicitud de informes',
+      nameLabel: 'Nombre completo', emailLabel: 'Correo electrónico', sending: 'Enviando…',
+      sentToast: '¡Gracias! Te contactaremos muy pronto.', errorToast: 'No fue posible enviar tu solicitud. Intenta de nuevo.',
+      privacyText: 'Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el',
+      privacyLink: 'Aviso de Privacidad',
+      message: '{nombre} solicita informes desde la página de inicio.',
     },
   }),
   section({

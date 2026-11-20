@@ -18,11 +18,11 @@ import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { admissionsApi } from '@/services/api';
 import { trackEvent, FunnelEvent } from '@/services/analytics';
 import type { PreRegistrationData } from '@/types';
-import { eligibilityHint } from '@/lib/eligibility';
+import { eligibilityGap } from '@/lib/eligibility';
 import { useDraft } from '@/hooks/useDraft';
 import { iconResolver } from '../iconRuntime';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, CmsAnchor, defineModule, f, sectionsOf } from './kit';
+import { asLink, CmsAnchor, defineModule, f, fill, inGroup, sectionsOf } from './kit';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ CalendarDays, Clock });
@@ -86,13 +86,15 @@ function PreRegisterTrustView(p: TrustProps) {
 }
 
 /* ── Formulario (bloqueado) ─────────────────────────────────────────────── */
+// Rules stay in code; each message is the prop that names it (errChildName...),
+// so the school words them in Contenido without touching the validation.
 const schema = z.object({
-  child_name:       z.string().min(2, 'Nombre requerido'),
-  child_dob:        z.string().min(1, 'Fecha de nacimiento requerida'),
-  grade_applying:   z.string().min(1, 'Seleccione un nivel'),
-  parent_name:      z.string().min(2, 'Nombre del tutor requerido'),
-  email:            z.string().email('Correo electrónico inválido'),
-  phone:            z.string().min(10, 'Teléfono inválido'),
+  child_name:       z.string().min(2, 'errChildName'),
+  child_dob:        z.string().min(1, 'errDob'),
+  grade_applying:   z.string().min(1, 'errGrade'),
+  parent_name:      z.string().min(2, 'errParentName'),
+  email:            z.string().email('errEmail'),
+  phone:            z.string().min(10, 'errPhone'),
   how_did_you_hear: z.string().optional(),
   message:          z.string().optional(),
   wants_visit:      z.boolean().optional(),
@@ -111,13 +113,26 @@ const GRADES = [
 const selectClass =
   'input-field text-base min-h-[44px] focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1';
 
+/** «¿Cómo se enteró?» answers: the value is stored with the pre-registro, the label is copy. */
+const HEAR_OPTIONS = [
+  { value: 'referido', prop: 'hearReferido' },
+  { value: 'redes', prop: 'hearRedes' },
+  { value: 'google', prop: 'hearGoogle' },
+  { value: 'espectacular', prop: 'hearEspectacular' },
+  { value: 'otro', prop: 'hearOtro' },
+] as const;
+
 interface FormProps {
   submitLabel?: string; error?: string;
   successTitle?: string; successText?: string; visitText?: string; visitLink?: CmsLink;
   primary?: CmsLink; secondary?: CmsLink;
+  [copy: string]: unknown;
 }
 function PreRegisterFormView(p: FormProps) {
   const t = useTokens();
+  const c = (key: string) => t(p[key]);
+  /** The edited message of a validation error (its key is the prop name). */
+  const err = (e?: { message?: string }) => (e?.message ? c(e.message) || e.message : undefined);
   const draft = useDraft<FormData>('pre-registro');
   const success = useSent();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -158,7 +173,8 @@ function PreRegisterFormView(p: FormProps) {
   const dobValue = watch('child_dob');
   const gradeValue = watch('grade_applying');
   const wantsVisit = watch('wants_visit');
-  const ageHint = eligibilityHint(dobValue ?? '', gradeValue ?? '');
+  const gap = eligibilityGap(dobValue ?? '', gradeValue ?? '');
+  const ageHint = gap ? fill(c('ageHint'), gap) : null;
 
   if (success) {
     const visitLink = asLink(p.visitLink);
@@ -216,40 +232,40 @@ function PreRegisterFormView(p: FormProps) {
           </div>
         )}
         <div>
-          <h2 className="font-semibold text-fluid-lg text-ink mb-1">Datos del alumno</h2>
-          <p className="text-xs text-subtle">Información del candidato a inscripción</p>
+          <h2 className="font-semibold text-fluid-lg text-ink mb-1">{c('studentTitle')}</h2>
+          <p className="text-xs text-subtle">{c('studentSubtitle')}</p>
         </div>
 
         <Input
-          label="Nombre completo del alumno"
-          placeholder="Ej. Ana María González Pérez"
-          error={errors.child_name?.message}
+          label={c('childNameLabel')}
+          placeholder={c('childNamePlaceholder')}
+          error={err(errors.child_name)}
           className="text-base min-h-[44px]"
           {...register('child_name')}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Fecha de nacimiento"
+            label={c('dobLabel')}
             type="date"
             max={new Date().toISOString().slice(0, 10)}
-            error={errors.child_dob?.message}
+            error={err(errors.child_dob)}
             className="text-base min-h-[44px]"
             {...register('child_dob')}
           />
           <div>
-            <label htmlFor="grade_applying" className="label">Grado al que aplica</label>
+            <label htmlFor="grade_applying" className="label">{c('gradeLabel')}</label>
             <select id="grade_applying" className={selectClass} {...register('grade_applying')}>
-              <option value="">Seleccionar…</option>
+              <option value="">{c('selectPlaceholder')}</option>
               {GRADES.map((g) => (
                 <option key={g} value={g}>{g}</option>
               ))}
             </select>
             {errors.grade_applying && (
-              <p className="mt-1.5 text-xs text-red-600">{errors.grade_applying.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">{err(errors.grade_applying)}</p>
             )}
             {!errors.grade_applying && ageHint && (
-              <p className="mt-1.5 text-xs text-coral-600" role="status">{ageHint} Elija el grado que corresponde a su edad o contacte a admisiones.</p>
+              <p className="mt-1.5 text-xs text-coral-600" role="status">{ageHint}</p>
             )}
           </div>
         </div>
@@ -257,55 +273,51 @@ function PreRegisterFormView(p: FormProps) {
         <hr className="border-line" />
 
         <div>
-          <h2 className="font-semibold text-fluid-lg text-ink mb-1">Datos del tutor</h2>
-          <p className="text-xs text-subtle">Información de contacto del padre/madre/tutor</p>
+          <h2 className="font-semibold text-fluid-lg text-ink mb-1">{c('parentTitle')}</h2>
+          <p className="text-xs text-subtle">{c('parentSubtitle')}</p>
         </div>
 
         <Input
-          label="Nombre completo del tutor"
-          placeholder="Ej. Roberto González Sánchez"
-          error={errors.parent_name?.message}
+          label={c('parentNameLabel')}
+          placeholder={c('parentNamePlaceholder')}
+          error={err(errors.parent_name)}
           className="text-base min-h-[44px]"
           {...register('parent_name')}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Correo electrónico"
+            label={c('emailLabel')}
             type="email" inputMode="email" autoComplete="email"
-            placeholder="correo@ejemplo.com"
-            error={errors.email?.message}
+            placeholder={c('emailPlaceholder')}
+            error={err(errors.email)}
             className="text-base min-h-[44px]"
             {...register('email')}
           />
           <Input
-            label="Teléfono / WhatsApp"
+            label={c('phoneLabel')}
             type="tel" inputMode="tel" autoComplete="tel"
-            placeholder="55 1234 5678"
-            error={errors.phone?.message}
+            placeholder={c('phonePlaceholder')}
+            error={err(errors.phone)}
             className="text-base min-h-[44px]"
             {...register('phone')}
           />
         </div>
 
         <div>
-          <label htmlFor="how_did_you_hear" className="label">¿Cómo se enteró de nosotros?</label>
+          <label htmlFor="how_did_you_hear" className="label">{c('hearLabel')}</label>
           <select id="how_did_you_hear" className={selectClass} {...register('how_did_you_hear')}>
-            <option value="">Seleccionar…</option>
-            <option value="referido">Recomendación de familia/amigo</option>
-            <option value="redes">Redes sociales</option>
-            <option value="google">Búsqueda en Google</option>
-            <option value="espectacular">Espectacular / Anuncio</option>
-            <option value="otro">Otro</option>
+            <option value="">{c('selectPlaceholder')}</option>
+            {HEAR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{c(o.prop)}</option>)}
           </select>
         </div>
 
         <div>
-          <label htmlFor="message" className="label">Mensaje adicional (opcional)</label>
+          <label htmlFor="message" className="label">{c('messageLabel')}</label>
           <textarea
             id="message"
             className="input-field text-base min-h-[96px] resize-none focus-visible:ring-2 focus-visible:ring-purple/40 focus-visible:ring-offset-1"
-            placeholder="Dudas, necesidades especiales, o información que desee compartir…"
+            placeholder={c('messagePlaceholder')}
             {...register('message')}
           />
         </div>
@@ -313,8 +325,8 @@ function PreRegisterFormView(p: FormProps) {
         <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm text-ink">
           <input type="checkbox" className="mt-0.5 h-5 w-5" {...register('wants_visit')} />
           <span>
-            <span className="block font-semibold">Deseo agendar una visita para conocer el colegio</span>
-            <span className="block text-xs text-muted">Al enviar, le daremos el enlace para elegir fecha y hora.</span>
+            <span className="block font-semibold">{c('visitCheck')}</span>
+            <span className="block text-xs text-muted">{c('visitCheckHint')}</span>
           </span>
         </label>
 
@@ -347,17 +359,46 @@ export const sections = [
   }),
   section({
     type: 'form', label: 'Pre-registro · Formulario', locked: true,
-    description: 'Formulario de pre-registro que llega a Admisiones; aquí se editan el botón y el mensaje de confirmación.',
+    description: 'Formulario de pre-registro que llega a Admisiones. Aquí se editan todos sus textos (etiquetas, ejemplos, avisos, botón y confirmación); los campos, los grados y las reglas no cambian.',
     component: PreRegisterFormView,
     fields: [
-      f.text('submitLabel', 'Texto del botón de envío'),
-      f.textarea('error', 'Mensaje si falla el envío'),
-      f.text('successTitle', 'Confirmación: título'),
-      f.textarea('successText', 'Confirmación: texto'),
-      f.text('visitText', 'Confirmación: aviso de visita', { hint: 'Se muestra si la familia pidió agendar una visita.' }),
-      f.link('visitLink', 'Confirmación: enlace para agendar la visita'),
-      f.link('primary', 'Confirmación: botón principal'),
-      f.link('secondary', 'Confirmación: botón secundario'),
+      ...inGroup('Datos del alumno', [
+        f.text('studentTitle', 'Título'), f.text('studentSubtitle', 'Subtítulo'),
+        f.text('childNameLabel', 'Nombre: etiqueta'), f.text('childNamePlaceholder', 'Nombre: ejemplo dentro del campo'),
+        f.text('dobLabel', 'Fecha de nacimiento: etiqueta'), f.text('gradeLabel', 'Grado: etiqueta'),
+        f.text('selectPlaceholder', 'Texto de las listas sin elegir'),
+        f.textarea('ageHint', 'Aviso de edad', { hint: 'Se ve si la edad no corresponde al grado. {grado}, {edad} (la requerida), {anio} y {tiene} (la del alumno) se llenan solos.' }),
+      ]),
+      ...inGroup('Datos del tutor', [
+        f.text('parentTitle', 'Título'), f.text('parentSubtitle', 'Subtítulo'),
+        f.text('parentNameLabel', 'Nombre: etiqueta'), f.text('parentNamePlaceholder', 'Nombre: ejemplo dentro del campo'),
+        f.text('emailLabel', 'Correo: etiqueta'), f.text('emailPlaceholder', 'Correo: ejemplo dentro del campo'),
+        f.text('phoneLabel', 'Teléfono: etiqueta'), f.text('phonePlaceholder', 'Teléfono: ejemplo dentro del campo'),
+      ]),
+      ...inGroup('Más información', [
+        f.text('hearLabel', '«¿Cómo se enteró?»: etiqueta'),
+        f.text('hearReferido', 'Respuesta: recomendación'), f.text('hearRedes', 'Respuesta: redes sociales'),
+        f.text('hearGoogle', 'Respuesta: Google'), f.text('hearEspectacular', 'Respuesta: anuncio'), f.text('hearOtro', 'Respuesta: otro'),
+        f.text('messageLabel', 'Mensaje: etiqueta'), f.text('messagePlaceholder', 'Mensaje: ejemplo dentro del campo'),
+        f.text('visitCheck', 'Casilla de visita'), f.text('visitCheckHint', 'Casilla de visita: aclaración'),
+      ]),
+      ...inGroup('Mensajes de validación', [
+        f.text('errChildName', 'Falta el nombre del alumno'), f.text('errDob', 'Falta la fecha de nacimiento'),
+        f.text('errGrade', 'Falta el grado'), f.text('errParentName', 'Falta el nombre del tutor'),
+        f.text('errEmail', 'Correo no válido'), f.text('errPhone', 'Teléfono no válido'),
+      ]),
+      ...inGroup('Envío', [
+        f.text('submitLabel', 'Texto del botón de envío'),
+        f.textarea('error', 'Mensaje si falla el envío'),
+      ]),
+      ...inGroup('Confirmación', [
+        f.text('successTitle', 'Título'),
+        f.textarea('successText', 'Texto'),
+        f.text('visitText', 'Aviso de visita', { hint: 'Se muestra si la familia pidió agendar una visita.' }),
+        f.link('visitLink', 'Enlace para agendar la visita'),
+        f.link('primary', 'Botón principal'),
+        f.link('secondary', 'Botón secundario'),
+      ]),
     ],
     defaults: {
       submitLabel: 'Enviar pre-registro',
@@ -368,6 +409,21 @@ export const sections = [
       visitLink: { label: 'Elija fecha y hora de su visita', href: '/agendar-visita' },
       primary: { label: 'Ver proceso de admisión', href: '/admisiones' },
       secondary: { label: 'Contactar al colegio', href: '/contacto' },
+      studentTitle: 'Datos del alumno', studentSubtitle: 'Información del candidato a inscripción',
+      childNameLabel: 'Nombre completo del alumno', childNamePlaceholder: 'Ej. Ana María González Pérez',
+      dobLabel: 'Fecha de nacimiento', gradeLabel: 'Grado al que aplica', selectPlaceholder: 'Seleccionar…',
+      ageHint: 'Para {grado} el alumno debe tener {edad} años al 31 de diciembre de {anio} (tendrá {tiene}). Elija el grado que corresponde a su edad o contacte a admisiones.',
+      parentTitle: 'Datos del tutor', parentSubtitle: 'Información de contacto del padre/madre/tutor',
+      parentNameLabel: 'Nombre completo del tutor', parentNamePlaceholder: 'Ej. Roberto González Sánchez',
+      emailLabel: 'Correo electrónico', emailPlaceholder: 'correo@ejemplo.com',
+      phoneLabel: 'Teléfono / WhatsApp', phonePlaceholder: '55 1234 5678',
+      hearLabel: '¿Cómo se enteró de nosotros?',
+      hearReferido: 'Recomendación de familia/amigo', hearRedes: 'Redes sociales', hearGoogle: 'Búsqueda en Google',
+      hearEspectacular: 'Espectacular / Anuncio', hearOtro: 'Otro',
+      messageLabel: 'Mensaje adicional (opcional)', messagePlaceholder: 'Dudas, necesidades especiales, o información que desee compartir…',
+      visitCheck: 'Deseo agendar una visita para conocer el colegio', visitCheckHint: 'Al enviar, le daremos el enlace para elegir fecha y hora.',
+      errChildName: 'Nombre requerido', errDob: 'Fecha de nacimiento requerida', errGrade: 'Seleccione un nivel',
+      errParentName: 'Nombre del tutor requerido', errEmail: 'Correo electrónico inválido', errPhone: 'Teléfono inválido',
     },
   }),
 ];
