@@ -445,6 +445,8 @@ export const templates = [{
   slug: 'iniciar-sesion', path: '/login', title: 'Iniciar sesión', group: 'acceso',
   seo: { title: 'Iniciar sesión', description: 'Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea.' },
   sections: ['acceso.screen'],
+  // Sign-in and one-time links never wait for the CMS (TemplatePage).
+  paintAtOnce: true,
 }];
 
 export default defineModule(sections, templates);

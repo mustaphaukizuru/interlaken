@@ -15,6 +15,7 @@ import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Badge } from '@/components/ui/Badge';
 import { admissionsApi, type DocumentsListing } from '@/services/api';
+import { exchangeOnce } from '@/components/admissions/RegisterWizard';
 import { useTokens, type CmsLink } from '../runtime';
 import { useCmsPreview } from '../preview';
 import { asLink, CmsAnchor, defineModule, f, inGroup, sectionsOf } from './kit';
@@ -55,7 +56,8 @@ function DocumentsView(p: Props) {
   useEffect(() => {
     if (preview || booted.current || !rid || !token) return;
     booted.current = true;
-    admissionsApi.exchangeAccess(rid, token)
+    // Single-use link: exchanged once per tab even if the section remounts.
+    exchangeOnce(rid, token)
       .then(({ data }) => setSession(data.session_token))
       .catch(() => setLinkError(true));
   }, [rid, token, preview]);
@@ -191,6 +193,8 @@ export const templates = [{
   slug: 'inscripcion-documentos', path: '/inscripcion/documentos', title: 'Documentos de inscripción', group: 'documentos',
   seo: { title: 'Documentos de inscripción', description: 'Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken.' },
   sections: ['documentos.main'],
+  // Sign-in and one-time links never wait for the CMS (TemplatePage).
+  paintAtOnce: true,
 }];
 
 export default defineModule(sections, templates);

@@ -73,6 +73,18 @@ function withNode(text: string, key: string, node: ReactNode): ReactNode {
   return parts.map((part, i) => <span key={i}>{i > 0 && node}{part}</span>);
 }
 
+/**
+ * The invitation token is single-use: its exchange runs once per token for the
+ * life of the tab, even if the wizard remounts (the page swaps in the school's
+ * published copy after painting the built-in one, docs/cms/full-coverage.md).
+ */
+const exchanges = new Map<string, ReturnType<typeof admissionsApi.exchangeAccess>>();
+export function exchangeOnce(rid: number, token: string): ReturnType<typeof admissionsApi.exchangeAccess> {
+  const key = `${rid}:${token}`;
+  if (!exchanges.has(key)) exchanges.set(key, admissionsApi.exchangeAccess(rid, token));
+  return exchanges.get(key)!;
+}
+
 export type WizardView = 'form' | 'other';
 export interface WizardLink { label?: string; href?: string }
 
@@ -128,7 +140,7 @@ export function RegisterWizard({ c, link, onView }: {
     exchangeStarted.current = true;
     (async () => {
       try {
-        const { data: sess } = await admissionsApi.exchangeAccess(inviteRid!, inviteToken);
+        const { data: sess } = await exchangeOnce(inviteRid!, inviteToken);
         const r = sess.registration ?? {};
         setForm((f) => ({
           ...f,

@@ -309,6 +309,8 @@ export const templates = [{
   slug: 'confirmar-correo', path: '/confirmar-correo', title: 'Confirmar correo', group: 'correo',
   seo: { title: 'Confirmar correo para avisos', description: 'Confirme el correo en el que recibirá los avisos del Colegio Interlaken.' },
   sections: ['correo.confirm'],
+  // Sign-in and one-time links never wait for the CMS (TemplatePage).
+  paintAtOnce: true,
 }];
 
 export default defineModule(sections, templates);

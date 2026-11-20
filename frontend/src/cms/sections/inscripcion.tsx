@@ -164,6 +164,8 @@ export const templates = [{
   // RouteSeo (siteMeta ROUTE_META '/inscripcion') keeps serving these until the school writes its own SEO.
   seo: {},
   sections: ['inscripcion.hero', 'inscripcion.wizard'],
+  // Sign-in and one-time links never wait for the CMS (TemplatePage).
+  paintAtOnce: true,
 }];
 
 export default defineModule(sections, templates);
