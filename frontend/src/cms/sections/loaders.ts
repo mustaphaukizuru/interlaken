@@ -26,6 +26,10 @@ export const SECTION_LOADERS: Record<string, () => Promise<SectionModule>> = {
   facturacion: () => import('./facturacion'),
   aviso: () => import('./aviso'),
   notfound: () => import('./notfound'),
+  acceso: () => import('./acceso'),
+  inscripcion: () => import('./inscripcion'),
+  documentos: () => import('./documentos'),
+  correo: () => import('./correo'),
 };
 
 /** Group labels shown in the editor's «Agregar bloque» dialog. */
@@ -34,6 +38,7 @@ export const GROUP_LABELS: Record<string, string> = {
   admisiones: 'Admisiones', costos: 'Costos', documentacion: 'Documentación', preregistro: 'Pre-registro',
   visita: 'Agendar visita', contacto: 'Contacto', pagos: 'Pagos',
   plataformas: 'Plataformas', facturacion: 'Facturación', aviso: 'Aviso de privacidad', notfound: 'Página no encontrada',
+  acceso: 'Iniciar sesión', inscripcion: 'Inscripción', documentos: 'Documentos de inscripción', correo: 'Confirmar correo',
 };
 
 export async function loadGroup(group: string): Promise<void> {

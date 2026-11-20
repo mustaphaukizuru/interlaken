@@ -47,6 +47,15 @@
       "required": {},
       "images": []
     },
+    "acceso.screen": {
+      "label": "Iniciar sesión · Pantalla de acceso",
+      "group": "acceso",
+      "locked": true,
+      "required": {},
+      "images": [
+        "image"
+      ]
+    },
     "admisiones.docs_cta": {
       "label": "Admisiones · Documentos y pre-registro",
       "group": "admisiones",
@@ -159,6 +168,13 @@
       "required": {},
       "images": []
     },
+    "correo.confirm": {
+      "label": "Confirmar correo · Página del enlace",
+      "group": "correo",
+      "locked": true,
+      "required": {},
+      "images": []
+    },
     "costos.hero": {
       "label": "Costos · Portada",
       "group": "costos",
@@ -202,6 +218,13 @@
       "label": "Documentación · Documentos requeridos",
       "group": "documentacion",
       "locked": false,
+      "required": {},
+      "images": []
+    },
+    "documentos.main": {
+      "label": "Documentos de inscripción · Subir documentos",
+      "group": "documentos",
+      "locked": true,
       "required": {},
       "images": []
     },
@@ -414,6 +437,24 @@
       "images": [
         "image"
       ]
+    },
+    "inscripcion.hero": {
+      "label": "Inscripción · Portada",
+      "group": "inscripcion",
+      "locked": false,
+      "required": {
+        "title": "str"
+      },
+      "images": [
+        "image"
+      ]
+    },
+    "inscripcion.wizard": {
+      "label": "Inscripción · Formulario",
+      "group": "inscripcion",
+      "locked": true,
+      "required": {},
+      "images": []
     },
     "levels_cards": {
       "label": "Niveles educativos",
