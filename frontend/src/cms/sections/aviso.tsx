@@ -21,23 +21,21 @@ import { PhotoHero } from '@/components/public/PhotoHero';
 import { iconResolver } from '../iconRuntime';
 import { useTokens } from '../runtime';
 import { asList, defineModule, f, sectionsOf } from './kit';
+import { displayTitle, parseNotice } from '@/lib/noticeText';
+
+export { parseNotice };
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ Building2, Phone, ShieldCheck });
 
 const section = sectionsOf('aviso');
 
-interface PrivacyNotice {
+export interface PrivacyNotice {
   version: string;
   title: string;
   body: string;
   integral_notice_url: string;
   effective_date: string;
-}
-
-interface NoticeSection {
-  title: string;
-  paragraphs: string[];
 }
 
 /** Both sections read the same query, so the notice is fetched once. */
@@ -52,36 +50,8 @@ function useNotice() {
   });
 }
 
-/**
- * Divide el texto oficial en secciones legibles usando sus propios
- * encabezados (párrafos en mayúsculas). El texto legal NO se altera —
- * solo se presenta por secciones; si la estructura no se reconoce,
- * se muestra íntegro tal cual (fallback).
- */
-export function parseNotice(body: string): { intro: string[]; sections: NoticeSection[] } {
-  const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const isHeading = (p: string) => {
-    const letters = p.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '');
-    if (letters.length < 15) return false;
-    const upper = letters.replace(/[a-záéíóúüñ]/g, '');
-    return upper.length / letters.length > 0.9;
-  };
-
-  const intro: string[] = [];
-  const sections: NoticeSection[] = [];
-  for (const p of paragraphs) {
-    if (isHeading(p)) {
-      sections.push({ title: p.replace(/\s*\n\s*/g, ' '), paragraphs: [] });
-    } else if (sections.length === 0) {
-      intro.push(p);
-    } else {
-      sections[sections.length - 1].paragraphs.push(p);
-    }
-  }
-  return { intro, sections };
-}
-
-function sectionIcon(title: string): LucideIcon {
+/** The icon the page shows next to a part of the notice (also used by the console editor). */
+export function sectionIcon(title: string): LucideIcon {
   const t = title.toUpperCase();
   if (t.includes('FINES')) return Target;
   if (t.includes('QUÉ DATOS')) return FileText;
@@ -96,8 +66,13 @@ function sectionIcon(title: string): LucideIcon {
 /* ── Portada ────────────────────────────────────────────────────────────── */
 interface HeroProps { label?: string; labelClass?: string; title?: string; image?: number | string; opacity?: number; dateLabel?: string; versionLabel?: string }
 function AvisoHeroView(p: HeroProps) {
-  const t = useTokens();
   const { data } = useNotice();
+  return <AvisoHero {...p} data={data} />;
+}
+
+/** The hero for a given notice: the public page, and the console preview of a draft. */
+export function AvisoHero({ data, ...p }: HeroProps & { data?: PrivacyNotice }) {
+  const t = useTokens();
   return (
     <PhotoHero
       label={t(p.label)}
@@ -126,16 +101,21 @@ function AvisoHeroView(p: HeroProps) {
 
 /* ── Texto oficial (bloqueado) ──────────────────────────────────────────── */
 interface CardItem { icon?: string; label?: string; value?: string }
-interface NoticeProps { cards?: CardItem[]; note?: string; integralLabel?: string; errorTitle?: string }
+interface NoticeProps { cards?: CardItem[]; note?: string; integralLabel?: string; errorTitle?: string; errorText?: string }
 /** Drops the empty parts of a «a · b» line (e.g. a phone or email not set in Ajustes). */
 const joinParts = (v: string) => v.split(' · ').filter((s) => s.trim()).join(' · ');
 
 function AvisoNoticeView(p: NoticeProps) {
+  const { data, isLoading, isError } = useNotice();
+  return <AvisoNoticeBody {...p} data={data} isLoading={isLoading} isError={isError} />;
+}
+
+/** The summary cards and the official text of a given notice (public page and console preview). */
+export function AvisoNoticeBody({ data, isLoading = false, isError = false, ...p }: NoticeProps & { data?: PrivacyNotice; isLoading?: boolean; isError?: boolean }) {
   // Contact data comes from the admin-editable site settings (CMS Phase 1) —
   // never hardcoded, so the page always matches the site chrome.
   const t = useTokens();
   const settings = useSiteSettings();
-  const { data, isLoading, isError } = useNotice();
   const cards = asList<CardItem>(p.cards);
 
   const parsed = data?.body ? parseNotice(data.body) : null;
@@ -152,7 +132,7 @@ function AvisoNoticeView(p: NoticeProps) {
       ) : isError || !data?.body ? (
         <EmptyState
           title={t(p.errorTitle) || 'Aviso no disponible'}
-          description={`No fue posible cargar el Aviso de Privacidad en este momento. Intente de nuevo más tarde${settings.contact_email ? ` o escríbanos a ${settings.contact_email}` : ''}.`}
+          description={p.errorText ? t(p.errorText) : `No fue posible cargar el Aviso de Privacidad en este momento. Intente de nuevo más tarde${settings.contact_email ? ` o escríbanos a ${settings.contact_email}` : ''}.`}
         />
       ) : (
         <div>
@@ -200,7 +180,7 @@ function AvisoNoticeView(p: NoticeProps) {
                           <Icon className="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span className="flex-1 text-sm font-semibold normal-case text-ink">
-                          {s.title.charAt(0) + s.title.slice(1).toLowerCase()}
+                          {displayTitle(s.title)}
                         </span>
                         <ChevronDown
                           className="h-4 w-4 flex-shrink-0 text-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none"
@@ -269,13 +249,14 @@ export const sections = [
   }),
   section({
     type: 'notice', label: 'Aviso de privacidad · Texto oficial', locked: true,
-    description: 'Resumen y texto oficial del aviso. El texto legal no se edita aquí: está versionado para el consentimiento de las familias.',
+    description: 'Resumen y texto oficial del aviso. El texto legal se edita en «Aviso de privacidad» (menú Contenido del sitio): cada versión publicada queda guardada con los consentimientos que recibió.',
     component: AvisoNoticeView,
     fields: [
       f.items('cards', 'Tarjetas de resumen', [f.icon('icon'), f.text('label', 'Etiqueta', { required: true }), f.text('value', 'Texto', { hint: 'Puede usar {{telefono}} y {{correo}}.' })]),
       f.text('note', 'Nota sobre el resumen'),
       f.text('integralLabel', 'Botón del aviso integral'),
       f.text('errorTitle', 'Título si el aviso no carga'),
+      f.textarea('errorText', 'Texto si el aviso no carga', { hint: 'Vacío = «No fue posible cargar el Aviso de Privacidad en este momento…» con el correo de Ajustes.' }),
     ],
     defaults: {
       cards: [
@@ -286,6 +267,7 @@ export const sections = [
       note: 'Resumen informativo — el texto oficial completo es el siguiente.',
       integralLabel: 'Consultar el aviso integral',
       errorTitle: 'Aviso no disponible',
+      errorText: '',
     },
   }),
 ];

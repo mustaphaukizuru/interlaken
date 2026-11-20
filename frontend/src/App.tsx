@@ -97,6 +97,7 @@ const AdminForms = lazy(() => import('./pages/admin/AdminForms'));
 const AdminPages = lazy(() => import('./pages/admin/AdminPages'));
 const AdminPageEditor = lazy(() => import('./pages/admin/AdminPageEditor'));
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
+const AdminPrivacyNotice = lazy(() => import('./pages/admin/AdminPrivacyNotice'));
 const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const DocumentsUploadPage = cmsRoute('inscripcion-documentos', () => import('./pages/public/DocumentsUploadPage'));
@@ -260,6 +261,8 @@ export default function App() {
               <Route path="arco" element={<AdminArco />} />
               <Route path="contenido/medios" element={<AdminMedia />} />
               <Route path="contenido/:id" element={<AdminPageEditor />} />
+              <Route path="aviso-privacidad" element={<AdminPrivacyNotice />} />
+              <Route path="aviso-privacidad/:id" element={<AdminPrivacyNotice />} />
             </Route>
 
           </Routes>
