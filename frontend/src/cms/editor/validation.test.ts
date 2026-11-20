@@ -34,7 +34,7 @@ describe('validateFields', () => {
     expect(by.cta).toMatchObject({ code: 'required', message: 'Elija a dónde lleva el enlace.' });
     expect(by.note).toMatchObject({ code: 'link' });
     expect(by.html).toMatchObject({ code: 'link' });
-    expect(by['items.1.name']).toMatchObject({ code: 'required', label: 'Tarjetas › 2 › Nombre' });
+    expect(by['items.1.name']).toMatchObject({ code: 'required', label: 'Tarjetas › elemento 2 › Nombre' });
     expect(by['items.1.href']).toMatchObject({ code: 'link' });
     expect(by['items.1.photo']).toMatchObject({ code: 'missing_image' });
     expect(by['items.0.name']).toBeUndefined();

@@ -11,6 +11,9 @@ import { ArrowDown, ArrowUp, ChevronRight, Copy, Plus, Trash2 } from 'lucide-rea
 import { Button } from '@/components/ui/Button';
 import type { Block, BlockSpec, FieldSpec } from '../blocks/registry';
 import { blockSpec, withDefaults } from '../blocks/registry';
+import { emptyTable, type TableValue } from '../blocks/table';
+import { CustomField } from './customFields';
+import { TableField } from './TableField';
 import { helpFor } from './fieldHelp';
 import { fieldDomId, focusFieldElement, onFieldFocusRequest, peekFieldFocus, takeFieldFocus } from './fieldFocus';
 import { slugify } from './helpers';
@@ -229,6 +232,7 @@ function move<T>(list: T[], i: number, d: -1 | 1): T[] {
 function emptyOf(f: FieldSpec): unknown {
   if (f.kind === 'items' || f.kind === 'images') return [];
   if (f.kind === 'link') return { label: '', href: '' };
+  if (f.kind === 'table') return emptyTable();
   if (f.kind === 'toggle') return false;
   if (f.kind === 'image' || f.kind === 'number') return undefined;
   if ((f.kind === 'select' || f.kind === 'color' || f.kind === 'icon') && f.options?.[0]) return f.options[0].value;
@@ -356,6 +360,14 @@ function Field({ spec, value, onChange, path, helpPath, ctx }: FieldProps) {
       break;
     case 'items':
       control = <ItemsField spec={spec} value={value} onChange={onChange} path={path} helpPath={helpPath} ctx={ctx} hint={hint} error={error} />;
+      break;
+    case 'table':
+      // The «Tabla» grid (./TableField): its own instructions, plus this form's help and errors.
+      control = <TableField spec={spec} value={value} onChange={(v: TableValue) => onChange(v)} id={id} hint={hint} error={error} onBlur={base.onBlur} />;
+      break;
+    case 'action':
+      // A button to a console screen («Editar precios»); stores nothing (./customFields).
+      control = <CustomField spec={spec} value={value} onChange={onChange} />;
       break;
     default:
       control = null;

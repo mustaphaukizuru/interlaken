@@ -246,6 +246,28 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e
 
+      # CMS visual guard (e2e/public-pages.spec.ts, docs/cms/safe-publish.md):
+      # its "published from the design == defaults" check always runs; the
+      # comparison with committed baselines is skipped while there are no
+      # linux ones. Until they are committed, every run renders them here and
+      # uploads `public-pages-baselines-linux`: review the PNGs and commit them
+      # into frontend/e2e/public-pages.spec.ts-snapshots/.
+      - name: Render missing public-page baselines (for review)
+        id: public-baselines
+        if: success() && hashFiles('frontend/e2e/public-pages.spec.ts-snapshots/*-linux.png') == ''
+        working-directory: frontend
+        run: |
+          npx playwright test public-pages.spec.ts --grep "Public pages: defaults" --update-snapshots=missing
+          echo "made=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload public-page baselines
+        if: steps.public-baselines.outputs.made == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-pages-baselines-linux
+          path: frontend/e2e/public-pages.spec.ts-snapshots/
+          retention-days: 14
+
       - name: Upload visual diffs on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -263,14 +285,17 @@ jobs:
         if: failure()
         working-directory: frontend
         continue-on-error: true
-        run: npx playwright test visual.spec.ts --update-snapshots
+        # Public pages: baselines come from the defaults state only.
+        run: npx playwright test visual.spec.ts public-pages.spec.ts --grep-invert "published from the design" --update-snapshots
 
       - name: Upload regenerated visual baselines
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: visual-baselines-linux
-          path: frontend/e2e/visual.spec.ts-snapshots/
+          path: |
+            frontend/e2e/visual.spec.ts-snapshots/
+            frontend/e2e/public-pages.spec.ts-snapshots/
           retention-days: 7
 
       - name: Upload Playwright report on failure

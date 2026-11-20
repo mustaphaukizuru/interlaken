@@ -136,9 +136,38 @@
       "required": {},
       "images": [],
       "labels": {
+        "editPrices": "Editar precios",
         "eyebrow": "Etiqueta superior",
         "title": "Título",
-        "text": "Texto"
+        "text": "Texto",
+        "cardEyebrow": "Calculadora: etiqueta",
+        "cardTitle": "Calculadora: título",
+        "sectionLabel": "Título de los niveles",
+        "sections": "Niveles",
+        "sections[].label": "Nivel",
+        "startSection": "Nivel elegido al abrir",
+        "modalityLabel": "Título de la modalidad",
+        "newTag": "Botón de nuevo ingreso",
+        "returningTag": "Botón de reinscripción",
+        "adminLabel": "Renglón de gastos administrativos",
+        "adminSub": "Nota de gastos administrativos",
+        "newFeeLabel": "Renglón de la cuota (nuevo ingreso)",
+        "returningFeeLabel": "Renglón de la cuota (reinscripción)",
+        "feeSub": "Nota de la cuota",
+        "tuitionLabel": "Renglón de la colegiatura",
+        "tuitionMissing": "Colegiatura sin precio",
+        "perMonth": "Texto después de la colegiatura",
+        "insuranceLabel": "Renglón de seguros",
+        "insuranceSub": "Nota de seguros",
+        "noCost": "Texto cuando no hay cuota",
+        "notes": "Notas",
+        "notes[].text": "Nota",
+        "notes[].tone": "Color del ícono",
+        "waLabel": "Botón de WhatsApp",
+        "allLabel": "Enlace a Costos: texto",
+        "allHref": "Enlace a Costos: destino",
+        "errorTitle": "Si no cargan los precios: título",
+        "errorText": "Si no cargan los precios: texto"
       }
     },
     "admisiones.faq": {
@@ -350,7 +379,8 @@
       "required": {},
       "images": [],
       "labels": {
-        "structureTitle": "Título de la explicación del pago",
+        "editPrices": "Editar precios",
+        "structureTitle": "Título de la explicación",
         "structure": "Cómo se estructura el pago",
         "structure[].title": "Concepto",
         "structure[].text": "Explicación",
@@ -359,19 +389,27 @@
         "feesSubtitle": "Inscripción: subtítulo",
         "newTag": "Pestaña de nuevo ingreso",
         "returningTag": "Pestaña de reinscripción",
+        "colLevel": "Encabezado: nivel",
+        "colAdmin": "Encabezado: gastos administrativos",
+        "colNew": "Encabezado de la cuota (nuevo ingreso)",
+        "colReturning": "Encabezado de la cuota (reinscripción)",
         "tuitionLabel": "Colegiaturas: etiqueta",
         "tuitionTitle": "Colegiaturas: título",
         "tuitionSubtitle": "Colegiaturas: subtítulo",
+        "perMonth": "Texto después de cada colegiatura",
         "insuranceLabel": "Seguros: etiqueta",
         "insuranceTitle": "Seguros: título",
         "insuranceSubtitle": "Seguros: subtítulo",
         "extrasLabel": "Extraescolares: etiqueta",
         "extrasTitle": "Extraescolares: título",
         "extrasSubtitle": "Extraescolares: subtítulo",
+        "perYear": "Texto después de cada anualidad",
         "daycareLabel": "Estancia: etiqueta",
         "daycareTitle": "Estancia: título",
         "daycareSubtitle": "Estancia: subtítulo",
-        "policiesTitle": "Título de las políticas de pago",
+        "daycareMonthly": "Texto después de la tarifa mensual",
+        "policiesTitle": "Título de las políticas",
+        "policyHighlight": "Destacar las políticas que mencionan",
         "noteText": "Nota: texto",
         "noteStrong": "Nota: texto en negritas",
         "noteLinkLead": "Nota: texto antes del enlace",
@@ -383,7 +421,9 @@
         "emptyTitle": "Sin precios publicados: título",
         "emptyText": "Sin precios publicados: texto",
         "emptyPrimary": "Sin precios publicados: botón principal",
-        "emptySecondary": "Sin precios publicados: botón secundario"
+        "emptySecondary": "Sin precios publicados: botón secundario",
+        "errorTitle": "Si no cargan los precios: título",
+        "errorText": "Si no cargan los precios: texto"
       }
     },
     "cta_band": {
@@ -1146,6 +1186,34 @@
         "items": "Cifras",
         "items[].value": "Valor",
         "items[].label": "Etiqueta"
+      }
+    },
+    "table": {
+      "label": "Tabla",
+      "group": "",
+      "locked": false,
+      "required": {
+        "table": "dict"
+      },
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "intro": "Introducción",
+        "table": "Tabla",
+        "notes": "Notas al pie",
+        "card": "Mostrar como tarjeta (igual que las tablas de Costos)",
+        "tone": "Color de la tarjeta",
+        "icon": "Ícono de la tarjeta",
+        "label": "Etiqueta de la tarjeta",
+        "subtitle": "Subtítulo de la tarjeta",
+        "bg": "Fondo de la sección"
+      },
+      "tables": {
+        "table": {
+          "columns": 8,
+          "rows": 60,
+          "cell": 300
+        }
       }
     },
     "testimonials": {

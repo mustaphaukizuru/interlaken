@@ -14,6 +14,7 @@ import { Testimonials } from '@/components/public/Testimonials';
 import { HistoryTimeline, type Milestone } from '@/components/public/HistoryTimeline';
 import { PricingSections } from '@/components/public/PricingSections';
 import { CmsForm } from '../CmsForm';
+import { TableBlock, type TableBlockProps } from './TableBlock';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { LEVELS } from '@/lib/levels';
 import { useSep } from '@/hooks/useSep';
@@ -99,6 +100,7 @@ export default function GenericBlockView({ block }: { block: Block }) {
     case 'open_school_events': return <OpenSchoolBlock />;
     case 'form': return <FormBlock slug={String(p.form ?? '')} />;
     case 'sep_incorporation': return <SepBlock />;
+    case 'table': return <TableBlock {...(p as unknown as TableBlockProps)} />;
     default: return null;
   }
 }

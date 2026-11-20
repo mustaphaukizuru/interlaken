@@ -1,32 +1,40 @@
 """
-Pre-publish checks for CMS pages (BACKLOG P3-12).
+Pre-publish checks for CMS pages (BACKLOG P3-12, docs/cms/safe-publish.md).
 
 run_checks(page) -> list of {level: 'error'|'warning', code, message, block_id?}
 Errors block publishing; warnings are shown but do not block.
-
-An issue about a section also says where, in the editor's words (contract
-C3): block_index, block_label, field (a path such as `items.2.title`),
-field_label («Tarjetas › 3 › Título») and field_message (the short text shown
-next to the field). `message` names the section and the field with their
-Spanish labels, never with prop keys.
 
 Checks: required props empty, images that no longer exist, images without alt,
 internal links to routes/pages that do not exist (and are not redirected),
 rich text with no content, SEO description missing/too long, duplicate
 consecutive block types (usually a paste mistake), a locked section (one that
-carries a form or the booking widget) hidden. Hidden blocks are otherwise
-skipped: they never reach the site. Built-in site photos (/assets/...) are
-valid images; only media-library ids are looked up.
+carries a form or the booking widget) hidden, SEO still holding the old
+seed_cms values. Hidden blocks are otherwise skipped: they never reach the
+site. Built-in site photos (/assets/...) are valid images; only media-library
+ids are looked up.
+
+A designed page published straight from its design passes with no issue at
+all: its SEO falls back to the template's (page_templates.template_seo), so a
+blank SEO field is not «missing». Messages are plain Spanish and name the
+section (its number and label in the editor's list) and the field.
+
+An issue about a section also says where, in the editor's words (contract
+C3): block_index, block_label, field (a path such as `items.2.title`, the
+editor field it belongs to), field_label («Tarjetas › elemento 3 › Título»)
+and field_message (the short text shown next to the field). Labels come from
+block_manifest.json (pages.field_label), never from prop keys.
 """
 from __future__ import annotations
 
 import re
 
 from .media import MediaAsset
-from .pages import Page, field_path, image_ref_paths, located_error, manifest, section_schema, where
+from .pages import Page, image_ref_paths, located_error, manifest, section_schema, where
 
 HREF_RE = re.compile(r'href=["\']([^"\']+)["\']', re.I)
 ROUTE_PREFIXES = ('/niveles/', '/portal', '/admin', '/staff', '/login', '/p/')
+SEO_TITLE_MAX = 60
+SEO_DESCRIPTION_MAX = 160
 
 
 def _known_paths() -> set[str]:
@@ -55,7 +63,7 @@ def _hrefs(value, out: list[tuple[str, str]], path: str = '') -> None:
 
 
 def _links_in(blocks: list[tuple[int, dict]]) -> list[tuple[int, str, str]]:
-    """(block index, field path, href) of every link of the given (index, block) pairs."""
+    """(block index, path, href) of every link of the given (index, block) pairs."""
     out = []
     for i, b in blocks:
         found: list[tuple[str, str]] = []
@@ -77,42 +85,47 @@ def issue_error(issue: dict) -> dict:
 
 
 def run_checks(page: Page) -> list[dict]:
+    from .legacy_seed import seed_seo_fields
+    from .page_templates import template_seo
+
     all_blocks = page.draft_blocks or []
-    blocks = [b for b in all_blocks if not b.get('hidden')]
-    visible = [(i, b) for i, b in enumerate(all_blocks) if not b.get('hidden')]
     issues: list[dict] = []
     err = lambda code, msg, bid=None: issues.append({'level': 'error', 'code': code, 'message': msg, 'block_id': bid})  # noqa: E731
     warn = lambda code, msg, bid=None: issues.append({'level': 'warning', 'code': code, 'message': msg, 'block_id': bid})  # noqa: E731
 
-    def at(level: str, code: str, index: int, field: str, short: str, full: str = '') -> None:
-        """An issue located in a section and field, with labelled messages (see module docstring)."""
-        loc = located_error(all_blocks, index, field, short)
+    def at(level: str, code: str, index: int, path: str, short: str, full: str = '') -> None:
+        """An issue located in a section and field: «Sección N (label), campo «…»: …» plus the structured fields."""
+        loc = located_error(all_blocks, index, path, short)
         t = all_blocks[index].get('type')
         issues.append({'level': level, 'code': code, 'block_id': loc['block_id'],
-                       'message': full or f'{where(t, index, loc["field"])}: {short[0].lower()}{short[1:]}',
+                       'message': full or f'{where(t, index, path)}: {short[0].lower()}{short[1:]}',
                        'block_index': index, 'block_label': loc['block_label'], 'field': loc['field'],
                        'field_label': loc['field_label'], 'field_message': short})
 
-    if not blocks:
-        err('empty', 'La página no tiene bloques visibles.')
-    for i, b in enumerate(all_blocks):
-        info = manifest().get(b.get('type'), {})
-        if b.get('hidden') and info.get('locked'):
-            at('error', 'locked_hidden', i, '', 'Esta sección no se puede ocultar: lleva un formulario o datos del sistema.')
+    # Numbered as in the editor's list (hidden ones count: they are still in the list).
+    numbered = [(i, b) for i, b in enumerate(all_blocks) if isinstance(b, dict)]
+    visible = [(i, b) for i, b in numbered if not b.get('hidden')]
+
+    if not visible:
+        err('empty', 'La página no tiene secciones visibles: agregue una o muestre alguna de las ocultas.')
+    for i, b in numbered:
+        if b.get('hidden') and manifest().get(b.get('type'), {}).get('locked'):
+            at('error', 'locked_hidden', i, '', 'Lleva un formulario o la agenda y no se puede ocultar. Vuelva a mostrarla.')
+
     prev, prev_i = None, 0
     for i, b in visible:
-        req = section_schema(b.get('type')) or {}
-        for name in req:
-            v = b.get('props', {}).get(name)
-            if v in (None, '', [], {}):
-                at('error', 'required', i, name, 'Este dato es obligatorio.')
-        if b.get('type') == 'rich_text' and not re.sub(r'<[^>]+>', '', str(b.get('props', {}).get('html', ''))).strip():
-            at('error', 'empty_text', i, 'html', 'El texto está vacío.')
-        if b.get('type') == 'gallery' and not b.get('props', {}).get('images'):
-            at('error', 'empty_gallery', i, 'images', 'La galería no tiene imágenes.')
+        props = b.get('props') or {}
+        for name in section_schema(b.get('type')) or {}:
+            if props.get(name) in (None, '', [], {}):
+                at('error', 'required', i, name, 'Está vacío y es obligatorio.')
+        if b.get('type') == 'rich_text' and not re.sub(r'<[^>]+>', '', str(props.get('html', ''))).strip():
+            at('error', 'empty_text', i, 'html', 'No tiene contenido. Escriba el texto o elimine la sección.')
+        if b.get('type') == 'gallery' and not props.get('images'):
+            at('error', 'empty_gallery', i, 'images', 'La galería no tiene fotos.')
         if prev == b.get('type') and b.get('type') in ('hero', 'cta_band', 'stats'):
-            at('warning', 'duplicate', i, '', 'Esta sección es igual a la anterior; ¿se duplicó por error?',
-               f'Las secciones {prev_i + 1} y {i + 1} son del mismo tipo («{manifest().get(b.get("type"), {}).get("label") or "Sección"}»); ¿se duplicó por error?')
+            label = manifest().get(b.get('type'), {}).get('label') or 'Sección'
+            at('warning', 'duplicate', i, '', 'Es del mismo tipo que la sección anterior; ¿se duplicó por error?',
+               f'Secciones {prev_i + 1} y {i + 1} ({label}): son del mismo tipo y van seguidas; ¿se duplicó por error?')
         prev, prev_i = b.get('type'), i
 
     refs = [(i, path, mid) for i, b in visible for path, mid in image_ref_paths(b)]
@@ -120,9 +133,9 @@ def run_checks(page: Page) -> list[dict]:
     for i, path, mid in refs:
         a = assets.get(mid)
         if a is None:
-            at('error', 'missing_image', i, path, 'Esta imagen ya no existe en la biblioteca. Elija otra.')
+            at('error', 'missing_image', i, path, 'La imagen se borró de la biblioteca de medios. Elija otra.')
         elif not a.alt:
-            at('error', 'missing_alt', i, path, f'La imagen «{a.filename}» no tiene descripción (texto alternativo). Escríbala junto a la imagen.')
+            at('error', 'missing_alt', i, path, f'La foto «{a.filename}» no tiene descripción (texto alternativo). Escríbala junto a la imagen.')
 
     known = _known_paths()
     for i, path, href in _links_in(visible):
@@ -130,25 +143,36 @@ def run_checks(page: Page) -> list[dict]:
         t = all_blocks[i].get('type')
         if not h or h.startswith(('http://', 'https://', 'mailto:', 'tel:', '#')):
             if h.startswith('http://'):
-                at('warning', 'insecure_link', i, path, f'Este enlace no usa conexión segura (https): {h}')
+                at('warning', 'insecure_link', i, path, f'El enlace {h} no es seguro (http). Use https:// si el sitio lo permite.')
             continue
         if not h.startswith('/'):
-            at('error', 'relative_link', i, path, f'El enlace «{h}» debe ser una página del sitio o una dirección que empiece con https://.')
+            at('error', 'relative_link', i, path, f'El enlace «{h}» debe empezar con / (página del sitio) o con https://.')
             continue
         target = h.split('?')[0].split('#')[0].rstrip('/') or '/'
         if target in known or target.startswith(ROUTE_PREFIXES):
             continue
-        short = f'Enlace roto: {h} no lleva a ninguna página ni redirección. Elija otro destino.'
-        at('error', 'broken_link', i, path, short, f'Enlace roto en {where(t, i, field_path(t, path))}: {h} no lleva a ninguna página ni redirección.')
+        at('error', 'broken_link', i, path, f'Enlace roto: {h} no lleva a ninguna página ni redirección. Elija otro destino.',
+           f'Enlace roto. {where(t, i, path)}: {h} no lleva a ninguna página ni redirección del sitio.')
 
+    # SEO: an empty field shows the design's own title and description, so only
+    # what the school typed (or the old seed left behind) is checked.
     seo = page.seo or {}
+    defaults = template_seo(page.slug)
     og = seo.get('og_image')
     if isinstance(og, int) and not isinstance(og, bool) and not MediaAsset.objects.filter(pk=og).exists():
-        warn('missing_og_image', 'La imagen para compartir ya no existe en la biblioteca; se usará la imagen general del sitio.')
-    if not (seo.get('description') or '').strip():
-        warn('seo_description', 'Falta la descripción SEO (aparece en Google).')
-    elif len(seo['description']) > 160:
-        warn('seo_long', f'La descripción SEO tiene {len(seo["description"])} caracteres; se recorta en Google a partir de 160.')
-    if (seo.get('title') or page.title or '') and len(seo.get('title') or page.title) > 60:
-        warn('seo_title', 'El título SEO supera 60 caracteres.')
+        warn('missing_og_image', 'SEO, campo «Imagen al compartir»: la imagen se borró de la biblioteca; se usará la imagen general del sitio.')
+    description = (seo.get('description') or '').strip()
+    if not description and not defaults['description']:
+        warn('seo_description', 'SEO, campo «Descripción SEO»: está vacío. Escriba una frase que resuma la página (aparece en Google).')
+    elif len(description) > SEO_DESCRIPTION_MAX:
+        warn('seo_long', f'SEO, campo «Descripción SEO»: tiene {len(description)} caracteres; Google la recorta a partir de {SEO_DESCRIPTION_MAX}.')
+    title = (seo.get('title') or '').strip() or (page.title if not defaults['title'] else '')
+    if len(title) > SEO_TITLE_MAX:
+        warn('seo_title', f'SEO, campo «Título SEO»: tiene {len(title)} caracteres; Google lo recorta a partir de {SEO_TITLE_MAX}.')
+    stale = seed_seo_fields(page.slug, seo)
+    if stale:
+        names = ' y '.join({'title': '«Título SEO»', 'description': '«Descripción SEO»'}[k] for k in ('title', 'description') if k in stale)
+        current = f' («{defaults["title"]}»)' if defaults['title'] and 'title' in stale else ''
+        warn('seed_seo', f'SEO, {names}: conservan el texto de la versión antigua del sitio y reemplazan el del diseño actual{current}. '
+                         'Bórrelos en SEO o use «Diseño original» para recuperar el del diseño.')
     return issues

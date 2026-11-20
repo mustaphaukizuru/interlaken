@@ -14,8 +14,8 @@ export interface CmsPagePayload {
   blocks: Block[];
   seo: { title?: string; description?: string; og_image?: number | string; noindex?: boolean };
   published_at: string | null;
-  /** Alt text and sizes of the library images the blocks use. */
-  media?: Record<string, { alt?: string; width?: number | null; height?: number | null }>;
+  /** Alt text, sizes and existing variants (thumb/md/lg) of the library images the blocks use. */
+  media?: Record<string, { alt?: string; width?: number | null; height?: number | null; variants?: string[] }>;
 }
 
 async function request(slug: string): Promise<CmsPagePayload | null> {

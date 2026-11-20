@@ -56,16 +56,18 @@ describe('BlockForm groups (C4)', () => {
   it('renders the price tables as named groups with counts and remembers what is open', async () => {
     const { unmount } = renderWithProviders(<Harness initial={{ id: 'p', type: 'costos.prices', props: {} }} />);
     const first = screen.getByRole('button', { name: /Cómo se paga/ });
-    const fees = screen.getByRole('button', { name: /Inscripción/ });
+    const fees = screen.getByRole('button', { name: /^Inscripción y reinscripción/ });
     expect(first).toHaveAttribute('aria-expanded', 'true');
     expect(fees).toHaveAttribute('aria-expanded', 'false');
-    expect(fees).toHaveTextContent('5 de 5');
+    expect(fees).toHaveTextContent('9 de 9');
+    // «Editar precios» (the tables branch's action) sits above the groups.
+    expect(screen.getByText(/Las cifras, los niveles y las políticas se editan/)).toBeInTheDocument();
     await userEvent.click(fees);
     expect(fees).toHaveAttribute('aria-expanded', 'true');
-    expect(JSON.parse(localStorage.getItem('cms-field-groups') ?? '{}')['costos.prices']['Inscripción']).toBe(true);
+    expect(JSON.parse(localStorage.getItem('cms-field-groups') ?? '{}')['costos.prices']['Inscripción y reinscripción']).toBe(true);
     unmount();
     renderWithProviders(<Harness initial={{ id: 'p', type: 'costos.prices', props: {} }} />);
-    expect(screen.getByRole('button', { name: /Inscripción/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /^Inscripción y reinscripción/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('a collapsed group shows how many fields need fixing', () => {

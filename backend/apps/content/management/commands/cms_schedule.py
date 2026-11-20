@@ -7,7 +7,9 @@ from cron next to the cafetería sync.
 A scheduled publish goes through the same pre-publish checks as the manual
 "Publicar" (``PagePublishView``): a page with blocking errors is skipped and
 logged, and keeps its ``publish_at`` so the editor shows it as overdue until
-someone fixes it.
+someone fixes it. A draft still in the old generic format (``legacy_seed``) is
+never published on a schedule: it would replace the designed page, which needs
+an explicit confirmation in the editor (docs/cms/safe-publish.md).
 
 A comunicado whose fan-out fails is retried on later ticks only within
 ``FANOUT_RETRY_WINDOW`` of its publish time or its last edit, so a permanent
@@ -21,7 +23,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.content.pages import Page
+from apps.content.pages import Page, is_legacy_seed
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,15 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         now = timezone.now()
         published = unpublished = blocked = 0
-        for page in Page.objects.filter(publish_at__lte=now).exclude(publish_at__isnull=True):
+        for page in Page.objects.select_related('published_version').filter(publish_at__lte=now).exclude(publish_at__isnull=True):
+            if is_legacy_seed(page):
+                blocked += 1
+                logger.warning(
+                    'cms_schedule: page %s (%s) not published: its draft is the old generic seed format '
+                    'and would replace the designed page; publish it from the editor to confirm.',
+                    page.pk, page.slug,
+                )
+                continue
             errors = blocking_issues(page)
             if errors:
                 blocked += 1

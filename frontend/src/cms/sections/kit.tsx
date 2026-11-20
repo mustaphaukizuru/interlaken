@@ -25,7 +25,7 @@ export function defineModule(sections: SectionSpec[], templates: PageTemplate[])
 }
 
 /* ── Field shorthands ────────────────────────────────────────────────────── */
-type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group' | 'advanced' | 'slugFrom' | 'optionsFrom' | 'marks' | 'minWidth'>>;
+type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group' | 'advanced' | 'slugFrom' | 'optionsFrom' | 'marks' | 'minWidth' | 'limits'>>;
 export const f = {
   text: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'text', ...o }),
   /** A link destination (page of the site, web address, e-mail, phone, WhatsApp) stored as a string. */
@@ -43,6 +43,8 @@ export const f = {
   color: (key: string, label = 'Color', o: Opt = {}): FieldSpec => ({ key, label, kind: 'color', options: COLOR_OPTIONS, ...o }),
   select: (key: string, label: string, options: { value: string; label: string }[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'select', options, ...o }),
   items: (key: string, label: string, item: FieldSpec[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'items', item, ...o }),
+  /** A button to a console screen (opens in a new tab); `hint` says what is edited there. */
+  action: (key: string, label: string, actionHref: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'action', actionHref, ...o }),
 };
 
 /** Fields shown together as one collapsible group in the editor (FieldSpec.group). */

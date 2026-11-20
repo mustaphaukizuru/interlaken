@@ -12,7 +12,7 @@ export type IssueCode = 'required' | 'alt' | 'missing_image' | 'link';
 export interface FieldIssue {
   /** `title`, `items.2.title` (see fieldFocus.ts). */
   path: string;
-  /** Spanish label chain, e.g. «Tarjetas › 3 › Título». */
+  /** Spanish label chain, e.g. «Tarjetas › elemento 3 › Título». */
   label: string;
   message: string;
   code: IssueCode;
@@ -38,7 +38,12 @@ const stripHtml = (s: string) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' 
 export function isEmptyValue(f: FieldSpec, v: unknown): boolean {
   switch (f.kind) {
     case 'toggle':
+    case 'action':
       return false;
+    case 'table': {
+      const t = (v ?? {}) as { columns?: unknown[]; rows?: unknown[][] };
+      return !Array.isArray(t.columns) || !t.columns.length || !Array.isArray(t.rows) || !t.rows.some((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim()));
+    }
     case 'number':
       return v === undefined || v === null || v === '' || Number.isNaN(v);
     case 'image':
@@ -71,6 +76,7 @@ function requiredMessage(f: FieldSpec, v: unknown): string {
     case 'color':
     case 'form': return 'Elija una opción: es obligatoria.';
     case 'href': return 'Elija a dónde lleva el enlace.';
+    case 'table': return 'Escriba al menos una fila en la tabla.';
     default: return 'Este campo es obligatorio.';
   }
 }
@@ -119,12 +125,12 @@ export function validateFields(fields: FieldSpec[], props: Record<string, unknow
       if (issue) issues.push(issue);
     } else if (f.kind === 'images' && Array.isArray(v)) {
       v.forEach((it, i) => {
-        const issue = imageIssue(`${path}.${i}.image`, `${label}${LABEL_SEP}${i + 1}`, (it as { image?: unknown })?.image, media);
+        const issue = imageIssue(`${path}.${i}.image`, `${label}${LABEL_SEP}elemento ${i + 1}`, (it as { image?: unknown })?.image, media);
         if (issue) issues.push(issue);
       });
     } else if (f.kind === 'items' && Array.isArray(v)) {
       v.forEach((it, i) => {
-        if (it && typeof it === 'object') issues.push(...validateFields(f.item ?? [], it as Record<string, unknown>, media, `${path}.${i}.`, `${label}${LABEL_SEP}${i + 1}${LABEL_SEP}`));
+        if (it && typeof it === 'object') issues.push(...validateFields(f.item ?? [], it as Record<string, unknown>, media, `${path}.${i}.`, `${label}${LABEL_SEP}elemento ${i + 1}${LABEL_SEP}`));
       });
     } else if (typeof v === 'string' && v) {
       const hrefs = f.kind === 'richtext' ? htmlHrefs(v) : f.marks?.includes('link') ? Array.from(v.matchAll(MARK_LINK_RE), (m) => m[2]) : [];

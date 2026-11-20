@@ -35,8 +35,8 @@ def test_manifest_labels_every_field_path():
 
 
 def test_field_paths_and_labels_never_show_keys():
-    assert field_label('feature_grid', 'items.2.title') == 'Tarjetas › 3 › Título'
-    assert field_label('galeria.grid', 'photos.0.image') == 'Fotos › 1 › Foto'
+    assert field_label('feature_grid', 'items.2.title') == 'Tarjetas › elemento 3 › Título'
+    assert field_label('galeria.grid', 'photos.0.image') == 'Fotos › elemento 1 › Foto'
     assert field_path('cta_band', 'cta.href') == 'cta'
     assert field_path('nivel.others', 'items.0.href') == 'items.0.href'
     assert field_label('hero', 'no_such_key') == ''
@@ -50,7 +50,7 @@ def test_save_with_invalid_blocks_returns_located_errors(admin_client):
                                              {'id': 'h1', 'type': 'hero', 'props': {}}]}, format='json')
     assert r.status_code == 400
     assert r.data['detail'] and r.data['draft_blocks']['blocks'] == [r.data['detail']]
-    assert '«Portada (hero)» (sección 2)' in r.data['detail'] and 'Título' in r.data['detail']
+    assert r.data['detail'] == 'Sección 2 (Portada (hero)), campo «Título»: falta este dato.'
     assert not RAW_KEY.search(r.data['detail'])
     [e] = r.data['errors']
     assert set(e) == ERROR_KEYS
@@ -78,9 +78,9 @@ def test_publish_errors_name_section_and_field(admin_client, settings, tmp_path)
     assert (by_block['a']['field'], by_block['a']['field_label'], by_block['a']['block_index']) == ('title', 'Título', 0)
     assert (by_block['b']['field'], by_block['b']['field_label']) == ('cta', 'Botón')
     assert 'Enlace roto' in by_block['b']['message']
-    assert (by_block['c']['field'], by_block['c']['field_label']) == ('photos.1.image', 'Fotos › 2 › Foto')
+    assert (by_block['c']['field'], by_block['c']['field_label']) == ('photos.1.image', 'Fotos › elemento 2 › Foto')
     assert 'texto alternativo' in by_block['c']['message']
-    assert (by_block['d']['field'], by_block['d']['field_label']) == ('items.0.href', 'Tarjetas › 1 › Enlace')
+    assert (by_block['d']['field'], by_block['d']['field_label']) == ('items.0.href', 'Tarjetas › elemento 1 › Enlace')
 
 
 @pytest.mark.django_db
@@ -91,9 +91,25 @@ def test_checks_issues_carry_location_and_short_message(admin_client):
     ])
     issues = {i['code']: i for i in run_checks(page)}
     assert issues['empty_text']['field'] == 'html' and issues['empty_text']['field_label'] == 'Contenido'
-    assert issues['empty_text']['field_message'] == 'El texto está vacío.'
-    assert issues['relative_link']['field'] == 'items.0.a' and issues['relative_link']['field_label'] == 'Preguntas › 1 › Respuesta'
-    assert issues['relative_link']['message'].startswith('«Preguntas frecuentes» (sección 2) › Preguntas › 1 › Respuesta:')
+    assert issues['empty_text']['field_message'] == 'No tiene contenido. Escriba el texto o elimine la sección.'
+    assert issues['relative_link']['field'] == 'items.0.a' and issues['relative_link']['field_label'] == 'Preguntas › elemento 1 › Respuesta'
+    assert issues['relative_link']['message'].startswith('Sección 2 (Preguntas frecuentes), campo «Preguntas › elemento 1 › Respuesta»:')
     data = admin_client.get(reverse('admin-page-checks', args=[page.pk])).data
     assert {i['code'] for i in data['issues']} >= {'empty_text', 'relative_link'}
     assert all('field_label' in i for i in data['issues'] if i['block_id'])
+
+
+@pytest.mark.django_db
+def test_table_limits_come_back_as_labelled_errors(admin_client):
+    page = Page.objects.create(slug='t', title='T', draft_blocks=[])
+    wide = {'columns': [{'label': f'C{i}'} for i in range(9)], 'rows': [['x'] * 9]}
+    r = admin_client.patch(reverse('admin-page-detail', args=[page.pk]),
+                           {'draft_blocks': [{'id': 'tb', 'type': 'table', 'props': {'title': 'Cuotas', 'table': wide}}]}, format='json')
+    assert r.status_code == 400
+    assert r.data['detail'] == 'Sección 1 (Tabla), campo «Tabla › Columnas»: la tabla admite hasta 8 columnas.'
+    [e] = r.data['errors']
+    assert (e['block_id'], e['field'], e['field_label'], e['message']) == ('tb', 'table', 'Tabla › Columnas', 'La tabla admite hasta 8 columnas.')
+    rows = {'columns': [{'label': 'A'}], 'rows': [['x', 'y']]}
+    r = admin_client.patch(reverse('admin-page-detail', args=[page.pk]),
+                           {'draft_blocks': [{'id': 'tb', 'type': 'table', 'props': {'table': rows}}]}, format='json')
+    assert r.status_code == 400 and r.data['errors'][0]['field_label'] == 'Tabla › Filas'

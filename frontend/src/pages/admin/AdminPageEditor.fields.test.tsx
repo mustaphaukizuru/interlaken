@@ -1,8 +1,8 @@
 /**
  * Editor round «editor fields» (contracts C3 to C5) inside the page editor:
  * the error summary before publishing, structured publish errors next to
- * their field, and «jump to field». Kept apart from AdminPageEditor.test.tsx
- * (the editor shell's own tests).
+ * their field, and «jump to field» (into the shell's form, not its heading).
+ * Kept apart from AdminPageEditor.test.tsx (the editor shell's own tests).
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -17,12 +17,14 @@ vi.mock('@/services/api', () => ({
     adminPageChecks: vi.fn(), adminReviewPage: vi.fn(), adminPreviewToken: vi.fn(), getSettings: vi.fn(), adminListPages: vi.fn(),
   },
 }));
+vi.mock('@/cms/editor/shell/publishApi', () => ({ publishPage: vi.fn() }));
 vi.mock('@/store/authStore', () => ({
   useAuthStore: (sel: (s: { user: { id: number; role: string } }) => unknown) => sel({ user: { id: 1, role: 'admin' } }),
 }));
 
 import toast from 'react-hot-toast';
 import { contentApi } from '@/services/api';
+import { publishPage } from '@/cms/editor/shell/publishApi';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { loadAllGroups } from '@/cms/sections/loaders';
 import AdminPageEditor from './AdminPageEditor';
@@ -61,7 +63,7 @@ describe('AdminPageEditor field errors', () => {
   });
 
   it('shows the structured publish errors next to their field', async () => {
-    vi.mocked(contentApi.adminPublishPage).mockRejectedValue({
+    vi.mocked(publishPage).mockRejectedValue({
       response: {
         status: 400,
         data: {
