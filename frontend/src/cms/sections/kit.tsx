@@ -25,7 +25,7 @@ export function defineModule(sections: SectionSpec[], templates: PageTemplate[])
 }
 
 /* ── Field shorthands ────────────────────────────────────────────────────── */
-type Opt = Partial<Pick<FieldSpec, 'required' | 'hint'>>;
+type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group'>>;
 export const f = {
   text: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'text', ...o }),
   textarea: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'textarea', ...o }),
@@ -42,6 +42,19 @@ export const f = {
   select: (key: string, label: string, options: { value: string; label: string }[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'select', options, ...o }),
   items: (key: string, label: string, item: FieldSpec[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'items', item, ...o }),
 };
+
+/** The same editor group for every field of a list: `inGroup('Mensajes', [f.text(...), ...])`. */
+export const inGroup = (group: string, fields: FieldSpec[]): FieldSpec[] => fields.map((fs) => ({ ...fs, group }));
+
+/**
+ * Fills `{name}` placeholders of an editable text with values the page
+ * computes (a count, a grade, an e-mail). Unknown names stay as written.
+ * Site tokens ({{ciclo}}, {{correo}}...) are a different syntax and are
+ * replaced by useTokens before this runs.
+ */
+export function fill(text: string, values: Record<string, string | number>): string {
+  return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
+}
 
 /** The usual heading trio of a section. */
 export const headingFields = (o: { eyebrow?: boolean; text?: boolean } = {}): FieldSpec[] => [

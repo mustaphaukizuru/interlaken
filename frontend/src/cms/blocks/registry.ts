@@ -20,6 +20,12 @@ export interface FieldSpec {
   /** For kind 'select'. */
   options?: { value: string; label: string }[];
   hint?: string;
+  /**
+   * Editor grouping: fields with the same Spanish title show together under
+   * one collapsible heading (sections with many texts, e.g. a form's labels
+   * and messages). Purely presentational; the stored props are flat.
+   */
+  group?: string;
 }
 
 export interface BlockSpec {
