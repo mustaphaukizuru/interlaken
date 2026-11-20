@@ -53,8 +53,10 @@ function rowFor(kind: PageRow['kind'], page: CmsPageAdmin | undefined, template:
 export function buildRows(templates: PageTemplate[], pages: CmsPageAdmin[], now = Date.now()): { site: PageRow[]; custom: PageRow[] } {
   const bySlug = new Map(pages.map((p) => [p.slug, p]));
   const templateSlugs = new Set(templates.map((t) => t.slug));
+  // Inicio first, the 404 page last, the rest by address.
+  const rank = (t: PageTemplate) => (t.path === '/' ? 0 : t.slug === 'no-encontrada' ? 2 : 1);
   const site = [...templates]
-    .sort((a, b) => (a.path === '/' ? -1 : b.path === '/' ? 1 : a.path.localeCompare(b.path)))
+    .sort((a, b) => rank(a) - rank(b) || a.path.localeCompare(b.path))
     .map((t) => rowFor('site', bySlug.get(t.slug), t, now));
   const custom = pages
     .filter((p) => !templateSlugs.has(p.slug))
