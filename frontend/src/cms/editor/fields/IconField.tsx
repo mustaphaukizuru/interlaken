@@ -52,7 +52,7 @@ export function IconField({ id, label, required, hint, error, warning, onBlur, v
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cream-2 text-ink" aria-hidden="true">
           {Icon ? <Icon size={17} /> : <Ban size={15} className="text-subtle" />}
         </span>
-        <span className={`min-w-0 flex-1 truncate text-sm ${value ? 'font-medium text-ink' : 'text-subtle'}`}>{value ? iconName(value) : 'Sin ícono'}</span>
+        <span className={`min-w-0 flex-1 truncate [contain:inline-size] text-sm ${value ? 'font-medium text-ink' : 'text-subtle'}`}>{value ? iconName(value) : 'Sin ícono'}</span>
         {!compact && <span className="shrink-0 text-xs font-semibold text-purple">Cambiar</span>}
       </button>
       <FieldNotes id={id} hint={hint} error={error} warning={warning} />

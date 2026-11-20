@@ -91,7 +91,7 @@ export function ImageField({ id, label, required, hint, error, warning, onBlur, 
             <span className="flex h-full w-full items-center justify-center text-subtle"><ImageIcon size={22} aria-hidden="true" /></span>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1 [contain:inline-size]">
           <p className="truncate text-sm font-medium text-ink">
             {asset === null ? 'La imagen ya no existe en la biblioteca' : isLibrary ? asset?.filename ?? 'Imagen de la biblioteca' : value ? 'Foto original del sitio' : 'Sin imagen'}
           </p>
@@ -169,7 +169,7 @@ function UploadRows({ rows }: { rows: UploadRow[] }) {
       {rows.map((r) => (
         <li key={r.key} className="text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-ink">{r.name}</span>
+            <span className="min-w-0 flex-1 truncate [contain:inline-size] text-ink">{r.name}</span>
             <span className={r.status === 'error' ? 'text-coral-600' : r.status === 'uploading' ? 'text-subtle' : 'text-green-dark'}>
               {r.status === 'uploading' ? `${r.pct}%` : r.status === 'error' ? 'No se subió' : 'Lista'}
             </span>

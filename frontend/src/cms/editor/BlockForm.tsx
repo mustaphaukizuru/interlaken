@@ -371,7 +371,7 @@ function GalleryField({ spec, value, onChange, path, ctx, hint, error }: { spec:
   const update = (i: number, patch: Partial<Img>) => onChange(list.map((it, j) => (j === i ? { ...it, ...patch } : it)));
   const id = fieldDomId(ctx.blockId, path);
   return (
-    <fieldset className={`space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
+    <fieldset className={`min-w-0 space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}{spec.required && <span aria-hidden="true" className="text-coral-600"> *</span>} ({list.length})</legend>
       {list.map((it, i) => {
         const p = `${path}.${i}.image`;
@@ -429,7 +429,7 @@ function ItemsField({ spec, value, onChange, path, helpPath, ctx, hint, error }:
     return <Field key={sf.key} spec={sf} value={it[sf.key]} path={p} helpPath={`${helpPath}[].${sf.key}`} ctx={ctx} onChange={(v) => { ctx.edited(p); update(i, sf.key, v); }} />;
   };
   return (
-    <fieldset className={`space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
+    <fieldset className={`min-w-0 space-y-3 rounded-xl border p-3 ${error ? 'border-coral-400' : 'border-line'}`} aria-describedby={describedBy(id, { hint, error })}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}{spec.required && <span aria-hidden="true" className="text-coral-600"> *</span>} ({list.length})</legend>
       {list.map((it, i) => {
         const problems = ctx.issuesUnder(`${path}.${i}.`);
@@ -438,7 +438,7 @@ function ItemsField({ spec, value, onChange, path, helpPath, ctx, hint, error }:
           <details key={i} className="group rounded-lg bg-cream-2 p-3" open={list.length <= 3} data-field-path={`${path}.${i}`}>
             <summary className="flex min-h-[32px] cursor-pointer list-none items-center gap-2 text-xs font-semibold text-subtle">
               <ChevronRight size={14} className="shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{i + 1}. {title || <span className="italic">sin título</span>}</span>
+              <span className="min-w-0 flex-1 truncate [contain:inline-size]">{i + 1}. {title || <span className="italic">sin título</span>}</span>
               {problems > 0 && <span className="shrink-0 rounded-full bg-coral-50 px-2 py-0.5 text-[11px] font-semibold text-coral-600">{problems} por corregir</span>}
             </summary>
             <div className="mt-3 space-y-3">

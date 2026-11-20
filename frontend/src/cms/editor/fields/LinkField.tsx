@@ -68,7 +68,7 @@ export function HrefInput({ id, label, required, hint, error, warning, onBlur, v
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${info.kind === 'empty' ? 'bg-cream-2 text-subtle' : 'bg-purple/10 text-purple'}`} aria-hidden="true">
           <Icon size={17} />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 [contain:inline-size]">
           <p className={`truncate text-sm font-semibold ${info.kind === 'empty' ? 'text-subtle' : 'text-ink'}`}>{info.title}</p>
           {info.detail && <p className="truncate text-xs text-subtle">{info.detail}</p>}
         </div>
@@ -272,7 +272,7 @@ export interface LinkFieldProps extends Omit<FieldBaseProps, 'id'> {
 export function LinkField({ id, label, required, hint, error, onBlur, value, onChange, textLabel = 'Texto del botón' }: LinkFieldProps) {
   const v = value ?? {};
   return (
-    <fieldset className="space-y-3 rounded-xl border border-line p-3" aria-describedby={hint ? `${id}-hint` : undefined}>
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line p-3" aria-describedby={hint ? `${id}-hint` : undefined}>
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{label}{required && <span aria-hidden="true" className="text-coral-600"> *</span>}</legend>
       <TextField id={`${id}-label`} label={textLabel} value={v.label ?? ''} onChange={(t) => onChange({ ...v, label: t })} onBlur={onBlur} />
       <HrefInput id={id} label="Destino" value={v.href ?? ''} onChange={(href) => onChange({ ...v, href })} error={error} onBlur={onBlur} required={required} />

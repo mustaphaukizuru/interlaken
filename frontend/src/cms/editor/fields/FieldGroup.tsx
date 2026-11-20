@@ -33,7 +33,7 @@ export function FieldGroup({ id, title, open, onToggle, filled, total, required,
           className="flex min-h-[48px] w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-cream-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple"
         >
           <ChevronDown size={16} className={`shrink-0 text-subtle transition-transform duration-150 ${open ? '' : '-rotate-90'}`} aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{title}</span>
+          <span className="min-w-0 flex-1 truncate [contain:inline-size] text-sm font-bold text-ink">{title}</span>
           <span className="shrink-0 text-xs tabular-nums text-subtle">
             {filled} de {total}
             {required > 0 && <span className={requiredFilled < required ? 'text-coral-600' : undefined}> · obligatorios {requiredFilled}/{required}</span>}
