@@ -8,9 +8,16 @@ export interface SectionSpec extends BlockSpec {
   defaults: Record<string, unknown>;
 }
 
+/**
+ * Head extras of a template, passed to <Seo> under the school's published SEO.
+ * Title and description of a ROUTED page belong in lib/siteMeta.ts ROUTE_META
+ * (one table for the browser, the server-rendered HTML and the sitemap); set
+ * them here only for pages that have no route of their own (the 404 page).
+ */
 export interface TemplateSeo {
   title?: string;
   description?: string;
+  noindex?: boolean;
   /** Passed through to <Seo> when the page renders its template (canonical, JSON-LD...). */
   canonical?: string;
   image?: string;

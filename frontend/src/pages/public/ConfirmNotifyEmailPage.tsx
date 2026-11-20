@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 // Icons and button styles the main bundle does not share: importing the ErrorBoundary's ones
 // (AlertTriangle, RefreshCw, <Button>) split them out of it and grew every page's download.
 import { CheckCircle2, CircleAlert, Clock, Info, MailCheck, RotateCw } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import { Seo } from '@/components/seo/Seo';
 import Logo from '@/components/ui/Logo';
 import { api, type NotifyEmailLink } from '@/services/api';
@@ -30,11 +31,12 @@ const linkOf = (err: unknown): NotifyEmailLink | null => {
 function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-cream">
-      <Seo title="Confirmar correo para avisos" description="Confirme el correo en el que recibirá los avisos del Colegio Interlaken.">
-        <meta name="robots" content="noindex, nofollow" />
-        {/* The token is in this page's URL: never send it to another site. */}
+      <Seo noindex title="Confirmar correo para avisos" description="Confirme el correo en el que recibirá los avisos del Colegio Interlaken." />
+      {/* The token is in this page's URL: never send it to another site
+          (the server also sends Referrer-Policy: no-referrer for this path). */}
+      <Helmet>
         <meta name="referrer" content="no-referrer" />
-      </Seo>
+      </Helmet>
       <div className="accent-bar" />
       <main id="contenido" className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:py-14">
         <div className="w-full max-w-[460px]">

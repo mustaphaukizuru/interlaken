@@ -23,18 +23,19 @@ export function TemplatePage({ template }: { template: PageTemplate }) {
   // rule as `.route-enter:empty` in index.css; e2e/layout-shift.spec.ts).
   if (isLoading) return <div className="min-h-screen" aria-busy="true" />;
   const seo = data?.seo ?? {};
-  // Pages that never set their own <Seo> keep the per-route defaults of
-  // RouteSeo (PublicLayout); only an explicit template or CMS value overrides.
-  const title = seo.title || template.seo.title;
-  const description = seo.description || template.seo.description;
-  const hasSeo = !!(title || description || seo.og_image || seo.noindex || template.seo.jsonLd || template.seo.canonical);
+  // Per-route defaults come from ROUTE_META via RouteSeo (PublicLayout); the
+  // template adds only what the table cannot know (JSON-LD, the 404 page's own
+  // title and noindex), and the school's published SEO wins over both.
   return (
     <>
-      {hasSeo && (
-        <Seo {...template.seo} title={title} description={description} image={absoluteImageUrl(seo.og_image, SITE_URL) || template.seo.image}>
-          {seo.noindex && <meta name="robots" content="noindex" />}
-        </Seo>
-      )}
+      <Seo {...template.seo} />
+      <Seo
+        priority={2}
+        title={seo.title || undefined}
+        description={seo.description || undefined}
+        image={absoluteImageUrl(seo.og_image, SITE_URL) || undefined}
+        noindex={seo.noindex || undefined}
+      />
       <CmsMediaProvider media={data?.media}>
         <BlockRenderer blocks={data?.blocks ?? fallback} />
       </CmsMediaProvider>

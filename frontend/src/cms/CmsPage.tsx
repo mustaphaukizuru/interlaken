@@ -32,6 +32,7 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
   if (isError || !data) {
     return (
       <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center px-5 text-center">
+        <Seo noindex title="Página no encontrada" />
         <h1 className="font-head text-fluid-2xl font-bold text-ink">Página no encontrada</h1>
         <p className="mt-2 text-muted">La página que busca no existe o ya no está publicada.</p>
         <Link to="/" className="btn-outline mt-6 min-h-[44px]">Ir al inicio</Link>
@@ -40,9 +41,8 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
   }
   return (
     <div>
-      <Seo title={data.seo?.title || data.title} description={data.seo?.description || undefined} image={absoluteImageUrl(data.seo?.og_image, SITE_URL)}>
-        {data.seo?.noindex && <meta name="robots" content="noindex" />}
-      </Seo>
+      <Seo priority={2} title={data.seo?.title || data.title} description={data.seo?.description || undefined}
+        image={absoluteImageUrl(data.seo?.og_image, SITE_URL) || undefined} noindex={data.seo?.noindex || !!preview || undefined} />
       {preview && <div className="sticky top-0 z-40 bg-amber px-4 py-2 text-center text-xs font-bold text-white">Vista previa del borrador: lo que ve aquí aún no está publicado.</div>}
       <CmsMediaProvider media={data.media}>
         <BlockRenderer blocks={data.blocks} />

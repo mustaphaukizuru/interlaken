@@ -16,6 +16,7 @@ import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { EditableBlocks } from '@/cms/editor/EditableBlocks';
 import { allSections as allSectionSpecs, templateFor } from '@/cms/sections';
+import { ROUTE_META } from '@/lib/siteMeta';
 import { GROUP_LABELS, loadAllGroups } from '@/cms/sections/loaders';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
@@ -24,6 +25,16 @@ import { cmsBase, diffBlocks, isLegacyDraft, moveBlock, newBlock, newBlockId, or
 import { useAuthStore } from '@/store/authStore';
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertical, Send } from 'lucide-react';
 import type { PageIssue } from '@/services/api';
+
+/**
+ * What a page shows when the school leaves its SEO fields empty: the route's
+ * entry in ROUTE_META (lib/siteMeta.ts), else the template's own (404 page).
+ */
+function seoDefaults(slug: string): { title: string; description: string } {
+  const tpl = templateFor(slug);
+  const meta = tpl ? ROUTE_META[tpl.path] : undefined;
+  return { title: meta?.title ?? tpl?.seo.title ?? '', description: meta?.description ?? tpl?.seo.description ?? '' };
+}
 
 type Device = 'mobile' | 'tablet' | 'desktop';
 
@@ -401,8 +412,8 @@ export default function AdminPageEditor() {
         <div className="space-y-3">
           <Input label="Título de la página" value={meta.title} onChange={(e) => updateMeta({ title: e.target.value })} error={errors.title} />
           <Input label="Dirección (slug)" value={meta.slug} onChange={(e) => updateMeta({ slug: e.target.value })} error={errors.slug} disabled={!isAdmin} hint={isAdmin ? 'Cambiarla rompe enlaces ya compartidos.' : 'Solo Dirección puede cambiar la dirección.'} />
-          <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} placeholder={templateFor(page.slug)?.seo.title ?? ''} hint="Máx. 60 caracteres recomendados. Vacío = el título actual del sitio." />
-          <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} placeholder={templateFor(page.slug)?.seo.description ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
+          <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} placeholder={seoDefaults(page.slug).title} hint="Máx. 60 caracteres recomendados. Vacío = el título actual del sitio." />
+          <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} placeholder={seoDefaults(page.slug).description} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
           <MediaPicker label="Imagen al compartir (WhatsApp, Facebook)" value={meta.seo.og_image ?? null} onChange={(id) => updateMeta({ seo: { ...meta.seo, og_image: id ?? undefined } })} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!meta.seo.noindex} onChange={(e) => updateMeta({ seo: { ...meta.seo, noindex: e.target.checked } })} /> No indexar en buscadores</label>
           {!isAdmin && <p className="text-xs text-muted">La publicación y el retiro programados los define Dirección al aprobar la página.</p>}

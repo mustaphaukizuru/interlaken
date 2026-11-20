@@ -305,10 +305,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'galeria', path: '/galeria', title: 'Galería', group: 'galeria',
-  seo: {
-    title: 'Galería',
-    description: 'La vida en el Colegio Interlaken: campus, salones, deportes y actividades de Preescolar, Primaria y Secundaria en Tlalnepantla.',
-  },
+  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
   sections: ['galeria.hero', 'galeria.grid'],
 }];
 

@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UploadCloud, CheckCircle2, XCircle, Clock, FileText, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Seo } from '@/components/seo/Seo';
 import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Badge } from '@/components/ui/Badge';
@@ -62,7 +61,6 @@ export default function DocumentsUploadPage() {
 
   return (
     <div>
-      <Seo title="Documentos de inscripción" description="Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken." />
       <Section bg="cream" containerSize="md">
         <div className="mx-auto max-w-2xl">
           <span className="section-label-green inline-flex">Admisiones</span>

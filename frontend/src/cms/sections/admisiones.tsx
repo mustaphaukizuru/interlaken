@@ -6,7 +6,7 @@
  */
 import { useMemo, useState, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { Seo } from '@/components/seo/Seo';
 import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, Search, ShieldCheck, Plus } from 'lucide-react';
 import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -484,11 +484,7 @@ function AdmFaqView(p: { eyebrow?: string; title?: string; items?: FaqItem[] }) 
   };
   return (
     <Section bg="white">
-      {faqs.length > 0 && (
-        <Helmet>
-          <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-        </Helmet>
-      )}
+      {faqs.length > 0 && <Seo jsonLd={jsonLd} />}
       {(p.eyebrow || p.title) && (
         <Reveal className="mb-8 text-center sm:mb-10">
           {p.eyebrow && <span className="section-label-green inline-flex">{t(p.eyebrow)}</span>}

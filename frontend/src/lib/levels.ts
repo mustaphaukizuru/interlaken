@@ -80,7 +80,7 @@ export const LEVELS: LevelData[] = [
       'Acompañamiento del Departamento de Psicopedagogía.',
     ],
     seoDescription:
-      'Primaria bilingüe e integral en Tlalnepantla: trabajo por proyectos, pocas tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos.',
+      'Primaria bilingüe en Tlalnepantla: proyectos, tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos.',
   },
   {
     slug: 'secundaria',
@@ -103,7 +103,7 @@ export const LEVELS: LevelData[] = [
       'Actividades extraescolares deportivas y culturales.',
     ],
     seoDescription:
-      'Secundaria en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, Money Adventure en inglés, arte y viajes opcionales al extranjero.',
+      'Secundaria bilingüe en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, arte y viajes opcionales al extranjero.',
   },
 ];
 

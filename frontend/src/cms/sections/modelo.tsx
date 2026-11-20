@@ -124,10 +124,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'modelo-educativo', path: '/modelo-educativo', title: 'Modelo educativo', group: 'modelo',
-  seo: {
-    title: 'Modelo Educativo',
-    description: 'El modelo del Colegio Interlaken: educación bilingüe, alto nivel académico, valores, tecnología en el aula y cultura ecológica, de Preescolar a Secundaria.',
-  },
+  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
   sections: ['modelo.hero', 'modelo.pillars'],
 }];
 

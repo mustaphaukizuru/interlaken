@@ -431,7 +431,7 @@ export const sections = [
 
 export const templates: PageTemplate[] = LEVELS.map((l) => ({
   slug: l.slug, path: `/niveles/${l.slug}`, title: l.name, group: 'nivel',
-  seo: { title: `${l.name} — Niveles Educativos`, description: l.seoDescription },
+  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
   sections: [
     { type: 'nivel.hero', props: heroProps(l) },
     { type: 'nivel.content', props: contentProps(l) },

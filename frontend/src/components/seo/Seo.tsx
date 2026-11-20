@@ -1,21 +1,29 @@
 /**
- * Seo — declarative per-page <head> tags via react-helmet-async.
+ * Seo: declarative per-page <head> for the public site.
  *
- * <RouteSeo /> is dropped once into the public layout and derives title,
- * description and canonical from the current pathname (see ROUTE_META). Pages
- * that need something bespoke (e.g. JSON-LD) can render <Seo /> directly.
+ * <RouteSeo/> sits once in PublicLayout and resolves the route's entry in
+ * ROUTE_META (lib/siteMeta.ts). A page only renders <Seo/> when it needs
+ * something the table cannot know: CMS pages (their own title/description),
+ * the 404 page (noindex), or extra JSON-LD such as the admissions FAQ.
+ *
+ * Every mounted <Seo/> registers a partial head; the merged result (higher
+ * `priority` wins field by field, JSON-LD blocks add up) is written into the
+ * existing tags by applyHead. Registration lives in a layout effect, so when
+ * React hides and re-shows a suspended subtree the entry is removed and added
+ * back: the failure mode that made react-helmet-async drop the route's tags.
  */
-import { Helmet } from 'react-helmet-async';
+import { useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  ROUTE_META,
-  SITE_URL,
-  SITE_NAME,
-  DEFAULT_TITLE,
   DEFAULT_DESCRIPTION,
+  DEFAULT_TITLE,
   OG_IMAGE,
-  LOCALE,
+  TITLE_SUFFIX,
+  canonicalFor,
+  routeHead,
+  type HeadData,
 } from '@/lib/siteMeta';
+import { applyHead } from './applyHead';
 
 export interface SeoProps {
   title?: string;
@@ -24,76 +32,93 @@ export interface SeoProps {
   image?: string;
   /** Suppress appending "· Colegio Interlaken" to the title. */
   bareTitle?: boolean;
-  /** Optional JSON-LD object(s) rendered as <script type="application/ld+json">. */
+  /** Keep this page out of search results. */
+  noindex?: boolean;
+  /** Extra JSON-LD object(s) for this page. */
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
-  children?: React.ReactNode;
+  /**
+   * Who wins when two <Seo/> are mounted: RouteSeo uses 0, pages default to 1,
+   * a published CMS version uses 2.
+   */
+  priority?: number;
 }
 
-export function Seo({
-  title,
-  description = DEFAULT_DESCRIPTION,
-  canonical,
-  image = OG_IMAGE,
-  bareTitle = false,
-  jsonLd,
-  children,
-}: SeoProps) {
-  const fullTitle = !title
-    ? DEFAULT_TITLE
-    : bareTitle
-      ? title
-      : `${title} · ${SITE_NAME}`;
-  const path = typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') : '';
-  const url = canonical ?? `${SITE_URL}${path === '/' ? '' : path}`;
+type PartialHead = Omit<SeoProps, 'priority' | 'jsonLd' | 'bareTitle'> & { jsonLd: Record<string, unknown>[] };
+interface Entry { id: number; priority: number; head: PartialHead }
+
+const entries: Entry[] = [];
+let nextId = 0;
+
+function flush() {
+  const ordered = [...entries].sort((a, b) => a.priority - b.priority || a.id - b.id);
+  const merged: HeadData = {
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    canonical: canonicalFor(window.location.pathname),
+    image: OG_IMAGE,
+    robots: undefined,
+    jsonLd: [],
+  };
+  for (const { head } of ordered) {
+    if (head.title) merged.title = head.title;
+    if (head.description) merged.description = head.description;
+    if (head.canonical) merged.canonical = head.canonical;
+    if (head.image) merged.image = head.image;
+    if (head.noindex !== undefined) merged.robots = head.noindex ? 'noindex' : undefined;
+    merged.jsonLd.push(...head.jsonLd);
+  }
+  applyHead(merged);
+}
+
+/** Test hook: forget every registration. */
+export function resetSeoForTests() {
+  entries.length = 0;
+}
+
+export function Seo({ title, description, canonical, image, bareTitle = false, noindex, jsonLd, priority = 1 }: SeoProps) {
+  const [id] = useState(() => nextId++);
   const blocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+  const full = title ? (bareTitle ? title : `${title}${TITLE_SUFFIX}`) : undefined;
+  const key = JSON.stringify([full, description, canonical, image, noindex, blocks, priority]);
 
-  return (
-    <Helmet>
-      <title>{fullTitle}</title>
-      <meta name="description" content={description} />
-      <link rel="canonical" href={url} />
+  useLayoutEffect(() => {
+    const entry: Entry = {
+      id,
+      priority,
+      head: { title: full, description, canonical, image, noindex, jsonLd: blocks },
+    };
+    entries.push(entry);
+    flush();
+    return () => {
+      const i = entries.indexOf(entry);
+      if (i >= 0) entries.splice(i, 1);
+      flush();
+    };
+    // `key` captures every input; the values themselves are read from this render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-      {/* Open Graph */}
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
-      <meta property="og:url" content={url} />
-      <meta property="og:image" content={image} />
-      <meta property="og:type" content="website" />
-      <meta property="og:site_name" content={SITE_NAME} />
-      <meta property="og:locale" content={LOCALE} />
-
-      {/* Twitter */}
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={image} />
-
-      {blocks.map((block, i) => (
-        <script key={i} type="application/ld+json">
-          {JSON.stringify(block)}
-        </script>
-      ))}
-      {children}
-    </Helmet>
-  );
+  return null;
 }
 
 /**
- * RouteSeo — resolves metadata for the active public route. Placed once in the
- * PublicLayout so every marketing page gets a correct <title>, description and
- * canonical without per-page boilerplate.
+ * RouteSeo: the route's ROUTE_META entry, at the lowest priority so a page or
+ * CMS <Seo/> can refine it. Unlisted paths fall back to the site defaults with
+ * a self-referencing canonical.
  */
 export function RouteSeo() {
   const { pathname } = useLocation();
-  const meta = ROUTE_META[pathname];
-  const canonical = `${SITE_URL}${pathname === '/' ? '' : pathname}`;
-
+  const head = routeHead(pathname);
   return (
     <Seo
-      title={meta?.title}
-      description={meta?.description}
-      canonical={canonical}
-      bareTitle={pathname === '/'}
+      priority={0}
+      bareTitle
+      title={head?.title}
+      description={head?.description}
+      canonical={head?.canonical ?? canonicalFor(pathname)}
+      image={head?.image}
+      noindex={head ? head.robots === 'noindex' : undefined}
+      jsonLd={head?.jsonLd}
     />
   );
 }

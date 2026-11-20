@@ -11,9 +11,15 @@
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#401a8e" />
 
-    <title>Colegio Interlaken — Educación bilingüe en Tlalnepantla</title>
-    <meta name="description" content="Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con más de cuatro décadas de trayectoria." />
+    <!-- Per-page head. These are the HOME page's values; for every other URL
+         backend/apps/core/spa.py rewrites them in the raw HTML from
+         seo-routes.json (built from src/lib/siteMeta.ts), and the app keeps
+         them in sync on navigation (components/seo/applyHead.ts). Keep exactly
+         one of each tag: spa.py replaces values, it never adds duplicates. -->
+    <title>Colegio Interlaken | Escuela bilingüe en Tlalnepantla</title>
+    <meta name="description" content="Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con 45 años de trayectoria. Agenda tu visita." />
     <link rel="canonical" href="https://interlaken.edu.mx/" />
+    <!--HEAD-->
 
     <!-- Site-wide structured data (Organization + WebSite). Static so it is in
          the raw HTML of every URL. The address, phone, pin and hours MUST match
@@ -71,8 +77,8 @@
     <!-- Open Graph / social preview -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Colegio Interlaken" />
-    <meta property="og:title" content="Colegio Interlaken" />
-    <meta property="og:description" content="Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Tiempo de educar, tiempo de aprender." />
+    <meta property="og:title" content="Colegio Interlaken | Escuela bilingüe en Tlalnepantla" />
+    <meta property="og:description" content="Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con 45 años de trayectoria. Agenda tu visita." />
     <meta property="og:url" content="https://interlaken.edu.mx/" />
     <meta property="og:image" content="https://interlaken.edu.mx/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -81,8 +87,8 @@
 
     <!-- Twitter card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Colegio Interlaken" />
-    <meta name="twitter:description" content="Educación bilingüe de excelencia en Tlalnepantla, Estado de México." />
+    <meta name="twitter:title" content="Colegio Interlaken | Escuela bilingüe en Tlalnepantla" />
+    <meta name="twitter:description" content="Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con 45 años de trayectoria. Agenda tu visita." />
     <meta name="twitter:image" content="https://interlaken.edu.mx/og-image.png" />
 
     <!-- Home-only LCP preload: starts the hero image download during HTML
