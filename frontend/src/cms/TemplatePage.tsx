@@ -3,7 +3,7 @@ import { Seo } from '@/components/seo/Seo';
 import { BlockRenderer } from './BlockRenderer';
 import { CmsMediaProvider } from './runtime';
 import { absoluteImageUrl } from './media';
-import { SITE_URL } from '@/lib/siteMeta';
+import { ROUTE_META, SITE_URL } from '@/lib/siteMeta';
 import { usePublishedPage } from './published';
 import { sectionSpec } from './sections';
 import { templateBlocks, type PageTemplate } from './sections/types';
@@ -28,10 +28,13 @@ export function TemplatePage({ template }: { template: PageTemplate }) {
   const title = seo.title || template.seo.title;
   const description = seo.description || template.seo.description;
   const hasSeo = !!(title || description || seo.og_image || seo.noindex || template.seo.jsonLd || template.seo.canonical);
+  // When something does override (a share image, say), the fields left blank
+  // keep the route's defaults instead of falling to the generic site title.
+  const route = ROUTE_META[template.path];
   return (
     <>
       {hasSeo && (
-        <Seo {...template.seo} title={title} description={description} image={absoluteImageUrl(seo.og_image, SITE_URL) || template.seo.image}>
+        <Seo {...template.seo} title={title || route?.title} description={description || route?.description} image={absoluteImageUrl(seo.og_image, SITE_URL) || template.seo.image}>
           {seo.noindex && <meta name="robots" content="noindex" />}
         </Seo>
       )}

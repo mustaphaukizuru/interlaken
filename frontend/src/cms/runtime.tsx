@@ -5,7 +5,7 @@
  */
 import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { CURRENT_CYCLE, FOUNDED_YEAR, SCHOOL_YEARS } from '@/lib/siteMeta';
-import { imageSrc, imageSrcSet } from './media';
+import { imageSrc, imageSrcSet, rememberMedia } from './media';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 /* ── Text tokens ─────────────────────────────────────────────────────────── */
@@ -38,11 +38,13 @@ export function useTokens(): (text: unknown) => string {
 
 /* ── Images ──────────────────────────────────────────────────────────────── */
 
-type MediaMeta = Record<string, { alt?: string; width?: number | null; height?: number | null }>;
+type MediaMeta = Record<string, { alt?: string; width?: number | null; height?: number | null; variants?: string[] }>;
 const MediaMetaContext = createContext<MediaMeta>({});
 
-/** Alt text and sizes of the library images on a published page (served with the page). */
+/** Alt text, sizes and existing variants of the library images on a published page (served with the page). */
 export function CmsMediaProvider({ media, children }: { media?: MediaMeta; children: ReactNode }) {
+  // Idempotent: URLs built below (imageSrc/imageSrcSet) then ask only for sizes that exist.
+  rememberMedia(media);
   return <MediaMetaContext.Provider value={media ?? {}}>{children}</MediaMetaContext.Provider>;
 }
 
