@@ -347,8 +347,30 @@ class MediaBulkView(AdminBulkView):
         return action
 
 
+def served_variant(asset: MediaAsset, variant: str) -> str | None:
+    """The file a request for ``variant`` gets: that variant, else the next larger
+    one that exists, else the original. None only for an unknown variant name.
+
+    build_variants skips sizes the photo is too small for (1600 px wide or less
+    has no ``lg``), so a valid asset must never 404 for a size it simply lacks.
+    """
+    if variant == 'original':
+        return 'original'
+    order = list(VARIANTS)
+    if variant not in order:
+        return None
+    for key in order[order.index(variant):]:
+        if (asset.variants or {}).get(key):
+            return key
+    return 'original'
+
+
 class MediaServeView(APIView):
-    """GET /content/media/<pk>/<variant>/ — public, cached, streamed from storage."""
+    """GET /content/media/<pk>/<variant>/ — public, cached, streamed from storage.
+
+    A missing variant serves the next larger existing one or the original
+    (``served_variant``), with the same long-lived cache headers.
+    """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, pk, variant='original'):
@@ -356,10 +378,13 @@ class MediaServeView(APIView):
             asset = MediaAsset.objects.get(pk=pk)
         except MediaAsset.DoesNotExist:
             raise Http404 from None
-        name = asset.file.name if variant == 'original' else asset.variants.get(variant)
+        served = served_variant(asset, variant)
+        if served is None:
+            raise Http404
+        name = asset.file.name if served == 'original' else asset.variants.get(served)
         if not name:
             raise Http404
-        etag = f'"{asset.sha256[:16]}-{variant}"'
+        etag = f'"{asset.sha256[:16]}-{served}"'
         if request.headers.get('If-None-Match') == etag:
             return HttpResponseNotModified()
         storage = asset.file.storage

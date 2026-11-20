@@ -428,14 +428,20 @@ def published_head(path: str) -> dict | None:
 
 
 def _media_meta(blocks) -> dict:
-    """Alt text and size of the library images on the page, so the site never repeats them in props."""
-    from .media import MediaAsset
+    """Alt text, size and existing variants of the library images on the page.
+
+    ``variants`` lets the site request only sizes that exist (a photo 1600 px
+    wide or less has no ``lg``, see media.VARIANTS), so srcset never lists a
+    file that is really the next size up.
+    """
+    from .media import VARIANTS, MediaAsset
 
     ids = {i for b in blocks for i in image_refs(b)}
     if not ids:
         return {}
-    return {str(a.pk): {'alt': a.alt, 'width': a.width, 'height': a.height}
-            for a in MediaAsset.objects.filter(pk__in=ids).only('pk', 'alt', 'width', 'height')}
+    return {str(a.pk): {'alt': a.alt, 'width': a.width, 'height': a.height,
+                        'variants': [k for k in VARIANTS if k in (a.variants or {})]}
+            for a in MediaAsset.objects.filter(pk__in=ids).only('pk', 'alt', 'width', 'height', 'variants')}
 
 
 def _public_payload(page: Page, blocks, seo) -> dict:
