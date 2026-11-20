@@ -4,7 +4,9 @@
  * from `fields`, the backend validates `required`. Adding a block = one entry
  * here + one component in blocks/*.tsx.
  */
-export type FieldKind = 'text' | 'textarea' | 'richtext' | 'image' | 'images' | 'link' | 'items' | 'url' | 'number';
+export type FieldKind =
+  | 'text' | 'textarea' | 'richtext' | 'image' | 'images' | 'link' | 'items' | 'url' | 'number'
+  | 'select' | 'toggle' | 'icon' | 'color';
 
 export interface FieldSpec {
   key: string;
@@ -13,6 +15,8 @@ export interface FieldSpec {
   required?: boolean;
   /** For kind 'items': the sub-fields of each item. */
   item?: FieldSpec[];
+  /** For kind 'select'. */
+  options?: { value: string; label: string }[];
   hint?: string;
 }
 
@@ -21,13 +25,24 @@ export interface BlockSpec {
   label: string;
   description: string;
   fields: FieldSpec[];
+  /** Designed sections (cms/sections): the page group they come from. Generic blocks have none. */
+  group?: string;
+  /** Carries application logic (a form, the booking widget): can move, cannot be hidden or deleted. */
+  locked?: boolean;
+  /** Values a fresh block starts with; missing props fall back to them when rendering. */
+  defaults?: Record<string, unknown>;
 }
 
 export interface Block {
   id: string;
   type: string;
   props: Record<string, unknown>;
+  /** Kept in the draft and versions, never rendered on the site. */
+  hidden?: boolean;
 }
+
+/** An image prop: a media-library id, or a path under /assets (the site's built-in photos). */
+export type ImageRef = number | string;
 
 export const BLOCKS: BlockSpec[] = [
   { type: 'hero', label: 'Portada (hero)', description: 'Título grande sobre imagen o video con botón.', fields: [
@@ -73,6 +88,9 @@ export const BLOCKS: BlockSpec[] = [
   { type: 'video', label: 'Video', description: 'YouTube o Vimeo.', fields: [
     { key: 'url', label: 'URL del video', kind: 'url', required: true },
   ] },
+  { type: 'form', label: 'Formulario', description: 'Un formulario de Formularios, o uno del sitio (pre-registro, contacto, facturación, agendar visita).', fields: [
+    { key: 'form', label: 'Formulario (slug)', kind: 'text', required: true, hint: 'El slug que aparece en Formularios, o pre-registro / contacto / facturacion / agendar-visita.' },
+  ] },
   { type: 'timeline', label: 'Línea de tiempo', description: 'Hitos por año.', fields: [
     { key: 'items', label: 'Hitos', kind: 'items', required: true, item: [
       { key: 'year', label: 'Año', kind: 'text', required: true },
@@ -84,8 +102,25 @@ export const BLOCKS: BlockSpec[] = [
   { type: 'testimonials', label: 'Testimonios', description: 'Muestra los testimonios publicados (automático).', fields: [] },
   { type: 'map_contact', label: 'Mapa y contacto', description: 'Dirección, teléfono y Cómo llegar (automático).', fields: [] },
   { type: 'pricing_table', label: 'Costos', description: 'Tabla de costos del ciclo (automático).', fields: [] },
+  { type: 'open_school_events', label: 'Clases abiertas', description: 'Próximas clases abiertas con lugares disponibles (automático).', fields: [] },
   { type: 'calendar', label: 'Calendario', description: 'Próximas fechas del calendario escolar (automático).', fields: [] },
   { type: 'sep_incorporation', label: 'Incorporación SEP', description: 'Registros oficiales (automático).', fields: [] },
 ];
 
-export const blockSpec = (type: string) => BLOCKS.find((b) => b.type === type);
+const GENERIC = new Map(BLOCKS.map((b) => [b.type, b]));
+const SECTIONS = new Map<string, BlockSpec>();
+
+/** Designed-section specs register here when their page group loads (cms/sections). */
+export function registerBlockSpecs(specs: BlockSpec[]) {
+  for (const s of specs) SECTIONS.set(s.type, s);
+}
+
+export const blockSpec = (type: string): BlockSpec | undefined => GENERIC.get(type) ?? SECTIONS.get(type);
+
+/** Props over the spec defaults, key by key: a prop added in a later release still has a value. */
+export function withDefaults(spec: BlockSpec | undefined, props: Record<string, unknown>): Record<string, unknown> {
+  if (!spec?.defaults) return props;
+  const out: Record<string, unknown> = { ...spec.defaults };
+  for (const [k, v] of Object.entries(props)) if (v !== undefined) out[k] = v;
+  return out;
+}

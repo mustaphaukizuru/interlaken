@@ -19,6 +19,8 @@ interface Props {
   /** Direct MP4/WebM URL from Ajustes (SiteSettings.hero_video_url). Empty = poster only. */
   src: string;
   poster: string;
+  /** Defaults to the /assets responsive variants of `poster`; CMS library posters pass their own. */
+  posterSrcSet?: string;
   posterAlt: string;
   reducedMotion: boolean;
   /** Rendered above the media (headline, CTAs). */
@@ -40,7 +42,7 @@ interface Props {
  *    session. Audio never starts on its own — that is a deliberate, one-tap opt-in.
  * 5. Playback pauses when the hero scrolls away or the tab is hidden (battery).
  */
-export function HeroVideo({ src, poster, posterAlt, reducedMotion, children, className = '' }: Props) {
+export function HeroVideo({ src, poster, posterSrcSet, posterAlt, reducedMotion, children, className = '' }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -102,7 +104,7 @@ export function HeroVideo({ src, poster, posterAlt, reducedMotion, children, cla
     <section ref={wrapRef} className={`relative flex items-end overflow-hidden bg-dark text-white ${className}`}>
       <img
         src={poster}
-        srcSet={assetSrcSet(poster, { full: true })}
+        srcSet={posterSrcSet ?? assetSrcSet(poster, { full: true })}
         sizes="100vw"
         alt={posterAlt}
         {...{ fetchpriority: 'high' }}

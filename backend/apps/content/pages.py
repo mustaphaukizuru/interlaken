@@ -3,8 +3,11 @@ content/pages.py — block-based pages (CMS-PLAN phase 2, BACKLOG P3-3).
 
 Page          slug, title, template, status, seo, published version pointer
 PageVersion   immutable snapshot of blocks JSON; every publish = a new version
-Blocks        [{id, type, props}] validated against BLOCK_SCHEMAS (mirrored in
-              frontend/src/cms/blocks/registry.ts; keep both in sync).
+Blocks        [{id, type, props, hidden?}] validated against BLOCK_SCHEMAS (the
+              generic blocks, mirrored in frontend/src/cms/blocks/registry.ts)
+              and SECTION_SCHEMAS (each public page's designed sections, read
+              from block_manifest.json, generated from the frontend registry
+              and checked for drift by cms/manifest.test.ts).
 
 Public:  GET /content/pages/<slug>/               published blocks, cached + ETag
          GET /content/pages/<id>/preview/?token=   draft, signed token (1 h)
@@ -15,6 +18,8 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from functools import lru_cache
+from pathlib import Path
 
 import django_filters
 from django.conf import settings
@@ -36,6 +41,7 @@ from apps.core.permissions import IsAdmin, IsAdminOrStaff
 from .ops import AuditedCrudMixin, delete_action, delete_keep_pk, tri_state
 
 PAGE_CACHE = 'cms:page:{slug}'
+HEAD_CACHE = 'cms:head:{slug}'
 PREVIEW_SALT = 'cms-preview'
 PREVIEW_MAX_AGE = 7 * 24 * 3600   # shareable approval links last a week (P3-10)
 
@@ -64,17 +70,39 @@ BLOCK_SCHEMAS: dict[str, dict[str, str]] = {
     'sep_incorporation': {},
     'open_school_events': {},
 }
-_PY = {'str': str, 'int': int, 'list': list, 'dict': dict}
+_PY = {'str': str, 'int': int, 'list': list, 'dict': dict, 'bool': bool, 'num': (int, float), 'image': (int, str)}
+
+MANIFEST_PATH = Path(__file__).with_name('block_manifest.json')
+MAX_DRAFT_BYTES = 512 * 1024   # a whole page of sections is ~20 KB; this only stops abuse
+
+
+@lru_cache(maxsize=1)
+def manifest() -> dict:
+    """{type: {label, group, locked, required{name: kind}, images[paths]}} for every block type."""
+    try:
+        return json.loads(MANIFEST_PATH.read_text(encoding='utf-8'))['types']
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def section_schema(block_type: str) -> dict[str, str] | None:
+    """Required props of a block type, or None if the type does not exist."""
+    if block_type in BLOCK_SCHEMAS:
+        return BLOCK_SCHEMAS[block_type]
+    entry = manifest().get(block_type) if '.' in block_type else None
+    return None if entry is None else entry.get('required', {})
 
 
 def validate_blocks(blocks) -> list[dict]:
     if not isinstance(blocks, list):
         raise serializers.ValidationError({'blocks': 'Debe ser una lista de bloques.'})
+    if len(json.dumps(blocks)) > MAX_DRAFT_BYTES:
+        raise serializers.ValidationError({'blocks': 'La página es demasiado grande; divídala en varias páginas.'})
     out = []
     for i, b in enumerate(blocks):
         if not isinstance(b, dict) or 'type' not in b:
             raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} inválido.'})
-        schema = BLOCK_SCHEMAS.get(b['type'])
+        schema = section_schema(b['type'])
         if schema is None:
             raise serializers.ValidationError({'blocks': f'Tipo de bloque desconocido: {b["type"]}'})
         props = b.get('props') or {}
@@ -83,8 +111,34 @@ def validate_blocks(blocks) -> list[dict]:
         for name, kind in schema.items():
             if name not in props or not isinstance(props[name], _PY[kind]):
                 raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} ({b["type"]}): falta "{name}".'})
-        out.append({'id': b.get('id') or uuid.uuid4().hex[:8], 'type': b['type'], 'props': props})
+        block = {'id': str(b.get('id') or uuid.uuid4().hex[:8])[:40], 'type': b['type'], 'props': props}
+        if b.get('hidden') is True:
+            block['hidden'] = True
+        out.append(block)
     return out
+
+
+def image_refs(block: dict) -> list[int]:
+    """Media-library ids a block uses, following the image paths of its type ("poster", "items[].image")."""
+    paths = manifest().get(block.get('type'), {}).get('images') or ['image', 'images[].image']
+    found: list[int] = []
+
+    def walk(value, parts):
+        if not parts:
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                found.append(value)
+            return
+        head, rest = parts[0], parts[1:]
+        if head.endswith('[]'):
+            items = value.get(head[:-2]) if isinstance(value, dict) else None
+            for it in items if isinstance(items, list) else []:
+                walk(it, rest)
+        elif isinstance(value, dict):
+            walk(value.get(head), rest)
+
+    for path in paths:
+        walk(block.get('props') or {}, path.replace('[].', '[] ').replace('.', ' ').split())
+    return found
 
 
 class Page(models.Model):
@@ -138,6 +192,7 @@ class Page(models.Model):
             self.publish_at = None
             self.save(update_fields=['published_version', 'status', 'published_at', 'review_requested_at', 'review_requested_by', 'review_note', 'publish_at'])
         cache.delete(PAGE_CACHE.format(slug=self.slug))
+        cache.delete(HEAD_CACHE.format(slug=self.slug))
         cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
@@ -150,6 +205,7 @@ class Page(models.Model):
         self.status = self.Status.DRAFT
         self.save(update_fields=['status'])
         cache.delete(PAGE_CACHE.format(slug=self.slug))
+        cache.delete(HEAD_CACHE.format(slug=self.slug))
         cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
@@ -243,9 +299,55 @@ class PageAdminSerializer(serializers.ModelSerializer):
             or json.dumps(p.seo, sort_keys=True) != json.dumps(p.published_version.seo, sort_keys=True)
 
 
+def published_head(path: str) -> dict | None:
+    """SEO of the published CMS page served at `path`, for the server-rendered <head>.
+
+    None when no published page lives there. Cached 5 min and busted on
+    publish/unpublish, so the SPA catch-all costs no query per request.
+    """
+    from .navigation import SITE, SLUG_PATHS
+
+    path = '/' + path.strip('/') if path.strip('/') else '/'
+    by_path = {p: s for s, p in SLUG_PATHS.items()}
+    slug = by_path.get(path) or (path[1:] if path.count('/') == 1 and len(path) > 1 else None)
+    if not slug:
+        return None
+    key = HEAD_CACHE.format(slug=slug)
+    head = cache.get(key)
+    if head is None:
+        page = Page.objects.select_related('published_version').filter(slug=slug, status=Page.Status.PUBLISHED).first()
+        if page is None or (page.unpublish_at and page.unpublish_at <= timezone.now()):
+            head = {}
+        else:
+            seo = (page.published_version.seo if page.published_version else page.seo) or {}
+            og = seo.get('og_image')
+            head = {
+                'title': (seo.get('title') or '').strip(),
+                'description': (seo.get('description') or '').strip(),
+                'image': f'{SITE}/api/v1/content/media/{og}/lg/' if isinstance(og, int) and not isinstance(og, bool) else '',
+                'noindex': bool(seo.get('noindex')),
+            }
+        cache.set(key, head, 300)
+    return head or None
+
+
+def _media_meta(blocks) -> dict:
+    """Alt text and size of the library images on the page, so the site never repeats them in props."""
+    from .media import MediaAsset
+
+    ids = {i for b in blocks for i in image_refs(b)}
+    if not ids:
+        return {}
+    return {str(a.pk): {'alt': a.alt, 'width': a.width, 'height': a.height}
+            for a in MediaAsset.objects.filter(pk__in=ids).only('pk', 'alt', 'width', 'height')}
+
+
 def _public_payload(page: Page, blocks, seo) -> dict:
-    return {'slug': page.slug, 'title': page.title, 'template': page.template, 'blocks': blocks,
-            'seo': seo, 'published_at': page.published_at.isoformat() if page.published_at else None}
+    # Hidden blocks stay in drafts and versions (to show them again later) but never leave the server.
+    visible = [b for b in blocks or [] if not b.get('hidden')]
+    return {'slug': page.slug, 'title': page.title, 'template': page.template, 'blocks': visible,
+            'seo': seo, 'media': _media_meta(visible),
+            'published_at': page.published_at.isoformat() if page.published_at else None}
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +375,9 @@ class PublicPageView(APIView):
             return Response(status=status.HTTP_304_NOT_MODIFIED)
         resp = Response(payload)
         resp['ETag'] = etag
-        resp['Cache-Control'] = 'public, max-age=60'
+        # Revalidate every time (a 304 costs nothing thanks to the ETag and the
+        # server cache): a page Dirección just published shows up immediately.
+        resp['Cache-Control'] = 'public, no-cache'
         return resp
 
 

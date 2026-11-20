@@ -3,21 +3,33 @@ import { screen, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 
 vi.mock('@/hooks/useSep', () => ({ useSep: () => [{ level: 'Primaria', label: 'Incorporada a la SEP · Clave 15PPR0000X' }] }));
+// No published CMS version: the level's template renders.
+vi.mock('@/services/api', () => ({
+  contentApi: {
+    getPage: vi.fn(() => Promise.reject(new Error('404'))),
+    getSettings: vi.fn(() => Promise.reject(new Error('offline'))),
+  },
+}));
 
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { LEVELS } from '@/lib/levels';
 import { LEVEL_STORIES } from '@/lib/levelStories';
 import NivelPage from './NivelPage';
 
-const open = (slug: string) => renderWithProviders(
-  <Routes><Route path="/niveles/:nivel" element={<NivelPage />} /></Routes>,
-  { route: `/niveles/${slug}` },
-);
+// The page is a CMS template: it asks for a published version first, then
+// renders the level's sections (cms/sections/nivel.tsx).
+const open = async (slug: string, name: string) => {
+  const r = renderWithProviders(
+    <Routes><Route path="/niveles/:nivel" element={<NivelPage />} /></Routes>,
+    { route: `/niveles/${slug}` },
+  );
+  await screen.findByRole('heading', { level: 1, name });
+  return r;
+};
 
 describe('NivelPage: the school\'s own text for each level (owner, 2026-11-08)', () => {
-  it('Primaria: hero headline and lead, every section, pull-quotes and the three programs', () => {
-    open('primaria');
-    expect(screen.getByRole('heading', { level: 1, name: 'Primaria' })).toBeInTheDocument();
+  it('Primaria: hero headline and lead, every section, pull-quotes and the three programs', async () => {
+    await open('primaria', 'Primaria');
     expect(screen.getByText('Aprender tiene sentido')).toBeInTheDocument();
     expect(screen.getByText('Queremos que nuestros alumnos no solo sepan más. Queremos que sepan qué hacer con lo que aprenden.')).toBeInTheDocument();
 
@@ -45,8 +57,8 @@ describe('NivelPage: the school\'s own text for each level (owner, 2026-11-08)',
     expect(screen.getByText(/Clave 15PPR0000X/)).toBeInTheDocument();
   });
 
-  it.each(LEVELS.map((l) => [l.slug, l] as const))('%s renders its headline and every section title', (slug, level) => {
-    open(slug);
+  it.each(LEVELS.map((l) => [l.slug, l] as const))('%s renders its headline and every section title', async (slug, level) => {
+    await open(slug, level.name);
     expect(screen.getByText(level.headline)).toBeInTheDocument();
     expect(screen.getByText(level.intro)).toBeInTheDocument();
     for (const s of LEVEL_STORIES[level.slug].story.filter((x) => x.title)) {
@@ -55,10 +67,11 @@ describe('NivelPage: the school\'s own text for each level (owner, 2026-11-08)',
     expect(document.body.textContent).not.toContain('**');
   });
 
-  it('keeps the two typo fixes from the documents', () => {
-    open('preescolar');
+  it('keeps the two typo fixes from the documents', async () => {
+    const first = await open('preescolar', 'Preescolar');
     expect(screen.getByText('queremos que aprendan a comunicarse en él.').tagName).toBe('STRONG');
-    open('secundaria');
+    first.unmount();
+    await open('secundaria', 'Secundaria');
     expect(document.body.textContent).toContain('lo que sienten y sus ideas, convivir');
     expect(document.body.textContent).not.toContain('sus ideas ,');
   });

@@ -69,6 +69,9 @@ class SiteSettings(models.Model):
 
     # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
     menu = models.JSONField('Menú del sitio', default=list, blank=True)
+    # Header buttons, footer text and the mobile CTA (CMS-COMPLETION-PLAN).
+    # {} = built-in copy; each empty key also falls back (frontend lib/siteChrome).
+    chrome = models.JSONField('Encabezado y pie de página', default=dict, blank=True)
 
     # ── Redes sociales (vacío = el ícono no se muestra) ───
     # Confirmado por el cliente: la única red social del colegio es Facebook.

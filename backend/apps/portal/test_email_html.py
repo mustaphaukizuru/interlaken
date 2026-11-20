@@ -10,6 +10,8 @@ pytestmark = pytest.mark.django_db
 
 def test_send_email_is_multipart_with_reply_to(settings):
     settings.CONTACT_FORM_EMAIL = 'pmaya@interlaken.com.mx'  # bitácora ref. 3
+    # Reply-To defaults to CONTACT_EMAIL; pin it so a local .env cannot change the expectation.
+    settings.CONTACT_EMAIL = 'info@interlaken.com.mx'
     mail.outbox.clear()
     assert send_email('Hola <b>', 'Primera línea.\n\nSegunda & tercera.', ['x@test.mx'], cta_url='https://p/login')
     m = mail.outbox[0]

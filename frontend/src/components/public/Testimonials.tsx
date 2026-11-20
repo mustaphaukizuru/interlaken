@@ -4,7 +4,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { contentApi, type Testimonial } from '@/services/api';
 
 /** Published family/alumni quotes (BACKLOG P2-15). Renders nothing when the school has none. */
-export function Testimonials({ limit = 3, title = 'Lo que dicen las familias' }: { limit?: number; title?: string }) {
+export function Testimonials({ limit = 3, title = 'Lo que dicen las familias', eyebrow = 'Comunidad' }: { limit?: number; title?: string; eyebrow?: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ['testimonials'],
     queryFn: async () => (await contentApi.getTestimonials()).data as Testimonial[],
@@ -24,7 +24,7 @@ export function Testimonials({ limit = 3, title = 'Lo que dicen las familias' }:
   return (
     <div>
       <Reveal className="mb-8 text-center">
-        <span className="section-label-pink inline-flex">Comunidad</span>
+        {eyebrow && <span className="section-label-pink inline-flex">{eyebrow}</span>}
         <h2 className="font-head text-fluid-3xl font-extrabold tracking-[-0.025em] text-ink">{title}</h2>
       </Reveal>
       <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

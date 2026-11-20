@@ -25,3 +25,13 @@ export const ADMISSION_DOCS: AdmissionDoc[] = [
   { label: 'Carta de buena conducta' },
   { label: 'Constancia de no adeudo' },
 ];
+
+/** Fills `{total}` and `{online}` (documents with an official online link) in a summary line. */
+export function docsSummary(template: string, docs: AdmissionDoc[]): string {
+  return template
+    .replace(/\{total\}/g, String(docs.length))
+    .replace(/\{online\}/g, String(docs.filter((d) => d.href).length));
+}
+
+/** The list above as CMS `items` defaults (every key present so the editor shows the fields). */
+export const ADMISSION_DOC_ITEMS = ADMISSION_DOCS.map((d) => ({ label: d.label, href: d.href ?? '', linkLabel: d.linkLabel ?? '' }));

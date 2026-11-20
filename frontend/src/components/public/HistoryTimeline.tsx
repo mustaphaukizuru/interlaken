@@ -14,18 +14,24 @@ const MILESTONES: { year: number | string; title: string; desc: string }[] = [
   { year: new Date().getFullYear(), title: `${SCHOOL_YEARS} años`, desc: 'Portal de Familias con cafetería digital, comunicados y admisiones en línea. La misma comunidad, nuevas herramientas.' },
 ];
 
-export function HistoryTimeline() {
+export type Milestone = { year: number | string; title: string; desc?: string };
+
+/** The built-in milestones; the CMS timeline block passes its own items. */
+export const DEFAULT_MILESTONES = MILESTONES;
+
+export function HistoryTimeline({ items }: { items?: Milestone[] }) {
+  const list = items && items.length > 0 ? items : MILESTONES;
   return (
     <ol className="relative ml-3 border-l-2 border-purple/20 pl-6 sm:ml-4 sm:pl-8" aria-label="Línea de tiempo del colegio">
-      {MILESTONES.map((m, i) => (
-        <li key={String(m.year)} className="relative pb-8 last:pb-0">
+      {list.map((m, i) => (
+        <li key={`${m.year}-${i}`} className="relative pb-8 last:pb-0">
           <span className="absolute -left-[33px] top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white ring-2 ring-purple sm:-left-[41px]" aria-hidden="true">
             <span className="h-2 w-2 rounded-full bg-purple" />
           </span>
           <Reveal delay={i * 60}>
             <p className="font-head text-[12px] font-bold uppercase tracking-[1.4px] text-purple">{m.year}</p>
             <h3 className="mt-1 font-head text-[17px] font-bold text-ink">{m.title}</h3>
-            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted">{m.desc}</p>
+            {m.desc && <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted">{m.desc}</p>}
           </Reveal>
         </li>
       ))}

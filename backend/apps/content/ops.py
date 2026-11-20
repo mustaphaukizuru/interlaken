@@ -139,11 +139,19 @@ def referenced_media_ids() -> set[int]:
     """Asset ids used by page drafts, published versions, SEO images and comunicado attachments."""
     from apps.portal.models import Announcement
 
-    from .pages import Page, PageVersion
+    from .pages import Page, PageVersion, image_refs
 
     out: set[int] = set()
-    for blocks, seo in Page.objects.values_list("draft_blocks", "seo"):
+
+    def walk_blocks(blocks) -> None:
         _walk(blocks, out)
+        # Designed sections name their images freely ("poster", "image1"...): the manifest knows the paths.
+        for b in blocks if isinstance(blocks, list) else []:
+            if isinstance(b, dict):
+                out.update(image_refs(b))
+
+    for blocks, seo in Page.objects.values_list("draft_blocks", "seo"):
+        walk_blocks(blocks)
         _walk(seo, out)
     published = Page.objects.exclude(published_version__isnull=True).values_list(
         "published_version_id", flat=True
@@ -151,7 +159,7 @@ def referenced_media_ids() -> set[int]:
     for blocks, seo in PageVersion.objects.filter(pk__in=list(published)).values_list(
         "blocks", "seo"
     ):
-        _walk(blocks, out)
+        walk_blocks(blocks)
         _walk(seo, out)
     for attachments in Announcement.objects.exclude(attachments=[]).values_list(
         "attachments", flat=True

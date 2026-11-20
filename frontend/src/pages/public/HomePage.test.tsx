@@ -43,7 +43,7 @@ describe('HomePage — video institucional (admin-editable, seeded)', () => {
 
   it('renders no video section when the admin clears video_url', async () => {
     renderHome();
-    expect(screen.getByText('Formando líderes')).toBeInTheDocument();
+    expect(await screen.findByText('Formando líderes')).toBeInTheDocument();
     // Wait for the lazy below-the-fold chunk before asserting an absence. The
     // generous timeout is for loaded CI machines: this waits on a dynamic
     // import resolving, not on a network round trip.

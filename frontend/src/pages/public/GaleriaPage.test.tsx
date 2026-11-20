@@ -3,14 +3,20 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HelmetProvider } from 'react-helmet-async';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GaleriaPage from './GaleriaPage';
 
+// The page is a CMS template now: it looks up a published version (react-query)
+// before rendering its default sections.
 function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <HelmetProvider>
-      <MemoryRouter>
-        <GaleriaPage />
-      </MemoryRouter>
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <GaleriaPage />
+        </MemoryRouter>
+      </QueryClientProvider>
     </HelmetProvider>,
   );
 }
@@ -21,7 +27,7 @@ describe('GaleriaPage', () => {
     // 14 fotos distintas en "Todas" (logos removidos y duplicados
     // consolidados: varias se publicaban dos veces con nombres distintos);
     // "Instalaciones" deja 8.
-    expect(screen.getAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(14);
+    expect(await screen.findAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(14);
     await userEvent.click(screen.getByRole('button', { name: 'Instalaciones' }));
     expect(screen.getAllByRole('button', { name: /ampliar imagen/i })).toHaveLength(8);
   });
@@ -29,7 +35,7 @@ describe('GaleriaPage', () => {
   it('opens the lightbox, navigates with arrow keys and closes with Escape', async () => {
     renderPage();
     await userEvent.click(
-      screen.getAllByRole('button', { name: /ampliar imagen/i })[0],
+      (await screen.findAllByRole('button', { name: /ampliar imagen/i }))[0],
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('1 / 14')).toBeInTheDocument();
