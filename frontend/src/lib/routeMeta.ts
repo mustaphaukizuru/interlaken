@@ -53,7 +53,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   },
   '/nosotros': {
     title: `Nosotros: ${SCHOOL_YEARS} años educando en Tlalnepantla`,
-    crumb: 'Nosotros',
+    crumb: 'Quiénes somos',
     description:
       `Conoce al Colegio Interlaken: ${SCHOOL_YEARS} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores.`,
   },
@@ -127,11 +127,13 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       'Contacta al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa.',
   },
+  // Menu «Familias» (2026-11-20): Pagar colegiatura (Servo Escolar), Colegiaturas
+  // y cafetería, Facturación, Plataformas. Labels and titles follow the menu.
   '/pagos': {
-    title: 'Pagos: colegiaturas y cafetería',
-    crumb: 'Pagos',
+    title: 'Colegiaturas y cafetería: pagos en línea',
+    crumb: 'Colegiaturas y cafetería',
     description:
-      'Pagos del Colegio Interlaken: colegiaturas y boletas en línea, y saldo y recargas de la cafetería escolar.',
+      'Familias del Colegio Interlaken: pague colegiaturas y consulte boletas en línea, y revise el saldo y las recargas de la cafetería escolar.',
   },
   '/plataformas': {
     title: 'Plataformas para familias',

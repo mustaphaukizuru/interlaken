@@ -28,3 +28,10 @@
 - [Modelo educativo](https://interlaken.edu.mx/modelo-educativo): enfoque bilingüe, académico y de valores
 - [Galería](https://interlaken.edu.mx/galeria): campus e instalaciones
 - [Contacto](https://interlaken.edu.mx/contacto): teléfono, WhatsApp, correo y mapa
+
+## Familias
+
+- [Pagar colegiatura](https://interlaken.servoescolar.mx): pago en línea de colegiaturas y consulta de boletas (Servo Escolar)
+- [Colegiaturas y cafetería](https://interlaken.edu.mx/pagos): cómo pagar colegiaturas y recargar la cafetería escolar
+- [Facturación](https://interlaken.edu.mx/comunidad/facturacion): solicitud de facturas (CFDI)
+- [Plataformas](https://interlaken.edu.mx/plataformas): Google Classroom, Gmail institucional, registro de iPad (Mosyle) y Educar es Padre
