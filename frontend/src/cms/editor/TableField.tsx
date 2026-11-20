@@ -75,7 +75,7 @@ export function TableField({ spec, value, onChange }: { spec: FieldSpec; value: 
   };
 
   return (
-    <fieldset className="space-y-3 rounded-xl border border-line p-3">
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line p-3">
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-subtle">{spec.label}{spec.required ? ' *' : ''}</legend>
       <p id={`${id}-help`} className="text-xs text-subtle">
         Escriba en las celdas o pegue celdas copiadas de Excel o Google Sheets; en la fila de encabezados se pegan también los títulos.
