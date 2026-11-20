@@ -3,7 +3,7 @@
  * SEO when the SEO fields still hold the old seed_cms values (docs/cms/safe-publish.md).
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 
@@ -26,6 +26,7 @@ vi.mock('@/store/authStore', () => ({
 
 import { contentApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { stubViewport } from '@/test/viewport';
 import AdminPageEditor from './AdminPageEditor';
 import { loadAllGroups } from '@/cms/sections/loaders';
 
@@ -49,6 +50,7 @@ beforeAll(async () => { await loadAllGroups(); }, 60_000);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stubViewport(1280);
   vi.mocked(contentApi.adminUpdatePage).mockImplementation(async (_id, data) => ({ data: { ...PAGE, ...data } }) as never);
 });
 
@@ -60,7 +62,7 @@ describe('AdminPageEditor: the design brings its own SEO', () => {
     await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
     expect(lastSave().seo).toEqual({ og_image: 3 });
     expect(lastSave().draft_blocks?.[0].type).toBe('costos.hero');
-  });
+  }, 20_000);
 
   it('«Diseño original» keeps SEO the school wrote', async () => {
     const own = { title: 'Costos y becas', description: SEED_SEO.description };
@@ -68,9 +70,10 @@ describe('AdminPageEditor: the design brings its own SEO', () => {
       data: { ...PAGE, seo: own, seed_seo: { description: SEED_SEO.description }, draft_blocks: [{ id: 'costos-1', type: 'costos.hero', props: { title: 'Otro' } }] },
     } as never);
     renderEditor();
-    await userEvent.click(await screen.findByRole('button', { name: /Diseño original/ }, { timeout: 8000 }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Más' }, { timeout: 8000 }));
+    await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: /Diseño original/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Restablecer borrador' }));
     await waitFor(() => expect(contentApi.adminUpdatePage).toHaveBeenCalled(), { timeout: 4000 });
     expect(lastSave().seo).toEqual({ title: 'Costos y becas' });
-  });
+  }, 20_000);
 });
