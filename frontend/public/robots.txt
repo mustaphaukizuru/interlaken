@@ -1,14 +1,18 @@
-# Colegio Interlaken — robots.txt
+# Colegio Interlaken: robots.txt
 User-agent: *
 Allow: /
 
-# Portal and auth areas are behind login; keep them out of the index.
+# Signed-in areas, consoles and the API: nothing for search engines there.
 Disallow: /portal
 Disallow: /alumno
-Disallow: /admin/
-Disallow: /django-admin/
+Disallow: /admin
 Disallow: /staff
+Disallow: /django-admin/
 Disallow: /login
 Disallow: /auth/
+Disallow: /api/
+# Personal-data flows (/inscripcion, /confirmar-correo, /pago/) are NOT listed
+# here on purpose: keep them out of the index with a noindex tag instead, which
+# Google can only read if it may fetch the page.
 
 Sitemap: https://interlaken.edu.mx/sitemap.xml

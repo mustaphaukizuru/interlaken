@@ -31,19 +31,27 @@ export const DEFAULT_DESCRIPTION =
 export const OG_IMAGE = `${SITE_URL}/og-image.png`;
 export const LOCALE = 'es_MX';
 
-/** Business/contact facts, reused by the LocalBusiness structured data. */
+/**
+ * Business facts (NAP) for the structured data. They MUST match the Google
+ * Business Profile and the SEP registry word for word; change them only
+ * together with the profile and the JSON-LD in index.html (siteMeta.test.ts
+ * fails when the two drift). Verified 2026-11-20 against the school's own
+ * contact page, the SEP records (CP 54020) and the profile pin.
+ */
 export const ORG = {
   legalName: 'Colegio Interlaken',
   telephone: '+52-55-5379-1188',
+  // The monitored mailboxes live on .com.mx; .edu.mx has no MX record.
   email: 'info@interlaken.com.mx',
-  streetAddress: 'Av. de los Reyes 67, Residencial el Dorado',
+  streetAddress: 'Av. de los Reyes 67, Residencial El Dorado',
   addressLocality: 'Tlalnepantla de Baz',
   addressRegion: 'Estado de México',
   postalCode: '54020',
   addressCountry: 'MX',
-  // Approximate campus geo (Tlalnepantla de Baz centre) — refine when surveyed.
-  latitude: 19.5407,
-  longitude: -99.1955,
+  // Google Business Profile pin (maps.app.goo.gl/Xd241Sht8TmrMHUe6).
+  latitude: 19.5557298,
+  longitude: -99.206715,
+  hasMap: 'https://maps.app.goo.gl/Xd241Sht8TmrMHUe6',
   // Confirmed social profile only (Instagram/YouTube stay empty until real URLs exist).
   sameAs: ['https://www.facebook.com/colegiointerlaken'] as string[],
 } as const;

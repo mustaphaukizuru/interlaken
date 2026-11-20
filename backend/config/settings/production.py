@@ -56,3 +56,6 @@ RATELIMIT_USE_CACHE = 'ratelimit'
 # index.html was removed from ./static/ in the image build, so '/' still falls
 # through to the Django SPA view (this only adds the missing root file routes).
 WHITENOISE_ROOT = BASE_DIR / 'static'
+# Python's mimetypes table has no entry for .webmanifest, so it went out as
+# application/octet-stream; browsers and Lighthouse expect the manifest type.
+WHITENOISE_MIMETYPES = {'.webmanifest': 'application/manifest+json'}
