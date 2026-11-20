@@ -4,7 +4,8 @@
  * one below, so the site never renders a blank button. Mirrors
  * backend/apps/content/navigation.py validate_chrome.
  */
-export interface ChromeButton { label: string; href: string; primary?: boolean }
+/** `icon` names a lucide icon from the public menu's set (PublicLayout ICONS); unknown names draw none. */
+export interface ChromeButton { label: string; href: string; primary?: boolean; icon?: string }
 
 export interface SiteChrome {
   header_buttons: ChromeButton[];
@@ -16,9 +17,10 @@ export interface SiteChrome {
 }
 
 export const CHROME_DEFAULTS: SiteChrome = {
+  // Menu «Opción 3» (confirmed 2026-11-20): the old «Pagos» button lives in the
+  // «Familias» menu as «Pagar colegiatura»; «Cafetería» reads «Portal Cafetería».
   header_buttons: [
-    { label: 'Pagos', href: 'https://interlaken.servoescolar.mx' },
-    { label: 'Cafetería', href: '/login' },
+    { label: 'Portal Cafetería', href: '/login', icon: 'Coffee' },
     { label: 'Agendar visita', href: '/agendar-visita', primary: true },
   ],
   footer_tagline: 'Educación bilingüe de excelencia para el desarrollo integral de sus hijos. Tlalnepantla, Estado de México.',

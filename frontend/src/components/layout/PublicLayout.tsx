@@ -1,10 +1,11 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
 import { waHref } from '@/lib/siteContact';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Menu, X, Phone, Mail, MapPin, ChevronDown,
+  Menu, X, Phone, Mail, MapPin, ChevronDown, ArrowUpRight,
   GraduationCap, ClipboardList, Users, BookOpen, Camera, Blocks, Pencil,
   FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt,
+  CreditCard, Coffee,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { MenuGroup } from '@/types/content';
@@ -30,13 +31,16 @@ const HIDE_STICKY_CTA = [
 ];
 
 /** Menú confirmado por el cliente (2026-07): 4 grupos + Contacto + CTAs.
- *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra. */
+ *  Los iconos viven en los SUBMENÚS (petición del cliente), no en la barra.
+ *  «Opción 3» (2026-11-20): «Pagos» se llama «Familias» y recibe el pago en
+ *  línea («Pagar colegiatura», antes un botón) y «Plataformas» (antes en «El Colegio»). */
 type MenuEntry = { label: string; to: string; icon: LucideIcon };
 type MenuGroupEntry = { label: string; items: MenuEntry[] };
 
 /** Icons the CMS menu editor can name (falls back to FileText). */
 const ICONS: Record<string, LucideIcon> = {
   Users, BookOpen, Camera, Blocks, Pencil, GraduationCap, ClipboardList, FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt, Phone, Mail, MapPin,
+  CreditCard, Coffee,
 };
 
 /** CMS menu → renderable groups; empty/invalid CMS menu keeps the built-in one. */
@@ -52,7 +56,6 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
       { label: 'Quiénes Somos', to: '/nosotros', icon: Users },
       { label: 'Modelo Educativo', to: '/modelo-educativo', icon: BookOpen },
       { label: 'Galería', to: '/galeria', icon: Camera },
-      { label: 'Plataformas', to: '/plataformas', icon: MonitorSmartphone },
     ],
   },
   {
@@ -73,22 +76,42 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
     ],
   },
   {
-    label: 'Pagos',
+    label: 'Familias',
     items: [
+      { label: 'Pagar colegiatura', to: 'https://interlaken.servoescolar.mx', icon: CreditCard },
       { label: 'Colegiaturas y cafetería', to: '/pagos', icon: CircleDollarSign },
       { label: 'Facturación', to: '/comunidad/facturacion', icon: Receipt },
+      { label: 'Plataformas', to: '/plataformas', icon: MonitorSmartphone },
     ],
   },
 ];
 
+/** The ↗ after a menu link that leaves the site (screen readers hear the new tab). */
+function ExternalMark() {
+  return (
+    <>
+      <ArrowUpRight className="ml-1 inline h-3.5 w-3.5 align-[-2px] opacity-60" aria-hidden="true" />
+      <span className="sr-only"> (se abre en otra pestaña)</span>
+    </>
+  );
+}
 
-
-/** A header/footer button from SiteSettings.chrome: external URLs open in a new tab. */
-function ChromeLink({ button, className, onClick }: { button: ChromeButton; className: string; onClick?: () => void }) {
-  if (isExternalHref(button.href)) {
-    return <a href={button.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{button.label}</a>;
+/** A menu or footer link: site pages use the router; https:// links (Servo Escolar) open in a new tab. */
+function MenuLink({ to, className, onClick, children }: { to: string; className: string; onClick?: () => void; children: ReactNode }) {
+  if (isExternalHref(to)) {
+    return <a href={to} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{children}</a>;
   }
-  return <Link to={button.href} onClick={onClick} className={className}>{button.label}</Link>;
+  return <Link to={to} onClick={onClick} className={className}>{children}</Link>;
+}
+
+/** A header/footer button from SiteSettings.chrome: external URLs open in a new tab; `icon` draws before the text. */
+function ChromeLink({ button, className, onClick }: { button: ChromeButton; className: string; onClick?: () => void }) {
+  const Icon = button.icon ? ICONS[button.icon] : undefined;
+  const content = <>{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}{button.label}</>;
+  if (isExternalHref(button.href)) {
+    return <a href={button.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{content}</a>;
+  }
+  return <Link to={button.href} onClick={onClick} className={className}>{content}</Link>;
 }
 
 /** Accessible desktop dropdown (hover + click, aria-expanded, Escape restores
@@ -149,7 +172,7 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
           <ul className="overflow-hidden rounded-2xl border border-line bg-white p-2 shadow-xl ring-1 ring-ink/5">
             {items.map((item) => (
               <li key={item.label}>
-                <Link
+                <MenuLink
                   to={item.to}
                   onClick={() => setOpen(false)}
                   className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink transition-colors hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
@@ -157,8 +180,8 @@ function NavDropdown({ label, items }: { label: string; items: { label: string; 
                   <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark transition-colors group-hover:bg-green-strong group-hover:text-white">
                     <item.icon className="h-4 w-4" aria-hidden="true" />
                   </span>
-                  <span className="font-medium">{item.label}</span>
-                </Link>
+                  <span className="font-medium">{item.label}{isExternalHref(item.to) && <ExternalMark />}</span>
+                </MenuLink>
               </li>
             ))}
           </ul>
@@ -362,7 +385,7 @@ export function PublicLayout() {
                 {openGroup === group.label && (
                   <div className="space-y-0.5 pl-2">
                     {group.items.map((item) => (
-                      <Link
+                      <MenuLink
                         key={item.label}
                         to={item.to}
                         onClick={() => setOpen(false)}
@@ -371,8 +394,8 @@ export function PublicLayout() {
                         <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green/10 text-green-dark">
                           <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
-                        {item.label}
-                      </Link>
+                        <span>{item.label}{isExternalHref(item.to) && <ExternalMark />}</span>
+                      </MenuLink>
                     ))}
                   </div>
                 )}
@@ -484,7 +507,7 @@ export function PublicLayout() {
                       <ul className="space-y-2.5 pb-4 text-xs">
                         {group.links.map((l) => (
                           <li key={l.label}>
-                            <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
+                            <MenuLink to={l.to} className="hover:text-white transition-colors">{l.label}{isExternalHref(l.to) && <ExternalMark />}</MenuLink>
                           </li>
                         ))}
                       </ul>
@@ -503,7 +526,7 @@ export function PublicLayout() {
                 <ul className="space-y-2 text-xs">
                   {group.links.map((l) => (
                     <li key={l.label}>
-                      <Link to={l.to} className="hover:text-white transition-colors">{l.label}</Link>
+                      <MenuLink to={l.to} className="hover:text-white transition-colors">{l.label}{isExternalHref(l.to) && <ExternalMark />}</MenuLink>
                     </li>
                   ))}
                 </ul>

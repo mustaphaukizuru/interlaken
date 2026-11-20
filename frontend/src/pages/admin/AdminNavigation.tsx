@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowDown, ArrowUp, Blocks, BookOpen, CalendarDays, Camera, CircleDollarSign, ClipboardList, CornerDownRight, FileText, GraduationCap,
+  ArrowDown, ArrowUp, Blocks, BookOpen, CalendarDays, Camera, CircleDollarSign, ClipboardList, Coffee, CornerDownRight, CreditCard, FileText, GraduationCap,
   Mail, MapPin, MonitorSmartphone, Pencil, Phone, Plus, Receipt, RotateCcw, Trash2, Upload, UserPlus, Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -39,15 +39,15 @@ import { TextField } from '@/cms/editor/fields/TextField';
 
 /** The icons the public menu can draw (components/layout/PublicLayout ICONS), shown with their Spanish names. */
 const NAV_ICON_CHOICES: IconChoice[] = Object.entries({
-  Users, BookOpen, Camera, Blocks, Pencil, GraduationCap, ClipboardList, FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt, Phone, Mail, MapPin,
+  Users, BookOpen, Camera, Blocks, Pencil, GraduationCap, ClipboardList, FileText, CircleDollarSign, UserPlus, CalendarDays, MonitorSmartphone, Receipt, Phone, Mail, MapPin, CreditCard, Coffee,
 }).map(([value, Icon]) => ({ value, Icon }));
 
 /** The built-in menu, offered as the starting point when the CMS menu is empty. */
 export const DEFAULT_MENU: MenuGroup[] = [
-  { label: 'El Colegio', items: [{ label: 'Quiénes Somos', to: '/nosotros', icon: 'Users' }, { label: 'Modelo Educativo', to: '/modelo-educativo', icon: 'BookOpen' }, { label: 'Galería', to: '/galeria', icon: 'Camera' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
+  { label: 'El Colegio', items: [{ label: 'Quiénes Somos', to: '/nosotros', icon: 'Users' }, { label: 'Modelo Educativo', to: '/modelo-educativo', icon: 'BookOpen' }, { label: 'Galería', to: '/galeria', icon: 'Camera' }] },
   { label: 'Niveles Educativos', items: [{ label: 'Preescolar', to: '/niveles/preescolar', icon: 'Blocks' }, { label: 'Primaria', to: '/niveles/primaria', icon: 'Pencil' }, { label: 'Secundaria', to: '/niveles/secundaria', icon: 'GraduationCap' }] },
   { label: 'Admisiones', items: [{ label: 'Proceso de Inscripción', to: '/admisiones', icon: 'ClipboardList' }, { label: 'Documentación', to: '/admisiones/documentacion', icon: 'FileText' }, { label: 'Costos', to: '/admisiones/costos', icon: 'CircleDollarSign' }, { label: 'Pre-Registro', to: '/pre-registro', icon: 'UserPlus' }] },
-  { label: 'Pagos', items: [{ label: 'Colegiaturas y cafetería', to: '/pagos', icon: 'CircleDollarSign' }, { label: 'Facturación', to: '/comunidad/facturacion', icon: 'Receipt' }] },
+  { label: 'Familias', items: [{ label: 'Pagar colegiatura', to: 'https://interlaken.servoescolar.mx', icon: 'CreditCard' }, { label: 'Colegiaturas y cafetería', to: '/pagos', icon: 'CircleDollarSign' }, { label: 'Facturación', to: '/comunidad/facturacion', icon: 'Receipt' }, { label: 'Plataformas', to: '/plataformas', icon: 'MonitorSmartphone' }] },
 ];
 
 function moveAt<T>(list: T[], i: number, d: -1 | 1): T[] {

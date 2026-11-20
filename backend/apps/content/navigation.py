@@ -146,7 +146,12 @@ def validate_chrome(chrome) -> dict:
             raise serializers.ValidationError('Cada botón necesita un texto (máx. 30 caracteres).')
         if not _valid_href(to):
             raise serializers.ValidationError(f'Botón "{label}": el enlace debe empezar con / o https://.')
-        clean.append({'label': label, 'href': to[:300], 'primary': bool((b or {}).get('primary'))})
+        button = {'label': label, 'href': to[:300], 'primary': bool((b or {}).get('primary'))}
+        # Optional lucide icon name drawn before the text (e.g. «Portal Cafetería» → Coffee).
+        icon = str((b or {}).get('icon') or '').strip()[:40]
+        if icon:
+            button['icon'] = icon
+        clean.append(button)
     if clean:
         out['header_buttons'] = clean
     return out
