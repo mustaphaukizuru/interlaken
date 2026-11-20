@@ -196,7 +196,6 @@ function PublishedView({ notice }: { notice: NoticeVersion }) {
 /** The public page's two sections rendering this version, with the page's own copy around it. */
 function NoticePreview({ notice }: { notice: Pick<NoticeVersion, 'version' | 'title' | 'body' | 'integral_notice_url' | 'effective_date'> }) {
   const { data: page } = usePublishedPage('aviso-de-privacidad');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- section props are free-form CMS JSON
   const props = (type: string): Record<string, any> => {
     const spec = aviso.sections.find((s) => s.type === type);
     const block = page?.blocks?.find((b) => b.type === type);
