@@ -50,7 +50,7 @@ describe('PricingSections copy', () => {
     expect(within(fees).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Nivel', 'Gastos administrativos', 'Inscripción']);
     expect(screen.getAllByText('/ mes')).toHaveLength(2);
     expect(screen.getByText('/ año')).toBeInTheDocument();
-    expect(screen.getByText('· $2,670.00 /mes (matutina)')).toBeInTheDocument();
+    expect(screen.getByText('$2,670.00 /mes (matutina)')).toBeInTheDocument();
     expect(screen.getByText(/devoluciones/)).toHaveClass('font-medium');
     expect(screen.getByText(/RECARGO/)).toHaveClass('font-medium');
     expect(screen.getByText(/11 mensualidades\./)).toHaveClass('text-muted');
@@ -67,7 +67,7 @@ describe('PricingSections copy', () => {
     expect(screen.getByRole('columnheader', { name: 'Cuota de regreso' })).toBeInTheDocument();
     expect(screen.getAllByText('al mes')).toHaveLength(2);
     expect(screen.getByText('al año')).toBeInTheDocument();
-    expect(screen.getByText('· $2,670.00 mensual (matutina)')).toBeInTheDocument();
+    expect(screen.getByText('$2,670.00 mensual (matutina)')).toBeInTheDocument();
     expect(screen.getByText(/11 mensualidades\./)).toHaveClass('font-medium');
     expect(screen.getByText(/devoluciones/)).toHaveClass('text-muted');
   });

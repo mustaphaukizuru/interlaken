@@ -136,17 +136,23 @@ export function PriceCard({ tone, icon: Icon, label, title, subtitle, children }
   );
 }
 
-function Row({ left, sub, right, rightMuted }: {
-  left: string; sub?: string; right: string; rightMuted?: string;
+/**
+ * One price line. `rightMuted` sits next to the price («/ año»); `rightNote` goes on its own
+ * line under it and may wrap, for long extras such as the daycare monthly rate: kept inline,
+ * a long note squeezed the label column on phones until the schedule overlapped the price.
+ */
+function Row({ left, sub, right, rightMuted, rightNote }: {
+  left: string; sub?: string; right: string; rightMuted?: string; rightNote?: string;
 }) {
   return (
     <li className="flex items-center justify-between gap-4 border-b border-ink/5 px-5 py-3.5 last:border-0">
-      <span className="min-w-0 text-sm text-ink">
+      <span className={`min-w-0 text-sm text-ink${rightNote ? ' flex-1' : ''}`}>
         {left}
         {sub && <span className="block text-xs text-muted">{sub}</span>}
       </span>
-      <span className="shrink-0 text-sm font-bold text-ink">
+      <span className={rightNote ? 'max-w-[55%] text-right text-sm font-bold text-ink' : 'shrink-0 text-sm font-bold text-ink'}>
         {right}{rightMuted && <span className="font-normal text-muted"> {rightMuted}</span>}
+        {rightNote && <span className="block text-xs font-normal text-muted">{rightNote}</span>}
       </span>
     </li>
   );
@@ -338,10 +344,10 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                           left={d.schedule}
                           sub={d.service}
                           right={mxn(d.daily_cost)}
-                          rightMuted={
+                          rightNote={
                             d.monthly_cost
-                              ? `· ${mxn(d.monthly_cost)} ${t(c.daycareMonthly)}${d.monthly_note ? ` (${d.monthly_note.toLowerCase()})` : ''}`
-                              : d.monthly_note ? `· ${d.monthly_note}` : undefined
+                              ? `${mxn(d.monthly_cost)} ${t(c.daycareMonthly)}${d.monthly_note ? ` (${d.monthly_note.toLowerCase()})` : ''}`
+                              : d.monthly_note || undefined
                           }
                         />
                       ))}
