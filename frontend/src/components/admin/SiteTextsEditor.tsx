@@ -247,7 +247,7 @@ export function SiteTextsEditor() {
                       </div>
                     ))}
                     {linkList.length < 4 && (
-                      <Button type="button" size="sm" variant="secondary" className="min-h-[44px]" onClick={() => setLinks([...linkList, { label: '', href: '' }])}><Plus size={14} aria-hidden="true" /> Agregar enlace</Button>
+                      <Button type="button" size="sm" variant="secondary" className="min-h-[44px]" onClick={() => setLinks([...linkList, { label: '', href: '' }])}><Plus size={14} aria-hidden="true" /> Agregar enlace legal</Button>
                     )}
                     {linkList.length === 0 && <p className="text-xs text-muted">Sin enlaces, el pie muestra «Aviso de Privacidad».</p>}
                   </fieldset>

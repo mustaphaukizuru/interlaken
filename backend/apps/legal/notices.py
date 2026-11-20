@@ -1,5 +1,5 @@
 """
-legal/notices.py — the console «Aviso de privacidad» (admin only).
+legal/notices.py: the console «Aviso de privacidad» (admin only).
 
 The privacy notice is versioned for consent: every ConsentRecord and every
 Registration points at the exact PrivacyNoticeVersion the family accepted.

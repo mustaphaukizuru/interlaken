@@ -1,5 +1,5 @@
 /**
- * /admin/aviso-privacidad — the official privacy notice (apps/legal/notices.py).
+ * /admin/aviso-privacidad: the official privacy notice (apps/legal/notices.py).
  *
  * The notice is versioned for consent: each family's consent stays tied to
  * the exact version it accepted. This screen lists the versions with how many
@@ -104,7 +104,7 @@ function VersionsOverview() {
                   <Button className="min-h-[44px] justify-center" onClick={() => create.mutate()} loading={create.isPending}><FilePlus2 size={16} aria-hidden="true" /> Nueva versión</Button>
                 )}
                 {current && <Link to={`${BASE}/${current.id}`} className="btn-outline min-h-[44px] justify-center"><Eye size={16} aria-hidden="true" /> Ver el texto vigente</Link>}
-                <a href="/aviso-de-privacidad" target="_blank" rel="noopener noreferrer" className="btn-ghost min-h-[44px] justify-center"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
+                <a href="/aviso-de-privacidad" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-muted transition-colors hover:bg-cream hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/30"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
               </div>
             </div>
           </Card>

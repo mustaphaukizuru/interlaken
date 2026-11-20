@@ -30,7 +30,7 @@ const deriveLevel = (grade: string): string => {
   return 'primaria';
 };
 
-/** Documents the school asks for — all optional at submit; admissions follows up. Labels are copy. */
+/** Documents the school asks for: all optional at submit; admissions follows up. Labels are copy. */
 const DOC_TYPES: { key: string; prop: string }[] = [
   { key: 'birth_cert',  prop: 'docBirthCert' },
   { key: 'curp_doc',    prop: 'docCurp' },
@@ -103,7 +103,7 @@ export function RegisterWizard({ c, link, onView }: {
   const [booting, setBooting] = useState(isInvited);
   const [inviteError, setInviteError] = useState(false);
   const [invited, setInvited] = useState(false);
-  // Per-field messages for empty required fields (step 1) — shown under each input.
+  // Per-field messages for empty required fields (step 1), shown under each input.
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Form, string>>>({});
 
   // The hero shows only next to the form (before paint, so it never flashes).
@@ -188,7 +188,7 @@ export function RegisterWizard({ c, link, onView }: {
         parent1_phone: form.parent1_phone,
       };
       if (regId) {
-        // Invited: the draft already exists — persist any corrections.
+        // Invited: the draft already exists, so persist any corrections.
         await admissionsApi.updateRegistration(regId, step1, session);
       } else {
         const { data } = await admissionsApi.createRegistration({
@@ -302,7 +302,7 @@ export function RegisterWizard({ c, link, onView }: {
     );
   }
 
-  // Invite link is being exchanged for a session — brief, blocking state.
+  // Invite link is being exchanged for a session: brief, blocking state.
   if (booting) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">

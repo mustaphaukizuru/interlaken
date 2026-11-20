@@ -3,7 +3,7 @@
  *
  * Central place for the wa.me deep link + the prefilled es-MX messages each
  * public CTA sends, so copy stays consistent and the school cycle rolls over
- * automatically ({{ciclo}} = CURRENT_CYCLE — nothing hardcoded).
+ * automatically ({{ciclo}} = CURRENT_CYCLE, nothing hardcoded).
  *
  * The messages are editable in Navegación → «Textos del sitio»
  * (SiteSettings.chrome wa_*); blank = the built-in text below.
