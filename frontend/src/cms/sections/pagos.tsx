@@ -32,10 +32,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'pagos', path: '/pagos', title: 'Colegiaturas y cafetería', group: 'pagos',
-  seo: {
-    title: 'Colegiaturas y cafetería',
-    description: 'Pagos del Colegio Interlaken: colegiaturas y boletas en línea, y saldo y recargas de cafetería.',
-  },
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['pagos.hero', 'pagos.platforms'],
 }];
 

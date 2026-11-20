@@ -191,7 +191,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'inscripcion-documentos', path: '/inscripcion/documentos', title: 'Documentos de inscripción', group: 'documentos',
-  seo: { title: 'Documentos de inscripción', description: 'Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken.' },
+  seo: {}, // title, description and noindex: lib/routeMeta.ts ROUTE_META
   sections: ['documentos.main'],
   // Sign-in and one-time links never wait for the CMS (TemplatePage).
   paintAtOnce: true,

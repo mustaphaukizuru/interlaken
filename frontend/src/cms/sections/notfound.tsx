@@ -67,7 +67,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'no-encontrada', path: '/no-encontrada', title: 'Página no encontrada', group: 'notfound',
-  seo: { title: 'Página no encontrada', description: 'La página que busca no existe o fue movida.' },
+  seo: { title: 'Página no encontrada', description: 'La página que busca no existe o fue movida.', noindex: true },
   sections: ['notfound.message'],
 }];
 

@@ -4,6 +4,25 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path';
+import { ROUTE_META, routeHead } from './src/lib/routeMeta';
+
+/**
+ * seo-routes.json: the per-URL head (title, description, canonical, robots,
+ * page JSON-LD) for every route in ROUTE_META, so backend/apps/core/spa.py can
+ * write it into the raw HTML. Crawlers and link previews (WhatsApp, Facebook)
+ * read that HTML and never run the app. Computed at build time, so the years
+ * and the school cycle in the copy are as of the deploy.
+ */
+function seoRoutesPlugin(): PluginOption {
+  return {
+    name: 'interlaken-seo-routes',
+    apply: 'build',
+    generateBundle() {
+      const routes = Object.fromEntries(Object.keys(ROUTE_META).map((p) => [p, routeHead(p)]));
+      this.emitFile({ type: 'asset', fileName: 'seo-routes.json', source: JSON.stringify(routes, null, 1) });
+    },
+  };
+}
 
 export default defineConfig(({ command }) => ({
   // In production the SPA is served by Django/whitenoise under /static/, so
@@ -29,6 +48,7 @@ export default defineConfig(({ command }) => ({
       },
     },
     react(),
+    seoRoutesPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       // The SPA is built with base '/static/' but pages live at the web ROOT

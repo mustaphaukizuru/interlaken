@@ -27,7 +27,6 @@ export interface LevelData {
   groupsTitle: string;
   groups: LevelGroup[];
   extras: string[];
-  seoDescription: string;
 }
 
 export const LEVELS: LevelData[] = [
@@ -56,8 +55,6 @@ export const LEVELS: LevelData[] = [
       'Estudios con reconocimiento oficial de la Secretaría de Educación Pública (SEP).',
       'Al concluir el tercer grado, los alumnos reciben su Certificado de Educación Preescolar.',
     ],
-    seoDescription:
-      'Kínder bilingüe en Tlalnepantla, de maternal a KIII: aprender jugando, proyectos en inglés y español, computación, música, deportes y yoga.',
   },
   {
     slug: 'primaria',
@@ -79,8 +76,6 @@ export const LEVELS: LevelData[] = [
       'Actividades complementarias y extraescolares: visitas, campañas, concursos, exposiciones, festivales y servicio a la comunidad.',
       'Acompañamiento del Departamento de Psicopedagogía.',
     ],
-    seoDescription:
-      'Primaria bilingüe e integral en Tlalnepantla: trabajo por proyectos, pocas tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos.',
   },
   {
     slug: 'secundaria',
@@ -102,8 +97,6 @@ export const LEVELS: LevelData[] = [
       'Actividades complementarias: visitas, exposiciones, concursos, conferencias, festivales, ceremonias y servicio a la comunidad.',
       'Actividades extraescolares deportivas y culturales.',
     ],
-    seoDescription:
-      'Secundaria en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, Money Adventure en inglés, arte y viajes opcionales al extranjero.',
   },
 ];
 

@@ -1,16 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Quote } from 'lucide-react';
 import { Reveal } from '@/components/ui/Reveal';
-import { contentApi, type Testimonial } from '@/services/api';
+import { testimonialsQuery } from './testimonialsQuery';
 
 /** Published family/alumni quotes (BACKLOG P2-15). Renders nothing when the school has none. */
 export function Testimonials({ limit = 3, title = 'Lo que dicen las familias', eyebrow = 'Comunidad' }: { limit?: number; title?: string; eyebrow?: string }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['testimonials'],
-    queryFn: async () => (await contentApi.getTestimonials()).data as Testimonial[],
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
+  const { data, isLoading } = useQuery(testimonialsQuery);
   const items = (data ?? []).slice(0, limit);
   // Loading: reserve the space so the page below does not jump when quotes land.
   if (isLoading) {

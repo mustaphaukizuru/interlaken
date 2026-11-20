@@ -5,24 +5,24 @@
       "path": "/admisiones",
       "title": "Admisiones",
       "seo": {
-        "title": "Admisiones",
-        "description": "Proceso de admisión a Colegio Interlaken para preescolar, primaria y secundaria. Conoce requisitos, fechas y cómo inscribir a tu hijo."
+        "title": "Admisiones {{ciclo}}",
+        "description": "Admisiones {{ciclo}} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a su hijo en preescolar, primaria o secundaria."
       }
     },
     "agendar-visita": {
       "path": "/agendar-visita",
       "title": "Agendar visita",
       "seo": {
-        "title": "Agendar Visita",
-        "description": "Reserva un recorrido personalizado por las instalaciones de Colegio Interlaken en Tlalnepantla. Agenda tu visita en línea."
+        "title": "Agende una visita al colegio",
+        "description": "Reserve en línea un recorrido por las instalaciones del Colegio Interlaken en Residencial El Dorado, Tlalnepantla. Conozca salones, maestros y patios."
       }
     },
     "aviso-de-privacidad": {
       "path": "/aviso-de-privacidad",
       "title": "Aviso de privacidad",
       "seo": {
-        "title": "Aviso de Privacidad",
-        "description": "Aviso de Privacidad de Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO."
+        "title": "Aviso de privacidad",
+        "description": "Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer sus derechos ARCO."
       }
     },
     "confirmar-correo": {
@@ -37,23 +37,23 @@
       "path": "/contacto",
       "title": "Contacto",
       "seo": {
-        "title": "Contacto",
-        "description": "Contacta a Colegio Interlaken en Tlalnepantla, Estado de México. Teléfono, correo y ubicación para resolver tus dudas de admisión."
+        "title": "Contacto y ubicación",
+        "description": "Contacte al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa."
       }
     },
     "costos": {
       "path": "/admisiones/costos",
       "title": "Costos",
       "seo": {
-        "title": "Costos {{ciclo}}",
-        "description": "Costos del Colegio Interlaken para el ciclo escolar {{ciclo}}: inscripción, colegiaturas, seguros, extraescolares y estancia para maternal, preescolar, primaria y secundaria."
+        "title": "Costos y colegiaturas {{ciclo}}",
+        "description": "Costos del Colegio Interlaken para el ciclo {{ciclo}}: inscripción, colegiaturas, seguros, extraescolares y estancia de preescolar, primaria y secundaria."
       }
     },
     "documentacion": {
       "path": "/admisiones/documentacion",
       "title": "Documentación",
       "seo": {
-        "title": "Documentación",
+        "title": "Documentos para la inscripción",
         "description": "Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo {{ciclo}}), con enlaces a los trámites oficiales en gob.mx."
       }
     },
@@ -61,16 +61,16 @@
       "path": "/comunidad/facturacion",
       "title": "Facturación",
       "seo": {
-        "title": "Facturación",
-        "description": "Solicite sus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos y avisos importantes."
+        "title": "Facturación (CFDI)",
+        "description": "Solicite sus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos, plazos y avisos importantes."
       }
     },
     "galeria": {
       "path": "/galeria",
       "title": "Galería",
       "seo": {
-        "title": "Galería",
-        "description": "La vida en el Colegio Interlaken: campus, salones, deportes y actividades de Preescolar, Primaria y Secundaria en Tlalnepantla."
+        "title": "Galería: campus e instalaciones",
+        "description": "La vida en el Colegio Interlaken: campus, salones, deportes y actividades de preescolar, primaria y secundaria en Tlalnepantla."
       }
     },
     "iniciar-sesion": {
@@ -85,16 +85,16 @@
       "path": "/",
       "title": "Inicio",
       "seo": {
-        "title": "Colegio Interlaken — Educación bilingüe en Tlalnepantla",
-        "description": "Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con {{anios}} años de trayectoria."
+        "title": "Colegio Interlaken | Escuela bilingüe en Tlalnepantla",
+        "description": "Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con {{anios}} años de trayectoria. Agende su visita."
       }
     },
     "inscripcion": {
       "path": "/inscripcion",
       "title": "Inscripción",
       "seo": {
-        "title": "Inscripción Formal",
-        "description": "Completa el proceso de inscripción formal en Colegio Interlaken tras tu pre-registro y contacto con el equipo de admisiones."
+        "title": "Inscripción formal",
+        "description": "Complete la inscripción formal en el Colegio Interlaken tras su pre-registro."
       }
     },
     "inscripcion-documentos": {
@@ -109,8 +109,8 @@
       "path": "/modelo-educativo",
       "title": "Modelo educativo",
       "seo": {
-        "title": "Modelo Educativo",
-        "description": "El modelo del Colegio Interlaken: educación bilingüe, alto nivel académico, valores, tecnología en el aula y cultura ecológica, de Preescolar a Secundaria."
+        "title": "Modelo educativo bilingüe",
+        "description": "El modelo del Colegio Interlaken: educación bilingüe, alto nivel académico, valores, tecnología en el aula y cultura ecológica, de preescolar a secundaria."
       }
     },
     "no-encontrada": {
@@ -125,23 +125,23 @@
       "path": "/nosotros",
       "title": "Nosotros",
       "seo": {
-        "title": "Nosotros",
-        "description": "Conoce el modelo educativo bilingüe de Colegio Interlaken: {{anios}} años formando líderes íntegros en Tlalnepantla con rigor académico y valores."
+        "title": "Nosotros: {{anios}} años educando en Tlalnepantla",
+        "description": "Conozca al Colegio Interlaken: {{anios}} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores."
       }
     },
     "pagos": {
       "path": "/pagos",
       "title": "Colegiaturas y cafetería",
       "seo": {
-        "title": "Colegiaturas y cafetería",
-        "description": "Pagos del Colegio Interlaken: colegiaturas y boletas en línea, y saldo y recargas de cafetería."
+        "title": "Colegiaturas y cafetería: pagos en línea",
+        "description": "Familias del Colegio Interlaken: pague colegiaturas y consulte boletas en línea, y revise el saldo y las recargas de la cafetería escolar."
       }
     },
     "plataformas": {
       "path": "/plataformas",
       "title": "Plataformas",
       "seo": {
-        "title": "Plataformas",
+        "title": "Plataformas para familias",
         "description": "Plataformas del Colegio Interlaken: Google Classroom, Gmail institucional, registro de iPad (Mosyle) y Educar es Padre."
       }
     },
@@ -149,15 +149,15 @@
       "path": "/pre-registro",
       "title": "Pre-registro",
       "seo": {
-        "title": "Pre-Registro en línea",
-        "description": "Inicia tu pre-registro en línea para el ciclo escolar {{ciclo}} en Colegio Interlaken. Un asesor te contactará en 2 días hábiles."
+        "title": "Pre-registro en línea",
+        "description": "Inicie su pre-registro en línea para el ciclo escolar {{ciclo}} en el Colegio Interlaken. Un asesor le contactará en 2 días hábiles."
       }
     },
     "preescolar": {
       "path": "/niveles/preescolar",
       "title": "Preescolar",
       "seo": {
-        "title": "Preescolar — Niveles Educativos",
+        "title": "Kínder bilingüe en Tlalnepantla",
         "description": "Kínder bilingüe en Tlalnepantla, de maternal a KIII: aprender jugando, proyectos en inglés y español, computación, música, deportes y yoga."
       }
     },
@@ -165,16 +165,16 @@
       "path": "/niveles/primaria",
       "title": "Primaria",
       "seo": {
-        "title": "Primaria — Niveles Educativos",
-        "description": "Primaria bilingüe e integral en Tlalnepantla: trabajo por proyectos, pocas tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos."
+        "title": "Primaria bilingüe en Tlalnepantla",
+        "description": "Primaria bilingüe en Tlalnepantla: proyectos, tareas con propósito, Método Singapur, certificaciones de Cambridge, teatro, música y campamentos."
       }
     },
     "secundaria": {
       "path": "/niveles/secundaria",
       "title": "Secundaria",
       "seo": {
-        "title": "Secundaria — Niveles Educativos",
-        "description": "Secundaria en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, Money Adventure en inglés, arte y viajes opcionales al extranjero."
+        "title": "Secundaria bilingüe en Tlalnepantla",
+        "description": "Secundaria bilingüe en Tlalnepantla: aprender haciendo, certificaciones de Cambridge y Microsoft, LEGO® Education, arte y viajes opcionales al extranjero."
       }
     }
   }

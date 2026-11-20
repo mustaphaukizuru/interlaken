@@ -40,9 +40,8 @@ export default function CmsOrNotFound() {
   if (!data) return <NotFoundPage />;
   return (
     <div>
-      <Seo title={data.seo?.title || data.title} description={data.seo?.description || undefined} image={absoluteImageUrl(data.seo?.og_image, SITE_URL)}>
-        {data.seo?.noindex && <meta name="robots" content="noindex" />}
-      </Seo>
+      <Seo priority={2} title={data.seo?.title || data.title} description={data.seo?.description || undefined}
+        image={absoluteImageUrl(data.seo?.og_image, SITE_URL) || undefined} noindex={data.seo?.noindex || undefined} />
       <CmsMediaProvider media={data.media}>
         <BlockRenderer blocks={data.blocks} />
       </CmsMediaProvider>

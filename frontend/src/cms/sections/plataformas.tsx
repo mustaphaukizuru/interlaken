@@ -35,10 +35,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'plataformas', path: '/plataformas', title: 'Plataformas', group: 'plataformas',
-  seo: {
-    title: 'Plataformas',
-    description: 'Plataformas del Colegio Interlaken: Google Classroom, Gmail institucional, registro de iPad (Mosyle) y Educar es Padre.',
-  },
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: [
     'plataformas.hero',
     'plataformas.platforms',

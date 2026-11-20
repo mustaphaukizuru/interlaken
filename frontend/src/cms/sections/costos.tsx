@@ -6,7 +6,6 @@
  */
 import { CalendarDays } from 'lucide-react';
 import { PricingSections, PRICING_COPY, type PricingCopy } from '@/components/public/PricingSections';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import type { FieldSpec } from '../blocks/registry';
 import { imageSrc, imageSrcSet, useTokens } from '../runtime';
 import { defineModule, f, grouped, sectionsOf } from './kit';
@@ -113,10 +112,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'costos', path: '/admisiones/costos', title: 'Costos', group: 'costos',
-  seo: {
-    title: `Costos ${CURRENT_CYCLE}`,
-    description: `Costos del Colegio Interlaken para el ciclo escolar ${CURRENT_CYCLE}: inscripción, colegiaturas, seguros, extraescolares y estancia para maternal, preescolar, primaria y secundaria.`,
-  },
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['costos.hero', 'costos.prices'],
 }];
 

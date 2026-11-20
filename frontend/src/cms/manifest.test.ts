@@ -12,7 +12,8 @@ import { BLOCKS, type BlockSpec, type FieldKind, type FieldSpec } from './blocks
 import { allSections, allTemplates, sectionSpec } from './sections';
 import { loadAllGroups } from './sections/loaders';
 import { templateBlocks } from './sections/types';
-import { CURRENT_CYCLE, ROUTE_META, SCHOOL_YEARS } from '@/lib/siteMeta';
+import { CURRENT_CYCLE, SCHOOL_YEARS } from '@/lib/siteMeta';
+import { ROUTE_META } from '@/lib/routeMeta';
 
 const MANIFEST = resolve(process.cwd(), '../backend/apps/content/block_manifest.json');
 const TEMPLATE_MANIFEST = resolve(process.cwd(), '../backend/apps/content/template_manifest.json');

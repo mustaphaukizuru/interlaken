@@ -45,8 +45,9 @@ def test_site_name_is_never_appended_twice():
 
 def test_template_seo_defaults():
     assert has_template('costos') and has_template('inicio') and not has_template('verano')
-    assert template_seo('costos', dt.date(2026, 11, 20))['title'] == 'Costos 2026\u20132027'
-    assert template_seo('costos', dt.date(2027, 1, 2))['title'] == 'Costos 2027\u20132028'
+    # Routed pages take their defaults from ROUTE_META (frontend/src/lib/routeMeta.ts).
+    assert template_seo('costos', dt.date(2026, 11, 20))['title'] == 'Costos y colegiaturas 2026\u20132027'
+    assert template_seo('costos', dt.date(2027, 1, 2))['title'] == 'Costos y colegiaturas 2027\u20132028'
     assert template_seo('inicio')['title'].startswith('Colegio Interlaken')
     assert '45 años' in expand_tokens('{{anios}} años', dt.date(2026, 5, 1))
     assert template_seo('verano') == {'title': '', 'description': ''}
@@ -60,7 +61,7 @@ def test_published_head_keeps_the_template_seo_when_the_page_has_none(admin_user
     assert f'<title>{template_seo("costos")["title"]} · Colegio Interlaken</title>' in out
     Page.objects.create(slug='inicio', title='Inicio', draft_blocks=[{'id': 'h', 'type': 'home.hero', 'props': {'title': 'Hola'}}]).publish(admin_user)
     home = spa.apply_head('<html><head><title>x</title></head></html>', published_head('/'))
-    assert '<title>Colegio Interlaken \u2014 Educación bilingüe en Tlalnepantla</title>' in home      # the brand title, once
+    assert '<title>Colegio Interlaken | Escuela bilingüe en Tlalnepantla</title>' in home      # the brand title, once
 
 
 def test_seed_seo_is_exposed_for_the_editor(admin_client):

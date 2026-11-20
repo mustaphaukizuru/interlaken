@@ -64,6 +64,9 @@ def page_path(slug: str) -> str:
     return SLUG_PATHS.get(slug, f'/{slug}')
 
 # Routes that live in code (App.tsx). Slugs of published CMS pages are added.
+# The built seo-routes.json (frontend/src/lib/siteMeta.ts ROUTE_META) is the
+# real list; this one is the fallback when no build is present (tests, dev) and
+# the source of the changefreq/priority hints. siteMeta.test.ts keeps both equal.
 STATIC_ROUTES = [
     ('/', 'weekly', '1.0'), ('/nosotros', 'monthly', '0.8'), ('/modelo-educativo', 'monthly', '0.7'),
     ('/galeria', 'monthly', '0.5'), ('/niveles/preescolar', 'monthly', '0.8'), ('/niveles/primaria', 'monthly', '0.8'),
@@ -390,11 +393,22 @@ class AdminRedirectsImportView(ImportView):
     template_url = '/api/v1/content/admin/redirects/import/template/'
 
 
+def static_routes() -> list[tuple[str, str, str]]:
+    """Indexable code routes: the build's seo-routes.json (ROUTE_META) when present, else STATIC_ROUTES."""
+    from apps.core.spa import _seo_routes
+
+    built = _seo_routes()
+    if not built:
+        return list(STATIC_ROUTES)
+    hints = {p: (f, pr) for p, f, pr in STATIC_ROUTES}
+    return [(p, *hints.get(p, ('monthly', '0.5'))) for p, head in built.items() if head.get('robots') != 'noindex']
+
+
 def build_sitemap() -> str:
     from .pages import Page
 
     redirected = set(Redirect.objects.values_list('from_path', flat=True))
-    rows = [(p, f, pr, None) for p, f, pr in STATIC_ROUTES if p not in redirected]
+    rows = [(p, f, pr, None) for p, f, pr in static_routes() if p not in redirected]
     for page in Page.objects.filter(status=Page.Status.PUBLISHED):
         if page.slug in UNLISTED_SLUGS or (page.seo or {}).get('noindex') or (page.unpublish_at and page.unpublish_at <= timezone.now()):
             continue

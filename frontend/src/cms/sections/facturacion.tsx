@@ -213,10 +213,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'facturacion', path: '/comunidad/facturacion', title: 'Facturación', group: 'facturacion',
-  seo: {
-    title: 'Facturación',
-    description: 'Solicite sus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos y avisos importantes.',
-  },
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['facturacion.hero', 'facturacion.notices', 'facturacion.request', 'facturacion.download'],
 }];
 

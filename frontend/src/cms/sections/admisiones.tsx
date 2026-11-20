@@ -6,6 +6,7 @@
  */
 import { lazy, Suspense, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -13,6 +14,7 @@ import { waHref } from '@/lib/siteContact';
 import { waMessage } from '@/lib/whatsapp';
 import { docsSummary, useAdmissionDocs } from '@/lib/admisionesDocs';
 import { Testimonials } from '@/components/public/Testimonials';
+import { testimonialsQuery } from '@/components/public/testimonialsQuery';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
@@ -56,6 +58,12 @@ function AdmHeroView(p: HeroProps) {
 /* ── Testimonios (BACKLOG P2-15) ────────────────────────────────────────── */
 function AdmTestimonialsView(p: { eyebrow?: string; title?: string; limit?: number }) {
   const t = useTokens();
+  // No skeleton and no empty band: this section sits right under the hero, and
+  // a 640 px placeholder collapsing to an empty 96 px band when the school has
+  // no quotes moved everything below by 552 px after the first paint (CLS 0.27
+  // on phones). The band appears only when there are quotes, like the home one.
+  const { data } = useQuery(testimonialsQuery);
+  if ((data ?? []).length === 0) return null;
   return (
     <Section bg="white">
       <Testimonials eyebrow={t(p.eyebrow)} title={t(p.title)} limit={typeof p.limit === 'number' && p.limit > 0 ? p.limit : 3} />

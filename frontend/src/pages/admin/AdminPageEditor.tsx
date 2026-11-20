@@ -18,6 +18,7 @@ import { PageErrorSummary } from '@/cms/editor/PageErrorSummary';
 import { requestFieldFocus } from '@/cms/editor/fieldFocus';
 import { fieldErrorsFromIssues } from '@/cms/editor/validation';
 import { templateFor } from '@/cms/sections';
+import { ROUTE_META } from '@/lib/routeMeta';
 import { loadAllGroups } from '@/cms/sections/loaders';
 import { contentApi, type CmsPageAdmin, type PageIssue } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
@@ -45,6 +46,16 @@ import { pageState } from '@/cms/editor/shell/status';
 import { useDraftSaver } from '@/cms/editor/shell/useDraftSaver';
 import { useLeaveGuard, type LeaveState } from '@/cms/editor/shell/useLeaveGuard';
 import { VersionsModal } from '@/cms/editor/shell/VersionsModal';
+
+/**
+ * What a page shows when the school leaves its SEO fields empty: the route's
+ * entry in ROUTE_META (lib/routeMeta.ts), else the template's own (404 page).
+ */
+function seoDefaults(slug: string): { title: string; description: string } {
+  const tpl = templateFor(slug);
+  const meta = tpl ? ROUTE_META[tpl.path] : undefined;
+  return { title: meta?.title ?? tpl?.seo.title ?? '', description: meta?.description ?? tpl?.seo.description ?? '' };
+}
 
 /** Copy/paste of sections between pages (and tabs) goes through localStorage. */
 const CLIPBOARD_KEY = 'cms-clipboard';
@@ -714,7 +725,7 @@ export default function AdminPageEditor() {
         onChange={updateMeta}
         isAdmin={isAdmin}
         errors={fieldErrors}
-        placeholders={{ title: templateFor(page.slug)?.seo.title, description: templateFor(page.slug)?.seo.description }}
+        placeholders={seoDefaults(page.slug)}
       />
       <ScheduleDialog
         open={dialog === 'schedule'}

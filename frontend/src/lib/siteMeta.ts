@@ -1,9 +1,10 @@
 /**
- * siteMeta.ts — single source of truth for public-site SEO metadata.
+ * siteMeta.ts: single source of truth for the public site's SEO metadata.
  *
- * Canonical URL, per-route <title>/description, and JSON-LD structured data all
- * derive from the constants here so the marketing site presents one consistent
- * identity to crawlers and social scrapers.
+ * Site-wide constants and the business facts. The per-route table (titles,
+ * descriptions, breadcrumbs) lives in ./routeMeta.ts, out of the entry chunk.
+ * Keep ORG equal to the JSON-LD in index.html (siteMeta.test.ts fails when
+ * they drift).
  */
 
 /** Absolute origin used for canonical URLs, OG tags and the sitemap. */
@@ -12,7 +13,7 @@ export const SITE_NAME = 'Colegio Interlaken';
 
 /**
  * Fundado en 1981 → "45 años" en 2026, y se actualiza solo cada año.
- * Usar SIEMPRE `SCHOOL_YEARS` en el copy — nunca un número fijo.
+ * Usar SIEMPRE `SCHOOL_YEARS` en el copy, nunca un número fijo.
  */
 export const FOUNDED_YEAR = 1981;
 export const SCHOOL_YEARS = new Date().getFullYear() - FOUNDED_YEAR;
@@ -25,17 +26,18 @@ export const SCHOOL_YEARS = new Date().getFullYear() - FOUNDED_YEAR;
 const _cycleStart = new Date().getFullYear();
 export const CURRENT_CYCLE = `${_cycleStart}–${_cycleStart + 1}`;
 
-export const DEFAULT_TITLE = 'Colegio Interlaken — Educación bilingüe en Tlalnepantla';
+/** Appended to every page title except the home page's. */
+export const TITLE_SUFFIX = ` · ${SITE_NAME}`;
+export const DEFAULT_TITLE = `${SITE_NAME} | Escuela bilingüe en Tlalnepantla`;
 export const DEFAULT_DESCRIPTION =
-  `Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con ${SCHOOL_YEARS} años de trayectoria.`;
+  `Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con ${SCHOOL_YEARS} años de trayectoria. Agende su visita.`;
 export const OG_IMAGE = `${SITE_URL}/og-image.png`;
 export const LOCALE = 'es_MX';
 
 /**
  * Business facts (NAP) for the structured data. They MUST match the Google
  * Business Profile and the SEP registry word for word; change them only
- * together with the profile and the JSON-LD in index.html (siteMeta.test.ts
- * fails when the two drift). Verified 2026-11-20 against the school's own
+ * together with the profile. Verified 2026-11-20 against the school's own
  * contact page, the SEP records (CP 54020) and the profile pin.
  */
 export const ORG = {
@@ -52,60 +54,24 @@ export const ORG = {
   latitude: 19.5557298,
   longitude: -99.206715,
   hasMap: 'https://maps.app.goo.gl/Xd241Sht8TmrMHUe6',
+  openingHours: 'Mo-Fr 07:30-15:00',
   // Confirmed social profile only (Instagram/YouTube stay empty until real URLs exist).
   sameAs: ['https://www.facebook.com/colegiointerlaken'] as string[],
 } as const;
 
-export interface RouteMeta {
-  title: string;
-  description: string;
-  /** Optional override; defaults to `${SITE_URL}${path}`. */
-  canonical?: string;
+/** Canonical URL of a pathname: no query, no trailing slash, home keeps "/". */
+export function canonicalFor(pathname: string): string {
+  const clean = pathname.split(/[?#]/)[0].replace(/\/+$/, '');
+  return clean ? `${SITE_URL}${clean}` : `${SITE_URL}/`;
 }
 
-/**
- * Per-route metadata for the public marketing pages. Keyed by pathname.
- * Titles are suffixed with the site name at render time (except the home page,
- * whose DEFAULT_TITLE already carries the brand).
- */
-export const ROUTE_META: Record<string, RouteMeta> = {
-  '/': {
-    title: DEFAULT_TITLE,
-    description: DEFAULT_DESCRIPTION,
-  },
-  '/nosotros': {
-    title: 'Nosotros',
-    description:
-      `Conoce el modelo educativo bilingüe de Colegio Interlaken: ${SCHOOL_YEARS} años formando líderes íntegros en Tlalnepantla con rigor académico y valores.`,
-  },
-  '/admisiones': {
-    title: 'Admisiones',
-    description:
-      'Proceso de admisión a Colegio Interlaken para preescolar, primaria y secundaria. Conoce requisitos, fechas y cómo inscribir a tu hijo.',
-  },
-  '/pre-registro': {
-    title: 'Pre-Registro en línea',
-    description:
-      `Inicia tu pre-registro en línea para el ciclo escolar ${CURRENT_CYCLE} en Colegio Interlaken. Un asesor te contactará en 2 días hábiles.`,
-  },
-  '/inscripcion': {
-    title: 'Inscripción Formal',
-    description:
-      'Completa el proceso de inscripción formal en Colegio Interlaken tras tu pre-registro y contacto con el equipo de admisiones.',
-  },
-  '/agendar-visita': {
-    title: 'Agendar Visita',
-    description:
-      'Reserva un recorrido personalizado por las instalaciones de Colegio Interlaken en Tlalnepantla. Agenda tu visita en línea.',
-  },
-  '/contacto': {
-    title: 'Contacto',
-    description:
-      'Contacta a Colegio Interlaken en Tlalnepantla, Estado de México. Teléfono, correo y ubicación para resolver tus dudas de admisión.',
-  },
-  '/aviso-de-privacidad': {
-    title: 'Aviso de Privacidad',
-    description:
-      'Aviso de Privacidad de Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO.',
-  },
-};
+export interface HeadData {
+  title: string;
+  description: string;
+  canonical: string;
+  image: string;
+  /** "noindex" for private flows and 404s; absent = indexable. */
+  robots?: string;
+  /** Page-level JSON-LD (the site-wide Organization/WebSite graph is static in index.html). */
+  jsonLd: Record<string, unknown>[];
+}

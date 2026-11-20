@@ -46,9 +46,9 @@ function Shell({ c, children }: { c: Copy; children: ReactNode }) {
   const email = c('helpEmail');
   return (
     <div className="flex min-h-screen flex-col bg-cream">
+      {/* The token is in this page's URL: never send it to another site (spa.py also sends
+          Referrer-Policy: no-referrer). noindex comes from the template SEO below. */}
       <Helmet>
-        <meta name="robots" content="noindex, nofollow" />
-        {/* The token is in this page's URL: never send it to another site. */}
         <meta name="referrer" content="no-referrer" />
       </Helmet>
       <div className="accent-bar" />
@@ -307,7 +307,8 @@ export const sections = [
 
 export const templates = [{
   slug: 'confirmar-correo', path: '/confirmar-correo', title: 'Confirmar correo', group: 'correo',
-  seo: { title: 'Confirmar correo para avisos', description: 'Confirme el correo en el que recibirá los avisos del Colegio Interlaken.' },
+  // Outside PublicLayout (no RouteSeo): the template carries its own head; ROUTE_META has the same for the server.
+  seo: { title: 'Confirmar correo para avisos', description: 'Confirme el correo en el que recibirá los avisos del Colegio Interlaken.', noindex: true },
   sections: ['correo.confirm'],
   // Sign-in and one-time links never wait for the CMS (TemplatePage).
   paintAtOnce: true,

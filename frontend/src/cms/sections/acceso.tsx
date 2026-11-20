@@ -443,7 +443,8 @@ export const sections = [
 
 export const templates = [{
   slug: 'iniciar-sesion', path: '/login', title: 'Iniciar sesión', group: 'acceso',
-  seo: { title: 'Iniciar sesión', description: 'Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea.' },
+  // Outside PublicLayout (no RouteSeo): the template carries its own head; ROUTE_META has the same for the server.
+  seo: { title: 'Iniciar sesión', description: 'Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea.', noindex: true },
   sections: ['acceso.screen'],
   // Sign-in and one-time links never wait for the CMS (TemplatePage).
   paintAtOnce: true,

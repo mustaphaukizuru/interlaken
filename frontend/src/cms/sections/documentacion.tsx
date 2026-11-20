@@ -5,7 +5,6 @@
  */
 import { ArrowRight, ArrowUpRight, CheckCircle, FileText, FolderOpen } from 'lucide-react';
 import { ADMISSION_DOC_ITEMS, docsSummary, type AdmissionDoc } from '@/lib/admisionesDocs';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { imageSrc, imageSrcSet, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, sectionsOf } from './kit';
 
@@ -123,10 +122,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'documentacion', path: '/admisiones/documentacion', title: 'Documentación', group: 'documentacion',
-  seo: {
-    title: 'Documentación',
-    description: `Documentos requeridos para el examen de valoración e inscripción al Colegio Interlaken (ciclo ${CURRENT_CYCLE}), con enlaces a los trámites oficiales en gob.mx.`,
-  },
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['documentacion.hero', 'documentacion.list'],
 }];
 
