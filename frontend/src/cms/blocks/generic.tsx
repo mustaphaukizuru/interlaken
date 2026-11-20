@@ -153,7 +153,7 @@ export function applySnippets(html: string, s: Record<string, string | undefined
 function RichText({ html }: { html: string }) {
   const settings = useSiteSettings();
   const safe = useMemo(() => sanitizeHtml(applySnippets(html, settings as unknown as Record<string, string | undefined>)), [html, settings]);
-  return <Section bg="white" containerSize="md"><div className="prose prose-sm max-w-none text-ink sm:prose-base" dangerouslySetInnerHTML={{ __html: safe }} /></Section>;
+  return <Section bg="white" containerSize="md"><div className="cms-rich prose prose-sm max-w-none text-ink sm:prose-base" dangerouslySetInnerHTML={{ __html: safe }} /></Section>;
 }
 
 function MapContactBlock() {

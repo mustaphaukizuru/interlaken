@@ -147,7 +147,7 @@ export function RichTextEditor({ id, label, required, hint, error, warning, onBl
           contentEditable
           suppressContentEditableWarning
           tabIndex={0}
-          className="prose prose-sm min-h-[160px] max-w-none px-3 py-2 text-ink focus:outline-none [&_a]:text-green-dark [&_a]:underline"
+          className="cms-rich min-h-[160px] px-3 py-2 text-[15px] text-ink focus:outline-none"
           onInput={emit}
           onKeyUp={saveRange}
           onMouseUp={saveRange}
