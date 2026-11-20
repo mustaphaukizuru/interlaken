@@ -21,6 +21,7 @@ import { MediaPicker } from '@/components/admin/MediaPicker';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { cmsBase, diffBlocks, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
+import { withoutSeedSeo } from '@/cms/seedSeo';
 import { useAuthStore } from '@/store/authStore';
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertical, Send } from 'lucide-react';
 import type { PageIssue } from '@/services/api';
@@ -227,6 +228,13 @@ export default function AdminPageEditor() {
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (isLoading || !page || !sectionsReady) return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
   const original = originalBlocks(page.slug);
+  // The design brings its own SEO: what the old seed_cms left there goes with the old blocks.
+  const loadDesign = () => {
+    if (original) update(original);
+    const seo = withoutSeedSeo(meta.seo, page.seed_seo);
+    if (seo !== meta.seo) updateMeta({ seo });
+    setSelected(null);
+  };
   const legacy = isLegacyDraft(page.slug, blocks, !!page.published_version_number);
   const st = pageStatusLabel({ status: page.status, has_unpublished_changes: page.has_unpublished_changes || dirty, review_requested_at: page.review_requested_at });
 
@@ -277,7 +285,7 @@ export default function AdminPageEditor() {
       {legacy && original && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-sm" role="status">
           <p className="text-ink">Este borrador se creó con bloques genéricos y no se parece a la página actual del sitio. Cargue el diseño actual para editar la página tal como se ve hoy.</p>
-          <Button size="sm" onClick={() => { update(original); setSelected(null); }}>Cargar el diseño actual</Button>
+          <Button size="sm" onClick={loadDesign}>Cargar el diseño actual</Button>
         </div>
       )}
       {issues && issues.length > 0 && (
@@ -420,7 +428,7 @@ export default function AdminPageEditor() {
         </div>
       </Modal>
       <ConfirmDialog open={confirmReset} title="¿Volver al diseño original?" message="El borrador se reemplaza por el contenido original de la página (textos, fotos y secciones). Lo publicado no cambia hasta que publique, y las versiones anteriores se conservan."
-        confirmLabel="Restablecer borrador" onConfirm={() => { if (original) update(original); setSelected(null); setConfirmReset(false); }} onClose={() => setConfirmReset(false)} />
+        confirmLabel="Restablecer borrador" onConfirm={() => { loadDesign(); setConfirmReset(false); }} onClose={() => setConfirmReset(false)} />
       <ConfirmDialog open={confirmUnpublish} title="¿Retirar la página del sitio?" message="Las visitas verán un 404 hasta volver a publicarla. El borrador se conserva."
         confirmLabel="Retirar página" loading={publish.isPending} onConfirm={() => publish.mutate('unpublish')} onClose={() => setConfirmUnpublish(false)} />
     </div>
