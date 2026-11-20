@@ -150,12 +150,19 @@ def _ld(block: dict) -> str:
     return f'<script type="application/ld+json" data-page-ld>{text}</script>'
 
 
-def apply_head(doc: str, head: dict, path: str) -> str:
+def apply_head(doc: str, head: dict, path: str | None = None) -> str:
+    """Write a head into the page. Titles go through full_title (the site name once,
+    never twice); `noindex` (CMS) and `robots` (route table) both mark the page;
+    canonical/og:url are rewritten when the head or the path gives one."""
+    from apps.content.page_templates import full_title
+
     title = head.get('title')
     desc = head.get('description')
     image = head.get('image')
-    canonical = head.get('canonical') or (SITE + (path if path != '/' else '/'))
+    canonical = head.get('canonical') or (SITE + path if path else None)
+    robots = head.get('robots') or ('noindex' if head.get('noindex') else None)
     if title:
+        title = full_title(title)
         doc = re.sub(r'<title>[^<]*</title>', lambda _m: f'<title>{html_lib.escape(title)}</title>', doc, count=1)
         doc = _set_meta(doc, 'property', 'og:title', title)
         doc = _set_meta(doc, 'name', 'twitter:title', title)
@@ -165,11 +172,12 @@ def apply_head(doc: str, head: dict, path: str) -> str:
     if image:
         doc = _set_meta(doc, 'property', 'og:image', image)
         doc = _set_meta(doc, 'name', 'twitter:image', image)
-    doc = re.sub(r'(<link rel="canonical" href=")[^"]*(")', lambda m: m.group(1) + _attr(canonical) + m.group(2), doc, count=1)
-    doc = _set_meta(doc, 'property', 'og:url', canonical)
+    if canonical:
+        doc = re.sub(r'(<link rel="canonical" href=")[^"]*(")', lambda m: m.group(1) + _attr(canonical) + m.group(2), doc, count=1)
+        doc = _set_meta(doc, 'property', 'og:url', canonical)
     extra = []
-    if head.get('robots'):
-        extra.append(f'<meta name="robots" content="{_attr(head["robots"])}" />')
+    if robots:
+        extra.append(f'<meta name="robots" content="{_attr(robots)}" />')
     extra.extend(_ld(b) for b in head.get('jsonLd') or [] if isinstance(b, dict))
     if extra:
         joined = '\n    '.join(extra)
@@ -180,7 +188,7 @@ def apply_head(doc: str, head: dict, path: str) -> str:
 def _cms_refine(head: dict, seo: dict) -> dict:
     out = dict(head)
     if seo.get('title'):
-        out['title'] = seo['title'] + SUFFIX
+        out['title'] = seo['title']   # apply_head adds the site name once
     if seo.get('description'):
         out['description'] = seo['description']
     if seo.get('image'):

@@ -22,6 +22,7 @@ import {
   DEFAULT_DESCRIPTION,
   DEFAULT_TITLE,
   OG_IMAGE,
+  SITE_NAME,
   TITLE_SUFFIX,
   canonicalFor,
   type HeadData,
@@ -35,7 +36,7 @@ export interface SeoProps {
   description?: string;
   canonical?: string;
   image?: string;
-  /** Suppress appending "· Colegio Interlaken" to the title. */
+  /** Suppress appending "· Colegio Interlaken" to the title (a title that already names the school never gets it twice). */
   bareTitle?: boolean;
   /** Keep this page out of search results. */
   noindex?: boolean;
@@ -50,6 +51,9 @@ export interface SeoProps {
 
 type PartialHead = Omit<SeoProps, 'priority' | 'jsonLd' | 'bareTitle'> & { jsonLd: Record<string, unknown>[] };
 interface Entry { id: number; priority: number; head: PartialHead }
+
+/** «Costos · Colegio Interlaken» already carries the site name: appending it again doubled it. */
+const namesSite = (title: string) => title.toLowerCase().includes(SITE_NAME.toLowerCase());
 
 const entries: Entry[] = [];
 let nextId = 0;
@@ -106,7 +110,7 @@ export function resetSeoForTests() {
 export function Seo({ title, description, canonical, image, bareTitle = false, noindex, jsonLd, priority = 1 }: SeoProps) {
   const [id] = useState(() => nextId++);
   const blocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
-  const full = title ? (bareTitle ? title : `${title}${TITLE_SUFFIX}`) : undefined;
+  const full = title ? (bareTitle || namesSite(title) ? title : `${title}${TITLE_SUFFIX}`) : undefined;
   const key = JSON.stringify([full, description, canonical, image, noindex, blocks, priority]);
 
   useLayoutEffect(() => {

@@ -29,26 +29,27 @@ def test_create_validates_blocks(admin_client):
 
 
 def test_publish_versions_rollback_and_public_cache(admin_client, api_client):
-    page = Page.objects.create(slug='nosotros', title='Nosotros', draft_blocks=BLOCKS)
+    # A custom page: generic blocks on a designed page's slug need confirm_legacy (test_safe_publish.py).
+    page = Page.objects.create(slug='verano', title='Verano', draft_blocks=BLOCKS)
     # unpublished page is 404 publicly
     api_client.force_authenticate(user=None)
-    assert api_client.get(reverse('cms-page', args=['nosotros'])).status_code == 404
+    assert api_client.get(reverse('cms-page', args=['verano'])).status_code == 404
     api_client.force_authenticate(user=AdminFactory())
     r1 = api_client.post(reverse('admin-page-publish', args=[page.pk]), {'action': 'publish'}, format='json')
     assert r1.status_code == 200 and r1.data['version'] == 1
     api_client.force_authenticate(user=None)
-    pub = api_client.get(reverse('cms-page', args=['nosotros']))
+    pub = api_client.get(reverse('cms-page', args=['verano']))
     assert pub.status_code == 200 and pub.data['blocks'][0]['type'] == 'hero' and pub['ETag']
-    assert api_client.get(reverse('cms-page', args=['nosotros']), HTTP_IF_NONE_MATCH=pub['ETag']).status_code == 304
+    assert api_client.get(reverse('cms-page', args=['verano']), HTTP_IF_NONE_MATCH=pub['ETag']).status_code == 304
     # edit draft → public unchanged until publish (cache busts on publish)
     api_client.force_authenticate(user=AdminFactory())
     api_client.patch(reverse('admin-page-detail', args=[page.pk]), {'draft_blocks': [BLOCKS[1]]}, format='json')
     api_client.force_authenticate(user=None)
-    assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 2
+    assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 2
     api_client.force_authenticate(user=AdminFactory())
     assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').data['version'] == 2
     api_client.force_authenticate(user=None)
-    assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 1
+    assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 1
     # restoring v1 copies it into the DRAFT only: nothing is published yet
     api_client.force_authenticate(user=AdminFactory())
     rb = api_client.post(reverse('admin-page-versions', args=[page.pk]), {'version': 1}, format='json')
@@ -57,12 +58,12 @@ def test_publish_versions_rollback_and_public_cache(admin_client, api_client):
     versions = api_client.get(reverse('admin-page-versions', args=[page.pk])).data
     assert [v['number'] for v in versions] == [2, 1]
     api_client.force_authenticate(user=None)
-    assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 1
+    assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 1
     # publishing the restored draft (through the checked publish flow) creates v3
     api_client.force_authenticate(user=AdminFactory())
     assert api_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json').data['version'] == 3
     api_client.force_authenticate(user=None)
-    assert len(api_client.get(reverse('cms-page', args=['nosotros'])).data['blocks']) == 2
+    assert len(api_client.get(reverse('cms-page', args=['verano'])).data['blocks']) == 2
 
 
 def test_restore_version_rejects_bad_input_and_staff(admin_client, api_client):
@@ -99,7 +100,7 @@ def test_publish_blocks_images_without_alt(admin_client, settings, tmp_path):
     buf = io.BytesIO()
     Image.new('RGB', (50, 50)).save(buf, format='PNG')
     asset = admin_client.post(reverse('admin-media'), {'file': SimpleUploadedFile('a.png', buf.getvalue(), content_type='image/png')}, format='multipart').data
-    page = Page.objects.create(slug='galeria', title='G', draft_blocks=[{'type': 'image', 'props': {'image': asset['id']}}])
+    page = Page.objects.create(slug='fotos', title='G', draft_blocks=[{'type': 'image', 'props': {'image': asset['id']}}])
     resp = admin_client.post(reverse('admin-page-publish', args=[page.pk]), {}, format='json')
     assert resp.status_code == 400 and 'texto alternativo' in resp.data['detail']
     admin_client.patch(reverse('admin-media-detail', args=[asset['id']]), {'alt': 'Campus'}, format='json')

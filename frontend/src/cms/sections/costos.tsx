@@ -1,7 +1,8 @@
 /**
  * Costos (/admisiones/costos): designed sections (docs/CMS-COMPLETION-PLAN.md).
- * Every figure comes from the price list (Ajustes, Costos); the hero and the
- * copy around the price tables are props.
+ * Every figure comes from the price list, edited in the console «Costos y
+ * precios» (/admin/costos, docs/cms/price-tables.md); the hero, the copy
+ * around the price tables and their column headers and labels are props.
  */
 import { CalendarDays } from 'lucide-react';
 import { PricingSections, PRICING_COPY, type PricingCopy } from '@/components/public/PricingSections';
@@ -38,12 +39,17 @@ function CostosPricesView(p: Partial<PricingCopy>) {
   return <PricingSections copy={p} />;
 }
 
-/** Label, title and subtitle of one price card. */
-const card = (key: string, name: string): FieldSpec[] => [
-  f.text(`${key}Label`, `${name}: etiqueta`),
-  f.text(`${key}Title`, `${name}: título`),
-  f.text(`${key}Subtitle`, `${name}: subtítulo`),
+/** Label, title and subtitle of one price card, in the card's field group. */
+const card = (key: string, name: string, group: string): FieldSpec[] => [
+  f.text(`${key}Label`, `${name}: etiqueta`, { group }),
+  f.text(`${key}Title`, `${name}: título`, { group }),
+  f.text(`${key}Subtitle`, `${name}: subtítulo`, { group }),
 ];
+
+const G = {
+  pay: 'Explicación del pago', fees: 'Inscripción y reinscripción', tuition: 'Colegiaturas', insurance: 'Seguros y credenciales',
+  extras: 'Extraescolares', daycare: 'Estancia', policies: 'Políticas de pago', note: 'Nota y llamado final', empty: 'Sin precios o con error',
+};
 
 export const sections = [
   section({
@@ -58,31 +64,43 @@ export const sections = [
     defaults: { label: 'Admisiones', title: 'Costos', badge: 'Ciclo Escolar {{ciclo}}', image: '/assets/facade.webp' },
   }),
   section({
-    type: 'prices', label: 'Costos · Tablas de precios', description: 'Cuotas, colegiaturas, seguros, extraescolares y estancia. Los precios se editan en Ajustes, Costos; aquí solo los textos que los acompañan.',
+    type: 'prices', label: 'Costos · Tablas de precios', description: 'Cuotas, colegiaturas, seguros, extraescolares, estancia y políticas. Las cifras se editan en «Costos y precios»; aquí, los textos, encabezados y etiquetas que las acompañan.',
     component: CostosPricesView,
     fields: [
-      f.text('structureTitle', 'Título de la explicación del pago'),
-      f.items('structure', 'Cómo se estructura el pago', [f.text('title', 'Concepto', { required: true }), f.text('text', 'Explicación')]),
-      ...card('fees', 'Inscripción'),
-      f.text('newTag', 'Pestaña de nuevo ingreso'),
-      f.text('returningTag', 'Pestaña de reinscripción'),
-      ...card('tuition', 'Colegiaturas'),
-      ...card('insurance', 'Seguros'),
-      ...card('extras', 'Extraescolares'),
-      ...card('daycare', 'Estancia'),
-      f.text('policiesTitle', 'Título de las políticas de pago'),
-      f.textarea('noteText', 'Nota: texto'),
-      f.textarea('noteStrong', 'Nota: texto en negritas'),
-      f.text('noteLinkLead', 'Nota: texto antes del enlace'),
-      f.link('noteLink', 'Nota: enlace'),
-      f.text('ctaTitle', 'Llamado final: título'),
-      f.textarea('ctaText', 'Llamado final: texto', { hint: 'Puede usar {{ciclo}}.' }),
-      f.link('ctaPrimary', 'Llamado final: botón principal'),
-      f.link('ctaSecondary', 'Llamado final: botón secundario'),
-      f.text('emptyTitle', 'Sin precios publicados: título'),
-      f.textarea('emptyText', 'Sin precios publicados: texto'),
-      f.link('emptyPrimary', 'Sin precios publicados: botón principal'),
-      f.link('emptySecondary', 'Sin precios publicados: botón secundario'),
+      // Where the figures are edited: the console screen, in another tab (the draft stays open).
+      f.action('editPrices', 'Editar precios', '/admin/costos', { hint: 'Las cifras, los niveles y las políticas se editan en «Costos y precios». Aquí, los textos que los acompañan.' }),
+      f.text('structureTitle', 'Título de la explicación', { group: G.pay }),
+      f.items('structure', 'Cómo se estructura el pago', [f.text('title', 'Concepto', { required: true }), f.text('text', 'Explicación')], { group: G.pay }),
+      ...card('fees', 'Inscripción', G.fees),
+      f.text('newTag', 'Pestaña de nuevo ingreso', { group: G.fees }),
+      f.text('returningTag', 'Pestaña de reinscripción', { group: G.fees }),
+      f.text('colLevel', 'Encabezado: nivel', { group: G.fees }),
+      f.text('colAdmin', 'Encabezado: gastos administrativos', { group: G.fees }),
+      f.text('colNew', 'Encabezado de la cuota (nuevo ingreso)', { group: G.fees }),
+      f.text('colReturning', 'Encabezado de la cuota (reinscripción)', { group: G.fees }),
+      ...card('tuition', 'Colegiaturas', G.tuition),
+      f.text('perMonth', 'Texto después de cada colegiatura', { group: G.tuition }),
+      ...card('insurance', 'Seguros', G.insurance),
+      ...card('extras', 'Extraescolares', G.extras),
+      f.text('perYear', 'Texto después de cada anualidad', { group: G.extras }),
+      ...card('daycare', 'Estancia', G.daycare),
+      f.text('daycareMonthly', 'Texto después de la tarifa mensual', { group: G.daycare }),
+      f.text('policiesTitle', 'Título de las políticas', { group: G.policies }),
+      f.text('policyHighlight', 'Destacar las políticas que mencionan', { group: G.policies, hint: 'Palabras separadas por comas; esas políticas se ven en negritas con el ícono ámbar.' }),
+      f.textarea('noteText', 'Nota: texto', { group: G.note }),
+      f.textarea('noteStrong', 'Nota: texto en negritas', { group: G.note }),
+      f.text('noteLinkLead', 'Nota: texto antes del enlace', { group: G.note }),
+      f.link('noteLink', 'Nota: enlace', { group: G.note }),
+      f.text('ctaTitle', 'Llamado final: título', { group: G.note }),
+      f.textarea('ctaText', 'Llamado final: texto', { group: G.note, hint: 'Puede usar {{ciclo}}.' }),
+      f.link('ctaPrimary', 'Llamado final: botón principal', { group: G.note }),
+      f.link('ctaSecondary', 'Llamado final: botón secundario', { group: G.note }),
+      f.text('emptyTitle', 'Sin precios publicados: título', { group: G.empty }),
+      f.textarea('emptyText', 'Sin precios publicados: texto', { group: G.empty }),
+      f.link('emptyPrimary', 'Sin precios publicados: botón principal', { group: G.empty }),
+      f.link('emptySecondary', 'Sin precios publicados: botón secundario', { group: G.empty }),
+      f.text('errorTitle', 'Si no cargan los precios: título', { group: G.empty }),
+      f.textarea('errorText', 'Si no cargan los precios: texto', { group: G.empty }),
     ],
     defaults: { ...PRICING_COPY },
   }),
