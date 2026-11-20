@@ -1,31 +1,46 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ChevronLeft, ClipboardPaste, Copy, ExternalLink, Eye, EyeOff, History, Lock, Monitor, Plus, Redo2, RotateCcw, Search, Smartphone, Tablet, Trash2, Undo2, Upload, XCircle } from 'lucide-react';
+import {
+  AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardPaste, Copy, ExternalLink, Eye, EyeOff,
+  HelpCircle, History, Link2, Plus, RotateCcw, Search, Send, Upload, XCircle,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cmsPagePath } from '@/cms/slugPaths';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
+import { blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
-import { EditableBlocks } from '@/cms/editor/EditableBlocks';
-import { allSections as allSectionSpecs, templateFor } from '@/cms/sections';
-import { GROUP_LABELS, loadAllGroups } from '@/cms/sections/loaders';
-import { MediaPicker } from '@/components/admin/MediaPicker';
-import { contentApi, type CmsPageAdmin } from '@/services/api';
+import { templateFor } from '@/cms/sections';
+import { loadAllGroups } from '@/cms/sections/loaders';
+import { contentApi, type CmsPageAdmin, type PageIssue } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
-import { cmsBase, diffBlocks, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps, pageStatusLabel, toLocalInput } from '@/cms/editor/helpers';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { cmsBase, isLegacyDraft, moveBlock, newBlock, newBlockId, originalBlocks, originalProps } from '@/cms/editor/helpers';
 import { useAuthStore } from '@/store/authStore';
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, GripVertical, Send } from 'lucide-react';
-import type { PageIssue } from '@/services/api';
-
-type Device = 'mobile' | 'tablet' | 'desktop';
+import { AddBlockModal } from '@/cms/editor/shell/AddBlockModal';
+import { BlockList } from '@/cms/editor/shell/BlockList';
+import { splitLabel } from '@/cms/editor/shell/blockLabels';
+import { BlockIcon } from '@/cms/editor/shell/blockIcons';
+import { ConflictBanner, LocalCopyBanner } from '@/cms/editor/shell/ConflictBanner';
+import { blockErrorsFrom, isLegacySeedRefusal, type BlockFieldError } from '@/cms/editor/shell/contracts';
+import { EditorActionBar, EditorBottomBar, type EditorPane } from '@/cms/editor/shell/EditorActionBar';
+import { EditorOnboarding } from '@/cms/editor/shell/EditorOnboarding';
+import { useOnboarding } from '@/cms/editor/shell/useOnboarding';
+import { LegacyDraftBanner, LegacyDraftDialog } from '@/cms/editor/shell/LegacyDraft';
+import { clearLocalCopy, readLocalCopy, writeLocalCopy, type LocalCopy } from '@/cms/editor/shell/localCopy';
+import type { MenuItem } from '@/cms/editor/shell/MoreMenu';
+import { PreviewPane, type Device } from '@/cms/editor/shell/PreviewPane';
+import { publishPage } from '@/cms/editor/shell/publishApi';
+import { ScheduleDialog, type Schedule } from '@/cms/editor/shell/ScheduleDialog';
+import { SeoDialog } from '@/cms/editor/shell/SeoDialog';
+import { pageState } from '@/cms/editor/shell/status';
+import { useDraftSaver } from '@/cms/editor/shell/useDraftSaver';
+import { useLeaveGuard, type LeaveState } from '@/cms/editor/shell/useLeaveGuard';
+import { VersionsModal } from '@/cms/editor/shell/VersionsModal';
 
 /** Copy/paste of sections between pages (and tabs) goes through localStorage. */
 const CLIPBOARD_KEY = 'cms-clipboard';
@@ -37,161 +52,322 @@ function readClipboard(): Block | null {
     return null;
   }
 }
-const DEVICE_WIDTH: Record<Device, number | undefined> = { mobile: 390, tablet: 820, desktop: undefined };
 
-/** /admin/contenido/:id — split-view block editor (BACKLOG P3-4). */
+/** Width of the editing column on desktop, resizable and remembered in this browser. */
+const COLUMN_KEY = 'cms-editor-column';
+const COLUMN_MIN = 320;
+const COLUMN_MAX = 640;
+function readColumn(): number {
+  try {
+    const v = Number(localStorage.getItem(COLUMN_KEY));
+    return Number.isFinite(v) && v >= COLUMN_MIN && v <= COLUMN_MAX ? v : 420;
+  } catch {
+    return 420;
+  }
+}
+
+/** Thrown when the draft could not be saved before publishing or reviewing. */
+class SaveBlocked extends Error {}
+
+type Meta = { title: string; slug: string; seo: CmsPageAdmin['seo']; publish_at: string | null; unpublish_at: string | null };
+const EMPTY_META: Meta = { title: '', slug: '', seo: {}, publish_at: null, unpublish_at: null };
+
+/** Public preview of the draft on this site's own origin (the API answers with FRONTEND_URL, which may be another host). */
+const previewUrl = (slug: string, token: string) => `${window.location.origin}/p/${encodeURIComponent(slug)}?preview=${encodeURIComponent(token)}`;
+
+/**
+ * /admin/contenido/:id: the page editor (docs/cms/editor-shell.md).
+ * Sticky action bar, section list and form side by side with the live
+ * preview on desktop, «Editar | Vista previa» tabs on phones and tablets.
+ */
 export default function AdminPageEditor() {
   const { id } = useParams();
   const pageId = Number(id);
+  const [params, setParams] = useSearchParams();
   const qc = useQueryClient();
   const role = useAuthStore((s) => s.user?.role);
   const isAdmin = role === 'admin';
   const base = cmsBase(role);
-  const [rejecting, setRejecting] = useState(false);
-  const [issues, setIssues] = useState<PageIssue[] | null>(null);
-  const [dragging, setDragging] = useState<number | null>(null);
-  const [dragOver, setDragOver] = useState<number | null>(null);
-  const [rejectNote, setRejectNote] = useState('');
+  const desktop = useMediaQuery('(min-width: 1024px)');
   const { data: page, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page', pageId], queryFn: async () => (await contentApi.adminGetPage(pageId)).data, enabled: Number.isFinite(pageId) });
 
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [meta, setMeta] = useState<{ title: string; slug: string; seo: CmsPageAdmin['seo']; publish_at: string | null; unpublish_at: string | null }>({ title: '', slug: '', seo: {}, publish_at: null, unpublish_at: null });
+  const [blocks, setBlocksState] = useState<Block[]>([]);
+  const [meta, setMetaState] = useState<Meta>(EMPTY_META);
+  // The draft as of the last change, read by autosave: a save requested in the
+  // same handler as an edit (e.g. «Guardar programación») sends that edit.
+  const draft = useRef<{ blocks: Block[]; meta: Meta }>({ blocks: [], meta: EMPTY_META });
+  const setBlocks = (next: Block[]) => { draft.current.blocks = next; setBlocksState(next); };
+  const setMeta = (next: Meta) => { draft.current.meta = next; setMetaState(next); };
   const [selected, setSelected] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const [lastSelected, setLastSelected] = useState<string | null>(null);
   const [device, setDevice] = useState<Device>('desktop');
-  const [adding, setAdding] = useState(false);
-  const [showVersions, setShowVersions] = useState(false);
-  const [showSeo, setShowSeo] = useState(false);
-  const [confirmUnpublish, setConfirmUnpublish] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pane, setPane] = useState<EditorPane>('edit');
+  // «Versiones» from the page list opens the dialog right away (?versiones=1).
+  const [dialog, setDialog] = useState<null | 'add' | 'versions' | 'seo' | 'schedule' | 'unpublish' | 'reset' | 'reject' | 'legacy'>(() => (isAdmin && params.get('versiones') ? 'versions' : null));
+  const [rejectNote, setRejectNote] = useState('');
+  const [issues, setIssues] = useState<PageIssue[] | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [legacyResolved, setLegacyResolved] = useState(false);
+  const [localCopy, setLocalCopy] = useState<LocalCopy | null>(null);
+  const [conflictBusy, setConflictBusy] = useState<'reload' | 'overwrite' | null>(null);
+  const [column, setColumn] = useState(readColumn);
+  const onboarding = useOnboarding();
   const loadedFor = useRef<number | null>(null);
+  const wroteCopy = useRef(false);
   const previewRef = useRef<HTMLDivElement>(null);
-  const propsRef = useRef<HTMLDivElement>(null);
-  // Where the last selection came from: the list scrolls the preview, a click in the preview scrolls the form.
+  const formHeading = useRef<HTMLHeadingElement>(null);
+  const formPanel = useRef<HTMLDivElement>(null);
+  const editColumn = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barHeight, setBarHeight] = useState(96);
+  const [viewHeight, setViewHeight] = useState(800);
+  // Where the last selection came from: the list scrolls the preview to the block, the preview opens its form.
   const selectSource = useRef<'list' | 'preview'>('list');
   // Undo/redo over the draft blocks. Consecutive edits of the same field are one
   // step (typing a title is not one step per keystroke); any other action starts a new one.
   const [history, setHistory] = useState<{ past: Block[][]; future: Block[][] }>({ past: [], future: [] });
   const lastEdit = useRef('');
   const [clip, setClip] = useState<Block | null>(() => readClipboard());
-  const [confirmReset, setConfirmReset] = useState(false);
   // Every page's designed sections, so any section renders and can be added here.
   const [sectionsReady, setSectionsReady] = useState(false);
   useEffect(() => { let alive = true; void loadAllGroups().then(() => { if (alive) setSectionsReady(true); }); return () => { alive = false; }; }, []);
 
-  useEffect(() => {
-    if (page && loadedFor.current !== page.id) {
-      loadedFor.current = page.id;
-      setBlocks(page.draft_blocks ?? []);
-      setHistory({ past: [], future: [] });
-      lastEdit.current = '';
-      setMeta({ title: page.title, slug: page.slug, seo: page.seo ?? {}, publish_at: page.publish_at ?? null, unpublish_at: page.unpublish_at ?? null });
-      setDirty(false);
-    }
-  }, [page]);
-
-  const save = useMutation({
+  const saver = useDraftSaver({
     // Address and scheduling are admin-only server-side (the cron publishes on
     // those dates with no further approval): staff never send them.
-    mutationFn: () => contentApi.adminUpdatePage(pageId, isAdmin
-      ? { draft_blocks: blocks, title: meta.title, slug: meta.slug, seo: meta.seo, publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }
-      : { draft_blocks: blocks, title: meta.title, seo: meta.seo }),
-    onSuccess: (res) => { setErrors({}); setDirty(false); qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); },
-    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo guardar el borrador.'); },
+    buildBody: () => {
+      const { blocks: b, meta: m } = draft.current;
+      return isAdmin
+        ? { draft_blocks: b, title: m.title, slug: m.slug, seo: m.seo, publish_at: m.publish_at, unpublish_at: m.unpublish_at }
+        : { draft_blocks: b, title: m.title, seo: m.seo };
+    },
+    send: (body) => contentApi.adminUpdatePage(pageId, body),
+    onSaved: (data) => {
+      setFieldErrors({});
+      qc.setQueryData(['admin-page', pageId], data);
+      qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
+      if (wroteCopy.current) { clearLocalCopy(pageId); wroteCopy.current = false; }
+    },
+    onConflict: () => keepLocalCopy(),
+    onFailure: (f) => {
+      setFieldErrors(f.fields);
+      keepLocalCopy();
+      toast.error(f.message);
+      showBlockError(f.blockErrors);
+    },
   });
+  const { reset: resetSaver } = saver;
 
-  // Autosave 1.5 s after the last change.
+  /** Keeps the local draft in this browser while it is not on the server. */
+  const keepLocalCopy = () => {
+    writeLocalCopy(pageId, { blocks: draft.current.blocks, title: draft.current.meta.title, seo: draft.current.meta.seo });
+    wroteCopy.current = true;
+  };
+
+  /** Contract C3 hook (the «fields» branch renders the messages): open the first block with an error. */
+  const showBlockError = (errs: BlockFieldError[]) => {
+    const first = errs[0];
+    if (!first) return;
+    const target = (first.block_id && blocks.find((b) => b.id === first.block_id)) || (typeof first.block_index === 'number' ? blocks[first.block_index] : undefined);
+    if (target) select(target.id, 'list');
+  };
+
+  const initFrom = useCallback((p: CmsPageAdmin) => {
+    loadedFor.current = p.id;
+    const m: Meta = { title: p.title, slug: p.slug, seo: p.seo ?? {}, publish_at: p.publish_at ?? null, unpublish_at: p.unpublish_at ?? null };
+    draft.current = { blocks: p.draft_blocks ?? [], meta: m };
+    setBlocksState(draft.current.blocks);
+    setMetaState(m);
+    setHistory({ past: [], future: [] });
+    lastEdit.current = '';
+    setLegacyResolved(false);
+    resetSaver(p);
+    const copy = readLocalCopy(p.id);
+    setLocalCopy(copy && JSON.stringify(copy.blocks) !== JSON.stringify(p.draft_blocks ?? []) ? copy : null);
+  }, [resetSaver]);
+
   useEffect(() => {
-    if (!dirty || !page) return;
-    const t = setTimeout(() => save.mutate(), 1500);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks, meta, dirty]);
+    if (page && loadedFor.current !== page.id) initFrom(page);
+  }, [page, initFrom]);
+
+  useEffect(() => {
+    if (params.get('versiones')) setParams((prev) => { const next = new URLSearchParams(prev); next.delete('versiones'); return next; }, { replace: true });
+  }, [params, setParams]);
+
+  // The sticky column sits under the sticky bar and fits the console's scroll area.
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar || typeof ResizeObserver === 'undefined') return;
+    let scroller: HTMLElement | null = bar.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const measure = () => {
+      setBarHeight(bar.offsetHeight);
+      setViewHeight(scroller ? scroller.clientHeight : window.innerHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(bar);
+    if (scroller) ro.observe(scroller);
+    return () => ro.disconnect();
+  }, [page, sectionsReady]);
+
+  const flushOrThrow = async () => { if (!(await saver.flush())) throw new SaveBlocked(); };
+  const blockedMessage = () => (saver.conflict ? 'Primero resuelva el aviso: otra persona guardó cambios en esta página.' : 'El borrador no se pudo guardar. Revise el aviso y vuelva a intentarlo.');
 
   const publish = useMutation({
-    mutationFn: async (action: 'publish' | 'unpublish') => { if (dirty) await save.mutateAsync(); return contentApi.adminPublishPage(pageId, action); },
-    onSuccess: (res, action) => {
-      toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');
-      setConfirmUnpublish(false);
-      qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] }); qc.invalidateQueries({ queryKey: ['cms-page'] });
+    mutationFn: async ({ action, confirmLegacy }: { action: 'publish' | 'unpublish'; confirmLegacy?: boolean }) => {
+      await flushOrThrow();
+      return publishPage(pageId, action, !!confirmLegacy);
     },
-    onError: (e) => { const f = apiFieldErrors(e); const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data; if (data?.issues) setIssues(data.issues); toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise los bloques.'); setErrors(f); },
+    onSuccess: (res, { action }) => {
+      toast.success(action === 'publish' ? `Publicada (versión ${res.data.version ?? res.data.published_version_number ?? ''}).` : 'Página retirada del sitio.');
+      setDialog(null);
+      qc.setQueryData(['admin-page', pageId], res.data);
+      qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
+      qc.invalidateQueries({ queryKey: ['cms-page'] });
+    },
+    onError: (e) => {
+      if (e instanceof SaveBlocked) { toast.error(blockedMessage()); return; }
+      // Contract C1: the backend refuses an old generic seed without confirmation.
+      if (isLegacySeedRefusal(e)) { setDialog('legacy'); return; }
+      const f = apiFieldErrors(e);
+      const data = (e as { response?: { data?: { issues?: PageIssue[] } } })?.response?.data;
+      if (data?.issues) setIssues(data.issues);
+      toast.error(f.detail || f.blocks || f.draft_blocks || 'No se pudo publicar. Revise las secciones.');
+      setFieldErrors(f);
+      showBlockError(blockErrorsFrom(e));
+    },
   });
 
   const review = useMutation({
-    mutationFn: async (args: { action: 'request' | 'reject'; note?: string }) => { if (dirty) await save.mutateAsync(); return contentApi.adminReviewPage(pageId, args.action, args.note); },
+    mutationFn: async (args: { action: 'request' | 'reject'; note?: string }) => { await flushOrThrow(); return contentApi.adminReviewPage(pageId, args.action, args.note); },
     onSuccess: (res, args) => {
       toast.success(args.action === 'request' ? 'Solicitud enviada a Dirección.' : 'Cambios solicitados al editor.');
-      setRejecting(false); setRejectNote('');
+      setDialog(null); setRejectNote('');
       qc.setQueryData(['admin-page', pageId], res.data); qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
     },
-    onError: (e) => toast.error(apiFieldErrors(e).detail || 'No se pudo enviar.'),
+    onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : apiFieldErrors(e).detail || 'No se pudo enviar.'),
   });
 
   const checks = useMutation({
-    mutationFn: async () => { if (dirty) await save.mutateAsync(); return contentApi.adminPageChecks(pageId); },
+    mutationFn: async () => { await flushOrThrow(); return contentApi.adminPageChecks(pageId); },
     onSuccess: ({ data }) => { setIssues(data.issues); if (data.ok && data.issues.length === 0) toast.success('Sin problemas: lista para publicar.'); },
-    onError: () => toast.error('No se pudo revisar la página.'),
+    onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo revisar la página.'),
   });
 
   const previewLink = useMutation({
-    mutationFn: () => contentApi.adminPreviewToken(pageId),
+    mutationFn: async () => { await flushOrThrow(); return contentApi.adminPreviewToken(pageId); },
     onSuccess: async ({ data }) => {
-      const url = `${window.location.origin}${data.url}`;
+      const url = previewUrl(meta.slug || page?.slug || '', data.token);
       try { await navigator.clipboard.writeText(url); toast.success('Enlace de vista previa copiado (válido 7 días).'); } catch { window.prompt('Copie el enlace de vista previa:', url); }
     },
-    onError: () => toast.error('No se pudo generar el enlace.'),
+    onError: (e) => toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo generar el enlace.'),
   });
+
+  /** «Vista previa»: the whole page as families will see it, in a new tab (saved draft, signed link). */
+  const openPreview = async () => {
+    // Opened right away, inside the click, so pop-up blockers allow it.
+    const win = typeof window.open === 'function' ? window.open('', '_blank') : null;
+    try {
+      await flushOrThrow();
+      const { data } = await contentApi.adminPreviewToken(pageId);
+      const url = previewUrl(meta.slug || page?.slug || '', data.token);
+      if (win) { win.opener = null; win.location.href = url; } else toast.error('El navegador bloqueó la pestaña nueva. Use «Más» y «Enlace de vista previa».');
+    } catch (e) {
+      win?.close();
+      toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo abrir la vista previa.');
+    }
+  };
 
   const update = (next: Block[], key = '') => {
     const sameField = key !== '' && key === lastEdit.current;
     lastEdit.current = key;
     setHistory((h) => (sameField ? { past: h.past, future: [] } : { past: [...h.past.slice(-49), blocks], future: [] }));
-    setBlocks(next); setDirty(true);
+    setBlocks(next);
+    saver.touch();
   };
   const undo = () => {
     const prev = history.past[history.past.length - 1];
     if (!prev) return;
     setHistory({ past: history.past.slice(0, -1), future: [...history.future, blocks] });
     lastEdit.current = '';
-    setBlocks(prev); setDirty(true);
+    setBlocks(prev); saver.touch();
   };
   const redo = () => {
     const next = history.future[history.future.length - 1];
     if (!next) return;
     setHistory({ past: [...history.past, blocks], future: history.future.slice(0, -1) });
     lastEdit.current = '';
-    setBlocks(next); setDirty(true);
+    setBlocks(next); saver.touch();
   };
   const historyActions = useRef({ undo, redo });
   useEffect(() => { historyActions.current = { undo, redo }; });
+  const updateMeta = (patch: Partial<Meta>) => { setMeta({ ...draft.current.meta, ...patch }); saver.touch(); };
+
+  const select = (blockId: string | null, source: 'list' | 'preview' = 'list') => {
+    selectSource.current = source;
+    if (blockId) setLastSelected(blockId);
+    setSelected(blockId);
+    if (blockId && !desktop) setPane('edit');
+  };
+  const backToList = () => {
+    const was = selected;
+    setSelected(null);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-block-item="${CSS.escape(was ?? '')}"] button`)?.focus());
+  };
+
   const copyBlock = (b: Block) => {
     try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(b)); } catch { /* private mode: the copy lives only in this tab */ }
     setClip(b);
     toast.success('Sección copiada. Puede pegarla en esta u otra página con «Pegar».');
   };
+  const insertAfterAnchor = (b: Block) => {
+    const anchor = selected ?? lastSelected;
+    const idx = blocks.findIndex((x) => x.id === anchor);
+    const at = idx >= 0 ? idx + 1 : blocks.length;
+    update([...blocks.slice(0, at), b, ...blocks.slice(at)]);
+    select(b.id, 'list');
+  };
   const pasteBlock = () => {
     if (!clip || !blockSpec(clip.type)) { toast.error('No hay una sección copiada.'); return; }
-    const b: Block = { id: newBlockId(), type: clip.type, props: JSON.parse(JSON.stringify(clip.props)) };
-    const at = selectedIdx >= 0 ? selectedIdx + 1 : blocks.length;
-    update([...blocks.slice(0, at), b, ...blocks.slice(at)]);
-    selectSource.current = 'list';
-    setSelected(b.id);
+    insertAfterAnchor({ id: newBlockId(), type: clip.type, props: JSON.parse(JSON.stringify(clip.props)) });
   };
-  const selectFromPreview = (id: string) => { selectSource.current = 'preview'; setSelected(id); };
-  const updateMeta = (patch: Partial<typeof meta>) => { setMeta((m) => ({ ...m, ...patch })); setDirty(true); };
-  const selectedBlock = useMemo(() => blocks.find((b) => b.id === selected) ?? null, [blocks, selected]);
-  const selectedIdx = blocks.findIndex((b) => b.id === selected);
-  const isLocked = (b: Block) => !!blockSpec(b.type)?.locked;
+  const duplicateBlock = (b: Block) => insertAfterAnchorOf(b, { ...b, id: newBlockId(), props: JSON.parse(JSON.stringify(b.props)) });
+  const insertAfterAnchorOf = (anchor: Block, b: Block) => {
+    const at = blocks.findIndex((x) => x.id === anchor.id) + 1;
+    update([...blocks.slice(0, at), b, ...blocks.slice(at)]);
+    select(b.id, 'list');
+  };
+  const deleteBlock = (b: Block) => {
+    update(blocks.filter((x) => x.id !== b.id));
+    if (selected === b.id) setSelected(null);
+    toast.success(`Sección «${splitLabel(b.type).name}» eliminada. «Deshacer» la recupera.`);
+  };
   const toggleHidden = (b: Block) => update(blocks.map((x) => (x.id === b.id ? { ...x, hidden: !x.hidden } : x)));
   const resetBlock = (b: Block) => { const props = originalProps(meta.slug || page?.slug || '', b); if (props) update(blocks.map((x) => (x.id === b.id ? { ...x, props } : x))); };
+  const loadDesign = () => {
+    const original = originalBlocks(page?.slug ?? '');
+    if (!original) return;
+    update(original);
+    setSelected(null);
+    setLegacyResolved(true);
+  };
 
-  // Selecting in the list brings the block into view in the preview; clicking in the preview brings up its form.
+  const selectedBlock = useMemo(() => blocks.find((b) => b.id === selected) ?? null, [blocks, selected]);
+  const selectedIdx = blocks.findIndex((b) => b.id === selected);
+
+  // A selection from the list shows the block in the preview; any selection
+  // brings its form into view and moves focus to its heading.
   useEffect(() => {
     if (!selected) return;
-    if (selectSource.current === 'preview') propsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-    else previewRef.current?.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(selected)}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-  }, [selected]);
+    if (selectSource.current === 'list' && desktop) {
+      previewRef.current?.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(selected)}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    }
+    if (desktop && editColumn.current) editColumn.current.scrollTop = 0;
+    formHeading.current?.focus({ preventScroll: true });
+    // Phones and tablets: the form starts right under the sticky bar (its scroll-margin).
+    if (!desktop) formPanel.current?.scrollIntoView?.({ block: 'start' });
+  }, [selected, desktop]);
 
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) outside text fields, which keep their own undo.
   useEffect(() => {
@@ -215,320 +391,344 @@ export default function AdminPageEditor() {
     return () => { window.removeEventListener('focus', refresh); window.removeEventListener('storage', refresh); };
   }, []);
 
-  // Leaving with an unsaved draft (autosave pending or failed) asks first.
-  useEffect(() => {
-    if (!dirty && !save.isPending) return;
-    const onLeave = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
-    window.addEventListener('beforeunload', onLeave);
-    return () => window.removeEventListener('beforeunload', onLeave);
-  }, [dirty, save.isPending]);
+  const leaveState: LeaveState = saver.status === 'error' || saver.status === 'conflict' ? 'unsaved'
+    : saver.dirty || saver.status === 'saving' || saver.status === 'pending' ? 'pending' : 'clean';
+  const guard = useLeaveGuard({ state: leaveState, flush: saver.flush, beforeLeave: () => { if (saver.dirty) keepLocalCopy(); } });
+
+  /** C2 «Ver sus cambios (recargar)»: local edits go to a copy in this browser first. */
+  const reloadTheirs = async () => {
+    keepLocalCopy();
+    setConflictBusy('reload');
+    const res = await refetch();
+    setConflictBusy(null);
+    if (res.data) {
+      initFrom(res.data);
+      setSelected(null);
+      toast.success('Se cargó la versión más reciente. Su copia quedó guardada en este navegador.');
+    }
+  };
+  const overwriteMine = async () => {
+    setConflictBusy('overwrite');
+    const ok = await saver.overwrite();
+    setConflictBusy(null);
+    if (ok) toast.success('Se guardaron sus cambios.');
+  };
+  const restoreLocalCopy = () => {
+    if (!localCopy) return;
+    const m = draft.current.meta;
+    setMeta({ ...m, title: localCopy.title ?? m.title, seo: localCopy.seo ?? m.seo });
+    update(localCopy.blocks);
+    setLocalCopy(null);
+    wroteCopy.current = true;
+    toast.success('Sus cambios volvieron al borrador.');
+  };
+  const discardLocalCopy = () => { clearLocalCopy(pageId); setLocalCopy(null); };
+
+  // ── column resize (desktop) ──
+  const saveColumn = (w: number) => { try { localStorage.setItem(COLUMN_KEY, String(w)); } catch { /* remembered for this visit only */ } };
+  const onSplitterKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 64 : 16;
+    let next: number;
+    if (e.key === 'ArrowLeft') next = column - step;
+    else if (e.key === 'ArrowRight') next = column + step;
+    else if (e.key === 'Home') next = COLUMN_MIN;
+    else if (e.key === 'End') next = COLUMN_MAX;
+    else return;
+    e.preventDefault();
+    next = Math.min(COLUMN_MAX, Math.max(COLUMN_MIN, next));
+    setColumn(next); saveColumn(next);
+  };
+  const onSplitterDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const start = editColumn.current?.getBoundingClientRect().width ?? column;
+    let last = column;
+    const onMove = (ev: PointerEvent) => { last = Math.min(COLUMN_MAX, Math.max(COLUMN_MIN, Math.round(start + ev.clientX - startX))); setColumn(last); };
+    const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); saveColumn(last); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
 
   if (!Number.isFinite(pageId)) return <ErrorState />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (isLoading || !page || !sectionsReady) return <div className="flex min-h-[40vh] items-center justify-center"><LoadingSpinner /></div>;
+
   const original = originalBlocks(page.slug);
-  const legacy = isLegacyDraft(page.slug, blocks, !!page.published_version_number);
-  const st = pageStatusLabel({ status: page.status, has_unpublished_changes: page.has_unpublished_changes || dirty, review_requested_at: page.review_requested_at });
+  // Contract C1: the backend flag when it exists (optional), else the old client-side guess on the local draft.
+  const legacy = !legacyResolved && (typeof page.legacy_seed === 'boolean' ? page.legacy_seed : isLegacyDraft(page.slug, blocks, !!page.published_version_number));
+  const state = pageState(page, { blocks, dirty: saver.dirty, legacy });
+  const published = page.status === 'published';
+  const nothingToPublish = published && !page.has_unpublished_changes && !saver.dirty;
+  const pageTitle = meta.title || page.title;
+  const path = cmsPagePath(meta.slug || page.slug);
+  const busy = publish.isPending || review.isPending;
+
+  const onPublishClick = () => {
+    // Without the backend flag (C1 not deployed yet) the client still stops an old seed.
+    if (legacy) { setDialog('legacy'); return; }
+    publish.mutate({ action: 'publish' });
+  };
+
+  // Same actions in the top bar (desktop) and the bottom bar (phones, tablets: «Vista previa» is a tab there).
+  const btn = desktop ? 'whitespace-nowrap' : 'whitespace-nowrap !px-3';
+  const primary = (
+    <>
+      <Button variant="secondary" size="md" onClick={() => checks.mutate()} loading={checks.isPending} className={btn}>
+        <ClipboardCheck size={17} aria-hidden="true" /> Revisar
+      </Button>
+      {desktop && (
+        <Button variant="secondary" size="md" onClick={() => void openPreview()} className={btn} title="Abre la página completa con sus cambios en otra pestaña">
+          <Eye size={17} aria-hidden="true" /> Vista previa
+        </Button>
+      )}
+      {isAdmin ? (
+        <Button variant="cta" size="md" onClick={onPublishClick} loading={publish.isPending && publish.variables?.action === 'publish'} disabled={nothingToPublish || busy}
+          title={nothingToPublish ? 'No hay cambios por publicar' : undefined} className={desktop ? btn : `${btn} flex-1`}>
+          <Upload size={17} aria-hidden="true" /> Publicar
+        </Button>
+      ) : (
+        <Button variant="cta" size="md" onClick={() => review.mutate({ action: 'request' })} loading={review.isPending} disabled={!!page.review_requested_at || busy} className={desktop ? btn : `${btn} flex-1`}>
+          <Send size={17} aria-hidden="true" /> {page.review_requested_at ? 'Esperando aprobación' : desktop ? 'Solicitar aprobación' : 'Pedir aprobación'}
+        </Button>
+      )}
+    </>
+  );
+
+  const more: MenuItem[] = [
+    ...(!desktop ? [{ key: 'preview', label: 'Ver la página completa', icon: ExternalLink, onSelect: () => void openPreview(), hint: 'Abre otra pestaña con sus cambios' }] : []),
+    ...(isAdmin ? [{ key: 'versions', label: 'Versiones', icon: History, onSelect: () => setDialog('versions'), hint: 'Publicaciones anteriores y «Restaurar»' }] : []),
+    { key: 'link', label: 'Enlace de vista previa', icon: Link2, onSelect: () => previewLink.mutate(), hint: 'Copia un enlace para compartir (7 días)' },
+    { key: 'seo', label: 'SEO', icon: Search, onSelect: () => setDialog('seo'), hint: 'Título, dirección y buscadores' },
+    { key: 'schedule', label: 'Programar', icon: CalendarClock, onSelect: () => setDialog('schedule'), hint: 'Publicar o retirar en una fecha' },
+    ...(original ? [{ key: 'reset', label: 'Diseño original', icon: RotateCcw, onSelect: () => setDialog('reset'), hint: 'Vuelve el borrador al diseño de la página' }] : []),
+    ...(published ? [{ key: 'live', label: 'Ver en el sitio', icon: ExternalLink, onSelect: () => window.open(path, '_blank', 'noopener') }] : []),
+    { key: 'help', label: 'Cómo editar', icon: HelpCircle, onSelect: onboarding.show },
+    ...(isAdmin && published ? [{ key: 'unpublish', label: 'Retirar', icon: XCircle, onSelect: () => setDialog('unpublish'), danger: true, hint: original ? 'El sitio vuelve al diseño original' : 'La página deja el sitio' }] : []),
+  ];
+
+  const alerts = saver.conflict
+    ? <ConflictBanner conflict={saver.conflict} onReload={() => void reloadTheirs()} onOverwrite={() => void overwriteMine()} busy={conflictBusy} />
+    : null;
+
+  const listToolbar = (
+    <div className="flex items-center gap-1">
+      {clip && blockSpec(clip.type) && <Button size="sm" variant="ghost" onClick={pasteBlock} title={`Pegar: ${blockSpec(clip.type)?.label ?? clip.type}`}><ClipboardPaste size={15} aria-hidden="true" /> Pegar</Button>}
+      <Button size="sm" variant="secondary" onClick={() => setDialog('add')}><Plus size={15} aria-hidden="true" /> Agregar</Button>
+    </div>
+  );
+
+  const selSpec = selectedBlock ? blockSpec(selectedBlock.type) : undefined;
+  const selLocked = !!selSpec?.locked;
+  const selName = selectedBlock ? splitLabel(selectedBlock.type).name : '';
+  const form = selectedBlock && (
+      <div ref={formPanel} style={{ scrollMarginTop: barHeight + 12 }}>
+        <div className="mb-3 flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={backToList} className="!px-2"><ChevronLeft size={16} aria-hidden="true" /> Secciones</Button>
+          <span className="ml-auto text-xs text-subtle" aria-hidden="true">{selectedIdx + 1} de {blocks.length}</span>
+          <button type="button" aria-label="Sección anterior" title="Sección anterior" disabled={selectedIdx <= 0} onClick={() => select(blocks[selectedIdx - 1].id)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink disabled:opacity-30"><ChevronLeft size={18} /></button>
+          <button type="button" aria-label="Sección siguiente" title="Sección siguiente" disabled={selectedIdx >= blocks.length - 1} onClick={() => select(blocks[selectedIdx + 1].id)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-subtle hover:bg-cream hover:text-ink disabled:opacity-30"><ChevronRight size={18} /></button>
+        </div>
+        <div className="mb-2 flex items-start gap-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple text-white" aria-hidden="true"><BlockIcon type={selectedBlock.type} locked={selLocked} size={17} /></span>
+          <div className="min-w-0">
+            <h2 ref={formHeading} tabIndex={-1} className="font-head text-base font-bold leading-snug text-ink focus:outline-none" title={selSpec?.label}>{selectedIdx + 1}. {selName}</h2>
+            <p className="text-xs text-muted">{selSpec?.description}</p>
+          </div>
+        </div>
+        <div className="mb-3 flex flex-wrap gap-x-1 gap-y-0">
+          {originalProps(page.slug, selectedBlock) && <Button variant="ghost" size="sm" onClick={() => resetBlock(selectedBlock)} title="Vuelve a los textos e imágenes originales de esta sección"><RotateCcw size={14} aria-hidden="true" /> Restablecer</Button>}
+          {!selLocked && <Button variant="ghost" size="sm" onClick={() => copyBlock(selectedBlock)} title="Copiar para pegar en otra página"><Copy size={14} aria-hidden="true" /> Copiar</Button>}
+          {!selLocked && <Button variant="ghost" size="sm" onClick={() => duplicateBlock(selectedBlock)}><Plus size={14} aria-hidden="true" /> Duplicar</Button>}
+          {!selLocked && (
+            <Button variant="ghost" size="sm" onClick={() => toggleHidden(selectedBlock)} aria-pressed={!!selectedBlock.hidden}>
+              {selectedBlock.hidden ? <><Eye size={14} aria-hidden="true" /> Mostrar</> : <><EyeOff size={14} aria-hidden="true" /> Ocultar</>}
+            </Button>
+          )}
+        </div>
+        {selectedBlock.hidden && <p className="mb-3 flex items-center gap-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink"><EyeOff size={14} aria-hidden="true" /> Esta sección está oculta: se conserva aquí pero no aparece en el sitio.</p>}
+        {(fieldErrors.blocks || fieldErrors.draft_blocks) && <p className="mb-2 text-sm text-coral-700" role="alert">{fieldErrors.blocks || fieldErrors.draft_blocks}</p>}
+        <BlockForm block={selectedBlock} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
+      </div>
+  );
+
+  const editPane = (
+    <div className="card !p-3 sm:!p-4">
+      {form ?? (
+        <BlockList
+          blocks={blocks}
+          selectedId={lastSelected}
+          onSelect={(blockId) => select(blockId, 'list')}
+          onMove={(from, to) => update(moveBlock(blocks, from, to))}
+          onToggleHidden={toggleHidden}
+          onDelete={deleteBlock}
+          onDuplicate={duplicateBlock}
+          onCopy={copyBlock}
+          toolbar={listToolbar}
+        />
+      )}
+    </div>
+  );
+  const preview = <PreviewPane blocks={blocks} selectedId={selected} onSelect={(blockId) => select(blockId, 'preview')} device={device} onDevice={setDevice} previewRef={previewRef} />;
 
   return (
     <div className="flex min-h-[calc(100svh-7rem)] flex-col">
-      <PageHeader
-        title={meta.title || page.title}
-        subtitle={cmsPagePath(meta.slug)}
-        actions={(
-          <div className="flex flex-wrap items-center gap-2">
-            <Link to={base} className="btn-outline inline-flex items-center gap-1"><ChevronLeft size={16} aria-hidden="true" /> Páginas</Link>
-            <Button variant="secondary" size="sm" onClick={() => setShowSeo(true)}>SEO</Button>
-            {original && <Button variant="secondary" size="sm" onClick={() => setConfirmReset(true)}><RotateCcw size={16} aria-hidden="true" /> Diseño original</Button>}
-            <Button variant="secondary" size="sm" onClick={() => checks.mutate()} loading={checks.isPending}><ClipboardCheck size={16} aria-hidden="true" /> Revisar</Button>
-            {/* Version history and restore are admin-only endpoints (staff would get a 403). */}
-            {isAdmin && <Button variant="secondary" size="sm" onClick={() => setShowVersions(true)}><History size={16} aria-hidden="true" /> Versiones</Button>}
-            <Button variant="secondary" size="sm" onClick={() => previewLink.mutate()} loading={previewLink.isPending}><Copy size={16} aria-hidden="true" /> Enlace de vista previa</Button>
-            {!isAdmin && (
-              <Button variant="cta" size="sm" onClick={() => review.mutate({ action: 'request' })} loading={review.isPending} disabled={!!page.review_requested_at}>
-                <Send size={16} aria-hidden="true" /> {page.review_requested_at ? 'Esperando aprobación' : 'Solicitar aprobación'}
-              </Button>
-            )}
-            {isAdmin && page.review_requested_at && (
-              <Button variant="secondary" size="sm" onClick={() => setRejecting(true)}>Pedir cambios</Button>
-            )}
-            {isAdmin && page.status === 'published' && (
-              <>
-                <a href={cmsPagePath(page.slug)} target="_blank" rel="noopener noreferrer" className="btn-outline inline-flex items-center gap-1 text-sm"><ExternalLink size={16} aria-hidden="true" /> Ver en el sitio</a>
-                <Button variant="danger" size="sm" onClick={() => setConfirmUnpublish(true)}><XCircle size={16} aria-hidden="true" /> Retirar</Button>
-              </>
-            )}
-            {isAdmin && (
-              <Button variant="cta" size="sm" onClick={() => publish.mutate('publish')} loading={publish.isPending} disabled={page.status === 'published' && !page.has_unpublished_changes && !dirty}>
-                <Upload size={16} aria-hidden="true" /> Publicar
-              </Button>
-            )}
-          </div>
-        )}
+      <EditorActionBar
+        barRef={barRef}
+        backTo={base}
+        title={pageTitle}
+        path={path}
+        liveHref={published && page.slug !== 'no-encontrada' ? path : null}
+        state={state}
+        save={{ status: saver.status, lastSavedAt: saver.lastSavedAt, serverSavedAt: page.draft_updated_at ?? page.updated_at, onRetry: () => void saver.flush() }}
+        history={{ canUndo: history.past.length > 0, canRedo: history.future.length > 0, onUndo: undo, onRedo: redo }}
+        actions={primary}
+        more={more}
+        desktop={desktop}
+        pane={desktop ? undefined : { value: pane, onChange: setPane }}
+        alerts={alerts}
       />
 
-      <p className="mb-3 inline-flex flex-wrap items-center gap-2 text-xs text-subtle" aria-live="polite">
-        <Badge variant={st.tone}>{st.label}</Badge> {save.isPending ? 'Guardando…' : dirty ? 'Cambios sin guardar' : 'Borrador guardado'}
-        {page.review_requested_by_name && page.review_requested_at && <span>· solicitó {page.review_requested_by_name}</span>}
-        {page.review_note && !page.review_requested_at && <span className="text-coral-600">· Dirección pidió cambios: {page.review_note}</span>}
-        {meta.publish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se publica {new Date(meta.publish_at).toLocaleString('es-MX')}</span>}
-        {meta.unpublish_at && <span className="inline-flex items-center gap-1"><CalendarClock size={12} aria-hidden="true" /> se retira {new Date(meta.unpublish_at).toLocaleString('es-MX')}</span>}
-      </p>
-      {legacy && original && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-sm" role="status">
-          <p className="text-ink">Este borrador se creó con bloques genéricos y no se parece a la página actual del sitio. Cargue el diseño actual para editar la página tal como se ve hoy.</p>
-          <Button size="sm" onClick={() => { update(original); setSelected(null); }}>Cargar el diseño actual</Button>
-        </div>
-      )}
-      {issues && issues.length > 0 && (
-        <div className="mb-4 rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">Revisión: {issues.filter((i) => i.level === 'error').length} por corregir · {issues.filter((i) => i.level === 'warning').length} sugerencias</h2>
-            <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => setIssues(null)}>Ocultar</button>
+      <div className="mb-4 space-y-3 empty:hidden">
+        {onboarding.visible && <EditorOnboarding onDismiss={onboarding.dismiss} canPublish={isAdmin} />}
+        {legacy && <LegacyDraftBanner canLoad={!!original} onLoadDesign={loadDesign} />}
+        {localCopy && !saver.conflict && <LocalCopyBanner copy={localCopy} onRestore={restoreLocalCopy} onDiscard={discardLocalCopy} />}
+        {page.review_requested_at && (
+          <div className="flex flex-col gap-2 rounded-xl border border-brand-600/20 bg-brand-50 p-3 text-sm md:flex-row md:items-center md:justify-between" role="status">
+            <p className="text-ink">{page.review_requested_by_name || 'Un editor'} pidió a Dirección publicar estos cambios.</p>
+            {isAdmin && <Button variant="secondary" size="md" onClick={() => setDialog('reject')}>Pedir cambios</Button>}
           </div>
-          <ul className="space-y-1 text-sm">
-            {issues.map((i, k) => (
-              <li key={k} className="flex items-start gap-2">
-                {i.level === 'error' ? <AlertTriangle size={16} className="mt-0.5 shrink-0 text-coral-600" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />}
-                {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => setSelected(i.block_id)}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div className="grid flex-1 gap-4 lg:grid-cols-[320px_1fr]">
-        {/* Left: block list + properties */}
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:overflow-y-auto" aria-label="Bloques">
-          <div className="card">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-head text-sm font-bold uppercase tracking-wide text-subtle">Bloques</h2>
-              <div className="flex items-center gap-1">
-                <button type="button" aria-label="Deshacer (Ctrl+Z)" title="Deshacer (Ctrl+Z)" disabled={history.past.length === 0} onClick={undo} className="rounded p-1.5 text-subtle hover:text-ink disabled:opacity-30"><Undo2 size={15} /></button>
-                <button type="button" aria-label="Rehacer (Ctrl+Shift+Z)" title="Rehacer (Ctrl+Shift+Z)" disabled={history.future.length === 0} onClick={redo} className="rounded p-1.5 text-subtle hover:text-ink disabled:opacity-30"><Redo2 size={15} /></button>
-                {clip && blockSpec(clip.type) && <Button size="sm" variant="ghost" onClick={pasteBlock} title={`Pegar: ${blockSpec(clip.type)?.label ?? clip.type}`}><ClipboardPaste size={14} aria-hidden="true" /> Pegar</Button>}
-                <Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus size={14} aria-hidden="true" /> Agregar</Button>
-              </div>
+        )}
+        {page.review_note && !page.review_requested_at && (
+          <p className="rounded-xl border border-coral-600/20 bg-coral-50 px-3 py-2 text-sm text-coral-700" role="status">Dirección pidió cambios: {page.review_note}</p>
+        )}
+        {issues && issues.length > 0 && (
+          <div className="rounded-xl border border-line bg-white p-3" role="region" aria-label="Revisión previa a publicar">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-ink">Revisión: {issues.filter((i) => i.level === 'error').length} por corregir · {issues.filter((i) => i.level === 'warning').length} sugerencias</h2>
+              <Button variant="ghost" size="sm" onClick={() => setIssues(null)}>Ocultar</Button>
             </div>
-            {blocks.length === 0 ? <p className="text-sm text-muted">La página está vacía. Agregue el primer bloque.</p> : (
-              <ol className="space-y-1">
-                {blocks.map((b, i) => (
-                  <li
-                    key={b.id}
-                    draggable
-                    onDragStart={(e) => { setDragging(i); e.dataTransfer.effectAllowed = 'move'; }}
-                    onDragOver={(e) => { e.preventDefault(); if (dragOver !== i) setDragOver(i); }}
-                    onDragLeave={() => setDragOver(null)}
-                    onDrop={(e) => { e.preventDefault(); if (dragging !== null && dragging !== i) update(moveBlock(blocks, dragging, i)); setDragging(null); setDragOver(null); }}
-                    onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                    className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm ${selected === b.id ? 'bg-purple/10 text-purple' : 'hover:bg-cream-2'} ${dragOver === i && dragging !== i ? 'ring-2 ring-purple/50' : ''} ${dragging === i ? 'opacity-50' : ''}`}
-                  >
-                    <span className="cursor-grab text-subtle" aria-hidden="true" title="Arrastre para reordenar"><GripVertical size={14} /></span>
-                    <button type="button" className="flex-1 truncate text-left font-medium" onClick={() => setSelected(b.id)} aria-current={selected === b.id ? 'true' : undefined}>
-                      <span className={b.hidden ? 'text-subtle line-through' : undefined}>{i + 1}. {blockSpec(b.type)?.label ?? b.type}</span>
-                    </button>
-                    <button type="button" aria-label="Subir" disabled={i === 0} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => update(moveBlock(blocks, i, i - 1))}><ArrowUp size={14} /></button>
-                    <button type="button" aria-label="Bajar" disabled={i === blocks.length - 1} className="rounded p-1 text-subtle hover:text-ink disabled:opacity-30" onClick={() => update(moveBlock(blocks, i, i + 1))}><ArrowDown size={14} /></button>
-                    {isLocked(b) ? (
-                      <span className="rounded p-1 text-subtle" title="Sección con formulario o datos del sistema: se puede mover, no ocultar ni eliminar." aria-label="Sección fija"><Lock size={14} /></span>
-                    ) : (
-                      <>
-                        <button type="button" aria-label={b.hidden ? 'Mostrar en el sitio' : 'Ocultar del sitio'} aria-pressed={!!b.hidden} title={b.hidden ? 'Oculto: no aparece en el sitio' : 'Ocultar sin eliminar'} className={`rounded p-1 hover:text-ink ${b.hidden ? 'text-amber' : 'text-subtle'}`} onClick={() => toggleHidden(b)}>{b.hidden ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                        <button type="button" aria-label="Eliminar bloque" className="rounded p-1 text-subtle hover:text-coral-600" onClick={() => { update(blocks.filter((x) => x.id !== b.id)); if (selected === b.id) setSelected(null); }}><Trash2 size={14} /></button>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-
-          <div className="card scroll-mt-24" ref={propsRef}>
-            {selectedBlock ? (
-              <>
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="font-head text-sm font-bold uppercase tracking-wide text-subtle">{blockSpec(selectedBlock.type)?.label ?? selectedBlock.type}</h2>
-                  <div className="flex items-center gap-3">
-                    {originalProps(page.slug, selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => resetBlock(selectedBlock)} title="Vuelve a los textos e imágenes originales de esta sección">Restablecer</button>}
-                    {!isLocked(selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => copyBlock(selectedBlock)} title="Copiar para pegar en otra página">Copiar</button>}
-                    {!isLocked(selectedBlock) && <button type="button" className="text-xs text-subtle hover:text-ink" onClick={() => update([...blocks.slice(0, selectedIdx + 1), { ...selectedBlock, id: newBlockId(), props: JSON.parse(JSON.stringify(selectedBlock.props)) }, ...blocks.slice(selectedIdx + 1)])}>Duplicar</button>}
-                  </div>
-                </div>
-                <p className="mb-3 text-xs text-muted">{blockSpec(selectedBlock.type)?.description}</p>
-                {selectedBlock.hidden && <p className="mb-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-ink">Este bloque está oculto: se conserva aquí pero no aparece en el sitio.</p>}
-                {(errors.blocks || errors.draft_blocks) && <p className="mb-2 text-sm text-coral-600">{errors.blocks || errors.draft_blocks}</p>}
-                <BlockForm block={selectedBlock} onChange={(props, field) => update(blocks.map((b) => (b.id === selectedBlock.id ? { ...b, props } : b)), `${selectedBlock.id}:${field}`)} />
-              </>
-            ) : <p className="text-sm text-muted">Seleccione un bloque en la lista o haga clic en la vista previa para editarlo.</p>}
-          </div>
-        </aside>
-
-        {/* Right: live preview */}
-        <section className="min-w-0" aria-label="Vista previa">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="inline-flex items-center gap-1 text-xs text-subtle"><Eye size={14} aria-hidden="true" /> Vista previa en vivo (haga clic en un bloque para editarlo)</span>
-            <div role="group" aria-label="Tamaño de pantalla" className="inline-flex rounded-lg bg-cream-2 p-0.5">
-              {([['mobile', Smartphone, 'Móvil'], ['tablet', Tablet, 'Tableta'], ['desktop', Monitor, 'Escritorio']] as const).map(([d, Icon, label]) => (
-                <button key={d} type="button" aria-pressed={device === d} aria-label={label} onClick={() => setDevice(d)} className={`rounded-md p-1.5 ${device === d ? 'bg-white text-purple shadow-sm' : 'text-subtle'}`}><Icon size={16} /></button>
+            <ul className="space-y-1 text-sm">
+              {issues.map((i, k) => (
+                <li key={k} className="flex items-start gap-2">
+                  {i.level === 'error' ? <AlertTriangle size={16} className="mt-0.5 shrink-0 text-coral-600" aria-label="Por corregir" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber" aria-label="Sugerencia" />}
+                  {i.block_id ? <button type="button" className="text-left text-ink underline-offset-2 hover:underline" onClick={() => select(i.block_id, 'list')}>{i.message}</button> : <span className="text-ink">{i.message}</span>}
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-line bg-cream-2 p-3">
-            <div ref={previewRef} className="mx-auto overflow-hidden rounded-xl bg-white shadow-card" style={{ width: DEVICE_WIDTH[device] ?? '100%', maxWidth: '100%' }}>
-              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <EditableBlocks blocks={blocks} selectedId={selected} onSelect={selectFromPreview} />}
-            </div>
-          </div>
-        </section>
+        )}
       </div>
 
-      <AddBlockModal open={adding} onClose={() => setAdding(false)} onPick={(type) => { const b = newBlock(type); update([...blocks, b]); setSelected(b.id); setAdding(false); }} />
+      {desktop ? (
+        <div className="grid flex-1 items-start" style={{ gridTemplateColumns: `clamp(${COLUMN_MIN}px, ${column}px, 55%) 16px minmax(0, 1fr)` }}>
+          <aside
+            ref={editColumn}
+            aria-label="Secciones y formulario"
+            className="sticky overflow-y-auto overscroll-contain rounded-2xl"
+            style={{ top: barHeight + 8, maxHeight: Math.max(320, viewHeight - barHeight - 16) }}
+          >
+            {editPane}
+          </aside>
+          {/* A focusable window splitter (ARIA separator widget): drag or arrow keys. */}
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ancho del panel de edición"
+            aria-valuemin={COLUMN_MIN}
+            aria-valuemax={COLUMN_MAX}
+            aria-valuenow={column}
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+            tabIndex={0}
+            onKeyDown={onSplitterKey}
+            onPointerDown={onSplitterDown}
+            onDoubleClick={() => { setColumn(420); saveColumn(420); }}
+            title="Arrastre para cambiar el ancho (doble clic: ancho normal)"
+            className="group sticky flex h-24 cursor-col-resize items-center justify-center focus-visible:outline-none"
+            style={{ top: barHeight + 8 }}
+          >
+            <span className="h-12 w-1 rounded-full bg-line transition-colors group-hover:bg-purple/50 group-focus-visible:bg-purple" />
+          </div>
+          {preview}
+        </div>
+      ) : (
+        <>
+          <div id="editor-pane-edit" role="tabpanel" aria-labelledby="editor-tab-edit" hidden={pane !== 'edit'}>{pane === 'edit' && editPane}</div>
+          <div id="editor-pane-preview" role="tabpanel" aria-labelledby="editor-tab-preview" hidden={pane !== 'preview'}>{pane === 'preview' && preview}</div>
+          <EditorBottomBar actions={primary} more={more} />
+        </>
+      )}
+
+      <AddBlockModal open={dialog === 'add'} onClose={() => setDialog(null)} onPick={(type) => { const b = newBlock(type); update([...blocks, b]); setDialog(null); select(b.id, 'list'); }} />
       {isAdmin && (
         <VersionsModal
-          open={showVersions}
+          open={dialog === 'versions'}
           pageId={pageId}
           current={blocks}
-          onClose={() => setShowVersions(false)}
+          onClose={() => setDialog(null)}
           onRestored={(restored) => {
             // Reload the editor from the restored draft (drops local edits and any pending autosave).
-            loadedFor.current = null;
-            setDirty(false);
             qc.setQueryData(['admin-page', pageId], restored);
             qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
-            setShowVersions(false);
+            initFrom(restored);
+            setSelected(null);
+            setDialog(null);
           }}
         />
       )}
-      <Modal open={showSeo} onClose={() => setShowSeo(false)} title="Título, dirección y SEO" maxWidth={520}>
-        <div className="space-y-3">
-          <Input label="Título de la página" value={meta.title} onChange={(e) => updateMeta({ title: e.target.value })} error={errors.title} />
-          <Input label="Dirección (slug)" value={meta.slug} onChange={(e) => updateMeta({ slug: e.target.value })} error={errors.slug} disabled={!isAdmin} hint={isAdmin ? 'Cambiarla rompe enlaces ya compartidos.' : 'Solo Dirección puede cambiar la dirección.'} />
-          <Input label="Título SEO" value={meta.seo.title ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, title: e.target.value } })} placeholder={templateFor(page.slug)?.seo.title ?? ''} hint="Máx. 60 caracteres recomendados. Vacío = el título actual del sitio." />
-          <div><label className="label" htmlFor="seo-desc">Descripción SEO</label><textarea id="seo-desc" className="input-field" rows={3} value={meta.seo.description ?? ''} placeholder={templateFor(page.slug)?.seo.description ?? ''} onChange={(e) => updateMeta({ seo: { ...meta.seo, description: e.target.value } })} /></div>
-          <MediaPicker label="Imagen al compartir (WhatsApp, Facebook)" value={meta.seo.og_image ?? null} onChange={(id) => updateMeta({ seo: { ...meta.seo, og_image: id ?? undefined } })} />
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!meta.seo.noindex} onChange={(e) => updateMeta({ seo: { ...meta.seo, noindex: e.target.checked } })} /> No indexar en buscadores</label>
-          {!isAdmin && <p className="text-xs text-muted">La publicación y el retiro programados los define Dirección al aprobar la página.</p>}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Publicar automáticamente el" disabled={!isAdmin} type="datetime-local" value={toLocalInput(meta.publish_at)} onChange={(e) => updateMeta({ publish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Vacío = manual." />
-            <Input label="Retirar del sitio el" disabled={!isAdmin} type="datetime-local" value={toLocalInput(meta.unpublish_at)} onChange={(e) => updateMeta({ unpublish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} hint="Para contenido con fecha de caducidad." />
-          </div>
-          <div className="flex justify-end"><Button onClick={() => setShowSeo(false)}>Listo</Button></div>
-        </div>
-      </Modal>
-      <Modal open={rejecting} onClose={() => setRejecting(false)} title="Pedir cambios al editor" maxWidth={480}>
+      <SeoDialog
+        open={dialog === 'seo'}
+        onClose={() => setDialog(null)}
+        meta={meta}
+        onChange={updateMeta}
+        isAdmin={isAdmin}
+        errors={fieldErrors}
+        placeholders={{ title: templateFor(page.slug)?.seo.title, description: templateFor(page.slug)?.seo.description }}
+      />
+      <ScheduleDialog
+        open={dialog === 'schedule'}
+        onClose={() => setDialog(null)}
+        value={{ publish_at: meta.publish_at, unpublish_at: meta.unpublish_at }}
+        canEdit={isAdmin}
+        hasOriginalDesign={!!original}
+        saving={saver.status === 'saving'}
+        onSave={(next: Schedule) => {
+          updateMeta(next);
+          // Saved right away (not after the autosave delay): the cron acts on these dates.
+          void saver.flush().then((ok) => {
+            if (!ok) return;
+            setDialog(null);
+            toast.success(next.publish_at || next.unpublish_at ? 'Programación guardada.' : 'Programación cancelada.');
+          });
+        }}
+      />
+      <LegacyDraftDialog
+        open={dialog === 'legacy'}
+        onClose={() => setDialog(null)}
+        pageTitle={pageTitle}
+        canLoad={!!original}
+        publishing={publish.isPending}
+        onLoadDesign={() => { loadDesign(); setDialog(null); toast.success('Diseño actual cargado. Revise sus cambios y publique cuando esté lista.'); }}
+        onPublishAnyway={() => publish.mutate({ action: 'publish', confirmLegacy: true })}
+      />
+      <Modal open={dialog === 'reject'} onClose={() => setDialog(null)} title="Pedir cambios al editor" maxWidth={480}>
         <div className="space-y-3">
           <div><label className="label" htmlFor="reject-note">¿Qué debe corregirse?</label><textarea id="reject-note" className="input-field" rows={3} value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} /></div>
-          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setRejecting(false)}>Cancelar</Button><Button onClick={() => review.mutate({ action: 'reject', note: rejectNote })} loading={review.isPending} disabled={!rejectNote.trim()}>Enviar</Button></div>
+          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDialog(null)}>Cancelar</Button><Button onClick={() => review.mutate({ action: 'reject', note: rejectNote })} loading={review.isPending} disabled={!rejectNote.trim()}>Enviar</Button></div>
         </div>
       </Modal>
-      <ConfirmDialog open={confirmReset} title="¿Volver al diseño original?" message="El borrador se reemplaza por el contenido original de la página (textos, fotos y secciones). Lo publicado no cambia hasta que publique, y las versiones anteriores se conservan."
-        confirmLabel="Restablecer borrador" onConfirm={() => { if (original) update(original); setSelected(null); setConfirmReset(false); }} onClose={() => setConfirmReset(false)} />
-      <ConfirmDialog open={confirmUnpublish} title="¿Retirar la página del sitio?" message="Las visitas verán un 404 hasta volver a publicarla. El borrador se conserva."
-        confirmLabel="Retirar página" loading={publish.isPending} onConfirm={() => publish.mutate('unpublish')} onClose={() => setConfirmUnpublish(false)} />
+      <ConfirmDialog open={dialog === 'reset'} title="¿Volver al diseño original?" message="El borrador se reemplaza por el contenido original de la página (textos, fotos y secciones). Lo publicado no cambia hasta que publique, y las versiones anteriores se conservan."
+        confirmLabel="Restablecer borrador" onConfirm={() => { loadDesign(); setDialog(null); }} onClose={() => setDialog(null)} />
+      <ConfirmDialog open={dialog === 'unpublish'} title="¿Retirar la página del sitio?"
+        message={original ? 'El sitio vuelve a mostrar el diseño original de esta página. El borrador y las versiones se conservan.' : 'Las visitas verán «Página no encontrada» hasta volver a publicarla. El borrador se conserva.'}
+        confirmLabel="Retirar página" loading={publish.isPending} onConfirm={() => publish.mutate({ action: 'unpublish' })} onClose={() => setDialog(null)} />
+      <ConfirmDialog open={!!guard.blockedHref} title="¿Salir sin guardar?"
+        message={saver.conflict
+          ? 'Otra persona guardó cambios en esta página y los suyos no se han guardado. Si sale, quedará una copia solo en este navegador.'
+          : 'El último cambio no se pudo guardar. Si sale, quedará una copia solo en este navegador y podrá recuperarla al volver.'}
+        confirmLabel="Salir sin guardar" onConfirm={guard.leave} onClose={guard.stay} />
     </div>
-  );
-}
-
-function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (type: string) => void }) {
-  const [q, setQ] = useState('');
-  const needle = q.trim().toLowerCase();
-  const match = (b: { label: string; description: string }) => !needle || `${b.label} ${b.description}`.toLowerCase().includes(needle);
-  // Locked sections carry a form or the booking widget: one per page, never added twice.
-  const sections = allSectionSpecs().filter((b) => !b.locked && match(b));
-  const groups = Object.entries(GROUP_LABELS)
-    .map(([key, label]) => ({ key, label, items: sections.filter((b) => b.group === key) }))
-    .filter((g) => g.items.length > 0);
-  const generic = BLOCKS.filter(match);
-  const card = (b: { type: string; label: string; description: string }) => (
-    <li key={b.type}>
-      <button type="button" onClick={() => onPick(b.type)} className="w-full rounded-xl border border-line p-3 text-left hover:border-purple hover:bg-purple/5">
-        <span className="block font-semibold text-ink">{b.label}</span>
-        <span className="block text-xs text-muted">{b.description}</span>
-      </button>
-    </li>
-  );
-  return (
-    <Modal open={open} onClose={onClose} title="Agregar bloque" maxWidth={720}>
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-        <input className="input-field pl-9" placeholder="Buscar bloque…" aria-label="Buscar bloque" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
-      <div className="max-h-[65vh] space-y-5 overflow-y-auto">
-        {generic.length > 0 && (
-          <section>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">Bloques generales</h3>
-            <ul className="grid gap-2 sm:grid-cols-2" aria-label="Bloques generales">{generic.map(card)}</ul>
-          </section>
-        )}
-        {groups.map((g) => (
-          <section key={g.key}>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-subtle">Secciones de {g.label}</h3>
-            <ul className="grid gap-2 sm:grid-cols-2" aria-label={`Secciones de ${g.label}`}>{g.items.map(card)}</ul>
-          </section>
-        ))}
-        {generic.length === 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-muted">Ningún bloque coincide con la búsqueda.</p>}
-      </div>
-    </Modal>
-  );
-}
-
-function VersionsModal({ open, pageId, current, onClose, onRestored }: { open: boolean; pageId: number; current: Block[]; onClose: () => void; onRestored: (page: CmsPageAdmin) => void }) {
-  const [diffOf, setDiffOf] = useState<number | null>(null);
-  const [toRestore, setToRestore] = useState<number | null>(null);
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-page-versions', pageId], queryFn: async () => (await contentApi.adminPageVersions(pageId)).data, enabled: open });
-  const rollback = useMutation({
-    mutationFn: (version: number) => contentApi.adminRollbackPage(pageId, version),
-    onSuccess: (res) => {
-      toast.success(`Versión ${res.data.restored_from} restaurada en el borrador. El sitio no cambia hasta que la publique.`);
-      setToRestore(null);
-      onRestored(res.data.page);
-    },
-    onError: (e) => { setToRestore(null); toast.error(apiFieldErrors(e).detail || 'No se pudo restaurar.'); },
-  });
-  return (
-    <Modal open={open} onClose={onClose} title="Versiones publicadas" maxWidth={480}>
-      {isError ? (
-        <ErrorState title="No se pudieron cargar las versiones" onRetry={() => refetch()} />
-      ) : isLoading ? (
-        <div className="flex justify-center py-6"><LoadingSpinner /></div>
-      ) : (data ?? []).length === 0 ? <p className="text-sm text-muted">Esta página aún no se ha publicado.</p> : (
-        <ul className="divide-y divide-line" aria-label="Versiones">
-          {(data ?? []).map((v) => (
-            <li key={v.id} className="py-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div><span className="font-semibold text-ink">Versión {v.number}</span><p className="text-xs text-subtle">{v.author_name} · {new Date(v.created_at).toLocaleString('es-MX')}</p></div>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => setDiffOf(diffOf === v.number ? null : v.number)}>{diffOf === v.number ? 'Ocultar cambios' : 'Ver cambios'}</Button>
-                  <Button size="sm" variant="secondary" onClick={() => setToRestore(v.number)}>Restaurar</Button>
-                </div>
-              </div>
-              {diffOf === v.number && <VersionDiff lines={diffBlocks(v.blocks ?? [], current)} number={v.number} />}
-            </li>
-          ))}
-        </ul>
-      )}
-      <ConfirmDialog
-        open={toRestore !== null}
-        title={`¿Restaurar la versión ${toRestore ?? ''} en el borrador?`}
-        message="El borrador actual (incluidos los cambios sin publicar) se reemplaza por esta versión. El sitio público no cambia hasta que publique."
-        confirmLabel="Restaurar en el borrador"
-        loading={rollback.isPending}
-        onConfirm={() => toRestore !== null && rollback.mutate(toRestore)}
-        onClose={() => setToRestore(null)}
-      />
-    </Modal>
-  );
-}
-
-const DIFF_LABEL: Record<string, string> = { added: '+ Nuevo', removed: '− Eliminado', changed: '± Modificado', moved: '↕ Movido', same: '' };
-function VersionDiff({ lines, number }: { lines: ReturnType<typeof diffBlocks>; number: number }) {
-  const changes = lines.filter((l) => l.kind !== 'same');
-  return (
-    <ul className="mt-2 space-y-0.5 rounded-lg bg-cream-2 p-2 text-xs" aria-label={`Cambios del borrador respecto a la versión ${number}`}>
-      {changes.length === 0 && <li className="text-muted">El borrador es idéntico a esta versión.</li>}
-      {changes.map((l) => (
-        <li key={`${l.kind}-${l.id}`} className={l.kind === 'added' ? 'text-green-700' : l.kind === 'removed' ? 'text-coral-600' : 'text-ink'}>
-          {DIFF_LABEL[l.kind]} {l.type}{l.summary ? `: ${l.summary}` : ''}
-        </li>
-      ))}
-    </ul>
   );
 }
