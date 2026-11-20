@@ -35,7 +35,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'plataformas', path: '/plataformas', title: 'Plataformas', group: 'plataformas',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: [
     'plataformas.hero',
     'plataformas.platforms',

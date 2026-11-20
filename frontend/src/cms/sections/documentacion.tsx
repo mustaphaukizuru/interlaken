@@ -122,7 +122,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'documentacion', path: '/admisiones/documentacion', title: 'Documentación', group: 'documentacion',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['documentacion.hero', 'documentacion.list'],
 }];
 

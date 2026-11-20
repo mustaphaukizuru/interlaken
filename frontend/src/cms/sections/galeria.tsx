@@ -305,7 +305,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'galeria', path: '/galeria', title: 'Galería', group: 'galeria',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['galeria.hero', 'galeria.grid'],
 }];
 

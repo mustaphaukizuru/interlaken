@@ -1,8 +1,8 @@
 import { act, render } from '@testing-library/react';
 import { Suspense, lazy, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { RouteSeo, Seo, resetSeoForTests } from './Seo';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { RouteSeo, Seo, loadRouteMeta, resetSeoForTests } from './Seo';
 
 const head = () => ({
   title: document.title,
@@ -11,6 +11,11 @@ const head = () => ({
   ogUrl: document.head.querySelector('meta[property="og:url"]')?.getAttribute('content'),
   robots: document.head.querySelector('meta[name="robots"]')?.getAttribute('content') ?? null,
   ld: [...document.head.querySelectorAll('script[data-page-ld]')].map((s) => JSON.parse(s.textContent || '{}')),
+});
+
+// RouteSeo loads the route table after first paint; have it ready so it renders at once.
+beforeAll(async () => {
+  await loadRouteMeta();
 });
 
 beforeEach(() => {
@@ -90,5 +95,20 @@ describe('RouteSeo', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(head().canonicals).toEqual(['https://interlaken.edu.mx/admisiones']);
     expect(head().title).toMatch(/^Admisiones/);
+  });
+
+  it('keeps the head the server wrote until the route table has loaded', () => {
+    // No RouteSeo yet (table still loading): a page-level <Seo> adding JSON-LD
+    // must not reset the server's title and description to the site defaults.
+    document.head.innerHTML =
+      '<title>Admisiones 2026–2027 · Colegio Interlaken</title><meta name="description" content="server">' +
+      '<link rel="canonical" href="https://interlaken.edu.mx/admisiones">';
+    window.history.pushState({}, '', '/admisiones');
+    render(<MemoryRouter initialEntries={['/admisiones']}><Seo jsonLd={{ '@type': 'FAQPage' }} /></MemoryRouter>);
+    expect(head().title).toBe('Admisiones 2026–2027 · Colegio Interlaken');
+    expect(head().description).toBe('server');
+    expect(head().canonicals).toEqual(['https://interlaken.edu.mx/admisiones']);
+    expect(head().ld.map((b) => b['@type'])).toEqual(['FAQPage']);
+    window.history.pushState({}, '', '/');
   });
 });

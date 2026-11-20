@@ -194,7 +194,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'facturacion', path: '/comunidad/facturacion', title: 'Facturación', group: 'facturacion',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['facturacion.hero', 'facturacion.notices', 'facturacion.request', 'facturacion.download'],
 }];
 

@@ -32,7 +32,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'pagos', path: '/pagos', title: 'Colegiaturas y cafetería', group: 'pagos',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['pagos.hero', 'pagos.platforms'],
 }];
 

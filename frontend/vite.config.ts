@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path';
-import { ROUTE_META, routeHead } from './src/lib/siteMeta';
+import { ROUTE_META, routeHead } from './src/lib/routeMeta';
 
 /**
  * seo-routes.json: the per-URL head (title, description, canonical, robots,

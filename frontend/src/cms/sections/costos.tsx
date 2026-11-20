@@ -90,7 +90,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'costos', path: '/admisiones/costos', title: 'Costos', group: 'costos',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['costos.hero', 'costos.prices'],
 }];
 

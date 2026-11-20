@@ -124,7 +124,7 @@ export const sections = [
 
 export const templates = [{
   slug: 'modelo-educativo', path: '/modelo-educativo', title: 'Modelo educativo', group: 'modelo',
-  seo: {}, // title and description: lib/siteMeta.ts ROUTE_META
+  seo: {}, // title and description: lib/routeMeta.ts ROUTE_META
   sections: ['modelo.hero', 'modelo.pillars'],
 }];
 

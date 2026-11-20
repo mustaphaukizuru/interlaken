@@ -16,7 +16,7 @@ import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
 import { EditableBlocks } from '@/cms/editor/EditableBlocks';
 import { allSections as allSectionSpecs, templateFor } from '@/cms/sections';
-import { ROUTE_META } from '@/lib/siteMeta';
+import { ROUTE_META } from '@/lib/routeMeta';
 import { GROUP_LABELS, loadAllGroups } from '@/cms/sections/loaders';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
@@ -28,7 +28,7 @@ import type { PageIssue } from '@/services/api';
 
 /**
  * What a page shows when the school leaves its SEO fields empty: the route's
- * entry in ROUTE_META (lib/siteMeta.ts), else the template's own (404 page).
+ * entry in ROUTE_META (lib/routeMeta.ts), else the template's own (404 page).
  */
 function seoDefaults(slug: string): { title: string; description: string } {
   const tpl = templateFor(slug);

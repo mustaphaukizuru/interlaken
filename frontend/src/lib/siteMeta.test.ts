@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ORG, ROUTE_META, breadcrumbLd, canonicalFor, routeHead } from './siteMeta';
+import { ORG, canonicalFor } from './siteMeta';
+import { ROUTE_META, breadcrumbLd, routeHead } from './routeMeta';
 
 const root = join(__dirname, '..', '..', '..');
 const indexable = Object.entries(ROUTE_META).filter(([, m]) => !m.noindex).map(([p]) => p);
