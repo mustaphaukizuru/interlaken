@@ -38,7 +38,7 @@ const AdmissionsPage  = cmsRoute('admisiones', () => import('./pages/public/Admi
 const DocumentacionPage = cmsRoute('documentacion', () => import('./pages/public/DocumentacionPage'));
 const CostosPage      = cmsRoute('costos', () => import('./pages/public/CostosPage'));
 const PreRegisterPage = cmsRoute('pre-registro', () => import('./pages/public/PreRegisterPage'));
-const RegisterPage    = lazy(() => import('./pages/public/RegisterPage'));
+const RegisterPage    = cmsRoute('inscripcion', () => import('./pages/public/RegisterPage'));
 const BookVisitPage   = cmsRoute('agendar-visita', () => import('./pages/public/BookVisitPage'));
 const ContactPage     = cmsRoute('contacto', () => import('./pages/public/ContactPage'));
 const AvisoPrivacidadPage = cmsRoute('aviso-de-privacidad', () => import('./pages/public/AvisoPrivacidadPage'));
@@ -51,8 +51,8 @@ const PagosPage = cmsRoute('pagos', () => import('./pages/public/PagosPage'));
 const FacturacionPage = cmsRoute('facturacion', () => import('./pages/public/FacturacionPage'));
 
 // Auth
-const LoginPage       = lazy(() => import('./pages/auth/LoginPage'));
-const ConfirmNotifyEmailPage = lazy(() => import('./pages/public/ConfirmNotifyEmailPage'));
+const LoginPage       = cmsRoute('iniciar-sesion', () => import('./pages/auth/LoginPage'));
+const ConfirmNotifyEmailPage = cmsRoute('confirmar-correo', () => import('./pages/public/ConfirmNotifyEmailPage'));
 const SandboxCheckout = lazy(() => import('./pages/public/SandboxCheckout'));
 
 // Parent portal
@@ -97,10 +97,11 @@ const AdminForms = lazy(() => import('./pages/admin/AdminForms'));
 const AdminPages = lazy(() => import('./pages/admin/AdminPages'));
 const AdminPageEditor = lazy(() => import('./pages/admin/AdminPageEditor'));
 const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
+const AdminPrivacyNotice = lazy(() => import('./pages/admin/AdminPrivacyNotice'));
 const AdminTestimonials = lazy(() => import('./pages/admin/AdminTestimonials'));
 const AdminPricing = lazy(() => import('./pages/admin/AdminPricing'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
-const DocumentsUploadPage = lazy(() => import('./pages/public/DocumentsUploadPage'));
+const DocumentsUploadPage = cmsRoute('inscripcion-documentos', () => import('./pages/public/DocumentsUploadPage'));
 const AdminStaffUsers = lazy(() => import('./pages/admin/AdminStaffUsers'));
 const AdminContactInbox = lazy(() => import('./pages/admin/AdminContactInbox'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
@@ -262,6 +263,8 @@ export default function App() {
               <Route path="arco" element={<AdminArco />} />
               <Route path="contenido/medios" element={<AdminMedia />} />
               <Route path="contenido/:id" element={<AdminPageEditor />} />
+              <Route path="aviso-privacidad" element={<AdminPrivacyNotice />} />
+              <Route path="aviso-privacidad/:id" element={<AdminPrivacyNotice />} />
             </Route>
 
           </Routes>

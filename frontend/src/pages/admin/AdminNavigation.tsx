@@ -30,6 +30,8 @@ import { idsParam, type ExportFormat } from '@/services/dataOps';
 import { formatDateTime } from '@/lib/format';
 import type { MenuGroup } from '@/types/content';
 import { resolveChrome, type SiteChrome } from '@/lib/siteChrome';
+import { CHROME_KEYS, mergeChrome } from '@/lib/chromeMerge';
+import { SiteTextsEditor } from '@/components/admin/SiteTextsEditor';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { HrefInput } from '@/cms/editor/fields/LinkField';
 import { IconField, type IconChoice } from '@/cms/editor/fields/IconField';
@@ -64,6 +66,7 @@ export default function AdminNavigation() {
       <div className="space-y-6">
         <MenuEditor />
         <ChromeEditor />
+        <SiteTextsEditor />
         <RedirectsPanel />
       </div>
     </>
@@ -80,8 +83,10 @@ function ChromeEditor() {
   const set = (patch: Partial<SiteChrome>) => setDraft({ ...value, ...patch });
   const setButton = (i: number, patch: Partial<SiteChrome['header_buttons'][number]>) => set({ header_buttons: value.header_buttons.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
   const save = useMutation({
-    mutationFn: (chrome: Partial<SiteChrome>) => contentApi.adminUpdateSettings({ chrome }),
-    onSuccess: (_res, chrome) => {
+    // «Textos del sitio» shares this JSON: keep its keys when saving these.
+    mutationFn: (chrome: Partial<SiteChrome>) => contentApi.adminUpdateSettings({ chrome: mergeChrome(data?.chrome, CHROME_KEYS, chrome) }),
+    onSuccess: (_res, own) => {
+      const chrome = mergeChrome(data?.chrome, CHROME_KEYS, own);
       toast.success('Encabezado y pie de página guardados. El sitio los muestra en unos minutos.');
       setError(''); setDraft(null);
       qc.setQueryData<{ chrome?: Partial<SiteChrome> }>(['admin-site-settings'], (prev) => (prev ? { ...prev, chrome } : prev));

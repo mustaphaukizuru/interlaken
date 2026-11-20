@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import notices, views
 
 urlpatterns = [
     path('notice/',  views.CurrentNoticeView.as_view(), name='legal-notice'),
@@ -15,4 +15,9 @@ urlpatterns = [
     path('admin/arco/intake/', views.AdminArcoIntakeView.as_view(), name='legal-admin-arco-intake'),
     path('admin/arco/<int:pk>/status/', views.AdminArcoStatusView.as_view(),
          name='legal-admin-arco-status'),
+
+    # Console «Aviso de privacidad»: versions, drafts, publish (admin only)
+    path('admin/notices/', notices.AdminNoticeListView.as_view(), name='legal-admin-notices'),
+    path('admin/notices/<int:pk>/', notices.AdminNoticeDetailView.as_view(), name='legal-admin-notice'),
+    path('admin/notices/<int:pk>/publish/', notices.AdminNoticePublishView.as_view(), name='legal-admin-notice-publish'),
 ]

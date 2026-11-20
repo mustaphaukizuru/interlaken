@@ -20,6 +20,8 @@ interface MonthCalendarProps {
   onSelect: (isoDate: string) => void;
   /** Screen-reader unit for the count badge, e.g. "horarios" / "eventos". */
   countLabel?: string;
+  /** Seven weekday labels from Monday (the visit page edits them in Contenido). */
+  weekdays?: string[];
 }
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -30,7 +32,7 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
  * brand-tinted with a count badge; prev/next step through months (never before
  * the current month). Token-driven, keyboard-accessible, reduced-motion aware.
  */
-export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'horarios' }: MonthCalendarProps) {
+export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'horarios', weekdays = WEEKDAYS }: MonthCalendarProps) {
   const today = startOfDay(new Date());
   const byDate = useMemo(() => {
     const m = new Map<string, number>();
@@ -84,8 +86,8 @@ export function MonthCalendar({ days, selectedDate, onSelect, countLabel = 'hora
 
       {/* Weekday labels */}
       <div className="mb-1 grid grid-cols-7 gap-1">
-        {WEEKDAYS.map((d) => (
-          <div key={d} className="py-1 text-center text-[11px] font-semibold uppercase tracking-wide text-subtle">
+        {weekdays.map((d, i) => (
+          <div key={i} className="py-1 text-center text-[11px] font-semibold uppercase tracking-wide text-subtle">
             {d}
           </div>
         ))}

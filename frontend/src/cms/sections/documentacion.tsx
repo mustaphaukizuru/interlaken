@@ -101,7 +101,7 @@ export const sections = [
     },
   }),
   section({
-    type: 'list', label: 'Documentación · Documentos requeridos', description: 'Lista de documentos con enlaces a los trámites oficiales y un llamado al pre-registro.',
+    type: 'list', label: 'Documentación · Documentos requeridos', description: 'Lista de documentos con enlaces a los trámites oficiales y un llamado al pre-registro. Esta lista es la única: Admisiones muestra la misma al publicar esta página.',
     component: DocsListView,
     fields: [
       f.text('title', 'Título de la lista'),

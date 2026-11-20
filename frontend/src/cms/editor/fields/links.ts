@@ -22,12 +22,16 @@ export const SITE_PAGES: SitePage[] = [
   { path: '/admisiones/documentacion', title: 'Documentación', group: 'Admisiones' },
   { path: '/pre-registro', title: 'Pre-registro', group: 'Admisiones' },
   { path: '/agendar-visita', title: 'Agendar visita', group: 'Admisiones' },
+  { path: '/inscripcion', title: 'Inscripción en línea', group: 'Admisiones' },
   { path: '/pagos', title: 'Colegiaturas y cafetería (pagos)', group: 'Comunidad' },
   { path: '/comunidad/facturacion', title: 'Facturación', group: 'Comunidad' },
   { path: '/contacto', title: 'Contacto', group: 'Comunidad' },
   { path: '/login', title: 'Iniciar sesión (portal de familias)', group: 'Comunidad' },
   { path: '/aviso-de-privacidad', title: 'Aviso de privacidad', group: 'Comunidad' },
 ];
+
+/** Pages that only work from a personal link the school sends (a token): never offered as a destination. */
+export const PERSONAL_LINK_PATHS = ['/inscripcion/documentos', '/confirmar-correo'];
 
 /** Sections of a page that can be linked directly (an id on the public page). */
 export const SITE_ANCHORS: Record<string, { hash: string; title: string }[]> = {

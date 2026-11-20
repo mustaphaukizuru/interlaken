@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock the API module so no real HTTP happens and we can drive both paths.
 vi.mock('@/hooks/useSiteSettings', () => ({
@@ -27,33 +30,41 @@ const mockedPost = vi.mocked(api.post);
 const mockedMe = vi.mocked(authApi.me);
 const mockedBootstrap = vi.mocked(bootstrapSession);
 
+// /login is a CMS page now (cms/sections/acceso): it reads its copy through
+// react-query and sets its title with Helmet. No published copy here (the API
+// mock has no contentApi), so the built-in texts render.
+function providers(children: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <HelmetProvider><QueryClientProvider client={client}>{children}</QueryClientProvider></HelmetProvider>;
+}
+
 function renderLogin(entry = '/login') {
-  return render(
+  return render(providers(
     <MemoryRouter initialEntries={[entry]}>
       <LoginPage />
     </MemoryRouter>,
-  );
+  ));
 }
 
 async function fillAndSubmit() {
   const user = userEvent.setup();
-  await user.type(screen.getByPlaceholderText('correo@interlaken.com.mx'), 'parent@test.mx');
+  await user.type(await screen.findByPlaceholderText('correo@interlaken.com.mx'), 'parent@test.mx');
   await user.type(screen.getByPlaceholderText('••••••••'), 's3cret');
   await user.click(screen.getByRole('button', { name: /ingresar/i }));
 }
 
 describe('LoginPage and old «correo para avisos» links', () => {
-  it('a signed-out visitor from an old link goes to the public confirmation, not the form', () => {
+  it('a signed-out visitor from an old link goes to the public confirmation, not the form', async () => {
     useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
-    render(
+    render(providers(
       <MemoryRouter initialEntries={[{ pathname: '/login', state: { from: { pathname: '/portal/perfil', search: '?tab=avisos&verificar_correo=old-tok' } } }]}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/confirmar-correo" element={<div>confirmar</div>} />
         </Routes>
       </MemoryRouter>,
-    );
-    expect(screen.getByText('confirmar')).toBeInTheDocument();
+    ));
+    expect(await screen.findByText('confirmar')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ingresar/i })).toBeNull();
   });
 });
@@ -114,8 +125,9 @@ describe('LoginPage email/password submit', () => {
     expect(screen.queryByText(/credenciales incorrectas/i)).not.toBeInTheDocument();
   });
 
-  it('has no self-service reset; points families to WhatsApp or email', () => {
+  it('has no self-service reset; points families to WhatsApp or email', async () => {
     renderLogin();
+    await screen.findByRole('button', { name: /ingresar/i });
     expect(screen.queryByRole('link', { name: /activar \/ restablecer/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /whatsapp/i })).toHaveAttribute('href', expect.stringMatching(/^https:\/\/wa\.me\//));
     expect(screen.getByRole('link', { name: /^correo$/i })).toHaveAttribute('href', expect.stringMatching(/^mailto:/));

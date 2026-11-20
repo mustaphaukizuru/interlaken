@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { allTemplates } from '../../sections';
 import { loadAllGroups } from '../../sections/loaders';
-import { buildEmail, buildPhone, buildWeb, buildWhatsApp, describeHref, hrefKind, hrefProblem, parseWhatsApp, SITE_PAGES } from './links';
+import { buildEmail, buildPhone, buildWeb, buildWhatsApp, describeHref, hrefKind, hrefProblem, parseWhatsApp, PERSONAL_LINK_PATHS, SITE_PAGES } from './links';
 
 describe('link destinations', () => {
-  it('lists every public page template by name (except the 404)', async () => {
+  it('lists every public page template by name (except the 404 and the pages behind a personal link)', async () => {
     await loadAllGroups();
     const listed = new Set(SITE_PAGES.map((p) => p.path));
-    const missing = allTemplates().filter((t) => t.slug !== 'no-encontrada' && !listed.has(t.path)).map((t) => t.path);
+    const missing = allTemplates().filter((t) => t.slug !== 'no-encontrada' && !PERSONAL_LINK_PATHS.includes(t.path) && !listed.has(t.path)).map((t) => t.path);
     expect(missing).toEqual([]);
   }, 30_000);
 

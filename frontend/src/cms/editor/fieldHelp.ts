@@ -7,6 +7,7 @@
  * override points at a field that no longer exists.
  */
 import type { FieldKind, FieldSpec } from '../blocks/registry';
+import { COVERAGE_HELP } from './fieldHelpCoverage';
 
 /** Help by the field's label (labels repeat across sections with the same meaning). */
 const BY_LABEL: Record<string, string> = {
@@ -279,6 +280,9 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
     'filters[].key': 'Se llena solo a partir del texto del botón. El filtro «todas» muestra todas las fotos; el primero de la lista es el que se ve al abrir la página.',
   },
 };
+
+// The full-coverage fields (docs/cms/full-coverage.md): same rules, kept in their own module.
+for (const [type, paths] of Object.entries(COVERAGE_HELP)) OVERRIDES[type] = { ...OVERRIDES[type], ...paths };
 
 const pattern = (label: string) => BY_SUFFIX.find(([re]) => re.test(label))?.[1];
 

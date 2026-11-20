@@ -18,7 +18,7 @@ import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import { CARD_SIZES } from '@/lib/images';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, useMediaAlt, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor } from './kit';
+import { asLink, asList, CmsAnchor, fill } from './kit';
 import { withMotion } from './motion';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
@@ -304,7 +304,11 @@ function HomeGalleryView(p: GalleryProps) {
 }
 
 /* ── Solicite informes (lead capture) ───────────────────────────────────── */
-interface LeadProps { title?: string; text?: string; button?: string; success?: string; subject?: string }
+interface LeadProps {
+  title?: string; text?: string; button?: string; success?: string; subject?: string;
+  nameLabel?: string; emailLabel?: string; sending?: string; sentToast?: string; errorToast?: string;
+  message?: string; privacyText?: string; privacyLink?: string;
+}
 function LeadForm(p: LeadProps) {
   const t = useTokens();
   const [name, setName] = useState('');
@@ -321,12 +325,12 @@ function LeadForm(p: LeadProps) {
         name: name.trim(),
         email: email.trim(),
         subject: p.subject || 'Solicitud de informes',
-        message: `${name.trim()} solicita informes desde la página de inicio.`,
+        message: fill(t(p.message) || '{nombre} solicita informes desde la página de inicio.', { nombre: name.trim() }),
       });
       setDone(true);
-      toast.success('¡Gracias! Te contactaremos muy pronto.');
+      toast.success(t(p.sentToast) || '¡Gracias! Te contactaremos muy pronto.');
     } catch {
-      toast.error('No fue posible enviar tu solicitud. Intenta de nuevo.');
+      toast.error(t(p.errorToast) || 'No fue posible enviar tu solicitud. Intenta de nuevo.');
     } finally {
       setSending(false);
     }
@@ -351,7 +355,7 @@ function LeadForm(p: LeadProps) {
                 first keystroke, leaving the field unidentified on review and for
                 voice control. */}
             <label className="min-w-0 flex-1 sm:flex-[1_1_180px]">
-              <span className="mb-1.5 block text-sm font-medium text-white/90">Nombre completo</span>
+              <span className="mb-1.5 block text-sm font-medium text-white/90">{t(p.nameLabel)}</span>
               <input
                 type="text"
                 required
@@ -362,7 +366,7 @@ function LeadForm(p: LeadProps) {
               />
             </label>
             <label className="min-w-0 flex-1 sm:flex-[1_1_220px]">
-              <span className="mb-1.5 block text-sm font-medium text-white/90">Correo electrónico</span>
+              <span className="mb-1.5 block text-sm font-medium text-white/90">{t(p.emailLabel)}</span>
               <input
                 type="email" inputMode="email" autoComplete="email"
                 required
@@ -376,18 +380,18 @@ function LeadForm(p: LeadProps) {
               className="btn btn-lg shrink-0 justify-center bg-pink text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-purple disabled:opacity-70"
               disabled={sending}
             >
-              {sending ? 'Enviando…' : <>{t(p.button) || 'Solicitar'} <Send size={16} /></>}
+              {sending ? t(p.sending) || 'Enviando…' : <>{t(p.button) || 'Solicitar'} <Send size={16} /></>}
             </button>
           </form>
         )}
         {!done && (
-          // LFPDPPP notice at the point of collection (legal copy: not editable).
+          // LFPDPPP notice at the point of collection (editable wording; the link always goes to the notice).
           <p className="mx-auto mt-4 flex max-w-[520px] items-start justify-center gap-2 text-xs leading-relaxed text-white/80">
             <ShieldCheck size={15} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
             <span>
-              Protegemos sus datos conforme a la LFPDPPP y solo los usamos para atender su solicitud. Consulte el{' '}
+              {t(p.privacyText)}{' '}
               <Link to="/aviso-de-privacidad" className="font-semibold text-white underline underline-offset-2">
-                Aviso de Privacidad
+                {t(p.privacyLink)}
               </Link>.
             </span>
           </p>

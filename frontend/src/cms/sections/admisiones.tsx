@@ -4,15 +4,14 @@
  * (Testimonios, Ajustes, Costos); their headings and every other text,
  * photo, step and question are props.
  */
-import { lazy, Suspense, useMemo, useState, type ElementType, type ReactNode } from 'react';
+import { lazy, Suspense, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
-import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, Search, ShieldCheck, Plus } from 'lucide-react';
+import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
-import { WA_MESSAGES } from '@/lib/whatsapp';
-import { ADMISSION_DOC_ITEMS, docsSummary, type AdmissionDoc } from '@/lib/admisionesDocs';
+import { waMessage } from '@/lib/whatsapp';
+import { docsSummary, useAdmissionDocs } from '@/lib/admisionesDocs';
 import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
@@ -22,7 +21,7 @@ import { ESTIMATOR_COPY, type EstimatorCopy } from '@/components/admissions/esti
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, isExternal, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, lazySection, sectionsOf } from './kit';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ CalendarDays, ClipboardList, FileText });
@@ -122,7 +121,7 @@ function AdmStepsView(p: StepsProps) {
   const t = useTokens();
   // WhatsApp number is admin-editable; CTA hidden (fallback to /contacto)
   // when it's empty, per site convention.
-  const { whatsapp_number } = useSiteSettings();
+  const { whatsapp_number, chrome } = useSiteSettings();
   const steps = asList<StepItem>(p.items);
   const contact = asLink(p.contact);
   return (
@@ -185,7 +184,7 @@ function AdmStepsView(p: StepsProps) {
                       </TrackedLink>
                     ) : whatsapp_number ? (
                       <a
-                        href={waHref(whatsapp_number, WA_MESSAGES.admissionsInfo)}
+                        href={waHref(whatsapp_number, waMessage(chrome, 'wa_admissions'))}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => {
@@ -222,7 +221,7 @@ const ESTIMATOR_SKELETON = (
 );
 
 /** Text fields of the estimator, one field group each call (C4). */
-const estimatorText = (group: string, pairs: [string, string][]) => pairs.map(([key, label]) => f.text(key, label, { group }));
+const estimatorText = (group: string, pairs: [string, string][]) => grouped(group, pairs.map(([key, label]) => f.text(key, label)));
 
 function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string; title?: string; text?: string } & Partial<EstimatorCopy>) {
   const p = { eyebrow, title, text };
@@ -253,12 +252,13 @@ function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string;
 
 /* ── Documentos + llamado al pre-registro ───────────────────────────────── */
 interface DocsCtaProps {
-  docsTitle?: string; docsSummary?: string; docs?: AdmissionDoc[]; docsNote?: string;
+  docsTitle?: string; docsSummary?: string; docsNote?: string;
   image?: number | string; imageAlt?: string; badge?: string; title?: string; text?: string; primary?: CmsLink; secondary?: CmsLink;
 }
 function AdmDocsCtaView(p: DocsCtaProps) {
   const t = useTokens();
-  const docs = asList<AdmissionDoc>(p.docs);
+  // One list for the whole site: the one edited in the Documentación page.
+  const docs = useAdmissionDocs();
   const img = useCmsImage(p.image, t(p.imageAlt));
   const primary = asLink(p.primary);
   const secondary = asLink(p.secondary);
@@ -358,161 +358,11 @@ function AdmDocsCtaView(p: DocsCtaProps) {
 }
 
 /* ── Preguntas frecuentes (objection handling) ──────────────────────────── */
+// The explorer (search, topic filter, accordion) is the last section of the
+// page: it loads from its own chunk (./admisiones.faq) so the first paint of
+// /admisiones does not wait for it. Its defaults and fields stay here.
 interface FaqItem { cat?: string; q?: string; a?: string }
-
-/**
- * Explorador de preguntas frecuentes: buscador + filtro por tema (barra
- * lateral) y lista acordeón. Sin dependencias; mobile-first (la barra se
- * apila sobre la lista en teléfonos).
- */
-function FaqExplorer({ faqs }: { faqs: Required<FaqItem>[] }) {
-  const [query, setQuery] = useState('');
-  const [topic, setTopic] = useState('Todas');
-  const topics = useMemo(() => ['Todas', ...Array.from(new Set(faqs.map((f) => f.cat)))], [faqs]);
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return faqs.filter(
-      (f) =>
-        (topic === 'Todas' || f.cat === topic) &&
-        (!q || f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q)),
-    );
-  }, [faqs, query, topic]);
-
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-      {/* Barra lateral */}
-      <aside className="self-start lg:sticky lg:top-24">
-        <div className="rounded-[20px] border border-ink/10 bg-white p-4 shadow-card sm:p-5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar…"
-              aria-label="Buscar en preguntas frecuentes"
-              className="input-field min-h-[44px] pl-9 text-base"
-            />
-          </div>
-
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">
-            Filtrar por tema
-          </p>
-          <div className="mt-2 flex flex-col gap-1">
-            {topics.map((t) => {
-              const count = t === 'Todas' ? faqs.length : faqs.filter((f) => f.cat === t).length;
-              const active = topic === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setTopic(t)}
-                  className={`flex min-h-[42px] items-center justify-between gap-2 rounded-xl px-3 text-sm font-semibold transition-colors ${
-                    active
-                      ? 'bg-purple text-white shadow-purple'
-                      : 'text-ink/80 hover:bg-purple/[0.07] hover:text-purple'
-                  }`}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-purple/40'}`}
-                      aria-hidden="true"
-                    />
-                    {t}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      active ? 'bg-white/20 text-white' : 'bg-purple/10 text-purple'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="mt-5 border-t border-ink/5 pt-3 text-xs uppercase tracking-wide text-subtle">
-            {visible.length} de {faqs.length} preguntas
-          </p>
-        </div>
-      </aside>
-
-      {/* Lista de preguntas */}
-      <div className="min-w-0">
-        {visible.length === 0 ? (
-          <div className="rounded-[20px] border border-ink/10 bg-white p-8 text-center shadow-card">
-            <p className="text-sm text-muted">
-              No encontramos preguntas para su búsqueda.{' '}
-              <Link to="/contacto" className="font-semibold text-green-dark underline">
-                Contáctenos
-              </Link>{' '}
-              y con gusto le ayudamos.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-ink/5 overflow-hidden rounded-[20px] border border-ink/10 bg-white shadow-card">
-            {visible.map((f, i) => (
-              <details key={`${i}-${f.q}`} className="group">
-                <summary className="flex cursor-pointer items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-cream-2/60 sm:px-6 [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-purple">
-                      {f.cat}
-                    </span>
-                    <span className="mt-0.5 block font-head text-[15.5px] font-bold leading-snug text-ink">
-                      {f.q}
-                    </span>
-                  </span>
-                  <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple/10 text-purple transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none">
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                </summary>
-                <p className="px-5 pb-4 text-sm leading-relaxed text-muted sm:px-6">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AdmFaqView(p: { eyebrow?: string; title?: string; items?: FaqItem[] }) {
-  const t = useTokens();
-  const raw = asList<FaqItem>(p.items);
-  const faqs = useMemo(
-    () => raw.filter((f) => f.q).map((f) => ({ cat: t(f.cat), q: t(f.q), a: t(f.a) })),
-    [raw, t],
-  );
-  // The questions are also emitted as FAQPage structured data.
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: faqs.map((f) => ({
-      '@type': 'Question',
-      name: f.q,
-      acceptedAnswer: { '@type': 'Answer', text: f.a },
-    })),
-  };
-  return (
-    <Section bg="white">
-      {faqs.length > 0 && (
-        <Helmet>
-          <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-        </Helmet>
-      )}
-      {(p.eyebrow || p.title) && (
-        <Reveal className="mb-8 text-center sm:mb-10">
-          {p.eyebrow && <span className="section-label-green inline-flex">{t(p.eyebrow)}</span>}
-          <h2 className="font-head text-fluid-3xl font-extrabold tracking-tight text-ink">{t(p.title)}</h2>
-        </Reveal>
-      )}
-      <FaqExplorer faqs={faqs} />
-    </Section>
-  );
-}
+const faqChunk = () => import('./admisiones.faq');
 
 /* ── Defaults ───────────────────────────────────────────────────────────── */
 
@@ -614,13 +464,12 @@ export const sections = [
     },
   }),
   section({
-    type: 'docs_cta', label: 'Admisiones · Documentos y pre-registro', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado al pre-registro.',
+    type: 'docs_cta', label: 'Admisiones · Documentos y pre-registro', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado al pre-registro. La lista se edita en la página Documentación.',
     component: AdmDocsCtaView,
     fields: [
       ...grouped('Documentos requeridos', [
         f.text('docsTitle', 'Documentos: título'),
         f.text('docsSummary', 'Documentos: resumen'),
-        f.items('docs', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.href('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')]),
         f.textarea('docsNote', 'Documentos: nota al pie'),
       ]),
       ...grouped('Llamado al pre-registro', [
@@ -635,7 +484,6 @@ export const sections = [
     ],
     defaults: {
       docsTitle: 'Documentos requeridos', docsSummary: '{total} documentos · {online} con trámite oficial en línea',
-      docs: ADMISSION_DOC_ITEMS,
       docsNote: 'Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE) para obtener o consultar cada documento en línea.',
       image: '/assets/classroom.webp', imageAlt: 'Salón de clases del Colegio Interlaken',
       badge: 'Inscripciones abiertas · Ciclo {{ciclo}}', title: '¿Listo para comenzar?',
@@ -646,12 +494,23 @@ export const sections = [
   }),
   section({
     type: 'faq', label: 'Admisiones · Preguntas frecuentes', description: 'Buscador y filtro por tema sobre la lista de preguntas; también se publican para Google.',
-    component: AdmFaqView,
+    component: lazySection(faqChunk, 'AdmFaqView', '60vh'),
     fields: [
       ...headingFields(),
       f.items('items', 'Preguntas', [f.text('cat', 'Tema', { hint: 'Las preguntas con el mismo tema se agrupan en el filtro.' }), f.text('q', 'Pregunta', { required: true }), f.textarea('a', 'Respuesta')]),
+      ...grouped('Buscador y filtro', [
+        f.text('search', 'Buscador'), f.text('searchLabel', 'Buscador (lectores de pantalla)'),
+        f.text('filterTitle', 'Título del filtro'), f.text('all', 'Filtro «todas»'),
+        f.text('count', 'Contador'),
+        f.text('empty', 'Sin resultados'), f.link('emptyLink', 'Sin resultados: enlace'), f.text('emptyAfter', 'Sin resultados: final'),
+      ]),
     ],
-    defaults: { eyebrow: 'Preguntas frecuentes', title: 'Resolvemos sus dudas', items: FAQS },
+    defaults: {
+      eyebrow: 'Preguntas frecuentes', title: 'Resolvemos sus dudas', items: FAQS,
+      search: 'Buscar…', searchLabel: 'Buscar en preguntas frecuentes', filterTitle: 'Filtrar por tema', all: 'Todas',
+      count: '{n} de {total} preguntas', empty: 'No encontramos preguntas para su búsqueda.',
+      emptyLink: { label: 'Contáctenos', href: '/contacto' }, emptyAfter: 'y con gusto le ayudamos.',
+    },
   }),
 ];
 

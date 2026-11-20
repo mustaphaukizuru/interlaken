@@ -47,8 +47,23 @@ export const f = {
   action: (key: string, label: string, actionHref: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'action', actionHref, ...o }),
 };
 
-/** Fields shown together as one collapsible group in the editor (FieldSpec.group). */
+/**
+ * Field groups (C4) are one key, FieldSpec.group: set it per field through
+ * `Opt` (`f.text(k, l, { group })`) or for a run of fields with
+ * `grouped('Mensajes', [f.text(...), ...])`. Both write the same key; the
+ * editor shows consecutive fields of a group as one collapsible group.
+ */
 export const grouped = (group: string, fields: FieldSpec[]): FieldSpec[] => fields.map((x) => ({ ...x, group }));
+
+/**
+ * Fills `{name}` placeholders of an editable text with values the page
+ * computes (a count, a grade, an e-mail). Unknown names stay as written.
+ * Site tokens ({{ciclo}}, {{correo}}...) are a different syntax and are
+ * replaced by useTokens before this runs.
+ */
+export function fill(text: string, values: Record<string, string | number>): string {
+  return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
+}
 
 /** The usual heading trio of a section. */
 export const headingFields = (o: { eyebrow?: boolean; text?: boolean } = {}): FieldSpec[] => [

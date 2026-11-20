@@ -12,6 +12,9 @@ export const CMS_SLUG_PATHS: Record<string, string> = {
   primaria: '/niveles/primaria',
   secundaria: '/niveles/secundaria',
   facturacion: '/comunidad/facturacion',
+  // Copy of app screens: the routes stay in code (sign-in, invitation wizards).
+  'iniciar-sesion': '/login',
+  'inscripcion-documentos': '/inscripcion/documentos',
 };
 
 export function cmsPagePath(slug: string): string {

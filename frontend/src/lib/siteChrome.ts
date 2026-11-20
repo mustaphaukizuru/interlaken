@@ -55,3 +55,55 @@ export function withYear(text: string): string[] {
 }
 
 export const isExternalHref = (href: string) => /^https?:/.test(href);
+
+/* ── Site texts (Navegación → «Textos del sitio») ─────────────────────────
+ * More site-wide copy in the same SiteSettings.chrome JSON: cookie banner,
+ * prefilled WhatsApp messages, the contact bubble, footer legal links, the
+ * privacy note under forms, the admission steps and the offline page.
+ * Each consumer keeps its own built-in text (so the main bundle does not
+ * carry copy only lazy pages use); blank = that built-in text. Mirrors
+ * backend/apps/content/navigation.py SITE_TEXTS.
+ */
+export type SiteTextKey =
+  | 'cookie_text' | 'cookie_link' | 'cookie_decline' | 'cookie_accept'
+  | 'wa_admissions' | 'wa_visit' | 'wa_float' | 'wa_password' | 'wa_estimator'
+  | 'float_whatsapp' | 'float_visit' | 'float_password'
+  | 'nav_contact' | 'footer_contact' | 'skip_link'
+  | 'privacy_note' | 'privacy_link'
+  | 'funnel_1' | 'funnel_2' | 'funnel_3' | 'funnel_4' | 'funnel_now' | 'funnel_done' | 'funnel_next'
+  | 'offline_title' | 'offline_accent' | 'offline_text' | 'offline_retry' | 'offline_home';
+
+export interface FooterLink { label: string; href: string }
+
+export type SiteTexts = Partial<Record<SiteTextKey, string>> & { legal_links?: FooterLink[] };
+
+/** Built-in words of the header, footer and skip link (components/layout/PublicLayout). */
+export const LAYOUT_TEXT_DEFAULTS = {
+  nav_contact: 'Contacto',
+  footer_contact: 'Contacto',
+  skip_link: 'Saltar al contenido',
+} as const;
+
+/** Footer bottom-bar links when Navegación has none. */
+export const LEGAL_LINKS_DEFAULT: FooterLink[] = [{ label: 'Aviso de Privacidad', href: '/aviso-de-privacidad' }];
+
+/** A site text from chrome, or `fallback` when it is blank or missing (the server stores them trimmed). */
+export function siteText(chrome: unknown, key: SiteTextKey, fallback: string): string {
+  const v = (chrome as Record<string, unknown> | null | undefined)?.[key];
+  return typeof v === 'string' && v ? v : fallback;
+}
+
+/** Every text of `builtIn` as the school edited it (blank or missing = built-in). */
+export function siteTexts<T extends Partial<Record<SiteTextKey, string>>>(chrome: unknown, builtIn: T): T {
+  const out = { ...builtIn };
+  for (const k in builtIn) out[k] = siteText(chrome, k as SiteTextKey, builtIn[k] as string) as T[typeof k];
+  return out;
+}
+
+/** Footer legal links from chrome (valid ones only), else the built-in list. */
+export function legalLinks(chrome: unknown): FooterLink[] {
+  const raw = (chrome as SiteTexts | null | undefined)?.legal_links;
+  const list = Array.isArray(raw) ? raw.filter((l) => l?.label && l.href) : [];
+  return list.length ? list : LEGAL_LINKS_DEFAULT;
+}
+

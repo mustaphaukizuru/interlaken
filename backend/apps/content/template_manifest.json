@@ -25,6 +25,14 @@
         "description": "Aviso de Privacidad de Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO."
       }
     },
+    "confirmar-correo": {
+      "path": "/confirmar-correo",
+      "title": "Confirmar correo",
+      "seo": {
+        "title": "Confirmar correo para avisos",
+        "description": "Confirme el correo en el que recibirá los avisos del Colegio Interlaken."
+      }
+    },
     "contacto": {
       "path": "/contacto",
       "title": "Contacto",
@@ -65,12 +73,36 @@
         "description": "La vida en el Colegio Interlaken: campus, salones, deportes y actividades de Preescolar, Primaria y Secundaria en Tlalnepantla."
       }
     },
+    "iniciar-sesion": {
+      "path": "/login",
+      "title": "Iniciar sesión",
+      "seo": {
+        "title": "Iniciar sesión",
+        "description": "Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea."
+      }
+    },
     "inicio": {
       "path": "/",
       "title": "Inicio",
       "seo": {
         "title": "Colegio Interlaken — Educación bilingüe en Tlalnepantla",
         "description": "Colegio Interlaken — Educación bilingüe de excelencia en Tlalnepantla, Estado de México. Preescolar, primaria y secundaria con {{anios}} años de trayectoria."
+      }
+    },
+    "inscripcion": {
+      "path": "/inscripcion",
+      "title": "Inscripción",
+      "seo": {
+        "title": "Inscripción Formal",
+        "description": "Completa el proceso de inscripción formal en Colegio Interlaken tras tu pre-registro y contacto con el equipo de admisiones."
+      }
+    },
+    "inscripcion-documentos": {
+      "path": "/inscripcion/documentos",
+      "title": "Documentos de inscripción",
+      "seo": {
+        "title": "Documentos de inscripción",
+        "description": "Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken."
       }
     },
     "modelo-educativo": {

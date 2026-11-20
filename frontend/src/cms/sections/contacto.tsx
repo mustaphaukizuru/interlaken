@@ -49,11 +49,12 @@ function ContactHeroView(p: HeroProps) {
 }
 
 /* ── Información y formulario (bloqueado) ───────────────────────────────── */
+// Rules stay in code; each message is the prop that words it (errName...).
 const schema = z.object({
-  name:    z.string().min(2, 'Nombre requerido'),
-  email:   z.string().email('Correo electrónico inválido'),
-  subject: z.string().min(2, 'Asunto requerido'),
-  message: z.string().min(10, 'El mensaje es demasiado corto'),
+  name:    z.string().min(2, 'errName'),
+  email:   z.string().email('errEmail'),
+  subject: z.string().min(2, 'errSubject'),
+  message: z.string().min(10, 'errMessage'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -63,9 +64,12 @@ interface MainProps {
   image?: number | string; imageAlt?: string; directionsLabel?: string;
   whatsappLabel?: string; whatsappMessage?: string;
   formTitle?: string; submitLabel?: string; success?: string; error?: string;
+  [copy: string]: unknown;
 }
 function ContactMainView(p: MainProps) {
   const t = useTokens();
+  const c = (key: string) => t(p[key]);
+  const err = (e?: { message?: string }) => (e?.message ? c(e.message) || e.message : '');
   const settings = useSiteSettings();
   const facade = useCmsImage(p.image, t(p.imageAlt));
   // Contact facts are admin-editable (Contenido del sitio → Ajustes del sitio);
@@ -187,34 +191,34 @@ function ContactMainView(p: MainProps) {
             {p.formTitle && <h2 className="mb-[18px] font-head text-fluid-xl font-extrabold tracking-tight text-ink">{t(p.formTitle)}</h2>}
             <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
               <div>
-                <label className="label" htmlFor="contact-name">Nombre</label>
-                <input id="contact-name" className="input-field text-base" placeholder="Su nombre completo" aria-invalid={!!errors.name} {...register('name')} />
-                {errors.name && <p className="mt-1.5 text-xs text-red-600">{errors.name.message}</p>}
+                <label className="label" htmlFor="contact-name">{c('nameLabel')}</label>
+                <input id="contact-name" className="input-field text-base" placeholder={c('namePlaceholder')} aria-invalid={!!errors.name} {...register('name')} />
+                {errors.name && <p className="mt-1.5 text-xs text-red-600">{err(errors.name)}</p>}
               </div>
               <div>
-                <label className="label" htmlFor="contact-email">Correo electrónico</label>
-                <input id="contact-email" className="input-field text-base" type="email" inputMode="email" autoComplete="email" placeholder="correo@ejemplo.com" aria-invalid={!!errors.email} {...register('email')} />
-                {errors.email && <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>}
+                <label className="label" htmlFor="contact-email">{c('emailLabel')}</label>
+                <input id="contact-email" className="input-field text-base" type="email" inputMode="email" autoComplete="email" placeholder={c('emailPlaceholder')} aria-invalid={!!errors.email} {...register('email')} />
+                {errors.email && <p className="mt-1.5 text-xs text-red-600">{err(errors.email)}</p>}
               </div>
               <div>
-                <label className="label" htmlFor="contact-subject">Asunto</label>
-                <input id="contact-subject" className="input-field text-base" placeholder="¿En qué le podemos ayudar?" aria-invalid={!!errors.subject} {...register('subject')} />
-                {errors.subject && <p className="mt-1.5 text-xs text-red-600">{errors.subject.message}</p>}
+                <label className="label" htmlFor="contact-subject">{c('subjectLabel')}</label>
+                <input id="contact-subject" className="input-field text-base" placeholder={c('subjectPlaceholder')} aria-invalid={!!errors.subject} {...register('subject')} />
+                {errors.subject && <p className="mt-1.5 text-xs text-red-600">{err(errors.subject)}</p>}
               </div>
               <div>
-                <label className="label" htmlFor="contact-message">Mensaje</label>
+                <label className="label" htmlFor="contact-message">{c('messageLabel')}</label>
                 <textarea
                   id="contact-message"
                   className="input-field min-h-[120px] resize-none text-base"
-                  placeholder="Describa su consulta…"
+                  placeholder={c('messagePlaceholder')}
                   aria-invalid={!!errors.message}
                   {...register('message')}
                 />
-                {errors.message && <p className="mt-1.5 text-xs text-red-600">{errors.message.message}</p>}
+                {errors.message && <p className="mt-1.5 text-xs text-red-600">{err(errors.message)}</p>}
               </div>
               <PrivacyNote />
               <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center disabled:opacity-60">
-                {isSubmitting ? 'Enviando…' : t(p.submitLabel) || 'Enviar mensaje'}
+                {isSubmitting ? c('sending') || 'Enviando…' : t(p.submitLabel) || 'Enviar mensaje'}
               </button>
             </form>
           </div>
@@ -226,7 +230,7 @@ function ContactMainView(p: MainProps) {
 
 /* ── Directorio por nivel ───────────────────────────────────────────────── */
 interface DirectoryItem { level?: string; ext?: string; email?: string }
-function ContactDirectoryView(p: { eyebrow?: string; title?: string; items?: DirectoryItem[] }) {
+function ContactDirectoryView(p: { eyebrow?: string; title?: string; items?: DirectoryItem[]; extLabel?: string }) {
   const t = useTokens();
   const settings = useSiteSettings();
   return (
@@ -254,7 +258,7 @@ function ContactDirectoryView(p: { eyebrow?: string; title?: string; items?: Dir
                         className="flex items-center gap-2 text-ink/85 hover:text-green-dark"
                       >
                         <Phone size={15} className="text-green-dark" aria-hidden="true" />
-                        {settings.phone_display}{d.ext ? ` · Ext ${d.ext}` : ''}
+                        {settings.phone_display}{d.ext ? ` · ${t(p.extLabel)} ${d.ext}` : ''}
                       </a>
                     </li>
                     {email && (
@@ -356,9 +360,18 @@ export const sections = [
       ]),
       ...grouped('Formulario', [
         f.text('formTitle', 'Título del formulario'),
+        f.text('nameLabel', 'Nombre: etiqueta'), f.text('namePlaceholder', 'Nombre: ejemplo dentro del campo'),
+        f.text('emailLabel', 'Correo: etiqueta'), f.text('emailPlaceholder', 'Correo: ejemplo dentro del campo'),
+        f.text('subjectLabel', 'Asunto: etiqueta'), f.text('subjectPlaceholder', 'Asunto: ejemplo dentro del campo'),
+        f.text('messageLabel', 'Mensaje: etiqueta'), f.text('messagePlaceholder', 'Mensaje: ejemplo dentro del campo'),
         f.text('submitLabel', 'Texto del botón de envío'),
+        f.text('sending', 'Botón mientras envía'),
+      ]),
+      ...grouped('Mensajes', [
         f.text('success', 'Mensaje al enviar'),
         f.text('error', 'Mensaje si falla el envío'),
+        f.text('errName', 'Falta el nombre'), f.text('errEmail', 'Correo no válido'),
+        f.text('errSubject', 'Falta el asunto'), f.text('errMessage', 'Mensaje demasiado corto'),
       ]),
     ],
     defaults: {
@@ -367,13 +380,20 @@ export const sections = [
       whatsappLabel: 'Escribir por WhatsApp', whatsappMessage: 'Hola, me gustaría obtener más información',
       formTitle: 'Envíenos un mensaje', submitLabel: 'Enviar mensaje',
       success: 'Mensaje enviado. Le responderemos pronto.', error: 'No se pudo enviar el mensaje. Intente nuevamente.',
+      nameLabel: 'Nombre', namePlaceholder: 'Su nombre completo',
+      emailLabel: 'Correo electrónico', emailPlaceholder: 'correo@ejemplo.com',
+      subjectLabel: 'Asunto', subjectPlaceholder: '¿En qué le podemos ayudar?',
+      messageLabel: 'Mensaje', messagePlaceholder: 'Describa su consulta…', sending: 'Enviando…',
+      errName: 'Nombre requerido', errEmail: 'Correo electrónico inválido',
+      errSubject: 'Asunto requerido', errMessage: 'El mensaje es demasiado corto',
     },
   }),
   section({
     type: 'directory', label: 'Contacto · Directorio por nivel', description: 'Tarjetas por nivel con extensión y correo; el conmutador se edita en Ajustes.',
     component: ContactDirectoryView,
-    fields: [...headingFields(), f.items('items', 'Niveles', [f.text('level', 'Nivel', { required: true }), f.text('ext', 'Extensión'), f.text('email', 'Correo')])],
+    fields: [...headingFields(), f.items('items', 'Niveles', [f.text('level', 'Nivel', { required: true }), f.text('ext', 'Extensión'), f.text('email', 'Correo')]), f.text('extLabel', 'Palabra antes de la extensión')],
     defaults: {
+      extLabel: 'Ext',
       // Directorio oficial por nivel (conmutador 5379-1188).
       eyebrow: 'Directorio', title: 'Atención por nivel educativo',
       items: [
