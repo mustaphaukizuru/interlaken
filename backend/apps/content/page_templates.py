@@ -42,11 +42,11 @@ def has_template(slug: str) -> bool:
 
 
 def expand_tokens(text: str, today: date | None = None) -> str:
-    """``{{ciclo}}`` → «2026–2027», ``{{anios}}`` → years since the school was founded (as the site does)."""
+    """``{{ciclo}}`` → the school year (2026 and 2027 joined like CURRENT_CYCLE), ``{{anios}}`` → years since the school was founded."""
     if not text or '{{' not in text:
         return text or ''
     year = (today or date.today()).year
-    values = {'ciclo': f'{year}–{year + 1}', 'anios': str(year - FOUNDED_YEAR)}
+    values = {'ciclo': f'{year}\u2013{year + 1}', 'anios': str(year - FOUNDED_YEAR)}
     return _TOKEN_RE.sub(lambda m: values[m.group(1)], text)
 
 

@@ -414,7 +414,7 @@ def published_head(path: str) -> dict | None:
 
             seo = (page.published_version.seo if page.published_version else page.seo) or {}
             og = seo.get('og_image')
-            # A designed page without SEO of its own keeps the template's («Costos 2026–2027»),
+            # A designed page without SEO of its own keeps the template's (the yearly «Costos» title),
             # exactly as the browser does (TemplatePage), so crawlers see the same head.
             defaults = template_seo(slug)
             head = {

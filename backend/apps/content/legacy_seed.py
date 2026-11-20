@@ -201,7 +201,7 @@ SEED_PAGES: dict[str, dict] = {
 }
 
 # SEO fields the seed wrote. Seo titles carry « · Colegio Interlaken» themselves, so the site
-# showed it twice; they also replace the template's own title («Costos 2026–2027»).
+# showed it twice; they also replace the template's own title (the yearly «Costos» one).
 SEED_SEO: dict[str, dict[str, str]] = {slug: dict(p['seo']) for slug, p in SEED_PAGES.items()}
 
 _ABSENT = object()

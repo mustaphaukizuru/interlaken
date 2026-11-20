@@ -366,7 +366,7 @@ def served_variant(asset: MediaAsset, variant: str) -> str | None:
 
 
 class MediaServeView(APIView):
-    """GET /content/media/<pk>/<variant>/ — public, cached, streamed from storage.
+    """GET /content/media/<pk>/<variant>/: public, cached, streamed from storage.
 
     A missing variant serves the next larger existing one or the original
     (``served_variant``), with the same long-lived cache headers.
