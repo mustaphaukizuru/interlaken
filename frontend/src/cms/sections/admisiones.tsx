@@ -7,7 +7,7 @@
 import { useMemo, useState, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, Search, ShieldCheck, Plus } from 'lucide-react';
+import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, Search, ShieldCheck, Plus } from 'lucide-react';
 import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
@@ -20,9 +20,12 @@ import { Blob } from '@/components/ui/Blob';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
 import { CostEstimator } from '@/components/admissions/CostEstimator';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, isExternal, useCmsImage, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, headingFields, sectionsOf } from './kit';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ CalendarDays, ClipboardList, FileText });
 
 const section = sectionsOf('admisiones');
 

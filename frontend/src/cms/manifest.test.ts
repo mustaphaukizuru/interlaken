@@ -9,7 +9,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BLOCKS, type BlockSpec, type FieldKind, type FieldSpec } from './blocks/registry';
-import { allSections, allTemplates, loadAllGroups, sectionSpec } from './sections';
+import { allSections, allTemplates, sectionSpec } from './sections';
+import { loadAllGroups } from './sections/loaders';
 import { templateBlocks } from './sections/types';
 
 const MANIFEST = resolve(process.cwd(), '../backend/apps/content/block_manifest.json');

@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { LucideProps } from 'lucide-react';
 
 export interface Platform {
   name: string;
   desc: string;
   /** External URL (opens in a new tab) or an internal route starting with "/". */
   href: string;
-  icon: LucideIcon;
+  icon: ComponentType<Omit<LucideProps, 'ref'>>;
   cta: string;
 }
 

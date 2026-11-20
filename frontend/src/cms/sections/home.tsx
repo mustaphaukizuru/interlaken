@@ -3,7 +3,7 @@
  * the stat band render in this chunk (first paint); everything below the
  * fold comes from ./home.below, loaded lazily.
  */
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, CalendarDays, GraduationCap, TrendingUp, Users } from 'lucide-react';
 import type { Variants } from 'framer-motion';
 import { m } from '@/lib/motion';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -11,10 +11,13 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Container } from '@/components/ui/Container';
 import Logo from '@/components/ui/Logo';
 import { HeroVideo } from '@/components/public/HeroVideo';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { cmsColor, useCmsImage, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, headingFields, lazySection, sectionsOf } from './kit';
 import { withMotion } from './motion';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ Users, GraduationCap, CalendarDays, TrendingUp });
 
 const below = () => import('./home.below');
 const section = sectionsOf('home');

@@ -9,7 +9,7 @@ import { absoluteImageUrl } from './media';
 import { SITE_URL } from '@/lib/siteMeta';
 import type { CmsPagePayload } from './published';
 
-export { BlockRenderer, applySnippets, mediaSrcSet } from './BlockRenderer';
+export { BlockRenderer } from './BlockRenderer';
 export type { CmsPagePayload } from './published';
 
 /** Route element: renders a published CMS page by slug, or the draft when ?preview=<token>. */

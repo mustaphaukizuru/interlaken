@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowRight, Check, Mail, Send, ShieldCheck, Star } from 'lucide-react';
+import { ArrowRight, Award, Check, FlaskConical, Heart, Languages, Mail, Palette, Send, ShieldCheck, Star, Trophy } from 'lucide-react';
 import type { Variants } from 'framer-motion';
 import { m } from '@/lib/motion';
 import { contactApi, contentApi } from '@/services/api';
@@ -16,10 +16,13 @@ import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
 import { VideoEmbed } from '@/components/ui/VideoEmbed';
 import { CARD_SIZES } from '@/lib/images';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor } from './kit';
 import { withMotion } from './motion';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ Languages, Trophy, Palette, FlaskConical, Heart, Award });
 
 const VIEWPORT = { once: true, margin: '0px 0px -60px 0px' } as const;
 

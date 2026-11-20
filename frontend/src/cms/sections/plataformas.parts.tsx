@@ -4,14 +4,17 @@
  * registers its own section types with its own defaults.
  */
 import { Fragment } from 'react';
-import { Info } from 'lucide-react';
+import { Coffee, CreditCard, GraduationCap, HeartHandshake, Info, Mail, Tablet } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { PlatformCard } from '@/components/public/PlatformCard';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { imageSrc, imageSrcSet, useTokens } from '../runtime';
 import { asList, CmsAnchor, f, Lines } from './kit';
 import type { FieldSpec } from '../blocks/registry';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ GraduationCap, HeartHandshake, Mail, Tablet, Coffee, CreditCard });
 
 // Icons these pages used that the curated CMS set does not include yet.
 

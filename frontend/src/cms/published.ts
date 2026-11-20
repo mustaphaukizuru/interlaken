@@ -20,7 +20,10 @@ export interface CmsPagePayload {
 
 async function request(slug: string): Promise<CmsPagePayload | null> {
   try {
-    return (await contentApi.getPage(slug)).data as CmsPagePayload;
+    const page = (await contentApi.getPage(slug)).data as CmsPagePayload;
+    // Generic blocks render from their own chunk: start it with the page data.
+    if (page?.blocks?.some((b) => !b.type.includes('.'))) void import('./blocks/generic');
+    return page;
   } catch {
     // 404 = never published (the template renders); a network error degrades the same way.
     return null;

@@ -10,7 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createElement, useEffect, useState, useSyncExternalStore } from 'react';
 import toast from 'react-hot-toast';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PrivacyNote } from '@/components/ui/PrivacyNote';
@@ -20,9 +20,12 @@ import { trackEvent, FunnelEvent } from '@/services/analytics';
 import type { PreRegistrationData } from '@/types';
 import { eligibilityHint } from '@/lib/eligibility';
 import { useDraft } from '@/hooks/useDraft';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { useCmsImage, useTokens, type CmsLink } from '../runtime';
 import { asLink, CmsAnchor, defineModule, f, sectionsOf } from './kit';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ CalendarDays, Clock });
 
 const section = sectionsOf('preregistro');
 

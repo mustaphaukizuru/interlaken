@@ -3,11 +3,14 @@
  * (docs/CMS-COMPLETION-PLAN.md). The original markup of ModeloEducativoPage
  * with its copy, photo, pillars and level links as props.
  */
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, BookOpenCheck, Globe2, HeartHandshake, Laptop, Leaf, Trophy } from 'lucide-react';
 import { Reveal } from '@/components/ui/Reveal';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { imageSrc, imageSrcSet, useTokens, type CmsLink } from '../runtime';
 import { asList, CmsAnchor, defineModule, f, Lines, sectionsOf } from './kit';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ BookOpenCheck, Globe2, HeartHandshake, Laptop, Leaf, Trophy });
 
 const section = sectionsOf('modelo');
 

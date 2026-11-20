@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-  BellRing, ChevronDown, ExternalLink, FileText,
+  BellRing, Building2, ChevronDown, ExternalLink, FileText, Phone,
   Share2, ShieldCheck, SlidersHorizontal, Target, Undo2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -18,9 +18,12 @@ import { Section } from '@/components/ui/Section';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PhotoHero } from '@/components/public/PhotoHero';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { useTokens } from '../runtime';
 import { asList, defineModule, f, sectionsOf } from './kit';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ Building2, Phone, ShieldCheck });
 
 const section = sectionsOf('aviso');
 

@@ -182,5 +182,5 @@ Bundle budgets (scripts/check-budgets.mjs): the generic blocks
 (`cms/blocks/generic.tsx`), the editor preview (`cms/editor/EditableBlocks.tsx`),
 the table of every section group (`cms/sections/loaders.ts`) and the full icon
 set (`cms/icons.ts`, now loaded on demand through `cms/iconRuntime.tsx`) are
-off the public pages: `/` 167.2 kB (master 170.4), `/admisiones` 148.9 kB
+off the public pages: `/` 167.3 kB (master 170.4), `/admisiones` 148.9 kB
 (148.7), `/admisiones/costos` 139.8 kB (139.8).

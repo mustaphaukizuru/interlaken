@@ -25,7 +25,7 @@ import toast from 'react-hot-toast';
 import { contentApi } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import AdminPageEditor from './AdminPageEditor';
-import { loadAllGroups } from '@/cms/sections';
+import { loadAllGroups } from '@/cms/sections/loaders';
 
 const BLOCKS = [{ id: 'a', type: 'rich_text', props: { html: '<p>Hola</p>' } }];
 const PAGE = {

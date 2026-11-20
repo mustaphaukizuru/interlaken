@@ -4,6 +4,8 @@
  * from `fields`, the backend validates `required`. Adding a block = one entry
  * here + one component in blocks/*.tsx.
  */
+import { registeredSection } from './specs';
+
 export type FieldKind =
   | 'text' | 'textarea' | 'richtext' | 'image' | 'images' | 'link' | 'items' | 'url' | 'number'
   | 'select' | 'toggle' | 'icon' | 'color';
@@ -108,19 +110,9 @@ export const BLOCKS: BlockSpec[] = [
 ];
 
 const GENERIC = new Map(BLOCKS.map((b) => [b.type, b]));
-const SECTIONS = new Map<string, BlockSpec>();
 
-/** Designed-section specs register here when their page group loads (cms/sections). */
-export function registerBlockSpecs(specs: BlockSpec[]) {
-  for (const s of specs) SECTIONS.set(s.type, s);
-}
+/** Editor and checks: the spec of a generic block or of a registered designed section. */
+export const blockSpec = (type: string): BlockSpec | undefined => GENERIC.get(type) ?? registeredSection(type);
 
-export const blockSpec = (type: string): BlockSpec | undefined => GENERIC.get(type) ?? SECTIONS.get(type);
-
-/** Props over the spec defaults, key by key: a prop added in a later release still has a value. */
-export function withDefaults(spec: BlockSpec | undefined, props: Record<string, unknown>): Record<string, unknown> {
-  if (!spec?.defaults) return props;
-  const out: Record<string, unknown> = { ...spec.defaults };
-  for (const [k, v] of Object.entries(props)) if (v !== undefined) out[k] = v;
-  return out;
-}
+// The public site needs only these two (./specs), not the generic block catalogue above.
+export { registerBlockSpecs, withDefaults } from './specs';

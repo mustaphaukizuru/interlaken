@@ -3,16 +3,19 @@
  * hero is the shared page.hero; every other section is the original markup
  * of AboutPage with its copy, photos, icons and colours as props.
  */
-import { ArrowRight, Award } from 'lucide-react';
+import { ArrowRight, Award, Eye, Globe2, Heart, Sparkles, Target, Users } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob, Accent } from '@/components/ui/Blob';
 import { HistoryTimeline, type Milestone } from '@/components/public/HistoryTimeline';
 import { CARD_SIZES } from '@/lib/images';
-import { cmsIcon } from '../icons';
+import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, useMediaAlt, useTokens, type CmsLink } from '../runtime';
 import { asLink, asList, CmsAnchor, defineModule, f, headingFields, sectionsOf } from './kit';
 import './page';
+
+/** The icons this module's defaults use; any other curated icon loads on demand. */
+const cmsIcon = iconResolver({ Award, Eye, Globe2, Heart, Sparkles, Target, Users });
 
 const section = sectionsOf('about');
 

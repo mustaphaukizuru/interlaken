@@ -14,8 +14,9 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BLOCKS, blockSpec, type Block } from '@/cms/blocks/registry';
 import { BlockForm } from '@/cms/editor/BlockForm';
-import { BlockRenderer } from '@/cms/BlockRenderer';
-import { allSections as allSectionSpecs, GROUP_LABELS, loadAllGroups, templateFor } from '@/cms/sections';
+import { EditableBlocks } from '@/cms/editor/EditableBlocks';
+import { allSections as allSectionSpecs, templateFor } from '@/cms/sections';
+import { GROUP_LABELS, loadAllGroups } from '@/cms/sections/loaders';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { contentApi, type CmsPageAdmin } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
@@ -373,7 +374,7 @@ export default function AdminPageEditor() {
           </div>
           <div className="overflow-x-auto rounded-2xl border border-line bg-cream-2 p-3">
             <div ref={previewRef} className="mx-auto overflow-hidden rounded-xl bg-white shadow-card" style={{ width: DEVICE_WIDTH[device] ?? '100%', maxWidth: '100%' }}>
-              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <BlockRenderer blocks={blocks} editing selectedId={selected} onSelect={selectFromPreview} />}
+              {blocks.length === 0 ? <p className="p-10 text-center text-sm text-muted">Sin contenido todavía.</p> : <EditableBlocks blocks={blocks} selectedId={selected} onSelect={selectFromPreview} />}
             </div>
           </div>
         </section>
