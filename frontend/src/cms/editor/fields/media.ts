@@ -3,8 +3,8 @@
  * size), a lookup for validation, and uploads with progress through the same
  * endpoint and limits as «Medios» (AdminMedia, lib/status checkMediaFile).
  */
-import { useCallback, useState } from 'react';
-import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, contentApi, type MediaAsset } from '@/services/api';
 import { apiErrorMessage, apiErrorStatus } from '@/lib/apiErrors';
 import { checkMediaFile } from '@/lib/status/AdminContentStatus';
@@ -30,16 +30,33 @@ export function useMediaAsset(ref: unknown): MediaAsset | null | undefined {
   return id > 0 ? data : undefined;
 }
 
-/** Alt text of many library images at once, for validation (one request per image, cached). */
+/**
+ * Alt text of many library images at once, for validation (one request per
+ * image, shared with the image fields' cache). Built on useQuery and the
+ * query cache instead of useQueries, which would add ~1 kB gz to the shared
+ * react-query chunk every public page loads.
+ */
 export function useMediaLookup(ids: number[]): MediaLookup {
+  const qc = useQueryClient();
   const unique = Array.from(new Set(ids.filter((i) => i > 0))).sort((a, b) => a - b);
-  const results = useQueries({ queries: unique.map((id) => one(id)) });
-  const byId = new Map(unique.map((id, i) => [id, results[i]]));
+  const key = unique.join(',');
+  useQuery({
+    queryKey: ['admin-media', 'lookup', key],
+    queryFn: async () => { await Promise.all(unique.map((id) => qc.fetchQuery(one(id)).catch(() => undefined))); return key; },
+    enabled: unique.length > 0,
+    staleTime: 60_000,
+    retry: false,
+  });
+  // Re-render when any of these images changes in the cache (alt text typed in an image field).
+  useSyncExternalStore(
+    useCallback((onChange: () => void) => qc.getQueryCache().subscribe(onChange), [qc]),
+    () => unique.map((id) => `${id}:${qc.getQueryState(mediaOneKey(id))?.dataUpdatedAt ?? 0}`).join(','),
+  );
   return (id) => {
-    const r = byId.get(id);
-    if (!r || r.isError) return undefined;
-    if (r.data === null) return null;
-    return r.data ? { alt: r.data.alt ?? '' } : undefined;
+    const state = qc.getQueryState<MediaAsset | null>(mediaOneKey(id));
+    if (!state || state.status !== 'success') return undefined;
+    if (state.data === null) return null; // deleted from the library
+    return state.data ? { alt: state.data.alt ?? '' } : undefined;
   };
 }
 
