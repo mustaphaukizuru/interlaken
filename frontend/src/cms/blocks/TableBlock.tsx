@@ -6,8 +6,10 @@
  * downloads it only when it uses the block. Everything renders as React
  * text (no HTML from the draft reaches the page).
  */
+import { useEffect, useRef, useState } from 'react';
 import { CircleDollarSign } from 'lucide-react';
 import { PriceCard } from '@/components/public/PricingSections';
+import { Section } from '@/components/ui/Section';
 import { iconResolver } from '../iconRuntime';
 import { useTokens } from '../runtime';
 import { alignOf, formatCell, normalizeTable, type TableValue } from './table';
@@ -22,15 +24,33 @@ export interface TableBlockProps {
   card?: boolean; tone?: string; icon?: string; label?: string; subtitle?: string; bg?: string;
 }
 
+/** True while the box is narrower than the table inside it (a phone with many columns). */
+function useScrollsSideways() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [sideways, setSideways] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const check = () => setSideways(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, sideways] as const;
+}
+
 /** The table itself; scrolls sideways inside its box on a narrow phone, never the page. */
 export function DataTableView({ value, caption }: { value: TableValue; caption: string }) {
   const t = useTokens();
+  const [box, sideways] = useScrollsSideways();
   const { columns, rows, highlight } = value;
   if (columns.length === 0) return null;
   return (
-    // Focusable so a keyboard can scroll a wide table sideways on a phone (WCAG 2.1.1).
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-    <div className="overflow-x-auto" role="region" aria-label={caption} tabIndex={0}>
+    <>
+    {/* While it scrolls, a keyboard can reach it to scroll (WCAG 2.1.1) and it is named. */}
+    <div ref={box} className="overflow-x-auto" {...(sideways ? { role: 'region', 'aria-label': caption, tabIndex: 0 } : {})}>
       <table className="w-full text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -45,7 +65,7 @@ export function DataTableView({ value, caption }: { value: TableValue; caption: 
             const strong = r === highlight;
             const bg = strong ? 'bg-green-50' : 'bg-white';
             return (
-              <tr key={r} className={`border-b border-ink/5 last:border-0 ${bg} ${strong ? 'font-bold' : ''}`}>
+              <tr key={r} className={`border-b border-ink/5 last:border-0 ${strong ? `${bg} font-bold` : ''}`}>
                 {cells.map((cell, i) => {
                   const col = columns[i];
                   const text = formatCell(t(cell), col.format);
@@ -61,6 +81,8 @@ export function DataTableView({ value, caption }: { value: TableValue; caption: 
         </tbody>
       </table>
     </div>
+    {sideways && <p className="px-5 py-2 text-right text-xs text-muted" aria-hidden="true">Deslice la tabla para ver todas las columnas →</p>}
+    </>
   );
 }
 
@@ -83,8 +105,9 @@ export function TableBlock(p: TableBlockProps) {
   const tone: Tone = TONES.includes(p.tone as Tone) ? (p.tone as Tone) : 'green';
   const body = <DataTableView value={value} caption={caption} />;
   return (
-    <section className={`${p.bg === 'white' ? 'bg-white' : 'bg-cream-2'} py-10 sm:py-14`}>
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+    // The width and rhythm of the other generic blocks and the designed sections (Section, container lg).
+    <Section bg={p.bg === 'white' ? 'white' : 'cream'}>
+      <div>
         {p.card !== false ? (
           <PriceCard tone={tone} icon={cardIcon(p.icon, CircleDollarSign)} label={t(p.label)} title={title} subtitle={t(p.subtitle) || undefined}>
             {intro && <p className="border-b border-ink/5 px-5 py-3 text-sm text-muted">{intro}</p>}
@@ -100,7 +123,7 @@ export function TableBlock(p: TableBlockProps) {
           </div>
         )}
       </div>
-    </section>
+    </Section>
   );
 }
 

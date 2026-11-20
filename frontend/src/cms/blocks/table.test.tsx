@@ -90,6 +90,20 @@ describe('TableBlock', () => {
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
   });
 
+  it('on a narrow screen it scrolls inside its box, says so, and the keyboard can reach it', () => {
+    const RO = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} } as unknown as typeof ResizeObserver;
+    const sw = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(600);
+    const cw = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(320);
+    try {
+      renderWithProviders(<TableBlock title="Cuotas" table={PRICES} />);
+      expect(screen.getByRole('region', { name: 'Cuotas' })).toHaveAttribute('tabindex', '0');
+      expect(screen.getByText(/Deslice la tabla/)).toBeInTheDocument();
+    } finally {
+      sw.mockRestore(); cw.mockRestore(); globalThis.ResizeObserver = RO;
+    }
+  });
+
   it('passes axe as a card and as a plain table', async () => {
     const a = renderWithProviders(<TableBlock title="Cuotas" intro="Por nivel." table={PRICES} card />);
     expect((await axe(a.container)).violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))).toEqual([]);

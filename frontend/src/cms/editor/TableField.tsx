@@ -151,7 +151,8 @@ export function TableField({ spec, value, onChange }: { spec: FieldSpec; value: 
           {columns.map((c, i) => (
             <li key={i} className="rounded-lg bg-white p-2">
               <p className="mb-2 truncate text-sm font-semibold text-ink">{i + 1}. {c.label || 'Sin título'}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
+              {/* One column: the editor's form panel is narrow at every screen width. */}
+              <div className="grid gap-2">
                 <label className="text-xs text-muted">
                   Formato
                   <select className="input-field mt-1" value={c.format ?? 'text'} onChange={(e) => setColumn(i, { format: e.target.value as CellFormat })}>

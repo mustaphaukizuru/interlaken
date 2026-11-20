@@ -90,3 +90,32 @@ describe('TableField', () => {
     expect(cell(1, 'Nivel').value).toBe('Primaria');
   });
 });
+
+describe('«Editar precios» field', () => {
+  it('opens the console in a new tab for Dirección and refreshes the prices on return', async () => {
+    const { useAuthStore } = await import('@/store/authStore');
+    const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+    const { CustomField } = await import('./customFields');
+    useAuthStore.setState({ user: { role: 'admin' } as never });
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    render(<QueryClientProvider client={qc}><CustomField spec={{ key: 'editPrices', label: 'Editar precios', kind: 'action', href: '/admin/costos', hint: 'Las cifras se editan en «Costos y precios».' }} value={undefined} onChange={vi.fn()} /></QueryClientProvider>);
+    const link = screen.getByRole('link', { name: /Editar precios/ });
+    expect(link).toHaveAttribute('href', '/admin/costos');
+    expect(link).toHaveAttribute('target', '_blank');
+    link.addEventListener('click', (e) => e.preventDefault());
+    fireEvent.click(link);
+    fireEvent.focus(window);
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['pricing-bundle'] });
+  });
+
+  it('tells staff who edits the prices instead', async () => {
+    const { useAuthStore } = await import('@/store/authStore');
+    const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+    const { CustomField } = await import('./customFields');
+    useAuthStore.setState({ user: { role: 'staff' } as never });
+    render(<QueryClientProvider client={new QueryClient()}><CustomField spec={{ key: 'editPrices', label: 'Editar precios', kind: 'action', href: '/admin/costos' }} value={undefined} onChange={vi.fn()} /></QueryClientProvider>);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText(/las cambia Dirección/)).toBeInTheDocument();
+  });
+});
