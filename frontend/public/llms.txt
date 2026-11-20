@@ -1,0 +1,30 @@
+# Colegio Interlaken
+
+> Colegio Interlaken es una escuela privada bilingüe (español-inglés) en Tlalnepantla de Baz, Estado de México, fundada en 1981. Ofrece preescolar (maternal a tercero de kínder), primaria y secundaria con reconocimiento de la SEP.
+
+- Dirección: Av. de los Reyes 67, Residencial El Dorado, C.P. 54020, Tlalnepantla de Baz, Estado de México
+- Teléfono: (55) 5379-1188
+- Correo: info@interlaken.com.mx
+- Horario de oficina: lunes a viernes, 7:30 a 15:00
+- Sitio oficial: https://interlaken.edu.mx/
+
+## Niveles
+
+- [Preescolar](https://interlaken.edu.mx/niveles/preescolar): kínder bilingüe de maternal a tercero, aprendizaje por juego y proyectos en inglés y español
+- [Primaria](https://interlaken.edu.mx/niveles/primaria): primaria bilingüe por proyectos, Método Singapur y certificaciones de Cambridge
+- [Secundaria](https://interlaken.edu.mx/niveles/secundaria): certificaciones de Cambridge y Microsoft, LEGO Education y viajes opcionales al extranjero
+
+## Admisiones
+
+- [Admisiones](https://interlaken.edu.mx/admisiones): requisitos, fechas y pasos para inscribir
+- [Costos](https://interlaken.edu.mx/admisiones/costos): inscripción, colegiaturas y servicios del ciclo vigente
+- [Documentación](https://interlaken.edu.mx/admisiones/documentacion): documentos para el examen de valoración e inscripción
+- [Agendar visita](https://interlaken.edu.mx/agendar-visita): reserva en línea de un recorrido por el colegio
+- [Pre-registro](https://interlaken.edu.mx/pre-registro): solicitud de admisión en línea
+
+## El colegio
+
+- [Nosotros](https://interlaken.edu.mx/nosotros): historia y valores
+- [Modelo educativo](https://interlaken.edu.mx/modelo-educativo): enfoque bilingüe, académico y de valores
+- [Galería](https://interlaken.edu.mx/galeria): campus e instalaciones
+- [Contacto](https://interlaken.edu.mx/contacto): teléfono, WhatsApp, correo y mapa

@@ -1,0 +1,55 @@
+# interlaken.com.mx (Hostinger shared hosting) → interlaken.edu.mx, page by page.
+#
+# Option A for retiring the old site without touching DNS: upload this file as
+# public_html/.htaccess on the hosting plan of interlaken.com.mx (hPanel → File
+# Manager) and remove any redirect set in hPanel → Domains → Redirects, so this
+# file is the only thing answering. Purge the Hostinger CDN cache afterwards.
+# The rules win even while the old files are still there; delete them (index*,
+# *.php, css/, images/, js*/) once the redirects are confirmed.
+# Option B (preferred, lets the shared plan be cancelled) is pointing the A
+# records at the VPS and setting LEGACY_DOMAINS in deploy/.env; the Caddyfile
+# has the same map. Keep the two maps identical.
+#
+# Every rule is a single 301 straight to https://interlaken.edu.mx (no http →
+# https → edu.mx chain). Mail is not affected: MX and TXT records stay as they are.
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Old static site (2017-2026)
+RewriteRule ^index\.html$          https://interlaken.edu.mx/ [R=301,L,QSD]
+RewriteRule ^index-pre\.html$      https://interlaken.edu.mx/niveles/preescolar [R=301,L,QSD]
+RewriteRule ^index-pri\.html$      https://interlaken.edu.mx/niveles/primaria [R=301,L,QSD]
+RewriteRule ^index-sec\.html$      https://interlaken.edu.mx/niveles/secundaria [R=301,L,QSD]
+RewriteRule ^index-1\.html$        https://interlaken.edu.mx/admisiones [R=301,L,QSD]
+RewriteRule ^index-1a\.html$       https://interlaken.edu.mx/admisiones [R=301,L,QSD]
+RewriteRule ^index-1b\.html$       https://interlaken.edu.mx/admisiones/documentacion [R=301,L,QSD]
+RewriteRule ^index-1c\.html$       https://interlaken.edu.mx/admisiones/costos [R=301,L,QSD]
+RewriteRule ^index-2\.html$        https://interlaken.edu.mx/plataformas [R=301,L,QSD]
+RewriteRule ^index-2(pre|pri|sec|1pre|2pre|3pre|mat)\.php$ https://interlaken.edu.mx/plataformas [R=301,L,QSD]
+RewriteRule ^index-2precal\.php$   https://interlaken.edu.mx/niveles/preescolar [R=301,L,QSD]
+RewriteRule ^index-2prical\.php$   https://interlaken.edu.mx/niveles/primaria [R=301,L,QSD]
+RewriteRule ^index-2seccal\.php$   https://interlaken.edu.mx/niveles/secundaria [R=301,L,QSD]
+RewriteRule ^index-3\.html$        https://interlaken.edu.mx/plataformas [R=301,L,QSD]
+RewriteRule ^index-4(inst|eve)?\.html$ https://interlaken.edu.mx/galeria [R=301,L,QSD]
+RewriteRule ^index-5\.html$        https://interlaken.edu.mx/contacto [R=301,L,QSD]
+RewriteRule ^index-6\.html$        https://interlaken.edu.mx/aviso-de-privacidad [R=301,L,QSD]
+RewriteRule ^index-7\.html$        https://interlaken.edu.mx/comunidad/facturacion [R=301,L,QSD]
+RewriteRule ^AvisoPrivacidad\.pdf$ https://interlaken.edu.mx/aviso-de-privacidad [R=301,L,QSD]
+
+# PHP site (2009-2016)
+RewriteRule ^1colegio\.php$        https://interlaken.edu.mx/nosotros [R=301,L,QSD]
+RewriteRule ^2preescolar\.php$     https://interlaken.edu.mx/niveles/preescolar [R=301,L,QSD]
+RewriteRule ^3primaria\.php$       https://interlaken.edu.mx/niveles/primaria [R=301,L,QSD]
+RewriteRule ^4secundaria\.php$     https://interlaken.edu.mx/niveles/secundaria [R=301,L,QSD]
+RewriteRule ^(5admisiones|admisiones)\.php$ https://interlaken.edu.mx/admisiones [R=301,L,QSD]
+RewriteRule ^(6galeria|12instalaciones|13videos)\.php$ https://interlaken.edu.mx/galeria [R=301,L,QSD]
+RewriteRule ^7circulares\.php$     https://interlaken.edu.mx/plataformas [R=301,L,QSD]
+RewriteRule ^8contacto\.php$       https://interlaken.edu.mx/contacto [R=301,L,QSD]
+RewriteRule ^11aviso\.php$         https://interlaken.edu.mx/aviso-de-privacidad [R=301,L,QSD]
+RewriteRule ^14registro\.php$      https://interlaken.edu.mx/pre-registro [R=301,L,QSD]
+RewriteRule ^actividades\.php$     https://interlaken.edu.mx/modelo-educativo [R=301,L,QSD]
+
+# Everything else keeps its path (and query) on the new domain.
+RewriteRule ^(.*)$                 https://interlaken.edu.mx/$1 [R=301,L]
+</IfModule>
