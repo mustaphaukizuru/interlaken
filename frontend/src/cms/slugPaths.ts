@@ -8,6 +8,10 @@ export const CMS_SLUG_PATHS: Record<string, string> = {
   documentacion: '/admisiones/documentacion',
   costos: '/admisiones/costos',
   plataformas: '/plataformas',
+  preescolar: '/niveles/preescolar',
+  primaria: '/niveles/primaria',
+  secundaria: '/niveles/secundaria',
+  facturacion: '/comunidad/facturacion',
 };
 
 export function cmsPagePath(slug: string): string {

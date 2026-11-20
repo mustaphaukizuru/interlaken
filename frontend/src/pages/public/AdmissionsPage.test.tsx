@@ -38,7 +38,7 @@ describe('AdmissionsPage — funnel timeline', () => {
     renderWithProviders(<AdmissionsPage />, { route: '/admisiones' });
 
     // The four step titles.
-    expect(screen.getByRole('heading', { name: 'Informes' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Informes' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Visita guiada' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Documentación' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Inscripción' })).toBeInTheDocument();
@@ -66,6 +66,7 @@ describe('AdmissionsPage — funnel timeline', () => {
   it('includes the linkable cost estimator section', async () => {
     const { container } = renderWithProviders(<AdmissionsPage />, { route: '/admisiones' });
 
+    await screen.findByRole('heading', { name: 'Estime su inversión' });
     expect(container.querySelector('#estimador')).not.toBeNull();
     expect(
       await screen.findByRole('heading', { name: '¿Cuánto cuesta por sección?' }),

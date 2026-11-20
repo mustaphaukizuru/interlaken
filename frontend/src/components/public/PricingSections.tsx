@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight, CalendarDays, CircleDollarSign, Clock, GraduationCap, Info,
+  ArrowRight, CircleDollarSign, Clock, GraduationCap, Info,
   ShieldCheck, Sparkles, Wallet,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
-import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { formatPrice } from '@/lib/format';
+import { useTokens, type CmsLink } from '@/cms/runtime';
+import { CmsAnchor } from '@/cms/sections/kit';
 
 interface EnrollmentFee {
   section: string;
@@ -36,6 +36,57 @@ interface PricingBundle {
 }
 
 const mxn = formatPrice;
+
+/**
+ * The explanatory copy around the price tables. The figures come from the API
+ * (Ajustes, Costos); this text is editable from the CMS `costos.prices`
+ * section. Any key left out keeps today's text, so the generic
+ * `pricing_table` block renders exactly as before.
+ */
+export interface PricingCopy {
+  emptyTitle: string; emptyText: string; emptyPrimary: CmsLink; emptySecondary: CmsLink;
+  structureTitle: string; structure: { title?: string; text?: string }[];
+  feesLabel: string; feesTitle: string; feesSubtitle: string; newTag: string; returningTag: string;
+  tuitionLabel: string; tuitionTitle: string; tuitionSubtitle: string;
+  insuranceLabel: string; insuranceTitle: string; insuranceSubtitle: string;
+  extrasLabel: string; extrasTitle: string; extrasSubtitle: string;
+  daycareLabel: string; daycareTitle: string; daycareSubtitle: string;
+  policiesTitle: string;
+  noteText: string; noteStrong: string; noteLinkLead: string; noteLink: CmsLink;
+  ctaTitle: string; ctaText: string; ctaPrimary: CmsLink; ctaSecondary: CmsLink;
+}
+
+/** Today's copy; `{{ciclo}}` keeps the school cycle current. */
+export const PRICING_COPY: PricingCopy = {
+  emptyTitle: 'Costos próximamente',
+  emptyText: 'El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo {{ciclo}}. Mientras tanto, nuestro equipo de admisiones puede orientarle.',
+  emptyPrimary: { label: 'Contactar al colegio', href: '/contacto' },
+  emptySecondary: { label: 'Ver admisiones', href: '/admisiones' },
+  structureTitle: '¿Cómo se estructura el pago?',
+  structure: [
+    { title: 'Inscripción', text: '— pago único al ingresar o reinscribirse.' },
+    { title: 'Colegiatura', text: '— 11 mensualidades, de agosto a junio.' },
+    { title: 'Seguros y credencial', text: '— conceptos anuales obligatorios.' },
+  ],
+  feesLabel: 'Pago único', feesTitle: 'Inscripción y reinscripción', feesSubtitle: 'Se divide en 4 parcialidades, de enero a abril',
+  newTag: 'Nuevo ingreso', returningTag: 'Alumnos Interlaken',
+  tuitionLabel: 'Mensual', tuitionTitle: 'Colegiaturas', tuitionSubtitle: '11 mensualidades, de agosto a junio',
+  insuranceLabel: 'Anual · obligatorio', insuranceTitle: 'Seguros y credenciales', insuranceSubtitle: 'Contratación obligatoria para todos los alumnos',
+  extrasLabel: 'Anualidad', extrasTitle: 'Extraescolares', extrasSubtitle: '10 parcialidades de septiembre a junio · se definen en agosto',
+  daycareLabel: 'Horario extendido', daycareTitle: 'Estancia', daycareSubtitle: 'Costo diario, con tarifa mensual opcional',
+  policiesTitle: 'Políticas de pago',
+  noteText: 'Información de referencia: los costos los publica la administración y pueden actualizarse cada ciclo escolar.',
+  noteStrong: 'Inscripciones y colegiaturas se pagan directamente con el colegio, no en este sitio.',
+  noteLinkLead: 'Para becas, hermanos o planes de pago,',
+  noteLink: { label: 'contacte a admisiones', href: '/contacto' },
+  ctaTitle: 'Asegure el lugar de su hijo/a',
+  ctaText: 'Inicie su pre-registro para el ciclo {{ciclo}} — toma menos de 5 minutos y un asesor le contactará.',
+  ctaPrimary: { label: 'Iniciar pre-registro', href: '/pre-registro' },
+  ctaSecondary: { label: 'Agendar visita', href: '/agendar-visita' },
+};
+
+/** Number badge colours of the «¿Cómo se estructura el pago?» steps, in order. */
+const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
 
 /** Card shell shared by every pricing section. */
 function PriceCard({ tone, icon: Icon, label, title, subtitle, children }: {
@@ -83,7 +134,11 @@ function Row({ left, sub, right, rightMuted }: {
 }
 
 /** Pricing body (tabs, tables, policies); also rendered by the CMS `pricing_table` block. */
-export function PricingSections() {
+export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) {
+  const t = useTokens();
+  const c: PricingCopy = { ...PRICING_COPY, ...(copy ?? {}) };
+  const structure = Array.isArray(c.structure) ? c.structure : [];
+  const link = (l: CmsLink | undefined): CmsLink => ({ label: t(l?.label), href: l?.href });
   const [modality, setModality] = useState<'nuevo_ingreso' | 'reinscripcion'>('nuevo_ingreso');
   const { data, isLoading, isError, refetch } = useQuery<PricingBundle>({
     queryKey: ['pricing-bundle'],
@@ -124,16 +179,12 @@ export function PricingSections() {
             ) : (
               <EmptyState
                 icon={CircleDollarSign}
-                title="Costos próximamente"
-                description={`El colegio publicará pronto las cuotas de inscripción y colegiatura para el ciclo ${CURRENT_CYCLE}. Mientras tanto, nuestro equipo de admisiones puede orientarle.`}
+                title={t(c.emptyTitle)}
+                description={t(c.emptyText)}
                 action={
                   <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <Link to="/contacto" className="btn-primary">
-                      Contactar al colegio
-                    </Link>
-                    <Link to="/admisiones" className="btn-outline">
-                      Ver admisiones
-                    </Link>
+                    <CmsAnchor link={link(c.emptyPrimary)} className="btn-primary" />
+                    <CmsAnchor link={link(c.emptySecondary)} className="btn-outline" />
                   </div>
                 }
               />
@@ -142,33 +193,29 @@ export function PricingSections() {
           ) : (
             <div className="space-y-6">
               {/* Estructura del pago — explicación breve */}
-              <div className="space-y-2">
-                <p className="font-head text-lg font-bold text-ink">¿Cómo se estructura el pago?</p>
-                <ol className="grid gap-2 text-sm text-muted sm:grid-cols-3">
-                  <li className="flex gap-2.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-strong text-[11px] font-bold text-white">1</span>
-                    <span><strong className="text-ink">Inscripción</strong> — pago único al ingresar o reinscribirse.</span>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple text-[11px] font-bold text-white">2</span>
-                    <span><strong className="text-ink">Colegiatura</strong> — 11 mensualidades, de agosto a junio.</span>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-coral text-[11px] font-bold text-white">3</span>
-                    <span><strong className="text-ink">Seguros y credencial</strong> — conceptos anuales obligatorios.</span>
-                  </li>
-                </ol>
-              </div>
+              {(c.structureTitle || structure.length > 0) && (
+                <div className="space-y-2">
+                  {c.structureTitle && <p className="font-head text-lg font-bold text-ink">{t(c.structureTitle)}</p>}
+                  <ol className="grid gap-2 text-sm text-muted sm:grid-cols-3">
+                    {structure.map((st, i) => (
+                      <li key={i} className="flex gap-2.5">
+                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${STEP_BG[i % STEP_BG.length]} text-[11px] font-bold text-white`}>{i + 1}</span>
+                        <span><strong className="text-ink">{t(st.title)}</strong> {t(st.text)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
 
               {/* Inscripción / reinscripción con selector de modalidad */}
               {fees.length > 0 && (
                 <PriceCard
-                  tone="green" icon={GraduationCap} label="Pago único"
-                  title="Inscripción y reinscripción"
-                  subtitle="Se divide en 4 parcialidades, de enero a abril"
+                  tone="green" icon={GraduationCap} label={t(c.feesLabel)}
+                  title={t(c.feesTitle)}
+                  subtitle={t(c.feesSubtitle)}
                 >
                   <div className="flex gap-2 border-b border-ink/5 px-5 py-3" role="group" aria-label="Modalidad de inscripción">
-                    {([['nuevo_ingreso', 'Nuevo ingreso'], ['reinscripcion', 'Alumnos Interlaken']] as const).map(([key, tag]) => (
+                    {([['nuevo_ingreso', t(c.newTag)], ['reinscripcion', t(c.returningTag)]] as const).map(([key, tag]) => (
                       <button
                         key={key}
                         type="button"
@@ -188,7 +235,7 @@ export function PricingSections() {
                   <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <caption className="sr-only">
-                      {modality === 'nuevo_ingreso' ? 'Nuevo ingreso' : 'Alumnos Interlaken'}: gastos administrativos y {modality === 'nuevo_ingreso' ? 'inscripción' : 'reinscripción'} por nivel
+                      {modality === 'nuevo_ingreso' ? t(c.newTag) : t(c.returningTag)}: gastos administrativos y {modality === 'nuevo_ingreso' ? 'inscripción' : 'reinscripción'} por nivel
                     </caption>
                     <thead>
                       <tr className="border-b border-ink/5 text-[11px] text-muted sm:text-xs sm:uppercase sm:tracking-wide">
@@ -216,8 +263,8 @@ export function PricingSections() {
               {/* Colegiaturas + Seguros lado a lado en desktop */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <PriceCard
-                  tone="purple" icon={Wallet} label="Mensual" title="Colegiaturas"
-                  subtitle="11 mensualidades, de agosto a junio"
+                  tone="purple" icon={Wallet} label={t(c.tuitionLabel)} title={t(c.tuitionTitle)}
+                  subtitle={t(c.tuitionSubtitle)}
                 >
                   <ul>
                     {tuition.map((r) => (
@@ -228,9 +275,9 @@ export function PricingSections() {
 
                 {seguros.length > 0 && (
                   <PriceCard
-                    tone="coral" icon={ShieldCheck} label="Anual · obligatorio"
-                    title="Seguros y credenciales"
-                    subtitle="Contratación obligatoria para todos los alumnos"
+                    tone="coral" icon={ShieldCheck} label={t(c.insuranceLabel)}
+                    title={t(c.insuranceTitle)}
+                    subtitle={t(c.insuranceSubtitle)}
                   >
                     <ul>
                       {seguros.map((c) => (
@@ -245,9 +292,9 @@ export function PricingSections() {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {extras.length > 0 && (
                   <PriceCard
-                    tone="pink" icon={Sparkles} label="Anualidad"
-                    title="Extraescolares"
-                    subtitle="10 parcialidades de septiembre a junio · se definen en agosto"
+                    tone="pink" icon={Sparkles} label={t(c.extrasLabel)}
+                    title={t(c.extrasTitle)}
+                    subtitle={t(c.extrasSubtitle)}
                   >
                     <ul>
                       {extras.map((e) => (
@@ -259,9 +306,9 @@ export function PricingSections() {
 
                 {estancia.length > 0 && (
                   <PriceCard
-                    tone="purple" icon={Clock} label="Horario extendido"
-                    title="Estancia"
-                    subtitle="Costo diario, con tarifa mensual opcional"
+                    tone="purple" icon={Clock} label={t(c.daycareLabel)}
+                    title={t(c.daycareTitle)}
+                    subtitle={t(c.daycareSubtitle)}
                   >
                     <ul>
                       {estancia.map((d) => (
@@ -285,7 +332,7 @@ export function PricingSections() {
               {/* Políticas — letra chica visible, recargos/devoluciones destacados */}
               {policies.length > 0 && (
                 <div className="rounded-xl2 border border-ink/10 bg-white p-5 shadow-card">
-                  <h2 className="font-head text-lg font-bold text-ink">Políticas de pago</h2>
+                  {c.policiesTitle && <h2 className="font-head text-lg font-bold text-ink">{t(c.policiesTitle)}</h2>}
                   <ul className="mt-3 space-y-2.5">
                     {policies.map((p) => {
                       const highlighted = /recargo|devoluci/i.test(p.text);
@@ -307,33 +354,32 @@ export function PricingSections() {
           )}
 
           {/* Always shown (also with the error) so the page below never jumps. */}
-          <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
-            <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
-            <p>
-              Información de referencia: los costos los publica la administración y pueden
-              actualizarse cada ciclo escolar. <strong className="text-ink">Inscripciones y colegiaturas se pagan
-              directamente con el colegio, no en este sitio.</strong> Para becas, hermanos o planes de
-              pago, <Link to="/contacto" className="font-medium text-green-dark underline">contacte a admisiones</Link>.
-            </p>
-          </div>
+          {(c.noteText || c.noteStrong || c.noteLinkLead || c.noteLink?.href) && (
+            <div className="mt-6 flex items-start gap-3 rounded-xl2 border border-ink/10 bg-white p-5 text-sm text-muted">
+              <Info size={18} className="mt-0.5 flex-shrink-0 text-purple" aria-hidden="true" />
+              <p>
+                {t(c.noteText)}{' '}
+                {c.noteStrong && <strong className="text-ink">{t(c.noteStrong)}</strong>}{' '}
+                {t(c.noteLinkLead)}{' '}
+                <CmsAnchor link={link(c.noteLink)} className="font-medium text-green-dark underline" />{c.noteLink?.href ? '.' : ''}
+              </p>
+            </div>
+          )}
 
           {/* Page CTA — Costos keeps in-page CTAs; sticky Agendar bar stays global */}
-          <div className="mt-10 flex flex-col items-center gap-3 rounded-xl2 bg-dark px-6 py-8 text-center text-white sm:py-10">
-            <CircleDollarSign className="h-8 w-8 text-green" aria-hidden="true" />
-            <h2 className="font-head text-fluid-xl font-bold">Asegure el lugar de su hijo/a</h2>
-            <p className="max-w-xl text-sm text-white/70">
-              Inicie su pre-registro para el ciclo {CURRENT_CYCLE} — toma menos de
-              5 minutos y un asesor le contactará.
-            </p>
-            <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-              <Link to="/pre-registro" className="btn-pink">
-                Iniciar pre-registro <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-              <Link to="/agendar-visita" className="btn-outline !border-white/40 !text-white hover:!bg-white/10">
-                Agendar visita
-              </Link>
+          {(c.ctaTitle || c.ctaText || c.ctaPrimary?.href || c.ctaSecondary?.href) && (
+            <div className="mt-10 flex flex-col items-center gap-3 rounded-xl2 bg-dark px-6 py-8 text-center text-white sm:py-10">
+              <CircleDollarSign className="h-8 w-8 text-green" aria-hidden="true" />
+              {c.ctaTitle && <h2 className="font-head text-fluid-xl font-bold">{t(c.ctaTitle)}</h2>}
+              {c.ctaText && <p className="max-w-xl text-sm text-white/70">{t(c.ctaText)}</p>}
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+                <CmsAnchor link={link(c.ctaPrimary)} className="btn-pink">
+                  {t(c.ctaPrimary?.label)} <ArrowRight size={16} aria-hidden="true" />
+                </CmsAnchor>
+                <CmsAnchor link={link(c.ctaSecondary)} className="btn-outline !border-white/40 !text-white hover:!bg-white/10" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </>

@@ -9,10 +9,27 @@ import { toPaged } from '@/lib/pagination';
 
 const mediaUrl = (id: number, variant = 'thumb') => `/api/v1/content/media/${id}/${variant}/`;
 
+interface Props {
+  /** A library id, or a built-in site photo path (/assets/...) shown as the current image. */
+  value?: number | string | null;
+  onChange: (id: number | null) => void;
+  label: string;
+  /** Pick several images at once (gallery fields); the picked ids go to onPickMany. */
+  multiple?: boolean;
+  onPickMany?: (ids: number[]) => void;
+}
+
 /** Field that picks a MediaAsset id from the library (CMS editor, BACKLOG P3-4). */
-export function MediaPicker({ value, onChange, label }: { value?: number | null; onChange: (id: number | null) => void; label: string }) {
+export function MediaPicker({ value, onChange, label, multiple = false, onPickMany }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const [picked, setPicked] = useState<number[]>([]);
+  const preview = typeof value === 'number' ? mediaUrl(value) : typeof value === 'string' && value.startsWith('/') ? value : '';
+  const close = () => { setOpen(false); setPicked([]); };
+  const pick = (id: number) => {
+    if (multiple) { setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])); return; }
+    onChange(id); setOpen(false);
+  };
   // Paged (20 per page) with «Cargar más»: the first page alone hid every
   // older image from the editor.
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
@@ -27,17 +44,17 @@ export function MediaPicker({ value, onChange, label }: { value?: number | null;
     <div>
       <span className="label">{label}</span>
       <div className="flex items-center gap-3">
-        {value ? (
-          <img src={mediaUrl(value)} alt="" className="h-16 w-16 rounded-lg object-cover ring-1 ring-line" />
+        {multiple ? null : preview ? (
+          <img src={preview} alt="" title={typeof value === 'string' ? 'Foto original del sitio' : undefined} className="h-16 w-16 rounded-lg object-cover ring-1 ring-line" />
         ) : (
           <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-cream-2 text-subtle"><ImageIcon size={20} aria-hidden="true" /></span>
         )}
         <div className="flex gap-2">
-          <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>{value ? 'Cambiar' : 'Elegir imagen'}</Button>
-          {value && <Button type="button" size="sm" variant="ghost" onClick={() => onChange(null)}><X className="h-4 w-4" aria-hidden="true" /> Quitar</Button>}
+          <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>{multiple ? 'Elegir fotos de la biblioteca' : value ? 'Cambiar' : 'Elegir imagen'}</Button>
+          {!multiple && value && <Button type="button" size="sm" variant="ghost" onClick={() => onChange(null)}><X className="h-4 w-4" aria-hidden="true" /> Quitar</Button>}
         </div>
       </div>
-      <Modal open={open} onClose={() => setOpen(false)} title="Elegir imagen" maxWidth={720}>
+      <Modal open={open} onClose={close} title={multiple ? 'Elegir fotos' : 'Elegir imagen'} maxWidth={720}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
           <input className="input-field pl-9" placeholder="Buscar…" aria-label="Buscar imágenes" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -54,7 +71,7 @@ export function MediaPicker({ value, onChange, label }: { value?: number | null;
         <ul className="grid max-h-[60vh] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4" aria-label="Imágenes">
           {assets.map((a) => (
             <li key={a.id}>
-              <button type="button" onClick={() => { onChange(a.id); setOpen(false); }} className={`block aspect-square w-full overflow-hidden rounded-lg ring-2 ${value === a.id ? 'ring-purple' : 'ring-transparent hover:ring-purple/40'}`} aria-label={a.alt || a.filename}>
+              <button type="button" onClick={() => pick(a.id)} aria-pressed={multiple ? picked.includes(a.id) : undefined} className={`block aspect-square w-full overflow-hidden rounded-lg ring-2 ${(multiple ? picked.includes(a.id) : value === a.id) ? 'ring-purple' : 'ring-transparent hover:ring-purple/40'}`} aria-label={a.alt || a.filename}>
                 <img src={a.urls.thumb ?? a.urls.original} alt={a.alt || ''} className="h-full w-full object-cover" loading="lazy" />
               </button>
               {!a.alt && <span className="block text-[10px] text-coral-600">Sin alt</span>}
@@ -68,6 +85,12 @@ export function MediaPicker({ value, onChange, label }: { value?: number | null;
           </div>
         )}
         <p className="text-xs text-subtle">¿Falta una imagen? Súbala en Biblioteca de medios.</p>
+        {multiple && (
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={close}>Cancelar</Button>
+            <Button type="button" disabled={picked.length === 0} onClick={() => { onPickMany?.(picked); close(); }}>Agregar {picked.length || ''} {picked.length === 1 ? 'foto' : 'fotos'}</Button>
+          </div>
+        )}
       </Modal>
     </div>
   );

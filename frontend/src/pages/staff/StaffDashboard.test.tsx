@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -56,6 +56,12 @@ function renderDashboard() {
 }
 
 describe('StaffDashboard states (IK-ADMIN item 8)', () => {
+  // Pay the cold transform of the lazy KPI and recharts chunks once, outside the
+  // per-assertion waits: under a loaded parallel run it alone exceeded 20 s.
+  beforeAll(async () => {
+    await Promise.all([import('@/components/staff/KpiRow'), import('@/components/staff/ChartsSection')]);
+  }, 120_000);
+
   beforeEach(() => {
     vi.clearAllMocks();
   });

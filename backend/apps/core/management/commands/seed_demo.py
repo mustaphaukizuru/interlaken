@@ -5,7 +5,7 @@ Creates (idempotently, keyed by email / ids prefixed "demo-"):
   1 admin, 1 staff, 6 families (parents + 9 students across the 3 levels),
   cafetería balances + 30 days of purchases/top-ups, 8 pre-registros in every
   status, 3 open-class slots with bookings, 3 comunicados, 3 testimonials,
-  6 calendar events, the CMS pages (via seed_cms).
+  6 calendar events, the site photos in the media library (via seed_cms).
 
 Refuses to run when DEBUG is False unless --force, so it can never touch
 production by accident. All demo accounts share the password "Demo-2026!".
@@ -143,7 +143,7 @@ class Command(BaseCommand):
             SchoolEvent.objects.get_or_create(title=title, start_date=today + dt.timedelta(days=2 + i * 9),
                                               defaults={'kind': kind, 'description': '[demo] Evento de ejemplo', 'is_published': True})
 
-        call_command('seed_cms', publish=False, stdout=self.stdout)
+        call_command('seed_cms', stdout=self.stdout)
         self.stdout.write(self.style.SUCCESS(
             f'Demo listo: admin direccion@demo.interlaken.mx / staff comunicacion@demo.interlaken.mx / familias *@demo.interlaken.mx '
             f'(contraseña {DEMO_PASSWORD}); {len(students)} alumnos.'))

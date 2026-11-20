@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySnippets } from './CmsPage';
+import { applySnippets } from './blocks/generic';
 import { resolveSep, SEP_INCORPORATIONS } from '@/lib/sepIncorporations';
 
 describe('site snippets', () => {

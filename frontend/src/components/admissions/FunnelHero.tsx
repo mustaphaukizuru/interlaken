@@ -32,6 +32,8 @@ interface FunnelHeroProps {
   subtitle?: string;
   /** Optional campus photo under the dark wash */
   imageSrc?: string;
+  /** Badge above the title; defaults to the cycle badge, '' hides it (CMS). */
+  label?: string;
 }
 
 /**
@@ -44,6 +46,7 @@ export function FunnelHero({
   title,
   subtitle,
   imageSrc = '/assets/hopscotch.webp',
+  label = `Ciclo Escolar ${CURRENT_CYCLE} · Admisiones`,
 }: FunnelHeroProps) {
   const active = STEP_INDEX[step];
 
@@ -65,9 +68,7 @@ export function FunnelHero({
         style={{ top: -160, left: -120 }}
       />
       <div className="relative mx-auto max-w-[1120px] px-4 py-10 sm:px-6 sm:py-14">
-        <span className="section-label-pink inline-flex">
-          Ciclo Escolar {CURRENT_CYCLE} · Admisiones
-        </span>
+        {label ? <span className="section-label-pink inline-flex">{label}</span> : null}
         <h1 className="mt-3 font-head text-fluid-4xl font-black leading-[1.08] tracking-[-0.04em]">
           {title}
         </h1>

@@ -4,7 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { contentApi, type FormDefinitionPublic, type FormField } from '@/services/api';
+import { contentApi, type FormField } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 
 type Values = Record<string, string | boolean>;
