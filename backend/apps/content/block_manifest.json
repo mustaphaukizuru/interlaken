@@ -6,21 +6,45 @@
       "group": "about",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Tarjetas",
+        "items[].icon": "Ícono",
+        "items[].color": "Color",
+        "items[].title": "Título",
+        "items[].text": "Texto"
+      }
     },
     "about.cta": {
       "label": "Nosotros · Llamado final",
       "group": "about",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario"
+      }
     },
     "about.levels": {
       "label": "Nosotros · Niveles educativos",
       "group": "about",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Niveles",
+        "items[].name": "Nivel",
+        "items[].grades": "Grados",
+        "items[].age": "Edades",
+        "items[].tone": "Color"
+      }
     },
     "about.mission": {
       "label": "Nosotros · Misión y visión",
@@ -31,21 +55,54 @@
         "image1",
         "image2",
         "image3"
-      ]
+      ],
+      "labels": {
+        "title": "Título",
+        "items": "Bloques (misión, visión...)",
+        "items[].icon": "Ícono",
+        "items[].color": "Color",
+        "items[].title": "Título",
+        "items[].text": "Texto",
+        "image1": "Foto grande",
+        "alt1": "Descripción de la foto grande",
+        "image2": "Foto superior",
+        "alt2": "Descripción de la foto superior",
+        "image3": "Foto inferior",
+        "alt3": "Descripción de la foto inferior",
+        "badgeValue": "Insignia: cifra",
+        "badgeLabel": "Insignia: texto"
+      }
     },
     "about.timeline": {
       "label": "Nosotros · Trayectoria",
       "group": "about",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Momentos",
+        "items[].year": "Año",
+        "items[].title": "Título",
+        "items[].text": "Texto"
+      }
     },
     "about.values": {
       "label": "Nosotros · Valores",
       "group": "about",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Valores",
+        "items[].icon": "Ícono",
+        "items[].color": "Color",
+        "items[].title": "Título",
+        "items[].text": "Texto"
+      }
     },
     "admisiones.docs_cta": {
       "label": "Admisiones · Documentos y pre-registro",
@@ -54,21 +111,50 @@
       "required": {},
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "docsTitle": "Documentos: título",
+        "docsSummary": "Documentos: resumen",
+        "docs": "Documentos",
+        "docs[].label": "Documento",
+        "docs[].href": "Enlace al trámite oficial",
+        "docs[].linkLabel": "Texto del enlace",
+        "docsNote": "Documentos: nota al pie",
+        "image": "Foto del llamado",
+        "imageAlt": "Descripción de la foto (accesibilidad)",
+        "badge": "Insignia",
+        "title": "Título del llamado",
+        "text": "Texto del llamado",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario"
+      }
     },
     "admisiones.estimator": {
       "label": "Admisiones · Estimador de costos",
       "group": "admisiones",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto"
+      }
     },
     "admisiones.faq": {
       "label": "Admisiones · Preguntas frecuentes",
       "group": "admisiones",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Preguntas",
+        "items[].cat": "Tema",
+        "items[].q": "Pregunta",
+        "items[].a": "Respuesta"
+      }
     },
     "admisiones.hero": {
       "label": "Admisiones · Portada",
@@ -79,28 +165,56 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Texto",
+        "image": "Foto"
+      }
     },
     "admisiones.sep": {
       "label": "Admisiones · Incorporación SEP",
       "group": "admisiones",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto"
+      }
     },
     "admisiones.steps": {
       "label": "Admisiones · Proceso de admisión",
       "group": "admisiones",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Pasos",
+        "items[].step": "Número",
+        "items[].title": "Título",
+        "items[].text": "Texto",
+        "items[].icon": "Ícono",
+        "items[].color": "Color",
+        "items[].link": "Botón",
+        "waLabel": "Texto del botón de WhatsApp",
+        "contact": "Enlace de contacto (si no hay WhatsApp)"
+      }
     },
     "admisiones.testimonials": {
       "label": "Admisiones · Testimonios",
       "group": "admisiones",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "limit": "Cuántos testimonios mostrar"
+      }
     },
     "aviso.hero": {
       "label": "Aviso de privacidad · Portada",
@@ -109,28 +223,55 @@
       "required": {},
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "labelClass": "Color de la etiqueta",
+        "title": "Título de respaldo",
+        "image": "Foto",
+        "opacity": "Visibilidad de la foto (0 a 1)",
+        "dateLabel": "Texto antes de la fecha",
+        "versionLabel": "Texto antes de la versión"
+      }
     },
     "aviso.notice": {
       "label": "Aviso de privacidad · Texto oficial",
       "group": "aviso",
       "locked": true,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "cards": "Tarjetas de resumen",
+        "cards[].icon": "Ícono",
+        "cards[].label": "Etiqueta",
+        "cards[].value": "Texto",
+        "note": "Nota sobre el resumen",
+        "integralLabel": "Botón del aviso integral",
+        "errorTitle": "Título si el aviso no carga"
+      }
     },
     "calendar": {
       "label": "Calendario",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "contacto.directory": {
       "label": "Contacto · Directorio por nivel",
       "group": "contacto",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Niveles",
+        "items[].level": "Nivel",
+        "items[].ext": "Extensión",
+        "items[].email": "Correo"
+      }
     },
     "contacto.hero": {
       "label": "Contacto · Portada",
@@ -141,7 +282,13 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "image": "Foto de fondo"
+      }
     },
     "contacto.main": {
       "label": "Contacto · Información y formulario",
@@ -150,14 +297,34 @@
       "required": {},
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "infoTitle": "Título de la información",
+        "phoneLabel": "Etiqueta del teléfono",
+        "hoursLabel": "Etiqueta del horario",
+        "image": "Foto de la fachada",
+        "imageAlt": "Descripción de la foto (accesibilidad)",
+        "directionsLabel": "Botón «Cómo llegar»",
+        "whatsappLabel": "Botón de WhatsApp",
+        "whatsappMessage": "Mensaje inicial de WhatsApp",
+        "formTitle": "Título del formulario",
+        "submitLabel": "Texto del botón de envío",
+        "success": "Mensaje al enviar",
+        "error": "Mensaje si falla el envío"
+      }
     },
     "contacto.map": {
       "label": "Contacto · Mapa",
       "group": "contacto",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "mapsLabel": "Texto del enlace a Google Maps",
+        "embed": "Dirección del mapa incrustado",
+        "mapTitle": "Descripción del mapa (accesibilidad)"
+      }
     },
     "costos.hero": {
       "label": "Costos · Portada",
@@ -168,14 +335,56 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "badge": "Insignia",
+        "image": "Foto"
+      }
     },
     "costos.prices": {
       "label": "Costos · Tablas de precios",
       "group": "costos",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "structureTitle": "Título de la explicación del pago",
+        "structure": "Cómo se estructura el pago",
+        "structure[].title": "Concepto",
+        "structure[].text": "Explicación",
+        "feesLabel": "Inscripción: etiqueta",
+        "feesTitle": "Inscripción: título",
+        "feesSubtitle": "Inscripción: subtítulo",
+        "newTag": "Pestaña de nuevo ingreso",
+        "returningTag": "Pestaña de reinscripción",
+        "tuitionLabel": "Colegiaturas: etiqueta",
+        "tuitionTitle": "Colegiaturas: título",
+        "tuitionSubtitle": "Colegiaturas: subtítulo",
+        "insuranceLabel": "Seguros: etiqueta",
+        "insuranceTitle": "Seguros: título",
+        "insuranceSubtitle": "Seguros: subtítulo",
+        "extrasLabel": "Extraescolares: etiqueta",
+        "extrasTitle": "Extraescolares: título",
+        "extrasSubtitle": "Extraescolares: subtítulo",
+        "daycareLabel": "Estancia: etiqueta",
+        "daycareTitle": "Estancia: título",
+        "daycareSubtitle": "Estancia: subtítulo",
+        "policiesTitle": "Título de las políticas de pago",
+        "noteText": "Nota: texto",
+        "noteStrong": "Nota: texto en negritas",
+        "noteLinkLead": "Nota: texto antes del enlace",
+        "noteLink": "Nota: enlace",
+        "ctaTitle": "Llamado final: título",
+        "ctaText": "Llamado final: texto",
+        "ctaPrimary": "Llamado final: botón principal",
+        "ctaSecondary": "Llamado final: botón secundario",
+        "emptyTitle": "Sin precios publicados: título",
+        "emptyText": "Sin precios publicados: texto",
+        "emptyPrimary": "Sin precios publicados: botón principal",
+        "emptySecondary": "Sin precios publicados: botón secundario"
+      }
     },
     "cta_band": {
       "label": "Llamado a la acción",
@@ -185,7 +394,12 @@
         "title": "str",
         "cta": "dict"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto",
+        "cta": "Botón"
+      }
     },
     "documentacion.hero": {
       "label": "Documentación · Portada",
@@ -196,21 +410,44 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Texto",
+        "image": "Foto"
+      }
     },
     "documentacion.list": {
       "label": "Documentación · Documentos requeridos",
       "group": "documentacion",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título de la lista",
+        "summary": "Resumen",
+        "items": "Documentos",
+        "items[].label": "Documento",
+        "items[].href": "Enlace al trámite oficial",
+        "items[].linkLabel": "Texto del enlace",
+        "ctaTitle": "Llamado: título",
+        "ctaText": "Llamado: texto",
+        "cta": "Llamado: botón"
+      }
     },
     "facturacion.download": {
       "label": "Facturación · Descargar facturas",
       "group": "facturacion",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto",
+        "link": "Botón",
+        "srHint": "Aviso para lectores de pantalla"
+      }
     },
     "facturacion.hero": {
       "label": "Facturación · Portada",
@@ -221,21 +458,37 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "image": "Foto de fondo"
+      }
     },
     "facturacion.notices": {
       "label": "Facturación · Antes de solicitar",
       "group": "facturacion",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "items": "Avisos",
+        "items[].text": "Aviso"
+      }
     },
     "facturacion.request": {
       "label": "Facturación · Solicitud",
       "group": "facturacion",
       "locked": true,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto antes del correo",
+        "email": "Correo de facturación"
+      }
     },
     "faq": {
       "label": "Preguntas frecuentes",
@@ -244,7 +497,12 @@
       "required": {
         "items": "list"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Preguntas",
+        "items[].q": "Pregunta",
+        "items[].a": "Respuesta"
+      }
     },
     "feature_grid": {
       "label": "Características",
@@ -253,7 +511,13 @@
       "required": {
         "items": "list"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título de sección",
+        "items": "Tarjetas",
+        "items[].title": "Título",
+        "items[].text": "Texto"
+      }
     },
     "form": {
       "label": "Formulario",
@@ -262,7 +526,10 @@
       "required": {
         "form": "str"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "form": "Formulario"
+      }
     },
     "galeria.grid": {
       "label": "Galería · Fotos con filtros",
@@ -271,7 +538,16 @@
       "required": {},
       "images": [
         "photos[].image"
-      ]
+      ],
+      "labels": {
+        "photos": "Fotos",
+        "photos[].image": "Foto",
+        "photos[].caption": "Pie de foto",
+        "photos[].category": "Categoría",
+        "filters": "Filtros",
+        "filters[].key": "Clave",
+        "filters[].label": "Texto del botón"
+      }
     },
     "galeria.hero": {
       "label": "Galería · Portada",
@@ -282,7 +558,13 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Texto",
+        "image": "Foto de fondo"
+      }
     },
     "gallery": {
       "label": "Galería",
@@ -293,7 +575,10 @@
       },
       "images": [
         "images[].image"
-      ]
+      ],
+      "labels": {
+        "images": "Imágenes"
+      }
     },
     "hero": {
       "label": "Portada (hero)",
@@ -304,7 +589,13 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "title": "Título",
+        "subtitle": "Subtítulo",
+        "image": "Imagen de fondo",
+        "cta": "Botón"
+      }
     },
     "home.about": {
       "label": "Inicio · Nuestra comunidad",
@@ -315,14 +606,31 @@
         "image1",
         "image2",
         "image3"
-      ]
+      ],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "cta": "Botón",
+        "image1": "Foto grande",
+        "image2": "Foto superior",
+        "image3": "Foto inferior",
+        "badgeValue": "Insignia: cifra",
+        "badgeLabel": "Insignia: texto"
+      }
     },
     "home.cta": {
       "label": "Inicio · Llamado final",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario"
+      }
     },
     "home.gallery": {
       "label": "Inicio · Franja de galería",
@@ -331,7 +639,13 @@
       "required": {},
       "images": [
         "images[].image"
-      ]
+      ],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "images": "Fotos",
+        "cta": "Botón"
+      }
     },
     "home.hero": {
       "label": "Inicio · Portada",
@@ -342,14 +656,32 @@
       },
       "images": [
         "poster"
-      ]
+      ],
+      "labels": {
+        "showLogo": "Mostrar el logo",
+        "title": "Título",
+        "titleAccent": "Título (segunda línea, en degradado)",
+        "subtitle": "Subtítulo",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario",
+        "poster": "Foto de portada",
+        "posterAlt": "Descripción de la foto (accesibilidad)",
+        "video": "Video de portada (MP4)"
+      }
     },
     "home.lead": {
       "label": "Inicio · Solicite informes",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "text": "Texto",
+        "button": "Texto del botón",
+        "success": "Mensaje al enviar",
+        "subject": "Asunto en Mensajes"
+      }
     },
     "home.levels": {
       "label": "Inicio · Niveles educativos",
@@ -358,7 +690,20 @@
       "required": {},
       "images": [
         "items[].image"
-      ]
+      ],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "items": "Niveles",
+        "items[].name": "Nombre",
+        "items[].image": "Foto",
+        "items[].color": "Color",
+        "items[].text": "Descripción",
+        "items[].href": "Enlace",
+        "items[].linkLabel": "Texto del enlace",
+        "cta": "Botón final"
+      }
     },
     "home.programs": {
       "label": "Inicio · Programas",
@@ -367,42 +712,91 @@
       "required": {},
       "images": [
         "items[].image"
-      ]
+      ],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Programas",
+        "items[].name": "Nombre",
+        "items[].image": "Foto",
+        "items[].icon": "Ícono",
+        "items[].color": "Color",
+        "footnote": "Texto final"
+      }
     },
     "home.promos": {
       "label": "Inicio · Tarjetas destacadas",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Tarjetas",
+        "items[].label": "Etiqueta",
+        "items[].title": "Título",
+        "items[].text": "Texto",
+        "items[].link": "Enlace",
+        "items[].icon": "Ícono",
+        "items[].color": "Color inicial",
+        "items[].color2": "Color final"
+      }
     },
     "home.stats": {
       "label": "Inicio · Cifras",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Cifras",
+        "items[].value": "Valor",
+        "items[].label": "Etiqueta",
+        "items[].icon": "Ícono",
+        "items[].color": "Color"
+      }
     },
     "home.strengths": {
       "label": "Inicio · Por qué Interlaken",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "items": "Tarjetas",
+        "items[].icon": "Ícono",
+        "items[].color": "Color",
+        "items[].title": "Título",
+        "items[].text": "Texto"
+      }
     },
     "home.testimonials": {
       "label": "Inicio · Testimonios",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "limit": "Cuántos testimonios mostrar"
+      }
     },
     "home.video": {
       "label": "Inicio · Video institucional",
       "group": "home",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "video": "Video (YouTube o Vimeo)",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario"
+      }
     },
     "image": {
       "label": "Imagen",
@@ -413,21 +807,27 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "image": "Imagen",
+        "caption": "Pie de foto"
+      }
     },
     "levels_cards": {
       "label": "Niveles educativos",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "map_contact": {
       "label": "Mapa y contacto",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "modelo.hero": {
       "label": "Modelo educativo · Portada",
@@ -438,14 +838,30 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Texto",
+        "image": "Foto de fondo"
+      }
     },
     "modelo.pillars": {
       "label": "Modelo educativo · Pilares",
       "group": "modelo",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Pilares",
+        "items[].icon": "Ícono",
+        "items[].title": "Título",
+        "items[].text": "Texto",
+        "ctaTitle": "Título del recuadro final",
+        "links": "Enlaces del recuadro",
+        "links[].label": "Texto",
+        "links[].href": "Enlace"
+      }
     },
     "nivel.content": {
       "label": "Nivel · Texto e información útil",
@@ -454,7 +870,35 @@
       "required": {},
       "images": [
         "photo"
-      ]
+      ],
+      "labels": {
+        "story": "Texto del nivel (apartados)",
+        "story[].title": "Subtítulo",
+        "story[].text": "Párrafos",
+        "story[].programs": "Programas (tarjetas)",
+        "story[].programs[].name": "Nombre",
+        "story[].programs[].icon": "Ícono",
+        "story[].programs[].text": "Descripción",
+        "story[].quote": "Frase destacada al final",
+        "photo": "Foto dentro del texto",
+        "photoAlt": "Descripción de la foto",
+        "photoAfter": "Mostrar la foto después del apartado n.º",
+        "accent": "Color de títulos e íconos",
+        "color": "Color del nivel (subtítulos, frases y recuadro SEP)",
+        "groupsTitle": "Título de los grupos",
+        "groups": "Grupos",
+        "groups[].name": "Nombre",
+        "groups[].detail": "Detalle",
+        "extras": "Notas finales",
+        "extras[].text": "Texto",
+        "sepLevel": "Nivel SEP a mostrar",
+        "sepTitle": "Título del recuadro SEP",
+        "sepNote": "Nota del recuadro SEP",
+        "sideTitle": "Título de la barra lateral",
+        "links": "Enlaces de la barra lateral",
+        "links[].label": "Texto",
+        "links[].href": "Enlace"
+      }
     },
     "nivel.hero": {
       "label": "Nivel · Portada",
@@ -465,14 +909,31 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "headline": "Frase principal",
+        "text": "Presentación",
+        "image": "Foto",
+        "accent": "Color de la etiqueta",
+        "color": "Color del nivel",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario"
+      }
     },
     "nivel.others": {
       "label": "Nivel · Conozca también",
       "group": "nivel",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "title": "Título",
+        "items": "Tarjetas",
+        "items[].name": "Nombre",
+        "items[].href": "Enlace"
+      }
     },
     "notfound.message": {
       "label": "Página no encontrada · Mensaje",
@@ -481,14 +942,22 @@
       "required": {
         "title": "str"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "code": "Número grande",
+        "title": "Título",
+        "text": "Texto",
+        "primary": "Botón principal",
+        "secondary": "Botón secundario"
+      }
     },
     "open_school_events": {
       "label": "Clases abiertas",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "page.hero": {
       "label": "Portada con foto",
@@ -499,7 +968,18 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "labelClass": "Color de la etiqueta",
+        "title": "Título",
+        "subtitle": "Subtítulo",
+        "image": "Foto",
+        "focus": "Encuadre de la foto",
+        "opacity": "Visibilidad de la foto (0 a 1)",
+        "primary": "Botón principal (opcional)",
+        "secondary": "Botón secundario (opcional)"
+      }
     },
     "pagos.hero": {
       "label": "Pagos · Portada",
@@ -510,14 +990,35 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Texto",
+        "image": "Foto de fondo"
+      }
     },
     "pagos.platforms": {
       "label": "Pagos · Accesos de pago",
       "group": "pagos",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "bg": "Fondo",
+        "labelClass": "Color de la etiqueta",
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "columns": "Columnas en computadora",
+        "items": "Plataformas",
+        "items[].name": "Nombre",
+        "items[].text": "Descripción",
+        "items[].icon": "Ícono",
+        "items[].href": "Enlace",
+        "items[].cta": "Texto del botón",
+        "note": "Nota final (opcional)"
+      }
     },
     "plataformas.hero": {
       "label": "Plataformas · Portada",
@@ -528,21 +1029,52 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Texto",
+        "image": "Foto de fondo"
+      }
     },
     "plataformas.platforms": {
       "label": "Plataformas · Tarjetas",
       "group": "plataformas",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "bg": "Fondo",
+        "labelClass": "Color de la etiqueta",
+        "eyebrow": "Etiqueta superior",
+        "title": "Título",
+        "text": "Texto",
+        "columns": "Columnas en computadora",
+        "items": "Plataformas",
+        "items[].name": "Nombre",
+        "items[].text": "Descripción",
+        "items[].icon": "Ícono",
+        "items[].href": "Enlace",
+        "items[].cta": "Texto del botón",
+        "note": "Nota final (opcional)"
+      }
     },
     "preregistro.form": {
       "label": "Pre-registro · Formulario",
       "group": "preregistro",
       "locked": true,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "submitLabel": "Texto del botón de envío",
+        "error": "Mensaje si falla el envío",
+        "successTitle": "Confirmación: título",
+        "successText": "Confirmación: texto",
+        "visitText": "Confirmación: aviso de visita",
+        "visitLink": "Confirmación: enlace para agendar la visita",
+        "primary": "Confirmación: botón principal",
+        "secondary": "Confirmación: botón secundario"
+      }
     },
     "preregistro.hero": {
       "label": "Pre-registro · Portada",
@@ -553,21 +1085,34 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Subtítulo",
+        "image": "Foto de fondo"
+      }
     },
     "preregistro.trust": {
       "label": "Pre-registro · Franja de confianza",
       "group": "preregistro",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "first": "Dato 1",
+        "firstIcon": "Ícono del dato 1",
+        "second": "Dato 2",
+        "secondIcon": "Ícono del dato 2"
+      }
     },
     "pricing_table": {
       "label": "Costos",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "rich_text": {
       "label": "Texto",
@@ -576,14 +1121,18 @@
       "required": {
         "html": "str"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "html": "Contenido"
+      }
     },
     "sep_incorporation": {
       "label": "Incorporación SEP",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "stats": {
       "label": "Cifras",
@@ -592,14 +1141,20 @@
       "required": {
         "items": "list"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Cifras",
+        "items[].value": "Valor",
+        "items[].label": "Etiqueta"
+      }
     },
     "testimonials": {
       "label": "Testimonios",
       "group": "",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {}
     },
     "timeline": {
       "label": "Línea de tiempo",
@@ -608,7 +1163,13 @@
       "required": {
         "items": "list"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Hitos",
+        "items[].year": "Año",
+        "items[].title": "Título",
+        "items[].text": "Texto"
+      }
     },
     "video": {
       "label": "Video",
@@ -617,14 +1178,35 @@
       "required": {
         "url": "str"
       },
-      "images": []
+      "images": [],
+      "labels": {
+        "url": "URL del video"
+      }
     },
     "visita.booking": {
       "label": "Agendar visita · Calendario y reserva",
       "group": "visita",
       "locked": true,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "pickTitle": "Título del calendario",
+        "formTitle": "Título del formulario",
+        "pickHint": "Aviso antes de elegir horario",
+        "submitLabel": "Texto del botón de envío",
+        "confirmedTitle": "Título al confirmar",
+        "confirmedText": "Texto al confirmar",
+        "againLabel": "Botón «Agendar otra visita»",
+        "emptyTitle": "Sin horarios: título",
+        "emptyText": "Sin horarios: texto",
+        "errorTitle": "Error al cargar: título",
+        "errorText": "Error al cargar: texto",
+        "whatsappTitle": "Recuadro de WhatsApp: título",
+        "whatsappText": "Recuadro de WhatsApp: texto",
+        "whatsappLabel": "Botón de WhatsApp",
+        "whatsappMessage": "Mensaje inicial de WhatsApp",
+        "contactLabel": "Botón de contacto (si no hay WhatsApp)"
+      }
     },
     "visita.hero": {
       "label": "Agendar visita · Portada",
@@ -635,14 +1217,25 @@
       },
       "images": [
         "image"
-      ]
+      ],
+      "labels": {
+        "label": "Etiqueta superior",
+        "title": "Título",
+        "subtitle": "Subtítulo",
+        "image": "Foto de fondo"
+      }
     },
     "visita.steps": {
       "label": "Agendar visita · Cómo funciona",
       "group": "visita",
       "locked": false,
       "required": {},
-      "images": []
+      "images": [],
+      "labels": {
+        "items": "Pasos",
+        "items[].text": "Paso",
+        "link": "Enlace bajo los pasos"
+      }
     }
   }
 }
