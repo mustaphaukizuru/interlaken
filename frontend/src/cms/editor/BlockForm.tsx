@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import type { Block, BlockSpec, FieldSpec } from '../blocks/registry';
 import { blockSpec, withDefaults } from '../blocks/registry';
 import { helpFor } from './fieldHelp';
-import { fieldDomId, focusFieldElement, onFieldFocusRequest, takeFieldFocus } from './fieldFocus';
+import { fieldDomId, focusFieldElement, onFieldFocusRequest, peekFieldFocus, takeFieldFocus } from './fieldFocus';
 import { slugify } from './helpers';
 import { imageIdsIn, isEmptyValue, validateFields, type CmsFieldError, type FieldIssue } from './validation';
 import { ColorField } from './fields/ColorField';
@@ -115,7 +115,9 @@ function SpecForm({ block, spec, onChange, serverErrors }: { block: Block; spec:
   for (const i of issues) if (!byPath.has(i.path)) byPath.set(i.path, i);
 
   // A field shows its problem once it was left (blur), and from then on as you type.
-  const [initialFocus] = useState(() => takeFieldFocus(block.id));
+  // A jump requested before this form existed opens its group from the first render;
+  // it is only read here (render must stay pure: StrictMode renders twice) and taken in an effect.
+  const [initialFocus] = useState(() => peekFieldFocus(block.id));
   const [touched, setTouched] = useState<Set<string>>(() => new Set(initialFocus ? [initialFocus] : []));
   const touch = (path: string) => setTouched((t) => (t.has(path) ? t : new Set(t).add(path)));
   // Server errors stand until their field is edited.
@@ -159,7 +161,7 @@ function SpecForm({ block, spec, onChange, serverErrors }: { block: Block; spec:
   const formRef = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<string | null>(null);
   const [, bump] = useState(0);
-  useEffect(() => { if (initialFocus) pendingFocus.current = initialFocus; }, [initialFocus]);
+  useEffect(() => { const path = takeFieldFocus(block.id); if (path !== null) pendingFocus.current = path; }, [block.id]);
   useEffect(() => onFieldFocusRequest((r) => {
     if (r.blockId !== block.id) return;
     const path = takeFieldFocus(block.id);

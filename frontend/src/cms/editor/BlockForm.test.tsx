@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -110,10 +110,11 @@ describe('BlockForm errors (C3)', () => {
     expect(screen.getByText('Este campo es obligatorio.')).toBeInTheDocument();
   });
 
-  it('a jump requested before the form exists runs when it mounts', async () => {
-    requestFieldFocus('t2', 'subtitle');
-    renderWithProviders(<Harness initial={{ id: 't2', type: 'prueba.form', props: { title: 'x' } }} />);
-    await waitFor(() => expect(document.activeElement).toBe(byId('f-t2-subtitle')));
+  it('a jump requested before the form exists runs when it mounts (also under StrictMode)', async () => {
+    requestFieldFocus('t2', 'items.1.name');
+    renderWithProviders(<StrictMode><Harness initial={{ id: 't2', type: 'prueba.form', props: { title: 'x', items: [{ name: 'a' }, { name: '' }, { name: 'c' }, { name: 'd' }] } }} /></StrictMode>);
+    await waitFor(() => expect(document.activeElement).toBe(byId('f-t2-items.1.name')));
+    expect(screen.getByRole('button', { name: /^Tarjetas/ })).toHaveAttribute('aria-expanded', 'true');
   });
 });
 

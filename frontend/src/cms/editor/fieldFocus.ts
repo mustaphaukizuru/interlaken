@@ -24,7 +24,12 @@ export function requestFieldFocus(blockId: string, path: string) {
   for (const l of listeners) l(pending);
 }
 
-/** The pending request for this block, consumed. */
+/** The pending request for this block, without consuming it (safe during render). */
+export function peekFieldFocus(blockId: string): string | null {
+  return pending?.blockId === blockId ? pending.path : null;
+}
+
+/** The pending request for this block, consumed (call from an effect or an event, never during render). */
 export function takeFieldFocus(blockId: string): string | null {
   if (pending?.blockId !== blockId) return null;
   const { path } = pending;
