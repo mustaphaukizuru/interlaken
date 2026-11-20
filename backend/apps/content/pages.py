@@ -168,6 +168,11 @@ class Page(models.Model):
     # view also enforces unpublish_at lazily so expiry never depends on cron.
     publish_at = models.DateTimeField(null=True, blank=True)
     unpublish_at = models.DateTimeField(null=True, blank=True)
+    # Draft conflicts (docs/cms/safe-publish.md, C2): +1 on every draft save; a
+    # save that names an older revision gets 409 instead of overwriting.
+    draft_revision = models.PositiveIntegerField(default=0)
+    draft_updated_by = models.ForeignKey('accounts.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    draft_updated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -179,7 +184,13 @@ class Page(models.Model):
     def __str__(self):
         return f'/{self.slug} ({self.get_status_display()})'
 
-    def publish(self, user) -> PageVersion:
+    def stamp_draft(self, user) -> None:
+        """One more draft save: bump the revision and remember who and when (caller saves)."""
+        self.draft_revision = (self.draft_revision or 0) + 1
+        self.draft_updated_by = user if getattr(user, 'pk', None) else None
+        self.draft_updated_at = timezone.now()
+
+    def publish(self, user, *, legacy_confirmed: bool = False) -> PageVersion:
         number = (self.versions.aggregate(m=models.Max('number'))['m'] or 0) + 1
         with transaction.atomic():
             v = PageVersion.objects.create(page=self, number=number, blocks=self.draft_blocks, seo=self.seo, author=user)
@@ -196,7 +207,10 @@ class Page(models.Model):
         cache.delete('cms:sitemap')
         try:
             from apps.core.audit import record
-            record('update', self, {'published_version': number}, actor=user, context='cms.publish')
+            changes = {'published_version': number}
+            if legacy_confirmed:
+                changes['legacy_seed_confirmed'] = True
+            record('update', self, changes, actor=user, context='cms.publish')
         except Exception:  # noqa: BLE001
             pass
         return v
@@ -234,6 +248,52 @@ class PageVersion(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Old generic drafts (docs/cms/safe-publish.md, C1)
+# ---------------------------------------------------------------------------
+LEGACY_SEED_CODE = 'legacy_seed_draft'
+DRAFT_CONFLICT_CODE = 'draft_conflict'
+
+
+def is_generic_draft(blocks) -> bool:
+    """Blocks, none of them a designed section: the format the old seed_cms wrote."""
+    if not isinstance(blocks, list) or not blocks:
+        return False
+    return not any(isinstance(b, dict) and '.' in str(b.get('type') or '') for b in blocks)
+
+
+def is_legacy_seed(page: Page) -> bool:
+    """Publishing this draft would replace a designed public page with generic blocks.
+
+    True when the slug has a designed template and the draft holds only generic
+    blocks, unless the site already shows a generic version of it (then
+    publishing changes the content, not the design).
+    """
+    from .page_templates import has_template
+
+    if not has_template(page.slug) or not is_generic_draft(page.draft_blocks):
+        return False
+    live = page.published_version if page.status == Page.Status.PUBLISHED and page.published_version_id else None
+    return not (live is not None and is_generic_draft(live.blocks))
+
+
+def legacy_seed_detail(page: Page) -> str:
+    from .navigation import page_path
+
+    return (f'Este borrador usa el formato antiguo de bloques genéricos. Si lo publica, la página '
+            f'{page_path(page.slug)} dejará de verse con su diseño actual. En el editor, use «Cargar el '
+            f'diseño actual» para editar la página tal como se ve hoy, o confirme si de verdad quiere publicarlo así.')
+
+
+def legacy_seed_response(page: Page) -> Response:
+    return Response({'code': LEGACY_SEED_CODE, 'detail': legacy_seed_detail(page)}, status=status.HTTP_409_CONFLICT)
+
+
+def confirmed(value) -> bool:
+    """``{"confirm_legacy": true}`` (also "true"/"1" from a form)."""
+    return value is True or str(value).strip().lower() in ('true', '1', 'si', 'sí', 'yes')
+
+
+# ---------------------------------------------------------------------------
 # Serializers
 # ---------------------------------------------------------------------------
 class PageVersionSerializer(serializers.ModelSerializer):
@@ -248,14 +308,22 @@ class PageAdminSerializer(serializers.ModelSerializer):
     published_version_number = serializers.IntegerField(source='published_version.number', read_only=True, default=None)
     review_requested_by_name = serializers.CharField(source='review_requested_by.full_name', read_only=True, default='')
     has_unpublished_changes = serializers.SerializerMethodField()
+    # C1: the draft is still the old generic format; publishing needs {"confirm_legacy": true}.
+    legacy_seed = serializers.SerializerMethodField()
+    # SEO fields that still hold the old seed values; «Diseño original» clears them.
+    seed_seo = serializers.SerializerMethodField()
+    # C2: send draft_revision back with the next save to detect a concurrent edit.
+    draft_updated_by = serializers.CharField(source='draft_updated_by.full_name', read_only=True, default='')
 
     class Meta:
         model = Page
         fields = ['id', 'slug', 'title', 'template', 'status', 'draft_blocks', 'seo',
                   'published_version_number', 'has_unpublished_changes', 'published_at',
                   'review_requested_at', 'review_requested_by_name', 'review_note', 'publish_at', 'unpublish_at',
+                  'legacy_seed', 'seed_seo', 'draft_revision', 'draft_updated_by', 'draft_updated_at',
                   'created_at', 'updated_at']
-        read_only_fields = ['id', 'status', 'published_at', 'review_requested_at', 'review_requested_by_name', 'review_note', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'published_at', 'review_requested_at', 'review_requested_by_name', 'review_note',
+                            'draft_revision', 'draft_updated_at', 'created_at', 'updated_at']
 
     # Staff edit drafts and ask Dirección for approval; only an admin decides
     # WHEN a page goes live or comes down (the cms_schedule cron acts on these
@@ -297,6 +365,29 @@ class PageAdminSerializer(serializers.ModelSerializer):
             return True
         return json.dumps(p.draft_blocks, sort_keys=True) != json.dumps(p.published_version.blocks, sort_keys=True) \
             or json.dumps(p.seo, sort_keys=True) != json.dumps(p.published_version.seo, sort_keys=True)
+
+    def get_legacy_seed(self, p) -> bool:
+        return is_legacy_seed(p)
+
+    def get_seed_seo(self, p) -> dict:
+        from .legacy_seed import seed_seo_fields
+
+        return seed_seo_fields(p.slug, p.seo)
+
+    def _actor(self):
+        request = self.context.get('request')
+        return getattr(request, 'user', None)
+
+    def create(self, validated_data):
+        page = Page(**validated_data)
+        page.stamp_draft(self._actor())
+        page.save()
+        return page
+
+    def update(self, instance, validated_data):
+        # Every save through the console is a draft save (the editor autosaves the whole draft).
+        instance.stamp_draft(self._actor())
+        return super().update(instance, validated_data)
 
 
 def published_head(path: str) -> dict | None:
@@ -460,15 +551,48 @@ class PageListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAP
     audit_context = "cms.page"
 
     def get_queryset(self):
-        return Page.objects.select_related("published_version", "review_requested_by")
+        return Page.objects.select_related("published_version", "review_requested_by", "draft_updated_by")
+
+
+def draft_conflict_payload(page: Page) -> dict:
+    """409 body when a save names an older draft_revision (C2)."""
+    who = page.draft_updated_by.full_name if page.draft_updated_by_id and page.draft_updated_by else ''
+    when = serializers.DateTimeField().to_representation(page.draft_updated_at) if page.draft_updated_at else None
+    detail = (f'{who or "Otra persona"} guardó cambios en esta página mientras usted la editaba. '
+              'Recargue para ver la versión más reciente antes de seguir; sus cambios no se guardaron.')
+    return {'code': DRAFT_CONFLICT_CODE, 'detail': detail, 'draft_revision': page.draft_revision,
+            'draft_updated_by': who, 'draft_updated_at': when}
 
 
 class PageDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrStaff]
 
     serializer_class = PageAdminSerializer
-    queryset = Page.objects.select_related("published_version")
+    queryset = Page.objects.select_related("published_version", "draft_updated_by")
     audit_context = "cms.page"
+
+    def update(self, request, *args, **kwargs):
+        """A save that names ``draft_revision`` is refused (409) when someone else saved in between.
+
+        The row stays locked from the check to the write, so two saves of the
+        same revision cannot both win. Without ``draft_revision`` the save works
+        exactly as before (last write wins), and still bumps the revision.
+        """
+        raw = request.data.get('draft_revision') if hasattr(request.data, 'get') else None
+        with transaction.atomic():
+            page = (Page.objects.select_for_update().select_related(None)
+                    .filter(pk=kwargs.get(self.lookup_url_kwarg or self.lookup_field)).first())
+            if page is None:
+                raise Http404
+            if raw is not None and raw != '':
+                try:
+                    expected = int(raw)
+                except (TypeError, ValueError):
+                    return Response({'draft_revision': ['Debe ser un número entero.']}, status=status.HTTP_400_BAD_REQUEST)
+                if expected != page.draft_revision:
+                    page = Page.objects.select_related('draft_updated_by').get(pk=page.pk)
+                    return Response(draft_conflict_payload(page), status=status.HTTP_409_CONFLICT)
+            return super().update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         if getattr(self.request.user, "role", None) != "admin":
@@ -531,6 +655,9 @@ def _page_publish_plan(page: Page, payload) -> None:
     if page.status == Page.Status.PUBLISHED and page.published_version_id:
         if not PageAdminSerializer().get_has_unpublished_changes(page):
             raise BulkSkip("ya está publicada sin cambios pendientes")
+    if is_legacy_seed(page):
+        # Never in bulk: publishing it replaces the designed page, so it needs the editor's confirmation.
+        raise BulkSkip("borrador antiguo con bloques genéricos: publíquelo desde el editor para confirmar")
     errors = [i for i in run_checks(page) if i["level"] == "error"]
     if errors:
         raise ValueError("Corrija antes de publicar: " + " · ".join(e["message"] for e in errors[:3]))
@@ -583,7 +710,11 @@ class PageBulkView(AdminBulkView):
 
 
 class PagePublishView(APIView):
-    """POST /content/admin/pages/<pk>/publish/  {"action": "publish"|"unpublish"}"""
+    """POST /content/admin/pages/<pk>/publish/  {"action": "publish"|"unpublish", "confirm_legacy"?: true}
+
+    A draft still in the old generic format (``legacy_seed``) answers 409
+    ``{"code": "legacy_seed_draft", "detail"}`` unless ``confirm_legacy`` is true.
+    """
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
@@ -594,6 +725,9 @@ class PagePublishView(APIView):
         if action == 'unpublish':
             page.unpublish(request.user)
             return Response(PageAdminSerializer(page).data)
+        legacy = is_legacy_seed(page)
+        if legacy and not confirmed(request.data.get('confirm_legacy')):
+            return legacy_seed_response(page)
         # Pre-publish checks (P3-12): errors block, warnings are informative.
         from .checks import run_checks
         issues = run_checks(page)
@@ -601,7 +735,7 @@ class PagePublishView(APIView):
         if errors:
             return Response({'detail': 'Corrija antes de publicar: ' + ' · '.join(e['message'] for e in errors[:5]), 'issues': issues},
                             status=status.HTTP_400_BAD_REQUEST)
-        v = page.publish(request.user)
+        v = page.publish(request.user, legacy_confirmed=legacy)
         data = PageAdminSerializer(page).data
         data['version'] = v.number
         return Response(data)
@@ -634,7 +768,8 @@ class PageVersionsView(APIView):
         if v is None:
             return Response({'version': ['Versión no encontrada.']}, status=status.HTTP_400_BAD_REQUEST)
         page.draft_blocks, page.seo = v.blocks, v.seo
-        page.save(update_fields=['draft_blocks', 'seo', 'updated_at'])
+        page.stamp_draft(request.user)
+        page.save(update_fields=['draft_blocks', 'seo', 'draft_revision', 'draft_updated_by', 'draft_updated_at', 'updated_at'])
         try:
             from apps.core.audit import record
             record('update', page, {'draft_restored_from': v.number}, actor=request.user,
@@ -671,6 +806,11 @@ class PageReviewView(APIView):
         note = str(request.data.get('note') or '')[:300]
         from apps.portal.services import notify
         if action == 'request':
+            # An old generic draft is never sent for approval unnoticed: the requester
+            # confirms first, and Dirección's notice says what publishing it does.
+            legacy = is_legacy_seed(page)
+            if legacy and not confirmed(request.data.get('confirm_legacy')):
+                return legacy_seed_response(page)
             page.review_requested_at = timezone.now()
             page.review_requested_by = request.user
             page.review_note = ''
@@ -679,9 +819,11 @@ class PageReviewView(APIView):
 
             from .navigation import page_path
             url = f"{(settings.FRONTEND_URL or '').rstrip('/')}/p/{page.slug}?preview={page.preview_token()}"
+            warning = (' Atención: el borrador usa el formato antiguo de bloques genéricos; al publicarlo, '
+                       'la página dejará de verse con su diseño actual.') if legacy else ''
             for admin in User.objects.filter(role='admin', is_active=True):
                 notify(admin, 'info', f'Página lista para aprobar: {page.title}',
-                       f'{request.user.full_name} solicita publicar {page_path(page.slug)}. Vista previa: {url}', fanout=False)
+                       f'{request.user.full_name} solicita publicar {page_path(page.slug)}. Vista previa: {url}{warning}', fanout=False)
             return Response(PageAdminSerializer(page).data)
         if action == 'reject':
             if getattr(request.user, 'role', None) != 'admin':
