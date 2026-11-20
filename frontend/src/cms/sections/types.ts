@@ -38,6 +38,13 @@ export interface PageTemplate {
    * Block ids are `${slug}-${n}` so versions diff cleanly.
    */
   sections: (string | TemplateEntry)[];
+  /**
+   * App screens (sign-in, one-time links) never wait for the CMS: the
+   * built-in copy paints at once and the school's edits replace it when the
+   * published page arrives. Every other page holds its first paint until it
+   * knows whether a published version exists (no flash of the default copy).
+   */
+  paintAtOnce?: boolean;
 }
 
 export interface TemplateEntry { type: string; props?: Record<string, unknown>; hidden?: boolean }

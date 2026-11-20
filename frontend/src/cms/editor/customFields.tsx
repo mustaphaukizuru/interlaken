@@ -30,9 +30,9 @@ function ActionField({ spec }: { spec: FieldSpec }) {
   return (
     <div className="space-y-2 rounded-xl border border-green/30 bg-green-50 p-3">
       {spec.hint && <p className="text-sm text-ink">{spec.hint}</p>}
-      {role === 'admin' && spec.href ? (
+      {role === 'admin' && spec.actionHref ? (
         <>
-          <a href={spec.href} target="_blank" rel="noopener noreferrer" onClick={() => setAway(true)} className="btn-outline min-h-[44px] w-full gap-2 !px-4 !py-2 text-sm sm:w-auto">
+          <a href={spec.actionHref} target="_blank" rel="noopener noreferrer" onClick={() => setAway(true)} className="btn-outline min-h-[44px] w-full gap-2 !px-4 !py-2 text-sm sm:w-auto">
             {spec.label} <ExternalLink size={15} aria-hidden="true" />
             <span className="sr-only">(se abre en otra pestaña)</span>
           </a>

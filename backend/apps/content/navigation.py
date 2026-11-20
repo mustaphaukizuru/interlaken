@@ -48,10 +48,15 @@ SLUG_PATHS = {
     'primaria': '/niveles/primaria',
     'secundaria': '/niveles/secundaria',
     'facturacion': '/comunidad/facturacion',
+    # Copy of the app screens (sign-in, invitation wizards): the routes stay
+    # in code, the school edits their texts and SEO in Contenido.
+    'iniciar-sesion': '/login',
+    'inscripcion-documentos': '/inscripcion/documentos',
 }
 
-# CMS pages that are not destinations of their own (the 404 page content).
-UNLISTED_SLUGS = {'no-encontrada'}
+# CMS pages that are not destinations of their own: the 404 page content and
+# the copy of screens reached by sign-in or by a personal link (never in the sitemap).
+UNLISTED_SLUGS = {'no-encontrada', 'iniciar-sesion', 'inscripcion', 'inscripcion-documentos', 'confirmar-correo'}
 
 
 def page_path(slug: str) -> str:
@@ -74,6 +79,28 @@ STATIC_ROUTES = [
 
 CHROME_TEXT = {'footer_tagline': 300, 'footer_copyright': 200, 'footer_note': 200, 'sticky_label': 40}
 
+# Site-wide texts edited in Navegación → «Textos del sitio» (same JSON; blank =
+# the built-in text of each component). Mirrors frontend/src/lib/siteChrome.ts
+# SiteTextKey. Max lengths keep each one a sentence or two.
+SITE_TEXTS = {
+    # Cookie banner (components/CookieConsent.tsx)
+    'cookie_text': 400, 'cookie_link': 60, 'cookie_decline': 30, 'cookie_accept': 30,
+    # Prefilled WhatsApp messages (lib/whatsapp.ts, WhatsAppFloat, PasswordHelp)
+    'wa_admissions': 400, 'wa_visit': 400, 'wa_float': 400, 'wa_password': 400, 'wa_estimator': 400,
+    # Contact bubble (components/ui/WhatsAppFloat.tsx)
+    'float_whatsapp': 40, 'float_visit': 40, 'float_password': 40,
+    # Header/footer words (components/layout/PublicLayout.tsx)
+    'nav_contact': 40, 'footer_contact': 40, 'skip_link': 60,
+    # Privacy note under the site's forms (components/ui/PrivacyNote.tsx)
+    'privacy_note': 400, 'privacy_link': 60,
+    # Admission steps in the funnel heroes (components/admissions/FunnelHero.tsx)
+    'funnel_1': 30, 'funnel_2': 30, 'funnel_3': 30, 'funnel_4': 30,
+    'funnel_now': 20, 'funnel_done': 20, 'funnel_next': 20,
+    # Offline page (public/offline.html via public/offline.js)
+    'offline_title': 80, 'offline_accent': 40, 'offline_text': 400, 'offline_retry': 40, 'offline_home': 40,
+}
+MAX_LEGAL_LINKS = 4
+
 
 def _valid_href(v: str) -> bool:
     return v.startswith('/') or v.startswith('https://') or v.startswith('mailto:') or v.startswith('tel:')
@@ -84,12 +111,27 @@ def validate_chrome(chrome) -> dict:
     if not isinstance(chrome, dict):
         raise serializers.ValidationError('Debe ser un objeto.')
     out: dict = {}
-    for key, limit in CHROME_TEXT.items():
+    for key, limit in {**CHROME_TEXT, **SITE_TEXTS}.items():
         v = str(chrome.get(key) or '').strip()
         if len(v) > limit:
             raise serializers.ValidationError(f'"{key}": máximo {limit} caracteres.')
         if v:
             out[key] = v
+    links = chrome.get('legal_links') or []
+    if not isinstance(links, list) or len(links) > MAX_LEGAL_LINKS:
+        raise serializers.ValidationError(f'Máximo {MAX_LEGAL_LINKS} enlaces legales en el pie de página.')
+    clean_links = []
+    for link in links:
+        label, to = str((link or {}).get('label') or '').strip(), str((link or {}).get('href') or '').strip()
+        if not label and not to:
+            continue
+        if not label or len(label) > 60:
+            raise serializers.ValidationError('Cada enlace legal necesita un texto (máx. 60 caracteres).')
+        if not _valid_href(to):
+            raise serializers.ValidationError(f'Enlace "{label}": debe empezar con / o https://.')
+        clean_links.append({'label': label, 'href': to[:300]})
+    if clean_links:
+        out['legal_links'] = clean_links
     href = str(chrome.get('sticky_href') or '').strip()
     if href:
         if not _valid_href(href):

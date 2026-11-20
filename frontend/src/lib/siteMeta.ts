@@ -30,7 +30,7 @@ export const CURRENT_CYCLE = `${_cycleStart}–${_cycleStart + 1}`;
 export const TITLE_SUFFIX = ` · ${SITE_NAME}`;
 export const DEFAULT_TITLE = `${SITE_NAME} | Escuela bilingüe en Tlalnepantla`;
 export const DEFAULT_DESCRIPTION =
-  `Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con ${SCHOOL_YEARS} años de trayectoria. Agenda tu visita.`;
+  `Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con ${SCHOOL_YEARS} años de trayectoria. Agende su visita.`;
 export const OG_IMAGE = `${SITE_URL}/og-image.png`;
 export const LOCALE = 'es_MX';
 

@@ -21,7 +21,8 @@ export function TemplatePage({ template }: { template: PageTemplate }) {
   // default copy never flashes before the school's edits. The placeholder
   // fills the screen so the footer stays below the fold meanwhile (the same
   // rule as `.route-enter:empty` in index.css; e2e/layout-shift.spec.ts).
-  if (isLoading) return <div className="min-h-screen" aria-busy="true" />;
+  // App screens (template.paintAtOnce) paint the built-in copy at once instead.
+  if (isLoading && !template.paintAtOnce) return <div className="min-h-screen" aria-busy="true" />;
   const seo = data?.seo ?? {};
   // Per-route defaults come from ROUTE_META via RouteSeo (PublicLayout); the
   // template adds only what the table cannot know (JSON-LD, the 404 page's own

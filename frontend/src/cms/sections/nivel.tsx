@@ -12,7 +12,7 @@ import { LEVELS, type LevelData } from '@/lib/levels';
 import { LEVEL_STORIES, type StorySection } from '@/lib/levelStories';
 import { useSep } from '@/hooks/useSep';
 import { cmsColor, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
 import type { PageTemplate } from './types';
 
 const section = sectionsOf('nivel');
@@ -392,29 +392,41 @@ export const sections = [
     description: 'El texto del nivel por apartados, una foto, los grupos, notas, incorporación SEP y enlaces laterales. El registro SEP se edita en Ajustes.',
     component: NivelContentView,
     fields: [
-      f.items('story', 'Texto del nivel (apartados)', [
-        f.text('title', 'Subtítulo', { hint: 'Vacío en el primer apartado: se lee como continuación de la portada.' }),
-        f.textarea('text', 'Párrafos', { hint: 'Deje una línea en blanco entre párrafos. Escriba **entre dobles asteriscos** lo que va en negritas.' }),
-        f.items('programs', 'Programas (tarjetas)', [
-          f.text('name', 'Nombre', { required: true }),
-          f.select('icon', 'Ícono', PROGRAM_ICON_OPTIONS),
-          f.textarea('text', 'Descripción'),
+      ...grouped('Texto del nivel', [
+        f.items('story', 'Texto del nivel (apartados)', [
+          f.text('title', 'Subtítulo'),
+          f.textarea('text', 'Párrafos', { marks: ['bold'] }),
+          f.items('programs', 'Programas (tarjetas)', [
+            f.text('name', 'Nombre', { required: true }),
+            f.select('icon', 'Ícono', PROGRAM_ICON_OPTIONS),
+            f.textarea('text', 'Descripción', { marks: ['bold'] }),
+          ]),
+          f.textarea('quote', 'Frase destacada al final', { hint: 'Opcional. Se muestra grande, con una línea del color del nivel.' }),
         ]),
-        f.textarea('quote', 'Frase destacada al final', { hint: 'Opcional. Se muestra grande, con una línea del color del nivel.' }),
       ]),
-      f.image('photo', 'Foto dentro del texto'),
-      f.text('photoAlt', 'Descripción de la foto', { hint: 'Para lectores de pantalla y buscadores.' }),
-      f.number('photoAfter', 'Mostrar la foto después del apartado n.º'),
-      f.select('accent', 'Color de títulos e íconos', ACCENT_OPTIONS),
-      f.color('color', 'Color del nivel (subtítulos, frases y recuadro SEP)'),
-      f.text('groupsTitle', 'Título de los grupos'),
-      f.items('groups', 'Grupos', [f.text('name', 'Nombre', { required: true }), f.textarea('detail', 'Detalle')]),
-      f.items('extras', 'Notas finales', textItem),
-      f.select('sepLevel', 'Nivel SEP a mostrar', SEP_LEVELS, { hint: 'El registro se toma de Ajustes · Incorporación SEP.' }),
-      f.text('sepTitle', 'Título del recuadro SEP'),
-      f.text('sepNote', 'Nota del recuadro SEP'),
-      f.text('sideTitle', 'Título de la barra lateral'),
-      f.items('links', 'Enlaces de la barra lateral', [f.text('label', 'Texto', { required: true }), f.text('href', 'Enlace', { required: true })]),
+      ...grouped('Foto dentro del texto', [
+        f.image('photo', 'Foto dentro del texto', { minWidth: 1200 }),
+        f.text('photoAlt', 'Descripción de la foto', { hint: 'Qué se ve en la foto, para quien no puede verla y para Google.' }),
+        f.number('photoAfter', 'Mostrar la foto después del apartado n.º'),
+      ]),
+      ...grouped('Colores', [
+        f.select('accent', 'Color de títulos e íconos', ACCENT_OPTIONS),
+        f.color('color', 'Color del nivel (subtítulos, frases y recuadro SEP)'),
+      ]),
+      ...grouped('Grupos y notas', [
+        f.text('groupsTitle', 'Título de los grupos'),
+        f.items('groups', 'Grupos', [f.text('name', 'Nombre', { required: true }), f.textarea('detail', 'Detalle')]),
+        f.items('extras', 'Notas finales', textItem),
+      ]),
+      ...grouped('Incorporación SEP', [
+        f.select('sepLevel', 'Nivel SEP a mostrar', SEP_LEVELS, { hint: 'El número de registro se toma de Ajustes, Incorporación SEP.' }),
+        f.text('sepTitle', 'Título del recuadro SEP'),
+        f.text('sepNote', 'Nota del recuadro SEP'),
+      ]),
+      ...grouped('Barra lateral', [
+        f.text('sideTitle', 'Título de la barra lateral'),
+        f.items('links', 'Enlaces de la barra lateral', [f.text('label', 'Texto', { required: true }), f.href('href', 'Enlace', { required: true })]),
+      ]),
     ],
     defaults: contentProps(LEVELS[0]),
   }),
@@ -423,7 +435,7 @@ export const sections = [
     component: NivelOthersView,
     fields: [
       f.text('title', 'Título'),
-      f.items('items', 'Tarjetas', [f.text('name', 'Nombre', { required: true }), f.text('href', 'Enlace', { required: true })]),
+      f.items('items', 'Tarjetas', [f.text('name', 'Nombre', { required: true }), f.href('href', 'Enlace', { required: true })]),
     ],
     defaults: othersProps(LEVELS[0]),
   }),

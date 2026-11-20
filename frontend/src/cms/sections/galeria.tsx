@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Maximize2 } from 'lucide-react';
 import { imageSrc, imageSrcSet, useMediaAlt, useTokens } from '../runtime';
-import { asList, defineModule, f, Lines, sectionsOf } from './kit';
+import { asList, defineModule, f, fill, grouped, Lines, sectionsOf } from './kit';
 
 const section = sectionsOf('galeria');
 
@@ -52,11 +52,14 @@ function GaleriaHeroView(p: { label?: string; title?: string; subtitle?: string;
 
 /* ── Lightbox ───────────────────────────────────────────────────────────── */
 
+/** Words of the grid and the lightbox (editable in Contenido; {n} and {total} are filled in). */
+interface GridCopy { countOne: string; countMany: string; zoomLabel: string; zoomAria: string; dialogLabel: string; closeLabel: string; prevLabel: string; nextLabel: string; position: string }
+
 /** Lightbox accesible y sin dependencias: Esc cierra, ←/→ navegan. */
 function Lightbox({
-  photos, index, onClose, onMove,
+  photos, index, onClose, onMove, copy,
 }: {
-  photos: Photo[]; index: number; onClose: () => void; onMove: (next: number) => void;
+  photos: Photo[]; index: number; onClose: () => void; onMove: (next: number) => void; copy: GridCopy;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -93,7 +96,7 @@ function Lightbox({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Fotografía ${index + 1} de ${photos.length}`}
+      aria-label={fill(copy.dialogLabel, { n: index + 1, total: photos.length })}
       className="fixed inset-0 z-[80] flex items-center justify-center bg-dark/95 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -101,7 +104,7 @@ function Lightbox({
         ref={closeRef}
         type="button"
         onClick={onClose}
-        aria-label="Cerrar galería"
+        aria-label={copy.closeLabel}
         className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green"
       >
         <X className="h-5 w-5" aria-hidden="true" />
@@ -110,7 +113,7 @@ function Lightbox({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); prev(); }}
-        aria-label="Fotografía anterior"
+        aria-label={copy.prevLabel}
         className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green sm:left-4"
       >
         <ChevronLeft className="h-6 w-6" aria-hidden="true" />
@@ -129,14 +132,14 @@ function Lightbox({
         </div>
         <figcaption className="mt-3 text-center text-sm text-white/70">
           {photos[index].caption && <span className="block text-base font-semibold text-white">{photos[index].caption}</span>}
-          {index + 1} / {photos.length}
+          {fill(copy.position, { n: index + 1, total: photos.length })}
         </figcaption>
       </figure>
 
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); next(); }}
-        aria-label="Fotografía siguiente"
+        aria-label={copy.nextLabel}
         className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green sm:right-4"
       >
         <ChevronRight className="h-6 w-6" aria-hidden="true" />
@@ -150,8 +153,13 @@ interface PhotoItem { image?: number | string; caption?: string; category?: stri
 interface FilterItem { key?: string; label?: string }
 
 /** Galería de vida escolar: filtros por categoría + lightbox con teclado. */
-function GaleriaGridView(p: { photos?: PhotoItem[]; filters?: FilterItem[] }) {
+type GridProps = { photos?: PhotoItem[]; filters?: FilterItem[]; filterLabel?: string } & Partial<GridCopy>;
+function GaleriaGridView(p: GridProps) {
   const t = useTokens();
+  const copy: GridCopy = {
+    countOne: t(p.countOne), countMany: t(p.countMany), zoomLabel: t(p.zoomLabel), zoomAria: t(p.zoomAria),
+    dialogLabel: t(p.dialogLabel), closeLabel: t(p.closeLabel), prevLabel: t(p.prevLabel), nextLabel: t(p.nextLabel), position: t(p.position),
+  };
   const altOf = useMediaAlt();
   const filters = asList<FilterItem>(p.filters).filter((x) => x?.key);
   const [filter, setFilter] = useState<string>(filters[0]?.key ?? ALL);
@@ -175,7 +183,7 @@ function GaleriaGridView(p: { photos?: PhotoItem[]; filters?: FilterItem[] }) {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           {/* Filtros por categoría */}
           {filters.length > 0 && (
-            <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filtrar fotografías">
+            <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label={t(p.filterLabel)}>
               {filters.map((fl) => (
                 <button
                   key={fl.key}
@@ -195,7 +203,7 @@ function GaleriaGridView(p: { photos?: PhotoItem[]; filters?: FilterItem[] }) {
           )}
 
           <p className="mb-5 text-[13px] font-medium text-subtle">
-            {visible.length} {visible.length === 1 ? 'fotografía' : 'fotografías'}
+            {visible.length} {visible.length === 1 ? copy.countOne : copy.countMany}
           </p>
 
           {/* Masonry grid: cada foto abre el lightbox */}
@@ -205,7 +213,7 @@ function GaleriaGridView(p: { photos?: PhotoItem[]; filters?: FilterItem[] }) {
                 key={photo.id}
                 type="button"
                 onClick={() => setOpen(i)}
-                aria-label={`Ampliar imagen ${i + 1} de ${visible.length}`}
+                aria-label={fill(copy.zoomAria, { n: i + 1, total: visible.length })}
                 className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-2xl bg-cream shadow-card ring-1 ring-ink/5 transition-shadow duration-300 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
               >
                 <img
@@ -220,7 +228,7 @@ function GaleriaGridView(p: { photos?: PhotoItem[]; filters?: FilterItem[] }) {
                 {/* Hover affordance: gradient wash + "Ampliar" pill */}
                 <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-ink/0 to-ink/0 opacity-100 transition-opacity duration-300 lg:opacity-0 lg:group-hover:opacity-100" />
                 <span aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-bold text-ink opacity-100 shadow-sm transition-all duration-300 lg:translate-y-1.5 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 motion-reduce:transition-none">
-                  <Maximize2 className="h-3 w-3 text-green-dark" /> Ampliar
+                  <Maximize2 className="h-3 w-3 text-green-dark" /> {copy.zoomLabel}
                 </span>
                 {photo.caption && (
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-3 pb-2.5 pt-8 text-left text-[12.5px] font-semibold text-white opacity-90 transition-opacity group-hover:opacity-0">
@@ -239,6 +247,7 @@ function GaleriaGridView(p: { photos?: PhotoItem[]; filters?: FilterItem[] }) {
           index={open}
           onClose={() => setOpen(null)}
           onMove={setOpen}
+          copy={copy}
         />
       )}
     </>
@@ -285,11 +294,25 @@ export const sections = [
       f.items('photos', 'Fotos', [
         f.image('image', 'Foto', { required: true }),
         f.text('caption', 'Pie de foto'),
-        f.text('category', 'Categoría', { hint: 'La clave de uno de los filtros, p. ej. vida o instalaciones.' }),
+        f.select('category', 'Filtro', [], { optionsFrom: { list: 'filters', value: 'key', label: 'label' } }),
       ]),
       f.items('filters', 'Filtros', [
-        f.text('key', 'Clave', { required: true, hint: 'La clave «todas» muestra todas las fotos. El primer filtro es el que se ve al abrir la página.' }),
         f.text('label', 'Texto del botón', { required: true }),
+        f.text('key', 'Clave', { required: true, advanced: true, slugFrom: { field: 'label', keep: ['todas'] } }),
+      ]),
+      ...grouped('Contador y foto ampliada', [
+        f.text('countOne', 'Contador: una foto'),
+        f.text('countMany', 'Contador: varias fotos'),
+        f.text('zoomLabel', 'Etiqueta «Ampliar» sobre cada foto'),
+        f.text('position', 'Posición bajo la foto ampliada'),
+      ]),
+      ...grouped('Lectores de pantalla (no se ven)', [
+        f.text('filterLabel', 'Grupo de filtros'),
+        f.text('zoomAria', 'Botón de cada foto'),
+        f.text('dialogLabel', 'Foto ampliada'),
+        f.text('closeLabel', 'Botón para cerrar'),
+        f.text('prevLabel', 'Botón anterior'),
+        f.text('nextLabel', 'Botón siguiente'),
       ]),
     ],
     defaults: {
@@ -299,6 +322,9 @@ export const sections = [
         { key: 'vida', label: 'Vida escolar' },
         { key: 'instalaciones', label: 'Instalaciones' },
       ],
+      countOne: 'fotografía', countMany: 'fotografías', zoomLabel: 'Ampliar',
+      filterLabel: 'Filtrar fotografías', zoomAria: 'Ampliar imagen {n} de {total}', dialogLabel: 'Fotografía {n} de {total}',
+      closeLabel: 'Cerrar galería', prevLabel: 'Fotografía anterior', nextLabel: 'Fotografía siguiente', position: '{n} / {total}',
     },
   }),
 ];

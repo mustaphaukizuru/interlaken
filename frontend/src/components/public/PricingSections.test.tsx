@@ -117,11 +117,11 @@ describe('section specs', () => {
   it('both sections open «Costos y precios» instead of the old «Ajustes, Costos» hint', () => {
     for (const type of ['costos.prices', 'admisiones.estimator']) {
       const spec = costos.sections.concat(admisiones.sections).find((s) => s.type === type)!;
-      expect(spec.fields[0]).toMatchObject({ kind: 'action', label: 'Editar precios', href: '/admin/costos' });
+      expect(spec.fields[0]).toMatchObject({ kind: 'action', label: 'Editar precios', actionHref: '/admin/costos' });
       expect(spec.description).not.toMatch(/Ajustes, Costos/);
     }
     const prices = costos.sections.find((s) => s.type === 'costos.prices')!;
     const groups = new Set(prices.fields.map((f) => f.group).filter(Boolean));
-    expect([...groups]).toEqual(['Explicación del pago', 'Inscripción y reinscripción', 'Colegiaturas', 'Seguros y credenciales', 'Extraescolares', 'Estancia', 'Políticas de pago', 'Nota y llamado final', 'Sin precios o con error']);
+    expect([...groups]).toEqual(['Cómo se paga', 'Inscripción y reinscripción', 'Colegiaturas', 'Seguros y credenciales', 'Extraescolares', 'Estancia', 'Políticas de pago', 'Nota al final de las tablas', 'Llamado final', 'Si no hay precios o no cargan']);
   });
 });

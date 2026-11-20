@@ -140,8 +140,8 @@ export const platformsFields: FieldSpec[] = [
     f.text('name', 'Nombre', { required: true }),
     f.textarea('text', 'Descripción'),
     f.icon('icon'),
-    f.text('href', 'Enlace', { required: true, hint: 'Dirección completa (https://...) o una página del sitio (/login).' }),
+    f.href('href', 'Enlace', { required: true }),
     f.text('cta', 'Texto del botón', { required: true }),
   ]),
-  f.textarea('note', 'Nota final (opcional)', { hint: 'Para un enlace escriba [Texto](/ruta), p. ej. [Contacto](/contacto).' }),
+  f.textarea('note', 'Nota final (opcional)', { marks: ['link'] }),
 ];

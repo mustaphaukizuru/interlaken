@@ -5,6 +5,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { contentApi } from '@/services/api';
 import { BlockRenderer } from './BlockRenderer';
 import { CmsMediaProvider } from './runtime';
+import { CmsPreviewProvider } from './preview';
 import { absoluteImageUrl } from './media';
 import { SITE_URL } from '@/lib/siteMeta';
 import type { CmsPagePayload } from './published';
@@ -45,7 +46,8 @@ export default function CmsPage({ slug: slugProp }: { slug?: string }) {
         image={absoluteImageUrl(data.seo?.og_image, SITE_URL) || undefined} noindex={data.seo?.noindex || !!preview || undefined} />
       {preview && <div className="sticky top-0 z-40 bg-amber px-4 py-2 text-center text-xs font-bold text-white">Vista previa del borrador: lo que ve aquí aún no está publicado.</div>}
       <CmsMediaProvider media={data.media}>
-        <BlockRenderer blocks={data.blocks} />
+        {/* A draft preview shows the app screens (sign-in, invitation links) in their sample state. */}
+        {preview ? <CmsPreviewProvider><BlockRenderer blocks={data.blocks} /></CmsPreviewProvider> : <BlockRenderer blocks={data.blocks} />}
       </CmsMediaProvider>
     </div>
   );

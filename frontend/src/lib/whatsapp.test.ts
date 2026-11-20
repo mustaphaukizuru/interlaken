@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { waHref } from './siteContact';
-import { WA_MESSAGES, waSectionMessage } from './whatsapp';
+import { setWaEstimatorTemplate, WA_MESSAGES, waMessage, waSectionMessage } from './whatsapp';
 import { CURRENT_CYCLE } from './siteMeta';
 
 describe('whatsapp helpers', () => {
@@ -26,5 +26,15 @@ describe('whatsapp helpers', () => {
   it('waSectionMessage interpolates the section and cycle', () => {
     const msg = waSectionMessage('Primaria');
     expect(msg).toBe(`Hola, me interesa información de Primaria para el ciclo ${CURRENT_CYCLE}.`);
+  });
+
+  it('the school edits the messages in Navegación; blank keeps the built-in text', () => {
+    expect(waMessage({ wa_visit: 'Quiero conocer el colegio.' }, 'wa_visit')).toBe('Quiero conocer el colegio.');
+    expect(waMessage({ wa_admissions: 'Informes {{ciclo}}' }, 'wa_admissions')).toBe(`Informes ${CURRENT_CYCLE}`);
+    expect(waMessage({ wa_visit: '' }, 'wa_visit')).toBe(WA_MESSAGES.visit);
+    setWaEstimatorTemplate({ wa_estimator: 'Cuotas de {seccion}, ciclo {{ciclo}}' });
+    expect(waSectionMessage('Primaria')).toBe(`Cuotas de Primaria, ciclo ${CURRENT_CYCLE}`);
+    setWaEstimatorTemplate({});
+    expect(waSectionMessage('Primaria')).toBe(`Hola, me interesa información de Primaria para el ciclo ${CURRENT_CYCLE}.`);
   });
 });

@@ -25,9 +25,11 @@ export function defineModule(sections: SectionSpec[], templates: PageTemplate[])
 }
 
 /* ── Field shorthands ────────────────────────────────────────────────────── */
-type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group'>>;
+type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group' | 'advanced' | 'slugFrom' | 'optionsFrom' | 'marks' | 'minWidth' | 'limits'>>;
 export const f = {
   text: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'text', ...o }),
+  /** A link destination (page of the site, web address, e-mail, phone, WhatsApp) stored as a string. */
+  href: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'href', ...o }),
   textarea: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'textarea', ...o }),
   richtext: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'richtext', ...o }),
   image: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'image', ...o }),
@@ -42,8 +44,26 @@ export const f = {
   select: (key: string, label: string, options: { value: string; label: string }[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'select', options, ...o }),
   items: (key: string, label: string, item: FieldSpec[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'items', item, ...o }),
   /** A button to a console screen (opens in a new tab); `hint` says what is edited there. */
-  action: (key: string, label: string, href: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'action', href, ...o }),
+  action: (key: string, label: string, actionHref: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'action', actionHref, ...o }),
 };
+
+/**
+ * Field groups (C4) are one key, FieldSpec.group: set it per field through
+ * `Opt` (`f.text(k, l, { group })`) or for a run of fields with
+ * `grouped('Mensajes', [f.text(...), ...])`. Both write the same key; the
+ * editor shows consecutive fields of a group as one collapsible group.
+ */
+export const grouped = (group: string, fields: FieldSpec[]): FieldSpec[] => fields.map((x) => ({ ...x, group }));
+
+/**
+ * Fills `{name}` placeholders of an editable text with values the page
+ * computes (a count, a grade, an e-mail). Unknown names stay as written.
+ * Site tokens ({{ciclo}}, {{correo}}...) are a different syntax and are
+ * replaced by useTokens before this runs.
+ */
+export function fill(text: string, values: Record<string, string | number>): string {
+  return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
+}
 
 /** The usual heading trio of a section. */
 export const headingFields = (o: { eyebrow?: boolean; text?: boolean } = {}): FieldSpec[] => [

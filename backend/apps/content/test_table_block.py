@@ -79,7 +79,8 @@ def test_validate_blocks_uses_the_manifest_limits():
     assert "hasta 8 columnas" in str(exc.value)
     with pytest.raises(Exception) as exc:
         validate_blocks([{"type": "table", "props": {"title": "Sin tabla"}}])
-    assert 'falta "table"' in str(exc.value)
+    # Named with the editor's labels (C3), never with the prop key.
+    assert 'Sección 1 (Tabla), campo «Tabla»: falta este dato.' in str(exc.value)
 
 
 def test_a_table_on_the_pagos_page_publishes(api_client):

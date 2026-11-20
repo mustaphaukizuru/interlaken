@@ -17,44 +17,24 @@ A designed page published straight from its design passes with no issue at
 all: its SEO falls back to the template's (page_templates.template_seo), so a
 blank SEO field is not «missing». Messages are plain Spanish and name the
 section (its number and label in the editor's list) and the field.
+
+An issue about a section also says where, in the editor's words (contract
+C3): block_index, block_label, field (a path such as `items.2.title`, the
+editor field it belongs to), field_label («Tarjetas › elemento 3 › Título»)
+and field_message (the short text shown next to the field). Labels come from
+block_manifest.json (pages.field_label), never from prop keys.
 """
 from __future__ import annotations
 
 import re
 
 from .media import MediaAsset
-from .pages import Page, manifest, section_schema
+from .pages import Page, image_ref_paths, located_error, manifest, section_schema, where
 
 HREF_RE = re.compile(r'href=["\']([^"\']+)["\']', re.I)
 ROUTE_PREFIXES = ('/niveles/', '/portal', '/admin', '/staff', '/login', '/p/')
 SEO_TITLE_MAX = 60
 SEO_DESCRIPTION_MAX = 160
-
-# Field names as the editor shows them (generic blocks and the common section props).
-FIELD_LABELS = {
-    'title': 'Título', 'subtitle': 'Subtítulo', 'text': 'Texto', 'html': 'Texto', 'body': 'Texto',
-    'label': 'Texto del botón', 'href': 'Enlace', 'to': 'Enlace', 'cta': 'Botón', 'primary': 'Botón principal',
-    'secondary': 'Botón secundario', 'buttons': 'Botones', 'links': 'Enlaces', 'items': 'Elementos',
-    'images': 'Fotos', 'photos': 'Fotos', 'image': 'Imagen', 'image1': 'Imagen 1', 'image2': 'Imagen 2',
-    'image3': 'Imagen 3', 'poster': 'Imagen de portada', 'photo': 'Foto', 'url': 'Enlace del video',
-    'form': 'Formulario', 'q': 'Pregunta', 'a': 'Respuesta',
-}
-
-
-def _field(path: list) -> str:
-    """['items', 2, 'href'] → «Elementos › elemento 3 › Enlace»."""
-    out: list[str] = []
-    for part in path:
-        if isinstance(part, int):
-            out.append(f'elemento {part + 1}')
-        else:
-            out.append(FIELD_LABELS.get(part, part))
-    return ' › '.join(out)
-
-
-def _section(n: int, block: dict) -> str:
-    label = manifest().get(block.get('type'), {}).get('label') or block.get('type') or 'bloque'
-    return f'Sección {n} ({label})'
 
 
 def _known_paths() -> set[str]:
@@ -66,42 +46,42 @@ def _known_paths() -> set[str]:
     return paths
 
 
-def _hrefs(value, path: list, out: list[tuple[list, str]]) -> None:
-    """Every link in a block's props, with where it sits: {href} objects, href/to strings, <a href> inside text."""
+def _hrefs(value, out: list[tuple[str, str]], path: str = '') -> None:
+    """Every link in a block's props, with where it is: {href} objects, href/to strings, <a href> inside text."""
     if isinstance(value, dict):
         for k, v in value.items():
+            at = f'{path}.{k}' if path else str(k)
             if k in ('href', 'to') and isinstance(v, str) and v.strip():
-                out.append(([*path, k], v))
+                out.append((at, v))
             elif isinstance(v, str) and '<a' in v:
-                out.extend(([*path, k], h) for h in HREF_RE.findall(v))
+                out.extend((at, h) for h in HREF_RE.findall(v))
             else:
-                _hrefs(v, [*path, k], out)
+                _hrefs(v, out, at)
     elif isinstance(value, list):
-        for i, v in enumerate(value):
-            _hrefs(v, [*path, i], out)
+        for n, v in enumerate(value):
+            _hrefs(v, out, f'{path}.{n}')
 
 
-def _image_refs(block: dict) -> list[tuple[list, int]]:
-    """Media-library ids a block uses, with their field (manifest image paths: "poster", "items[].image")."""
-    paths = manifest().get(block.get('type'), {}).get('images') or ['image', 'images[].image']
-    found: list[tuple[list, int]] = []
+def _links_in(blocks: list[tuple[int, dict]]) -> list[tuple[int, str, str]]:
+    """(block index, path, href) of every link of the given (index, block) pairs."""
+    out = []
+    for i, b in blocks:
+        found: list[tuple[str, str]] = []
+        _hrefs(b.get('props', {}), found)
+        out += [(i, path, h) for path, h in found]
+    return out
 
-    def walk(value, parts, at):
-        if not parts:
-            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-                found.append((at, value))
-            return
-        head, rest = parts[0], parts[1:]
-        if head.endswith('[]'):
-            items = value.get(head[:-2]) if isinstance(value, dict) else None
-            for i, it in enumerate(items if isinstance(items, list) else []):
-                walk(it, rest, [*at, head[:-2], i])
-        elif isinstance(value, dict):
-            walk(value.get(head), rest, [*at, head])
 
-    for p in paths:
-        walk(block.get('props') or {}, p.replace('[].', '[] ').replace('.', ' ').split(), [])
-    return found
+def issue_error(issue: dict) -> dict:
+    """An issue as a structured error for the editor (publish 400 `errors`)."""
+    return {
+        'block_index': issue.get('block_index'),
+        'block_id': issue.get('block_id'),
+        'block_label': issue.get('block_label', ''),
+        'field': issue.get('field', ''),
+        'field_label': issue.get('field_label', ''),
+        'message': issue.get('field_message') or issue.get('message', ''),
+    }
 
 
 def run_checks(page: Page) -> list[dict]:
@@ -113,58 +93,66 @@ def run_checks(page: Page) -> list[dict]:
     err = lambda code, msg, bid=None: issues.append({'level': 'error', 'code': code, 'message': msg, 'block_id': bid})  # noqa: E731
     warn = lambda code, msg, bid=None: issues.append({'level': 'warning', 'code': code, 'message': msg, 'block_id': bid})  # noqa: E731
 
+    def at(level: str, code: str, index: int, path: str, short: str, full: str = '') -> None:
+        """An issue located in a section and field: «Sección N (label), campo «…»: …» plus the structured fields."""
+        loc = located_error(all_blocks, index, path, short)
+        t = all_blocks[index].get('type')
+        issues.append({'level': level, 'code': code, 'block_id': loc['block_id'],
+                       'message': full or f'{where(t, index, path)}: {short[0].lower()}{short[1:]}',
+                       'block_index': index, 'block_label': loc['block_label'], 'field': loc['field'],
+                       'field_label': loc['field_label'], 'field_message': short})
+
     # Numbered as in the editor's list (hidden ones count: they are still in the list).
-    numbered = [(k + 1, b) for k, b in enumerate(all_blocks) if isinstance(b, dict)]
-    visible = [(n, b) for n, b in numbered if not b.get('hidden')]
+    numbered = [(i, b) for i, b in enumerate(all_blocks) if isinstance(b, dict)]
+    visible = [(i, b) for i, b in numbered if not b.get('hidden')]
 
     if not visible:
         err('empty', 'La página no tiene secciones visibles: agregue una o muestre alguna de las ocultas.')
-    for n, b in numbered:
+    for i, b in numbered:
         if b.get('hidden') and manifest().get(b.get('type'), {}).get('locked'):
-            err('locked_hidden', f'{_section(n, b)}: lleva un formulario o la agenda y no se puede ocultar. Vuelva a mostrarla.', b.get('id'))
+            at('error', 'locked_hidden', i, '', 'Lleva un formulario o la agenda y no se puede ocultar. Vuelva a mostrarla.')
 
-    prev, prev_n = None, 0
-    for n, b in visible:
+    prev, prev_i = None, 0
+    for i, b in visible:
         props = b.get('props') or {}
         for name in section_schema(b.get('type')) or {}:
             if props.get(name) in (None, '', [], {}):
-                err('required', f'{_section(n, b)}, campo «{_field([name])}»: está vacío y es obligatorio.', b.get('id'))
+                at('error', 'required', i, name, 'Está vacío y es obligatorio.')
         if b.get('type') == 'rich_text' and not re.sub(r'<[^>]+>', '', str(props.get('html', ''))).strip():
-            err('empty_text', f'{_section(n, b)}, campo «Texto»: no tiene contenido. Escriba el texto o elimine la sección.', b.get('id'))
+            at('error', 'empty_text', i, 'html', 'No tiene contenido. Escriba el texto o elimine la sección.')
         if b.get('type') == 'gallery' and not props.get('images'):
-            err('empty_gallery', f'{_section(n, b)}, campo «Fotos»: la galería no tiene fotos.', b.get('id'))
+            at('error', 'empty_gallery', i, 'images', 'La galería no tiene fotos.')
         if prev == b.get('type') and b.get('type') in ('hero', 'cta_band', 'stats'):
-            label = manifest().get(b.get('type'), {}).get('label') or b.get('type')
-            warn('duplicate', f'Secciones {prev_n} y {n} ({label}): son del mismo tipo y van seguidas; ¿se duplicó por error?', b.get('id'))
-        prev, prev_n = b.get('type'), n
+            label = manifest().get(b.get('type'), {}).get('label') or 'Sección'
+            at('warning', 'duplicate', i, '', 'Es del mismo tipo que la sección anterior; ¿se duplicó por error?',
+               f'Secciones {prev_i + 1} y {i + 1} ({label}): son del mismo tipo y van seguidas; ¿se duplicó por error?')
+        prev, prev_i = b.get('type'), i
 
-    refs = [(n, b, at, i) for n, b in visible for at, i in _image_refs(b)]
-    assets = {a.pk: a for a in MediaAsset.objects.filter(pk__in=[r[3] for r in refs])}
-    for n, b, at, i in refs:
-        a = assets.get(i)
+    refs = [(i, path, mid) for i, b in visible for path, mid in image_ref_paths(b)]
+    assets = {a.pk: a for a in MediaAsset.objects.filter(pk__in=[mid for _i, _p, mid in refs])}
+    for i, path, mid in refs:
+        a = assets.get(mid)
         if a is None:
-            err('missing_image', f'{_section(n, b)}, campo «{_field(at)}»: la imagen se borró de la biblioteca de medios. Elija otra.', b.get('id'))
+            at('error', 'missing_image', i, path, 'La imagen se borró de la biblioteca de medios. Elija otra.')
         elif not a.alt:
-            err('missing_alt', f'{_section(n, b)}, campo «{_field(at)}»: la foto "{a.filename}" no tiene texto alternativo. Agréguelo en Medios.', b.get('id'))
+            at('error', 'missing_alt', i, path, f'La foto «{a.filename}» no tiene descripción (texto alternativo). Escríbala junto a la imagen.')
 
     known = _known_paths()
-    for n, b in visible:
-        found: list[tuple[list, str]] = []
-        _hrefs(b.get('props') or {}, [], found)
-        for at, href in found:
-            h = href.strip()
-            where = f'{_section(n, b)}, campo «{_field(at)}»'
-            if not h or h.startswith(('http://', 'https://', 'mailto:', 'tel:', '#')):
-                if h.startswith('http://'):
-                    warn('insecure_link', f'{where}: el enlace {h} no es seguro (http). Use https:// si el sitio lo permite.', b.get('id'))
-                continue
-            if not h.startswith('/'):
-                err('relative_link', f'{where}: el enlace "{h}" debe empezar con / (página del sitio) o con https://.', b.get('id'))
-                continue
-            path = h.split('?')[0].split('#')[0].rstrip('/') or '/'
-            if path in known or path.startswith(ROUTE_PREFIXES):
-                continue
-            err('broken_link', f'Enlace roto. {where}: {h} no lleva a ninguna página ni redirección del sitio.', b.get('id'))
+    for i, path, href in _links_in(visible):
+        h = href.strip()
+        t = all_blocks[i].get('type')
+        if not h or h.startswith(('http://', 'https://', 'mailto:', 'tel:', '#')):
+            if h.startswith('http://'):
+                at('warning', 'insecure_link', i, path, f'El enlace {h} no es seguro (http). Use https:// si el sitio lo permite.')
+            continue
+        if not h.startswith('/'):
+            at('error', 'relative_link', i, path, f'El enlace «{h}» debe empezar con / (página del sitio) o con https://.')
+            continue
+        target = h.split('?')[0].split('#')[0].rstrip('/') or '/'
+        if target in known or target.startswith(ROUTE_PREFIXES):
+            continue
+        at('error', 'broken_link', i, path, f'Enlace roto: {h} no lleva a ninguna página ni redirección. Elija otro destino.',
+           f'Enlace roto. {where(t, i, path)}: {h} no lleva a ninguna página ni redirección del sitio.')
 
     # SEO: an empty field shows the design's own title and description, so only
     # what the school typed (or the old seed left behind) is checked.

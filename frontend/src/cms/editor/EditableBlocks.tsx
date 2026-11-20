@@ -8,9 +8,11 @@ import { Suspense, type KeyboardEvent, type MouseEvent } from 'react';
 import { EyeOff } from 'lucide-react';
 import { BlockView } from '../BlockRenderer';
 import { blockSpec, type Block } from '../blocks/registry';
+import { CmsPreviewProvider } from '../preview';
 
 export function EditableBlocks({ blocks, selectedId, onSelect }: { blocks: Block[]; selectedId?: string | null; onSelect?: (id: string) => void }) {
   return (
+    <CmsPreviewProvider>
     <Suspense fallback={<div className="min-h-[40vh]" aria-busy="true" />}>
       {blocks.map((b) => {
         const select = (e: MouseEvent | KeyboardEvent) => { e.preventDefault(); e.stopPropagation(); onSelect?.(b.id); };
@@ -38,6 +40,7 @@ export function EditableBlocks({ blocks, selectedId, onSelect }: { blocks: Block
         );
       })}
     </Suspense>
+    </CmsPreviewProvider>
   );
 }
 

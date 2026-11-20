@@ -8,9 +8,10 @@
   <!--
     Offline navigation fallback, served from the service worker's precache when
     a navigation fails (no network and no cached copy of the page). Fully
-    self-contained: system fonts, inline styles, no scripts (CSP: script-src
-    'self' — a retry is just a link back to the same URL). Brand tokens mirror
-    tailwind.config.js (cream/ink/purple/green/coral).
+    self-contained: system fonts, inline styles, one same-origin script
+    (offline.js, precached too; CSP script-src 'self') that only swaps in the
+    copy edited in Navegación. A retry is just a link back to the same URL.
+    Brand tokens mirror tailwind.config.js (cream/ink/purple/green/coral).
   -->
   <style>
     :root {
@@ -52,7 +53,7 @@
       font-weight: 700;
       margin-bottom: 10px;
     }
-    h1 span { color: var(--purple); }
+    h1 .accent { color: var(--purple); }
     p { font-size: 0.95rem; line-height: 1.55; color: var(--muted); margin-bottom: 24px; }
     .actions { display: flex; flex-direction: column; gap: 10px; }
     a.btn {
@@ -78,16 +79,18 @@
   <main class="card">
     <img class="logo" src="/icon-192.png" alt="" width="72" height="72" />
     <div class="rule" aria-hidden="true"></div>
-    <h1>Sin conexión a <span>internet</span></h1>
-    <p>
+    <h1><span id="offline-title">Sin conexión a</span> <span id="offline-accent" class="accent">internet</span></h1>
+    <p id="offline-text">
       No pudimos cargar esta página. Verifique su conexión Wi-Fi o de datos
       móviles e intente de nuevo. Cuando la conexión regrese, el portal se
       mostrará normalmente.
     </p>
     <div class="actions">
-      <a class="btn retry" href="">Reintentar</a>
-      <a class="btn home" href="/portal">Ir al portal</a>
+      <a class="btn retry" href="" id="offline-retry">Reintentar</a>
+      <a class="btn home" href="/portal" id="offline-home">Ir al portal</a>
     </div>
   </main>
+  <!-- The school's edited copy, if the site stored one (src/lib/offlineCopy.ts). -->
+  <script src="/offline.js"></script>
 </body>
 </html>

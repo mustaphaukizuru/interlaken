@@ -46,6 +46,9 @@ class PrivacyNoticeVersion(models.Model):
     effective_date       = models.DateField()
     is_active            = models.BooleanField(default=False, verbose_name='Vigente')
     created_at           = models.DateTimeField(default=timezone.now)
+    # Set when the version goes live (console «Aviso de privacidad» or Django
+    # admin activation). A version with it set was public: its text is frozen.
+    published_at         = models.DateTimeField(null=True, blank=True, verbose_name='Publicada')
 
     class Meta:
         ordering = ['-effective_date', '-created_at']
@@ -60,7 +63,22 @@ class PrivacyNoticeVersion(models.Model):
         """The active notice version applicants must accept (newest active)."""
         return cls.objects.filter(is_active=True).order_by('-effective_date').first()
 
+    @property
+    def was_published(self) -> bool:
+        """Shown on the site at some point (or accepted by someone): legal evidence, read-only."""
+        from apps.admissions.models import Registration
+        return bool(self.pk and (
+            self.is_active or self.published_at
+            or self.consent_records.exists()
+            or Registration.objects.filter(privacy_notice_version=self).exists()
+        ))
+
     def save(self, *args, **kwargs):
+        # Activating a version (here or in Django admin) is publishing it.
+        if self.is_active and self.published_at is None:
+            self.published_at = timezone.now()
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = {*kwargs['update_fields'], 'published_at'}
         # Any edit/activation may change which notice is "current" — drop the
         # public cache so CurrentNoticeView re-reads on the next request.
         from django.core.cache import cache

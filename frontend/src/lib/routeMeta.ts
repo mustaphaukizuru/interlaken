@@ -55,7 +55,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     title: `Nosotros: ${SCHOOL_YEARS} años educando en Tlalnepantla`,
     crumb: 'Quiénes somos',
     description:
-      `Conoce al Colegio Interlaken: ${SCHOOL_YEARS} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores.`,
+      `Conozca al Colegio Interlaken: ${SCHOOL_YEARS} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores.`,
   },
   '/modelo-educativo': {
     title: 'Modelo educativo bilingüe',
@@ -91,7 +91,7 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     title: `Admisiones ${CURRENT_CYCLE}`,
     crumb: 'Admisiones',
     description:
-      `Admisiones ${CURRENT_CYCLE} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a tu hijo en preescolar, primaria o secundaria.`,
+      `Admisiones ${CURRENT_CYCLE} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a su hijo en preescolar, primaria o secundaria.`,
   },
   '/admisiones/documentacion': {
     title: 'Documentos para la inscripción',
@@ -112,20 +112,20 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     crumb: 'Pre-registro',
     parent: '/admisiones',
     description:
-      `Inicia tu pre-registro en línea para el ciclo escolar ${CURRENT_CYCLE} en el Colegio Interlaken. Un asesor te contactará en 2 días hábiles.`,
+      `Inicie su pre-registro en línea para el ciclo escolar ${CURRENT_CYCLE} en el Colegio Interlaken. Un asesor le contactará en 2 días hábiles.`,
   },
   '/agendar-visita': {
-    title: 'Agenda una visita al colegio',
+    title: 'Agende una visita al colegio',
     crumb: 'Agendar visita',
     parent: '/admisiones',
     description:
-      'Reserva en línea un recorrido por las instalaciones del Colegio Interlaken en Residencial El Dorado, Tlalnepantla. Conoce salones, maestros y patios.',
+      'Reserve en línea un recorrido por las instalaciones del Colegio Interlaken en Residencial El Dorado, Tlalnepantla. Conozca salones, maestros y patios.',
   },
   '/contacto': {
     title: 'Contacto y ubicación',
     crumb: 'Contacto',
     description:
-      'Contacta al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa.',
+      'Contacte al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa.',
   },
   // Menu «Familias» (2026-11-20): Pagar colegiatura (Servo Escolar), Colegiaturas
   // y cafetería, Facturación, Plataformas. Labels and titles follow the menu.
@@ -145,29 +145,34 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     title: 'Facturación (CFDI)',
     crumb: 'Facturación',
     description:
-      'Solicita tus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos, plazos y avisos importantes.',
+      'Solicite sus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos, plazos y avisos importantes.',
   },
   '/aviso-de-privacidad': {
     title: 'Aviso de privacidad',
     crumb: 'Aviso de privacidad',
     description:
-      'Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO.',
+      'Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer sus derechos ARCO.',
   },
   // Personal-data flows: reachable, never indexed.
   '/inscripcion': {
     title: 'Inscripción formal',
     noindex: true,
-    description: 'Completa la inscripción formal en el Colegio Interlaken tras tu pre-registro.',
+    description: 'Complete la inscripción formal en el Colegio Interlaken tras su pre-registro.',
   },
   '/inscripcion/documentos': {
     title: 'Documentos de inscripción',
     noindex: true,
-    description: 'Sube los documentos de inscripción de tu hijo(a) al Colegio Interlaken.',
+    description: 'Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken.',
+  },
+  '/login': {
+    title: 'Iniciar sesión',
+    noindex: true,
+    description: 'Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea.',
   },
   '/confirmar-correo': {
     title: 'Confirmar correo para avisos',
     noindex: true,
-    description: 'Confirma el correo en el que recibirás los avisos del Colegio Interlaken.',
+    description: 'Confirme el correo en el que recibirá los avisos del Colegio Interlaken.',
   },
 };
 

@@ -2,14 +2,21 @@ import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Blob } from '@/components/ui/Blob';
+import { useSiteTexts } from '@/hooks/useSiteSettings';
 
 const FUNNEL_STEPS = [
-  { n: '01', label: 'Pre-Registro', to: '/pre-registro' },
+  { n: '01', key: 'funnel_1', label: 'Pre-Registro', to: '/pre-registro' },
   // Covers both Puertas Abiertas (group) and Agendar Visita (individual).
-  { n: '02', label: 'Visita', to: '/agendar-visita' },
-  { n: '03', label: 'Inscripción', to: '/admisiones/documentacion' },
-  { n: '04', label: 'Bienvenida', to: '/admisiones' },
+  { n: '02', key: 'funnel_2', label: 'Visita', to: '/agendar-visita' },
+  { n: '03', key: 'funnel_3', label: 'Inscripción', to: '/admisiones/documentacion' },
+  { n: '04', key: 'funnel_4', label: 'Bienvenida', to: '/admisiones' },
 ] as const;
+
+/** Built-in step words; Navegación → «Textos del sitio» edits them (SiteSettings.chrome funnel_*). */
+export const FUNNEL_DEFAULTS = {
+  funnel_1: 'Pre-Registro', funnel_2: 'Visita', funnel_3: 'Inscripción', funnel_4: 'Bienvenida',
+  funnel_now: 'Ahora', funnel_done: 'Listo', funnel_next: 'Siguiente',
+} as const;
 
 export type FunnelStepKey =
   | 'pre-registro'
@@ -49,6 +56,7 @@ export function FunnelHero({
   label = `Ciclo Escolar ${CURRENT_CYCLE} · Admisiones`,
 }: FunnelHeroProps) {
   const active = STEP_INDEX[step];
+  const text = useSiteTexts(FUNNEL_DEFAULTS);
 
   return (
     <section className="relative overflow-hidden bg-dark text-white">
@@ -104,14 +112,14 @@ export function FunnelHero({
                     ) : (
                       <span className={current ? 'text-pink' : ''}>{s.n}</span>
                     )}
-                    {current ? 'Ahora' : done ? 'Listo' : 'Siguiente'}
+                    {current ? text.funnel_now : done ? text.funnel_done : text.funnel_next}
                   </span>
                   <span
                     className={`mt-0.5 block text-sm font-semibold ${
                       current ? 'text-white' : 'text-white/75'
                     }`}
                   >
-                    {s.label}
+                    {text[s.key]}
                   </span>
                 </Link>
               </li>

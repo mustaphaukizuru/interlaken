@@ -19,7 +19,7 @@ export interface SiteSettings {
   /** CMS menu (P3-7). Empty = built-in menu. */
   menu?: MenuGroup[];
   /** Header buttons, footer text, mobile CTA (lib/siteChrome). {} = built-in copy. */
-  chrome?: Partial<import('@/lib/siteChrome').SiteChrome>;
+  chrome?: Partial<import('@/lib/siteChrome').SiteChrome> & import('@/lib/siteChrome').SiteTexts;
   /** Official SEP registrations (P3-8). Empty = built-in flyer values. */
   sep_incorporations?: { level: 'Preescolar' | 'Primaria' | 'Secundaria'; label: string }[];
   updated_at?: string;

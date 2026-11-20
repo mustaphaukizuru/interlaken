@@ -22,12 +22,17 @@ export function ageOnDec31(dobIso: string, year = new Date().getFullYear()): num
   return year - y - (before ? 0 : 1);
 }
 
-/** Null when eligible (or unknown); otherwise the Spanish hint shown under the grade. */
-export function eligibilityHint(dobIso: string, grade: string): string | null {
+/** Null when eligible (or unknown); otherwise the facts the hint under the grade states. */
+export function eligibilityGap(dobIso: string, grade: string): { grado: string; edad: number; anio: number; tiene: number } | null {
   const need = requiredAge(grade);
   const have = ageOnDec31(dobIso);
   if (need === null || have === null) return null;
   if (have === need) return null;
-  const year = new Date().getFullYear();
-  return `Para ${grade} el alumno debe tener ${need} años al 31 de diciembre de ${year} (tendrá ${have}).`;
+  return { grado: grade, edad: need, anio: new Date().getFullYear(), tiene: have };
+}
+
+/** Null when eligible (or unknown); otherwise the Spanish hint shown under the grade. */
+export function eligibilityHint(dobIso: string, grade: string): string | null {
+  const gap = eligibilityGap(dobIso, grade);
+  return gap && `Para ${gap.grado} el alumno debe tener ${gap.edad} años al 31 de diciembre de ${gap.anio} (tendrá ${gap.tiene}).`;
 }

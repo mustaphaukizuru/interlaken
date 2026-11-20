@@ -6,15 +6,15 @@
       "title": "Admisiones",
       "seo": {
         "title": "Admisiones {{ciclo}}",
-        "description": "Admisiones {{ciclo}} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a tu hijo en preescolar, primaria o secundaria."
+        "description": "Admisiones {{ciclo}} al Colegio Interlaken en Tlalnepantla: requisitos, fechas, costos y pasos para inscribir a su hijo en preescolar, primaria o secundaria."
       }
     },
     "agendar-visita": {
       "path": "/agendar-visita",
       "title": "Agendar visita",
       "seo": {
-        "title": "Agenda una visita al colegio",
-        "description": "Reserva en línea un recorrido por las instalaciones del Colegio Interlaken en Residencial El Dorado, Tlalnepantla. Conoce salones, maestros y patios."
+        "title": "Agende una visita al colegio",
+        "description": "Reserve en línea un recorrido por las instalaciones del Colegio Interlaken en Residencial El Dorado, Tlalnepantla. Conozca salones, maestros y patios."
       }
     },
     "aviso-de-privacidad": {
@@ -22,7 +22,15 @@
       "title": "Aviso de privacidad",
       "seo": {
         "title": "Aviso de privacidad",
-        "description": "Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer tus derechos ARCO."
+        "description": "Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer sus derechos ARCO."
+      }
+    },
+    "confirmar-correo": {
+      "path": "/confirmar-correo",
+      "title": "Confirmar correo",
+      "seo": {
+        "title": "Confirmar correo para avisos",
+        "description": "Confirme el correo en el que recibirá los avisos del Colegio Interlaken."
       }
     },
     "contacto": {
@@ -30,7 +38,7 @@
       "title": "Contacto",
       "seo": {
         "title": "Contacto y ubicación",
-        "description": "Contacta al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa."
+        "description": "Contacte al Colegio Interlaken: Av. de los Reyes 67, Residencial El Dorado, Tlalnepantla. Teléfono (55) 5379-1188, WhatsApp, correo y mapa."
       }
     },
     "costos": {
@@ -54,7 +62,7 @@
       "title": "Facturación",
       "seo": {
         "title": "Facturación (CFDI)",
-        "description": "Solicita tus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos, plazos y avisos importantes."
+        "description": "Solicite sus facturas (CFDI) del Colegio Interlaken: datos fiscales requeridos, plazos y avisos importantes."
       }
     },
     "galeria": {
@@ -65,12 +73,36 @@
         "description": "La vida en el Colegio Interlaken: campus, salones, deportes y actividades de preescolar, primaria y secundaria en Tlalnepantla."
       }
     },
+    "iniciar-sesion": {
+      "path": "/login",
+      "title": "Iniciar sesión",
+      "seo": {
+        "title": "Iniciar sesión",
+        "description": "Acceso al portal del Colegio Interlaken para familias y personal: cafetería y pagos en línea."
+      }
+    },
     "inicio": {
       "path": "/",
       "title": "Inicio",
       "seo": {
         "title": "Colegio Interlaken | Escuela bilingüe en Tlalnepantla",
-        "description": "Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con {{anios}} años de trayectoria. Agenda tu visita."
+        "description": "Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con {{anios}} años de trayectoria. Agende su visita."
+      }
+    },
+    "inscripcion": {
+      "path": "/inscripcion",
+      "title": "Inscripción",
+      "seo": {
+        "title": "Inscripción formal",
+        "description": "Complete la inscripción formal en el Colegio Interlaken tras su pre-registro."
+      }
+    },
+    "inscripcion-documentos": {
+      "path": "/inscripcion/documentos",
+      "title": "Documentos de inscripción",
+      "seo": {
+        "title": "Documentos de inscripción",
+        "description": "Suba los documentos de inscripción de su hijo(a) al Colegio Interlaken."
       }
     },
     "modelo-educativo": {
@@ -94,7 +126,7 @@
       "title": "Nosotros",
       "seo": {
         "title": "Nosotros: {{anios}} años educando en Tlalnepantla",
-        "description": "Conoce al Colegio Interlaken: {{anios}} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores."
+        "description": "Conozca al Colegio Interlaken: {{anios}} años formando líderes íntegros en Tlalnepantla con educación bilingüe, rigor académico y valores."
       }
     },
     "pagos": {
@@ -118,7 +150,7 @@
       "title": "Pre-registro",
       "seo": {
         "title": "Pre-registro en línea",
-        "description": "Inicia tu pre-registro en línea para el ciclo escolar {{ciclo}} en el Colegio Interlaken. Un asesor te contactará en 2 días hábiles."
+        "description": "Inicie su pre-registro en línea para el ciclo escolar {{ciclo}} en el Colegio Interlaken. Un asesor le contactará en 2 días hábiles."
       }
     },
     "preescolar": {
