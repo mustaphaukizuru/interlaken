@@ -106,7 +106,7 @@ export const sections = [
     fields: [
       f.text('title', 'Título de la lista'),
       f.text('summary', 'Resumen', { hint: '{total} = número de documentos; {online} = cuántos tienen enlace a un trámite en línea.' }),
-      f.items('items', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.url('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')]),
+      f.items('items', 'Documentos', [f.textarea('label', 'Documento', { required: true }), f.href('href', 'Enlace al trámite oficial'), f.text('linkLabel', 'Texto del enlace')]),
       f.text('ctaTitle', 'Llamado: título'),
       f.textarea('ctaText', 'Llamado: texto'),
       f.link('cta', 'Llamado: botón'),

@@ -25,9 +25,11 @@ export function defineModule(sections: SectionSpec[], templates: PageTemplate[])
 }
 
 /* ── Field shorthands ────────────────────────────────────────────────────── */
-type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group'>>;
+type Opt = Partial<Pick<FieldSpec, 'required' | 'hint' | 'group' | 'advanced' | 'slugFrom' | 'optionsFrom' | 'marks' | 'minWidth' | 'limits'>>;
 export const f = {
   text: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'text', ...o }),
+  /** A link destination (page of the site, web address, e-mail, phone, WhatsApp) stored as a string. */
+  href: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'href', ...o }),
   textarea: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'textarea', ...o }),
   richtext: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'richtext', ...o }),
   image: (key: string, label: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'image', ...o }),
@@ -42,8 +44,11 @@ export const f = {
   select: (key: string, label: string, options: { value: string; label: string }[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'select', options, ...o }),
   items: (key: string, label: string, item: FieldSpec[], o: Opt = {}): FieldSpec => ({ key, label, kind: 'items', item, ...o }),
   /** A button to a console screen (opens in a new tab); `hint` says what is edited there. */
-  action: (key: string, label: string, href: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'action', href, ...o }),
+  action: (key: string, label: string, actionHref: string, o: Opt = {}): FieldSpec => ({ key, label, kind: 'action', actionHref, ...o }),
 };
+
+/** Fields shown together as one collapsible group in the editor (FieldSpec.group). */
+export const grouped = (group: string, fields: FieldSpec[]): FieldSpec[] => fields.map((x) => ({ ...x, group }));
 
 /** The usual heading trio of a section. */
 export const headingFields = (o: { eyebrow?: boolean; text?: boolean } = {}): FieldSpec[] => [

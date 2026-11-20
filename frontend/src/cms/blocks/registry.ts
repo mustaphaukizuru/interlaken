@@ -7,11 +7,19 @@
 import { registeredSection } from './specs';
 import { TABLE_LIMITS, emptyTable } from './table';
 
+/**
+ * Field kinds. The stored value never depends on the editor control:
+ * `href` is a plain string (a page of the site, https://, mailto:, tel:), the
+ * same string a `text` field held before; `form` is a form slug; `link` is
+ * `{ label, href }`; `table` is the «Tabla» value (./table). `action` stores
+ * nothing: it is a button to a console screen. The editor controls live in
+ * cms/editor/fields.
+ */
 export type FieldKind =
   | 'text' | 'textarea' | 'richtext' | 'image' | 'images' | 'link' | 'items' | 'url' | 'number'
-  | 'select' | 'toggle' | 'icon' | 'color'
-  // Editors of their own (cms/editor/customFields): the «Tabla» grid, and a
-  // button that opens a console screen (`href`), e.g. «Editar precios».
+  | 'select' | 'toggle' | 'icon' | 'color' | 'href' | 'form'
+  // Editors of their own: the «Tabla» grid, and a button that opens a console
+  // screen (`actionHref`), e.g. «Editar precios».
   | 'table' | 'action';
 
 export interface FieldSpec {
@@ -24,12 +32,22 @@ export interface FieldSpec {
   /** For kind 'select'. */
   options?: { value: string; label: string }[];
   hint?: string;
-  /** Consecutive fields with the same group show together under this title (C4). */
+  /** Editor: consecutive fields with the same group title render as one collapsible group. */
   group?: string;
+  /** Editor (list items): the field sits under «Avanzado», closed by default. */
+  advanced?: boolean;
+  /** Editor: a key derived from a sibling field (a slug of its text) while it is empty or still derived; `keep` values never change. */
+  slugFrom?: { field: string; keep?: string[] };
+  /** Editor (select): options read from a list of the same block, e.g. a photo's category from the gallery filters. */
+  optionsFrom?: { list: string; value: string; label: string };
+  /** Editor (textarea): inline marks this text renders, offered as a toolbar: `**negritas**`, `[texto](/ruta)`. */
+  marks?: ('bold' | 'link')[];
+  /** Editor (image): narrowest width in px that still looks sharp in this slot. */
+  minWidth?: number;
   /** For kind 'table': the most columns, rows and characters per cell (the backend enforces them too). */
   limits?: { columns: number; rows: number; cell: number };
-  /** For kind 'action': where the button goes (opens in a new tab, so the draft stays open). */
-  href?: string;
+  /** For kind 'action': where the button goes (opens in a new tab, so the draft stays open). Not the `href` kind. */
+  actionHref?: string;
 }
 
 export interface BlockSpec {
@@ -101,7 +119,7 @@ export const BLOCKS: BlockSpec[] = [
     { key: 'url', label: 'URL del video', kind: 'url', required: true },
   ] },
   { type: 'form', label: 'Formulario', description: 'Un formulario de Formularios, o uno del sitio (pre-registro, contacto, facturación, agendar visita).', fields: [
-    { key: 'form', label: 'Formulario (slug)', kind: 'text', required: true, hint: 'El slug que aparece en Formularios, o pre-registro / contacto / facturacion / agendar-visita.' },
+    { key: 'form', label: 'Formulario', kind: 'form', required: true, hint: 'Elija uno de los formularios del sitio o uno creado en Contenido, Formularios.' },
   ] },
   { type: 'timeline', label: 'Línea de tiempo', description: 'Hitos por año.', fields: [
     { key: 'items', label: 'Hitos', kind: 'items', required: true, item: [

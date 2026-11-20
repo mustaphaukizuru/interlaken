@@ -34,18 +34,8 @@ export function draftConflictFrom(err: unknown): DraftConflict | null {
   };
 }
 
-/** C3 (owned by the «fields» branch): one problem in one field of one block. */
-export interface BlockFieldError {
-  block_index?: number;
-  block_id?: string;
-  block_label?: string;
-  field?: string;
-  field_label?: string;
-  message: string;
-}
-
-/** C3 `errors: [...]` of a 400, if the backend sends them. */
-export function blockErrorsFrom(err: unknown): BlockFieldError[] {
-  const list = body(err).errors;
-  return Array.isArray(list) ? list.filter((e): e is BlockFieldError => !!e && typeof e === 'object' && typeof (e as BlockFieldError).message === 'string') : [];
-}
+/**
+ * C3: one problem in one field of one block, and the `errors: [...]` of a 400.
+ * One implementation for the whole editor: cms/editor/validation.
+ */
+export { fieldErrorsFrom as blockErrorsFrom, type CmsFieldError as BlockFieldError } from '../validation';

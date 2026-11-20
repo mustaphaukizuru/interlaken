@@ -80,7 +80,7 @@ MAX_DRAFT_BYTES = 512 * 1024   # a whole page of sections is ~20 KB; this only s
 
 @lru_cache(maxsize=1)
 def manifest() -> dict:
-    """{type: {label, group, locked, required{name: kind}, images[paths]}} for every block type."""
+    """{type: {label, group, locked, required{name: kind}, images[paths], labels{path: label}}} for every block type."""
     try:
         return json.loads(MANIFEST_PATH.read_text(encoding='utf-8'))['types']
     except (OSError, ValueError, KeyError):
@@ -95,56 +95,195 @@ def section_schema(block_type: str) -> dict[str, str] | None:
     return None if entry is None else entry.get('required', {})
 
 
-def validate_blocks(blocks) -> list[dict]:
-    if not isinstance(blocks, list):
-        raise serializers.ValidationError({'blocks': 'Debe ser una lista de bloques.'})
-    if len(json.dumps(blocks)) > MAX_DRAFT_BYTES:
-        raise serializers.ValidationError({'blocks': 'La página es demasiado grande; divídala en varias páginas.'})
+# ---------------------------------------------------------------------------
+# Errors that name the section and the field the way the editor shows them
+# (contract C3): «Sección 1 (Inicio · Portada), campo «Título»». Labels come from
+# the manifest (`label`, `labels`), never from prop keys.
+# ---------------------------------------------------------------------------
+LABEL_SEP = ' › '
+
+
+def block_label(block_type) -> str:
+    entry = manifest().get(block_type) if isinstance(block_type, str) else None
+    return (entry or {}).get('label') or 'Sección'
+
+
+def _field_key(path: str) -> list[tuple[str, str]]:
+    """'items.2.title' -> [('items', 'items'), ('2', 'items[]'), ('title', 'items[].title')] (segment, manifest key)."""
+    out, key = [], ''
+    for seg in [p for p in (path or '').split('.') if p]:
+        key = f'{key}[]' if seg.isdigit() else (f'{key}.{seg}' if key else seg)
+        out.append((seg, key))
+    return out
+
+
+def field_path(block_type, path: str) -> str:
+    """The deepest part of `path` that is an editor field ('cta.href' -> 'cta': the link field)."""
+    labels = (manifest().get(block_type) or {}).get('labels') or {}
+    if not labels:
+        return path or ''
+    keep = 0
+    for n, (seg, key) in enumerate(_field_key(path), start=1):
+        if seg.isdigit() or key in labels:
+            keep = n
+        else:
+            break
+    parts = [p for p in (path or '').split('.') if p][:keep]
+    while parts and parts[-1].isdigit():
+        parts.pop()
+    return '.'.join(parts)
+
+
+# Props the editor does not show as fields (old drafts, nested link keys): their usual names.
+FIELD_LABELS = {
+    'title': 'Título', 'subtitle': 'Subtítulo', 'text': 'Texto', 'html': 'Texto', 'body': 'Texto',
+    'label': 'Texto del botón', 'href': 'Enlace', 'to': 'Enlace', 'cta': 'Botón', 'primary': 'Botón principal',
+    'secondary': 'Botón secundario', 'buttons': 'Botones', 'links': 'Enlaces', 'items': 'Elementos',
+    'images': 'Fotos', 'photos': 'Fotos', 'image': 'Imagen', 'poster': 'Imagen de portada', 'photo': 'Foto',
+    'url': 'Enlace del video', 'form': 'Formulario', 'q': 'Pregunta', 'a': 'Respuesta',
+}
+
+
+def field_label(block_type, path: str) -> str:
+    """'items.2.title' -> 'Tarjetas › elemento 3 › Título' (the editor's labels, never a key)."""
+    labels = (manifest().get(block_type) or {}).get('labels') or {}
     out = []
+    for seg, key in _field_key(path):
+        if seg.isdigit():
+            out.append(f'elemento {int(seg) + 1}')
+        elif labels.get(key) or FIELD_LABELS.get(seg):
+            out.append(labels.get(key) or FIELD_LABELS[seg])
+    return LABEL_SEP.join(out)
+
+
+def where(block_type, index: int, path: str = '') -> str:
+    """Sección 2 (Costos · Portada), campo «Título»: how the issues list names a place."""
+    label = field_label(block_type, path) if path else ''
+    return f'Sección {index + 1} ({block_label(block_type)})' + (f', campo «{label}»' if label else '')
+
+
+def located_error(blocks, index, field: str, message: str) -> dict:
+    """One structured error: {block_index, block_id, block_label, field, field_label, message}."""
+    b = blocks[index] if isinstance(index, int) and 0 <= index < len(blocks) and isinstance(blocks[index], dict) else {}
+    t = b.get('type')
+    field = field_path(t, field) if field else ''
+    return {
+        'block_index': index,
+        'block_id': b.get('id'),
+        'block_label': block_label(t) if b else '',
+        'field': field,
+        'field_label': field_label(t, field) if field else '',
+        'message': message,
+    }
+
+
+def block_errors(blocks) -> tuple[str, list[dict]]:
+    """Structural problems of a draft: (first message, for `detail`; structured errors). ('', []) when valid."""
+    if not isinstance(blocks, list):
+        return 'Debe ser una lista de bloques.', []
+    if len(json.dumps(blocks)) > MAX_DRAFT_BYTES:
+        return 'La página es demasiado grande; divídala en varias páginas.', []
+    errors: list[dict] = []
+    messages: list[str] = []
     for i, b in enumerate(blocks):
         if not isinstance(b, dict) or 'type' not in b:
-            raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} inválido.'})
+            messages.append(f'Sección {i + 1}: no es una sección válida.')
+            errors.append({'block_index': i, 'block_id': b.get('id') if isinstance(b, dict) else None,
+                           'block_label': '', 'field': '', 'field_label': '', 'message': 'No es una sección válida.'})
+            continue
         schema = section_schema(b['type'])
         if schema is None:
-            raise serializers.ValidationError({'blocks': f'Tipo de bloque desconocido: {b["type"]}'})
+            messages.append(f'Sección {i + 1}: este tipo de sección ya no existe en el sitio.')
+            errors.append({'block_index': i, 'block_id': b.get('id'), 'block_label': '', 'field': '', 'field_label': '',
+                           'message': 'Este tipo de sección ya no existe en el sitio.'})
+            continue
         props = b.get('props') or {}
         if not isinstance(props, dict):
-            raise serializers.ValidationError({'blocks': f'Bloque #{i + 1}: props inválidas.'})
+            messages.append(f'{where(b["type"], i)}: su contenido no es válido.')
+            errors.append(located_error(blocks, i, '', 'El contenido de esta sección no es válido.'))
+            continue
         for name, kind in schema.items():
             if name not in props or not isinstance(props[name], _PY[kind]):
-                raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} ({b["type"]}): falta "{name}".'})
+                short = 'Falta este dato.' if name not in props else 'Este dato no tiene el formato esperado.'
+                messages.append(f'{where(b["type"], i, name)}: {short[0].lower()}{short[1:]}')
+                errors.append(located_error(blocks, i, name, short))
+        # «Tabla» fields: the limits the editor enforces (table_block.py, read from the manifest).
         for name, limits in (manifest().get(b['type'], {}).get('tables') or {}).items():
             problem = table_problem(props.get(name), limits) if name in props else None
             if problem:
-                raise serializers.ValidationError({'blocks': f'Bloque #{i + 1} ({b["type"]}): {problem}'})
-        block = {'id': str(b.get('id') or uuid.uuid4().hex[:8])[:40], 'type': b['type'], 'props': props}
+                short = problem[0].upper() + problem[1:]
+                part = table_part(problem)
+                err = located_error(blocks, i, name, short)
+                if part:
+                    err['field_label'] = f"{err['field_label']}{LABEL_SEP}{part}" if err['field_label'] else part
+                messages.append(f'Sección {i + 1} ({block_label(b["type"])}), campo «{err["field_label"]}»: {problem}')
+                errors.append(err)
+    return (messages[0] if messages else ''), errors
+
+
+def table_part(problem: str) -> str:
+    """The part of a «Tabla» a table_problem() message is about: «Filas» or «Columnas» (or the whole table)."""
+    text = problem.lower()
+    if 'fila' in text:
+        return 'Filas'
+    if 'columna' in text or 'encabezado' in text:
+        return 'Columnas'
+    return ''
+
+
+def validate_blocks(blocks) -> list[dict]:
+    detail, _errors = block_errors(blocks)
+    if detail:
+        raise serializers.ValidationError({'blocks': detail})
+    out = []
+    for b in blocks:
+        block = {'id': str(b.get('id') or uuid.uuid4().hex[:8])[:40], 'type': b['type'], 'props': b.get('props') or {}}
         if b.get('hidden') is True:
             block['hidden'] = True
         out.append(block)
     return out
 
 
-def image_refs(block: dict) -> list[int]:
-    """Media-library ids a block uses, following the image paths of its type ("poster", "items[].image")."""
-    paths = manifest().get(block.get('type'), {}).get('images') or ['image', 'images[].image']
-    found: list[int] = []
+def blocks_error_response(data):
+    """400 with `detail` and structured `errors` when a save sends invalid blocks, else None.
 
-    def walk(value, parts):
+    Runs before the serializer so the errors keep their numbers (block_index)
+    and reach the editor next to each field; `draft_blocks` keeps its old shape.
+    """
+    if not hasattr(data, 'get') or 'draft_blocks' not in data:
+        return None
+    detail, errors = block_errors(data.get('draft_blocks'))
+    if not detail:
+        return None
+    return Response({'detail': detail, 'draft_blocks': {'blocks': [detail]}, 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def image_ref_paths(block: dict) -> list[tuple[str, int]]:
+    """(field path, media id) of every library image in a block: 'poster', 'photos.3.image'..."""
+    paths = manifest().get(block.get('type'), {}).get('images') or ['image', 'images[].image']
+    found: list[tuple[str, int]] = []
+
+    def walk(value, parts, at):
         if not parts:
             if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-                found.append(value)
+                found.append(('.'.join(at), value))
             return
         head, rest = parts[0], parts[1:]
         if head.endswith('[]'):
             items = value.get(head[:-2]) if isinstance(value, dict) else None
-            for it in items if isinstance(items, list) else []:
-                walk(it, rest)
+            for n, it in enumerate(items if isinstance(items, list) else []):
+                walk(it, rest, [*at, head[:-2], str(n)])
         elif isinstance(value, dict):
-            walk(value.get(head), rest)
+            walk(value.get(head), rest, [*at, head])
 
     for path in paths:
-        walk(block.get('props') or {}, path.replace('[].', '[] ').replace('.', ' ').split())
+        walk(block.get('props') or {}, path.replace('[].', '[] ').replace('.', ' ').split(), [])
     return found
+
+
+def image_refs(block: dict) -> list[int]:
+    """Media-library ids a block uses, following the image paths of its type ("poster", "items[].image")."""
+    return [i for _p, i in image_ref_paths(block)]
 
 
 class Page(models.Model):
@@ -570,6 +709,9 @@ class PageListCreateView(AuditedCrudMixin, AdminListMixin, generics.ListCreateAP
     def get_queryset(self):
         return Page.objects.select_related("published_version", "review_requested_by", "draft_updated_by")
 
+    def create(self, request, *args, **kwargs):
+        return blocks_error_response(request.data) or super().create(request, *args, **kwargs)
+
 
 def draft_conflict_payload(page: Page) -> dict:
     """409 body when a save names an older draft_revision (C2)."""
@@ -594,6 +736,7 @@ class PageDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
         The row stays locked from the check to the write, so two saves of the
         same revision cannot both win. Without ``draft_revision`` the save works
         exactly as before (last write wins), and still bumps the revision.
+        A conflict is answered first: a stale draft is not worth validating.
         """
         raw = request.data.get('draft_revision') if hasattr(request.data, 'get') else None
         with transaction.atomic():
@@ -609,7 +752,8 @@ class PageDetailView(AuditedCrudMixin, generics.RetrieveUpdateDestroyAPIView):
                 if expected != page.draft_revision:
                     page = Page.objects.select_related('draft_updated_by').get(pk=page.pk)
                     return Response(draft_conflict_payload(page), status=status.HTTP_409_CONFLICT)
-            return super().update(request, *args, **kwargs)
+            # Invalid blocks answer 400 with structured errors (C3) before the serializer.
+            return blocks_error_response(request.data) or super().update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         if getattr(self.request.user, "role", None) != "admin":
@@ -746,11 +890,12 @@ class PagePublishView(APIView):
         if legacy and not confirmed(request.data.get('confirm_legacy')):
             return legacy_seed_response(page)
         # Pre-publish checks (P3-12): errors block, warnings are informative.
-        from .checks import run_checks
+        from .checks import issue_error, run_checks
         issues = run_checks(page)
         errors = [i for i in issues if i['level'] == 'error']
         if errors:
-            return Response({'detail': 'Corrija antes de publicar: ' + ' · '.join(e['message'] for e in errors[:5]), 'issues': issues},
+            return Response({'detail': 'Corrija antes de publicar: ' + ' · '.join(e['message'] for e in errors[:5]), 'issues': issues,
+                             'errors': [issue_error(e) for e in errors]},
                             status=status.HTTP_400_BAD_REQUEST)
         v = page.publish(request.user, legacy_confirmed=legacy)
         data = PageAdminSerializer(page).data
