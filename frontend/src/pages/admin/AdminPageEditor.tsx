@@ -271,7 +271,7 @@ export default function AdminPageEditor() {
       await flushOrThrow();
       const { data } = await contentApi.adminPreviewToken(pageId);
       const url = previewUrl(meta.slug || page?.slug || '', data.token);
-      if (win) { win.opener = null; win.location.href = url; } else window.location.assign(url);
+      if (win) { win.opener = null; win.location.href = url; } else toast.error('El navegador bloqueó la pestaña nueva. Use «Más» y «Enlace de vista previa».');
     } catch (e) {
       win?.close();
       toast.error(e instanceof SaveBlocked ? blockedMessage() : 'No se pudo abrir la vista previa.');

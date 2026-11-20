@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode, type Ref } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ExternalLink, Eye, Pencil, Redo2, Undo2 } from 'lucide-react';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { MoreMenu, type MenuItem } from './MoreMenu';
 import { ReviewChip, StatusChip } from './StatusChip';
 import { SaveIndicator } from './SaveIndicator';
@@ -163,6 +164,8 @@ function useBottomNavHeight(): number {
 export function EditorBottomBar({ actions, more }: { actions: ReactNode; more: MenuItem[] }) {
   const keyboardOpen = useKeyboardOpen();
   const navHeight = useBottomNavHeight();
+  // Narrow phones: «Más» becomes a 44 px «⋯» so the main button keeps its words.
+  const roomy = useMediaQuery('(min-width: 480px)');
   if (keyboardOpen) return null;
   return (
     <>
@@ -176,7 +179,7 @@ export function EditorBottomBar({ actions, more }: { actions: ReactNode; more: M
       >
         <div className="mx-auto flex max-w-3xl items-center gap-2 [&>*]:min-w-0">
           {actions}
-          <MoreMenu items={more} placement="up" />
+          <MoreMenu items={more} placement="up" iconOnly={!roomy} label={roomy ? 'Más' : 'Más acciones'} />
         </div>
       </div>
     </>
