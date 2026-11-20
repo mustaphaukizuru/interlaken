@@ -594,6 +594,22 @@
       },
       "images": []
     },
+    "table": {
+      "label": "Tabla",
+      "group": "",
+      "locked": false,
+      "required": {
+        "table": "dict"
+      },
+      "images": [],
+      "tables": {
+        "table": {
+          "columns": 8,
+          "rows": 60,
+          "cell": 300
+        }
+      }
+    },
     "testimonials": {
       "label": "Testimonios",
       "group": "",

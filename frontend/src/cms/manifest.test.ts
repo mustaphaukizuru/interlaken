@@ -20,6 +20,7 @@ const TEMPLATE_MANIFEST = resolve(process.cwd(), '../backend/apps/content/templa
 const PY_KIND: Record<FieldKind, string> = {
   text: 'str', textarea: 'str', richtext: 'str', url: 'str', select: 'str', icon: 'str', color: 'str',
   image: 'image', images: 'list', items: 'list', link: 'dict', toggle: 'bool', number: 'num',
+  table: 'dict', action: 'str',
 };
 
 function imagePaths(fields: FieldSpec[], prefix = ''): string[] {
@@ -32,12 +33,15 @@ function imagePaths(fields: FieldSpec[], prefix = ''): string[] {
 }
 
 function entry(spec: BlockSpec) {
+  // «Tabla» fields: the backend enforces their limits (content/table_block.py).
+  const tables = Object.fromEntries(spec.fields.filter((fs) => fs.kind === 'table' && fs.limits).map((fs) => [fs.key, fs.limits]));
   return {
     label: spec.label,
     group: spec.group ?? '',
     locked: !!spec.locked,
     required: Object.fromEntries(spec.fields.filter((fs) => fs.required).map((fs) => [fs.key, PY_KIND[fs.kind]])),
     images: imagePaths(spec.fields),
+    ...(Object.keys(tables).length ? { tables } : {}),
   };
 }
 

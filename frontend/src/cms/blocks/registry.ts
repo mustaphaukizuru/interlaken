@@ -5,10 +5,14 @@
  * here + one component in blocks/*.tsx.
  */
 import { registeredSection } from './specs';
+import { TABLE_LIMITS, emptyTable } from './table';
 
 export type FieldKind =
   | 'text' | 'textarea' | 'richtext' | 'image' | 'images' | 'link' | 'items' | 'url' | 'number'
-  | 'select' | 'toggle' | 'icon' | 'color';
+  | 'select' | 'toggle' | 'icon' | 'color'
+  // Editors of their own (cms/editor/customFields): the «Tabla» grid, and a
+  // button that opens a console screen (`href`), e.g. «Editar precios».
+  | 'table' | 'action';
 
 export interface FieldSpec {
   key: string;
@@ -20,6 +24,12 @@ export interface FieldSpec {
   /** For kind 'select'. */
   options?: { value: string; label: string }[];
   hint?: string;
+  /** Consecutive fields with the same group show together under this title (C4). */
+  group?: string;
+  /** For kind 'table': the most columns, rows and characters per cell (the backend enforces them too). */
+  limits?: { columns: number; rows: number; cell: number };
+  /** For kind 'action': where the button goes (opens in a new tab, so the draft stays open). */
+  href?: string;
 }
 
 export interface BlockSpec {
@@ -107,6 +117,23 @@ export const BLOCKS: BlockSpec[] = [
   { type: 'open_school_events', label: 'Clases abiertas', description: 'Próximas clases abiertas con lugares disponibles (automático).', fields: [] },
   { type: 'calendar', label: 'Calendario', description: 'Próximas fechas del calendario escolar (automático).', fields: [] },
   { type: 'sep_incorporation', label: 'Incorporación SEP', description: 'Registros oficiales (automático).', fields: [] },
+  { type: 'table', label: 'Tabla', description: 'Tabla con encabezados, filas y notas al pie; puede pegar celdas de Excel o Google Sheets.', fields: [
+    { key: 'title', label: 'Título', kind: 'text', hint: 'También es el nombre de la tabla para lectores de pantalla.' },
+    { key: 'intro', label: 'Introducción', kind: 'textarea' },
+    { key: 'table', label: 'Tabla', kind: 'table', required: true, limits: { ...TABLE_LIMITS } },
+    { key: 'notes', label: 'Notas al pie', kind: 'textarea', hint: 'Una nota por línea.' },
+    { key: 'card', label: 'Mostrar como tarjeta (igual que las tablas de Costos)', kind: 'toggle', group: 'Estilo' },
+    { key: 'tone', label: 'Color de la tarjeta', kind: 'select', group: 'Estilo', options: [
+      { value: 'green', label: 'Verde' }, { value: 'coral', label: 'Coral' }, { value: 'purple', label: 'Morado' }, { value: 'pink', label: 'Rosa' },
+    ] },
+    { key: 'icon', label: 'Ícono de la tarjeta', kind: 'icon', group: 'Estilo' },
+    { key: 'label', label: 'Etiqueta de la tarjeta', kind: 'text', group: 'Estilo', hint: 'Texto pequeño sobre el título, por ejemplo «Mensual».' },
+    { key: 'subtitle', label: 'Subtítulo de la tarjeta', kind: 'text', group: 'Estilo' },
+    { key: 'bg', label: 'Fondo de la sección', kind: 'select', group: 'Estilo', options: [{ value: 'cream', label: 'Crema' }, { value: 'white', label: 'Blanco' }] },
+  ], defaults: {
+    title: 'Nueva tabla', intro: '', table: emptyTable(), notes: '',
+    card: true, tone: 'green', icon: 'CircleDollarSign', label: '', subtitle: '', bg: 'cream',
+  } },
 ];
 
 const GENERIC = new Map(BLOCKS.map((b) => [b.type, b]));

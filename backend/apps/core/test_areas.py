@@ -50,6 +50,10 @@ ADMIN_ONLY = {
     'apps.content.pages.PageExportView',
     'apps.content.pages.PagePublishView',
     'apps.content.pages.PageVersionsView',
+    'apps.content.pricing_admin.AdminPricingExportView',
+    'apps.content.pricing_admin.AdminPricingImportView',
+    'apps.content.pricing_admin.AdminPricingTableView',
+    'apps.content.pricing_admin.AdminPricingView',
     'apps.content.views.AdminSiteSettingsView',
     'apps.content.views.AdminTestimonialDetailView',
     'apps.content.views.AdminTestimonialsBulkView',
@@ -138,7 +142,8 @@ SECRETARIA_OK = ['/api/v1/admissions/pre-register/', '/api/v1/bookings/admin/boo
 CAFETERIA_OK = ['/api/v1/cafeteria/admin/topups/', '/api/v1/cafeteria/admin/balances/',
                 '/api/v1/payments/admin/']
 ADMIN_ONLY_URLS = ['/api/v1/accounts/admin/staff/', '/api/v1/content/admin/settings/',
-                   '/api/v1/core/admin/audit/', '/api/v1/legal/admin/arco/']
+                   '/api/v1/core/admin/audit/', '/api/v1/legal/admin/arco/',
+                   '/api/v1/content/admin/pricing/', '/api/v1/content/admin/pricing/colegiaturas/']
 
 
 @pytest.mark.parametrize('url', SECRETARIA_OK)

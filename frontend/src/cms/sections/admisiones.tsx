@@ -4,7 +4,7 @@
  * (Testimonios, Ajustes, Costos); their headings and every other text,
  * photo, step and question are props.
  */
-import { useMemo, useState, type ElementType, type ReactNode } from 'react';
+import { lazy, Suspense, useMemo, useState, type ElementType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, Search, ShieldCheck, Plus } from 'lucide-react';
@@ -18,7 +18,7 @@ import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 import { Blob } from '@/components/ui/Blob';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
-import { CostEstimator } from '@/components/admissions/CostEstimator';
+import { ESTIMATOR_COPY, type EstimatorCopy } from '@/components/admissions/estimatorCopy';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, isExternal, useCmsImage, useTokens, type CmsLink } from '../runtime';
@@ -213,7 +213,19 @@ function AdmStepsView(p: StepsProps) {
 }
 
 /* ── Estimador de costos (linkable: /admisiones#estimador) ──────────────── */
-function AdmEstimatorView(p: { eyebrow?: string; title?: string; text?: string }) {
+// Below the fold: the calculator loads on demand; its own loading skeleton holds the place.
+const CostEstimator = lazy(() => import('@/components/admissions/CostEstimator'));
+const ESTIMATOR_SKELETON = (
+  <div aria-busy="true" aria-label="Cargando estimador de costos">
+    <div className="skeleton h-[420px] rounded-[20px]" aria-hidden="true" />
+  </div>
+);
+
+/** Text fields of the estimator, one field group each call (C4). */
+const estimatorText = (group: string, pairs: [string, string][]) => pairs.map(([key, label]) => f.text(key, label, { group }));
+
+function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string; title?: string; text?: string } & Partial<EstimatorCopy>) {
+  const p = { eyebrow, title, text };
   const t = useTokens();
   return (
     <Section bg="cream" id="estimador">
@@ -230,7 +242,9 @@ function AdmEstimatorView(p: { eyebrow?: string; title?: string; text?: string }
           )}
         </Reveal>
         <Reveal delay={100}>
-          <CostEstimator />
+          <Suspense fallback={ESTIMATOR_SKELETON}>
+            <CostEstimator copy={copy} />
+          </Suspense>
         </Reveal>
       </div>
     </Section>
@@ -573,12 +587,29 @@ export const sections = [
     },
   }),
   section({
-    type: 'estimator', label: 'Admisiones · Estimador de costos', description: 'Calculadora de cuotas por sección y modalidad. Las cifras se editan en Ajustes, Costos; aquí solo el texto de la izquierda.',
+    type: 'estimator', label: 'Admisiones · Estimador de costos', description: 'Calculadora de cuotas por sección y modalidad. Las cifras salen de «Costos y precios» y el cálculo es automático; aquí, el texto de la izquierda y las etiquetas de la calculadora.',
     component: AdmEstimatorView,
-    fields: [...headingFields({ text: true })],
+    fields: [
+      f.action('editPrices', 'Editar precios', '/admin/costos', { hint: 'Las cifras del estimador son las de «Costos y precios» (las mismas de la página de Costos).' }),
+      ...headingFields({ text: true }),
+      ...estimatorText('Tarjeta', [['cardEyebrow', 'Calculadora: etiqueta'], ['cardTitle', 'Calculadora: título']]),
+      f.text('sectionLabel', 'Título de los niveles', { group: 'Selectores' }),
+      f.items('sections', 'Niveles', [f.text('label', 'Nivel', { required: true })], { group: 'Selectores', hint: 'Cada botón muestra las filas de precios cuyo nombre contiene ese texto (Primaria = «Primaria»).' }),
+      ...estimatorText('Selectores', [['startSection', 'Nivel elegido al abrir'], ['modalityLabel', 'Título de la modalidad'], ['newTag', 'Botón de nuevo ingreso'], ['returningTag', 'Botón de reinscripción']]),
+      ...estimatorText('Resultados', [
+        ['adminLabel', 'Renglón de gastos administrativos'], ['adminSub', 'Nota de gastos administrativos'],
+        ['newFeeLabel', 'Renglón de la cuota (nuevo ingreso)'], ['returningFeeLabel', 'Renglón de la cuota (reinscripción)'], ['feeSub', 'Nota de la cuota'],
+        ['tuitionLabel', 'Renglón de la colegiatura'], ['tuitionMissing', 'Colegiatura sin precio'], ['perMonth', 'Texto después de la colegiatura'],
+        ['insuranceLabel', 'Renglón de seguros'], ['insuranceSub', 'Nota de seguros'], ['noCost', 'Texto cuando no hay cuota'],
+      ]),
+      f.items('notes', 'Notas', [f.textarea('text', 'Nota', { required: true }), f.select('tone', 'Color del ícono', [{ value: 'purple', label: 'Morado' }, { value: 'amber', label: 'Ámbar (aviso)' }])], { group: 'Notas y botones' }),
+      ...estimatorText('Notas y botones', [['waLabel', 'Botón de WhatsApp'], ['allLabel', 'Enlace a Costos: texto'], ['allHref', 'Enlace a Costos: ruta']]),
+      ...estimatorText('Si no cargan los precios', [['errorTitle', 'Si no cargan los precios: título'], ['errorText', 'Si no cargan los precios: texto']]),
+    ],
     defaults: {
       eyebrow: 'Costos {{ciclo}}', title: 'Estime su inversión',
       text: 'Elija la sección y la modalidad para ver las cuotas del ciclo. Las cifras son publicadas por la administración del colegio y el desglose completo está en la página de Costos.',
+      ...ESTIMATOR_COPY,
     },
   }),
   section({
