@@ -55,3 +55,59 @@ export function withYear(text: string): string[] {
 }
 
 export const isExternalHref = (href: string) => /^https?:/.test(href);
+
+/* ── Site texts (Navegación → «Textos del sitio») ─────────────────────────
+ * More site-wide copy in the same SiteSettings.chrome JSON: cookie banner,
+ * prefilled WhatsApp messages, the contact bubble, footer legal links, the
+ * privacy note under forms, the admission steps and the offline page.
+ * Each consumer keeps its own built-in text (so the main bundle does not
+ * carry copy only lazy pages use); blank = that built-in text. Mirrors
+ * backend/apps/content/navigation.py SITE_TEXTS.
+ */
+export type SiteTextKey =
+  | 'cookie_text' | 'cookie_link' | 'cookie_decline' | 'cookie_accept'
+  | 'wa_admissions' | 'wa_visit' | 'wa_float' | 'wa_password' | 'wa_estimator'
+  | 'float_whatsapp' | 'float_visit' | 'float_password'
+  | 'nav_contact' | 'footer_contact' | 'skip_link'
+  | 'privacy_note' | 'privacy_link'
+  | 'funnel_1' | 'funnel_2' | 'funnel_3' | 'funnel_4' | 'funnel_now' | 'funnel_done' | 'funnel_next'
+  | 'offline_title' | 'offline_accent' | 'offline_text' | 'offline_retry' | 'offline_home';
+
+export interface FooterLink { label: string; href: string }
+
+export type SiteTexts = Partial<Record<SiteTextKey, string>> & { legal_links?: FooterLink[] };
+
+/** Built-in words of the header, footer and skip link (components/layout/PublicLayout). */
+export const LAYOUT_TEXT_DEFAULTS = {
+  nav_contact: 'Contacto',
+  footer_contact: 'Contacto',
+  skip_link: 'Saltar al contenido',
+} as const;
+
+/** Footer bottom-bar links when Navegación has none. */
+export const LEGAL_LINKS_DEFAULT: FooterLink[] = [{ label: 'Aviso de Privacidad', href: '/aviso-de-privacidad' }];
+
+/** A site text from chrome, or `fallback` when it is blank or missing. */
+export function siteText(chrome: unknown, key: SiteTextKey, fallback: string): string {
+  const v = chrome && typeof chrome === 'object' ? (chrome as Record<string, unknown>)[key] : undefined;
+  return typeof v === 'string' && v.trim() ? v.trim() : fallback;
+}
+
+/** Footer legal links from chrome (valid ones only), else the built-in list. */
+export function legalLinks(chrome: unknown): FooterLink[] {
+  const raw = chrome && typeof chrome === 'object' ? (chrome as SiteTexts).legal_links : undefined;
+  const list = Array.isArray(raw) ? raw.filter((l) => l && l.label?.trim() && l.href?.trim()) : [];
+  return list.length ? list : LEGAL_LINKS_DEFAULT;
+}
+
+/**
+ * Saving one part of chrome must keep the parts other editors own: the
+ * header/footer form and «Textos del sitio» each send only their keys.
+ */
+export function mergeChrome(stored: object | null | undefined, ownKeys: readonly string[], patch: object): Record<string, unknown> {
+  const keep = Object.fromEntries(Object.entries(stored ?? {}).filter(([k]) => !ownKeys.includes(k)));
+  return { ...keep, ...patch };
+}
+
+/** The keys the header/footer form (AdminNavigation ChromeEditor) owns. */
+export const CHROME_KEYS = ['header_buttons', 'footer_tagline', 'footer_copyright', 'footer_note', 'sticky_label', 'sticky_href'] as const;

@@ -11,7 +11,7 @@ import { Award, FileText, CheckCircle, ArrowRight, ArrowUpRight, CalendarDays, C
 import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
-import { WA_MESSAGES } from '@/lib/whatsapp';
+import { waMessage } from '@/lib/whatsapp';
 import { ADMISSION_DOC_ITEMS, docsSummary, type AdmissionDoc } from '@/lib/admisionesDocs';
 import { Testimonials } from '@/components/public/Testimonials';
 import { Section } from '@/components/ui/Section';
@@ -122,7 +122,7 @@ function AdmStepsView(p: StepsProps) {
   const t = useTokens();
   // WhatsApp number is admin-editable; CTA hidden (fallback to /contacto)
   // when it's empty, per site convention.
-  const { whatsapp_number } = useSiteSettings();
+  const { whatsapp_number, chrome } = useSiteSettings();
   const steps = asList<StepItem>(p.items);
   const contact = asLink(p.contact);
   return (
@@ -185,7 +185,7 @@ function AdmStepsView(p: StepsProps) {
                       </TrackedLink>
                     ) : whatsapp_number ? (
                       <a
-                        href={waHref(whatsapp_number, WA_MESSAGES.admissionsInfo)}
+                        href={waHref(whatsapp_number, waMessage(chrome, 'wa_admissions'))}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => {

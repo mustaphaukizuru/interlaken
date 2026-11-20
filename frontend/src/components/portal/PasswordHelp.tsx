@@ -1,6 +1,7 @@
 import { MessageCircle, Mail, KeyRound } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
+import { siteText } from '@/lib/siteChrome';
 
 /**
  * School policy (2026-08-22): families and students NEVER reset or change
@@ -11,31 +12,45 @@ import { waHref } from '@/lib/siteContact';
 export const PASSWORD_REQUEST_MESSAGE =
   'Hola, necesito que me recuerden o restablezcan la contraseña de mi acceso al portal de familias.';
 
+/** The login card's line (editable in Contenido → Iniciar sesión). */
+export const PASSWORD_INLINE_DEFAULTS = {
+  before: '¿Olvidó su contraseña? Solicítela al colegio por',
+  whatsapp: 'WhatsApp',
+  or: 'o',
+  email: 'correo',
+  after: 'Un administrador le enviará una nueva.',
+};
+
 interface Props {
   /** Compact inline variant for the login card; default is a full card body. */
   variant?: 'inline' | 'card';
   /** Email of the person asking, prefilled into the mail body when known. */
   email?: string;
+  /** Inline variant copy (the login page passes the school's edited text). */
+  copy?: Partial<typeof PASSWORD_INLINE_DEFAULTS>;
 }
 
-export function PasswordHelp({ variant = 'card', email }: Props) {
+export function PasswordHelp({ variant = 'card', email, copy }: Props) {
   const s = useSiteSettings();
-  const wa = s.whatsapp_number ? waHref(s.whatsapp_number, PASSWORD_REQUEST_MESSAGE) : null;
-  const body = email ? `${PASSWORD_REQUEST_MESSAGE}\n\nCorreo de acceso: ${email}` : PASSWORD_REQUEST_MESSAGE;
+  // The WhatsApp/e-mail request text is editable in Navegación → «Textos del sitio».
+  const request = siteText(s.chrome, 'wa_password', PASSWORD_REQUEST_MESSAGE);
+  const wa = s.whatsapp_number ? waHref(s.whatsapp_number, request) : null;
+  const body = email ? `${request}\n\nCorreo de acceso: ${email}` : request;
+  const c = { ...PASSWORD_INLINE_DEFAULTS, ...Object.fromEntries(Object.entries(copy ?? {}).filter(([, v]) => typeof v === 'string' && v.trim())) };
   const mailto = `mailto:${s.contact_email}?subject=${encodeURIComponent('Solicitud de contraseña del portal')}&body=${encodeURIComponent(body)}`;
 
   if (variant === 'inline') {
     return (
       <p className="mt-3.5 text-center text-[12px] leading-relaxed text-subtle">
-        ¿Olvidó su contraseña? Solicítela al colegio por{' '}
+        {c.before}{' '}
         {wa && (
           <>
-            <a href={wa} target="_blank" rel="noopener noreferrer" className="font-semibold text-purple hover:underline">WhatsApp</a>
-            {' o '}
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="font-semibold text-purple hover:underline">{c.whatsapp}</a>
+            {` ${c.or} `}
           </>
         )}
-        <a href={mailto} className="font-semibold text-purple hover:underline">correo</a>.
-        {' '}Un administrador le enviará una nueva.
+        <a href={mailto} className="font-semibold text-purple hover:underline">{c.email}</a>.
+        {' '}{c.after}
       </p>
     );
   }

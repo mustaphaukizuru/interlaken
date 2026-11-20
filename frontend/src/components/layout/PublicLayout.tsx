@@ -12,8 +12,9 @@ import Logo from '@/components/ui/Logo';
 import { RouteTransition } from '@/components/layout/RouteTransition';
 import { RouteSeo } from '@/components/seo/Seo';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { isExternalHref, resolveChrome, withYear, type ChromeButton } from '@/lib/siteChrome';
-import { WA_MESSAGES } from '@/lib/whatsapp';
+import { isExternalHref, LAYOUT_TEXT_DEFAULTS, legalLinks, resolveChrome, siteText, withYear, type ChromeButton } from '@/lib/siteChrome';
+import { setWaEstimatorTemplate, waMessage } from '@/lib/whatsapp';
+import { saveOfflineCopy } from '@/lib/offlineCopy';
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { WhatsAppFloat } from '@/components/ui/WhatsAppFloat';
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon';
@@ -175,6 +176,13 @@ export function PublicLayout() {
   const { pathname } = useLocation();
   const settings = useSiteSettings();
   const chrome = resolveChrome(settings.chrome);
+  // Navegación → «Textos del sitio»: blank = the built-in text.
+  const text = (key: Parameters<typeof siteText>[1], builtIn: string) => siteText(settings.chrome, key, builtIn);
+  const contactLabel = text('nav_contact', LAYOUT_TEXT_DEFAULTS.nav_contact);
+  const footerContact = text('footer_contact', LAYOUT_TEXT_DEFAULTS.footer_contact);
+  const LEGAL = legalLinks(settings.chrome);
+  // The cost estimator and the offline page read the edited copy outside React.
+  useEffect(() => { setWaEstimatorTemplate(settings.chrome); saveOfflineCopy(settings.chrome); }, [settings.chrome]);
   const MENU = resolveMenu(settings.menu, DEFAULT_MENU);
   /** El pie refleja los mismos grupos del menú; Portal/Aviso van en la barra inferior. */
   const FOOTER_GROUPS = MENU.map((g) => ({ heading: g.label, links: g.items }));
@@ -229,7 +237,7 @@ export function PublicLayout() {
     // (see lib/motion.tsx), keeping framer out of the portal's initial chunks.
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <RouteSeo />
-      <a href="#contenido" className="skip-link">Saltar al contenido</a>
+      <a href="#contenido" className="skip-link">{text('skip_link', LAYOUT_TEXT_DEFAULTS.skip_link)}</a>
       <SiteNoticeBanner />
       {/* Preheader — solo escritorio/tablet. Petición del colegio (2026-08-21):
           teléfono a la izquierda, correo a la derecha; sin redes sociales. */}
@@ -274,7 +282,7 @@ export function PublicLayout() {
                 }`
               }
             >
-              Contacto
+              {contactLabel}
             </NavLink>
           </nav>
 
@@ -335,7 +343,7 @@ export function PublicLayout() {
                 }`
               }
             >
-              Contacto
+              {contactLabel}
             </NavLink>
 
             <div className="border-t border-line pt-1" />
@@ -396,7 +404,7 @@ export function PublicLayout() {
           <ChromeLink button={{ label: chrome.sticky_label, href: chrome.sticky_href }} className="btn-pink min-w-0 flex-1 justify-center shadow-lg" />
           {settings.whatsapp_number && (
             <a
-              href={waHref(settings.whatsapp_number, WA_MESSAGES.visit)}
+              href={waHref(settings.whatsapp_number, waMessage(settings.chrome, 'wa_visit'))}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Escribir por WhatsApp"
@@ -430,8 +438,8 @@ export function PublicLayout() {
 
           {/* Mobile (&lt;md): accordion link groups — desktop: open grid */}
           <div className="md:hidden divide-y divide-white/10 border-y border-white/10">
-            {[...FOOTER_GROUPS, { heading: 'Contacto', links: [] as typeof FOOTER_GROUPS[number]['links'] }].map((group) => {
-              const isContact = group.heading === 'Contacto';
+            {[...FOOTER_GROUPS.map((g) => ({ ...g, contact: false })), { heading: footerContact, links: [] as typeof FOOTER_GROUPS[number]['links'], contact: true }].map((group) => {
+              const isContact = group.contact;
               const expanded = footerOpen === group.heading;
               return (
                 <div key={group.heading}>
@@ -502,7 +510,7 @@ export function PublicLayout() {
               </div>
             ))}
             <div>
-              <h3 className="text-white font-semibold mb-3 text-sm">Contacto</h3>
+              <h3 className="text-white font-semibold mb-3 text-sm">{footerContact}</h3>
               <ul className="space-y-2 text-xs">
                 {settings.phone_display && (
                   <li className="flex items-start gap-2">
@@ -537,7 +545,11 @@ export function PublicLayout() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2 text-xs text-center sm:flex-row sm:items-center sm:justify-between">
             <span>{withYear(chrome.footer_copyright).map((part, i) => <Fragment key={i}>{part}</Fragment>)}</span>
             <div className="flex items-center gap-4">
-              <Link to="/aviso-de-privacidad" className="hover:text-white transition-colors">Aviso de Privacidad</Link>
+              {LEGAL.map((l) => (
+                isExternalHref(l.href)
+                  ? <a key={l.label + l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">{l.label}</a>
+                  : <Link key={l.label + l.href} to={l.href} className="hover:text-white transition-colors">{l.label}</Link>
+              ))}
               <span className="text-white/70">{chrome.footer_note}</span>
             </div>
           </div>

@@ -10,6 +10,15 @@ import { Cookie } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { hasConsentDecision, setConsent } from '@/services/consent';
 import { initAnalytics, isAnalyticsConfigured, trackPageView } from '@/services/analytics';
+import { useSiteText } from '@/hooks/useSiteSettings';
+
+/** Built-in banner copy; Navegación → «Textos del sitio» edits it (SiteSettings.chrome cookie_*). */
+export const COOKIE_DEFAULTS = {
+  cookie_text: 'Usamos cookies para medir el uso del sitio y mejorar tu experiencia. No se activa ninguna analítica hasta que aceptes.',
+  cookie_link: 'Más información',
+  cookie_decline: 'Rechazar',
+  cookie_accept: 'Aceptar',
+} as const;
 
 export function CookieConsent() {
   // Config + stored consent are fixed for the life of the page, so the initial
@@ -32,6 +41,12 @@ export function CookieConsent() {
     setVisible(false);
   };
 
+  return <CookieBanner onAccept={accept} onDecline={decline} />;
+}
+
+/** The banner itself: reads its copy only when shown (no settings request otherwise). */
+function CookieBanner({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
+  const text = useSiteText();
   return (
     <div
       role="region"
@@ -45,10 +60,9 @@ export function CookieConsent() {
             <Cookie className="w-5 h-5 text-brand-600" />
           </div>
           <p className="text-sm text-muted leading-relaxed">
-            Usamos cookies para medir el uso del sitio y mejorar tu experiencia.
-            No se activa ninguna analítica hasta que aceptes.{' '}
+            {text('cookie_text', COOKIE_DEFAULTS.cookie_text)}{' '}
             <Link to="/aviso-de-privacidad" className="text-brand-600 underline hover:text-brand-700">
-              Más información
+              {text('cookie_link', COOKIE_DEFAULTS.cookie_link)}
             </Link>
             .
           </p>
@@ -56,17 +70,17 @@ export function CookieConsent() {
         <div className="flex gap-2 mt-4 sm:mt-0 flex-shrink-0">
           <button
             type="button"
-            onClick={decline}
+            onClick={onDecline}
             className="btn-secondary text-sm px-4 py-2 flex-1 sm:flex-none justify-center"
           >
-            Rechazar
+            {text('cookie_decline', COOKIE_DEFAULTS.cookie_decline)}
           </button>
           <button
             type="button"
-            onClick={accept}
+            onClick={onAccept}
             className="btn-primary text-sm px-4 py-2 flex-1 sm:flex-none justify-center"
           >
-            Aceptar
+            {text('cookie_accept', COOKIE_DEFAULTS.cookie_accept)}
           </button>
         </div>
       </div>
