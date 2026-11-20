@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CreditCard, Users, Coffee, ClipboardList, BarChart3,
-  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, type LucideIcon } from 'lucide-react';
+  CalendarClock, Megaphone, Settings, ShieldCheck, UserCircle, QrCode, KeyRound, Bell, Inbox, UserCog, Image, FileText, Compass, CalendarRange, Merge, Scale, KanbanSquare, CalendarDays, FormInput, MessageSquareQuote, House, CircleDollarSign, type LucideIcon } from 'lucide-react';
 
 export type Role = 'parent' | 'student' | 'admin' | 'staff';
 
@@ -88,6 +88,7 @@ export const navGroupsByRole: Record<Role, NavGroup[]> = {
         { icon: FormInput,     label: 'Formularios', to: '/admin/formularios', badgeKey: 'formularios' },
         { icon: Compass,       label: 'Navegación', to: '/admin/navegacion' },
         { icon: Image,         label: 'Biblioteca de medios', to: '/admin/contenido/medios' },
+        { icon: CircleDollarSign, label: 'Costos y precios', to: '/admin/costos' },
         { icon: CalendarDays,  label: 'Calendario',  to: '/admin/calendario' },
         { icon: MessageSquareQuote, label: 'Testimonios', to: '/admin/testimonios' },
       ],
