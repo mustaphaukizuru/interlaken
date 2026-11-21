@@ -10,7 +10,8 @@ Principles
   deleted, so funnel statistics stay intact).
 
 Windows (days, overridable via settings.RETENTION):
-  rejected_prospects   365   PreRegistration/Registration rejected → anonymise contact fields, delete documents
+  rejected_prospects   365   PreRegistration/Registration rejected → anonymise contact fields and the
+                             Expediente notes, delete documents
   form_submissions     180   handled CMS form submissions → delete
   contact_messages     180   handled contact messages → delete
   notifications         90   read in-app notifications → delete
@@ -89,8 +90,12 @@ def run(apply: bool = False, actor=None) -> dict[str, int]:
             except Exception:  # noqa: BLE001 - missing file must not stop the purge
                 pass
         reg_docs.delete()
+        # The Expediente's free-text notes can name the family or the child
+        # (why they left, how the exam went): cleared with the contact data.
         prospects.update(parent_name=REDACTED, parent_email=REDACTED, parent_phone='', message='',
-                         child_first_name=REDACTED, child_last_name='')
+                         child_first_name=REDACTED, child_last_name='',
+                         closed_reason='', visit_note='', exam_notes='', agreements_note='',
+                         exam_result_reason='', documents_waived_reason='')
         submissions.delete()
         messages.delete()
         notifications.delete()

@@ -485,7 +485,9 @@ class AdminWeekView(APIView):
                     'end_time': sl.end_time.strftime('%H:%M'), 'capacity': sl.capacity, 'is_active': sl.is_active,
                     'booked': sum(b.num_attendees for b in bk),
                     'bookings': [{'id': b.pk, 'parent_name': b.parent_name, 'child_name': b.child_name, 'status': b.status,
-                                  'outcome': b.outcome, 'num_attendees': b.num_attendees, 'parent_phone': b.parent_phone} for b in bk],
+                                  'outcome': b.outcome, 'num_attendees': b.num_attendees, 'parent_phone': b.parent_phone,
+                                  # The admissions case (Expediente) the visit belongs to, if any.
+                                  'case': b.pre_registration_id} for b in bk],
                 })
             days.append({'date': d.isoformat(), 'slots': day_slots})
         return Response({'start': start.isoformat(), 'end': end.isoformat(), 'days': days})

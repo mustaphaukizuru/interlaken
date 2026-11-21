@@ -195,6 +195,8 @@ class RegistrationAdminListSerializer(serializers.ModelSerializer):
             'parent1_name', 'parent1_email', 'parent1_phone',
             'parent2_email', 'child_curp',
             'status', 'submitted_at', 'created_at', 'updated_at', 'doc_count', 'doc_verified',
+            # The case (Expediente) the ficha belongs to: the row links to it.
+            'pre_registration',
         ]
 
     def get_child_name(self, obj):

@@ -4,7 +4,14 @@ from unfold.admin import ModelAdmin
 # OpenSchoolDay is retired for publishing — live /puertas-abiertas reads
 # bookings.AvailabilitySlot(visit_type=open_class). Manage dates in
 # /admin/visitas (React) or bookings.AvailabilitySlot.
-from .models import PreRegistration, Registration, RegistrationDocument, RegistrationGuardian
+from .models import (
+    AdmissionDiscount,
+    EnrollmentPayment,
+    PreRegistration,
+    Registration,
+    RegistrationDocument,
+    RegistrationGuardian,
+)
 
 
 class RegistrationGuardianInline(admin.StackedInline):
@@ -59,3 +66,46 @@ class RegistrationDocumentAdmin(ModelAdmin):
     list_select_related = ('registration',)
     readonly_fields = ('filename', 'file_size', 'uploaded_at')
 
+
+class _ExpedienteRecordAdmin(ModelAdmin):
+    """Becas/descuentos and inscripción payments of the Expediente (Fase 5):
+    a read-only system-of-record view. They are written in /admin/admisiones/<id>
+    (validation, audit row per change) and never deleted: «Anular» voids them
+    there, so the case history keeps them. See docs/ADMIN-VS-PORTAL.md."""
+
+    list_select_related = ('pre_registration',)
+    raw_id_fields = ('pre_registration',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AdmissionDiscount)
+class AdmissionDiscountAdmin(_ExpedienteRecordAdmin):
+    list_display = ('pre_registration', 'kind', 'percent', 'amount', 'duration',
+                    'authorized_by', 'created_at', 'voided_at')
+    list_filter = ('kind', 'duration', ('voided_at', admin.EmptyFieldListFilter))
+    search_fields = ('pre_registration__child_first_name', 'pre_registration__child_last_name',
+                     'pre_registration__parent_name', 'authorized_by')
+    date_hierarchy = 'created_at'
+    readonly_fields = ('pre_registration', 'kind', 'percent', 'amount', 'duration', 'start_month',
+                       'end_month', 'authorized_by', 'note', 'created_by', 'created_at',
+                       'updated_at', 'voided_at', 'void_reason')
+
+
+@admin.register(EnrollmentPayment)
+class EnrollmentPaymentAdmin(_ExpedienteRecordAdmin):
+    list_display = ('pre_registration', 'paid_on', 'amount', 'method', 'reference',
+                    'recorded_by', 'voided_at')
+    list_filter = ('method', ('voided_at', admin.EmptyFieldListFilter))
+    search_fields = ('pre_registration__child_first_name', 'pre_registration__child_last_name',
+                     'pre_registration__parent_name', 'reference')
+    date_hierarchy = 'paid_on'
+    readonly_fields = ('pre_registration', 'paid_on', 'amount', 'method', 'reference', 'note',
+                       'recorded_by', 'created_at', 'updated_at', 'voided_at', 'void_reason')
