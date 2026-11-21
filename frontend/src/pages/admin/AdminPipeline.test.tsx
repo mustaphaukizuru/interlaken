@@ -1,58 +1,81 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import AdminPipeline, { docsLabel } from './AdminPipeline';
-import { admissionsApi } from '@/services/api';
+import AdminPipeline, { columnParams } from './AdminPipeline';
+import { api } from '@/services/api';
 
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/services/api', () => ({
-  admissionsApi: {
-    pipeline: vi.fn().mockResolvedValue({ data: { templates: { missing_docs: 'x' }, bounded: true, complete_window_days: 90, columns: [
-      { status: 'submitted', label: 'Enviado', cards: [{ id: 1, child_name: 'Ana López', level: 'primaria', grade_applying: '1° Primaria', parent_name: 'María', parent_email: 'm@x.mx', parent_phone: '5512345678', status: 'submitted', submitted_at: null, updated_at: '', docs_verified: 1, docs_required: 6, missing: ['CURP', 'Fotografía', 'Boleta Anterior'], student: null }] },
-      { status: 'reviewing', label: 'En Revisión', cards: [{ id: 3, child_name: 'Carla Ruiz', level: 'primaria', grade_applying: '3° Primaria', parent_name: 'Eva', parent_email: 'e@x.mx', parent_phone: '', status: 'reviewing', submitted_at: null, updated_at: '', docs_verified: 6, docs_required: 6, missing: [], student: null }] },
-      { status: 'approved', label: 'Aprobado', cards: [{ id: 2, child_name: 'Bruno Soto', level: 'preescolar', grade_applying: '2° Preescolar', parent_name: 'Laura', parent_email: 'l@x.mx', parent_phone: '', status: 'approved', submitted_at: null, updated_at: '', docs_verified: 6, docs_required: 6, missing: [], student: null }] },
-      { status: 'complete', label: 'Inscripción Completa', cards: [] },
-      { status: 'rejected', label: 'Rechazado', cards: [] },
-    ] } }),
-    requestDocs: vi.fn(), convert: vi.fn(),
-  },
-}));
-vi.mock('@/hooks/useSiteSettings', () => ({ useSiteSettings: () => ({ contact_email: 'info@x.mx', whatsapp_number: '' }) }));
+vi.mock('@/services/api', () => ({ api: { get: vi.fn() } }));
 
-describe('AdminPipeline', () => {
-  it('docsLabel summarises the checklist', () => {
-    expect(docsLabel({ docs_verified: 6, docs_required: 6, missing: [] })).toBe('Expediente completo');
-    expect(docsLabel({ docs_verified: 1, docs_required: 6, missing: ['CURP', 'Foto', 'Boleta'] })).toBe('Faltan 3: CURP, Foto…');
+const COUNTS = { informes: 2, visita: 1, examen: 0, documentacion: 1, inscrito: 40, cerrado: 3 };
+
+const row = (over: Record<string, unknown>) => ({
+  id: 1, child_name: 'Lucía Prueba', parent_name: 'Marta Ejemplo', parent_phone: '5512345678', parent_email: '',
+  level: 'primaria', level_label: 'Primaria', grade_applying: '2° Primaria', cycle: '2027-2028',
+  stage: 'informes', stage_label: 'Informes', closed_outcome: '', closed_outcome_label: '', status: 'pending',
+  next_action: { code: 'send_costs', label: 'Enviar cuotas' }, days_waiting: 9,
+  stage_changed_at: null, exam_at: null, created_at: '2026-11-01T10:00:00Z', updated_at: '2026-11-01T10:00:00Z',
+  ...over,
+});
+
+const BY_STAGE: Record<string, unknown[]> = {
+  informes: [row({ id: 1 }), row({ id: 2, child_name: 'Mateo Ejemplo', days_waiting: 1, next_action: { code: 'send_visit_link', label: 'Enviar liga de visita' } })],
+  visita: [row({ id: 3, child_name: 'Sofía Prueba', stage: 'visita', next_action: { code: 'visit_outcome', label: 'Registrar resultado de la visita' } })],
+  examen: [],
+  documentacion: [row({ id: 4, child_name: 'Elena Prueba', stage: 'documentacion', next_action: { code: 'record_payment', label: 'Registrar pago de inscripción' } })],
+  inscrito: [row({ id: 5, child_name: 'Iker Prueba', stage: 'inscrito', next_action: null })],
+  cerrado: [row({ id: 6, child_name: 'Olga Prueba', stage: 'cerrado', closed_outcome: 'no_interesa', closed_outcome_label: 'No le interesa', next_action: null })],
+};
+
+const get = vi.mocked(api.get);
+
+describe('AdminPipeline (stages board)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    get.mockImplementation(async (_url: string, cfg?: { params?: unknown }) => {
+      const stage = (cfg?.params as { stage?: string } | undefined)?.stage ?? '';
+      return { data: { count: COUNTS[stage as keyof typeof COUNTS] ?? 0, results: BY_STAGE[stage] ?? [], counts: COUNTS } } as never;
+    });
   });
-  it('renders columns with the right actions per status', async () => {
-    renderWithProviders(<AdminPipeline />, { route: '/admin/admisiones/pipeline' });
-    expect(await screen.findByText('Ana López')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Pedir documentos/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Convertir en alumno/ })).toBeInTheDocument();
-    expect(screen.getAllByText('Expediente completo').length).toBeGreaterThan(0);
+
+  it('asks for each column: open stages oldest first, done ones latest first', () => {
+    expect(columnParams('visita')).toEqual({ stage: 'visita', page_size: 30, ordering: 'stage_changed_at' });
+    expect(columnParams('cerrado')).toEqual({ stage: 'cerrado', page_size: 12, ordering: '-stage_changed_at' });
   });
-  it('says the board is bounded and links to the full list', async () => {
+
+  it('renders the five stages plus Cerrados with counts, next action and days waiting', async () => {
     renderWithProviders(<AdminPipeline />, { route: '/admin/admisiones/pipeline' });
-    expect(await screen.findByText(/completados en los últimos 90 días/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/admin/admisiones?vista=inscripciones');
+    expect(await screen.findByText('Lucía Prueba')).toBeInTheDocument();
+    const columns = screen.getAllByRole('listitem').filter((el) => el.tagName === 'SECTION');
+    expect(columns.map((c) => within(c).getByRole('heading').textContent)).toEqual([
+      'Informes2', 'Visita guiada1', 'Examen0', 'Documentación y acuerdos1', 'Inscrito40', 'Cerrados3',
+    ]);
+    const informes = columns[0];
+    expect(within(informes).getByText('Enviar cuotas')).toBeInTheDocument();
+    expect(within(informes).getByText('9 días')).toBeInTheDocument();
+    expect(within(columns[5]).getByText('No le interesa')).toBeInTheDocument();
+    // More cases than cards: the column links to the filtered list.
+    expect(within(columns[4]).getByRole('link', { name: /Ver los 40/ })).toHaveAttribute('href', '/admin/admisiones?etapa=inscrito');
+    expect(get).toHaveBeenCalledWith('/admissions/admin/cases/', { params: { stage: 'informes', page_size: 30, ordering: 'stage_changed_at' } });
   });
-  it('offers «Convertir» only on approved cards (not «En revisión»)', async () => {
-    renderWithProviders(<AdminPipeline />, { route: '/admin/admisiones/pipeline' });
-    expect(await screen.findByText('Carla Ruiz')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /Convertir en alumno/ })).toHaveLength(1);
+
+  it('a card opens its Expediente', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/admisiones/pipeline" element={<AdminPipeline />} />
+        <Route path="/admin/admisiones/:caseId" element={<p>Expediente abierto</p>} />
+      </Routes>,
+      { route: '/admin/admisiones/pipeline' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Abrir el expediente de Sofía Prueba' }));
+    expect(await screen.findByText('Expediente abierto')).toBeInTheDocument();
   });
-  it('lists guardians that were not linked because their email belongs to a non-family account', async () => {
-    vi.mocked(admissionsApi.convert).mockResolvedValue({ data: {
-      student: 9, student_id: '260002', already: false,
-      credentials: [{ email: 'l@x.mx', password: 'Abc123xyz9', name: 'Laura' }],
-      unlinked: [{ email: 'maestra@x.mx', name: 'Pedro', reason: 'Ese correo pertenece a una cuenta de «Personal».' }],
-    } } as never);
+
+  it('shows the error state and retries', async () => {
+    get.mockRejectedValueOnce(new Error('boom'));
     renderWithProviders(<AdminPipeline />, { route: '/admin/admisiones/pipeline' });
-    await userEvent.click(await screen.findByRole('button', { name: /Convertir en alumno/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Crear alumno y cuentas' }));
-    const list = await screen.findByRole('list', { name: 'Tutores no vinculados' });
-    expect(within(list).getByText(/maestra@x.mx/)).toBeInTheDocument();
-    await waitFor(() => expect(admissionsApi.convert).toHaveBeenCalledWith(2, expect.any(Object)));
+    await userEvent.click(await screen.findByRole('button', { name: /Reintentar/ }));
+    await waitFor(() => expect(screen.getByText('Lucía Prueba')).toBeInTheDocument());
   });
 });
