@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory
-from apps.admissions.models import RegistrationDocument
+from apps.admissions.models import Registration, RegistrationDocument
 from apps.admissions.test_registration_admin import _reg
 from apps.admissions.tokens import issue_session
 
@@ -51,7 +51,8 @@ def test_reject_with_note_emails_family_and_syncs_is_verified(api_client):
 
 
 def test_documents_link_issues_invite_and_lists_missing(api_client):
-    reg = _reg()
+    # Documents are asked for once the ficha is sent (a draft gets 409: test_docs_after_ficha).
+    reg = _reg(status=Registration.Status.SUBMITTED)
     api_client.force_authenticate(AdminFactory())
     mail.outbox.clear()
     resp = api_client.post(reverse('register-docs-link', args=[reg.id]), {}, format='json')

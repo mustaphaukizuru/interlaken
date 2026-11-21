@@ -160,6 +160,8 @@ def registration_status_action(name: str, label_es: str, target: str) -> BulkAct
 def _request_docs_plan(instance, payload):
     from .pipeline import checklist
 
+    if instance.status == Registration.Status.DRAFT:
+        raise BulkSkip("la familia todavía no envía la ficha")
     if not checklist(instance)["missing"]:
         raise BulkSkip("no falta ningún documento")
 

@@ -145,14 +145,18 @@ export function DocumentChecklist({ registrationId, columns = 1 }: { registratio
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-subtle">Recordatorio de faltantes</span>
           <button type="button" className={clsx(ACTION, 'border border-line bg-white text-purple hover:bg-cream')}
-            disabled={nothingMissing || remind.isPending || !data.parent_email} onClick={() => remind.mutate('email')}>
+            disabled={nothingMissing || !data.ficha_submitted || remind.isPending || !data.parent_email} onClick={() => remind.mutate('email')}>
             <Mail size={16} aria-hidden="true" /> {remind.isPending && remind.variables === 'email' ? 'Enviando…' : 'Por correo'}
           </button>
           <button type="button" className={clsx(ACTION, 'border border-line bg-white text-green-700 hover:bg-cream')}
-            disabled={nothingMissing || remind.isPending} onClick={() => remind.mutate('whatsapp')}>
+            disabled={nothingMissing || !data.ficha_submitted || remind.isPending} onClick={() => remind.mutate('whatsapp')}>
             <MessageCircle size={16} aria-hidden="true" /> {remind.isPending && remind.variables === 'whatsapp' ? 'Preparando…' : 'Por WhatsApp'}
           </button>
           {nothingMissing && <span className="text-xs text-subtle">No falta nada por pedir.</span>}
+          {/* The ficha and the documents share the family's link: a reminder now would cancel the ficha link. */}
+          {!nothingMissing && !data.ficha_submitted && (
+            <span className="text-xs text-subtle">Disponible cuando la familia envíe la ficha: el enlace de la ficha sigue vigente.</span>
+          )}
         </div>
       </div>
 

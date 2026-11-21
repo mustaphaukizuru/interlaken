@@ -227,6 +227,30 @@ def email_registration_outcome(reg: Registration):
 
 OUTCOME_STATES = (Registration.Status.APPROVED, Registration.Status.REJECTED)
 
+# Documents come after the ficha (the school's process). The ficha and the
+# documents page share the family's single-use link, so a documents link sent
+# while the ficha is still a draft would cancel the ficha link in their email.
+FICHA_PENDING_MSG = (
+    "La familia todavía no envía la ficha de inscripción. Los documentos se piden "
+    "después: el enlace de la ficha sigue vigente; cuando la envíe, pida los documentos."
+)
+
+
+class FichaPending(Exception):
+    """A documents link was asked for while the ficha is still a draft."""
+
+    code = "ficha_pending"
+
+    def __init__(self, message: str = FICHA_PENDING_MSG):
+        super().__init__(message)
+        self.message = message
+
+
+def ensure_ficha_sent(reg: Registration) -> None:
+    """Raise ``FichaPending`` while the ficha is a draft (see FICHA_PENDING_MSG)."""
+    if reg.status == Registration.Status.DRAFT:
+        raise FichaPending()
+
 
 def request_missing_documents(
     reg: Registration, actor=None, *, context: str = "", audit=True
@@ -238,6 +262,7 @@ def request_missing_documents(
     """
     from .pipeline import checklist, documents_upload_url, render_missing_docs
 
+    ensure_ficha_sent(reg)
     if not checklist(reg)["missing"]:
         return {"missing": [], "text": "", "sent_to": ""}
     from apps.portal.emailing import EmailContent

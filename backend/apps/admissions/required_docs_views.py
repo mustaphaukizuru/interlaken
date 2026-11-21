@@ -417,10 +417,14 @@ class RegistrationDocumentsReminderView(APIView):
 
     def post(self, request, pk):
         from .pipeline import documents_upload_url, render_missing_docs
-        from .services import request_missing_documents
+        from .services import FichaPending, ensure_ficha_sent, request_missing_documents
         from .tokens import issue_invite
 
         reg = _registration(pk)
+        try:
+            ensure_ficha_sent(reg)
+        except FichaPending as exc:
+            return Response(error_body(exc.message, code=exc.code), status=status.HTTP_409_CONFLICT)
         channel = str(request.data.get("channel") or "email")
         if channel not in ("email", "whatsapp"):
             return Response(
