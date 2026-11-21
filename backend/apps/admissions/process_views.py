@@ -39,6 +39,7 @@ from apps.core.exceptions import error_body
 from apps.core.filtersets import parse_bool_param
 from apps.core.listing import AdminListMixin, apply_date_range, search_q
 from apps.core.permissions import IsAdmin
+from apps.core.transitions import TransitionError, transition_code
 
 from . import cuotas_pdf, process, process_messages
 from .models import AdmissionDiscount, EnrollmentPayment, PreRegistration, Registration
@@ -63,6 +64,15 @@ AREA = "admisiones"
 def conflict(exc: process.CaseConflict) -> Response:
     return Response(
         error_body(exc.message, code=exc.code, **exc.extra), status=status.HTTP_409_CONFLICT
+    )
+
+
+def transition_failed(exc: TransitionError) -> Response:
+    """A refused stage move as ``{detail, code}`` (DRF would answer a bare list)."""
+    detail = exc.detail[0] if isinstance(exc.detail, list) and exc.detail else exc.detail
+    return Response(
+        error_body(str(detail), code=transition_code(exc) or "not_allowed"),
+        status=status.HTTP_400_BAD_REQUEST,
     )
 
 
@@ -234,6 +244,9 @@ def patch_stage(request, pk, stage):
         except process.CaseConflict as exc:
             transaction.set_rollback(True)
             return conflict(exc)
+        except TransitionError as exc:
+            transaction.set_rollback(True)
+            return transition_failed(exc)
     return detail_response(pk, request)
 
 
@@ -284,6 +297,9 @@ class CaseMoveView(APIView):
                     )
             except process.CaseConflict as exc:
                 return conflict(exc)
+            except TransitionError as exc:
+                transaction.set_rollback(True)
+                return transition_failed(exc)
         return detail_response(pk, request)
 
 

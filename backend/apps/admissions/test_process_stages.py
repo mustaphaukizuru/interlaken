@@ -177,7 +177,11 @@ def test_move_close_reopen_round_trip_is_audited(admin_client):
     r = admin_client.post(url("case-move"), {"stage": "examen"}, format="json")
     assert r.status_code == 200 and r.data["stage"] == "examen"
     back = admin_client.post(url("case-move"), {"stage": "visita"}, format="json")
-    assert back.status_code == 400 and "motivo" in str(back.data)
+    assert (
+        back.status_code == 400
+        and back.data["code"] == "note_required"
+        and "motivo" in back.data["detail"]
+    )
     back = admin_client.post(
         url("case-move"),
         {"stage": "visita", "note": "Pidió conocer primero el colegio"},

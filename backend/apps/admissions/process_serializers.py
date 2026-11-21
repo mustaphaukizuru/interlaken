@@ -108,7 +108,7 @@ class ProspectSerializer(serializers.Serializer):
             parent_email=validated.get("parent_email") or "",
             parent_phone=validated["parent_phone"],
             relationship=clean_text(validated.get("relationship")) or "Padre/Madre",
-            referral_source=validated.get("referral_source") or "WhatsApp",
+            referral_source=clean_text(validated.get("referral_source")),
             previous_school=clean_text(validated.get("previous_school")),
             child_age=validated.get("child_age"),
             notes=validated.get("notes") or "",
