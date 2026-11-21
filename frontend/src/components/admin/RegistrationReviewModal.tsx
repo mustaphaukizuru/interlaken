@@ -9,6 +9,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { admissionsAdminApi, api } from '@/services/api';
+import { fichaApi } from '@/components/admissions/ficha/api';
+import { FichaReadOnly } from '@/components/admin/FichaReadOnly';
 import type { BulkActionDef } from '@/services/dataOps';
 import { apiErrorMessage } from '@/lib/apiErrors';
 import { REG_ENTITY, registrationDetailKey, useDocumentBulk } from '@/hooks/queries/admissions';
@@ -56,6 +58,20 @@ export function RegistrationReviewModal({ id, open, onClose }: {
     queryFn: async () => (await admissionsAdminApi.getRegistration(id!)).data as Reg,
     enabled: open && id != null,
   });
+
+  // The ficha de inscripción (version 2): every section, grouped like the Excel.
+  const fichaQ = useQuery({
+    queryKey: [...registrationDetailKey(id), 'ficha'],
+    queryFn: async () => (await fichaApi.get(id!)).data,
+    enabled: open && id != null,
+  });
+  const schemaQ = useQuery({
+    queryKey: ['ficha-schema'],
+    queryFn: async () => (await fichaApi.schema()).data,
+    enabled: open && fichaQ.data?.ficha_version === 2,
+    staleTime: 10 * 60_000,
+  });
+  const fichaView = fichaQ.data?.ficha_version === 2 && schemaQ.data?.steps ? { ficha: fichaQ.data, schema: schemaQ.data } : null;
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<{ id: number; label: string; note: string } | null>(null);
@@ -141,8 +157,9 @@ export function RegistrationReviewModal({ id, open, onClose }: {
             <span className="text-subtle">· Ciclo {data.cycle}</span>
           </div>
 
-          {/* dt/dd rows live in a real <dl>; each Field is a div-wrapped group
-              (valid HTML5 and what axe's definition-list rule expects). */}
+          {fichaView ? <FichaReadOnly schema={fichaView.schema} ficha={fichaView.ficha} /> : (
+          /* dt/dd rows live in a real <dl>; each Field is a div-wrapped group
+              (valid HTML5 and what axe's definition-list rule expects). */
           <dl className="space-y-5">
             <Field label="Alumno">
               {fullName}{data.child_curp ? ` · CURP ${data.child_curp}` : ''} · Nac. {data.child_dob}
@@ -173,6 +190,7 @@ export function RegistrationReviewModal({ id, open, onClose }: {
               </Field>
             )}
           </dl>
+          )}
 
           {/* LFPDPPP consents — staff must see what the family accepted */}
           <div>
