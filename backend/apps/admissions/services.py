@@ -64,9 +64,12 @@ def change_status(
             {"status": ["La inscripción se completa con «Convertir en alumno» en el pipeline."]}
         )
     assert_transition(entity, current, target, note=note or "")
+    stage = getattr(instance, "stage", None)
     instance.status = target
     instance.save(update_fields=["status", "updated_at"])
     changes = {"status": [current, target]}
+    if stage is not None and instance.stage != stage:  # Expediente: the stage follows
+        changes["stage"] = [stage, instance.stage]
     if note:
         changes["note"] = note[:500]
     if audit:  # bulk passes False: its per-row record() carries the same diff
@@ -86,7 +89,7 @@ def sent_registration(pre: PreRegistration):
 
 
 def invite_preregistration(
-    pre: PreRegistration, actor=None, *, context: str = "", audit=True
+    pre: PreRegistration, actor=None, *, context: str = "", audit=True, email=True
 ) -> dict:
     """Create or refresh the DRAFT registration for ``pre`` and email the invite.
 
@@ -112,6 +115,7 @@ def invite_preregistration(
         "child_first_name": pre.child_first_name,
         "child_last_name": pre.child_last_name,
         "child_dob": pre.child_dob,
+        "previous_school": pre.previous_school,
         "level": pre.level,
         "grade_applying": pre.grade_applying,
         "cycle": pre.cycle or current_school_cycle(),
@@ -144,11 +148,15 @@ def invite_preregistration(
 
     changes = {"invite": reg.id}
     if pre.status == PreRegistration.Status.PENDING:
+        stage = pre.stage
         pre.status = PreRegistration.Status.CONTACTED
         pre.save(update_fields=["status", "updated_at"])
         changes["status"] = [PreRegistration.Status.PENDING, PreRegistration.Status.CONTACTED]
+        if pre.stage != stage:
+            changes["stage"] = [stage, pre.stage]
 
-    after_commit(partial(email_invite, reg, url, to=to))
+    if email:  # the Expediente sends it itself to know whether it went out
+        after_commit(partial(email_invite, reg, url, to=to))
     if audit:
         record("update", pre, changes, actor=actor, context=context or "admissions: invitación")
     return {"registration": reg, "raw": raw, "url": url, "changes": changes}
@@ -181,8 +189,8 @@ def email_invite(reg: Registration, invite_url: str, *, to: str = ""):
         signoff="Equipo de Admisiones",
         reason=ADM_REASON,
     )
-    send_email(f"Invitación de inscripción: {_child(reg)}", "", [to or reg.parent1_email],
-               reply_to=settings.ADMISSIONS_EMAIL, content=content)
+    return send_email(f"Invitación de inscripción: {_child(reg)}", "", [to or reg.parent1_email],
+                      reply_to=settings.ADMISSIONS_EMAIL, content=content)
 
 
 # ── inscripciones ─────────────────────────────────────────

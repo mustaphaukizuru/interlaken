@@ -136,6 +136,11 @@ class Booking(models.Model):
     outcome           = models.CharField(max_length=12, choices=Outcome.choices, blank=True, default='')
     outcome_note      = models.CharField(max_length=500, blank=True, default='')
     rescheduled_from  = models.ForeignKey(AvailabilitySlot, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    # The admissions case (Expediente, Fase 5) this visit belongs to: set by the
+    # signed visit link, by the office, or matched by email (latest lead).
+    pre_registration  = models.ForeignKey('admissions.PreRegistration', null=True, blank=True,
+                                          on_delete=models.SET_NULL, related_name='bookings',
+                                          verbose_name='Expediente de admisión')
     created_at        = models.DateTimeField(default=timezone.now)
     updated_at        = models.DateTimeField(auto_now=True)
 

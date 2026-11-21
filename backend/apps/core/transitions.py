@@ -31,6 +31,19 @@ TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
         "rejected": frozenset({"pending"}),
         "enrolled": frozenset(),
     },
+    # Expediente de admisión (Fase 5): PreRegistration.stage. Forward jumps are
+    # free (a family may skip the visit); going back needs a note; «cerrado»
+    # carries its own outcome + reason (admissions.process.close_case) and a
+    # reopen is a reverse move; «inscrito» is reached only by «Marcar como
+    # inscrito» (admissions.process.enroll_case).
+    "admissions.stage": {
+        "informes": frozenset({"visita", "examen", "documentacion", "cerrado"}),
+        "visita": frozenset({"examen", "documentacion", "informes", "cerrado"}),
+        "examen": frozenset({"documentacion", "visita", "informes", "cerrado"}),
+        "documentacion": frozenset({"inscrito", "examen", "visita", "informes", "cerrado"}),
+        "cerrado": frozenset({"informes", "visita", "examen", "documentacion"}),
+        "inscrito": frozenset(),
+    },
     "admissions.registration": {
         "submitted": frozenset({"reviewing", "approved", "rejected"}),
         "reviewing": frozenset({"approved", "rejected", "submitted"}),
@@ -86,6 +99,16 @@ REVERSE_TRANSITIONS: frozenset[tuple[str, str, str]] = frozenset(
     {
         ("admissions.preregistration", "contacted", "pending"),
         ("admissions.preregistration", "rejected", "pending"),
+        ("admissions.stage", "visita", "informes"),
+        ("admissions.stage", "examen", "visita"),
+        ("admissions.stage", "examen", "informes"),
+        ("admissions.stage", "documentacion", "examen"),
+        ("admissions.stage", "documentacion", "visita"),
+        ("admissions.stage", "documentacion", "informes"),
+        ("admissions.stage", "cerrado", "informes"),
+        ("admissions.stage", "cerrado", "visita"),
+        ("admissions.stage", "cerrado", "examen"),
+        ("admissions.stage", "cerrado", "documentacion"),
         ("admissions.registration", "reviewing", "submitted"),
         ("admissions.registration", "approved", "reviewing"),
         ("admissions.registration", "rejected", "reviewing"),
@@ -113,6 +136,14 @@ class TransitionError(ValidationError):
 # is_active + fanout_at onto draft/inactive/active) name their states here.
 STATE_LABELS: dict[str, dict[str, str]] = {
     "portal.announcement": {"draft": "Borrador", "inactive": "Inactivo", "active": "Activo"},
+    "admissions.stage": {
+        "informes": "Informes",
+        "visita": "Visita guiada",
+        "examen": "Examen",
+        "documentacion": "Documentación y acuerdos",
+        "inscrito": "Inscrito",
+        "cerrado": "Cerrado",
+    },
 }
 
 

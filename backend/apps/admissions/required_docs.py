@@ -119,6 +119,12 @@ def documents_for_level(
     return [d for d in docs if d.active and d.applies_to(level)]
 
 
+def required_documents(level: str) -> list[str]:
+    """Names of the documents a level asks for, in order: the Expediente and the
+    «Cuotas por nivel» PDF read them through ``process.required_documents``."""
+    return [d.name for d in documents_for_level(level)]
+
+
 def normalize_levels(values) -> list[str]:
     """Known level codes from ``values``, deduplicated, in school order."""
     wanted = {str(v).strip().lower() for v in (values or ())}

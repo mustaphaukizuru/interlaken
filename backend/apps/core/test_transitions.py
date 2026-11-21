@@ -87,7 +87,9 @@ def test_terminal_states():
 
 
 def test_reverse_transitions_are_the_documented_ones():
-    assert REVERSE_TRANSITIONS == {
+    # The Expediente stages (admissions.stage) have their own contract test:
+    # apps/admissions/test_process_stages.py.
+    assert {r for r in REVERSE_TRANSITIONS if r[0] != "admissions.stage"} == {
         ("admissions.preregistration", "contacted", "pending"),
         ("admissions.preregistration", "rejected", "pending"),
         ("admissions.registration", "reviewing", "submitted"),

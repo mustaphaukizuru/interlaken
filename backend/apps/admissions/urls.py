@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ficha_views, required_docs_views, views
+from . import ficha_views, process_views, required_docs_views, views
 from .bulk import DocumentBulkView, PreRegistrationBulkView, RegistrationBulkView
 from .exports import PreRegistrationExportView, RegistrationExportView
 from .ficha_export import views as ficha_export
@@ -63,4 +63,28 @@ urlpatterns = [
          required_docs_views.RegistrationDocumentStateView.as_view(), name='register-checklist-state'),
     path('open-school/',               views.OpenSchoolDayListView.as_view(),       name='open-school-list'),
     path('open-school/signup/',        views.OpenSchoolDaySignUpView.as_view(),     name='open-school-signup'),
+]
+
+# ── Expediente de admisión (Fase 5): admissions/process_views.py ───────────
+pv = process_views
+urlpatterns += [
+    path('admin/cases/',                          pv.CaseListCreateView.as_view(), name='cases'),
+    path('admin/cases/templates/',                pv.CaseTemplatesView.as_view(),  name='cases-templates'),
+    path('admin/cases/<int:pk>/',                 pv.CaseDetailView.as_view(),     name='case-detail'),
+    path('admin/cases/<int:pk>/move/',            pv.CaseMoveView.as_view(),       name='case-move'),
+    path('admin/cases/<int:pk>/close/',           pv.CaseCloseView.as_view(),      name='case-close'),
+    path('admin/cases/<int:pk>/reopen/',          pv.CaseReopenView.as_view(),     name='case-reopen'),
+    path('admin/cases/<int:pk>/enroll/',          pv.CaseEnrollView.as_view(),     name='case-enroll'),
+    path('admin/cases/<int:pk>/actions/<slug:action>/', pv.CaseActionView.as_view(), name='case-action'),
+    path('admin/cases/<int:pk>/discounts/',       pv.DiscountListView.as_view(),   name='case-discounts'),
+    path('admin/cases/<int:pk>/discounts/<int:item>/', pv.DiscountDetailView.as_view(),
+         name='case-discount-detail'),
+    path('admin/cases/<int:pk>/payments/',        pv.PaymentListView.as_view(),    name='case-payments'),
+    path('admin/cases/<int:pk>/payments/<int:item>/', pv.PaymentDetailView.as_view(),
+         name='case-payment-detail'),
+    path('admin/cases/<int:pk>/visita/',          pv.CaseVisitStageView.as_view(), name='case-stage-visita'),
+    path('admin/cases/<int:pk>/<slug:stage>/',    pv.CaseStageView.as_view(),      name='case-stage'),
+    path('admin/exams/',                          pv.ExamsView.as_view(),          name='case-exams'),
+    path('admin/cuotas/<slug:level>.pdf',         pv.CuotasPdfPreviewView.as_view(), name='cuotas-pdf-preview'),
+    path('cuotas/<slug:level>.pdf',               pv.CuotasPdfView.as_view(),      name='cuotas-pdf'),
 ]
