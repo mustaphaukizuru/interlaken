@@ -5,7 +5,7 @@
  * The open slots are edited in Visitas (availability).
  */
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -103,6 +103,11 @@ function VisitBookingView(p: BookingProps) {
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [confirmed, setConfirmed] = useState<AvailabilitySlot | null>(null);
   const { whatsapp_number } = useSiteSettings();
+  // `?lead=` is the signed visit link the office sends from the Expediente:
+  // the booking attaches itself to that case. It stays in the address (a
+  // reload keeps it) and is never shown; a bad or old one is ignored by the API.
+  const [searchParams] = useSearchParams();
+  const leadToken = searchParams.get('lead')?.trim() ?? '';
   const whatsappText = t(p.whatsappMessage);
   const whatsappLabel = t(p.whatsappLabel) || 'Reservar por WhatsApp';
 
@@ -155,6 +160,7 @@ function VisitBookingView(p: BookingProps) {
         child_name: values.child_name,
         child_grade: values.child_grade,
         num_attendees: 1,
+        ...(leadToken ? { lead_token: leadToken } : {}),
       });
       trackEvent(FunnelEvent.BookingConversion, { grade: values.child_grade });
       setConfirmed(selectedSlot);

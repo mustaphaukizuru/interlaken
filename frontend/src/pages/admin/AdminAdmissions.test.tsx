@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 
 vi.mock('@/services/api', async () => ({
@@ -19,31 +20,42 @@ vi.mock('react-hot-toast', () => ({
   default: { error: vi.fn(), success: vi.fn(), loading: vi.fn(() => 't'), dismiss: vi.fn() },
 }));
 
-import toast from 'react-hot-toast';
 import AdminAdmissions from './AdminAdmissions';
 import { api, downloadBlob } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { stubViewport } from '@/test/viewport';
+import { makeCase } from '@/test/caseFixtures';
 
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
-const patch = vi.mocked(api.patch);
-const toastSuccess = vi.mocked(toast.success);
 
-const PRE = {
+const CASE = {
   id: 7,
   child_name: 'Ana Pérez',
-  level: 'primaria',
-  grade_applying: 'Primaria 1°',
-  cycle: '2026-2027',
   parent_name: 'Roberto Pérez',
-  parent_email: 'roberto@test.mx',
   parent_phone: '5551234567',
-  wants_visit: true,
+  parent_email: 'roberto@ejemplo.test',
+  level: 'primaria',
+  level_label: 'Primaria',
+  grade_applying: '1° Primaria',
+  cycle: '2027-2028',
+  stage: 'informes',
+  stage_label: 'Informes',
+  closed_outcome: '',
+  closed_outcome_label: '',
   status: 'pending',
-  created_at: '2026-08-01T12:00:00Z',
+  next_action: { code: 'send_costs', label: 'Enviar cuotas' },
+  days_waiting: 9,
+  stage_changed_at: '2026-11-12T12:00:00Z',
+  exam_at: null,
+  created_at: '2026-11-12T12:00:00Z',
+  updated_at: '2026-11-12T12:00:00Z',
 };
-const PRE_CONTACTED = { ...PRE, id: 8, child_name: 'Beto Ruiz', status: 'contacted' };
+const CASE_CLOSED = {
+  ...CASE, id: 8, child_name: 'Beto Ruiz', stage: 'cerrado', stage_label: 'Cerrado',
+  closed_outcome: 'no_aceptado', closed_outcome_label: 'No aceptado', next_action: null, days_waiting: 0,
+};
+const COUNTS = { informes: 4, visita: 3, examen: 2, documentacion: 1, inscrito: 12, cerrado: 5 };
 
 const REG = {
   id: 3,
@@ -52,130 +64,178 @@ const REG = {
   grade_applying: 'Primaria 2°',
   cycle: '2026-2027',
   parent1_name: 'María Ruiz',
-  parent1_email: 'maria@test.mx',
+  parent1_email: 'maria@ejemplo.test',
   parent1_phone: '5559999999',
   status: 'submitted',
   submitted_at: '2026-08-02T10:00:00Z',
   created_at: '2026-08-01T10:00:00Z',
   doc_count: 2,
   doc_verified: 1,
+  pre_registration: 7,
 };
 
 const page = <T,>(results: T[], count = results.length) => ({ data: { count, next: null, previous: null, results } });
 
-function mockLists({ pre = [PRE, PRE_CONTACTED], regs = [REG] }: { pre?: unknown[]; regs?: unknown[] } = {}) {
+function mockLists({ cases = [CASE, CASE_CLOSED], regs = [REG], count }: { cases?: unknown[]; regs?: unknown[]; count?: number } = {}) {
   get.mockImplementation(async (url: string) => {
-    if (url === '/admissions/pre-register/') return page(pre) as never;
+    if (url === '/admissions/admin/cases/') return { data: { ...page(cases, count).data, counts: COUNTS } } as never;
     if (url === '/admissions/register/') return page(regs) as never;
     if (url.endsWith('/export/')) return { data: new Blob(['x']) } as never;
     throw new Error(`unexpected GET ${url}`);
   });
 }
 
-const plan = (over: Record<string, unknown> = {}) => ({
-  data: { action: 'set_status', requested: 1, ok: 1, failed: [], skipped: [], dry_run: true, ...over },
-});
+function renderPage(route: string) {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/admin/admisiones" element={<AdminAdmissions />} />
+      <Route path="/admin/admisiones/:caseId" element={<p>Expediente abierto</p>} />
+    </Routes>,
+    { route },
+  );
+}
 
-describe('AdminAdmissions', () => {
+describe('AdminAdmissions · Expedientes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubViewport(1280);
-    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
     mockLists();
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('maps the URL state onto the pre-registros list request', async () => {
-    renderWithProviders(<AdminAdmissions />, {
-      route: '/admin/admisiones?q=ana&estado=pending&nivel=primaria&ciclo=2026-2027&visita=true&desde=2026-08-01&hasta=2026-08-31&orden=-child&page=2',
-    });
+  it('maps the URL state onto the cases request and shows the stage counts', async () => {
+    renderPage('/admin/admisiones?q=ana&etapa=examen&nivel=primaria&ciclo=2027-2028&desde=2026-11-01&hasta=2026-11-30&orden=-child&page=2');
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
-    expect(get).toHaveBeenCalledWith('/admissions/pre-register/', {
+    expect(get).toHaveBeenCalledWith('/admissions/admin/cases/', {
       params: {
-        page: 2, q: 'ana', status: 'pending', level: 'primaria', cycle: '2026-2027', wants_visit: 'true',
-        from: '2026-08-01', to: '2026-08-31', ordering: '-child',
+        page: 2, q: 'ana', stage: 'examen', level: 'primaria', cycle: '2027-2028',
+        from: '2026-11-01', to: '2026-11-30', ordering: '-child',
       },
     });
-    expect(screen.getByRole('columnheader', { name: 'Alumno' })).toHaveAttribute('aria-sort', 'descending');
-    expect(screen.getByRole('tab', { name: 'Pre-registros' })).toHaveAttribute('aria-selected', 'true');
+    const tabs = screen.getByRole('tablist', { name: 'Filtrar por etapa' });
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Todos27', 'Informes4', 'Visita3', 'Examen2', 'Documentación1', 'Inscritos12', 'Cerrados5',
+    ]);
+    expect(within(tabs).getByRole('tab', { name: /Examen/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Expedientes' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('offers only allowed transitions and patches forward moves directly', async () => {
-    const user = userEvent.setup();
-    patch.mockResolvedValue({ data: {} } as never);
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones' });
-    const select = await screen.findByLabelText('Cambiar estado del pre-registro de Ana Pérez');
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['Pendiente', 'Contactado', 'Inscrito', 'No procedió']);
-    await user.selectOptions(select, 'contacted');
-    await waitFor(() => expect(patch).toHaveBeenCalledWith('/admissions/pre-register/7/', { status: 'contacted' }));
-    expect(toastSuccess).toHaveBeenCalledWith('Estado actualizado.');
+  it('shows the stage, the next step and the days waiting; closed cases show their outcome', async () => {
+    renderPage('/admin/admisiones');
+    const row = (await screen.findByText('Ana Pérez')).closest('tr')!;
+    expect(row).toHaveTextContent('Informes');
+    expect(row).toHaveTextContent('Enviar cuotas');
+    expect(row).toHaveTextContent('9 días');
+    expect(row).toHaveTextContent('Roberto Pérez');
+    expect(row).toHaveTextContent('5551234567');
+    const closed = screen.getByText('Beto Ruiz').closest('tr')!;
+    expect(closed).toHaveTextContent('Cerrado · No aceptado');
   });
 
-  it('a reverse move opens the confirm dialog and requires a note', async () => {
+  it('a stage chip filters the list', async () => {
     const user = userEvent.setup();
-    post.mockImplementation(async (_url: string, body: unknown) => {
-      const b = body as { dry_run?: boolean };
-      return plan({ dry_run: !!b.dry_run }) as never;
-    });
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones' });
-    await user.selectOptions(await screen.findByLabelText('Cambiar estado del pre-registro de Beto Ruiz'), 'pending');
-    const dialog = await screen.findByRole('dialog');
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/admin/pre-registrations/bulk/', {
-      action: 'set_status', ids: [8], all_matching: false, filters: undefined, dry_run: true, payload: { status: 'pending' },
-    }));
-    const confirm = await within(dialog).findByRole('button', { name: /Regresar a pendiente \(1\)/ });
-    expect(confirm).toBeDisabled();
-    await user.type(within(dialog).getByLabelText('Motivo (obligatorio)'), 'Se reabre');
-    await user.click(confirm);
-    await waitFor(() => expect(post).toHaveBeenLastCalledWith('/admissions/admin/pre-registrations/bulk/', {
-      action: 'set_status', ids: [8], all_matching: false, filters: undefined, dry_run: false,
-      payload: { note: 'Se reabre', status: 'pending' },
-    }));
-    expect(patch).not.toHaveBeenCalled();
-  });
-
-  it('bulk "select all matching" sends the list filters to set_status', async () => {
-    const user = userEvent.setup();
-    get.mockImplementation(async (url: string) => (url === '/admissions/pre-register/' ? page([PRE, PRE_CONTACTED], 120) : page([])) as never);
-    post.mockImplementation(async (_u: string, body: unknown) => plan({ requested: 120, ok: 118, dry_run: !!(body as { dry_run?: boolean }).dry_run }) as never);
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones?nivel=secundaria' });
+    renderPage('/admin/admisiones');
     await screen.findByText('Ana Pérez');
-    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las filas de esta página' }));
-    await user.click(screen.getByRole('button', { name: 'Seleccionar las 120 que coinciden' }));
-    const bar = screen.getByRole('region', { name: 'Acciones en lote' });
-    await user.click(within(bar).getByRole('button', { name: 'Marcar contactados' }));
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/admin/pre-registrations/bulk/', expect.objectContaining({
-      action: 'set_status', all_matching: true, ids: [], dry_run: true,
-      filters: expect.objectContaining({ level: 'secundaria' }), payload: { status: 'contacted' },
-    })));
-    expect(await screen.findByText(/Se marcarán como contactados/)).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /Cerrados/ }));
+    await waitFor(() => expect(get).toHaveBeenLastCalledWith('/admissions/admin/cases/', { params: { page: 1, stage: 'cerrado' } }));
   });
 
-  it('invites a family from the row action and shows the link banner', async () => {
+  it('a row opens its Expediente', async () => {
     const user = userEvent.setup();
-    post.mockResolvedValue({ data: { invite_url: 'https://interlaken.edu.mx/inscripcion?rid=1&token=abc' } } as never);
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones' });
-    await user.click(await screen.findByRole('button', { name: 'Invitar a inscripción: Ana Pérez' }));
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/pre-register/7/invite/'));
-    expect(await screen.findByText(/Invitación generada para Ana Pérez/)).toBeInTheDocument();
+    renderPage('/admin/admisiones');
+    const row = (await screen.findByText('Beto Ruiz')).closest('tr')!;
+    await user.click(within(row).getByText('Cerrado · No aceptado'));
+    expect(await screen.findByText('Expediente abierto')).toBeInTheDocument();
   });
 
-  it('exports the current pre-registros view', async () => {
+  it('«Nuevo prospecto» warns about duplicates with links, then creates and opens the Expediente', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones?estado=pending' });
+    post.mockImplementation(async (_url: string, _body: unknown, cfg?: { params?: unknown }) => {
+      if ((cfg?.params as { dry_run?: number } | undefined)?.dry_run) return { data: { created: false, duplicates: [CASE] } } as never;
+      return { data: { ...makeCase('informes', { id: 31, child_name: 'Sofía Pérez' }), duplicates: [CASE] } } as never;
+    });
+    renderPage('/admin/admisiones');
+    await screen.findByText('Ana Pérez');
+    await user.click(screen.getByRole('button', { name: /Nuevo prospecto/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nuevo prospecto' });
+    await user.click(within(dialog).getByRole('button', { name: 'Crear expediente' }));
+    expect(within(dialog).getAllByText('Escriba el nombre del alumno.').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText('Elija el grado.').length).toBeGreaterThan(0);
+    expect(post).not.toHaveBeenCalled();
+
+    await user.type(within(dialog).getByLabelText('Nombre del alumno'), 'Sofía Pérez');
+    await user.type(within(dialog).getByLabelText('Nombre del tutor'), 'Roberto Pérez');
+    await user.type(within(dialog).getByLabelText('Celular'), '55 5123 4567');
+    await user.selectOptions(within(dialog).getByLabelText('Grado al que ingresa'), '3° Primaria');
+    await user.type(within(dialog).getByLabelText('Edad (opcional)'), '8');
+    await user.type(within(dialog).getByLabelText('Colegio de procedencia (opcional)'), 'Colegio Ficticio');
+    await user.click(within(dialog).getByRole('button', { name: 'Crear expediente' }));
+
+    const body = {
+      child_name: 'Sofía Pérez', parent_name: 'Roberto Pérez', parent_phone: '55 5123 4567', grade_applying: '3° Primaria',
+      cycle: 'proximo', previous_school: 'Colegio Ficticio', child_age: 8, parent_email: '',
+    };
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/admin/cases/', body, { params: { dry_run: 1 } }));
+    const warning = await within(dialog).findByRole('alert');
+    expect(warning).toHaveTextContent('Ya hay un expediente con ese celular o correo.');
+    expect(within(warning).getByRole('link', { name: 'Ana Pérez' })).toHaveAttribute('href', '/admin/admisiones/7');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Crear de todos modos' }));
+    await waitFor(() => expect(post).toHaveBeenLastCalledWith('/admissions/admin/cases/', body, undefined));
+    expect(await screen.findByText('Expediente abierto')).toBeInTheDocument();
+  });
+
+  it('«Nuevo prospecto» without duplicates creates right away; server field errors stay on the form', async () => {
+    const user = userEvent.setup();
+    post.mockRejectedValueOnce({ response: { status: 400, data: { parent_phone: ['Escriba un celular de 10 dígitos.'] } } });
+    renderPage('/admin/admisiones');
+    await screen.findByText('Ana Pérez');
+    await user.click(screen.getByRole('button', { name: /Nuevo prospecto/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nuevo prospecto' });
+    await user.type(within(dialog).getByLabelText('Nombre del alumno'), 'Sofía Pérez');
+    await user.type(within(dialog).getByLabelText('Nombre del tutor'), 'Roberto Pérez');
+    await user.type(within(dialog).getByLabelText('Celular'), '5551234567');
+    await user.selectOptions(within(dialog).getByLabelText('Grado al que ingresa'), 'Maternal');
+    await user.click(within(dialog).getByRole('radio', { name: /ciclo en curso/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Crear expediente' }));
+    expect(await within(dialog).findAllByText(/Escriba un celular de 10 dígitos/)).toHaveLength(2);
+    expect(within(dialog).getByLabelText('Celular')).toHaveAttribute('aria-invalid', 'true');
+
+    post.mockImplementation(async (_u: string, _b: unknown, cfg?: { params?: unknown }) =>
+      ((cfg?.params as { dry_run?: number } | undefined)?.dry_run
+        ? { data: { created: false, duplicates: [] } }
+        : { data: { ...makeCase('informes', { id: 32 }), duplicates: [] } }) as never);
+    await user.click(within(dialog).getByRole('button', { name: 'Crear expediente' }));
+    await waitFor(() => expect(post).toHaveBeenLastCalledWith('/admissions/admin/cases/', expect.objectContaining({ cycle: 'actual', grade_applying: 'Maternal' }), undefined));
+    expect(await screen.findByText('Expediente abierto')).toBeInTheDocument();
+  });
+
+  it('exports the current view with the stage filter (pre-registro export)', async () => {
+    const user = userEvent.setup();
+    renderPage('/admin/admisiones?etapa=visita&orden=stage_changed_at');
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('button', { name: /^Exportar$/ }));
     await user.click(screen.getByRole('menuitem', { name: /Excel/ }));
     await waitFor(() => expect(get).toHaveBeenCalledWith('/admissions/pre-register/export/', {
-      params: { status: 'pending', fmt: 'xlsx', ids: undefined, q: undefined, level: undefined, cycle: undefined, wants_visit: undefined, from: undefined, to: undefined, ordering: undefined },
+      params: { q: undefined, stage: 'visita', level: undefined, cycle: undefined, from: undefined, to: undefined, ordering: undefined, fmt: 'xlsx', ids: undefined },
       responseType: 'blob',
     }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalled());
   });
 
+  it('selected rows offer only «Exportar seleccionados» (no bulk stage moves)', async () => {
+    const user = userEvent.setup();
+    renderPage('/admin/admisiones');
+    await screen.findByText('Ana Pérez');
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar expediente de Ana Pérez' }));
+    const bar = screen.getByRole('region', { name: 'Acciones en lote' });
+    expect(within(bar).queryByRole('button', { name: /Marcar|Invitar|No procedió/ })).not.toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /Exportar seleccionados/ })).toBeInTheDocument();
+  });
+
   it('opens the import dialog with the pre-registros template', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones' });
+    renderPage('/admin/admisiones');
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('button', { name: 'Importar' }));
     expect(await screen.findByRole('dialog', { name: /Importar pre-registros/ })).toBeInTheDocument();
@@ -189,7 +249,7 @@ describe('AdminAdmissions', () => {
     post.mockImplementation(async (_u: string, body: unknown) => ({
       data: { action: 'approve', requested: 1, ok: 1, failed: [], skipped: [], dry_run: !!(body as { dry_run?: boolean }).dry_run },
     }) as never);
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones?q=ana' });
+    renderPage('/admin/admisiones?q=ana&etapa=informes');
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('tab', { name: 'Inscripciones' }));
     expect(await screen.findByText('Luis Ruiz')).toBeInTheDocument();
@@ -206,35 +266,36 @@ describe('AdminAdmissions', () => {
     }));
   });
 
-  it('maps inscripciones filters and opens the review from the row action', async () => {
+  it('maps inscripciones filters, opens the review and links each ficha to its Expediente', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones?vista=inscripciones&docs=true&estado=reviewing&orden=submitted_at' });
+    renderPage('/admin/admisiones?vista=inscripciones&docs=true&estado=reviewing&orden=submitted_at');
     expect(await screen.findByText('Luis Ruiz')).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith('/admissions/register/', {
       params: { page: 1, status: 'reviewing', documents_pending: 'true', ordering: 'submitted_at' },
     });
+    expect(screen.getByRole('link', { name: 'Abrir el expediente de admisión de Luis Ruiz' })).toHaveAttribute('href', '/admin/admisiones/7');
     await user.click(screen.getByRole('button', { name: 'Revisar expediente de Luis Ruiz' }));
     expect(await screen.findByRole('dialog', { name: /revisión/i })).toHaveTextContent('Expediente #3');
   });
 
   it('the ?inscripcion= deep link opens the review on the inscripciones tab', async () => {
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones?inscripcion=3' });
+    renderPage('/admin/admisiones?inscripcion=3');
     expect(await screen.findByRole('dialog', { name: /revisión/i })).toHaveTextContent('Expediente #3');
     await waitFor(() => expect(screen.getByRole('tab', { name: 'Inscripciones' })).toHaveAttribute('aria-selected', 'true'));
   });
 
   it('renders cards with checkboxes on phones (no bespoke mobile list)', async () => {
     stubViewport(375);
-    renderWithProviders(<AdminAdmissions />, { route: '/admin/admisiones' });
+    renderPage('/admin/admisiones');
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Seleccionar pre-registro de Ana Pérez' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Seleccionar expediente de Ana Pérez' })).toBeInTheDocument();
   });
 
   it.each([
-    ['pre-registros', '/admin/admisiones', 'Ana Pérez'],
+    ['expedientes', '/admin/admisiones', 'Ana Pérez'],
     ['inscripciones', '/admin/admisiones?vista=inscripciones', 'Luis Ruiz'],
   ])('%s has no serious/critical axe violations', async (_name, route, text) => {
-    const { container } = renderWithProviders(<AdminAdmissions />, { route });
+    const { container } = renderPage(route);
     expect(await screen.findByText(text)).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('checkbox')[1]);
     await screen.findByRole('region', { name: 'Acciones en lote' });

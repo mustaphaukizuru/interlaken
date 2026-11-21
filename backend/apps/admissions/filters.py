@@ -3,7 +3,8 @@ admissions/filters.py — FilterSets for the Admisiones lists (Data Ops Phase 4)
 
 Query params (API side; the console URL uses estado/nivel/ciclo/visita/desde/hasta):
 
-* pre-registros:  ``status``, ``level``, ``cycle``, ``wants_visit``, ``from``, ``to``
+* pre-registros:  ``status``, ``stage`` (one or a comma list, as the Expediente
+  list), ``level``, ``cycle``, ``wants_visit``, ``from``, ``to``
 * inscripciones:  ``status``, ``level``, ``cycle``, ``documents_pending``, ``from``, ``to``
 
 ``from``/``to`` are inclusive calendar days in America/Mexico_City applied to
@@ -34,13 +35,24 @@ class CreatedRangeFilterSet(django_filters.FilterSet):
 
 class PreRegistrationFilter(CreatedRangeFilterSet):
     status = django_filters.ChoiceFilter(choices=PreRegistration.Status.choices)
+    # The Expediente stage chips: the «Expedientes» tab exports what it shows.
+    stage = django_filters.CharFilter(method="filter_stage")
     level = django_filters.ChoiceFilter(choices=PreRegistration.Level.choices)
     cycle = django_filters.CharFilter(field_name="cycle")
     wants_visit = django_filters.BooleanFilter(field_name="wants_visit")
 
     class Meta:
         model = PreRegistration
-        fields = ["status", "level", "cycle", "wants_visit"]
+        fields = ["status", "stage", "level", "cycle", "wants_visit"]
+
+    def filter_stage(self, queryset, _name, value):
+        from rest_framework.exceptions import ValidationError
+
+        wanted = [v for v in (x.strip() for x in str(value).split(",")) if v]
+        bad = [v for v in wanted if v not in PreRegistration.Stage.values]
+        if bad:
+            raise ValidationError({"stage": [f"Etapa desconocida: {bad[0]}."]})
+        return queryset.filter(stage__in=wanted) if wanted else queryset
 
 
 class RegistrationFilter(CreatedRangeFilterSet):

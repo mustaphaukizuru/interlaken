@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
 import toast from 'react-hot-toast';
@@ -15,6 +15,10 @@ import { contentApi } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { socialEntries } from '@/lib/siteContact';
 import type { SiteSettings } from '@/types/content';
+
+// On demand: keeps the Expediente modules out of this route's preload list,
+// which lives in the entry chunk every public visitor downloads.
+const CaseTemplatesCard = lazy(() => import('@/components/admin/admissions/CaseTemplatesCard'));
 
 type SettingsForm = Omit<SiteSettings, 'updated_at' | 'menu'>;
 type SepRow = NonNullable<SiteSettings['sep_incorporations']>[number];
@@ -355,6 +359,10 @@ export default function AdminSettings() {
             </Card>
 
             <AdmissionTemplatesCard />
+
+            <Suspense fallback={<Card title="Mensajes del expediente"><div className="skeleton h-48 rounded-xl" role="status" aria-label="Cargando mensajes" /></Card>}>
+              <CaseTemplatesCard />
+            </Suspense>
 
             <Card title="Incorporaciones SEP">
               <p className="mb-3 text-sm text-subtle">

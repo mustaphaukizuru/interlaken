@@ -1,159 +1,104 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { invalidateStudents } from '@/hooks/queries/studentKeys';
-import { CheckCircle2, FileWarning, Mail, MessageCircle, UserPlus, KanbanSquare } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, Clock } from 'lucide-react';
+import { clsx } from 'clsx';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
-import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { admissionsApi, type PipelineCard, type ConvertResult } from '@/services/api';
-import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { credentialTemplate, mailtoDeliveryHref, whatsappDeliveryHref } from '@/lib/credentialTemplates';
-import { apiFieldErrors } from '@/lib/apiErrors';
-import { STATUS_BADGE } from '@/lib/admissionsStatus';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { ALL_STAGES, STAGE_META, isStale, waitingText, type StageKey } from '@/lib/caseStages';
+import { casesApi, caseKeys, type CaseListParams, type CaseRow } from '@/hooks/queries/cases';
 
+/** Cards per column; the column header links to the full list when there are more. */
+export const BOARD_LIMIT = 30;
 
-/** Docs progress label for a card. */
-export function docsLabel(c: Pick<PipelineCard, 'docs_verified' | 'docs_required' | 'missing'>): string {
-  if (c.missing.length === 0 && c.docs_verified === c.docs_required) return 'Expediente completo';
-  if (c.missing.length === 0) return `${c.docs_verified}/${c.docs_required} verificados`;
-  return `Faltan ${c.missing.length}: ${c.missing.slice(0, 2).join(', ')}${c.missing.length > 2 ? '…' : ''}`;
+/** Open stages show who waited longest first; Inscritos and Cerrados, the latest. */
+export function columnParams(stage: StageKey): CaseListParams {
+  const done = stage === 'inscrito' || stage === 'cerrado';
+  return { stage, page_size: done ? 12 : BOARD_LIMIT, ordering: done ? '-stage_changed_at' : 'stage_changed_at' };
 }
 
-/** /admin/admisiones/pipeline — kanban of inscripciones (BACKLOG P4-1). */
+/**
+ * /admin/admisiones/pipeline — the admission cases as a board (Fase 5): one
+ * column per stage (Informes → Inscrito) plus Cerrados, with each column's
+ * count, the child, grade, next step and days waiting. A card opens its
+ * Expediente, where everything is done («Marcar como inscrito» included).
+ */
 export default function AdminPipeline() {
-  const qc = useQueryClient();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admissions-pipeline'], queryFn: async () => (await admissionsApi.pipeline()).data });
-  const [converting, setConverting] = useState<PipelineCard | null>(null);
-  const [studentId, setStudentId] = useState('');
-  const [group, setGroup] = useState('');
-  const [result, setResult] = useState<ConvertResult | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admissions-pipeline'] }); qc.invalidateQueries({ queryKey: ['badges'] }); void invalidateStudents(qc); };
-  const requestDocs = useMutation({
-    mutationFn: (id: number) => admissionsApi.requestDocs(id),
-    onSuccess: ({ data: r }) => { toast.success(`Solicitud enviada a ${r.sent_to}.`); invalidate(); },
-    onError: (e) => toast.error(apiFieldErrors(e).detail || 'No se pudo enviar.'),
+  const navigate = useNavigate();
+  // One query for the six columns. (Not useQueries: it would add QueriesObserver
+  // to the shared @tanstack chunk that every public page downloads.)
+  const { data, isError, isLoading, refetch } = useQuery({
+    queryKey: caseKeys.list({ board: true }),
+    queryFn: () => Promise.all(ALL_STAGES.map(async (stage) => (await casesApi.list(columnParams(stage))).data)),
   });
-  const convert = useMutation({
-    mutationFn: () => admissionsApi.convert(converting!.id, { student_id: studentId || undefined, group: group || undefined }),
-    onSuccess: ({ data: r }) => {
-      setResult(r); setErrors({}); invalidate();
-      if (r.already) toast.success('Este expediente ya era alumno.');
-      else if (r.unlinked?.length) toast.success('Alumno creado. Revise los tutores que no se vincularon.');
-      else toast.success('Alumno y cuentas creados.');
-    },
-    onError: (e) => { const f = apiFieldErrors(e); setErrors(f); toast.error(f.detail || f.student_id || 'No se pudo convertir.'); },
-  });
+  const counts = data?.find((c) => c.counts)?.counts ?? {};
 
   return (
     <>
-      <PageHeader title="Pipeline de inscripciones" subtitle="De solicitud enviada a alumno inscrito. Pida los documentos que faltan con un clic y convierta el expediente aprobado en alumno con sus cuentas de familia."
-        actions={<Link to="/admin/admisiones" className="btn-outline">Lista clásica</Link>} />
-      {data?.bounded && (
-        <p className="mb-3 text-sm text-muted">
-          Se muestran los expedientes activos y los completados en los últimos {data.complete_window_days ?? 90} días.{' '}
-          <Link to="/admin/admisiones?vista=inscripciones" className="font-semibold text-purple hover:underline">Ver todos</Link>
-        </p>
-      )}
+      <PageHeader
+        title="Pipeline de admisiones"
+        subtitle="Cada expediente en su etapa, del primer informe a la inscripción. Toque una tarjeta para abrir su expediente."
+        actions={(
+          <Link to="/admin/admisiones" className="btn-outline inline-flex min-h-[44px] items-center gap-2">
+            Lista de expedientes
+          </Link>
+        )}
+      />
       {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
-        <div className="-mx-4 px-4 pb-4 md:overflow-x-auto">
-          <div className="grid grid-cols-1 gap-3 md:min-w-[1100px] md:grid-cols-5" role="list" aria-label="Columnas del pipeline">
-            {data.columns.map((col) => (
-              <section key={col.status} role="listitem" aria-label={col.label} className="rounded-xl2 bg-cream-2 p-2">
-                <h2 className="mb-2 flex items-center justify-between px-1 text-xs font-bold uppercase tracking-wide text-subtle"><span className="inline-flex items-center gap-1"><KanbanSquare size={12} aria-hidden="true" /> {col.label}</span><span>{col.cards.length}</span></h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" role="list" aria-label="Etapas del proceso">
+          {ALL_STAGES.map((stage, i) => {
+            const meta = STAGE_META[stage];
+            const Icon = meta.icon;
+            const cards = data[i]?.results ?? [];
+            const total = counts[stage] ?? cards.length;
+            return (
+              <section key={stage} role="listitem" aria-labelledby={`col-${stage}`} className="flex min-w-0 flex-col rounded-xl2 bg-cream-2 p-2">
+                <div className={clsx('mb-2 h-1 rounded-full', meta.dot)} aria-hidden="true" />
+                <h2 id={`col-${stage}`} className="mb-2 flex items-center justify-between gap-2 px-1 text-sm font-bold text-ink">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <Icon size={15} className={meta.text} aria-hidden="true" />
+                    <span className="truncate">{stage === 'cerrado' ? 'Cerrados' : meta.label}</span>
+                  </span>
+                  <span className="rounded-full bg-white px-2 text-xs font-semibold tabular-nums text-muted" aria-label={`${total} expedientes`}>{total}</span>
+                </h2>
                 <ul className="space-y-2">
-                  {col.cards.length === 0 && <li className="rounded-lg border border-dashed border-line p-3 text-center text-xs text-subtle">Vacío</li>}
-                  {col.cards.map((c) => (
-                    <li key={c.id} className="rounded-xl border border-line bg-white p-3 text-sm shadow-card">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <Link to={`/admin/admisiones?inscripcion=${c.id}`} className="block truncate font-semibold text-ink hover:text-purple">{c.child_name}</Link>
-                          <p className="truncate text-xs text-subtle">{c.grade_applying} · {c.parent_name}</p>
-                        </div>
-                        <Badge variant={STATUS_BADGE[c.status]?.variant ?? 'neutral'}>{col.label}</Badge>
-                      </div>
-                      <p className={`mt-2 inline-flex items-center gap-1 text-xs ${c.missing.length ? 'text-amber' : 'text-green-700'}`}>
-                        {c.missing.length ? <FileWarning size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />} {docsLabel(c)}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {c.missing.length > 0 && c.status !== 'rejected' && c.status !== 'complete' && (
-                          <Button size="sm" variant="secondary" onClick={() => requestDocs.mutate(c.id)} loading={requestDocs.isPending && requestDocs.variables === c.id}><Mail size={13} aria-hidden="true" /> Pedir documentos</Button>
-                        )}
-                        {/* Only an approved expediente converts (the API refuses «En revisión»). */}
-                        {c.status === 'approved' && !c.student && (
-                          <Button size="sm" onClick={() => { setConverting(c); setStudentId(''); setGroup(''); setResult(null); setErrors({}); }}><UserPlus size={13} aria-hidden="true" /> Convertir en alumno</Button>
-                        )}
-                        {c.student && <Link to={`/admin/alumnos/${c.student}`} className="btn-outline btn-sm text-xs">Ver alumno</Link>}
-                        {c.parent_phone && <a href={`https://wa.me/52${c.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="btn-outline btn-sm text-xs" aria-label={`WhatsApp a ${c.parent_name}`}><MessageCircle size={13} aria-hidden="true" /></a>}
-                      </div>
-                    </li>
-                  ))}
+                  {cards.length === 0 && <li className="rounded-lg border border-dashed border-line p-3 text-center text-xs text-subtle">Sin expedientes</li>}
+                  {cards.map((c) => <BoardCard key={c.id} card={c} onOpen={() => navigate(`/admin/admisiones/${c.id}`)} />)}
                 </ul>
+                {total > cards.length && (
+                  <Link to={`/admin/admisiones?etapa=${stage}`} className="mt-2 inline-flex min-h-[44px] items-center justify-center gap-1 rounded-lg text-xs font-semibold text-purple hover:bg-white">
+                    Ver los {total} <ArrowRight size={13} aria-hidden="true" />
+                  </Link>
+                )}
               </section>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
-
-      <Modal open={!!converting} onClose={() => setConverting(null)} title={result ? 'Alumno creado' : `Convertir a alumno: ${converting?.child_name ?? ''}`} maxWidth={560}>
-        {result ? <ConvertSummary result={result} card={converting!} onClose={() => setConverting(null)} /> : (
-          <div className="space-y-3">
-            <p className="text-sm text-muted">Se crea el alumno con los datos del expediente (incluidos los médicos), su acceso escolar y las cuentas de madre/padre. Las contraseñas nuevas se muestran una sola vez para que usted las envíe.</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Matrícula (opcional)" value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="Automática" error={errors.student_id} />
-              <Input label="Grupo (opcional)" value={group} onChange={(e) => setGroup(e.target.value.toUpperCase())} placeholder="A" maxLength={5} />
-            </div>
-            {errors.detail && <p className="text-sm text-coral-600">{errors.detail}</p>}
-            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setConverting(null)}>Cancelar</Button><Button onClick={() => convert.mutate()} loading={convert.isPending}>Crear alumno y cuentas</Button></div>
-          </div>
-        )}
-      </Modal>
     </>
   );
 }
 
-function ConvertSummary({ result, card, onClose }: { result: ConvertResult; card: PipelineCard; onClose: () => void }) {
-  const settings = useSiteSettings();
+function BoardCard({ card: c, onOpen }: { card: CaseRow; onOpen: () => void }) {
+  const done = c.stage === 'inscrito' || c.stage === 'cerrado';
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-ink">Matrícula <strong>{result.student_id}</strong>. <Link to={`/admin/alumnos/${result.student}`} className="font-semibold text-purple underline">Abrir expediente del alumno</Link></p>
-      {result.credentials.length > 0 && (
-        <ul className="space-y-3" aria-label="Cuentas de familia">
-          {result.credentials.map((c) => {
-            const t = c.password ? credentialTemplate({ firstName: (c.name || '').split(' ')[0], email: c.email, password: c.password, supportEmail: settings.contact_email }) : null;
-            const wa = t ? whatsappDeliveryHref(card.parent_phone, t) : null;
-            return (
-              <li key={c.email} className="rounded-xl border border-line p-3 text-sm">
-                <p className="font-semibold text-ink">{c.name || c.email}</p>
-                {c.password ? (
-                  <>
-                    <p className="text-xs text-subtle">Usuario {c.email} · contraseña <code className="select-all rounded bg-cream-2 px-1">{c.password}</code></p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm text-xs"><MessageCircle size={13} aria-hidden="true" /> WhatsApp</a>}
-                      <a href={mailtoDeliveryHref(c.email, t!)} className="btn-outline btn-sm text-xs"><Mail size={13} aria-hidden="true" /> Correo</a>
-                    </div>
-                  </>
-                ) : <p className="text-xs text-subtle">Ya tenía cuenta ({c.email}); se vinculó al alumno.</p>}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {(result.unlinked ?? []).length > 0 && (
-        <div className="rounded-xl border border-coral/30 bg-coral-50/50 p-3 text-sm" role="alert">
-          <p className="font-semibold text-coral-dark">Tutores no vinculados</p>
-          <ul className="mt-1 space-y-1 text-xs text-ink" aria-label="Tutores no vinculados">
-            {(result.unlinked ?? []).map((u) => <li key={u.email}><strong>{u.name || u.email}</strong> ({u.email}): {u.reason}</li>)}
-          </ul>
-        </div>
-      )}
-      <div className="flex justify-end"><Button onClick={onClose}>Listo</Button></div>
-    </div>
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Abrir el expediente de ${c.child_name}`}
+        className="block min-h-[44px] w-full rounded-xl border border-line bg-white p-3 text-left text-sm shadow-card transition hover:border-purple/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+      >
+        <span className="block truncate font-semibold text-ink">{c.child_name}</span>
+        <span className="block truncate text-xs text-subtle">{c.grade_applying} · {c.parent_name}</span>
+        {c.stage === 'cerrado' && c.closed_outcome_label && <span className="mt-1.5 block text-xs text-coral-700">{c.closed_outcome_label}</span>}
+        {c.next_action && <span className="mt-1.5 block text-xs font-medium text-ink">{c.next_action.label}</span>}
+        {!done && (
+          <span className={clsx('mt-1 inline-flex items-center gap-1 text-xs', isStale(c.days_waiting) ? 'font-semibold text-amber' : 'text-muted')}>
+            <Clock size={12} aria-hidden="true" /> {waitingText(c.days_waiting)}
+          </span>
+        )}
+      </button>
+    </li>
   );
 }

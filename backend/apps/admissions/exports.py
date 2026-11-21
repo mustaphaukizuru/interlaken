@@ -11,8 +11,17 @@ and ``?ids=1,2,3`` exports the selected rows. Every download is audited with
 
 from apps.core.exporting import AdminExportMixin, Col, ExportSpec
 
+from .models import PreRegistration
 from .serializers import child_full_name
 from .views import PreRegistrationAdminListView, RegistrationAdminListView
+
+
+def stage_text(lead) -> str:
+    """The Expediente stage as the office reads it: «Examen», «Cerrado: No le interesa»."""
+    label = lead.get_stage_display()
+    if lead.stage == PreRegistration.Stage.CERRADO and lead.closed_outcome:
+        return f"{label}: {lead.get_closed_outcome_display()}"
+    return label
 
 
 def _docs_approved(reg) -> str:
@@ -38,6 +47,7 @@ PREREGISTRATION_EXPORT = ExportSpec(
         Col("relationship", "Parentesco", width=13),
         Col("referral_source", "Cómo nos conoció", width=18),
         Col("wants_visit", "Desea visita", width=8, fmt="bool"),
+        Col("stage", "Etapa", getter=lambda r: stage_text(r), width=24),
         Col("status", "Estado", getter=lambda r: r.get_status_display(), width=13),
         Col("notes", "Notas", width=30),
     ],
@@ -71,7 +81,7 @@ REGISTRATION_EXPORT = ExportSpec(
 class PreRegistrationExportView(AdminExportMixin, PreRegistrationAdminListView):
     """GET /api/v1/admissions/pre-register/export/?fmt=csv|xlsx|pdf
 
-    Same ``q``, filters (status, level, cycle, wants_visit, from, to) and
+    Same ``q``, filters (status, stage, level, cycle, wants_visit, from, to) and
     ``ordering`` as the list, plus ``ids``.
     """
     admin_area = 'admisiones'
