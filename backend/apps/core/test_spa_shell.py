@@ -106,6 +106,17 @@ def test_private_flows_and_app_screens_say_noindex(client, built_site):
 
 
 @pytest.mark.django_db
+def test_index_html_is_the_home_page_for_the_service_worker(client, built_site):
+    # The PWA precaches /index.html; a 404 fails every SW install (prod, 2026-11-20).
+    r = client.get('/index.html')
+    assert r.status_code == 200
+    home = client.get('/')
+    assert r.content == home.content
+    assert _head(r.content.decode())['canonical'] == ['https://interlaken.edu.mx/']
+    assert 'data-shell' in r.content.decode()
+
+
+@pytest.mark.django_db
 def test_unknown_paths_are_real_404s_and_spam_paths_410(client, built_site):
     for path in ('/no-existe', '/index.php', '/nosotros.html', '/niveles/kinder'):
         r = client.get(path)
