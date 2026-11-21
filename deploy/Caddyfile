@@ -29,15 +29,31 @@ www.{$PORTAL_DOMAIN}, http://www.{$PORTAL_DOMAIN} {
 # Unset, the block binds a dummy http-only name and does nothing. Never add a
 # host before its DNS points here: Caddy would retry its certificate forever.
 # MX/TXT records are untouched by this, so Google Workspace mail keeps working.
-# ⚠ interlaken.com.mx was retired on 2026-11-20 with Option A: its Hostinger
-# public_html/.htaccess (a SUPERSET of deploy/legacy-domains/) also keeps
-# serving /firmas/ (staff e-mail signature images), the /documentos and
-# /libros PDFs, and short links (/informes, /manualdepagos, /facturacion,
-# /tarjeta, /ligadepago, /teachinghub, /comisiones). Do NOT list
-# interlaken.com.mx here until those files and links have moved: pointing its
-# A records at this server would break every staff e-mail signature.
+# interlaken.com.mx is retired by its Hostinger public_html/.htaccess (Option A,
+# live since 2026-11-20), which deploy/legacy-domains/interlaken.com.mx.htaccess
+# copies rule for rule. Keep the two maps identical. That host also keeps
+# serving real files this block cannot: /firmas/ (staff e-mail signature
+# images, embedded in every outgoing e-mail) and the /documentos and /libros
+# PDFs. Do NOT list interlaken.com.mx here until those files have moved:
+# pointing its A records at this server would break every staff e-mail signature.
 {$LEGACY_DOMAINS:http://legacy.invalid} {
+	# Short links the school shares (same targets as the .htaccess).
+	@informes path /informes /informes/
+	redir @informes https://padlet.com/Interlaken/informes-interlaken-2q1wjcn3omj0vdzi permanent
+	@manualdepagos path /manualdepagos /manualdepagos/
+	redir @manualdepagos https://padlet.com/Interlaken/circulares-primaria-mkzjm65p65l1/wish/459397854 permanent
+	@tarjeta path /tarjeta /tarjeta/
+	redir @tarjeta https://evopaymentsmexico.gateway.mastercard.com/ma/ permanent
+	@ligadepago path /ligadepago /ligadepago/
+	redir @ligadepago https://evo-oneclick.com/evoclick/ permanent
+	@teachinghub path /teachinghub /teachinghub/
+	redir @teachinghub https://sites.google.com/interlaken.com.mx/teachinghub/english-department/reading-catalogue?pli=1 permanent
+	@comisiones path /comisiones /comisiones/
+	redir @comisiones https://www2.soluciones.eglobal.com.mx/iMerchantws/ permanent
+
 	map {path} {legacy_path} {
+		/facturacion         /comunidad/facturacion
+		/facturacion/        /comunidad/facturacion
 		# Old static site (2017-2026)
 		/index.html          /
 		/index-pre.html      /niveles/preescolar
@@ -81,6 +97,16 @@ www.{$PORTAL_DOMAIN}, http://www.{$PORTAL_DOMAIN} {
 		/11aviso.php         /aviso-de-privacidad
 		/14registro.php      /pre-registro
 		/actividades.php     /modelo-educativo
+		# Copies and drafts left on the old site (index-7old.html,
+		# index-2pri1esp.php...). Regex entries are tried in order, after the
+		# exact ones above.
+		~^/index-1c[^/]*\.html$       /admisiones/costos
+		~^/index-2precal[^/]*\.php$   /niveles/preescolar
+		~^/index-2prical[^/]*\.php$   /niveles/primaria
+		~^/index-2seccal[^/]*\.php$   /niveles/secundaria
+		~^/index-[23][^/]*\.(html|php)$ /plataformas
+		~^/index-7[^/]*\.html$        /comunidad/facturacion
+		~^/[^/]*\.(html?|php)$        /
 		# Anything else keeps its path: new-style links (/admisiones) land on
 		# the right page, and true leftovers get the new site's honest 404.
 		default              {path}
