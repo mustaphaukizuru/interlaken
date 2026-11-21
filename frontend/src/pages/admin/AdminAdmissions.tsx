@@ -15,6 +15,8 @@ import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog, type ImportHeader } from '@/components/admin/ImportDialog';
 import { RegistrationReviewModal } from '@/components/admin/RegistrationReviewModal';
+import { FichaRowMenu, FichasZipMenu } from '@/components/admin/FichaDownloads';
+import { fichaExportExtras } from '@/hooks/queries/fichaExports';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import {
@@ -441,6 +443,9 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
 
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
     exportRegs.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
+  // Fase 3: «Concentrado de fichas» and the blank form ride in the Exportar menu.
+  const fichaExtras = fichaExportExtras(filters, selection.allMatching ? undefined : idsParam(selection.ids));
+  const selectedIds = selection.ids.map(Number);
 
   const columns: Column<RegistrationRow>[] = [
     { id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 160, className: 'font-medium text-ink', cell: (r) => r.child_name },
@@ -490,10 +495,13 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
         pinFirstColumn
         selection={selection}
         rowActions={(r) => (
-          <button type="button" onClick={() => onReview(r.id)} aria-label={`Revisar expediente de ${r.child_name}`}
-            className="inline-flex min-h-[44px] items-center rounded-lg bg-cream px-3 text-xs font-semibold text-ink hover:bg-line sm:min-h-[36px]">
-            Revisar
-          </button>
+          <>
+            <button type="button" onClick={() => onReview(r.id)} aria-label={`Revisar expediente de ${r.child_name}`}
+              className="inline-flex min-h-[44px] items-center rounded-lg bg-cream px-3 text-xs font-semibold text-ink hover:bg-line sm:min-h-[36px]">
+              Revisar
+            </button>
+            <FichaRowMenu id={r.id} childName={r.child_name} />
+          </>
         )}
         toolbar={(
           <FilterBar
@@ -506,7 +514,7 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
             ]}
             dateRange={{ idPrefix: 'inscripciones' }}
           >
-            <ExportMenu filenamePrefix="inscripciones" selectedCount={selection.count} fetch={fetchExport} />
+            <ExportMenu filenamePrefix="inscripciones" selectedCount={selection.count} fetch={fetchExport} extraItems={fichaExtras} />
           </FilterBar>
         )}
         bulkBar={(
@@ -520,7 +528,12 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
             actions={REG_ACTIONS}
             onAction={setBulkAction}
             busy={bulk.isPending}
-            exportMenu={<ExportMenu label="Exportar seleccionadas" filenamePrefix="inscripciones" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+            exportMenu={(
+              <>
+                <ExportMenu label="Exportar seleccionadas" filenamePrefix="inscripciones" selectedCount={selection.count} forceSelected fetch={fetchExport} />
+                <FichasZipMenu ids={selectedIds} allMatching={selection.allMatching} />
+              </>
+            )}
           />
         )}
         empty={{

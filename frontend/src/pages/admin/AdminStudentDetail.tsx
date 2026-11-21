@@ -21,7 +21,8 @@ import { Badge } from '@/components/ui/Badge';
 import { STUDENT_STATUS } from '@/lib/studentStatus';
 import { studentDetailKey } from '@/hooks/queries/studentKeys';
 import { useStudentsBulk } from '@/hooks/queries/students';
-import { isAdmin } from '@/lib/areas';
+import { areasOf, isAdmin } from '@/lib/areas';
+import { StudentFichaDownload } from '@/components/admin/FichaDownloads';
 import { useAuthStore } from '@/store/authStore';
 import { portalApi } from '@/services/api';
 import type { BulkActionDef } from '@/services/api';
@@ -127,7 +128,10 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
   const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('datos');
   const [confirming, setConfirming] = useState<BulkActionDef | null>(null);
-  const canDelete = isAdmin(useAuthStore((s) => s.user));
+  const me = useAuthStore((s) => s.user);
+  const canDelete = isAdmin(me);
+  // The ficha download is an Admisiones endpoint: admins and staff with that area.
+  const canFicha = !!student.registration && (isAdmin(me) || areasOf(me).has('admisiones'));
   const bulk = useStudentsBulk();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -172,6 +176,7 @@ function StudentDetailBody({ student, onDeleted }: { student: StudentProfile; on
             <Link to={`/admin/cafeteria/${student.id}`} className="btn-outline">
               <Coffee size={16} aria-hidden="true" /> Cafetería
             </Link>
+            {canFicha && <StudentFichaDownload registrationId={student.registration!} />}
             {/* An archived file offers Restaurar in its banner, next to the explanation. */}
             {!archived && (
               <button type="button" className="btn-outline" onClick={() => setConfirming(ARCHIVE_ACTION)}>

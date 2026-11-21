@@ -20,9 +20,23 @@ interface LegacyProps {
   label?: string;
 }
 
+/** A related download listed under the formats («Concentrado de fichas»); it saves the file itself. */
+export interface ExportExtraItem {
+  key: string;
+  label: string;
+  /** Small text at the right («.xlsx»). */
+  hint?: string;
+  /** Defaults to the spreadsheet icon. */
+  icon?: typeof FileDown;
+  /** Receives the "Solo seleccionados" state; resolves once the file was saved (or the failure was shown). */
+  run: (opts: { selectedOnly: boolean }) => Promise<unknown>;
+}
+
 interface V2Props {
   /** Fetch the current view (filters, search, sort) in one format; `selectedOnly` = "Solo seleccionados". */
   fetch: (fmt: ExportFormat, opts: { selectedOnly: boolean }) => Promise<Blob>;
+  /** Extra downloads after the formats, below a divider. */
+  extraItems?: ExportExtraItem[];
   /** Formats offered, in menu order. One format = a single button. */
   formats?: ExportFormat[];
   /** `{prefix}_{YYYY-MM-DD}.{ext}`. */
@@ -68,7 +82,7 @@ export function ExportMenu(props: Props) {
 
   if ('options' in props) return <LegacyExportMenu {...props} />;
 
-  const { fetch, formats = ['csv', 'xlsx', 'pdf'], filenamePrefix, selectedCount = 0, forceSelected = false, className = '' } = props;
+  const { fetch, formats = ['csv', 'xlsx', 'pdf'], filenamePrefix, selectedCount = 0, forceSelected = false, className = '', extraItems = [] } = props;
   const useSelected = (forceSelected || selectedOnly) && selectedCount > 0;
 
   const run = async (fmt: ExportFormat, close: () => void) => {
@@ -79,7 +93,17 @@ export function ExportMenu(props: Props) {
     setBusy(false);
   };
 
-  if (formats.length === 1 && selectedCount === 0) {
+  const runExtra = async (item: ExportExtraItem, close: () => void) => {
+    close();
+    setBusy(true);
+    try {
+      await item.run({ selectedOnly: useSelected });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (formats.length === 1 && selectedCount === 0 && extraItems.length === 0) {
     const fmt = formats[0];
     const Icon = FORMAT_ICON[fmt];
     return (
@@ -129,6 +153,22 @@ export function ExportMenu(props: Props) {
               >
                 <Icon size={15} className="text-purple" aria-hidden="true" /> {EXPORT_FORMAT_LABEL[fmt]}
                 <span className="ml-auto text-xs text-subtle">.{fmt}</span>
+              </button>
+            );
+          })}
+          {extraItems.length > 0 && <div className="my-1 border-t border-line" role="separator" />}
+          {extraItems.map((item) => {
+            const Icon = item.icon ?? FileSpreadsheet;
+            return (
+              <button
+                key={item.key}
+                role="menuitem"
+                type="button"
+                onClick={() => runExtra(item, close)}
+                className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-ink hover:bg-cream-2"
+              >
+                <Icon size={15} className="text-purple" aria-hidden="true" /> {item.label}
+                {item.hint && <span className="ml-auto text-xs text-subtle">{item.hint}</span>}
               </button>
             );
           })}

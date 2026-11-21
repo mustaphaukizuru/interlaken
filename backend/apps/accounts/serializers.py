@@ -68,6 +68,9 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     # Staff cafetería accounts (2026-11-18): ``tipo`` alumno|personal, and the
     # staff member's ``puesto`` (empty for pupils) with its label.
     puesto_label = serializers.CharField(source='get_puesto_display', read_only=True)
+    # The inscripción the student came from (convert, P4-1): the file offers
+    # «Ficha de inscripción» downloads when it is set. Read-only.
+    registration = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = StudentProfile
@@ -75,7 +78,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
                   'tipo', 'puesto', 'puesto_label',
                   'enrollment_date', 'is_active', 'status', 'archived_at',
                   'birth_date', 'age', 'curp', 'emergency_name', 'emergency_phone', 'emergency_rel',
-                  'blood_type', 'allergies', 'medical_notes']
+                  'blood_type', 'allergies', 'medical_notes', 'registration']
 
     def get_loyverse_code(self, obj):
         """The matrícula exactly as Loyverse spells it (``ci09932``), i.e. what
