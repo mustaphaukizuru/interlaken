@@ -55,6 +55,8 @@ from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
 logger = logging.getLogger(__name__)
 
+FICHA_BY_SECTIONS = ('Esta ficha de inscripción se guarda por secciones. Actualice la página '
+                     'para continuarla.')
 PUBLIC_START_OFF = ('En este momento la ficha de inscripción solo se puede iniciar con el enlace '
                     'que le envía el colegio. Escríbanos o llámenos y con gusto le enviamos el suyo.')
 
@@ -226,7 +228,7 @@ class PreRegistrationInviteView(APIView):
 
     Creates (or reuses) a DRAFT Registration pre-filled from the pre-registration,
     mints a fresh single-use invite token, and returns a ready-to-share link
-    (``/inscripcion?rid=&token=``). The invite is also emailed to the applicant
+    (``/pre-registro?rid=&token=``, the ficha). The invite is also emailed to the applicant
     (fail-soft). Idempotent: re-inviting the same pre-registration refreshes the
     token on the existing draft rather than spawning duplicates.
     """
@@ -310,7 +312,7 @@ class RegistrationListCreateView(RegistrationListConfig, generics.ListCreateAPIV
                             status=status.HTTP_403_FORBIDDEN)
         if 'contact_email' in request.data:
             return self._start_ficha(request)
-        # The old /inscripcion wizard's payload (kept until Fase 2 replaces it).
+        # The old /inscripcion wizard's payload (version-1 records; no screen sends it since Fase 2).
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -551,7 +553,9 @@ class RegistrationDetailView(generics.RetrieveUpdateAPIView):
     """GET/PATCH /api/v1/admissions/register/<id>/ — Retrieve or update.
 
     Anonymous applicants must present a valid SESSION token (X-Session-Token
-    header); staff (JWT) may access without it.
+    header); staff (JWT) may access without it. PATCH is the old wizard's save
+    and only edits version-1 records: a ficha (version 2) is saved section by
+    section (``PATCH …/ficha/<section>/``), where its rules live.
     """
     serializer_class = RegistrationSerializer
     permission_classes = [permissions.AllowAny]
@@ -559,6 +563,12 @@ class RegistrationDetailView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return authorize_registration(self.request, self.kwargs['pk'])
+
+    def update(self, request, *args, **kwargs):
+        if self.get_object().ficha_version != Registration.FichaVersion.LEGACY:
+            return Response(error_body(FICHA_BY_SECTIONS, code='ficha_by_sections'),
+                            status=status.HTTP_409_CONFLICT)
+        return super().update(request, *args, **kwargs)
 
 
 @method_decorator(ratelimit('registration-submit', '10/m', key='ip', method='POST'), name='dispatch')

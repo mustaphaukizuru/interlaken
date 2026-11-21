@@ -5,7 +5,7 @@ the same audit rows and obey the same transition tables.
 
 * ``change_status``: the one way a pre-registro or an inscripción changes
   status from the console (``assert_transition`` + save + ``record``).
-* ``invite_preregistration``: create/reuse the DRAFT registration, mint a
+* ``invite_preregistration``: create/reuse the DRAFT ficha, mint a
   single-use invite, email it, advance pending → contacted.
 * ``email_registration_outcome``: the approved / rejected email.
 * ``request_missing_documents``: email the family the missing-documents
@@ -76,7 +76,8 @@ def change_status(
 
 # ── pre-registros ─────────────────────────────────────────
 def invite_url_for(reg: Registration, raw_token: str) -> str:
-    return f"{settings.FRONTEND_URL}/inscripcion?rid={reg.id}&token={raw_token}"
+    """The family's link to the ficha (``/pre-registro``; ``/inscripcion`` redirects there)."""
+    return f"{settings.FRONTEND_URL}/pre-registro?rid={reg.id}&token={raw_token}"
 
 
 def sent_registration(pre: PreRegistration):
@@ -123,9 +124,16 @@ def invite_preregistration(
         "contact_phone": pre.parent_phone,
         "contact_relationship": pre.relationship,
     }
+    # The ficha's split names (the form shows these, not the legacy pair).
+    paternal, _, maternal = (pre.child_last_name or "").strip().partition(" ")
+    if not (reg.child_paternal_surname or reg.child_maternal_surname):
+        seed.update(child_paternal_surname=paternal[:100], child_maternal_surname=maternal.strip()[:100])
+    seed["child_given_names"] = (pre.child_first_name or "")[:100]
     for field, value in seed.items():
         if created or not getattr(reg, field):
             setattr(reg, field, value)
+    # Every invitation now opens the ficha (Fase 2): its full rules apply on submit.
+    reg.ficha_version = Registration.FichaVersion.FICHA
     reg.save()
 
     raw = issue_invite(reg)
@@ -159,12 +167,14 @@ def email_invite(reg: Registration, invite_url: str, *, to: str = ""):
 
     content = EmailContent(
         category="Admisiones",
-        title=f"Le invitamos a completar la inscripción de {reg.child_first_name}",
-        intro=(f"Estimado/a {reg.parent1_name}: le invitamos a completar la inscripción de "
-               f"{_child(reg)} para el ciclo {reg.cycle} en el Colegio Interlaken."),
+        title=f"Le invitamos a llenar la ficha de inscripción de {reg.child_first_name}",
+        intro=(f"Estimado/a {reg.parent1_name}: le invitamos a llenar la ficha de inscripción de "
+               f"{_child(reg)} para el ciclo {reg.cycle} en el Colegio Interlaken. La ficha ya "
+               f"trae los datos que nos compartió; le tomará unos 15 minutos y puede guardarla y "
+               f"continuar después."),
         details=[("Alumno", _child(reg)), ("Grado", reg.grade_applying), ("Ciclo escolar", reg.cycle),
                  ("El enlace vence", long_date(timezone.now() + timedelta(days=14)))],
-        cta_label="Completar la inscripción",
+        cta_label="Llenar la ficha",
         cta_url=invite_url,
         note=("El enlace es personal: no lo comparta. Si tiene dudas, responda a este correo "
               "y le atenderá el equipo de admisiones."),
