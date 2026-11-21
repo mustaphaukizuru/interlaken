@@ -29,12 +29,9 @@ from rest_framework.views import APIView
 from apps.core.audit import record
 from apps.core.permissions import IsAdmin
 
-from .models import Registration, RegistrationDocument
+from .models import Registration
+from .required_docs import active_catalog, build_checklist, prefetch_checklist
 
-REQUIRED_DOCS = [
-    RegistrationDocument.DocType.BIRTH_CERT, RegistrationDocument.DocType.CURP_DOC, RegistrationDocument.DocType.PHOTO,
-    RegistrationDocument.DocType.REPORT_CARD, RegistrationDocument.DocType.PROOF_ADDR, RegistrationDocument.DocType.VACCINATION,
-]
 DEFAULT_MISSING_DOCS_TEMPLATE = (
     'Hola {parent_name}:\n\nPara completar la inscripción de {child_name} nos falta recibir:\n{missing_list}\n\n'
     'Puede subirlos desde este enlace: {upload_url}\n\nGracias,\nAdmisiones Colegio Interlaken'
@@ -43,33 +40,21 @@ STATUS_ORDER = [Registration.Status.SUBMITTED, Registration.Status.REVIEWING, Re
                 Registration.Status.COMPLETE, Registration.Status.REJECTED]
 
 
-def checklist(reg: Registration) -> dict:
-    """Required documents by state. The newest upload of each type decides it
-    (a re-upload replaces a rejected one); a rejected document is still owed,
-    so «Pedir documentos» asks for it again, marked «por corregir»."""
-    have: dict = {}
-    for d in reg.documents.all():
-        current = have.get(d.doc_type)
-        if current is None or (d.uploaded_at, d.pk) > (current.uploaded_at, current.pk):
-            have[d.doc_type] = d
-    items = []
-    for dt in REQUIRED_DOCS:
-        d = have.get(dt)
-        if d is None:
-            state = 'missing'
-        elif d.status == RegistrationDocument.Review.REJECTED:
-            state = 'rejected'
-        else:
-            state = 'verified' if d.is_verified else 'uploaded'
-        items.append({'doc_type': dt, 'label': RegistrationDocument.DocType(dt).label, 'state': state})
-    missing = [i['label'] if i['state'] == 'missing' else f"{i['label']} (por corregir)"
-               for i in items if i['state'] in ('missing', 'rejected')]
-    return {'items': items, 'missing': missing,
-            'verified': sum(1 for i in items if i['state'] == 'verified'), 'required': len(REQUIRED_DOCS)}
+def checklist(reg: Registration, docs=None) -> dict:
+    """The registration's documents for its level (Fase 4: the list edited in
+    Admisiones → Documentos, ``required_docs.build_checklist``), in the shape
+    the pipeline, the bulk «Solicitar documentos» and the email use:
+    ``missing`` (missing, then «por corregir» with the reason), ``verified``
+    (approved, delivered on paper or the sent ficha) and ``required`` (the
+    level's documents minus «No aplica»). Pass ``docs=active_catalog()`` when
+    building many."""
+    c = build_checklist(reg, docs=docs, staff=False)
+    return {'items': c['items'], 'missing': c['missing'], 'verified': c['counts']['done'],
+            'required': c['counts']['total'], 'complete': c['complete']}
 
 
-def _card(reg: Registration) -> dict:
-    c = checklist(reg)
+def _card(reg: Registration, docs=None) -> dict:
+    c = checklist(reg, docs)
     return {
         'id': reg.pk, 'child_name': f'{reg.child_first_name} {reg.child_last_name}', 'level': reg.level, 'grade_applying': reg.grade_applying,
         'parent_name': reg.parent1_name, 'parent_email': reg.parent1_email, 'parent_phone': reg.parent1_phone,
@@ -98,10 +83,11 @@ class PipelineView(APIView):
         if not show_all:
             complete_since = timezone.now() - timedelta(days=COMPLETE_WINDOW_DAYS)
             regs = regs.exclude(status=Registration.Status.COMPLETE, updated_at__lt=complete_since)
-        regs = regs.select_related('student_profile').prefetch_related('documents').order_by('-updated_at')
+        regs = prefetch_checklist(regs.select_related('student_profile')).order_by('-updated_at')
+        docs = active_catalog()
         columns = {s: [] for s in STATUS_ORDER}
         for r in regs:
-            columns.setdefault(r.status, []).append(_card(r))
+            columns.setdefault(r.status, []).append(_card(r, docs))
         return Response({'columns': [{'status': s, 'label': Registration.Status(s).label, 'cards': columns[s]} for s in STATUS_ORDER],
                          'bounded': not show_all,
                          'complete_window_days': None if show_all else COMPLETE_WINDOW_DAYS,

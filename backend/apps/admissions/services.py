@@ -277,7 +277,10 @@ def email_rejected_documents(reg: Registration, docs: list[RegistrationDocument]
         return
     from apps.portal.emailing import EmailContent
 
-    items = [d.get_doc_type_display() + (f": {d.review_note}" if d.review_note else "") for d in docs]
+    from .required_docs import document_label
+
+    # The name of the per-level document (Fase 4), not the legacy type label.
+    items = [document_label(d) + (f": {d.review_note}" if d.review_note else "") for d in docs]
     plural = len(docs) > 1
     content = EmailContent(
         category="Admisiones", tone="warning",

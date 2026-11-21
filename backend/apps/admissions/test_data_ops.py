@@ -20,6 +20,7 @@ from apps.admissions.models import (
     PreRegistration,
     Registration,
     RegistrationDocument,
+    RequiredDocument,
     current_school_cycle,
 )
 from apps.admissions.services import RETENTION_PLACEHOLDER
@@ -76,6 +77,13 @@ def _doc(reg, doc_type, **o):
     d.file.save(f"{doc_type}.pdf", ContentFile(b"x"), save=False)
     d.save()
     return d
+
+
+def _approve_level_docs(reg, level="primaria"):
+    """Every upload document of ``level`` approved (the ficha counts once sent)."""
+    for rd in RequiredDocument.objects.filter(kind="upload"):
+        if level in rd.levels:
+            _doc(reg, "other", required_document=rd, is_verified=True, status="approved")
 
 
 def _names(resp):
@@ -166,15 +174,7 @@ class TestRegistrationList:
     def test_documents_pending(self, api_client, admin, settings, tmp_path):
         settings.MEDIA_ROOT = str(tmp_path)
         done = _reg(child_first_name="Completa")
-        for code in (
-            "birth_cert",
-            "curp_doc",
-            "photo",
-            "report_card",
-            "proof_addr",
-            "vaccination",
-        ):
-            _doc(done, code, is_verified=True, status="approved")
+        _approve_level_docs(done)
         partial = _reg(child_first_name="Parcial")
         _doc(partial, "birth_cert", is_verified=True, status="approved")
         _doc(partial, "photo")
@@ -371,8 +371,7 @@ class TestRegistrationBulk:
         settings.MEDIA_ROOT = str(tmp_path)
         needs = _reg()
         complete = _reg(child_first_name="Todo")
-        for code in ("birth_cert", "curp_doc", "photo", "report_card", "proof_addr", "vaccination"):
-            _doc(complete, code, is_verified=True, status="approved")
+        _approve_level_docs(complete)
         mail.outbox.clear()
         body = {"action": "request_docs", "ids": [needs.pk, complete.pk]}
         plan = _bulk(api_client, "register-bulk", {**body, "dry_run": True}).data
@@ -402,7 +401,7 @@ class TestDocumentBulk:
             {"action": "reject", "ids": [d2.pk, d3.pk], "payload": {"note": "Ilegible"}},
         ).data
         assert resp["ok"] == 2 and len(mail.outbox) == 1
-        assert "CURP: Ilegible" in mail.outbox[0].body
+        assert "CURP del alumno: Ilegible" in mail.outbox[0].body
         d2.refresh_from_db()
         assert d2.status == "rejected" and not d2.is_verified and d2.review_note == "Ilegible"
         again = _bulk(api_client, "document-bulk", {"action": "approve", "ids": [d1.pk]}).data

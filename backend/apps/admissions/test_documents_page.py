@@ -27,7 +27,10 @@ def test_applicant_lists_own_documents_with_status(api_client):
     resp = api_client.get(reverse('register-docs-list', args=[reg.id]), HTTP_X_SESSION_TOKEN=token)
     assert resp.status_code == 200
     assert resp.data['documents'][0]['status'] == 'pending'
-    assert {r['code'] for r in resp.data['required']} >= {'birth_cert', 'curp_doc', 'photo'}
+    # Fase 4: the documents of the student's level, by key, with their status.
+    assert {r['code'] for r in resp.data['required']} >= {'acta-nacimiento', 'curp-alumno', 'fotografia'}
+    acta = next(i for i in resp.data['items'] if i['key'] == 'acta-nacimiento')
+    assert acta['status'] == 'en_revision' and acta['files'][0]['filename'] == 'acta.pdf'
 
 
 def test_reject_with_note_emails_family_and_syncs_is_verified(api_client):
@@ -53,5 +56,5 @@ def test_documents_link_issues_invite_and_lists_missing(api_client):
     mail.outbox.clear()
     resp = api_client.post(reverse('register-docs-link', args=[reg.id]), {}, format='json')
     assert resp.status_code == 200
-    assert '/inscripcion/documentos?rid=' in resp.data['url'] and 'Acta de Nacimiento' in resp.data['missing']
+    assert '/inscripcion/documentos?rid=' in resp.data['url'] and 'Acta de nacimiento' in resp.data['missing']
     assert mail.outbox[-1].to == [reg.parent1_email] and resp.data['url'] in mail.outbox[-1].body

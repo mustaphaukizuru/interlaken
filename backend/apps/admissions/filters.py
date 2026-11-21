@@ -16,20 +16,10 @@ declared filter. An unparsable date is ignored, like every list of the round.
 from __future__ import annotations
 
 import django_filters
-from django.db.models import Count, Q
 
 from apps.core.listing import apply_date_range
 
-from .models import PreRegistration, Registration, RegistrationDocument
-
-REQUIRED_DOC_TYPES = [
-    RegistrationDocument.DocType.BIRTH_CERT,
-    RegistrationDocument.DocType.CURP_DOC,
-    RegistrationDocument.DocType.PHOTO,
-    RegistrationDocument.DocType.REPORT_CARD,
-    RegistrationDocument.DocType.PROOF_ADDR,
-    RegistrationDocument.DocType.VACCINATION,
-]
+from .models import PreRegistration, Registration
 
 
 class CreatedRangeFilterSet(django_filters.FilterSet):
@@ -65,17 +55,15 @@ class RegistrationFilter(CreatedRangeFilterSet):
         fields = ["status", "level", "cycle", "documents_pending"]
 
     def filter_documents_pending(self, queryset, name, value):
-        """``true``: at least one required document is missing or not yet approved
-        (the same rule as the pipeline checklist); ``false``: all six approved."""
+        """``true``: some document of the student's level is still missing, to
+        review or to correct (the checklist of ``admissions.required_docs``);
+        ``false``: all of them approved, delivered on paper or «No aplica».
+        Computed in Python over the matching rows (the list is per level and
+        has manual states): fine at a school's scale."""
         if value is None:
             return queryset
-        qs = queryset.annotate(
-            _docs_ok=Count(
-                "documents__doc_type",
-                filter=Q(documents__is_verified=True, documents__doc_type__in=REQUIRED_DOC_TYPES),
-                distinct=True,
-            )
-        )
-        if value:
-            return qs.filter(_docs_ok__lt=len(REQUIRED_DOC_TYPES))
-        return qs.filter(_docs_ok__gte=len(REQUIRED_DOC_TYPES))
+        from .required_docs import active_catalog, documents_complete, prefetch_checklist
+
+        docs = active_catalog()
+        done = [r.pk for r in prefetch_checklist(queryset) if documents_complete(r, docs=docs)]
+        return queryset.exclude(pk__in=done) if value else queryset.filter(pk__in=done)
