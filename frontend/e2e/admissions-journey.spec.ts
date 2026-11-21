@@ -6,7 +6,8 @@ import { CYCLE_START, choose, makeCurp, next } from './fichaHelpers';
  * The admission process end to end (Fase 5, «Expediente»), against the real
  * dev backend: the office creates a prospect, records the Informes outcome,
  * links the visit the family booked and marks it attended, schedules the
- * exam and records «Aceptado», sends the ficha link (copied); the family
+ * exam (the private ficha is refused until then) and records «Aceptado»,
+ * sends the result with the ficha link in one message (copied); the family
  * fills the ficha on a 390 px phone; the office marks the documents
  * «Entregado en físico», adds a beca, records the inscripción payment,
  * «Marcar como inscrito», and downloads the ficha in Excel and PDF.
@@ -127,17 +128,22 @@ test('the office takes a prospect from the first call to «Inscrito»', async ({
     await examen.getByLabel('Fecha y hora del examen').fill(examLocal);
     await examen.getByRole('button', { name: 'Agendar examen' }).click();
     await expect(examen.getByRole('button', { name: 'Guardar cambios' })).toBeVisible();
+    // The ficha is private: an «Examen agendado» is not enough.
+    await expect(examen.getByText('La ficha de inscripción se envía cuando el examen está registrado como Aceptado.', { exact: false })).toBeVisible();
     await examen.getByText('Aceptado', { exact: true }).click();
     await examen.getByRole('button', { name: 'Guardar resultado' }).click();
     await stageIs(page, 'Documentación y acuerdos');
+    await expect(page.getByRole('group', { name: 'Siguiente paso' })).toContainText('Enviar resultado y ficha');
 
-    // ── The ficha link, copied to send by another channel ──────────────────
-    await examen.getByRole('button', { name: 'Enviar ficha de inscripción' }).click();
-    const send = page.getByRole('dialog', { name: 'Enviar ficha de inscripción' });
-    await send.getByRole('radio', { name: /Copiar liga/ }).check();
-    await send.getByRole('button', { name: 'Copiar liga' }).click();
-    await expect(send.getByRole('status')).toContainText(/Liga copiada|Copie el texto/);
-    const fichaUrl = new URL((await send.locator('p.break-all span').first().textContent())!.trim());
+    // ── The result and the ficha link in one message, copied ───────────────
+    await examen.getByRole('button', { name: 'Enviar resultado y ficha' }).click();
+    const send = page.getByRole('dialog', { name: 'Enviar resultado y ficha' });
+    await send.getByRole('radio', { name: /Copiar mensaje/ }).check();
+    await send.getByRole('button', { name: 'Copiar mensaje' }).click();
+    await expect(send.getByRole('status')).toContainText(/Mensaje copiado|Copie el texto/);
+    const message = (await send.locator('pre').first().textContent()) ?? '';
+    expect(message).toContain('fue aceptado/a');
+    const fichaUrl = new URL(message.match(/https?:\/\/\S+\/pre-registro\?\S+/)![0]);
     expect(fichaUrl.pathname).toBe('/pre-registro');
     await send.getByRole('button', { name: 'Listo' }).click();
 

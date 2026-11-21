@@ -1,15 +1,17 @@
 import { test, expect, type Page } from '@playwright/test';
-import { DEV_ADMIN } from './helpers';
-import { CYCLE_START, choose, makeCurp, next } from './fichaHelpers';
+import { CYCLE_START, admitAndSendFicha, adminAuth, choose, makeCurp, next } from './fichaHelpers';
 
 /**
  * Ficha de inscripción (/pre-registro), end to end on a 390 px phone against
- * the real dev backend: a family starts the ficha, fills Alumno (the CURP
- * fills birth date, sex and state), Domicilio and Salud, and stops. The
- * office sends a fresh invitation from Admisiones; the family opens it in a
- * new browser, lands on the first step with something missing, finishes
- * Padre (no aplica), Madre (prefilled from who fills the ficha), Emergencia,
- * signs and sends.
+ * the real dev backend. The ficha is private (2026-11-21): without a link
+ * the page says so («La ficha de inscripción es personal») and offers the
+ * visit. The office records the exam as «Aceptado» and sends the result with
+ * the family's personal link (admin API, as the Expediente does); the family
+ * opens it, fills Alumno (the CURP fills birth date, sex and state),
+ * Domicilio and Salud, and stops. The office resends the ficha; the family
+ * opens it in a new browser, lands on the first step with something missing,
+ * finishes Padre (no aplica), Madre (prefilled from who fills the ficha),
+ * Emergencia, signs and sends.
  *
  * Synthetic people only, with a unique email per run; CURPs carry a valid
  * check digit and a birth date that fits 1° Primaria in the running cycle.
@@ -31,31 +33,40 @@ async function shot(page: Page, name: string) {
 
 test.use({ viewport: PHONE, serviceWorkers: 'block' });
 
+test('without a link, /pre-registro explains that the ficha is personal', async ({ page }) => {
+  await page.goto('/pre-registro');
+  await expect(page.getByRole('heading', { level: 2, name: 'La ficha de inscripción es personal' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Así es el proceso de admisión' }).getByRole('listitem')).toHaveCount(3);
+  await expect(page.getByRole('link', { name: 'Agendar visita' }).first()).toHaveAttribute('href', '/agendar-visita');
+  await expect(page.getByRole('button', { name: /Comenzar la ficha/ })).toHaveCount(0);
+  // Never indexed (RouteSeo writes the route table's robots meta).
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+  await shot(page, '00-privada');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});
+
 test('a family fills the ficha in two sittings and sends it', async ({ page, browser, request }) => {
   test.setTimeout(180_000);
   const run = String(Date.now()).slice(-7);
   const email = `ficha.${run}@ejemplo.test`;
+  const auth = await adminAuth(request);
 
-  // ── 0 · Antes de empezar ────────────────────────────────────────────────
-  await page.goto('/pre-registro');
-  await expect(page.getByRole('heading', { level: 2, name: 'Antes de empezar' })).toBeVisible();
-  await shot(page, '00-inicio');
-  await page.getByLabel('Nombre completo').fill('Marta Prueba Gil');
-  await page.getByLabel('Correo electrónico').fill(email);
-  await page.getByLabel('Celular').fill('55 1111 2222');
-  await choose(page, 'Madre');
-  await page.getByLabel('Nombre(s) del alumno').fill('Ana Sofía');
-  await page.getByLabel('Apellido paterno del alumno').fill(`López${run}`);
-  await page.getByLabel('Apellido materno del alumno').fill('Prueba');
-  await page.getByLabel('Grado al que se inscribe').selectOption('1° Primaria');
-  await choose(page, /ciclo en curso/);
-  const started = page.waitForResponse((r) => r.url().endsWith('/api/v1/admissions/register/') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: /Comenzar la ficha/ }).click();
-  const start = await (await started).json();
-  expect(start.pre_registration).toBeTruthy();
+  // ── The office: exam «Aceptado», the result goes with the ficha link ─────
+  const { caseId, link } = await admitAndSendFicha(request, auth, {
+    child_name: `Ana López${run} Prueba`,
+    parent_name: 'Marta Prueba Gil',
+    parent_phone: `55${run.padStart(8, '0').slice(-8)}`,
+    parent_email: email,
+    relationship: 'Madre',
+    grade_applying: '1° Primaria',
+  });
+  expect(link.pathname).toBe('/pre-registro');
+  await page.goto(`${link.pathname}${link.search}`);
 
   // ── 1 · Alumno ─────────────────────────────────────────────────────────
   await expect(page.getByRole('heading', { level: 2, name: 'Datos del alumno' })).toBeFocused();
+  await expect(page.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
+  await expect(page).toHaveURL(/\/pre-registro$/); // the token left the address bar
   await expect(page.getByLabel('Apellido paterno')).toHaveValue(`López${run}`);
   await page.getByLabel('CURP').fill(CHILD_CURP.toLowerCase());
   await expect(page.getByLabel('Fecha de nacimiento')).toHaveValue(CHILD_DOB);
@@ -84,19 +95,16 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await next(page, 'Datos del padre');
   await page.close();
 
-  // ── The office sends a fresh invitation (Admisiones) ───────────────────
-  const login = await request.post('/api/v1/accounts/token/', { data: { email: DEV_ADMIN.email, password: DEV_ADMIN.password } });
-  expect(login.ok(), await login.text()).toBeTruthy();
-  const { access } = await login.json();
-  const invite = await request.post(`/api/v1/admissions/pre-register/${start.pre_registration}/invite/`, { headers: { Authorization: `Bearer ${access}` } });
-  expect(invite.status(), await invite.text()).toBe(201);
-  const link = new URL((await invite.json()).invite_url);
-  expect(link.pathname).toBe('/pre-registro');
+  // ── The office resends the ficha (Expediente «Enviar ficha de inscripción») ─
+  const resend = await request.post(`/api/v1/admissions/admin/cases/${caseId}/actions/send-ficha-link/`, { headers: auth, data: { channel: 'whatsapp' } });
+  expect(resend.status(), await resend.text()).toBe(200);
+  const again = new URL((await resend.json()).link);
+  expect(again.pathname).toBe('/pre-registro');
 
   // ── A new browser: the link opens the first step with something missing ─
   const context = await browser.newContext({ viewport: PHONE, serviceWorkers: 'block' });
   const later = await context.newPage();
-  await later.goto(`${link.pathname}${link.search}`);
+  await later.goto(`${again.pathname}${again.search}`);
   await expect(later.getByRole('heading', { level: 2, name: 'Datos del padre' })).toBeFocused();
   await expect(later.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(later).toHaveURL(/\/pre-registro$/); // the token left the address bar
