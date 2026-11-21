@@ -56,7 +56,11 @@ SLUG_PATHS = {
 
 # CMS pages that are not destinations of their own: the 404 page content and
 # the copy of screens reached by sign-in or by a personal link (never in the sitemap).
-UNLISTED_SLUGS = {'no-encontrada', 'iniciar-sesion', 'inscripcion', 'inscripcion-documentos', 'confirmar-correo'}
+# 'pre-registro' is the ficha de inscripción: private since 2026-11-21 (the
+# school sends the link to each admitted family), noindex and unlisted.
+UNLISTED_SLUGS = {
+    'no-encontrada', 'iniciar-sesion', 'inscripcion', 'inscripcion-documentos', 'confirmar-correo', 'pre-registro',
+}
 
 
 def page_path(slug: str) -> str:
@@ -71,7 +75,7 @@ STATIC_ROUTES = [
     ('/', 'weekly', '1.0'), ('/nosotros', 'monthly', '0.8'), ('/modelo-educativo', 'monthly', '0.7'),
     ('/galeria', 'monthly', '0.5'), ('/niveles/preescolar', 'monthly', '0.8'), ('/niveles/primaria', 'monthly', '0.8'),
     ('/niveles/secundaria', 'monthly', '0.8'), ('/admisiones', 'weekly', '0.9'), ('/admisiones/documentacion', 'monthly', '0.6'),
-    ('/admisiones/costos', 'monthly', '0.7'), ('/pre-registro', 'monthly', '0.8'), ('/agendar-visita', 'weekly', '0.7'),
+    ('/admisiones/costos', 'monthly', '0.7'), ('/agendar-visita', 'weekly', '0.7'),
     ('/contacto', 'monthly', '0.6'), ('/pagos', 'monthly', '0.5'), ('/plataformas', 'monthly', '0.4'),
     ('/comunidad/facturacion', 'monthly', '0.3'), ('/aviso-de-privacidad', 'yearly', '0.2'),
 ]

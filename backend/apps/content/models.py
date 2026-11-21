@@ -70,11 +70,13 @@ class SiteSettings(models.Model):
     # messages (cuotas, liga de visita, ficha, examen, resultado). A missing or
     # empty key uses the built-in text (admissions.process_templates).
     tpl_process = models.JSONField('Plantillas del proceso de admisión', default=dict, blank=True)
-    # Ficha de inscripción (2026-11): off = only the private link the office
-    # sends opens a ficha; the public start answers 403 (admissions.ficha).
+    # Ficha de inscripción: private since 2026-11-21 (off). Only the personal
+    # link the school sends once the exam is «Aceptado» opens a ficha; the
+    # public start answers 403 (admissions.ficha). On = anyone may start one.
     admissions_public_start = models.BooleanField(
-        'Permitir iniciar la ficha sin enlace', default=True,
-        help_text='Apagado: la ficha de inscripción solo se abre con el enlace que envía el colegio.')
+        'Permitir iniciar la ficha sin enlace', default=False,
+        help_text=('Apagado (recomendado): la ficha de inscripción solo se abre con el enlace personal '
+                   'que el colegio envía a cada familia admitida.'))
 
     # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
     menu = models.JSONField('Menú del sitio', default=list, blank=True)
