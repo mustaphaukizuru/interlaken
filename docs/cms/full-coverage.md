@@ -142,11 +142,14 @@ retired version nobody accepted stays frozen (Django admin uses the same rule).
 
 ### Admission documents: one list
 
-The list is edited once, in Documentación («Documentos requeridos» section).
-Admisiones («Documentos y pre-registro») no longer has its own copy: it shows
-the list of the published Documentación page, or the built-in list while
-that page is not published (`useAdmissionDocs` in `lib/admisionesDocs.ts`).
-Both looks are unchanged; each page keeps its own title, summary and note.
+Since Fase 4 (required documents by level) the list is not CMS content: it
+is edited in Admin → Admisiones → Documentos requeridos
+(`admissions.RequiredDocument`) and read from `/admissions/required-documents/`
+(`hooks/queries/requiredDocs.ts`). Documentación («Documentos requeridos»
+section) shows it with a tab per level; Admisiones («Documentos y
+pre-registro») shows every document with the levels of those not asked for
+all; the family's upload page and the staff checklist use the same rows.
+Each page keeps its own title, summary and note as CMS copy.
 
 ### Testimonials photo: skipped
 

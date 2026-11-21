@@ -11,7 +11,7 @@ import PagosPage from '@/pages/public/PagosPage';
 import PlataformasPage from '@/pages/public/PlataformasPage';
 import FacturacionPage from '@/pages/public/FacturacionPage';
 import DocumentacionPage from '@/pages/public/DocumentacionPage';
-import { contactApi } from '@/services/api';
+import { api, contactApi } from '@/services/api';
 
 vi.mock('@/services/api', async (orig) => {
   const actual = await orig<typeof import('@/services/api')>();
@@ -60,8 +60,16 @@ describe('Bitácora 13/10/2026', () => {
   });
 
   it('ref. 9 · Documentación: no «Trámites INE» link and no closing note', async () => {
+    // Fase 4: the list comes from Admisiones → Documentos requeridos.
+    const ine = { key: 'ine-padres', name: 'INE de papá y mamá', description: '', physical_note: 'Copia',
+      levels: ['preescolar', 'primaria', 'secundaria'], kind: 'upload', multiple_files: true, link_url: '', link_label: '' };
+    const get = vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url === '/admissions/required-documents/') return { data: { level: '', levels: [], results: [ine] } };
+      throw { response: { status: 404 } };
+    });
     renderWithProviders(<DocumentacionPage />);
-    expect(await screen.findByText(/INE de cada padre o tutor/)).toBeInTheDocument();
+    expect(await screen.findByText('INE de papá y mamá')).toBeInTheDocument();
+    get.mockRestore();
     expect(screen.queryByRole('link', { name: /Trámites INE/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Los enlaces llevan a los portales oficiales/)).not.toBeInTheDocument();
   });

@@ -116,7 +116,11 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
   },
   'documentacion.list': {
     title: 'Encabezado de la lista de documentos.',
-    summary: 'Escriba {total} donde va el número de documentos y {online} donde va cuántos se tramitan en línea: se cuentan solos.',
+    summary: 'Escriba {total} donde va el número de documentos del nivel elegido, {nivel} donde va el nivel y {online} donde va cuántos se tramitan en línea: se llenan solos.',
+    tabsLabel: 'No se ve en pantalla: lo escucha quien usa un lector de pantalla al llegar a las pestañas de nivel.',
+    physicalLabel: 'Lo que va antes de lo que se entrega en papel, por ejemplo «En físico:».',
+    emptyText: 'Se ve si un nivel no tiene documentos publicados.',
+    retryLabel: 'Lo que dice el botón para volver a cargar la lista.',
     ctaTitle: 'Encabezado del recuadro final.',
     ctaText: 'Texto del recuadro final.',
     cta: 'El botón del recuadro final.',
@@ -124,6 +128,8 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
   'admisiones.docs_cta': {
     docsTitle: 'Encabezado de la lista de documentos.',
     docsSummary: 'Escriba {total} donde va el número de documentos y {online} donde va cuántos se tramitan en línea: se cuentan solos.',
+    docsOnlyLabel: 'Palabra antes de los niveles en los documentos que no piden todos, por ejemplo «Solo» (Solo Preescolar).',
+    docsError: 'Se ve si la lista de documentos no carga; el enlace a la lista por nivel va después.',
     image: 'Foto del recuadro que invita al pre-registro.',
     badge: 'Etiqueta pequeña sobre la foto, por ejemplo el ciclo escolar.',
     title: 'Encabezado del recuadro que invita al pre-registro.',
