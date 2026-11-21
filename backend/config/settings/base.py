@@ -406,9 +406,10 @@ LOYVERSE_WEBHOOK_SECRET = env('LOYVERSE_WEBHOOK_SECRET', default='')
 # daily/weekly spending digest (send_spending_digest cron). Default False keeps
 # the immediate per-purchase notification behaviour.
 CAFETERIA_PURCHASE_DIGEST = env.bool('CAFETERIA_PURCHASE_DIGEST', default=False)
-# When an online (card) top-up reaches the wallet. Loyverse points cannot be
-# written by API (spec R1), so staff load every online top-up into the POS by
-# hand. ``scheduled`` (the school's rule since 2026-10-18): a paid top-up waits
+# When an online (card) top-up reaches the wallet. Until 2026-11-21 staff
+# loaded every online top-up into the POS by hand (spec R1 said Loyverse points
+# could not be written; a live test that day proved they can, see
+# CAFETERIA_TOPUP_LOYVERSE_PUSH below). ``scheduled`` (the school's rule since 2026-10-18): a paid top-up waits
 # as «pagada, por aplicar» and the wallet is credited only once the money is
 # in the POS (staff load it at CAFETERIA_TOPUP_APPLY_TIME every school day, or
 # right away when a family sends its comprobante by WhatsApp), so the portal
@@ -423,6 +424,16 @@ CAFETERIA_TOPUP_APPLY_CUTOFF_MINUTES = env.int('CAFETERIA_TOPUP_APPLY_CUTOFF_MIN
 # School WhatsApp (10-digit Mexican number) where families send the
 # comprobante when the top-up must be applied the same day.
 CAFETERIA_TOPUP_WHATSAPP = env('CAFETERIA_TOPUP_WHATSAPP', default='5553791188')
+# The app writes a paid card top-up straight into the student's Loyverse
+# points, so nobody types it into the POS (apps/cafeteria/loyverse_push.py).
+# ``off`` (default): nothing is written, the scheduled flow above is unchanged.
+# ``verified``: written as soon as the approval is verified in MultiCobros.
+# ``instant``: written on approval when the amount is at most
+# CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX; larger ones wait for the verification.
+# Only with PAYMENTS_LIVE=true, never for a Payworks simulation.
+CAFETERIA_TOPUP_LOYVERSE_PUSH = env('CAFETERIA_TOPUP_LOYVERSE_PUSH', default='off')
+# ``instant`` mode: the largest approval written before it is verified (MXN).
+CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX = env('CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX', default='500')
 
 # ── PAYMENTS ──────────────────────────────────────────────
 # Banorte "Ventana de Comercio Electrónico Cifrada" is the only gateway

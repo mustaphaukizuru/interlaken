@@ -11,12 +11,14 @@ Notes for maintainers:
   and transport-level retries (429/5xx). The one exception is the read behind
   the money guard (``loyverse_points_for_guard``): one attempt on a short
   budget, because a snapshot fallback exists and a bulk apply runs it per row.
-- Per spec **R1** the Loyverse ``total_points`` field is effectively read-only,
-  so the local ``CafeteriaBalance`` row is the source of truth for credits.
+- The local ``CafeteriaBalance`` row is the source of truth for credits.
   ``add_points_to_customer`` credits that row **atomically and idempotently**
-  (``select_for_update`` + a reference guard). Nothing here writes points to
-  Loyverse; a local DEBIT must instead pass ``check_pos_debit`` so the POS
-  mirror cannot credit it back.
+  (``select_for_update`` + a reference guard). Spec R1 said Loyverse
+  ``total_points`` could not be written; a live test on 2026-11-21 showed it
+  can (absolute value, full record or other fields are wiped:
+  ``customer_write_body``). The ONLY writer is ``loyverse_push`` (paid card
+  top-ups, behind CAFETERIA_TOPUP_LOYVERSE_PUSH). Every other local DEBIT
+  must still pass ``check_pos_debit`` so the POS mirror cannot credit it back.
 """
 import logging
 import re
@@ -165,6 +167,53 @@ def get_balance_from_customer(customer: dict) -> Decimal:
     """
     points = customer.get('total_points', 0) or 0
     return Decimal(str(points))
+
+
+# Customer fields the API computes itself (``readOnly`` in Loyverse's OpenAPI
+# file, plus the timestamps): never echoed back in a write.
+CUSTOMER_READ_ONLY_FIELDS = frozenset({
+    'first_visit', 'last_visit', 'total_visits', 'total_spent',
+    'created_at', 'updated_at', 'deleted_at', 'permanent_deletion_at',
+})
+# A write is sent exactly once (no transport retries: replaying an absolute
+# balance after a sale would erase the sale). (connect, read) in seconds.
+_WRITE_TIMEOUT = (3, 8)
+
+
+def customer_write_body(customer: dict, points) -> dict:
+    """The body that sets ``customer``'s points to ``points`` and nothing else.
+
+    ``POST /customers`` with an ``id`` REPLACES the record: a field missing
+    from the body is cleared. Live test 2026-11-21: ``{id, name,
+    total_points}`` set the points and wiped ``customer_code`` and ``note``.
+    ``customer_code`` is the student's matrícula link, so the body is always
+    the full record just read, minus the computed fields, with the new points.
+    """
+    if not customer.get('id') or not customer.get('name'):
+        raise LoyverseError('Refusing to write a Loyverse customer read without id or name.')
+    body = {k: v for k, v in customer.items() if k not in CUSTOMER_READ_ONLY_FIELDS}
+    body['total_points'] = float(Decimal(str(points)).quantize(Decimal('0.01')))
+    return body
+
+
+def set_customer_points(customer: dict, points) -> dict:
+    """Set ``customer``'s Loyverse points balance to ``points`` (absolute).
+
+    ``customer`` must be the record just read with ``get_customer_by_id``
+    (see ``customer_write_body``). One attempt, no retries. Raises
+    ``LoyverseError`` on any failure; a timeout or a 5xx leaves the outcome
+    unknown, so the caller always re-reads the customer to learn what
+    Loyverse holds. Returns the customer as Loyverse echoes it.
+    """
+    body = customer_write_body(customer, points)
+    try:
+        with _session(retries=False) as session:
+            resp = session.post(f'{_base_url()}/customers', json=body, timeout=_WRITE_TIMEOUT)
+            resp.raise_for_status()
+            return resp.json()
+    except (requests.RequestException, ValueError) as e:
+        logger.error('Loyverse points write for %s failed: %s', customer.get('id'), e)
+        raise LoyverseError(str(e)) from e
 
 
 def get_recent_transactions(loyverse_customer_id: str, limit: int = 20) -> list:
@@ -1100,10 +1149,11 @@ def complete_online_topup(payment):
 
     - ``scheduled`` mode (``schedule.apply_mode()``, the default): the top-up
       becomes PAID with the promised ``apply_due_at``. The wallet is NOT
-      credited: Loyverse ``total_points`` is read-only (spec **R1**), so the
-      money reaches the wallet only once staff have it in the POS
-      (``apply_paid_topup`` or the POS mirror's match). The family's portal
-      balance then never shows money the cashier does not have.
+      credited until the money is in the POS (``apply_paid_topup``, the POS
+      mirror's match, or the app writing it into Loyverse itself,
+      ``loyverse_push``, which in ``instant`` push mode starts right after
+      this commits). The family's portal balance then never shows money the
+      cashier does not have.
     - ``instant`` mode: credits the local ``CafeteriaBalance`` now (a ``topup``
       ``CafeteriaTransaction`` with ``balance_after``) and marks the top-up
       COMPLETED; staff load the POS afterwards (the "Cargar en POS" queue).
@@ -1145,6 +1195,12 @@ def complete_online_topup(payment):
             payment.related_topup = topup
             logger.info('Online top-up #%s paid ($%s, %s); wallet credit due %s.',
                         topup.id, payment.amount, topup.student, topup.apply_due_at)
+            # CAFETERIA_TOPUP_LOYVERSE_PUSH=instant: write it into Loyverse
+            # once this commits (it locks the rows this block holds).
+            from apps.cafeteria import loyverse_push
+            if loyverse_push.push_mode() == 'instant' and loyverse_push.is_enabled():
+                transaction.on_commit(
+                    lambda pk=payment.pk: loyverse_push.push_after_payment(pk), robust=True)
             return None
 
         cb, _ = CafeteriaBalance.objects.select_for_update().get_or_create(student=topup.student)
@@ -1390,6 +1446,15 @@ def apply_after_verification(payment, *, quick_read=False) -> dict:
     student = topup.student
     if not student.loyverse_id:
         return {'apply_state': 'waiting_pos', 'balance': None}
+    # CAFETERIA_TOPUP_LOYVERSE_PUSH on: the app writes it into Loyverse now.
+    # Not for the report upload (``quick_read``, many in one request): the
+    # 5-minute cron writes those. Anything not written falls through to the
+    # usual path (staff may have typed it into the POS already).
+    from apps.cafeteria import loyverse_push
+    if not quick_read and loyverse_push.is_enabled():
+        pushed = loyverse_push.push_topup(payment)
+        if pushed['state'] == 'pushed':
+            return {'apply_state': 'applied', 'balance': pushed['balance']}
     try:
         with _guard_read_budget() if quick_read else nullcontext():
             customer = get_customer_by_id(student.loyverse_id)
@@ -1722,7 +1787,12 @@ def notify_topup_result(payment, *, success: bool) -> int:
     from apps.cafeteria.schedule import format_amount, format_apply_at, whatsapp_display
 
     # Read after commit: the settlement that just ran may have moved it.
-    topup.refresh_from_db(fields=['status', 'apply_due_at'])
+    topup.refresh_from_db(fields=['status', 'apply_due_at', 'applied_via'])
+    if (success and topup.status == TopUpRequest.Status.COMPLETED
+            and topup.applied_via == TopUpRequest.AppliedVia.AUTO_POS):
+        # The app already wrote it into Loyverse on approval and the family got
+        # one message saying so («Recarga de cafetería lista», loyverse_push).
+        return 0
     student = topup.student
     name = student.user.full_name
     details, highlight, tone, cta_label, intro = [('Alumno', name)], None, None, None, None
@@ -1831,8 +1901,7 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
                            reference: str = '') -> dict:
     """Credit a student's cafeteria balance after a successful top-up.
 
-    Per spec **R1**, Loyverse ``total_points`` is read-only, so the **local**
-    ``CafeteriaBalance`` is the source of truth. This:
+    The **local** ``CafeteriaBalance`` is the source of truth. This:
 
     - locks the balance row with ``select_for_update`` (fixes the R2 read-modify-write
       race with concurrent purchase syncs),
@@ -1841,8 +1910,8 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
       a retried webhook / cron double-apply),
     - records a ``topup`` ``CafeteriaTransaction`` (only when ``reference`` is given).
 
-    Loyverse is never written (``total_points`` is read-only); staff load the
-    credit into the POS.
+    Loyverse is not written here; staff load the credit into the POS (only
+    ``loyverse_push`` writes points, for paid card top-ups).
 
     Returns ``{'applied': bool, 'balance': Decimal, 'reason'?: str}``.
     """
@@ -1882,10 +1951,11 @@ def add_points_to_customer(loyverse_customer_id: str, points, note: str = '',
             )
         new_balance = cb.balance
 
-    # No Loyverse write: ``total_points`` is not a writable field (spec R1), and
-    # the old best-effort push sent an ABSOLUTE balance, which would have
-    # double-counted any online top-up still waiting for its POS load had
-    # Loyverse ever accepted it. Staff load the cash into the POS themselves.
+    # No Loyverse write here. The old best-effort push (removed 2026-10-16)
+    # sent the ABSOLUTE local balance, which double-counts any online top-up
+    # still waiting for its POS load; Loyverse does accept such writes (live
+    # test 2026-11-21), so that design was a real hazard. Writes live only in
+    # ``loyverse_push`` (read, add, write back, re-read).
     logger.info(f'Credited {amount} to {loyverse_customer_id}. Local balance: {new_balance}')
     return {'applied': True, 'balance': new_balance}
 
@@ -1946,6 +2016,7 @@ class PosDebitBlocked(ValueError):
 
 POS_LOAD_PENDING = 'tiene una recarga en línea pendiente de cargar en el POS'
 POS_UNLOAD_PENDING = 'tiene una devolución pendiente de quitar del POS'
+POS_PUSH_CHECK = 'tiene una recarga automática por revisar en Loyverse'
 
 
 def pending_pos_loads():
@@ -1986,14 +2057,34 @@ def pos_queue_reasons(student_ids=None, *, include_paid: bool = True) -> dict:
     "reconciliación". The POS mirror passes ``include_paid=False`` because it
     is the one place that settles those gaps (``_match_paid_topups``).
     """
-    loads, unloads = pending_pos_loads(), pending_pos_unloads()
+    from django.db.models import Q
+
+    from apps.cafeteria.models import TopUpRequest
+
+    loads = pending_pos_loads()
     paid = paid_topups_pending() if include_paid else None
+    # One query for two kinds of rows (same count as before the push existed,
+    # test_query_budgets): refunds still to remove from the POS
+    # (``pending_pos_unloads``) and top-ups the app wrote into Loyverse while
+    # a sale of the same student landed (``loyverse_push`` CHECK: Loyverse may
+    # be above the wallet by that sale, which is not a cash recarga).
+    held = TopUpRequest.objects.filter(
+        Q(pos_unload_needed_at__isnull=False, pos_unloaded_at__isnull=True)
+        | Q(loyverse_push_state=TopUpRequest.PushState.CHECK))
     if student_ids is not None:
         loads = loads.filter(student_id__in=student_ids)
-        unloads = unloads.filter(student_id__in=student_ids)
+        held = held.filter(student_id__in=student_ids)
         if paid is not None:
             paid = paid.filter(student_id__in=student_ids)
-    reasons = {sid: POS_UNLOAD_PENDING for sid in unloads.values_list('student_id', flat=True)}
+    reasons, checks = {}, []
+    for sid, unload_at, unloaded_at in held.values_list(
+            'student_id', 'pos_unload_needed_at', 'pos_unloaded_at'):
+        if unload_at is not None and unloaded_at is None:
+            reasons[sid] = POS_UNLOAD_PENDING
+        else:
+            checks.append(sid)
+    for sid in checks:
+        reasons.setdefault(sid, POS_PUSH_CHECK)
     for sid in loads.values_list('student_id', flat=True):
         reasons.setdefault(sid, POS_LOAD_PENDING)
     if paid is not None:
@@ -2045,7 +2136,7 @@ def loyverse_points_for_guard(student):
 def check_pos_debit(student, new_balance, points) -> None:
     """Refuse a local debit that ``mirror_pos_topups`` would credit straight back.
 
-    Loyverse ``total_points`` cannot be written (spec R1), so the POS keeps the
+    Nothing writes a local debit back to Loyverse, so the POS keeps the
     money a local-only debit takes away, and the 5-minute mirror reads any
     positive "Loyverse minus local" gap as a cash recarga: the debit would be
     undone and the family told about a recarga that never happened. The rule:

@@ -125,6 +125,10 @@ export interface TopUpPolicy {
   whatsapp: string;
   /** When a payment made right now would be applied (null in instant mode). */
   next_apply_at: string | null;
+  /** The app writes card top-ups into Loyverse itself: 'instant' = approvals up
+   *  to `auto_load_max` reach the cafetería in seconds. Absent from older servers. */
+  auto_load?: 'off' | 'verified' | 'instant';
+  auto_load_max?: string;
 }
 
 export interface CafeteriaTransactionItem {
@@ -241,9 +245,14 @@ export interface TopUpLogEntry {
   /** Scheduled apply: the POS load promised to the family and when it reached the wallet. */
   apply_due_at?: string | null;
   applied_at?: string | null;
-  applied_via?: '' | 'instant' | 'staff' | 'pos_sync' | 'override';
+  applied_via?: '' | 'instant' | 'staff' | 'pos_sync' | 'override' | 'auto_pos';
   applied_via_display?: string;
   applied_by_name?: string;
+  /** The app writing this top-up into Loyverse (CAFETERIA_TOPUP_LOYVERSE_PUSH). */
+  loyverse_push_state?: '' | 'waiting' | 'pushed' | 'check' | 'failed';
+  loyverse_push_state_display?: string;
+  loyverse_push_note?: string;
+  loyverse_push_at?: string | null;
   /** Paid, waiting to be loaded into the POS and applied. */
   needs_apply?: boolean;
   /** Past the time promised to the family. */
@@ -371,6 +380,8 @@ export interface Payment {
     status: 'pending' | 'paid' | 'completed' | 'failed' | 'refunded';
     apply_due_at: string | null;
     applied_at: string | null;
+    /** 'auto_pos': the app already wrote it into Loyverse (spendable now). */
+    applied_via?: string;
   } | null;
   created_at: string;
   updated_at: string;

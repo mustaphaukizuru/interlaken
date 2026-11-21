@@ -99,9 +99,20 @@ export function whatsappHref(number: string, { folio, amount }: { folio?: number
   return `https://wa.me/52${digits}?text=${encodeURIComponent(lines.join('\n'))}`;
 }
 
-/** The school's message about when a card top-up reaches the balance (as the school wrote it). */
-export function applyNotice(policy?: Pick<TopUpPolicy, 'apply_time' | 'whatsapp'> | null): string {
+/**
+ * The school's message about when a card top-up reaches the balance (as the
+ * school wrote it). With `auto_load: 'instant'` the app writes approvals up to
+ * `auto_load_max` into the cafetería itself, so it says so instead.
+ */
+export function applyNotice(
+  policy?: Pick<TopUpPolicy, 'apply_time' | 'whatsapp' | 'auto_load' | 'auto_load_max'> | null,
+): string {
   const clock = formatClock(policy?.apply_time || DEFAULT_APPLY_TIME);
+  const max = Number(policy?.auto_load_max ?? 0);
+  if (policy?.auto_load === 'instant' && max > 0) {
+    return `Al confirmarse el pago, el saldo se carga en la cafetería en unos segundos (recargas de hasta ${formatMXN(max)}). `
+      + `Las recargas mayores se aplican cuando el colegio verifica el pago, a más tardar el siguiente día hábil a las ${clock}.`;
+  }
   const whatsapp = policy?.whatsapp ?? DEFAULT_WHATSAPP;
   const base = sentence(`Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las ${clock}`);
   if (!whatsapp) return base;

@@ -482,14 +482,23 @@ def online_topups_awaiting_staff():
 
 
 def paid_topups_awaiting_verification():
-    """PAID card top-ups whose real (PRD) approval staff have not matched in
-    MultiCobros yet: nothing puts them in the wallet until someone verifies
-    them, not even the POS mirror. The console's «Por verificar» badge and the
-    dashboard card count these; same rule as ``Payment.needs_bank_verification``."""
-    from apps.cafeteria.services import paid_topups_pending
+    """Card top-ups whose real (PRD) approval staff have not matched in
+    MultiCobros yet. Two kinds: PAID ones (nothing puts them in the wallet
+    until someone verifies them, not even the POS mirror) and, with
+    ``CAFETERIA_TOPUP_LOYVERSE_PUSH=instant``, small ones the app already
+    wrote into Loyverse on approval (``AUTO_POS``), which staff verify after
+    the fact. The console's «Por verificar» badge and the dashboard card count
+    these; same rule as ``Payment.needs_bank_verification``."""
+    from apps.cafeteria.models import TopUpRequest
 
+    status = TopUpRequest.Status
     return (
-        paid_topups_pending()
+        TopUpRequest.objects.filter(
+            Q(status=status.PAID)
+            | Q(status=status.COMPLETED, applied_via=TopUpRequest.AppliedVia.AUTO_POS),
+            method=TopUpRequest.Method.ONLINE,
+        )
+        .exclude(payments__status=Payment.Status.REFUNDED)
         .filter(
             payments__status=Payment.Status.SUCCESS,
             payments__banorte__mode="PRD",

@@ -273,7 +273,35 @@ wallet matches.
 
 ## 6. Daily operation for staff
 
-**Every school day at 07:30.** Paid card top-ups are listed in **Cafetería →
+**Automatic load into Loyverse (`CAFETERIA_TOPUP_LOYVERSE_PUSH`, off by
+default).** Since 2026-11-21 the app can write a paid card top-up into the
+student's Loyverse points itself (`backend/apps/cafeteria/loyverse_push.py`;
+a live test that day proved the API accepts it). With `verified`, it does so
+the moment staff press **Verificar en MultiCobros** (top-ups verified with the
+report upload are written by the next 5-minute pass). With `instant`, it does
+so right after the approval for amounts up to
+`CAFETERIA_TOPUP_PUSH_UNVERIFIED_MAX` (MXN 500 by default) and staff verify
+them afterwards (they still count in «Por verificar»); larger ones wait for
+the verification. Either way the app reads the card, writes the full customer
+record back with the new balance, reads it again and credits the wallet only
+when Loyverse shows exactly the expected figure. Nothing is typed by hand, and
+the rows simply never reach «Por aplicar» (or leave it on verification).
+
+What staff still see:
+
+- **«Carga automática en espera»** on a row: Loyverse and the app did not agree
+  to the cent (a sale or a POS load in flight), so nothing was written. The
+  5-minute pass tries again; after about two hours it gives up.
+- **«No se cargó sola»** plus an email *Cargar a mano*: the write was refused,
+  or Loyverse showed another figure afterwards. The app will not write it
+  again. Check the card in Loyverse first: if the money is already there the
+  app applies it within minutes by itself; if not, load it by hand as below.
+- An email *Revisar en Loyverse*: a purchase of the same student reached
+  Loyverse in the same second as the write. Check that the card's balance in
+  Loyverse equals the app's; if Loyverse shows more, remove the difference
+  there. The app leaves that student alone until both agree again.
+
+**Every school day at 07:30** (and for anything the automatic load did not do). Paid card top-ups are listed in **Cafetería →
 POS Loyverse → Por aplicar (carga de las 7:30)**, oldest promise first, with
 the student's Loyverse customer code, the amount and the folio. At 07:05 (and
 hourly until 14:40 while something is overdue) every admin gets the same list

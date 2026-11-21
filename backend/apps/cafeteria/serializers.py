@@ -301,6 +301,8 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         source='applied_by.full_name', read_only=True, default='')
     applied_via_display = serializers.CharField(
         source='get_applied_via_display', read_only=True)
+    loyverse_push_state_display = serializers.CharField(
+        source='get_loyverse_push_state_display', read_only=True)
     needs_apply = serializers.SerializerMethodField()
     apply_overdue = serializers.SerializerMethodField()
     payer = serializers.SerializerMethodField()
@@ -321,6 +323,8 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'apply_due_at', 'applied_at', 'applied_via', 'applied_via_display',
             'applied_by_name', 'needs_apply', 'apply_overdue',
             'loyverse_code', 'loyverse_points', 'wallet_balance', 'payer',
+            'loyverse_push_state', 'loyverse_push_state_display', 'loyverse_push_note',
+            'loyverse_push_at',
         ]
 
     def get_payer(self, obj):

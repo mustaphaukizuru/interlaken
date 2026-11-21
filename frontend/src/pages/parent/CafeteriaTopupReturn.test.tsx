@@ -63,6 +63,19 @@ describe('CafeteriaTopupReturn polling', () => {
     );
   });
 
+  it('a top-up the app already wrote into Loyverse says it is spendable now', async () => {
+    getStatus.mockResolvedValue({ data: {
+      id: 42, status: 'success', amount: '200.00', student_name: 'Ana', gateway_tx_id: 'IK9',
+      topup: { id: 8, status: 'completed', apply_due_at: null, applied_at: '2030-01-07T15:00:00Z', applied_via: 'auto_pos' },
+    } } as never);
+    renderAt('?payment_id=42');
+
+    expect(await screen.findByText('Pago confirmado')).toBeInTheDocument();
+    expect(screen.getByText(/ya está cargado en la cafetería: su hijo\(a\) ya puede usarlo/)).toBeInTheDocument();
+    expect(screen.queryByText(/cargará el monto en el POS/)).not.toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenCalledWith('Pago confirmado. El saldo ya está en la cafetería.');
+  });
+
   it('a paid top-up waiting for the POS load says when it applies and offers WhatsApp', async () => {
     getStatus.mockResolvedValue({ data: {
       id: 41, status: 'success', amount: '200.00', student_name: 'Ana', gateway_tx_id: 'IK9',

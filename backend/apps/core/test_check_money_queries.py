@@ -69,6 +69,7 @@ def test_the_money_paths_are_covered():
         "reverse_online_topup",
         "mirror_pos_topups",
         "add_points_to_customer",
+        "apps/cafeteria/loyverse_push.py push_topup",
         "apps/cafeteria/views.py AdminApplyTopUpView.post",
         # The two bulk lists whose lock failed (or would fail) on PostgreSQL.
         "apps/content/forms.py FormBulkView",

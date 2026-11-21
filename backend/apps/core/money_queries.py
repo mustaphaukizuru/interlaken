@@ -129,7 +129,8 @@ def _cafeteria_checks() -> list[LockedQuery]:
         ),
         LockedQuery(
             "Aplicar / devolver recarga pagada (recarga + alumno + usuario)",
-            "apps/cafeteria/services.py apply_paid_topup, refund_paid_topup",
+            "apps/cafeteria/services.py apply_paid_topup, refund_paid_topup; "
+            "apps/cafeteria/loyverse_push.py push_topup",
             lambda: _get(
                 TopUpRequest.objects.select_for_update()
                 .select_related("student__user")
@@ -167,7 +168,8 @@ def _cafeteria_checks() -> list[LockedQuery]:
         ),
         LockedQuery(
             "Saldo del monedero (first)",
-            "apps/cafeteria/services.py reset_wallet_seed, mirror_pos_topups",
+            "apps/cafeteria/services.py reset_wallet_seed, mirror_pos_topups; "
+            "apps/cafeteria/loyverse_push.py push_topup",
             lambda: _first(CafeteriaBalance.objects.select_for_update().filter(student_id=MISSING)),
         ),
         LockedQuery(

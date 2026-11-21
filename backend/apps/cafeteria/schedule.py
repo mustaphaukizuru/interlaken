@@ -187,6 +187,8 @@ def whatsapp_display() -> str:
 
 def policy(now: datetime | None = None) -> dict:
     """What the family top-up form needs to promise before paying."""
+    from apps.cafeteria import loyverse_push
+
     scheduled = is_scheduled()
     return {
         'mode': apply_mode(),
@@ -194,4 +196,9 @@ def policy(now: datetime | None = None) -> dict:
         'whatsapp': whatsapp_number(),
         # When a payment made right now would reach the wallet.
         'next_apply_at': next_apply_at(now).isoformat() if scheduled else None,
+        # The app writes card top-ups into Loyverse itself
+        # (``loyverse_push``): 'off', 'verified', or 'instant' (approvals up
+        # to ``auto_load_max`` reach the cafetería in seconds).
+        'auto_load': loyverse_push.effective_mode(),
+        'auto_load_max': f'{loyverse_push.unverified_max():.2f}',
     }

@@ -36,6 +36,19 @@ describe('topupApply', () => {
     expect(formatWhatsapp('5553791188')).toBe('55 5379 1188');
   });
 
+  it('says top-ups reach the cafetería in seconds when the app loads them itself', () => {
+    const text = applyNotice({ apply_time: '07:30', whatsapp: '5553791188', auto_load: 'instant', auto_load_max: '500.00' });
+    expect(text).toContain('el saldo se carga en la cafetería en unos segundos');
+    expect(text).toContain('hasta $500.00');
+    expect(text).toContain('a más tardar el siguiente día hábil a las 7:30 a.m.');
+    expect(text).not.toContain('WhatsApp');
+    // Verified-only or off: the school's own wording, unchanged.
+    for (const auto_load of ['verified', 'off'] as const) {
+      expect(applyNotice({ apply_time: '07:30', whatsapp: '', auto_load, auto_load_max: '500.00' })).toBe(
+        'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m.');
+    }
+  });
+
   it('drops the WhatsApp sentence when the school has none configured', () => {
     expect(applyNotice({ apply_time: '07:30', whatsapp: '' })).toBe(
       'Después de realizar el pago, el saldo se actualizará al siguiente día hábil a las 7:30 a.m.');

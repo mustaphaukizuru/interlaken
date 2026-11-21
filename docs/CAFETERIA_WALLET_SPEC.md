@@ -162,7 +162,22 @@ Most is reuse. Additions:
 
 - **R1 — Loyverse points as a wallet (validate FIRST):** using loyalty `total_points` as prepaid balance is a workaround. Confirm the Loyverse API actually allows **writing** `total_points` via `PATCH /customers/<id>` (`services.py:124`) — several Loyverse plans treat points as **read-only**, updated only through sales/redemptions. If writes aren't supported, the top-up mechanism must change (e.g., record credit locally and reconcile, or use a proper prepaid/redemption flow). **This gates Feature 4.**
 
-  > ### 🔴 R1 result (2026-07-07 — Prompt 08) — **writing `total_points` is NOT supported → STOP before Prompt 10**
+  > ### ✅ R1 corrected (2026-11-21): **`total_points` IS writable**
+  >
+  > The July finding below was never tested live and was wrong. Loyverse's own
+  > OpenAPI file (`developer.loyverse.com/docs/API-Reference__v1.0.yaml`) marks
+  > `first_visit`, `last_visit`, `total_visits` and `total_spent` as `readOnly`
+  > but not `total_points` ("Actual customer points balance"). A live test on a
+  > throwaway customer (created and deleted, no student linked) confirmed it:
+  > `POST /customers` with the `id` set the balance 0 → 5 → 7 → 244.50 exactly.
+  > It is an **absolute** value, not an amount to add, and a body without the
+  > other fields **wipes them** (`customer_code` and `note` came back null), so
+  > every write sends the full record just read. The only writer is
+  > `apps/cafeteria/loyverse_push.py` (paid card top-ups, behind
+  > `CAFETERIA_TOPUP_LOYVERSE_PUSH`, off by default); see
+  > `docs/BANORTE-INTEGRATION.md` §6. The local ledger stays the source of truth.
+  >
+  > ### 🔴 R1 result (2026-07-07 — Prompt 08) — superseded above: **writing `total_points` is NOT supported → STOP before Prompt 10**
   >
   > **Finding.** Loyverse's public API treats a customer's `total_points` as **read-only**. It is *returned* by `GET /customers/<id>` but is **computed and owned by the loyalty program** — points accrue on sales and are redeemed on receipts. The customer create/update endpoint is `POST /customers` (an **upsert keyed by `id`**, not `PATCH`), and its accepted body fields are the customer's *profile* only: `id, name, email, phone_number, address, city, region, postal_code, country_code, note, customer_code`. **`total_points` is not an accepted write field**, so there is no supported way to set/credit a balance directly. The current `add_points_to_customer()` is doubly wrong: it uses `PATCH` (unsupported verb) and sends `total_points` (read-only field) — it would fail even with valid credentials.
   >
