@@ -21,8 +21,13 @@ from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory, ParentFactory
 from apps.accounts.models import StudentProfile
-from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
-from apps.admissions.pipeline import REQUIRED_DOCS, checklist
+from apps.admissions.models import (
+    PreRegistration,
+    Registration,
+    RegistrationDocument,
+    RequiredDocument,
+)
+from apps.admissions.pipeline import checklist
 
 pytestmark = pytest.mark.django_db
 
@@ -172,16 +177,21 @@ class TestDocuments:
 
     def test_a_rejected_document_is_asked_for_again(self):
         reg = _reg()
-        for doc_type in REQUIRED_DOCS:
-            _doc(reg, doc_type, status=RegistrationDocument.Review.APPROVED, is_verified=True)
+        # Every upload document of the level (primaria) approved, the acta by its
+        # legacy type; the ficha is sent.
+        for rd in RequiredDocument.objects.filter(kind="upload").exclude(key="acta-nacimiento"):
+            if "primaria" in rd.levels:
+                _doc(reg, "other", required_document=rd,
+                     status=RegistrationDocument.Review.APPROVED, is_verified=True)
+        _doc(reg, RegistrationDocument.DocType.BIRTH_CERT,
+             status=RegistrationDocument.Review.APPROVED, is_verified=True)
         assert checklist(reg)["missing"] == []
 
         birth = reg.documents.get(doc_type=RegistrationDocument.DocType.BIRTH_CERT)
         birth.status, birth.is_verified = RegistrationDocument.Review.REJECTED, False
         birth.save()
         reg = Registration.objects.prefetch_related("documents").get(pk=reg.pk)
-        label = RegistrationDocument.DocType.BIRTH_CERT.label
-        assert checklist(reg)["missing"] == [f"{label} (por corregir)"]
+        assert checklist(reg)["missing"] == ["Acta de nacimiento (por corregir)"]
 
         # The family uploads it again: the newest upload decides.
         _doc(reg, RegistrationDocument.DocType.BIRTH_CERT)

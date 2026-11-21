@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ficha_views, views
+from . import ficha_views, required_docs_views, views
 from .bulk import DocumentBulkView, PreRegistrationBulkView, RegistrationBulkView
 from .exports import PreRegistrationExportView, RegistrationExportView
 from .ficha_export import views as ficha_export
@@ -30,8 +30,9 @@ urlpatterns = [
     path('register/<int:pk>/status/',  views.RegistrationStatusView.as_view(),      name='register-status'),
     path('register/<int:pk>/',         views.RegistrationDetailView.as_view(),      name='register-detail'),
     path('register/<int:pk>/submit/',  views.RegistrationSubmitView.as_view(),      name='register-submit'),
-    path('register/<int:pk>/documents/', views.DocumentUploadView.as_view(),        name='register-docs'),
-    path('register/<int:pk>/documents/list/', views.DocumentListView.as_view(),    name='register-docs-list'),
+    path('register/<int:pk>/documents/', required_docs_views.DocumentUploadView.as_view(), name='register-docs'),
+    path('register/<int:pk>/documents/list/', required_docs_views.DocumentListView.as_view(),
+         name='register-docs-list'),
     path('register/<int:pk>/documents-link/', views.DocumentsLinkView.as_view(),   name='register-docs-link'),
     path('documents/<int:pk>/verify/', views.DocumentVerifyView.as_view(),          name='document-verify'),
     path('documents/<int:pk>/download/', views.DocumentDownloadView.as_view(),      name='document-download'),
@@ -45,6 +46,21 @@ urlpatterns = [
     path('admin/templates/',           TemplatesView.as_view(),                      name='admissions-templates'),
     path('admin/register/<int:pk>/request-docs/', RequestDocsView.as_view(),         name='register-request-docs'),
     path('admin/register/<int:pk>/convert/', ConvertView.as_view(),                  name='register-convert'),
+    # Fase 4: required documents by level.
+    path('required-documents/',        required_docs_views.PublicRequiredDocumentsView.as_view(),
+         name='required-documents'),
+    path('admin/required-documents/',  required_docs_views.RequiredDocumentListCreateView.as_view(),
+         name='admin-required-documents'),
+    path('admin/required-documents/reorder/', required_docs_views.RequiredDocumentReorderView.as_view(),
+         name='admin-required-documents-reorder'),
+    path('admin/required-documents/<int:pk>/', required_docs_views.RequiredDocumentDetailView.as_view(),
+         name='admin-required-document'),
+    path('admin/register/<int:pk>/checklist/', required_docs_views.RegistrationChecklistView.as_view(),
+         name='register-checklist'),
+    path('admin/register/<int:pk>/checklist/reminder/',
+         required_docs_views.RegistrationDocumentsReminderView.as_view(), name='register-checklist-reminder'),
+    path('admin/register/<int:pk>/checklist/<slug:key>/state/',
+         required_docs_views.RegistrationDocumentStateView.as_view(), name='register-checklist-state'),
     path('open-school/',               views.OpenSchoolDayListView.as_view(),       name='open-school-list'),
     path('open-school/signup/',        views.OpenSchoolDaySignUpView.as_view(),     name='open-school-signup'),
 ]

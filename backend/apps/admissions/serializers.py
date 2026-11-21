@@ -157,6 +157,13 @@ class DocumentVerifySerializer(serializers.ModelSerializer):
         extra_kwargs = {'is_verified': {'required': False}, 'status': {'required': False},
                         'review_note': {'required': False}}
 
+    def validate(self, attrs):
+        # A rejection tells the family what to fix (Fase 4 checklist): never without a reason.
+        note = (attrs.get('review_note') or '').strip()
+        if attrs.get('status') == RegistrationDocument.Review.REJECTED and not note:
+            raise serializers.ValidationError({'review_note': ['Escriba el motivo del rechazo.']})
+        return attrs
+
     def update(self, instance, validated):
         status_ = validated.get('status')
         if status_ is None and 'is_verified' in validated:

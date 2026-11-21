@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -7,13 +7,16 @@ vi.mock('@/services/api', () => ({
   admissionsAdminApi: {
     getRegistration: vi.fn(),
     updateRegistrationStatus: vi.fn(),
-    verifyDocument: vi.fn(),
-    downloadDocument: vi.fn(),
   },
 }));
 
 vi.mock('react-hot-toast', () => ({
   default: { error: vi.fn(), success: vi.fn() },
+}));
+
+// The documents block is its own component (Fase 4), tested in DocumentChecklist.test.tsx.
+vi.mock('@/components/admin/admissions/DocumentChecklist', () => ({
+  DocumentChecklist: ({ registrationId }: { registrationId: number }) => <div data-testid="checklist">Documentos de {registrationId}</div>,
 }));
 
 import toast from 'react-hot-toast';
@@ -24,20 +27,9 @@ import fichaSchema from '@/components/admissions/ficha/fixtures/schema.json';
 
 const getRegistration = vi.mocked(admissionsAdminApi.getRegistration);
 const updateStatus = vi.mocked(admissionsAdminApi.updateRegistrationStatus);
-const verifyDocument = vi.mocked(admissionsAdminApi.verifyDocument);
-const downloadDocument = vi.mocked(admissionsAdminApi.downloadDocument);
 const toastSuccess = vi.mocked(toast.success);
-const apiPost = vi.mocked(api.post);
 const apiGet = vi.mocked(api.get);
 const toastError = vi.mocked(toast.error);
-
-const DOC = {
-  id: 44,
-  doc_type: 'birth_cert',
-  filename: 'acta.pdf',
-  is_verified: false,
-  download_url: '/api/docs/44',
-};
 
 const baseReg = {
   id: 9,
@@ -71,7 +63,7 @@ const baseReg = {
   status: 'submitted',
   submitted_at: '2026-08-01T15:31:00Z',
   admin_notes: '',
-  documents: [] as typeof DOC[],
+  documents: [],
 };
 
 function renderModal(onClose = vi.fn()) {
@@ -83,27 +75,12 @@ function renderModal(onClose = vi.fn()) {
 }
 
 describe('RegistrationReviewModal', () => {
-  let createObjectURL: ReturnType<typeof vi.fn>;
-  let revokeObjectURL: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     getRegistration.mockResolvedValue({ data: baseReg } as never);
     // The staff-only review endpoint carries «Notas internas».
     apiGet.mockResolvedValue({ data: { id: 9, status: 'submitted', admin_notes: '' } } as never);
     updateStatus.mockResolvedValue({ data: {} } as never);
-    verifyDocument.mockResolvedValue({ data: {} } as never);
-    createObjectURL = vi.fn(() => 'blob:acta');
-    revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL,
-      revokeObjectURL,
-    });
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it('shows privacy, photo, and medical consent evidence for staff review', async () => {
@@ -130,76 +107,9 @@ describe('RegistrationReviewModal', () => {
     expect(await screen.findByText('Consentimientos')).toBeInTheDocument();
   });
 
-  it('shows empty-documents copy when none are attached', async () => {
+  it('shows the documents checklist of the registration', async () => {
     renderModal();
-
-    expect(await screen.findByText(/Documentos \(0\/0 verificados\)/i)).toBeInTheDocument();
-    expect(screen.getByText('Sin documentos adjuntos.')).toBeInTheDocument();
-  });
-
-  it('lists documents and toggles verification', async () => {
-    getRegistration.mockResolvedValue({
-      data: { ...baseReg, documents: [DOC] },
-    } as never);
-
-    renderModal();
-
-    expect(await screen.findByText('Acta de Nacimiento')).toBeInTheDocument();
-    expect(screen.getByText(/· acta\.pdf/)).toBeInTheDocument();
-    expect(screen.getByText(/Documentos \(0\/1 verificados\)/i)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: /^Verificar$/i }));
-    await waitFor(() => {
-      expect(verifyDocument).toHaveBeenCalledWith(44, true);
-    });
-  });
-
-  it('downloads a document via authenticated blob and revokes the object URL', async () => {
-    getRegistration.mockResolvedValue({
-      data: { ...baseReg, documents: [DOC] },
-    } as never);
-    downloadDocument.mockResolvedValue({
-      data: new Blob(['pdf'], { type: 'application/pdf' }),
-    } as never);
-
-    const click = vi.fn();
-    const appendChild = vi.spyOn(document.body, 'appendChild');
-    const originalCreate = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      const el = originalCreate(tag);
-      if (tag === 'a') {
-        Object.defineProperty(el, 'click', { value: click });
-      }
-      return el;
-    });
-
-    renderModal();
-    await screen.findByText('Acta de Nacimiento');
-    await userEvent.click(screen.getByRole('button', { name: /Descargar acta\.pdf/i }));
-
-    await waitFor(() => {
-      expect(downloadDocument).toHaveBeenCalledWith(44);
-      expect(createObjectURL).toHaveBeenCalled();
-      expect(click).toHaveBeenCalled();
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:acta');
-    });
-
-    appendChild.mockRestore();
-  });
-
-  it('toasts when document download fails', async () => {
-    getRegistration.mockResolvedValue({
-      data: { ...baseReg, documents: [DOC] },
-    } as never);
-    downloadDocument.mockRejectedValue(new Error('boom'));
-
-    renderModal();
-    await screen.findByText('Acta de Nacimiento');
-    await userEvent.click(screen.getByRole('button', { name: /Descargar acta\.pdf/i }));
-
-    await waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith('No se pudo descargar el documento.');
-    });
+    expect(await screen.findByTestId('checklist')).toHaveTextContent('Documentos de 9');
   });
 
   it('saves status and notes, then closes on success', async () => {
@@ -290,27 +200,6 @@ describe('RegistrationReviewModal', () => {
     expect(updateStatus.mock.calls[0][1]).not.toHaveProperty('admin_notes');
   });
 
-  it('bulk-rejects the selected documents with a note through the documents bulk endpoint', async () => {
-    const DOC2 = { ...DOC, id: 45, doc_type: 'curp_doc', filename: 'curp.pdf' };
-    getRegistration.mockResolvedValue({ data: { ...baseReg, documents: [DOC, DOC2] } } as never);
-    apiPost.mockImplementation(async (_url: string, body: unknown) => ({
-      data: { action: 'reject', requested: 2, ok: 2, failed: [], skipped: [], dry_run: !!(body as { dry_run?: boolean }).dry_run },
-    }) as never);
-    renderModal();
-    await userEvent.click(await screen.findByRole('checkbox', { name: 'Seleccionar Acta de Nacimiento' }));
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar CURP' }));
-    expect(screen.getByRole('region', { name: /documentos seleccionados/i })).toHaveTextContent('2 documentos seleccionados');
-    await userEvent.click(screen.getByRole('button', { name: 'Rechazar seleccionados' }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/admissions/admin/documents/bulk/', {
-      action: 'reject', ids: [44, 45], all_matching: false, filters: undefined, dry_run: true,
-    }));
-    fireEvent.change(await screen.findByLabelText('Motivo (obligatorio)'), { target: { value: 'Ilegibles' } });
-    await userEvent.click(screen.getByRole('button', { name: /Rechazar seleccionados \(2\)/ }));
-    await waitFor(() => expect(apiPost).toHaveBeenLastCalledWith('/admissions/admin/documents/bulk/', {
-      action: 'reject', ids: [44, 45], all_matching: false, filters: undefined, dry_run: false,
-      payload: { note: 'Ilegibles', notify: true },
-    }));
-  });
   it('a ficha (version 2) shows its sections grouped like the Excel instead of the old summary', async () => {
     apiGet.mockImplementation(async (url: string) => {
       if (url === '/admissions/ficha/schema/') return { data: fichaSchema } as never;

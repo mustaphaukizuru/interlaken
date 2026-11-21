@@ -1,38 +1,22 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, Download, FileText, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Circle, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
+import { DocumentChecklist } from '@/components/admin/admissions/DocumentChecklist';
 import { admissionsAdminApi, api } from '@/services/api';
 import { fichaApi } from '@/components/admissions/ficha/api';
 import { FichaReadOnly } from '@/components/admin/FichaReadOnly';
-import type { BulkActionDef } from '@/services/dataOps';
 import { apiErrorMessage } from '@/lib/apiErrors';
-import { REG_ENTITY, registrationDetailKey, useDocumentBulk } from '@/hooks/queries/admissions';
+import { REG_ENTITY, registrationDetailKey } from '@/hooks/queries/admissions';
 import { invalidateEntity } from '@/hooks/queries/keys';
 import {
   STATUS_BADGE, REGISTRATION_STATUS_OPTIONS, REGISTRATION_TRANSITIONS, isReverseTransition,
 } from '@/lib/admissionsStatus';
-
-/** Bulk review of the selected documents (Data Ops C5, `/admissions/admin/documents/bulk/`). */
-const DOC_ACTIONS: Record<'approve' | 'reject', BulkActionDef> = {
-  approve: { name: 'approve', label: 'Aprobar seleccionados', planVerb: 'Se aprobarán' },
-  reject: {
-    name: 'reject', label: 'Rechazar seleccionados', danger: true, requiresNote: true,
-    notifyOption: true, planVerb: 'Se rechazarán',
-  },
-};
-
-const DOC_LABELS: Record<string, string> = {
-  birth_cert: 'Acta de Nacimiento', curp_doc: 'CURP', photo: 'Fotografía',
-  report_card: 'Boleta Anterior', proof_addr: 'Comprobante de Domicilio',
-  vaccination: 'Cartilla de Vacunación', other: 'Otro Documento',
-};
 
 interface Doc { id: number; doc_type: string; filename: string; is_verified: boolean; status?: 'pending' | 'approved' | 'rejected'; review_note?: string; download_url: string }
 interface Reg {
@@ -52,7 +36,6 @@ interface Reg {
 export function RegistrationReviewModal({ id, open, onClose }: {
   id: number | null; open: boolean; onClose: () => void;
 }) {
-  const qc = useQueryClient();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: registrationDetailKey(id),
     queryFn: async () => (await admissionsAdminApi.getRegistration(id!)).data as Reg,
@@ -72,58 +55,6 @@ export function RegistrationReviewModal({ id, open, onClose }: {
     staleTime: 10 * 60_000,
   });
   const fichaView = fichaQ.data?.ficha_version === 2 && schemaQ.data?.steps ? { ficha: fichaQ.data, schema: schemaQ.data } : null;
-
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
-  const [rejecting, setRejecting] = useState<{ id: number; label: string; note: string } | null>(null);
-  const [pickedDocs, setPickedDocs] = useState<Set<number>>(() => new Set());
-  const [docAction, setDocAction] = useState<BulkActionDef | null>(null);
-  const docBulk = useDocumentBulk();
-  const togglePick = (docId: number) => setPickedDocs((prev) => {
-    const next = new Set(prev);
-    if (next.has(docId)) next.delete(docId);
-    else next.add(docId);
-    return next;
-  });
-  const refreshRegistration = () => invalidateEntity(qc, REG_ENTITY);
-
-  // Prod serves no /media/, so we fetch the file with auth (JWT via the api
-  // client) and save the returned blob rather than linking to a URL.
-  const handleDownload = async (doc: Doc) => {
-    setDownloadingId(doc.id);
-    try {
-      const resp = await admissionsAdminApi.downloadDocument(doc.id);
-      const url = URL.createObjectURL(resp.data as Blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = doc.filename || 'documento';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('No se pudo descargar el documento.');
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const reviewDoc = useMutation({
-    mutationFn: ({ docId, status, note }: { docId: number; status: 'approved' | 'rejected' | 'pending'; note?: string }) =>
-      admissionsAdminApi.reviewDocument(docId, status, note),
-    onSuccess: () => { void refreshRegistration(); },
-    onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo actualizar el documento.')),
-  });
-  const sendDocsLink = useMutation({
-    mutationFn: () => admissionsAdminApi.sendDocumentsLink(id!),
-    onSuccess: ({ data: r }) => toast.success(r.missing.length ? `Enlace enviado. Faltan: ${r.missing.join(', ')}` : 'Enlace enviado.'),
-    onError: () => toast.error('No se pudo enviar el enlace.'),
-  });
-  const verifyDoc = useMutation({
-    mutationFn: ({ docId, next }: { docId: number; next: boolean }) =>
-      admissionsAdminApi.verifyDocument(docId, next),
-    onSuccess: () => { void refreshRegistration(); },
-    onError: () => toast.error('No se pudo actualizar el documento.'),
-  });
 
   const fullName = data ? `${data.child_first_name} ${data.child_last_name}`.trim() : 'Inscripción';
   const hasMedical = !!(data && (
@@ -224,130 +155,8 @@ export function RegistrationReviewModal({ id, open, onClose }: {
             </div>
           </div>
 
-          {/* Documents + verification */}
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
-              Documentos ({data.documents.filter((d) => d.is_verified).length}/{data.documents.length} verificados)
-              <button type="button" onClick={() => sendDocsLink.mutate()} disabled={sendDocsLink.isPending}
-                className="ml-3 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-purple hover:bg-cream disabled:opacity-50">
-                {sendDocsLink.isPending ? 'Enviando…' : 'Solicitar documentos'}
-              </button>
-            </p>
-            {pickedDocs.size > 0 && (
-              <div role="region" aria-label="Acciones sobre documentos seleccionados"
-                className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm">
-                <span className="text-brand-700" aria-live="polite">
-                  <strong className="text-ink">{pickedDocs.size}</strong> {pickedDocs.size === 1 ? 'documento seleccionado' : 'documentos seleccionados'}
-                </span>
-                <div className="ml-auto flex flex-wrap gap-2">
-                  <Button type="button" size="sm" onClick={() => setDocAction(DOC_ACTIONS.approve)}>Aprobar seleccionados</Button>
-                  <Button type="button" size="sm" variant="danger" onClick={() => setDocAction(DOC_ACTIONS.reject)}>Rechazar seleccionados</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setPickedDocs(new Set())}>Limpiar</Button>
-                </div>
-              </div>
-            )}
-            {data.documents.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center text-sm text-subtle">
-                Sin documentos adjuntos.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {data.documents.map((d) => (
-                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2.5">
-                    <span className="flex min-w-0 items-center gap-2 text-sm text-ink">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 shrink-0 rounded border-line text-purple focus:ring-purple/40"
-                        checked={pickedDocs.has(d.id)}
-                        onChange={() => togglePick(d.id)}
-                        aria-label={`Seleccionar ${DOC_LABELS[d.doc_type] ?? d.doc_type}`}
-                      />
-                      <FileText className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
-                      <span className="truncate">{DOC_LABELS[d.doc_type] ?? d.doc_type}</span>
-                      <span className="truncate text-xs text-subtle">· {d.filename}</span>
-                    </span>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button
-                        type="button"
-                        disabled={downloadingId === d.id}
-                        onClick={() => handleDownload(d)}
-                        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-cream px-3 text-xs font-semibold text-muted transition hover:bg-line disabled:opacity-50"
-                        aria-label={`Descargar ${d.filename}`}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        {downloadingId === d.id ? '…' : 'Ver'}
-                      </button>
-                      {d.status !== 'rejected' && (
-                        <button
-                          type="button"
-                          disabled={reviewDoc.isPending}
-                          onClick={() => setRejecting({ id: d.id, label: DOC_LABELS[d.doc_type] ?? d.doc_type, note: d.review_note ?? '' })}
-                          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-cream px-3 text-xs font-semibold text-coral-dark transition hover:bg-coral-50 disabled:opacity-50"
-                        >
-                          Rechazar
-                        </button>
-                      )}
-                      {d.status === 'rejected' && <span className="text-xs text-coral-600" title={d.review_note}>Rechazado</span>}
-                      <button
-                        type="button"
-                        disabled={verifyDoc.isPending}
-                        onClick={() => verifyDoc.mutate({ docId: d.id, next: !d.is_verified })}
-                        className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition disabled:opacity-50 ${
-                          d.is_verified ? 'bg-green-50 text-green-700' : 'bg-cream text-muted hover:bg-line'
-                        }`}
-                      >
-                        {d.is_verified ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-                        {d.is_verified ? 'Verificado' : 'Verificar'}
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <BulkConfirmDialog
-            open={!!docAction}
-            onClose={() => setDocAction(null)}
-            action={docAction}
-            entityLabel="documentos"
-            gender="m"
-            ids={Array.from(pickedDocs)}
-            execute={(body) => docBulk.mutateAsync(body)}
-            onDone={(r) => { if (!r.failed.length) setPickedDocs(new Set()); }}
-          />
-
-          <Modal open={!!rejecting} onClose={() => setRejecting(null)} title={`Rechazar: ${rejecting?.label ?? ''}`} maxWidth={460}>
-            <div className="space-y-3">
-              <p className="text-sm text-muted">La familia recibe este motivo por correo y puede volver a subir el documento.</p>
-              <div>
-                <label className="label" htmlFor="reject-doc-note">Motivo del rechazo</label>
-                <textarea
-                  id="reject-doc-note"
-                  className="input-field"
-                  rows={3}
-                  value={rejecting?.note ?? ''}
-                  onChange={(e) => setRejecting((r) => (r ? { ...r, note: e.target.value } : r))}
-                  placeholder="La foto está borrosa; envíe el acta completa."
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setRejecting(null)}>Cancelar</Button>
-                <Button
-                  variant="danger"
-                  loading={reviewDoc.isPending}
-                  disabled={!rejecting?.note.trim()}
-                  onClick={() => {
-                    if (!rejecting) return;
-                    reviewDoc.mutate({ docId: rejecting.id, status: 'rejected', note: rejecting.note.trim() });
-                    setRejecting(null);
-                  }}
-                >
-                  Rechazar y avisar
-                </Button>
-              </div>
-            </div>
-          </Modal>
+          {/* Documents of the student's level (Fase 4): statuses, review, manual marks, reminder. */}
+          <DocumentChecklist registrationId={data.id} />
 
           {/* Review decision — keyed so switching to a different registration
               reseeds the controls, while refetches of the same one (e.g. after

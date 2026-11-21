@@ -31,8 +31,9 @@ def test_pipeline_columns_and_checklist(admin_client, reg, settings, tmp_path):
     assert r.status_code == 200
     col = next(c for c in r.data['columns'] if c['status'] == 'submitted')
     card = col['cards'][0]
-    assert card['child_name'] == 'Ana López' and card['docs_verified'] == 1 and card['docs_required'] == 6
-    assert 'CURP' in card['missing'] and 'Acta de Nacimiento' not in card['missing']
+    # Fase 4: primaria asks for 10 documents plus the ficha (sent: it counts).
+    assert card['child_name'] == 'Ana López' and card['docs_verified'] == 2 and card['docs_required'] == 11
+    assert 'CURP del alumno' in card['missing'] and 'Acta de nacimiento' not in card['missing']
     assert '{missing_list}' in r.data['templates']['missing_docs']
 
 
@@ -46,7 +47,7 @@ def test_request_docs_uses_editable_template(admin_client, reg, settings):
     r = admin_client.post(reverse('register-request-docs', args=[reg.pk]), {}, format='json')
     assert r.status_code == 200 and r.data['sent_to'] == 'maria@test.mx'
     body = mail.outbox[-1].body
-    assert body.startswith('Estimado María López') and '• CURP' in body
+    assert body.startswith('Estimado María López') and '• CURP del alumno' in body
     # The link must be redeemable: rid + a fresh invite, never the persistent access_token UUID.
     assert f'/inscripcion/documentos?rid={reg.pk}&token=' in body and str(reg.access_token) not in body
     reg.refresh_from_db()

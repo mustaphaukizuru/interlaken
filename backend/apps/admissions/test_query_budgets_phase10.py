@@ -20,10 +20,11 @@ pytestmark = pytest.mark.django_db
 PREREG_EXPORT_BUDGET = 3
 # count + rows + documents prefetch + audit insert.
 REG_EXPORT_BUDGET = 4
-# registrations (student profile joined) + documents prefetch + site settings
+# registrations (student profile joined) + documents prefetch + manual document
+# states prefetch + the required-documents list (once, Fase 4) + site settings
 # (the singleton row already exists, as in production). Was 1 + N before
 # Phase 10: the reverse one-to-one ``student_profile`` was read per card.
-PIPELINE_BUDGET = 3
+PIPELINE_BUDGET = 5
 
 
 def _body(resp) -> bytes:

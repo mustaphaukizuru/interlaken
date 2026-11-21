@@ -12,7 +12,8 @@ import { useSep } from '@/hooks/useSep';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { waHref } from '@/lib/siteContact';
 import { waMessage } from '@/lib/whatsapp';
-import { docsSummary, useAdmissionDocs } from '@/lib/admisionesDocs';
+import { usePublicRequiredDocs } from '@/hooks/queries/requiredDocsPublic';
+import { docsSummary, levelsLabel, LEVELS } from '@/lib/requiredDocs';
 import { Testimonials } from '@/components/public/Testimonials';
 import { testimonialsQuery } from '@/components/public/testimonialsQuery';
 import { Section } from '@/components/ui/Section';
@@ -260,13 +261,15 @@ function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string;
 
 /* ── Documentos + llamado a la ficha de inscripción ─────────────────────── */
 interface DocsCtaProps {
-  docsTitle?: string; docsSummary?: string; docsNote?: string;
+  docsTitle?: string; docsSummary?: string; docsNote?: string; docsLink?: CmsLink; docsOnlyLabel?: string; docsError?: string;
   image?: number | string; imageAlt?: string; badge?: string; title?: string; text?: string; primary?: CmsLink; secondary?: CmsLink;
 }
 function AdmDocsCtaView(p: DocsCtaProps) {
   const t = useTokens();
-  // One list for the whole site: the one edited in the Documentación page.
-  const docs = useAdmissionDocs();
+  // One list for the whole site: Admisiones → Documentos requeridos (Fase 4).
+  const { data, isError } = usePublicRequiredDocs();
+  const docs = data?.results ?? [];
+  const docsLink = asLink(p.docsLink);
   const img = useCmsImage(p.image, t(p.imageAlt));
   const primary = asLink(p.primary);
   const secondary = asLink(p.secondary);
@@ -282,32 +285,60 @@ function AdmDocsCtaView(p: DocsCtaProps) {
               </span>
               <div>
                 <h3 className="font-head text-[19px] font-bold text-ink">{t(p.docsTitle)}</h3>
-                {p.docsSummary && <p className="text-xs text-muted">{docsSummary(t(p.docsSummary), docs)}</p>}
+                {p.docsSummary && data && <p className="text-xs text-muted">{docsSummary(t(p.docsSummary), docs)}</p>}
               </div>
             </div>
-            <ul className="flex-1 divide-y divide-ink/5 px-5 sm:px-6">
-              {docs.map((d, i) => (
-                <li key={i} className="flex items-start gap-3 py-3 text-sm">
-                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" aria-hidden="true" />
-                  <span className="text-ink/90">
-                    {t(d.label)}
-                    {d.href && (
-                      <>
-                        {' '}
-                        <a
-                          href={d.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 whitespace-nowrap font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green"
-                        >
-                          {t(d.linkLabel)} <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                        </a>
-                      </>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {isError && !data ? (
+              <p className="flex-1 px-5 py-6 text-sm text-muted sm:px-6" role="alert">
+                {t(p.docsError)}{' '}
+                <CmsAnchor link={docsLink} className="font-semibold text-green-dark underline">{t(docsLink.label)}</CmsAnchor>
+              </p>
+            ) : !data ? (
+              <ul className="flex-1 divide-y divide-ink/5 px-5 sm:px-6" aria-hidden="true">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <li key={i} className="flex items-start gap-3 py-3">
+                    <span className="skeleton mt-0.5 h-4 w-4 shrink-0 rounded-full" />
+                    <span className="skeleton h-4 rounded" style={{ width: `${50 + ((i * 17) % 40)}%` }} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="flex-1 divide-y divide-ink/5 px-5 sm:px-6">
+                {docs.map((d) => (
+                  <li key={d.key} className="flex items-start gap-3 py-3 text-sm">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" aria-hidden="true" />
+                    <span className="text-ink/90">
+                      {d.name}
+                      {d.levels.length < LEVELS.length && (
+                        <span className="ml-1.5 whitespace-nowrap rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-muted">
+                          {t(p.docsOnlyLabel)} {levelsLabel(d.levels)}
+                        </span>
+                      )}
+                      {d.link_url && (
+                        <>
+                          {' '}
+                          <a
+                            href={d.link_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 whitespace-nowrap font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green"
+                          >
+                            {d.link_label} <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                          </a>
+                        </>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {docsLink.href && data && (
+              <p className="px-5 pt-1 sm:px-6">
+                <CmsAnchor link={docsLink} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-green-dark underline decoration-green/40 underline-offset-2 hover:decoration-green">
+                  {t(docsLink.label)} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </CmsAnchor>
+              </p>
+            )}
             {p.docsNote && (
               <p className="m-5 mt-2 rounded-lg bg-cream px-3.5 py-2.5 text-xs leading-relaxed text-muted sm:mx-6">
                 {t(p.docsNote)}
@@ -472,13 +503,17 @@ export const sections = [
     },
   }),
   section({
-    type: 'docs_cta', label: 'Admisiones · Documentos y ficha de inscripción', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado a la ficha de inscripción. La lista se edita en la página Documentación.',
+    type: 'docs_cta', label: 'Admisiones · Documentos y ficha de inscripción', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado a la ficha de inscripción. La lista se edita en Admisiones → Documentos requeridos.',
     component: AdmDocsCtaView,
     fields: [
       ...grouped('Documentos requeridos', [
         f.text('docsTitle', 'Documentos: título'),
-        f.text('docsSummary', 'Documentos: resumen'),
+        f.text('docsSummary', 'Documentos: resumen', { hint: '{total} = documentos de la lista; {online} = cuántos tienen enlace a un trámite en línea.' }),
+        f.text('docsOnlyLabel', 'Documentos: palabra antes de los niveles («Solo»)', { hint: 'Se muestra en los documentos que no piden todos los niveles.' }),
         f.textarea('docsNote', 'Documentos: nota al pie'),
+        f.link('docsLink', 'Documentos: enlace a la lista por nivel'),
+        f.text('docsError', 'Documentos: si no carga la lista'),
+        f.action('editList', 'Editar la lista de documentos', '/admin/admisiones/documentos', { hint: 'Los documentos y sus niveles se editan en «Documentos requeridos».' }),
       ]),
       ...grouped('Llamado a la ficha de inscripción', [
         f.image('image', 'Foto del llamado'),
@@ -493,6 +528,8 @@ export const sections = [
     defaults: {
       docsTitle: 'Documentos requeridos', docsSummary: '{total} documentos · {online} con trámite oficial en línea',
       docsNote: 'Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE) para obtener o consultar cada documento en línea.',
+      docsOnlyLabel: 'Solo', docsLink: { label: 'Ver los documentos por nivel', href: '/admisiones/documentacion' },
+      docsError: 'No se pudo cargar la lista de documentos.',
       image: '/assets/classroom.webp', imageAlt: 'Salón de clases del Colegio Interlaken',
       badge: 'Inscripciones abiertas · Ciclo {{ciclo}}', title: '¿Listo para comenzar?',
       text: 'La ficha de inscripción toma unos 15 minutos y puede guardarla y continuar después. Le contactaremos para coordinar los siguientes pasos.',

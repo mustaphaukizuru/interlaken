@@ -12,7 +12,6 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -35,11 +34,9 @@ from .serializers import (
     PreRegistrationStatusSerializer,
     PublicPreRegistrationSerializer,
     RegistrationAdminListSerializer,
-    RegistrationDocumentSerializer,
     RegistrationParentStatusSerializer,
     RegistrationSerializer,
     RegistrationStatusSerializer,
-    child_full_name,
 )
 from .services import (
     OUTCOME_STATES,
@@ -406,21 +403,7 @@ class RegistrationStatusView(generics.RetrieveUpdateAPIView):
             email_registration_outcome(reg)
 
 
-class DocumentListView(APIView):
-    """GET /api/v1/admissions/register/<pk>/documents/ — the applicant's own
-    documents with review status (session token) or any, for staff (P1-G4)."""
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request, pk):
-        reg = authorize_registration(request, pk)
-        docs = reg.documents.order_by('doc_type', '-uploaded_at')
-        return Response({
-            'registration': reg.id,
-            'child_name': child_full_name(reg),
-            'required': [{'code': c, 'label': label} for c, label in RegistrationDocument.DocType.choices
-                         if c != RegistrationDocument.DocType.OTHER],
-            'documents': RegistrationDocumentSerializer(docs, many=True, context={'request': request}).data,
-        })
+# The family's document list and the upload live in required_docs_views (Fase 4).
 
 
 class DocumentsLinkView(APIView):
@@ -433,9 +416,10 @@ class DocumentsLinkView(APIView):
         reg = get_object_or_404(Registration, pk=pk)
         raw = issue_invite(reg)
         url = f'{settings.FRONTEND_URL}/inscripcion/documentos?rid={reg.id}&token={raw}'
-        missing = [label for code, label in RegistrationDocument.DocType.choices
-                   if code != RegistrationDocument.DocType.OTHER
-                   and not reg.documents.filter(doc_type=code, status=RegistrationDocument.Review.APPROVED).exists()]
+        from .pipeline import checklist
+
+        # The documents of the student's level still missing or to correct (Fase 4).
+        missing = checklist(reg)['missing']
         from apps.portal.emailing import EmailContent
 
         content = EmailContent(
@@ -642,68 +626,6 @@ class RegistrationSubmitView(APIView):
         ficha.email_ficha_submitted(reg)
         return Response({'status': 'submitted', 'message': 'Ficha de inscripción enviada.',
                          'submitted_at': reg.submitted_at})
-
-
-@method_decorator(ratelimit('registration-upload', '20/m', key='ip', method='POST'), name='dispatch')
-class DocumentUploadView(APIView):
-    """POST /api/v1/admissions/register/<id>/documents/ — Upload a document."""
-    parser_classes = [MultiPartParser, FormParser]
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, pk):
-        reg = authorize_registration(request, pk)
-
-        file = request.FILES.get('file')
-        doc_type = request.data.get('doc_type')
-
-        if not file or not doc_type:
-            return Response(
-                error_body('Debe adjuntar un archivo y indicar el tipo de documento.'),
-                status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate doc_type against the model's choices — create() skips
-        # full_clean(), so without this any string is stored.
-        if doc_type not in RegistrationDocument.DocType.values:
-            return Response(
-                error_body('Tipo de documento no válido.'),
-                status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate extension
-        import os
-        ext = os.path.splitext(file.name)[1].lower()
-        if ext not in settings.ALLOWED_DOCUMENT_EXTENSIONS:
-            return Response(
-                error_body(f'Tipo de archivo {ext} no permitido.'),
-                status=status.HTTP_400_BAD_REQUEST)
-
-        # Cap the size — the *_MAX_MEMORY_SIZE settings don't bound uploads, so
-        # without this an invited session-holder could fill the disk (DoS).
-        max_size = getattr(settings, 'MAX_DOCUMENT_UPLOAD_SIZE', 10 * 1024 * 1024)
-        if file.size > max_size:
-            return Response(
-                error_body(f'El archivo excede el tamaño máximo de '
-                          f'{max_size // (1024 * 1024)} MB.'),
-                status=status.HTTP_400_BAD_REQUEST)
-
-        # Replacing the same doc_type avoids duplicate rows when a family
-        # retries finish() (OTHER may still have multiple attachments).
-        if doc_type != RegistrationDocument.DocType.OTHER:
-            for old in RegistrationDocument.objects.filter(
-                registration=reg, doc_type=doc_type,
-            ):
-                if old.file:
-                    old.file.delete(save=False)
-                old.delete()
-
-        doc = RegistrationDocument.objects.create(
-            registration=reg,
-            doc_type=doc_type,
-            file=file,
-            filename=file.name,
-            file_size=file.size,
-        )
-        return Response(RegistrationDocumentSerializer(doc).data,
-                        status=status.HTTP_201_CREATED)
 
 
 class OpenSchoolDayListView(APIView):

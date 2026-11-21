@@ -301,6 +301,11 @@ class RegistrationDocument(models.Model):
 
     registration = models.ForeignKey(Registration, on_delete=models.CASCADE, related_name='documents')
     doc_type     = models.CharField(max_length=30, choices=DocType.choices)
+    # Fase 4: the document of the per-level list this file is for. ``doc_type``
+    # stays for compatibility (old wizard, exports); new uploads by key store
+    # the matching legacy code or ``other`` (admissions.required_docs).
+    required_document = models.ForeignKey('admissions.RequiredDocument', null=True, blank=True,
+                                          on_delete=models.PROTECT, related_name='uploads')
     file         = models.FileField(upload_to=document_upload_path)
     filename     = models.CharField(max_length=255)
     file_size    = models.PositiveIntegerField(default=0)  # bytes
@@ -323,3 +328,8 @@ class RegistrationDocument(models.Model):
 
     def __str__(self):
         return f'{self.get_doc_type_display()} — {self.registration}'
+
+
+# Fase 4: required documents by level and the office's manual states.
+from .document_models import RegistrationDocumentState, RequiredDocument  # noqa: E402,F401
+
