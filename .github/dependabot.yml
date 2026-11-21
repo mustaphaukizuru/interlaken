@@ -44,7 +44,7 @@ updates:
       # version is skipped: the next axios release is proposed again and the
       # budget check judges it then.
       - dependency-name: "axios"
-        versions: ["1.21.0"]
+        versions: ["1.21.0", "1.21.1"]  # 1.21.1 (#271, 2026-11-20): / 172.6 kB of 171, /admisiones 150.5 of 150
 
   - package-ecosystem: github-actions
     directory: /
