@@ -10,7 +10,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0028_page_draft_revision'),
+        ('content', '0029_precios_2027'),
     ]
 
     operations = [
