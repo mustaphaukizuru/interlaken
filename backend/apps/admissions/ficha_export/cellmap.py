@@ -22,11 +22,12 @@ SHEET = "Hoja1"
 MARK = "X"
 
 # What prints, and how: Letter portrait, 1 page wide, exactly 3 pages
-# (page 2 starts at «DATOS DEL PADRE», page 3 after the emergency bar).
+# (page 2 starts at «DATOS DEL PADRE», page 3 at the emergency bar, so the
+# bar and its fields print together).
 PRINT_AREA = "A1:AD130"
 LAST_COLUMN = 30  # AD
-ROW_BREAKS = (48, 91)
-PAGES: tuple[tuple[int, int], ...] = ((1, 48), (49, 91), (92, 130))
+ROW_BREAKS = (48, 90)
+PAGES: tuple[tuple[int, int], ...] = ((1, 48), (49, 90), (91, 130))
 
 # ── single values ────────────────────────────────────────────────────────
 CELLS: dict[str, str] = {

@@ -6,7 +6,7 @@ from the template grid itself (``template.grid()``), so the PDF mirrors the
 Excel file box for box: the logo, the black section bars with white bold
 text, the grey #BFBFBF label boxes, the bordered value boxes and the «X»
 marks, on the same three pages (page 2 starts at «DATOS DEL PADRE», page 3
-after the emergency bar). Helvetica replaces the form's fonts. Values shrink
+at the emergency bar). Helvetica replaces the form's fonts. Values shrink
 to fit their box; long free text wraps and shrinks, cut with «…» only past
 5 pt. Page 3 adds the electronic acceptance (who accepted the privacy
 notice, when, and which version) and every page says «Página n de 3».

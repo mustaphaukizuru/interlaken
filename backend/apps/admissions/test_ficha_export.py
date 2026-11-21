@@ -366,7 +366,7 @@ class TestExcelFile:
         _twb, tws = workbook(template.template_bytes())
         assert {str(r) for r in ws.merged_cells.ranges} == {str(r) for r in tws.merged_cells.ranges}
         assert ws.print_area == tws.print_area == "'Hoja1'!$A$1:$AD$130"
-        assert [b.id for b in ws.row_breaks.brk] == [48, 91]
+        assert [b.id for b in ws.row_breaks.brk] == [48, 90]
         assert (ws.page_setup.fitToWidth, ws.page_setup.fitToHeight) == (1, 0)
         assert int(ws.page_setup.paperSize) == 1
         assert len(ws._images) == 1

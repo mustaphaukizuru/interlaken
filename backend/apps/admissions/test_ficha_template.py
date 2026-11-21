@@ -242,13 +242,14 @@ def test_print_setup_is_letter_one_page_wide_three_pages():
     assert ws.page_setup.orientation == "portrait"
     assert ws.sheet_properties.pageSetUpPr.fitToPage is True
     assert (ws.page_setup.fitToWidth, ws.page_setup.fitToHeight) == (1, 0)
-    assert [b.id for b in ws.row_breaks.brk] == list(cellmap.ROW_BREAKS) == [48, 91]
+    assert [b.id for b in ws.row_breaks.brk] == list(cellmap.ROW_BREAKS) == [48, 90]
     assert ws["A49"].value == "DATOS DEL PADRE"  # page 2 starts here
-    assert ws["A91"].value == "INFORMACIÓN EN CASO DE EMERGENCIA"  # last row of page 2
-    # Page 1 fits a Letter sheet at 100 % (Excel adds a 4th page otherwise).
-    page1 = sum(ws.row_dimensions[r].height or 15.75 for r in range(1, 49))
+    assert ws["A91"].value == "INFORMACIÓN EN CASO DE EMERGENCIA"  # page 3 starts here
+    # Every page fits a Letter sheet at 100 % (Excel adds a page otherwise).
     margins = (ws.page_margins.top + ws.page_margins.bottom) * 72
-    assert page1 <= 792 - margins - 15
+    for first, last in cellmap.PAGES:
+        height = sum(ws.row_dimensions[r].height or 15.75 for r in range(first, last + 1))
+        assert height <= 792 - margins - 15, (first, last)
 
 
 def test_logo_is_the_official_jpeg():
