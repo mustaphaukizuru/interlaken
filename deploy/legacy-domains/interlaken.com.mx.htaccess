@@ -1,26 +1,36 @@
-# interlaken.com.mx (Hostinger shared hosting) → interlaken.edu.mx, page by page.
+# interlaken.com.mx (Hostinger shared hosting) -> interlaken.edu.mx, page by page.
 #
-# DEPLOYED 2026-11-20 (Option A) as a SUPERSET of this file: the live copy also
-# passes /.well-known through, keeps serving /firmas/ (staff e-mail signature
-# images; never redirect them), /documentos and /libros, maps 7 school short
-# links and old page copies (index-7MICH.html…). The live file is the source of
-# truth; this one is the page map it started from.
+# LIVE since 2026-11-20 as public_html/.htaccess on the interlaken.com.mx site
+# of the Hostinger shared plan (Option A). The rules below are exactly the live
+# ones; only this header differs. The old site is backed up next to public_html
+# in old-site-backup-2026-11-20/ (567 files, its original .htaccess included).
+# Mail is not affected: MX and TXT records stay as they are.
 #
-# Option A for retiring the old site without touching DNS: upload this file as
-# public_html/.htaccess on the hosting plan of interlaken.com.mx (hPanel → File
-# Manager) and remove any redirect set in hPanel → Domains → Redirects, so this
-# file is the only thing answering. Purge the Hostinger CDN cache afterwards.
-# The rules win even while the old files are still there; delete them (index*,
-# *.php, css/, images/, js*/) once the redirects are confirmed.
-# Option B (preferred, lets the shared plan be cancelled) is pointing the A
-# records at the VPS and setting LEGACY_DOMAINS in deploy/.env; the Caddyfile
-# has the same map. Keep the two maps identical.
+# To change it: edit this file, upload it over public_html/.htaccess (hPanel ->
+# File Manager), keep hPanel -> Domains -> Redirects EMPTY (those run at the
+# CDN edge, before this file, and silently override it), then purge the CDN
+# cache (hPanel -> Rendimiento -> CDN -> Vaciar cache).
 #
-# Every rule is a single 301 straight to https://interlaken.edu.mx (no http →
-# https → edu.mx chain). Mail is not affected: MX and TXT records stay as they are.
+# Option B (lets the shared plan be cancelled) is pointing the A records at the
+# VPS and setting LEGACY_DOMAINS in deploy/.env; the Caddyfile has the same map.
+# Keep the two maps identical. Before Option B, move /firmas/ (staff email
+# signature images, embedded in every outgoing email) and the PDFs that this
+# file still serves: the VPS does not have them.
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
+
+# Certificate renewals for the old domain keep working.
+RewriteRule ^\.well-known/ - [L]
+
+# Short links the school shares (same targets as before, now https).
+RewriteRule ^informes/?$        https://padlet.com/Interlaken/informes-interlaken-2q1wjcn3omj0vdzi [R=301,L]
+RewriteRule ^manualdepagos/?$   https://padlet.com/Interlaken/circulares-primaria-mkzjm65p65l1/wish/459397854 [R=301,L]
+RewriteRule ^facturacion/?$     https://interlaken.edu.mx/comunidad/facturacion [R=301,L,QSD]
+RewriteRule ^tarjeta/?$         https://evopaymentsmexico.gateway.mastercard.com/ma/ [R=301,L]
+RewriteRule ^ligadepago/?$      https://evo-oneclick.com/evoclick/ [R=301,L]
+RewriteRule ^teachinghub/?$     https://sites.google.com/interlaken.com.mx/teachinghub/english-department/reading-catalogue?pli=1 [R=301,L]
+RewriteRule ^comisiones/?$      https://www2.soluciones.eglobal.com.mx/iMerchantws/ [R=301,L]
 
 # Old static site (2017-2026)
 RewriteRule ^index\.html$          https://interlaken.edu.mx/ [R=301,L,QSD]
@@ -55,6 +65,22 @@ RewriteRule ^8contacto\.php$       https://interlaken.edu.mx/contacto [R=301,L,Q
 RewriteRule ^11aviso\.php$         https://interlaken.edu.mx/aviso-de-privacidad [R=301,L,QSD]
 RewriteRule ^14registro\.php$      https://interlaken.edu.mx/pre-registro [R=301,L,QSD]
 RewriteRule ^actividades\.php$     https://interlaken.edu.mx/modelo-educativo [R=301,L,QSD]
+
+# Real files that other places still embed or link to keep loading: staff
+# email-signature images in /firmas/, PDFs in /documentos/ and /libros/,
+# images. Pages (.html, .php) never do.
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} !\.(html?|php)$ [NC]
+RewriteRule ^ - [L]
+
+# Copies and drafts left on the old site (index-7old.html, index-2pri1esp.php...)
+RewriteRule ^index-1c[^/]*\.html$     https://interlaken.edu.mx/admisiones/costos [R=301,L,QSD]
+RewriteRule ^index-2precal[^/]*\.php$ https://interlaken.edu.mx/niveles/preescolar [R=301,L,QSD]
+RewriteRule ^index-2prical[^/]*\.php$ https://interlaken.edu.mx/niveles/primaria [R=301,L,QSD]
+RewriteRule ^index-2seccal[^/]*\.php$ https://interlaken.edu.mx/niveles/secundaria [R=301,L,QSD]
+RewriteRule ^index-[23][^/]*\.(html|php)$ https://interlaken.edu.mx/plataformas [R=301,L,QSD]
+RewriteRule ^index-7[^/]*\.html$      https://interlaken.edu.mx/comunidad/facturacion [R=301,L,QSD]
+RewriteRule ^[^/]*\.(html?|php)$      https://interlaken.edu.mx/ [R=301,L,QSD]
 
 # Everything else keeps its path (and query) on the new domain.
 RewriteRule ^(.*)$                 https://interlaken.edu.mx/$1 [R=301,L]
