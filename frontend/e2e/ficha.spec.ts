@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { DEV_ADMIN } from './helpers';
+import { CYCLE_START, choose, makeCurp, next } from './fichaHelpers';
 
 /**
  * Ficha de inscripción (/pre-registro), end to end on a 390 px phone against
@@ -17,18 +18,6 @@ import { DEV_ADMIN } from './helpers';
 const SHOTS = process.env.FICHA_SHOTS;
 const PHONE = { width: 390, height: 844 };
 
-const ALPHABET = '0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ';
-function makeCurp(dob: string, sex: 'H' | 'M', initials: string, state: string, consonants = 'RRN') {
-  const [y, m, d] = dob.split('-');
-  const body = `${initials}${y.slice(2)}${m}${d}${sex}${state}${consonants}${Number(y) >= 2000 ? 'A' : '0'}`;
-  let total = 0;
-  for (let i = 0; i < 17; i += 1) total += ALPHABET.indexOf(body[i]) * (18 - i);
-  return body + ((10 - (total % 10)) % 10);
-}
-
-/** First year of the school year in progress (August to July). */
-const now = new Date();
-const CYCLE_START = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
 // 1° Primaria: 6 years old on 31 December of the cycle's first year.
 const CHILD_DOB = `${CYCLE_START - 6}-05-01`;
 const CHILD_CURP = makeCurp(CHILD_DOB, 'M', 'LOHA', 'DF');
@@ -38,18 +27,6 @@ async function shot(page: Page, name: string) {
   if (!SHOTS) return;
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-}
-
-/** Tap a tap-to-choose option card (the label around its native radio), as a person does. */
-async function choose(page: Page, name: string | RegExp) {
-  const radio = page.getByRole('radio', { name, exact: typeof name === 'string' });
-  await page.locator('label').filter({ has: radio }).click();
-  await expect(radio).toBeChecked();
-}
-
-async function next(page: Page, heading: string) {
-  await page.getByRole('button', { name: 'Guardar y continuar', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 2, name: heading })).toBeFocused();
 }
 
 test.use({ viewport: PHONE, serviceWorkers: 'block' });
