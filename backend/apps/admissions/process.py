@@ -10,8 +10,8 @@ The lead (``PreRegistration``) walks the school's five stages (Proceso.xlsx):
 3. **Examen**: date and time, when the results are given, Aceptado or
    No aceptado (with reason). The ficha link may go out from «Examen
    agendado» on (owner decision).
-4. **Documentación y acuerdos**: documents (pluggable check, see
-   ``documents_complete``) and the becas/descuentos agreed (``AdmissionDiscount``).
+4. **Documentación y acuerdos**: documents (the Fase 4 checklist of
+   ``required_docs``, see ``documents_state``) and the becas/descuentos agreed (``AdmissionDiscount``).
 5. **Inscrito**: the inscripción payment recorded (``EnrollmentPayment``) and
    «Marcar como inscrito», which runs the convert service.
 
@@ -471,12 +471,13 @@ def _waive(lead, waived: bool, reason: str) -> dict:
     }
 
 
-# ── documents: pluggable check (another module owns the rules by level) ───
-# The documents-by-level module registers its functions here (or is found at
-# one of DOCUMENT_HOOK_MODULES): ``documents_complete(registration) -> bool``
-# and ``required_documents(level) -> list[str | {'label'}]``. Absent, the
-# Expediente reports «unknown» and does not block «Marcar como inscrito».
-DOCUMENT_HOOK_MODULES = ("apps.admissions.documents", "apps.admissions.documents_by_level")
+# ── documents: the per-level checklist (Fase 4, ``required_docs``) ────────
+# Found at DOCUMENT_HOOK_MODULES (``build_checklist(reg)``, ``documents_complete
+# (reg)``, ``required_documents(level) -> list[str]``) or registered here with
+# ``register_documents_hooks`` (an explicit registration wins). Without any,
+# or when the check answers None, the Expediente reports «unknown» and does
+# not block «Marcar como inscrito».
+DOCUMENT_HOOK_MODULES = ("apps.admissions.required_docs",)
 _document_hooks: dict = {}
 
 
@@ -507,12 +508,31 @@ def _hook(name: str):
     return _discovered[name]
 
 
-def documents_complete(reg) -> bool | None:
-    """True / False from the documents module; ``None`` (unknown) without it."""
-    fn = _hook("documents_complete")
-    if fn is None or reg is None:
+def _documents_check(reg) -> dict | None:
+    """``{'complete': bool | None, 'missing': [...], 'counts': {...} | None}``;
+    ``None`` when no documents module is wired."""
+    explicit = _document_hooks.get("documents_complete")
+    checklist = None if explicit else _hook("build_checklist")
+    complete_fn = explicit or _hook("documents_complete")
+    if checklist is None and complete_fn is None:
         return None
-    return bool(fn(reg))
+    if reg is None:
+        return {"complete": False, "missing": [], "counts": None}
+    if checklist is not None:
+        data = checklist(reg) or {}
+        return {
+            "complete": data.get("complete"),
+            "missing": list(data.get("missing") or []),
+            "counts": data.get("counts"),
+        }
+    result = complete_fn(reg)
+    return {"complete": None if result is None else bool(result), "missing": [], "counts": None}
+
+
+def documents_complete(reg) -> bool | None:
+    """True / False from the documents checklist; ``None`` (unknown) without it."""
+    check = _documents_check(reg) if reg is not None else None
+    return None if check is None else check["complete"]
 
 
 def required_documents(level: str) -> list[str] | None:
@@ -531,28 +551,56 @@ def required_documents(level: str) -> list[str] | None:
     return [x for x in out if x]
 
 
+UNKNOWN_DOCUMENTS = "La revisión de documentos por nivel no está disponible: revíselos a mano."
+
+
 def documents_state(lead, reg) -> dict:
+    """``{state: waived | complete | incomplete | unknown, ok, detail, missing, counts}``."""
     if lead.documents_waived:
-        return {"state": "waived", "ok": True, "detail": lead.documents_waived_reason}
-    complete = documents_complete(reg)
-    if complete is None:
-        if _hook("documents_complete") is None:
-            return {
-                "state": "unknown",
-                "ok": True,
-                "detail": "La revisión de documentos por nivel aún no está disponible: revíselos a mano.",
-            }
+        return {
+            "state": "waived",
+            "ok": True,
+            "detail": lead.documents_waived_reason,
+            "missing": [],
+            "counts": None,
+        }
+    check = _documents_check(reg)
+    if check is None or check["complete"] is None:
+        return {
+            "state": "unknown",
+            "ok": True,
+            "detail": UNKNOWN_DOCUMENTS,
+            "missing": [],
+            "counts": None,
+        }
+    if reg is None:
         return {
             "state": "incomplete",
             "ok": False,
             "detail": "Todavía no hay ficha de inscripción.",
+            "missing": [],
+            "counts": None,
         }
-    if complete:
-        return {"state": "complete", "ok": True, "detail": ""}
+    if check["complete"]:
+        return {
+            "state": "complete",
+            "ok": True,
+            "detail": "",
+            "missing": [],
+            "counts": check["counts"],
+        }
+    missing = check["missing"]
+    detail = (
+        ("Faltan: " + "; ".join(missing) + ".")
+        if missing
+        else ("Faltan documentos o hay documentos por corregir.")
+    )
     return {
         "state": "incomplete",
         "ok": False,
-        "detail": "Faltan documentos o hay documentos por corregir.",
+        "detail": detail,
+        "missing": missing,
+        "counts": check["counts"],
     }
 
 
@@ -631,6 +679,8 @@ def enroll_gates(lead, reg=None) -> dict:
             "ok": docs["ok"],
             "state": docs["state"],
             "detail": docs["detail"],
+            "missing": docs["missing"],
+            "counts": docs["counts"],
             "overridable": not docs["ok"],
         },
         {

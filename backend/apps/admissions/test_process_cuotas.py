@@ -84,7 +84,11 @@ def test_documents_show_the_figures_and_contact():
         "Inscripción Maternal  Sección Maternal  Sin costo",
     ):
         assert text in lines, text
-    assert "Documentos para la inscripción" not in lines  # the documents module is absent
+    # The level's documents come from the Fase 4 list (required_docs).
+    from apps.admissions.required_docs import documents_for_level
+
+    names = [d.name for d in documents_for_level("preescolar")]
+    assert names and f"Documentos para la inscripción: {'; '.join(names)}." in lines
     sec = "\n".join(cuotas_pdf.level_document("secundaria").text_lines())
     assert "Bono «Sigue con nosotros»" not in sec and "$8,400.00" in sec
 
@@ -98,6 +102,23 @@ def test_pdf_is_valid_with_one_page_per_level():
         assert amount in pdf
     one = cuotas_pdf.render_cuotas_pdf(["primaria"])
     assert b"/Count 1" in one and b"$7,200.00" in one and b"$6,444.00" not in one
+
+
+def test_documents_block_follows_the_list_and_disappears_without_it(monkeypatch):
+    from apps.admissions.document_models import RequiredDocument
+    from apps.admissions.required_docs import documents_for_level
+
+    sec = documents_for_level("secundaria")
+    first = sec[0]
+    RequiredDocument.objects.filter(pk=first.pk).update(active=False)
+    lines = cuotas_pdf.level_document("secundaria").text_lines()
+    block = next(line for line in lines if line.startswith("Documentos para la inscripción"))
+    assert first.name not in block.split(": ", 1)[1].split("; ") and sec[1].name in block
+    monkeypatch.setattr(process, "DOCUMENT_HOOK_MODULES", ())
+    monkeypatch.setattr(process, "_discovered", {})
+    monkeypatch.setattr(process, "_document_hooks", {})
+    lines = cuotas_pdf.level_document("secundaria").text_lines()
+    assert not any(line.startswith("Documentos para la inscripción") for line in lines)
 
 
 def test_required_documents_block_with_the_hook():

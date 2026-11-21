@@ -127,3 +127,24 @@ def make_booking(lead=None, **kw):
     )
     data.update(kw)
     return Booking.objects.create(**data)
+
+
+def deliver_documents(reg) -> list:
+    """Mark every upload document of the registration's level «Entregado en físico»
+    (Fase 4 checklist), so its documents gate is complete. The ficha item is
+    satisfied by a sent ficha."""
+    from .document_models import RegistrationDocumentState, RequiredDocument
+    from .required_docs import documents_for_level, registration_level
+
+    out = []
+    for rd in documents_for_level(registration_level(reg)):
+        if rd.kind == RequiredDocument.Kind.FICHA:
+            continue
+        out.append(
+            RegistrationDocumentState.objects.update_or_create(
+                registration=reg,
+                required_document=rd,
+                defaults={"state": RegistrationDocumentState.State.ENTREGADO_FISICO},
+            )[0]
+        )
+    return out

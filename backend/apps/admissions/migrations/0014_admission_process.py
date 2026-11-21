@@ -48,7 +48,7 @@ def backwards(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('admissions', '0012_ficha_backfill'),
+        ('admissions', '0013_required_documents'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

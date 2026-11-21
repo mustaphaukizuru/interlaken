@@ -9,8 +9,8 @@ Secundaria), with the same hand-rolled engine as receipts
 * colegiatura mensual of every ``TuitionCost`` row of the level,
 * Bono «Sigue con nosotros» = reinscripción + gastos administrativos,
 * seguros y credenciales, total of the mandatory ``FixedConcept`` rows,
-* the documents the level asks for (``process.required_documents``; the block
-  is left out while that module is absent),
+* the documents the level asks for (the Fase 4 list, ``required_docs``, through
+  ``process.required_documents``; the block is left out without it),
 * the school's contact (``SiteSettings``).
 
 No personal data: the public link (``GET cuotas/<level>.pdf``) and the email

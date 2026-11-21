@@ -18,6 +18,7 @@ from apps.admissions.models import (
 )
 from apps.admissions.process_fixtures import (
     at_stage,
+    deliver_documents,
     make_discount,
     make_lead,
     make_payment,
@@ -265,7 +266,7 @@ def test_closed_case_takes_no_new_records(admin_client):
 
 
 # ── «Marcar como inscrito» ────────────────────────────────────────────────
-def ready_case(**reg_kw):
+def ready_case(deliver=True, **reg_kw):
     lead = at_stage(
         make_lead(),
         Stage.DOCUMENTACION,
@@ -274,6 +275,8 @@ def ready_case(**reg_kw):
     )
     reg = make_registration(lead, **reg_kw)
     make_payment(lead)
+    if deliver:
+        deliver_documents(reg)
     return lead, reg
 
 
@@ -282,7 +285,8 @@ def test_enroll_lists_every_missing_gate(admin_client):
     r = admin_client.post(reverse("case-enroll", args=[lead.pk]), {}, format="json")
     assert r.status_code == 400 and r.data["code"] == "gates"
     failing = {g["key"] for g in r.data["gates"]["items"] if not g["ok"]}
-    assert failing == {"stage", "ficha", "payment"}
+    # No ficha yet: the documents checklist cannot be complete either.
+    assert failing == {"stage", "ficha", "documents", "payment"}
     assert not StudentProfile.objects.exists()
 
 
@@ -364,8 +368,9 @@ def test_convert_errors_leave_the_case_untouched(admin_client):
     assert lead.stage == "documentacion" and reg.status == "submitted"
 
 
-class TestDocumentsHook:
-    """The documents-by-level module plugs in; without it the gate is «unknown» (not blocking)."""
+class TestDocumentsChecklist:
+    """The gate follows the Fase 4 checklist (``required_docs``); a registered hook
+    wins over it, and with no answer at all the gate is «unknown» (not blocking)."""
 
     @pytest.fixture
     def hooks(self):
@@ -374,13 +379,21 @@ class TestDocumentsHook:
         process._document_hooks.clear()
         process._document_hooks.update(saved)
 
-    def test_incomplete_documents_block_until_an_admin_waives_them(self, admin_client, hooks):
-        hooks(complete=lambda reg: False, required_for_level=lambda level: ["Acta de nacimiento"])
-        lead, _reg = ready_case()
+    def test_missing_documents_block_until_an_admin_waives_them(self, admin_client):
+        from apps.admissions.document_models import RegistrationDocumentState
+        from apps.admissions.required_docs import documents_for_level
+
+        lead, reg = ready_case(deliver=False)
+        delivered = deliver_documents(reg)
+        last = delivered[-1]
+        RegistrationDocumentState.objects.filter(pk=last.pk).delete()
         r = admin_client.post(reverse("case-enroll", args=[lead.pk]), {}, format="json")
         assert r.status_code == 400
         docs = next(g for g in r.data["gates"]["items"] if g["key"] == "documents")
         assert docs["state"] == "incomplete" and docs["overridable"] is True
+        assert docs["missing"] == [last.required_document.name]
+        assert docs["detail"] == f"Faltan: {last.required_document.name}."
+        assert last.required_document in documents_for_level("primaria")
         secretaria = staff_client("admisiones")
         denied = secretaria.post(
             reverse("case-enroll", args=[lead.pk]),
@@ -403,14 +416,30 @@ class TestDocumentsHook:
         lead.refresh_from_db()
         assert lead.documents_waived and lead.documents_waived_reason == "Los entrega en agosto"
 
-    def test_complete_documents_pass(self, hooks):
-        hooks(complete=lambda reg: True)
+    def test_delivered_documents_complete_the_gate(self):
         lead, reg = ready_case()
-        assert process.documents_state(lead, reg)["state"] == "complete"
+        state = process.documents_state(lead, reg)
+        assert state["state"] == "complete" and state["counts"]["done"] == state["counts"]["total"]
+        assert process.enroll_gates(lead, reg)["ready"] is True
+        assert process.required_documents("primaria")  # the level's names, for the PDF
+
+    def test_a_registered_hook_wins(self, hooks):
+        hooks(complete=lambda reg: False)
+        lead, reg = ready_case()
+        assert process.documents_state(lead, reg)["state"] == "incomplete"
+
+    def test_a_hook_without_an_answer_is_unknown(self, hooks):
+        hooks(complete=lambda reg: None)
+        lead, reg = ready_case(deliver=False)
+        state = process.documents_state(lead, reg)
+        assert state["state"] == "unknown" and state["ok"] is True
         assert process.enroll_gates(lead, reg)["ready"] is True
 
-    def test_without_the_module_the_state_is_unknown(self):
-        lead, reg = ready_case()
+    def test_without_the_module_the_state_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(process, "DOCUMENT_HOOK_MODULES", ())
+        monkeypatch.setattr(process, "_discovered", {})
+        monkeypatch.setattr(process, "_document_hooks", {})
+        lead, reg = ready_case(deliver=False)
         state = process.documents_state(lead, reg)
         assert state["state"] == "unknown" and state["ok"] is True
         assert process.required_documents("primaria") is None

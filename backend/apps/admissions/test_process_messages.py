@@ -223,11 +223,11 @@ def test_ficha_link_from_examen_agendado_reuses_the_invite(admin_client):
     assert r.status_code == 200, r.data
     reg = Registration.objects.get(pre_registration=lead)
     assert reg.status == "draft" and reg.invite_token_hash
-    assert r.data["link"].startswith(
-        f"https://colegio.ejemplo.test/inscripcion?rid={reg.pk}&token="
-    )
+    # The ficha link is Fase 2's (services.invite_url_for): same origin, rid + token.
+    assert r.data["link"].startswith("https://colegio.ejemplo.test/")
+    assert f"?rid={reg.pk}&token=" in r.data["link"]
     assert r.data["sent"] is True and r.data["link"] in r.data["whatsapp_text"]
-    assert len(mail.outbox) == 1 and "Completar la inscripción" in mail.outbox[0].alternatives[0][0]
+    assert len(mail.outbox) == 1 and r.data["link"] in mail.outbox[0].body
     lead.refresh_from_db()
     assert (
         lead.ficha_link_sent_at and lead.stage == "examen"

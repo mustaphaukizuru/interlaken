@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.admissions.models import PreRegistration
 from apps.admissions.process_fixtures import (
     at_stage,
+    deliver_documents,
     future,
     make_booking,
     make_lead,
@@ -151,6 +152,13 @@ def test_case_detail_shape(admin_client):
     reg = make_registration(lead)
     booking = make_booking(lead, status=Booking.Status.ATTENDED)
     make_payment(lead)
+    # Nothing delivered yet: the Fase 4 checklist names what is missing.
+    pending = admin_client.get(reverse("case-detail", args=[lead.pk])).data
+    docs = next(g for g in pending["inscrito"]["gates"]["items"] if g["key"] == "documents")
+    assert docs["state"] == "incomplete" and not docs["ok"] and docs["overridable"]
+    assert docs["missing"] and docs["detail"].startswith("Faltan: ")
+    assert pending["next_action"]["code"] == "review_documents"
+    deliver_documents(reg)
     r = admin_client.get(reverse("case-detail", args=[lead.pk]))
     assert r.status_code == 200
     d = r.data
@@ -173,8 +181,9 @@ def test_case_detail_shape(admin_client):
     assert d["inscrito"]["payments"][0]["summary"].startswith("$9,500.00 · transferencia")
     gates = {g["key"]: g for g in d["inscrito"]["gates"]["items"]}
     assert gates["stage"]["ok"] and gates["ficha"]["ok"] and gates["payment"]["ok"]
-    assert gates["documents"]["state"] == "unknown" and gates["documents"]["ok"]
-    assert d["inscrito"]["gates"]["ready"] is True
+    assert gates["documents"]["state"] == "complete" and gates["documents"]["ok"]
+    assert d["ficha"]["documents"]["counts"]["done"] == d["ficha"]["documents"]["counts"]["total"]
+    assert d["inscrito"]["gates"]["ready"] is True and d["next_action"]["code"] == "enroll"
     assert d["ficha_link"]["allowed"] is True
     assert admin_client.get(reverse("case-detail", args=[999999])).status_code == 404
 

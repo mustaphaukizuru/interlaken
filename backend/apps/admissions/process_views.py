@@ -84,7 +84,7 @@ def case_queryset():
         Prefetch(
             "registrations",
             queryset=Registration.objects.select_related("student_profile").prefetch_related(
-                "documents"
+                "documents", "document_states"
             ),
         ),
         "discounts__created_by",
