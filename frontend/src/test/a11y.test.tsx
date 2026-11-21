@@ -195,9 +195,10 @@ describe('page sweep — no serious/critical axe violations', () => {
     const { container } = renderWithProviders(ui(), { route });
     // Wait for the initial queries to settle so axe scans the real layout,
     // not the loading skeletons.
+    // AdminPages imports every CMS section group first: give a loaded suite time.
     await waitFor(() => {
       expect(container.querySelector('.skeleton')).toBeNull();
-    });
+    }, { timeout: 5000 });
     const results = await axe(container);
     const gating = results.violations.filter((v) =>
       ['serious', 'critical'].includes(v.impact ?? ''),
