@@ -7,13 +7,16 @@ Entries are keyed by a logical field id («alumno.curp», «padre.estado_civil»
 
 * ``CELLS``: one value in one cell (the top-left cell of its merged box);
 * ``MARKS``: an «X» in the box of the chosen option (sexo, tipo de sangre,
-  alergias, estado civil, grado académico, ocupación);
+  alergias, estado civil, grado académico, ocupación). «Otro» marks its box
+  only: the form has no space for the text (the concentrado has it);
 * ``LABEL_CELLS``: a printed label the export may rewrite. The form has boxes
   for «Soltero» and «Casado» only: «Unión libre», «Divorciado/a» and
   «Viudo/a» mark the second box and replace its «Casado» label.
 
-``data.py`` builds the values, ``excel.py`` writes them into the template and
-``pdf.py`` draws the same cells on its Letter pages, so both files agree.
+Every coordinate is a cell of the original form: the export never adds a
+cell, a merge or a note. ``data.py`` builds the values, ``excel.py`` writes
+them into the template and ``pdf.py`` draws the same cells on its Letter
+pages, so both files agree.
 """
 
 from __future__ import annotations
@@ -21,13 +24,14 @@ from __future__ import annotations
 SHEET = "Hoja1"
 MARK = "X"
 
-# What prints, and how: Letter portrait, 1 page wide, exactly 3 pages
-# (page 2 starts at «DATOS DEL PADRE», page 3 at the emergency bar, so the
-# bar and its fields print together).
-PRINT_AREA = "A1:AD130"
-LAST_COLUMN = 30  # AD
-ROW_BREAKS = (48, 90)
-PAGES: tuple[tuple[int, int], ...] = ((1, 48), (49, 90), (91, 130))
+# What prints: exactly the three pages Excel prints of the original, at
+# 100 % with its own margins and row heights (no manual breaks, no scaling):
+# A1:AC137, rows 1-45, 46-91 and 92-137 (the privacy box ends at row 130;
+# 131-137 are the blank foot of page 3). Column AD, the tail of the two
+# e-mail boxes, falls outside the printed width in the original too.
+PRINT_AREA = "A1:AC137"
+LAST_COLUMN = 29  # AC
+PAGES: tuple[tuple[int, int], ...] = ((1, 45), (46, 91), (92, 137))
 
 # ── single values ────────────────────────────────────────────────────────
 CELLS: dict[str, str] = {
@@ -60,8 +64,6 @@ CELLS: dict[str, str] = {
     "salud.peso": "K37",
     "salud.alergias_cuales": "T37",
     "salud.enfermedades": "F41",
-    # Under the blood-type list: «no lo sabe», or why the block is empty.
-    "salud.nota": "A45",
     # Información en caso de emergencia
     "emergencia.apellidos": "B93",
     "emergencia.nombre": "O93",
@@ -74,8 +76,6 @@ CELLS: dict[str, str] = {
     "firma.fecha": "T111",
     "firma.padre": "A118",
     "firma.madre": "T118",
-    # Inside the privacy box, under the signatures (merged B121:AB123).
-    "firma.aceptacion": "B121",
 }
 
 # The two parent blocks share a layout 21 rows apart, except the contact
@@ -91,7 +91,6 @@ _GUARDIAN_CELLS = {
         "pais_nacimiento": "P57",
         "estado_nacimiento": "V57",
         "curp": "A60",
-        "ocupacion_otro": "AA65",
         "celular": "A68",
         "telefono_oficina": "I68",
         "extension": "P68",
@@ -107,7 +106,6 @@ _GUARDIAN_CELLS = {
         "pais_nacimiento": "P78",
         "estado_nacimiento": "V78",
         "curp": "A81",
-        "ocupacion_otro": "AA86",
         "celular": "A89",
         "telefono_oficina": "J89",
         "extension": "R89",
@@ -129,7 +127,7 @@ BLOOD_BOXES = {
     "O+": "A43",
     "O-": "A44",
 }
-# «no_se» (No lo sé) has no box: nothing is marked and ``salud.nota`` says so.
+# «no_se» (No lo sé) has no box on the form: nothing is marked.
 
 MARKS: dict[str, dict[str, str]] = {
     "salud.tipo_sangre": BLOOD_BOXES,

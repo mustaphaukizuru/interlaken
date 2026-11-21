@@ -7,11 +7,17 @@ id → value (``cellmap.CELLS``), the chosen option of every «X» group
 (``cellmap.MARKS``) and the labels to rewrite. Formatting follows the
 school's original form: names, places and addresses in capitals, dates split
 into día / MES (Spanish month name) / año, phones as text (a leading zero or
-a long number never turns into 5.5E+09), e-mails as typed.
+a long number never turns into 5.5E+09), e-mails as typed. The form's boxes
+are single lines, so free text (allergies, conditions) is one line too.
+
+Nothing goes outside the form's own cells: «No lo sé» (blood type) marks no
+box, «Otro» (occupation) marks its box (the text stays in the concentrado),
+and the electronic acceptance of the privacy notice (who, when, which
+version) is document metadata (``description`` / ``keywords``), not ink.
 
 Health data appears only when ``medical_ok`` (``ficha.can_access_medical``:
 the family's own session, or an admin once the family consented); otherwise
-the block stays empty with a note saying why.
+the block stays empty and the metadata says why.
 """
 
 from __future__ import annotations
@@ -43,7 +49,6 @@ MONTHS = (
 )
 _MONTHS_LOWER = tuple(m.lower() for m in MONTHS)
 
-NOTE_NO_BLOOD_TYPE = "Tipo de sangre: la familia indicó que no lo sabe."
 NOTE_MEDICAL_MASKED = (
     "Datos de salud reservados: solo los consulta la dirección, con la autorización de la familia."
 )
@@ -60,9 +65,19 @@ class FichaSheet:
     marks: dict[str, str] = field(default_factory=dict)
     labels: dict[str, str] = field(default_factory=dict)
     medical_masked: bool = False
-    # For the file name and the PDF metadata.
+    # Document metadata (never drawn): the electronic acceptance as a sentence
+    # and as search keywords.
+    acceptance: str = ""
+    keywords: str = ""
+    # For the file name and the PDF title.
     child_paternal: str = ""
     child_given: str = ""
+
+    @property
+    def description(self) -> str:
+        """The workbook's Description and the PDF's Subject."""
+        notes = [self.acceptance, NOTE_MEDICAL_MASKED if self.medical_masked else ""]
+        return "\n".join(n for n in notes if n)
 
     def cells(self) -> dict[str, object]:
         """``{cell: value}`` for every value, «X» and rewritten label."""
@@ -87,12 +102,6 @@ def clean(value) -> str:
 
 def upper(value) -> str:
     return clean(value).upper()
-
-
-def multiline(value) -> str:
-    """Free text (allergies, conditions): line breaks kept, spaces squeezed."""
-    lines = [" ".join(line.split()) for line in str(value or "").splitlines()]
-    return "\n".join(line for line in lines if line)
 
 
 def split_date(prefix: str, value) -> dict[str, object]:
@@ -142,16 +151,33 @@ def notice_version(reg) -> str:
     return getattr(ver, "version", None) or str(ver)
 
 
+def _signer(reg) -> str:
+    return clean(reg.signed_name) or clean(reg.contact_name) or clean(reg.parent1_name)
+
+
 def acceptance_line(reg) -> str:
     """«Aceptado electrónicamente por … el … · Aviso de privacidad versión …»."""
     if not reg.signed_at:
         return ""
-    who = clean(reg.signed_name) or clean(reg.contact_name) or clean(reg.parent1_name)
-    text = f"Aceptado electrónicamente por {who} el {long_datetime(reg.signed_at)}"
+    text = f"Aceptado electrónicamente por {_signer(reg)} el {long_datetime(reg.signed_at)}"
     version = notice_version(reg)
     if version:
         text += f" · Aviso de privacidad versión {version}"
     return text
+
+
+def acceptance_keywords(reg) -> str:
+    """«aceptación electrónica; aviso de privacidad 2026.1; 2026-11-20T13:47:00-06:00; Marta …»."""
+    if not reg.signed_at:
+        return ""
+    version = notice_version(reg)
+    parts = [
+        "aceptación electrónica",
+        f"aviso de privacidad {version}" if version else "",
+        local_dt(reg.signed_at).isoformat(timespec="seconds"),
+        _signer(reg),
+    ]
+    return "; ".join(p for p in parts if p)
 
 
 # ── the sheet ────────────────────────────────────────────────────────────
@@ -198,8 +224,6 @@ def _guardian(sheet: FichaSheet, role: str, g) -> str:
         sheet.marks[f"{role}.grado_academico"] = g.education_level
     if g.occupation:
         sheet.marks[f"{role}.ocupacion"] = g.occupation
-        if g.occupation == "otro":
-            v[f"{role}.ocupacion_otro"] = clean(g.occupation_other)
     return upper(join_name(g.given_names, g.paternal_surname, g.maternal_surname))
 
 
@@ -209,20 +233,18 @@ def _health(sheet: FichaSheet, reg) -> None:
         v["salud.estatura"] = f"{clean(reg.estatura)} cm"
     if reg.peso:
         v["salud.peso"] = f"{clean(reg.peso)} kg"
-    if reg.blood_type == "no_se":
-        v["salud.nota"] = NOTE_NO_BLOOD_TYPE
-    elif reg.blood_type:
+    if reg.blood_type in cellmap.BLOOD_BOXES:  # «no_se» has no box
         sheet.marks["salud.tipo_sangre"] = reg.blood_type
     if reg.has_allergies:
         sheet.marks["salud.alergias"] = reg.has_allergies
     if reg.has_allergies != "no":
-        v["salud.alergias_cuales"] = multiline(reg.allergies)
+        v["salud.alergias_cuales"] = clean(reg.allergies)
     parts = []
     if clean(reg.chronic_conditions):
-        parts.append(multiline(reg.chronic_conditions))
+        parts.append(clean(reg.chronic_conditions))
     if clean(reg.medical_notes):
-        parts.append(f"Otras indicaciones médicas: {multiline(reg.medical_notes)}")
-    v["salud.enfermedades"] = "\n".join(parts)
+        parts.append(f"Otras indicaciones médicas: {clean(reg.medical_notes)}")
+    v["salud.enfermedades"] = "; ".join(parts)
 
 
 def ficha_sheet(reg, *, medical_ok: bool, guardians: dict | None = None) -> FichaSheet:
@@ -233,6 +255,8 @@ def ficha_sheet(reg, *, medical_ok: bool, guardians: dict | None = None) -> Fich
     sheet = FichaSheet(
         ciclo=clean(reg.cycle),
         medical_masked=not medical_ok,
+        acceptance=acceptance_line(reg),
+        keywords=acceptance_keywords(reg),
         child_paternal=paternal,
         child_given=given,
     )
@@ -265,8 +289,6 @@ def ficha_sheet(reg, *, medical_ok: bool, guardians: dict | None = None) -> Fich
 
     if medical_ok:
         _health(sheet, reg)
-    else:
-        v["salud.nota"] = NOTE_MEDICAL_MASKED
 
     padre = _guardian(sheet, "padre", guardians.get("padre"))
     madre = _guardian(sheet, "madre", guardians.get("madre"))
@@ -288,7 +310,6 @@ def ficha_sheet(reg, *, medical_ok: bool, guardians: dict | None = None) -> Fich
         v["firma.fecha"] = f"{local_dt(reg.signed_at):%d/%m/%Y}"
     v["firma.padre"] = padre
     v["firma.madre"] = madre
-    v["firma.aceptacion"] = acceptance_line(reg)
     return sheet
 
 

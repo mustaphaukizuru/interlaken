@@ -5,12 +5,15 @@ concentrado) and their endpoints.
 Synthetic data only (``apps.admissions.factories``): invented names and CURPs.
 Every mapped field is checked in its exact cell of the school's Excel form,
 the «X» groups (sexo, sangre, alergias, estado civil, grado académico,
-ocupación), the print setup and merged boxes the output keeps, the 3-page PDF,
-who may download what (staff area, admin health gating, the family's own
-copy after submit) and the audit row of every download.
+ocupación), that the export writes only the form's own cells and changes
+nothing else of the package, the electronic acceptance in the document
+metadata (never on the form), the 3-page PDF of the same form (embedded
+fonts, no footer), who may download what (staff area, admin health gating,
+the family's own copy after submit) and the audit row of every download.
 """
 
 import io
+import re
 import zipfile
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -36,7 +39,7 @@ from apps.admissions.factories import (
     padre_data,
     salud_data,
 )
-from apps.admissions.ficha_export import cellmap, data, files, template
+from apps.admissions.ficha_export import cellmap, data, excel, files, pdf, template
 from apps.admissions.ficha_export.concentrado import HEALTH_COLUMNS
 from apps.admissions.ficha_export.excel import ascii_part, build_xlsx, ficha_filename
 from apps.admissions.ficha_export.pdf import build_pdf
@@ -155,6 +158,28 @@ def ficha_xlsx(reg, *, medical_ok=True):
     return workbook(build_xlsx(data.ficha_sheet(reg, medical_ok=medical_ok)))
 
 
+ACCEPTANCE = (
+    "Aceptado electrónicamente por Marta Hernández Gil el 20 de noviembre de 2026, "
+    "13:47 h (hora de la Ciudad de México) · Aviso de privacidad versión 2026.1"
+)
+
+
+def pdf_info(content: bytes, key: str) -> str:
+    """An Info dictionary entry written as a UTF-16 hex string."""
+    m = re.search(rb"/" + key.encode() + rb" <FEFF([0-9A-F]*)>", content)
+    return bytes.fromhex(m.group(1).decode()).decode("utf-16-be") if m else ""
+
+
+def parts(content: bytes) -> dict[str, bytes]:
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        return {name: zf.read(name) for name in zf.namelist()}
+
+
+def cell_elements(sheet_xml: bytes) -> dict[str, str]:
+    text = sheet_xml.decode("utf-8")
+    return {m.group("ref"): m.group(0) for m in excel.CELL_XML.finditer(text)}
+
+
 # ── the cell map ─────────────────────────────────────────────────────────
 class TestCellMap:
     def test_every_field_lands_in_its_exact_cell(self):
@@ -205,8 +230,7 @@ class TestCellMap:
             "A60": FATHER_CURP,
             "K61": "X",
             "X60": "X",
-            "AA64": "X",
-            "AA65": "Músico",
+            "AA64": "X",  # «Otro»: the box only (the text is in the concentrado)
             "A68": "5544445555",
             "I68": "5566667777",
             "P68": "123",
@@ -238,12 +262,22 @@ class TestCellMap:
             "T111": "20/11/2026",
             "A118": "JULIO LÓPEZ PÉREZ",
             "T118": "MARTA HERNÁNDEZ GIL",
-            "B121": (
-                "Aceptado electrónicamente por Marta Hernández Gil el 20 de noviembre de 2026, "
-                "13:47 h (hora de la Ciudad de México) · Aviso de privacidad versión 2026.1"
-            ),
         }
         assert written(ws) == expected
+
+    def test_acceptance_is_document_metadata_not_ink(self):
+        reg = make_registration()
+        wb, ws = ficha_xlsx(reg)
+        assert wb.properties.description == ACCEPTANCE
+        assert wb.properties.keywords == (
+            "aceptación electrónica; aviso de privacidad 2026.1; "
+            "2026-11-20T13:47:00-06:00; Marta Hernández Gil"
+        )
+        assert not [v for v in written(ws).values() if "Aceptado" in str(v)]
+        draft = data.ficha_sheet(
+            make_registration(status=Registration.Status.DRAFT), medical_ok=True
+        )
+        assert draft.acceptance == "" and draft.keywords == ""
 
     def test_phones_and_codes_stay_text(self):
         _wb, ws = ficha_xlsx(make_registration())
@@ -263,11 +297,11 @@ class TestCellMap:
         marked = [c for c in cellmap.BLOOD_BOXES.values() if ws[c].value == "X"]
         assert marked == [box]
 
-    def test_blood_type_unknown_marks_nothing_and_says_so(self):
+    def test_blood_type_unknown_marks_nothing_and_adds_nothing(self):
         reg = make_registration(salud=salud_data(blood_type="no_se"))
         _wb, ws = ficha_xlsx(reg)
         assert not [c for c in cellmap.BLOOD_BOXES.values() if ws[c].value]
-        assert ws["A45"].value == data.NOTE_NO_BLOOD_TYPE
+        assert not [c for c in written(ws) if re.fullmatch(r"A(3[7-9]|4[0-8])", c)]
 
     def test_allergies_no(self):
         reg = make_registration(salud=salud_data(has_allergies="no", allergies=""))
@@ -317,7 +351,7 @@ class TestCellMap:
         _wb, ws = ficha_xlsx(reg)
         boxes = cellmap.MARKS["madre.ocupacion"].values()
         assert [c for c in boxes if ws[c].value == "X"] == [box]
-        assert ws["AA86"].value == (other or None)
+        assert "Bióloga" not in [str(v) for v in written(ws).values()]
 
     def test_parent_block_not_applicable(self):
         reg = make_registration(padre={**padre_data(), "not_applicable": True})
@@ -328,17 +362,25 @@ class TestCellMap:
 
     def test_health_masked_without_access(self):
         reg = make_registration()
-        _wb, ws = ficha_xlsx(reg, medical_ok=False)
+        wb, ws = ficha_xlsx(reg, medical_ok=False)
         health = {"F37", "K37", "T37", "F41", "P37", "P38", *cellmap.BLOOD_BOXES.values()}
         assert all(ws[c].value is None for c in health)
-        assert ws["A45"].value == data.NOTE_MEDICAL_MASKED
+        assert ws["A45"].value is None  # no note on the form…
+        assert wb.properties.description == f"{ACCEPTANCE}\n{data.NOTE_MEDICAL_MASKED}"  # …metadata
 
-    def test_long_free_text_shrinks_and_is_cut(self):
-        long = "Asma moderada con crisis estacionales; requiere inhalador. " * 30
+    def test_long_free_text_keeps_the_cells_own_format(self):
+        """No shrinking, no cut: the box shows it as the school's file would."""
+        long = "Asma moderada con crisis estacionales;\nrequiere inhalador. " * 30
         reg = make_registration(salud=salud_data(chronic_conditions=long, allergies="Polen " * 200))
         _wb, ws = ficha_xlsx(reg)
-        assert ws["F41"].font.sz < 9 and ws["F41"].value.endswith("…")
-        assert ws["T37"].font.sz < 9
+        _twb, tws = workbook(template.template_bytes())
+        for coord in ("F41", "T37"):
+            font, align = ws[coord].font, ws[coord].alignment
+            assert (font.name, font.sz) == (tws[coord].font.name, tws[coord].font.sz)
+            assert (align.horizontal, align.vertical) == ("center", "center")
+            assert not align.shrink_to_fit and not align.wrap_text
+        assert ws["F41"].value == " ".join(long.split())  # one line, in full
+        assert ws["T37"].value == ("Polen " * 200).strip()
 
     def test_formula_text_stays_text(self):
         reg = make_registration(child_given_names='=HYPERLINK("http://x","y")')
@@ -365,11 +407,44 @@ class TestExcelFile:
         _wb, ws = ficha_xlsx(make_registration())
         _twb, tws = workbook(template.template_bytes())
         assert {str(r) for r in ws.merged_cells.ranges} == {str(r) for r in tws.merged_cells.ranges}
-        assert ws.print_area == tws.print_area == "'Hoja1'!$A$1:$AD$130"
-        assert [b.id for b in ws.row_breaks.brk] == [48, 90]
-        assert (ws.page_setup.fitToWidth, ws.page_setup.fitToHeight) == (1, 0)
+        assert len(ws.merged_cells.ranges) == 194
+        assert ws.print_area == tws.print_area == "'Hoja1'!$A$1:$AC$137"
+        assert not ws.row_breaks.brk
         assert int(ws.page_setup.paperSize) == 1
         assert len(ws._images) == 1
+
+    def test_writes_only_the_forms_value_cells_and_nothing_else(self):
+        """Every part but the cells, the strings and the properties is the
+        template's byte for byte; each written cell keeps its style index."""
+        sheet = data.ficha_sheet(make_registration(), medical_ok=True)
+        out, tpl = parts(build_xlsx(sheet)), parts(template.template_bytes())
+        assert list(out) == list(tpl)
+        changed = {name for name in out if out[name] != tpl[name]}
+        assert changed == {excel.SHEET_PART, excel.STRINGS_PART, excel.CORE_PART}
+        cells_out = cell_elements(out[excel.SHEET_PART])
+        cells_tpl = cell_elements(tpl[excel.SHEET_PART])
+        assert list(cells_out) == list(cells_tpl)  # no cell added, none moved
+        differ = {c for c in cells_out if cells_out[c] != cells_tpl[c]}
+        assert differ == set(sheet.cells()) and differ <= cellmap.value_cells()
+        for coord in differ:
+            style = re.search(r' s="[0-9]+"', cells_tpl[coord]).group(0)
+            assert style in cells_out[coord], coord
+        strip = re.compile(r"<c r=.*?(?:/>|</c>)", re.S)
+        assert strip.sub("", out[excel.SHEET_PART].decode()) == strip.sub(
+            "", tpl[excel.SHEET_PART].decode()
+        )
+        # The template's strings stay where they were; the values are appended.
+        assert out[excel.STRINGS_PART].startswith(tpl[excel.STRINGS_PART].split(b"<si>")[0][:60])
+
+    def test_text_is_escaped_and_never_a_formula(self):
+        cells = {"B12": '=HYPERLINK("x") & <b> _x0041_', "G20": 7}
+        _wb, ws = workbook(excel.build_workbook(cells))
+        assert ws["B12"].value == '=HYPERLINK("x") & <b> _x0041_' and ws["B12"].data_type == "s"
+        assert ws["G20"].value == 7
+
+    def test_an_unknown_cell_is_refused(self):
+        with pytest.raises(KeyError):
+            excel.build_workbook({"AZ500": "x"})
 
     def test_blank_form_has_only_the_labels(self):
         _wb, ws = workbook(build_xlsx(data.blank_sheet()))
@@ -411,40 +486,91 @@ LABELS_ON_PDF = (
 
 
 class TestPdf:
-    def test_three_letter_pages_with_labels_values_and_footer(self):
+    def test_three_letter_pages_with_labels_and_values_and_nothing_added(self):
         reg = make_registration()
-        pdf = build_pdf(data.ficha_sheet(reg, medical_ok=True))
-        assert assert_well_formed(pdf) == 3
-        assert pdf.count(b"/MediaBox [0 0 612 792]") == 3
+        content = build_pdf(data.ficha_sheet(reg, medical_ok=True))
+        assert assert_well_formed(content) == 3
+        assert content.count(b"/MediaBox [0 0 612 792]") == 3
         for label in LABELS_ON_PDF:
-            assert has_text(pdf, label), label
+            assert has_text(content, label), label
         for value in (
             "ANA SOFÍA",
             CHILD_CURP,
             FATHER_CURP,
             "JULIO LÓPEZ PÉREZ",
             "Polen",
-            f"Ciclo Escolar {reg.cycle}",
-            "Página 1 de 3",
-            "Página 3 de 3",
+            "Ciclo Escolar",
+            reg.cycle,
+            "julio.ficha@ejemplo.test",
         ):
-            assert has_text(pdf, value), value
-        assert has_text(pdf, "Aviso de privacidad versión 2026.1")
-        assert b"/DCTDecode" in pdf  # the official logo
+            assert has_text(content, value), value
+        assert b"/DCTDecode" in content  # the official logo
+        # No footer, no acceptance box: the form only.
+        for extra in (
+            "Página",
+            "Colegio Interlaken · Ficha",
+            "Aceptado electrónicamente",
+            "Músico",
+        ):
+            assert not has_text(content, extra), extra
+
+    def test_acceptance_goes_to_the_info_dictionary(self):
+        content = build_pdf(data.ficha_sheet(make_registration(), medical_ok=True))
+        assert pdf_info(content, "Subject") == ACCEPTANCE
+        assert "aviso de privacidad 2026.1" in pdf_info(content, "Keywords")
+        assert "2026-11-20T13:47:00-06:00" in pdf_info(content, "Keywords")
+
+    def test_fonts_stand_in_for_the_forms_and_are_embedded(self):
+        content = build_pdf(data.ficha_sheet(make_registration(), medical_ok=True))
+        for name in (b"/TeXGyreAdventor-Bold", b"/TeXGyreAdventor-Regular", b"+Carlito"):
+            assert name in content, name
+        assert b"/Times-Roman" in content and b"/BaseFont /Symbol" in content
+        assert b"/FontFile3" in content and b"/Subtype /Type1C" in content  # Century Gothic → CFF
+        assert b"/FontFile2" in content  # Calibri → TrueType subset
+        assert b"Helvetica" not in content
+
+    def test_values_take_their_cells_fonts(self):
+        g = template.grid()
+        sheet = data.ficha_sheet(make_registration(), medical_ok=True)
+        placed = {p.pieces[0].text: p for p in pdf.layout(g, sheet.cells()) if p.pieces}
+        assert pdf.font_key(placed["ANA SOFÍA"].pieces[0].run) == pdf.TIMES  # Times New Roman
+        assert pdf.font_key(placed["julio.ficha@ejemplo.test"].pieces[0].run) == pdf.CARLITO
+        assert placed["julio.ficha@ejemplo.test"].pieces[0].run.underline  # the link look
+        signature = placed["JULIO LÓPEZ PÉREZ"].pieces[0].run
+        assert (signature.font, signature.size) == ("Century Gothic", 10.0)
+
+    def test_draws_every_label_and_value_once(self):
+        g = template.grid()
+        sheet = data.ficha_sheet(make_registration(), medical_ok=True)
+        cells = sheet.cells()
+        placed = pdf.layout(g, cells)
+        assert len(placed) == len(set(g.labels) | {template_pos(c) for c in cells})
+        for p in placed:
+            for piece in p.pieces:
+                assert template.PRINT_ORIGIN - 1 < piece.x < g.right
+                assert 0 < piece.baseline < pdf.PAGE_H
 
     def test_masked_health_and_long_text_keep_three_pages(self):
         long = "Asma moderada con crisis estacionales; requiere inhalador. " * 40
         reg = make_registration(salud=salud_data(chronic_conditions=long))
         masked = build_pdf(data.ficha_sheet(reg, medical_ok=False))
         assert assert_well_formed(masked) == 3
-        assert not has_text(masked, "Polen") and has_text(masked, "Datos de salud reservados")
+        assert not has_text(masked, "Polen") and not has_text(masked, "Datos de salud")
+        assert pdf_info(masked, "Subject").endswith(data.NOTE_MEDICAL_MASKED)
         full = build_pdf(data.ficha_sheet(reg, medical_ok=True))
         assert assert_well_formed(full) == 3
 
     def test_blank_pdf(self):
-        pdf = build_pdf(data.blank_sheet())
-        assert assert_well_formed(pdf) == 3
-        assert has_text(pdf, "DATOS DEL ALUMNO") and not has_text(pdf, "Aceptado electrónicamente")
+        content = build_pdf(data.blank_sheet())
+        assert assert_well_formed(content) == 3
+        assert has_text(content, "DATOS DEL ALUMNO") and has_text(content, "____-____")
+        assert not pdf_info(content, "Subject")
+
+
+def template_pos(coord: str) -> tuple[int, int]:
+    from openpyxl.utils import coordinate_to_tuple
+
+    return coordinate_to_tuple(coord)
 
 
 # ── endpoints ────────────────────────────────────────────────────────────
@@ -473,8 +599,9 @@ class TestSingleFichaEndpoint:
             f'attachment; filename="Ficha_Lopez_Ana-Sofia_{reg.cycle}.xlsx"'
         )
         assert resp["Cache-Control"] == "no-store"
-        _wb, ws = workbook(resp.content)
-        assert ws["T37"].value is None and ws["A45"].value == data.NOTE_MEDICAL_MASKED
+        wb, ws = workbook(resp.content)
+        assert ws["T37"].value is None and ws["A45"].value is None
+        assert wb.properties.description.endswith(data.NOTE_MEDICAL_MASKED)
         (row,) = audit_rows("ficha")
         assert row.actor == user and row.object_id == "xlsx"
         assert row.changes["filters"] == {"registration": reg.pk, "salud": False}
