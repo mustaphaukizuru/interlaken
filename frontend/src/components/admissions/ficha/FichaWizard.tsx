@@ -5,7 +5,11 @@
  * The ficha is private (2026-11-21): the school sends each family its link
  * once the child is admitted (exam «Aceptado»). Opened without a link or a
  * session, the page shows «La ficha de inscripción es personal»
- * (PrivateFicha); step 0 only exists when Ajustes allows a public start.
+ * (PrivateFicha); step 0 only exists when Ajustes allows a public start, or
+ * for the school's staff (admin, or the «admisiones» area: ./staffView), who
+ * see the whole ficha under a «Vista del personal» banner to fill it with a
+ * family at the office. Until a remembered staff login is confirmed the
+ * page shows its loading state, so a visitor never sees the form flash.
  *
  *   0 Antes de empezar (public start only) · 1 Alumno · 2 Domicilio · 3 Salud
  *   4 Padre · 5 Madre · 6 Emergencia · 7 Revisión y firma
@@ -34,6 +38,8 @@ import { Field } from './fields';
 import { FichaFormProvider } from './context';
 import { ErrorSummary, Panel, SaveStatus, StepHeading, type SaveState, type SummaryItem } from './parts';
 import { PrivateFicha } from './PrivateFicha';
+import { StaffBanner } from './StaffBanner';
+import { useStaffView } from './staffView';
 import { ResumeForm } from './ResumeForm';
 import { clearSession, loadSession, saveSession, type FichaSession } from './session';
 import { StepBar, type StepBarItem, type StepState } from './StepBar';
@@ -125,7 +131,14 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const topRef = useRef<HTMLDivElement>(null);
   const moved = useRef(false);
 
-  const closed = phase === 'start' && schema?.public_start_enabled === false;
+  // The school's staff opening the page without a family's link: the whole ficha.
+  const staffView = useStaffView();
+  const staffMode = staffView === 'staff' && !link;
+  const privateStart = phase === 'start' && schema?.public_start_enabled === false;
+  const closed = privateStart && !staffMode;
+  // A remembered staff login not confirmed yet: neither the form nor the panel.
+  const deciding = privateStart && !link && staffView === 'unknown';
+  const staffBanner = staffMode ? <StaffBanner /> : null;
   const view: FichaView = phase === 'start' || phase === 'closed' ? 'start' : 'other';
   useLayoutEffect(() => { onView?.(view); }, [view, onView]);
 
@@ -238,7 +251,8 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const onStarted = (res: StartResponse) => {
     const s = { id: res.id, token: res.session_token, expires: res.session_expires_at };
     saveSession(s);
-    trackEvent(FunnelEvent.SubmitPreRegister, { grade: res.ficha.sections.alumno?.grade_applying ?? '' });
+    // A ficha the office starts for a family is not a website conversion.
+    if (!staffMode) trackEvent(FunnelEvent.SubmitPreRegister, { grade: res.ficha.sections.alumno?.grade_applying ?? '' });
     open(res.ficha, s, { invited: false });
   };
 
@@ -379,7 +393,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     try {
       await fichaApi.submit(session.id, { accept_privacy: true, signed_name: signed.join(' '), consent_photos_media: fv.consent_photos_media === true }, session.token);
       clearSession();
-      trackEvent(FunnelEvent.SubmitFicha, { grade: values.alumno?.grade_applying ?? '' });
+      if (!staffMode) trackEvent(FunnelEvent.SubmitFicha, { grade: values.alumno?.grade_applying ?? '' });
       move('done');
     } catch (err) {
       const status = apiErrorStatus(err);
@@ -410,7 +424,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   // ── rendering ──────────────────────────────────────────────────────────
   if (schemaQ.isError) {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <Panel icon={<AlertTriangle className="h-7 w-7" />} tone="warn" title={copy.t('loadError')}>
           <Button className="mt-4" variant="secondary" onClick={() => void schemaQ.refetch()}>{copy.t('retryLabel')}</Button>
         </Panel>
@@ -418,9 +432,9 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     );
   }
 
-  if (!schema || phase === 'booting') {
+  if (!schema || phase === 'booting' || deciding) {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <div className="card flex min-h-[320px] flex-col items-center justify-center gap-4 p-8 text-muted" role="status" aria-live="polite">
           <span className="h-9 w-9 rounded-full border-[3px] border-line border-t-purple motion-safe:animate-spin" aria-hidden="true" />
           {phase === 'booting' ? copy.t('booting') : <span className="sr-only">{copy.t('booting')}</span>}
@@ -433,7 +447,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   // explains how a family gets one (Ajustes may still allow a public start).
   if (phase === 'closed' || closed) {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <PrivateFicha copy={copy} headingRef={headingRef} />
       </Shell>
     );
@@ -441,7 +455,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
 
   if (phase === 'start') {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <StepInicio schema={schema} copy={copy} onStarted={onStarted} onClosed={() => move('closed')} headingRef={headingRef} />
       </Shell>
     );
@@ -449,7 +463,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
 
   if (phase === 'link-error' || phase === 'expired') {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <Panel icon={<Link2Off className="h-7 w-7" />} tone="warn" headingRef={headingRef}
           title={phase === 'expired' ? copy.t('expiredTitle') : copy.t('inviteErrorTitle')}>
           <p>{phase === 'expired' ? copy.t('sessionExpired') : copy.t('inviteErrorText')}</p>
@@ -461,7 +475,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
 
   if (phase === 'sent') {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <Panel icon={<MailCheck className="h-7 w-7" />} tone="success" title={copy.t('sentTitle')} headingRef={headingRef}>
           <p>{copy.t('sentText')}</p>
         </Panel>
@@ -471,7 +485,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
 
   if (phase === 'later' && later) {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <Panel icon={<Send className="h-7 w-7" />} tone={later.state === 'error' ? 'warn' : 'success'} title={copy.t('laterTitle')} headingRef={headingRef}>
           <p aria-live="polite">
             {later.state === 'error' ? copy.t('laterError') : later.state === 'sent' ? fillText(copy.t('laterText'), { correo: later.email }) : copy.t('saving')}
@@ -485,7 +499,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const childName = ficha?.child_name || String(values.alumno?.child_given_names ?? '');
   if (phase === 'done') {
     return (
-      <Shell topRef={topRef}>
+      <Shell topRef={topRef} banner={staffBanner}>
         <FichaDone copy={copy} childName={childName} headingRef={headingRef}
           download={session && ficha ? downloadSlot?.({ registrationId: ficha.id, sessionToken: session.token, childName }) : null} />
       </Shell>
@@ -535,7 +549,7 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   }
 
   return (
-    <Shell topRef={topRef}>
+    <Shell topRef={topRef} banner={staffBanner}>
       {invitedBanner ? (
         <div className="mb-4 flex items-start gap-3 rounded-xl2 border border-green/30 bg-green-light px-4 py-3 text-[15px] text-ink" role="status">
           <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-dark" aria-hidden="true" />
@@ -600,9 +614,10 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
 }
 
 /** The page column the ficha lives in (16 px gutters on a phone, never wider than a form should be). */
-function Shell({ children, topRef }: { children: ReactNode; topRef: RefObject<HTMLDivElement> }) {
+function Shell({ children, topRef, banner }: { children: ReactNode; topRef: RefObject<HTMLDivElement>; banner?: ReactNode }) {
   return (
     <div ref={topRef} className="mx-auto w-full max-w-2xl scroll-mt-24 px-4 py-6 sm:px-6 sm:py-10">
+      {banner}
       {children}
     </div>
   );

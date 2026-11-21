@@ -11,7 +11,7 @@
  * changes. Synthetic people only; the CURP carries a valid check digit.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/services/api', () => ({
@@ -28,6 +28,7 @@ import { api } from '@/services/api';
 import { exchangeOnce } from '@/lib/inviteExchange';
 import { trackEvent } from '@/services/analytics';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { useAuthStore, type User } from '@/store/authStore';
 import { FichaWizard } from './FichaWizard';
 import { defaultCopy } from './copy';
 import schemaJson from './fixtures/schema.json';
@@ -90,7 +91,20 @@ const renderWizard = (route = '/pre-registro') => renderWithProviders(<FichaWiza
 beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
+  useAuthStore.getState().logout();
 });
+
+/** A signed-in account; `access: null` = remembered, the session not restored yet. */
+function signIn(role: User['role'], staffAreas: string[] = [], access: string | null = 'A1') {
+  useAuthStore.setState({
+    user: {
+      id: 1, email: `${role}@ejemplo.test`, first_name: 'Ana', last_name: 'Prueba', full_name: 'Ana Prueba', role,
+      avatar: '', whatsapp: '', staff_areas: staffAreas,
+    },
+    isAuthenticated: true,
+    accessToken: access,
+  });
+}
 
 describe('FichaWizard · public start', () => {
   it('asks for the missing data, then starts the ficha and opens the alumno step', async () => {
@@ -367,5 +381,105 @@ describe('FichaWizard · review and submit', () => {
     expect(screen.getByRole('link', { name: /Ver los documentos requeridos/ })).toHaveAttribute('href', '/admisiones/documentacion');
     expect(sessionStorage.getItem('interlaken:ficha-session')).toBeNull();
     expect(trackEvent).toHaveBeenCalledWith('funnel_submit_ficha', { grade: '1° Primaria' });
+  });
+});
+
+describe('FichaWizard · the school staff (Vista del personal)', () => {
+  const privateSchema = () => ({ ...schema, public_start_enabled: false });
+
+  it.each([
+    ['an administrator', 'admin', []],
+    ['staff with the «admisiones» area', 'staff', ['admisiones']],
+  ] as const)('%s sees the whole ficha with the staff banner, the switch off', async (_who, role, areas) => {
+    signIn(role, [...areas]);
+    serve(null, privateSchema());
+    renderWizard();
+    expect(await screen.findByRole('heading', { name: 'Antes de empezar' })).toBeInTheDocument();
+    const banner = screen.getByRole('complementary', { name: 'Vista del personal' });
+    expect(banner).toHaveTextContent('Vista del personal: las familias solo pueden abrir esta ficha con su enlace personal. Desde aquí puede llenarla con una familia en la oficina.');
+    expect(within(banner).getByRole('link', { name: /Ir a Expedientes/ })).toHaveAttribute('href', '/admin/admisiones');
+    expect(screen.queryByRole('heading', { name: 'La ficha de inscripción es personal' })).not.toBeInTheDocument();
+  });
+
+  it('starts a ficha for a family and keeps the banner (no website conversion tracked)', async () => {
+    const user = userEvent.setup();
+    signIn('staff', ['admisiones']);
+    serve(null, privateSchema());
+    post.mockImplementation((url: string) => {
+      if (url === '/admissions/register/') {
+        return Promise.resolve({ data: {
+          id: RID, session_token: 'S1', session_expires_at: '2099-01-01T00:00:00Z', status: 'draft', cycle: '2026-2027', pre_registration: 3,
+          ficha: payload({ contacto: CONTACT, alumno: ALUMNO_START }),
+        } }) as never;
+      }
+      return fail(404, {}) as never;
+    });
+    renderWizard();
+    await screen.findByRole('heading', { name: 'Antes de empezar' });
+    await user.type(screen.getByLabelText('Nombre completo'), CONTACT.contact_name);
+    await user.type(screen.getByLabelText('Correo electrónico'), CONTACT.contact_email);
+    await user.type(screen.getByLabelText('Celular'), '5511112222');
+    await user.click(screen.getByRole('radio', { name: 'Madre' }));
+    await user.type(screen.getByLabelText('Nombre(s) del alumno'), 'Ana Sofía');
+    await user.type(screen.getByLabelText('Apellido paterno del alumno'), 'López');
+    await user.selectOptions(screen.getByLabelText('Grado al que se inscribe'), '1° Primaria');
+    await user.click(screen.getByRole('radio', { name: /2026-2027/ }));
+    await user.click(screen.getByRole('button', { name: /Comenzar la ficha/ }));
+    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Vista del personal' })).toBeInTheDocument();
+    expect(trackEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a family (parent account)', 'parent', []],
+    ['staff without the «admisiones» area', 'staff', ['visitas']],
+  ] as const)('%s keeps seeing «La ficha de inscripción es personal»', async (_who, role, areas) => {
+    signIn(role, [...areas]);
+    serve(null, privateSchema());
+    renderWizard();
+    expect(await screen.findByRole('heading', { name: 'La ficha de inscripción es personal' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Vista del personal' })).not.toBeInTheDocument();
+  });
+
+  it('an anonymous visitor never sees the form, not even for a moment', async () => {
+    serve(null, privateSchema());
+    renderWizard();
+    // Every render on the way to the panel: never the start form, never the banner.
+    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'La ficha de inscripción es personal' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Vista del personal' })).not.toBeInTheDocument();
+  });
+
+  it('a remembered staff login waits for the session: loading, then the form', async () => {
+    signIn('admin', [], null);
+    serve(null, privateSchema());
+    renderWizard();
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admissions/ficha/schema/'));
+    expect(await screen.findByRole('status')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'La ficha de inscripción es personal' })).not.toBeInTheDocument();
+    act(() => { useAuthStore.getState().setAccess('A2'); });
+    expect(await screen.findByRole('heading', { name: 'Antes de empezar' })).toBeInTheDocument();
+  });
+
+  it('a remembered login whose session cannot be restored gets the private panel', async () => {
+    signIn('staff', ['admisiones'], null);
+    serve(null, privateSchema());
+    renderWizard();
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/admissions/ficha/schema/'));
+    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
+    act(() => { useAuthStore.getState().logout(); });
+    expect(await screen.findByRole('heading', { name: 'La ficha de inscripción es personal' })).toBeInTheDocument();
+  });
+
+  it('with a family link, staff see that family\'s ficha (no banner)', async () => {
+    signIn('admin');
+    serve(payload({ contacto: CONTACT, alumno: ALUMNO_START }), privateSchema());
+    exchange.mockResolvedValue({ data: { session_token: 'S7', expires_at: '2099-01-01T00:00:00Z' } } as never);
+    renderWizard(`/pre-registro?rid=${RID}&token=un-token-de-prueba`);
+    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Vista del personal' })).not.toBeInTheDocument();
   });
 });

@@ -304,11 +304,19 @@ def session_token(request) -> str:
 def can_access_medical(request, reg) -> bool:
     """Same rule as ``RegistrationSerializer``: the family's own session, or an
     admin (role admin / Django staff) once the family gave the MEDICAL_DATA
-    consent. Staff accounts with the admisiones area never see health data."""
+    consent. Staff accounts with the admisiones area never see health data
+    without the family's session.
+
+    The session comes first: when the office fills a ficha with a family at
+    the desk (/pre-registro, «Vista del personal»), the request carries both
+    the staff login and that ficha's own session, and the health step must
+    save before the consent on it is stored."""
+    if session_valid(reg, session_token(request)):
+        return True
     user = getattr(request, "user", None)
     if is_admin_reader(user):
         return bool(reg.consent_medical_data)
-    return session_valid(reg, session_token(request))
+    return False
 
 
 def _notice_label(reg) -> str:
