@@ -257,7 +257,11 @@ export function PublicLayout() {
     // with the portal), so the framer-motion provider does NOT live here —
     // motion-using public pages wrap themselves in <SiteMotionProvider>
     // (see lib/motion.tsx), keeping framer out of the portal's initial chunks.
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
+    // overflow-x-CLIP, not hidden: `hidden` turns this wrapper into a scroll box, so the
+    // sticky header stuck inside a box that never scrolls and left the screen with the
+    // page. `clip` still cuts sideways overflow without creating a scroll box (body keeps
+    // overflow-x: hidden as the fallback for browsers without `clip`).
+    <div className="min-h-screen flex flex-col overflow-x-clip">
       <RouteSeo />
       <a href="#contenido" className="skip-link">{text.skip_link}</a>
       <SiteNoticeBanner />

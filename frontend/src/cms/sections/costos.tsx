@@ -44,6 +44,7 @@ const card = (key: string, name: string, group: string, extra: FieldSpec[] = [])
   f.text(`${key}Label`, `${name}: etiqueta`),
   f.text(`${key}Title`, `${name}: título`),
   f.text(`${key}Year`, `${name}: año de los precios`, { hint: 'Insignia junto al título, por ejemplo «Precios 2027». Déjelo vacío para ocultarla.' }),
+  f.text(`${key}Pending`, `${name}: aviso de precios pendientes`, { hint: 'Aviso ámbar cuando aún no hay precios del próximo año, por ejemplo «Precios 2027: pendientes». Déjelo vacío cuando ya estén publicados.' }),
   f.text(`${key}Subtitle`, `${name}: subtítulo`),
   ...extra,
 ]);
