@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { ClipboardList, Copy, FileUp, GraduationCap, KanbanSquare, Send, X } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ClipboardList, FileUp, FolderOpen, GraduationCap, Hourglass, KanbanSquare, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -16,24 +16,20 @@ import { BulkConfirmDialog } from '@/components/admin/BulkConfirmDialog';
 import { ImportDialog, type ImportHeader } from '@/components/admin/ImportDialog';
 import { RegistrationReviewModal } from '@/components/admin/RegistrationReviewModal';
 import { FichaRowMenu, FichasZipMenu } from '@/components/admin/FichaDownloads';
+import { StageChip } from '@/components/admin/admissions/StageChip';
+import { NewProspectDialog } from '@/components/admin/admissions/NewProspectDialog';
 import { fichaExportExtras } from '@/hooks/queries/fichaExports';
 import { useUrlFilters, useUrlPage } from '@/hooks/useUrlFilters';
 import { useRowSelection } from '@/hooks/useRowSelection';
 import {
-  PREREG_ENTITY, preRegistrationImportApi, usePreRegistrationBulk, usePreRegistrationExport,
-  usePreRegistrationInvite, usePreRegistrationList, usePreRegistrationStatus, useRegistrationBulk,
-  useRegistrationExport, useRegistrationList,
-  type PreRegistrationParams, type PreRegistrationRow, type RegistrationParams, type RegistrationRow,
+  PREREG_ENTITY, preRegistrationImportApi, useRegistrationBulk, useRegistrationExport, useRegistrationList,
+  type RegistrationParams, type RegistrationRow,
 } from '@/hooks/queries/admissions';
-import { apiErrorMessage } from '@/lib/apiErrors';
-import {
-  PREREG_LEVELS, PREREG_STATUS, PREREG_TRANSITIONS, STATUS_BADGE, isReverseTransition,
-} from '@/lib/admissionsStatus';
-import { idsParam, type BulkActionDef, type BulkRequest, type ExportFormat } from '@/services/dataOps';
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
-}
+import { CASES_ENTITY, casesApi, useCaseList, type CaseListParams, type CaseRow } from '@/hooks/queries/cases';
+import { useExport } from '@/hooks/queries/dataOpsHooks';
+import { PREREG_LEVELS, STATUS_BADGE } from '@/lib/admissionsStatus';
+import { ALL_STAGES, STAGE_TABS, isStale, waitingText } from '@/lib/caseStages';
+import { idsParam, type BulkActionDef, type ExportFormat } from '@/services/dataOps';
 
 const fmtDate = (iso: string | null | undefined) => (iso ? format(new Date(iso), 'd MMM yyyy', { locale: es }) : '—');
 
@@ -44,11 +40,14 @@ function cycleOptions(now = new Date()) {
 }
 
 // Every filter param the two sections own; switching section clears them all.
-const SECTION_PARAMS = ['q', 'estado', 'nivel', 'ciclo', 'visita', 'docs', 'desde', 'hasta', 'orden', 'page'];
+const SECTION_PARAMS = ['q', 'etapa', 'estado', 'nivel', 'ciclo', 'visita', 'docs', 'desde', 'hasta', 'orden', 'page'];
 
 type View = 'pre' | 'inscripciones';
 
-/** /admin/admisiones — pre-registros and inscripciones on the Data Ops table (Phase 4). */
+/**
+ * /admin/admisiones — the admission cases («Expedientes», Fase 5) and the
+ * inscripciones (fichas) on the Data Ops table.
+ */
 export default function AdminAdmissions() {
   const { get, set } = useUrlFilters();
   const view: View = get('vista') === 'inscripciones' ? 'inscripciones' : 'pre';
@@ -110,7 +109,7 @@ export default function AdminAdmissions() {
     <div className="space-y-6">
       <PageHeader
         title="Admisiones"
-        subtitle="Pre-registros e inscripciones recibidas."
+        subtitle="Cada prospecto, de la primera llamada a la inscripción, y las fichas que envían las familias."
         actions={(
           <Link to="/admin/admisiones/pipeline" className="btn-secondary inline-flex min-h-[44px] items-center gap-2">
             <KanbanSquare size={16} aria-hidden="true" /> Pipeline
@@ -119,12 +118,12 @@ export default function AdminAdmissions() {
       />
 
       <div role="tablist" aria-label="Sección de admisiones" className="flex flex-wrap gap-2">
-        {tab('pre', 'Pre-registros', ClipboardList)}
+        {tab('pre', 'Expedientes', FolderOpen)}
         {tab('inscripciones', 'Inscripciones', GraduationCap)}
       </div>
 
       <div role="tabpanel" id={`adm-panel-${view}`} aria-labelledby={`adm-tab-${view}`}>
-        {view === 'pre' ? <PreRegistrationsSection /> : <RegistrationsSection onReview={setReviewId} />}
+        {view === 'pre' ? <CasesSection /> : <RegistrationsSection onReview={setReviewId} />}
       </div>
 
       <RegistrationReviewModal id={reviewId} open={reviewId != null} onClose={() => setReviewId(null)} />
@@ -132,9 +131,7 @@ export default function AdminAdmissions() {
   );
 }
 
-// ── Pre-registros ─────────────────────────────────────────────────────────
-
-const PREREG_STATUS_OPTIONS = Object.entries(PREREG_STATUS).map(([value, m]) => ({ value, label: m.label }));
+// ── Expedientes ──────────────────────────────────────────────────────────
 
 const IMPORT_HEADERS: ImportHeader[] = [
   { key: 'nombre_alumno', required: true },
@@ -149,145 +146,123 @@ const IMPORT_HEADERS: ImportHeader[] = [
   { key: 'mensaje' },
 ];
 
-/** Bulk status actions share one API action (`set_status`); the target rides in the name. */
-const statusAction = (target: string, label: string, extra: Partial<BulkActionDef> = {}): BulkActionDef => ({
-  name: `status:${target}`, label, ...extra,
-});
+/** The pre-registro export knows these orderings; the others export in its default order. */
+const EXPORT_ORDERING = new Set(['created_at', '-created_at', 'child', '-child']);
 
-const PREREG_ACTIONS: BulkActionDef[] = [
-  statusAction('contacted', 'Marcar contactados', { planVerb: 'Se marcarán como contactados' }),
-  { name: 'invite', label: 'Invitar a inscripción', planVerb: 'Se enviará la invitación a' },
-  statusAction('enrolled', 'Marcar inscritos', { planVerb: 'Se marcarán como inscritos' }),
-  statusAction('rejected', 'No procedió', { danger: true, planVerb: 'Se marcarán como «No procedió»' }),
-  statusAction('pending', 'Regresar a pendiente', { requiresNote: true, planVerb: 'Regresarán a pendiente' }),
-];
-
-/** Turn the UI action into the API body (`status:<target>` → `set_status` + payload.status). */
-function preRegBody(body: BulkRequest): BulkRequest {
-  if (!body.action.startsWith('status:')) return body;
-  return { ...body, action: 'set_status', payload: { ...(body.payload ?? {}), status: body.action.slice('status:'.length) } };
-}
-
-function PreRegistrationsSection() {
+/**
+ * The admission cases (Fase 5) on the Data Ops table: stage chips with their
+ * counts, child, tutor, grade and cycle, the stage, the next step and how
+ * long the case has waited; a row opens its Expediente.
+ *
+ * The legacy bulk status actions («Marcar contactados / inscritos», «No
+ * procedió», «Regresar a pendiente») and the row «Invitar» are gone: they
+ * moved the stage without its outcome, skipped the «Marcar como inscrito»
+ * gates, closed without a reason or sent the ficha before the exam. Each
+ * now lives in the Expediente. Export (stage filter + «Etapa» column) and
+ * the fair-sheet import stay.
+ */
+function CasesSection() {
+  const navigate = useNavigate();
   const [page, setPage] = useUrlPage();
   const { get, set } = useUrlFilters();
   const sort = parseSort(get('orden'));
-  const filters: Omit<PreRegistrationParams, 'page'> = {
+  const filters: Omit<CaseListParams, 'page'> = {
     q: get('q') || undefined,
-    status: get('estado') || undefined,
+    stage: get('etapa') || undefined,
     level: get('nivel') || undefined,
     cycle: get('ciclo') || undefined,
-    wants_visit: get('visita') || undefined,
     from: get('desde') || undefined,
     to: get('hasta') || undefined,
     ordering: serializeSort(sort) || undefined,
   };
-  const { data, isLoading, isError, refetch } = usePreRegistrationList({ page, ...filters });
+  const { data, isLoading, isError, refetch } = useCaseList({ page, ...filters });
   const rows = data?.results;
   const count = data?.count ?? 0;
+  const counts = data?.counts ?? {};
+  const allCount = ALL_STAGES.reduce((n, s) => n + (counts[s] ?? 0), 0);
   const selection = useRowSelection(count, JSON.stringify(filters));
   const onSort = (next: SortState) => set({ orden: serializeSort(next), page: null });
-
-  const exportPre = usePreRegistrationExport();
-  const bulk = usePreRegistrationBulk();
-  const updateStatus = usePreRegistrationStatus();
-  const invite = usePreRegistrationInvite();
-
-  const [bulkAction, setBulkAction] = useState<BulkActionDef | null>(null);
-  // A single-row reverse transition (needs a note) reuses the bulk dialog for that one row.
-  const [rowTarget, setRowTarget] = useState<{ id: number; action: BulkActionDef } | null>(null);
+  const exportCases = useExport(CASES_ENTITY, casesApi.export);
   const [importOpen, setImportOpen] = useState(false);
-  const [invitedLink, setInvitedLink] = useState<{ name: string; url: string } | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const fetchExport = (fmt: ExportFormat, { selectedOnly }: { selectedOnly: boolean }) =>
-    exportPre.mutateAsync({ ...filters, fmt, ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined });
-
-  const changeStatus = (row: PreRegistrationRow, target: string) => {
-    if (isReverseTransition('preregistration', row.status, target)) {
-      const def = PREREG_ACTIONS.find((a) => a.name === `status:${target}`);
-      if (def) setRowTarget({ id: row.id, action: def });
-      return;
-    }
-    updateStatus.mutate({ id: row.id, status: target }, {
-      onSuccess: () => toast.success('Estado actualizado.'),
-      onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo actualizar el estado.')),
+    exportCases.mutateAsync({
+      q: filters.q, stage: filters.stage, level: filters.level, cycle: filters.cycle, from: filters.from, to: filters.to,
+      ordering: filters.ordering && EXPORT_ORDERING.has(filters.ordering) ? filters.ordering : undefined,
+      fmt,
+      ids: selectedOnly && !selection.allMatching ? idsParam(selection.ids) : undefined,
     });
-  };
 
-  const doInvite = (row: PreRegistrationRow) =>
-    invite.mutate({ id: row.id, name: row.child_name }, {
-      onSuccess: async ({ data: res }) => {
-        const url = res.invite_url as string;
-        const copied = await copyToClipboard(url);
-        setInvitedLink({ name: row.child_name, url });
-        toast.success(copied ? 'Invitación generada. Enlace copiado.' : 'Invitación generada.');
-      },
-      onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo generar la invitación.')),
-    });
-  const invitingId = invite.isPending ? invite.variables?.id : undefined;
-  const savingId = updateStatus.isPending ? updateStatus.variables?.id : undefined;
+  const open = (row: CaseRow) => navigate(`/admin/admisiones/${row.id}`);
 
-  const columns: Column<PreRegistrationRow>[] = [
-    { id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 160, className: 'font-medium text-ink', cell: (p) => p.child_name },
+  const columns: Column<CaseRow>[] = [
     {
-      id: 'status', header: 'Estado', sortKey: 'status', minWidth: 140,
-      cell: (p) => <StatusSelect row={p} disabled={savingId === p.id} onChange={(t) => changeStatus(p, t)} />,
+      id: 'child', header: 'Alumno', sortKey: 'child', hideable: false, minWidth: 170,
+      cell: (c) => (
+        <Link to={`/admin/admisiones/${c.id}`} className="font-semibold text-ink hover:text-purple hover:underline">{c.child_name}</Link>
+      ),
     },
-    { id: 'date', header: 'Fecha', sortKey: 'created_at', minWidth: 110, className: 'text-subtle whitespace-nowrap', cell: (p) => fmtDate(p.created_at) },
-    { id: 'grade', header: 'Grado', sortKey: 'grade', minWidth: 110, className: 'whitespace-nowrap text-muted', cell: (p) => p.grade_applying },
-    { id: 'level', header: 'Nivel', sortKey: 'level', minWidth: 100, defaultHidden: true, className: 'text-muted', cell: (p) => PREREG_LEVELS.find((l) => l.value === p.level)?.label ?? p.level },
-    { id: 'cycle', header: 'Ciclo', minWidth: 100, defaultHidden: true, className: 'text-muted whitespace-nowrap', cell: (p) => p.cycle ?? '—' },
-    { id: 'parent', header: 'Tutor', sortKey: 'parent', minWidth: 140, className: 'text-muted', cell: (p) => p.parent_name },
     {
-      id: 'contact', header: 'Contacto', minWidth: 180,
-      cell: (p) => (
+      id: 'parent', header: 'Tutor', minWidth: 170,
+      cell: (c) => (
         <>
-          <div className="max-w-[240px] truncate text-muted" title={p.parent_email}>{p.parent_email}</div>
-          <div className="text-xs text-subtle">{p.parent_phone}</div>
+          <div className="text-ink">{c.parent_name}</div>
+          <div className="text-xs text-subtle">{c.parent_phone}</div>
         </>
       ),
     },
-    { id: 'visit', header: 'Visita', minWidth: 80, defaultHidden: true, className: 'text-muted', cell: (p) => (p.wants_visit ? 'Sí' : 'No') },
-    { id: 'source', header: 'Origen', minWidth: 120, defaultHidden: true, className: 'text-muted', cell: (p) => p.referral_source || '—' },
+    {
+      id: 'grade', header: 'Grado y ciclo', minWidth: 130,
+      cell: (c) => (
+        <>
+          <div className="whitespace-nowrap text-muted">{c.grade_applying}</div>
+          <div className="text-xs text-subtle">{c.cycle}</div>
+        </>
+      ),
+    },
+    { id: 'stage', header: 'Etapa', sortKey: 'stage', minWidth: 150, cell: (c) => <StageChip stage={c.stage} outcome={c.closed_outcome_label} short /> },
+    {
+      id: 'next', header: 'Siguiente paso', minWidth: 190,
+      cell: (c) => (c.next_action ? <span className="text-sm text-ink">{c.next_action.label}</span> : ''),
+    },
+    {
+      id: 'waiting', header: 'En la etapa', sortKey: 'stage_changed_at', minWidth: 110,
+      cell: (c) => (c.stage === 'inscrito' || c.stage === 'cerrado' ? '' : (
+        <span className={`inline-flex items-center gap-1 whitespace-nowrap ${isStale(c.days_waiting) ? 'font-semibold text-amber' : 'text-muted'}`}>
+          {isStale(c.days_waiting) && <Hourglass size={13} aria-hidden="true" />}
+          {waitingText(c.days_waiting)}
+        </span>
+      )),
+    },
+    { id: 'date', header: 'Alta', sortKey: 'created_at', minWidth: 110, defaultHidden: true, className: 'text-subtle whitespace-nowrap', cell: (c) => fmtDate(c.created_at) },
+    { id: 'email', header: 'Correo', minWidth: 180, defaultHidden: true, truncate: 220, className: 'text-muted', cell: (c) => c.parent_email },
   ];
 
-  return (
-    <Card title={`${count.toLocaleString('es-MX')} pre-registros`}>
-      {invitedLink && (
-        <div className="mb-4 rounded-xl2 border border-brand-600/25 bg-brand-50 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">
-                Invitación generada{invitedLink.name ? ` para ${invitedLink.name}` : ''}
-              </p>
-              <p className="mt-1 break-all text-xs text-muted">{invitedLink.url}</p>
-              <p className="mt-1 text-xs text-subtle">También se envió por correo al tutor. Comparta el enlace por WhatsApp si lo prefiere.</p>
-            </div>
-            <button type="button" onClick={() => setInvitedLink(null)} aria-label="Descartar"
-              className="-mr-1 -mt-1 inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-1 text-subtle hover:bg-white hover:text-ink">
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-          <button type="button" onClick={() => copyToClipboard(invitedLink.url).then((ok) => ok && toast.success('Enlace copiado.'))}
-            className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-brand-700 ring-1 ring-brand-600/20 hover:bg-brand-50">
-            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copiar enlace
-          </button>
-        </div>
-      )}
+  const filtered = !!(filters.q || filters.stage || filters.level || filters.cycle || filters.from || filters.to);
 
-      <DataTable<PreRegistrationRow>
-        tableId="admissions-preregistrations"
+  return (
+    <Card
+      title={`${count.toLocaleString('es-MX')} ${count === 1 ? 'expediente' : 'expedientes'}`}
+      action={(
+        <Button type="button" onClick={() => setCreating(true)}>
+          <UserPlus size={16} aria-hidden="true" /> Nuevo prospecto
+        </Button>
+      )}
+    >
+      <DataTable<CaseRow>
+        tableId="admissions-cases"
         columns={columns}
         rows={rows}
-        rowKey={(p) => p.id}
-        rowLabel={(p) => `pre-registro de ${p.child_name}`}
-        caption="Pre-registros"
+        rowKey={(c) => c.id}
+        rowLabel={(c) => `expediente de ${c.child_name}`}
+        caption="Expedientes de admisión"
         sort={sort}
         onSort={onSort}
         page={page}
         count={count}
         onPage={setPage}
-        itemLabel="pre-registros"
+        itemLabel="expedientes"
         isLoading={isLoading}
         isError={isError}
         onRetry={() => refetch()}
@@ -295,26 +270,24 @@ function PreRegistrationsSection() {
         resizable
         pinFirstColumn
         selection={selection}
-        rowActions={(p) => (
-          <button type="button" disabled={invitingId === p.id || p.status === 'enrolled' || p.status === 'rejected'}
-            onClick={() => doInvite(p)}
-            aria-label={`Invitar a inscripción: ${p.child_name}`}
-            className="inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-lg bg-purple/10 px-3 text-xs font-semibold text-purple hover:bg-purple/15 disabled:opacity-50 sm:min-h-[36px]">
-            <Send className="h-3.5 w-3.5" aria-hidden="true" /> {invitingId === p.id ? 'Generando…' : 'Invitar'}
-          </button>
-        )}
+        onRowClick={open}
         toolbar={(
           <FilterBar
-            search={{ placeholder: 'Alumno, tutor, correo o teléfono…', label: 'Buscar pre-registros' }}
-            tabs={{ paramKey: 'estado', options: PREREG_STATUS_OPTIONS, allLabel: 'Todos', label: 'Filtrar por estado' }}
+            search={{ placeholder: 'Alumno, tutor, correo, teléfono o colegio…', label: 'Buscar expedientes' }}
+            tabs={{
+              paramKey: 'etapa',
+              options: STAGE_TABS.map((t) => ({ ...t, count: counts[t.value] ?? 0 })),
+              allLabel: 'Todos',
+              allCount,
+              label: 'Filtrar por etapa',
+            }}
             selects={[
               { key: 'nivel', label: 'Nivel', options: PREREG_LEVELS, allLabel: 'Todos los niveles' },
               { key: 'ciclo', label: 'Ciclo', options: cycleOptions(), allLabel: 'Todos los ciclos' },
-              { key: 'visita', label: 'Visita', options: [{ value: 'true', label: 'Desea visita' }, { value: 'false', label: 'Sin visita' }], allLabel: 'Visita: todos' },
             ]}
-            dateRange={{ idPrefix: 'prereg' }}
+            dateRange={{ idPrefix: 'expedientes' }}
           >
-            <ExportMenu filenamePrefix="pre-registros" selectedCount={selection.count} fetch={fetchExport} />
+            <ExportMenu filenamePrefix="expedientes" selectedCount={selection.count} fetch={fetchExport} />
             <button type="button" onClick={() => setImportOpen(true)} className="btn-secondary inline-flex min-h-[44px] items-center gap-2">
               <FileUp size={16} aria-hidden="true" /> Importar
             </button>
@@ -327,43 +300,18 @@ function PreRegistrationsSection() {
             allMatchingCount={count}
             onSelectAllMatching={selection.onSelectAllMatching}
             onClear={selection.onClear}
-            itemLabel="pre-registros"
+            itemLabel="expedientes"
             gender="m"
-            actions={PREREG_ACTIONS}
-            onAction={setBulkAction}
-            busy={bulk.isPending}
-            exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="pre-registros" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
+            exportMenu={<ExportMenu label="Exportar seleccionados" filenamePrefix="expedientes" selectedCount={selection.count} forceSelected fetch={fetchExport} />}
           />
         )}
         empty={{
           icon: ClipboardList,
-          title: filters.q || filters.status || filters.level ? 'Sin resultados' : 'Sin pre-registros',
-          description: filters.q || filters.status || filters.level
-            ? 'Ningún pre-registro coincide con los filtros.'
-            : 'Los pre-registros aparecerán aquí cuando se reciban.',
+          title: filtered ? 'Sin resultados' : 'Sin expedientes',
+          description: filtered
+            ? 'Ningún expediente coincide con los filtros.'
+            : 'Registre la primera llamada con «Nuevo prospecto»; los pre-registros del sitio también llegan aquí.',
         }}
-      />
-
-      <BulkConfirmDialog
-        open={!!bulkAction}
-        onClose={() => setBulkAction(null)}
-        action={bulkAction}
-        entityLabel="pre-registros"
-        gender="m"
-        ids={selection.ids}
-        allMatching={selection.allMatching}
-        filters={{ ...filters, ordering: undefined }}
-        execute={(body) => bulk.mutateAsync(preRegBody(body))}
-        onDone={(r) => { if (!r.failed.length) selection.onClear(); }}
-      />
-      <BulkConfirmDialog
-        open={!!rowTarget}
-        onClose={() => setRowTarget(null)}
-        action={rowTarget?.action ?? null}
-        entityLabel="pre-registros"
-        gender="m"
-        ids={rowTarget ? [rowTarget.id] : []}
-        execute={(body) => bulk.mutateAsync(preRegBody(body))}
       />
 
       <ImportDialog
@@ -374,36 +322,10 @@ function PreRegistrationsSection() {
         api={preRegistrationImportApi}
         headers={IMPORT_HEADERS}
         templatePrefix="plantilla_pre-registros"
-        description="Hojas de registro de ferias y eventos. Cada fila crea un pre-registro pendiente del ciclo actual; no se envían correos. Los duplicados solo se avisan. Fecha de nacimiento en formato DD/MM/AAAA."
+        description="Hojas de registro de ferias y eventos. Cada fila crea un expediente en «Informes» del ciclo actual; no se envían correos. Los duplicados solo se avisan. Fecha de nacimiento en formato DD/MM/AAAA."
       />
+      <NewProspectDialog open={creating} onClose={() => setCreating(false)} />
     </Card>
-  );
-}
-
-const VARIANT_CLASS: Record<string, string> = {
-  warning: 'border-amber/40 text-amber',
-  info:    'border-purple/40 text-purple',
-  success: 'border-green/50 text-green-dark',
-  error:   'border-coral/50 text-coral-dark',
-};
-
-/** Inline status control: only the transitions the table allows are offered. */
-function StatusSelect({ row, onChange, disabled }: { row: PreRegistrationRow; onChange: (v: string) => void; disabled?: boolean }) {
-  const meta = PREREG_STATUS[row.status] ?? PREREG_STATUS.pending;
-  const targets = PREREG_TRANSITIONS[row.status] ?? [];
-  return (
-    <select
-      value={row.status}
-      disabled={disabled || targets.length === 0}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={`Cambiar estado del pre-registro de ${row.child_name}`}
-      className={`min-h-[44px] rounded-lg border bg-white px-2 py-1 text-base font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-60 sm:min-h-0 sm:text-xs ${VARIANT_CLASS[meta.variant] ?? 'border-line text-muted'}`}
-    >
-      <option value={row.status}>{meta.label}</option>
-      {targets.map((t) => (
-        <option key={t} value={t}>{PREREG_STATUS[t]?.label ?? t}</option>
-      ))}
-    </select>
   );
 }
 
@@ -500,6 +422,12 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
               className="inline-flex min-h-[44px] items-center rounded-lg bg-cream px-3 text-xs font-semibold text-ink hover:bg-line sm:min-h-[36px]">
               Revisar
             </button>
+            {r.pre_registration ? (
+              <Link to={`/admin/admisiones/${r.pre_registration}`} aria-label={`Abrir el expediente de admisión de ${r.child_name}`}
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-lg px-3 text-xs font-semibold text-purple hover:bg-purple/5 sm:min-h-[36px]">
+                <FolderOpen size={14} aria-hidden="true" /> Expediente
+              </Link>
+            ) : null}
             <FichaRowMenu id={r.id} childName={r.child_name} />
           </>
         )}
@@ -557,8 +485,7 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
         onDone={(r) => { if (!r.failed.length) selection.onClear(); }}
       />
       <p className="mt-3 text-xs text-subtle">
-        Los expedientes aprobados se convierten en alumnos desde el{' '}
-        <Link to="/admin/admisiones/pipeline" className="font-semibold text-purple hover:underline">pipeline</Link>.
+        Cada ficha se inscribe desde su expediente de admisión, con «Marcar como inscrito» en la etapa «Inscripción».
       </p>
     </Card>
   );

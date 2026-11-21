@@ -50,6 +50,8 @@ export interface RegistrationRow {
   updated_at?: string;
   doc_count: number;
   doc_verified: number;
+  /** The admission case (Expediente) the ficha belongs to, if any. */
+  pre_registration?: number | null;
 }
 
 export interface PreRegistrationParams {
