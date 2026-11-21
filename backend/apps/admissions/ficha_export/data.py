@@ -6,9 +6,11 @@ blocks) as the values of the printed ficha.
 id → value (``cellmap.CELLS``), the chosen option of every «X» group
 (``cellmap.MARKS``) and the labels to rewrite. Formatting follows the
 school's original form: names, places and addresses in capitals, dates split
-into día / MES (Spanish month name) / año, phones as text (a leading zero or
-a long number never turns into 5.5E+09), e-mails as typed. The form's boxes
-are single lines, so free text (allergies, conditions) is one line too.
+into día / mes / año as numbers (as in the original's own entries: a month
+name such as «SEPTIEMBRE» does not fit its two-column box), phones as text
+(a leading zero or a long number never turns into 5.5E+09), e-mails as
+typed. The form's boxes are single lines, so free text (allergies,
+conditions) is one line too.
 
 Nothing goes outside the form's own cells: «No lo sé» (blood type) marks no
 box, «Otro» (occupation) marks its box (the text stays in the concentrado),
@@ -109,7 +111,7 @@ def split_date(prefix: str, value) -> dict[str, object]:
         return {}
     return {
         f"{prefix}_dia": value.day,
-        f"{prefix}_mes": MONTHS[value.month - 1],
+        f"{prefix}_mes": value.month,
         f"{prefix}_anio": value.year,
     }
 

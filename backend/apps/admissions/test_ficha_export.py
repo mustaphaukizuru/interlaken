@@ -185,7 +185,6 @@ class TestCellMap:
     def test_every_field_lands_in_its_exact_cell(self):
         reg = make_registration()
         _wb, ws = ficha_xlsx(reg)
-        months = data.MONTHS
         expected = {
             "F3": f"Ciclo Escolar {reg.cycle}",
             # alumno
@@ -196,7 +195,7 @@ class TestCellMap:
             "L15": "1°",
             "B20": "X",
             "G20": CHILD_DOB.day,
-            "I20": months[CHILD_DOB.month - 1],
+            "I20": CHILD_DOB.month,
             "K20": CHILD_DOB.year,
             "P20": "MÉXICO",
             "V20": "CIUDAD DE MÉXICO",
@@ -223,7 +222,7 @@ class TestCellMap:
             "B53": "JULIO",
             "D57": "X",
             "G57": FATHER_DOB.day,
-            "I57": months[FATHER_DOB.month - 1],
+            "I57": FATHER_DOB.month,
             "K57": FATHER_DOB.year,
             "P57": "MÉXICO",
             "V57": "ESTADO DE MÉXICO",
@@ -241,7 +240,7 @@ class TestCellMap:
             "B74": "MARTA",
             "B78": "X",
             "G78": MOTHER_DOB.day,
-            "I78": months[MOTHER_DOB.month - 1],
+            "I78": MOTHER_DOB.month,
             "K78": MOTHER_DOB.year,
             "P78": "MÉXICO",
             "V78": "PUEBLA",
