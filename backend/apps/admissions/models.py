@@ -3,6 +3,7 @@ admissions/models.py — Pre-registration, Registration (the ficha), guardians, 
 """
 from uuid import uuid4
 
+from django.conf import settings
 from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
@@ -48,7 +49,9 @@ class PreRegistration(models.Model):
 
     # Parent/guardian contact
     parent_name  = models.CharField(max_length=200, verbose_name='Nombre del padre/tutor')
-    parent_email = models.EmailField(verbose_name='Correo electrónico')
+    # Blank allowed since the Expediente (Fase 5): «Informes» mostly arrive by
+    # WhatsApp, with a phone and no email yet.
+    parent_email = models.EmailField(blank=True, verbose_name='Correo electrónico')
     parent_phone = models.CharField(max_length=20, verbose_name='Teléfono / WhatsApp')
     relationship = models.CharField(max_length=50, default='Padre/Madre', verbose_name='Parentesco')
 
@@ -64,6 +67,81 @@ class PreRegistration(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     notes      = models.TextField(blank=True, verbose_name='Notas internas')
 
+    # ── Proceso de admisión, «Expediente» (Fase 5) ─────────────────────────
+    # ``stage`` drives the process; the legacy ``status`` is kept in sync both
+    # ways for the screens and exports that still read it (admissions.process:
+    # STAGE_STATUS / sync_stage_with_status, run from ``save``).
+    class Stage(models.TextChoices):
+        INFORMES      = 'informes',      'Informes'
+        VISITA        = 'visita',        'Visita guiada'
+        EXAMEN        = 'examen',        'Examen'
+        DOCUMENTACION = 'documentacion', 'Documentación y acuerdos'
+        INSCRITO      = 'inscrito',      'Inscrito'
+        CERRADO       = 'cerrado',       'Cerrado'
+
+    class ClosedOutcome(models.TextChoices):
+        NONE        = '',            'Abierto'
+        NO_INTERESA = 'no_interesa', 'No le interesa'
+        NO_ASISTIO  = 'no_asistio',  'No asistió'
+        NO_ACEPTADO = 'no_aceptado', 'No aceptado'
+        # Legacy «No procedió» (status rejected before the Expediente existed).
+        NO_PROCEDIO = 'no_procedio', 'No procedió'
+
+    class InformesOutcome(models.TextChoices):
+        NONE            = '',                'Sin registrar'
+        CONTINUA_VISITA = 'continua_visita', 'Continúa a visita guiada'
+        NO_INTERESA     = 'no_interesa',     'No le interesa'
+
+    class VisitOutcome(models.TextChoices):
+        NONE          = '',              'Sin registrar'
+        AGENDA_EXAMEN = 'agenda_examen', 'Asistió y agenda examen'
+        NO_INTERESA   = 'no_interesa',   'Asistió, no le interesa'
+        NO_ASISTIO    = 'no_asistio',    'No asistió'
+
+    class ExamResult(models.TextChoices):
+        NONE        = '',            'Sin resultado'
+        ACEPTADO    = 'aceptado',    'Aceptado'
+        NO_ACEPTADO = 'no_aceptado', 'No aceptado'
+
+    previous_school   = models.CharField(max_length=200, blank=True, verbose_name='Colegio de procedencia')
+    child_age         = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name='Edad')
+    stage             = models.CharField(max_length=20, choices=Stage.choices, default=Stage.INFORMES,
+                                         verbose_name='Etapa')
+    stage_changed_at  = models.DateTimeField(null=True, blank=True, verbose_name='En la etapa desde')
+    closed_outcome    = models.CharField(max_length=20, choices=ClosedOutcome.choices, blank=True, default='',
+                                         verbose_name='Motivo de cierre')
+    closed_reason     = models.CharField(max_length=500, blank=True, default='', verbose_name='Detalle del cierre')
+    closed_from_stage = models.CharField(max_length=20, blank=True, default='', verbose_name='Cerrado en la etapa')
+    closed_at         = models.DateTimeField(null=True, blank=True, verbose_name='Cerrado el')
+    # 1 Informes
+    costs_sent_at      = models.DateTimeField(null=True, blank=True, verbose_name='Cuotas enviadas')
+    visit_link_sent_at = models.DateTimeField(null=True, blank=True, verbose_name='Liga de visita enviada')
+    informes_outcome   = models.CharField(max_length=20, choices=InformesOutcome.choices, blank=True, default='',
+                                          verbose_name='Resultado de informes')
+    # 2 Visita guiada
+    visit_outcome    = models.CharField(max_length=20, choices=VisitOutcome.choices, blank=True, default='',
+                                        verbose_name='Resultado de la visita')
+    visit_outcome_at = models.DateTimeField(null=True, blank=True)
+    visit_note       = models.CharField(max_length=500, blank=True, default='', verbose_name='Nota de la visita')
+    # 3 Examen
+    exam_at             = models.DateTimeField(null=True, blank=True, verbose_name='Examen')
+    exam_notes          = models.TextField(blank=True, default='', verbose_name='Notas del examen')
+    exam_results_at     = models.DateTimeField(null=True, blank=True, verbose_name='Entrega de resultados')
+    exam_result         = models.CharField(max_length=20, choices=ExamResult.choices, blank=True, default='',
+                                           verbose_name='Resultado del examen')
+    exam_result_reason  = models.CharField(max_length=500, blank=True, default='',
+                                           verbose_name='Motivo del resultado')
+    exam_date_sent_at   = models.DateTimeField(null=True, blank=True)
+    exam_result_sent_at = models.DateTimeField(null=True, blank=True)
+    ficha_link_sent_at  = models.DateTimeField(null=True, blank=True, verbose_name='Liga de ficha enviada')
+    # 4 Documentación y acuerdos (discounts: AdmissionDiscount)
+    documents_waived        = models.BooleanField(default=False, verbose_name='Documentos dispensados')
+    documents_waived_reason = models.CharField(max_length=500, blank=True, default='')
+    documents_waived_at     = models.DateTimeField(null=True, blank=True)
+    agreements_note         = models.TextField(blank=True, default='', verbose_name='Acuerdos')
+    # 5 Inscrito (payments: EnrollmentPayment)
+    enrolled_at = models.DateTimeField(null=True, blank=True, verbose_name='Inscrito el')
+
     class Meta:
         verbose_name = 'Pre-registro'
         verbose_name_plural = 'Pre-registros'
@@ -73,10 +151,23 @@ class PreRegistration(models.Model):
             models.Index(fields=['status', '-created_at'], name='adm_prereg_status_created'),
             # Case-insensitive dedupe key for the fair-sheet importer.
             models.Index(Lower('parent_email'), name='adm_prereg_email_lower'),
+            # Expediente: cases by stage, and the exams week view.
+            models.Index(fields=['stage', '-created_at'], name='adm_prereg_stage_created'),
+            models.Index(fields=['exam_at'], name='adm_prereg_exam_at'),
         ]
 
     def __str__(self):
         return f'{self.child_first_name} {self.child_last_name} — {self.level} ({self.status})'
+
+    def save(self, *args, **kwargs):
+        # A legacy ``status`` write (console, bulk, invite, imports) moves the
+        # stage with it; the Expediente writes both consistently.
+        from .process import sync_stage_with_status
+
+        touched = sync_stage_with_status(self)
+        if touched and kwargs.get('update_fields') is not None:
+            kwargs['update_fields'] = list(dict.fromkeys([*kwargs['update_fields'], *touched]))
+        super().save(*args, **kwargs)
 
 
 def document_upload_path(instance, filename):
@@ -330,6 +421,88 @@ class RegistrationDocument(models.Model):
         return f'{self.get_doc_type_display()} — {self.registration}'
 
 
+# ── Proceso de admisión: acuerdos y pago de inscripción (Fase 5) ───────────
+# RECORD ONLY: the platform never charges colegiaturas or inscripción. These
+# rows write down what the school agreed and received, for the Expediente and
+# the «Marcar como inscrito» gate. Deleting one voids it (``voided_at``), so the
+# case history keeps it.
+class AdmissionDiscount(models.Model):
+    """A beca or descuento agreed during «Documentación y acuerdos»."""
+
+    class Kind(models.TextChoices):
+        INSCRIPCION           = 'inscripcion',           'Descuento en inscripción'
+        BECA_COLEGIATURA      = 'beca_colegiatura',      'Beca en colegiatura'
+        DESCUENTO_COLEGIATURA = 'descuento_colegiatura', 'Descuento en colegiatura'
+
+    class Duration(models.TextChoices):
+        NONE          = '',              'Sin duración'
+        TRES_MESES    = '3_meses',       '3 meses'
+        SEIS_MESES    = '6_meses',       '6 meses'
+        CICLO         = 'ciclo',         '1 ciclo'
+        PERMANENTE    = 'permanente',    'Permanente'
+        PERSONALIZADO = 'personalizado', 'Meses a la medida'
+
+    pre_registration = models.ForeignKey(PreRegistration, on_delete=models.CASCADE, related_name='discounts')
+    kind        = models.CharField(max_length=30, choices=Kind.choices, verbose_name='Tipo')
+    percent     = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                      verbose_name='Porcentaje')
+    amount      = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                      verbose_name='Monto fijo (MXN)')
+    duration    = models.CharField(max_length=20, choices=Duration.choices, blank=True, default='',
+                                   verbose_name='Duración')
+    # First day of the first / last month (custom range; optional start otherwise).
+    start_month = models.DateField(null=True, blank=True, verbose_name='Desde')
+    end_month   = models.DateField(null=True, blank=True, verbose_name='Hasta')
+    authorized_by = models.CharField(max_length=150, verbose_name='Autorizó')
+    note        = models.TextField(blank=True, default='', verbose_name='Nota')
+    created_by  = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name='+')
+    created_at  = models.DateTimeField(default=timezone.now)
+    updated_at  = models.DateTimeField(auto_now=True)
+    voided_at   = models.DateTimeField(null=True, blank=True)
+    void_reason = models.CharField(max_length=300, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Beca o descuento (admisión)'
+        verbose_name_plural = 'Becas y descuentos (admisión)'
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f'{self.get_kind_display()} del expediente {self.pre_registration_id}'
+
+
+class EnrollmentPayment(models.Model):
+    """The inscripción payment as the school received it (record only)."""
+
+    class Method(models.TextChoices):
+        EFECTIVO      = 'efectivo',      'Efectivo'
+        TRANSFERENCIA = 'transferencia', 'Transferencia'
+        TARJETA       = 'tarjeta',       'Tarjeta'
+        OTRO          = 'otro',          'Otro'
+
+    # PROTECT: a money record never disappears with its case.
+    pre_registration = models.ForeignKey(PreRegistration, on_delete=models.PROTECT,
+                                         related_name='enrollment_payments')
+    paid_on     = models.DateField(verbose_name='Fecha de pago')
+    amount      = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto (MXN)')
+    method      = models.CharField(max_length=20, choices=Method.choices, verbose_name='Forma de pago')
+    reference   = models.CharField(max_length=100, blank=True, default='', verbose_name='Referencia')
+    note        = models.CharField(max_length=300, blank=True, default='', verbose_name='Nota')
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name='+')
+    created_at  = models.DateTimeField(default=timezone.now)
+    updated_at  = models.DateTimeField(auto_now=True)
+    voided_at   = models.DateTimeField(null=True, blank=True)
+    void_reason = models.CharField(max_length=300, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Pago de inscripción (registro)'
+        verbose_name_plural = 'Pagos de inscripción (registro)'
+        ordering = ['paid_on', 'id']
+
+    def __str__(self):
+        return f'Pago de inscripción del expediente {self.pre_registration_id}'
+
+
 # Fase 4: required documents by level and the office's manual states.
 from .document_models import RegistrationDocumentState, RequiredDocument  # noqa: E402,F401
-

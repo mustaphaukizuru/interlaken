@@ -44,9 +44,11 @@ def test_outcome_marks_attended_and_updates_prereg(admin_client, booking):
     assert admin_client.post(url, {'outcome': 'weird'}, format='json').status_code == 400
     r = admin_client.post(url, {'outcome': 'enrolling', 'note': 'Trae documentos el lunes'}, format='json')
     assert r.status_code == 200 and r.data['status'] == 'attended' and r.data['outcome'] == 'enrolling'
-    assert r.data['pre_registration'] == {'id': pr.pk, 'status': 'enrolled', 'changed': True}
+    # Expediente (Fase 5): «Se inscribirá» = «Asistió y agenda examen»; «Inscrito»
+    # needs the gates of «Marcar como inscrito» (payment, ficha, documents).
+    assert r.data['pre_registration'] == {'id': pr.pk, 'status': 'contacted', 'stage': 'examen', 'changed': True}
     pr.refresh_from_db()
-    assert pr.status == 'enrolled'
+    assert pr.status == 'contacted' and pr.stage == 'examen' and pr.visit_outcome == 'agenda_examen'
 
 
 @pytest.mark.django_db

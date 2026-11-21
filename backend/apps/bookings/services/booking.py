@@ -23,7 +23,7 @@ class SlotUnavailable(Exception):
 
 def create_booking(*, slot_id, parent_name, parent_email='', parent_phone='',
                    child_name='', child_grade='', num_attendees=1,
-                   source=Booking.Source.WEB, notes='', notify_email=True):
+                   source=Booking.Source.WEB, notes='', notify_email=True, pre_registration=None):
     """Create a confirmed booking for ``slot_id`` under a row lock.
 
     Returns the ``Booking``. Raises ``SlotUnavailable`` if the slot can't take it.
@@ -57,6 +57,7 @@ def create_booking(*, slot_id, parent_name, parent_email='', parent_phone='',
             status=Booking.Status.CONFIRMED,
             source=source,
             notes=notes,
+            pre_registration=pre_registration,
         )
 
     if notify_email and parent_email:

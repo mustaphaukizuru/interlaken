@@ -172,13 +172,21 @@ class AvailabilityView(APIView):
 
 @method_decorator(ratelimit('booking-create', '10/m', method='POST'), name='dispatch')
 class BookingCreateView(APIView):
-    """POST /api/v1/bookings/ — public: create a booking (capacity-safe)."""
+    """POST /api/v1/bookings/ — public: create a booking (capacity-safe).
+
+    Optional ``lead_token``: the signed token of the visit link the Expediente
+    sends (``/agendar-visita?lead=…``). A valid one attaches the booking to its
+    admissions case; a bad or expired one is ignored (the booking still goes
+    through, matched by email later)."""
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        from apps.admissions.process import booking_from_visit_link, lead_from_token
+
         serializer = BookingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        lead = lead_from_token(str(request.data.get('lead_token') or ''))
         try:
             booking = create_booking(
                 slot_id=data['slot'].id,
@@ -189,9 +197,12 @@ class BookingCreateView(APIView):
                 child_grade=data.get('child_grade', ''),
                 num_attendees=data['num_attendees'],
                 source=Booking.Source.WEB,
+                pre_registration=lead,
             )
         except SlotUnavailable as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if lead is not None:
+            booking_from_visit_link(lead, booking)
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -395,22 +406,20 @@ class AdminBookingOutcomeView(APIView):
     """POST /bookings/admin/bookings/<pk>/outcome/ {"outcome", "note"?, "update_prereg"?}: post-visit result (P4-2).
 
     Marks the visit attended through the booking transition table (no email),
-    stores the outcome and, unless ``update_prereg`` is false, moves the linked
-    pre-registro (latest one with the parent's email) forward through
-    ``admissions.services.change_status`` (transition table + its own audit row).
-    A move the table forbids (e.g. an inscrito, or rechazado → contactado) is
-    skipped and reported, never forced."""
+    stores the outcome and, unless ``update_prereg`` is false, moves the
+    booking's admissions case: ``Booking.pre_registration`` first, else the
+    latest lead with the parent's email (then attached to the booking). The
+    case moves forward only, through ``admissions.process.apply_booking_outcome``
+    (Expediente, Fase 5): «Se inscribirá» → Examen, «No le interesó» → cerrado,
+    «Interesada» / «No por ahora» → Visita guiada (legacy status «contacted»).
+    A closed or enrolled case is skipped and reported, never forced (its own
+    audit row on the case)."""
     admin_area = 'visitas'
     permission_classes = [IsAdmin]
 
-    PREREG_TARGET = {'enrolling': 'enrolled', 'declined': 'rejected',
-                     'interested': 'contacted', 'not_now': 'contacted'}
-
     def post(self, request, pk):
-        from apps.admissions.models import PreRegistration
-        from apps.admissions.services import PREREG_ENTITY, change_status
+        from apps.admissions.process import apply_booking_outcome, lead_for_booking
         from apps.bookings.services.status import change_booking_status
-        from apps.core.transitions import allowed_targets, is_reverse
 
         booking = Booking.objects.select_related('slot').filter(pk=pk).first()
         if booking is None:
@@ -436,21 +445,9 @@ class AdminBookingOutcomeView(APIView):
             booking.save(update_fields=['outcome', 'outcome_note', 'updated_at'])
 
             linked = None
-            target = self.PREREG_TARGET.get(outcome)
-            prereg = (PreRegistration.objects.select_for_update()
-                      .filter(parent_email__iexact=booking.parent_email).order_by('-created_at').first()
-                      if update_prereg and target and booking.parent_email else None)
-            if prereg is not None:
-                current = prereg.status
-                if current == target:
-                    linked = {'id': prereg.pk, 'status': current, 'changed': False}
-                elif target in allowed_targets(PREREG_ENTITY, current) and not is_reverse(PREREG_ENTITY, current, target):
-                    change_status(prereg, target, entity=PREREG_ENTITY, actor=request.user,
-                                  context=f'admissions: estado por resultado de visita #{booking.pk}')
-                    linked = {'id': prereg.pk, 'status': prereg.status, 'changed': True}
-                else:
-                    linked = {'id': prereg.pk, 'status': current, 'changed': False,
-                              'skipped': f'El pre-registro está «{prereg.get_status_display()}» y no se movió.'}
+            lead = lead_for_booking(booking, lock=True) if update_prereg else None
+            if lead is not None:
+                linked = apply_booking_outcome(lead, booking, outcome, actor=request.user)
             changes = {'outcome': outcome, 'prereg': linked}
             if previous != booking.status:
                 changes['status'] = [previous, booking.status]
