@@ -157,6 +157,31 @@ def wrap(text: str, font: str, size: float, max_width: float) -> list[str]:
     return out
 
 
+def fit_text(text: str, font: str, width: float, height: float, *, max_size: float,
+             min_size: float = 5.0, leading: float = 1.2, step: float = 0.5) -> tuple[float, list[str]]:
+    """Shrink-to-fit word wrap inside a ``width`` × ``height`` box.
+
+    Tries ``max_size`` down to ``min_size`` (by ``step``) and returns
+    ``(size, lines)`` for the first size whose wrapped lines fit; at
+    ``min_size`` the lines that do not fit are dropped and the last kept line
+    ends in «…». Line pitch is ``size * leading``.
+    """
+    text = str(text or '').strip()
+    if not text:
+        return max_size, []
+    size = max_size
+    while True:
+        lines = [ln for ln in wrap(text, font, size, width) if ln] or ['']
+        if len(lines) * size * leading <= height or size - step < min_size:
+            break
+        size -= step
+    room = max(int(height // (size * leading)), 1)
+    if len(lines) > room:
+        lines = lines[:room]
+        lines[-1] = ellipsize(lines[-1] + '…', font, size, width) if lines[-1] else '…'
+    return size, lines
+
+
 # ── Document model ──────────────────────────────────────────────────────────
 @dataclass
 class Column:
@@ -289,8 +314,33 @@ class _Canvas:
     def image(self, name, x, y, w, h):
         self._op(f'q {_f(w)} 0 0 {_f(h)} {_f(x)} {_f(y)} cm /{name} Do Q')
 
+    def runs(self, x, y, parts, *, align='left'):
+        """One line of mixed runs ``[(text, font, size, rgb), ...]`` on one
+        baseline («Celular» bold 9 pt + «(10 dígitos)» bold 7 pt)."""
+        total = sum(text_width(t, f, s) for t, f, s, _ in parts)
+        if align == 'right':
+            x -= total
+        elif align == 'center':
+            x -= total / 2
+        for t, f, s, rgb in parts:
+            self.text(x, y, t, font=f, size=s, rgb=rgb)
+            x += text_width(t, f, s)
+
     def stream(self) -> bytes:
         return b'\n'.join(self.ops)
+
+
+# Public name for documents laid out outside this module (the ficha de
+# inscripción draws the school's Excel grid with it).
+Canvas = _Canvas
+
+
+def jpeg_image(data: bytes):
+    """``(data, (width, height, components))`` for an embeddable JPEG, else None."""
+    size = _jpeg_size(data or b'')
+    if not size or size[2] not in (1, 3):
+        return None
+    return data, size
 
 
 def _jpeg_size(data: bytes) -> tuple[int, int, int] | None:
@@ -612,6 +662,12 @@ def _assemble(pages: list[_Canvas], page_w: float, page_h: float, logo, title: s
     out += (f'trailer\n<< /Size {len(objects) + 1} /Root {catalog} 0 R /Info {info_id} 0 R >>\n'
             f'startxref\n{xref}\n%%EOF\n').encode()
     return bytes(out)
+
+
+def assemble_pdf(pages: list[_Canvas], page_size: tuple[float, float], *, logo=None, title: str = '') -> bytes:
+    """Pages drawn on ``Canvas`` objects → PDF bytes (Helvetica family; the
+    ``logo`` from ``jpeg_image`` is the ``/Logo`` image of every page)."""
+    return _assemble(pages, page_size[0], page_size[1], logo, title)
 
 
 def render_document_pdf(doc: Document, *, table_heading: str = 'Movimientos') -> bytes:
