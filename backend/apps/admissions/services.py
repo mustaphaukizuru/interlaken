@@ -117,6 +117,11 @@ def invite_preregistration(
         "parent1_name": pre.parent_name,
         "parent1_email": pre.parent_email,
         "parent1_phone": pre.parent_phone,
+        # The ficha's «quién llena la ficha» (parent1 is derived from it).
+        "contact_name": pre.parent_name,
+        "contact_email": pre.parent_email,
+        "contact_phone": pre.parent_phone,
+        "contact_relationship": pre.relationship,
     }
     for field, value in seed.items():
         if created or not getattr(reg, field):

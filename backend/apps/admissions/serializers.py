@@ -251,6 +251,10 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'id', 'status', 'submitted_at', 'created_at', 'documents',
             'privacy_accepted_at', 'privacy_notice_version_label',
         ]
+        # The column is nullable since the ficha (its public start comes before
+        # the birth date); the old wizard's contract stays: required on create,
+        # never nulled by a PATCH.
+        extra_kwargs = {'child_dob': {'required': True, 'allow_null': False}}
 
     def get_privacy_notice_version_label(self, obj):
         ver = obj.privacy_notice_version

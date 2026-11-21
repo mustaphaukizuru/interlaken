@@ -26,6 +26,7 @@ from apps.core.permissions import IsAdmin, is_admin_or_django_staff
 from apps.core.ratelimit import ratelimit
 from apps.portal.services import send_email
 
+from . import ficha
 from .filters import PreRegistrationFilter, RegistrationFilter
 from .models import PreRegistration, Registration, RegistrationDocument
 from .serializers import (
@@ -48,10 +49,14 @@ from .services import (
     email_registration_outcome,
     email_rejected_documents,
     invite_preregistration,
+    invite_url_for,
 )
 from .tokens import issue_invite, issue_session, redeem_invite, session_valid
 
 logger = logging.getLogger(__name__)
+
+PUBLIC_START_OFF = ('En este momento la ficha de inscripción solo se puede iniciar con el enlace '
+                    'que le envía el colegio. Escríbanos o llámenos y con gusto le enviamos el suyo.')
 
 
 def _is_staff(request):
@@ -298,6 +303,14 @@ class RegistrationListCreateView(RegistrationListConfig, generics.ListCreateAPIV
         return RegistrationSerializer
 
     def create(self, request, *args, **kwargs):
+        # «Permitir iniciar la ficha sin enlace» (Ajustes). Off: only the link
+        # the office sends opens a ficha (that path never comes through here).
+        if not _is_staff(request) and not ficha.public_start_enabled():
+            return Response(error_body(PUBLIC_START_OFF, code='public_start_disabled'),
+                            status=status.HTTP_403_FORBIDDEN)
+        if 'contact_email' in request.data:
+            return self._start_ficha(request)
+        # The old /inscripcion wizard's payload (kept until Fase 2 replaces it).
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -307,6 +320,23 @@ class RegistrationListCreateView(RegistrationListConfig, generics.ListCreateAPIV
         data = dict(serializer.data)
         data['invite_token'] = issue_invite(serializer.instance)
         return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def _start_ficha(self, request):
+        """Step 0 «Antes de empezar»: lead + DRAFT ficha + session (continue now)
+        + a single-use link by email (continue later) + the office notice."""
+        reg, session, invite = ficha.start_ficha(request.data)
+        url = invite_url_for(reg, invite)
+        ficha.email_ficha_started(reg, url)
+        ficha.notify_office_ficha_started(reg)
+        return Response({
+            'id': reg.id,
+            'session_token': session,
+            'session_expires_at': reg.session_expires_at,
+            'status': reg.status,
+            'cycle': reg.cycle,
+            'pre_registration': reg.pre_registration_id,
+            'ficha': ficha.ficha_payload(reg, is_staff=False, medical_ok=True),
+        }, status=status.HTTP_201_CREATED)
 
 
 # Re-applications accumulate per cycle and are never purged; a family only ever
@@ -544,6 +574,9 @@ class RegistrationSubmitView(APIView):
                 error_body('Esta inscripción ya fue enviada.'),
                 status=status.HTTP_400_BAD_REQUEST)
 
+        if reg.ficha_version == Registration.FichaVersion.FICHA:
+            return self._submit_ficha(request, reg)
+
         # LFPDPPP (IK-LEGAL B2): Stage B requires acceptance of the current notice.
         if reg.privacy_accepted_at is None:
             from apps.legal.models import PrivacyNoticeVersion
@@ -558,11 +591,7 @@ class RegistrationSubmitView(APIView):
         # Medical data may only be submitted with explicit MEDICAL_DATA consent.
         # Include estatura/peso — they are EncryptedTextField medical fields in
         # MEDICAL_FIELDS and must not bypass the consent gate.
-        has_medical = any([
-            reg.blood_type, reg.allergies, reg.medical_notes,
-            reg.estatura, reg.peso,
-        ])
-        if has_medical and not reg.consent_medical_data:
+        if ficha.has_medical_data(reg) and not reg.consent_medical_data:
             return Response(
                 error_body('Se requiere consentimiento de datos de salud para enviar información médica.'),
                 status=status.HTTP_400_BAD_REQUEST)
@@ -584,6 +613,25 @@ class RegistrationSubmitView(APIView):
         send_email(f'Inscripción recibida: {child}', '', [reg.parent1_email],
                    reply_to=settings.ADMISSIONS_EMAIL, content=content)
         return Response({'status': 'submitted', 'message': 'Inscripción enviada exitosamente.'})
+
+    def _submit_ficha(self, request, reg):
+        """The ficha: full required rules, privacy acceptance + typed signature
+        (stored with the notice version, time and IP), the medical-consent gate.
+        Documents are NOT required here: they have their own page."""
+        problems, guardians = ficha.submit_problems(reg, request.data, is_staff=_is_staff(request))
+        if problems:
+            return Response(
+                error_body('Faltan datos o hay datos por corregir en la ficha. '
+                           'Revise las secciones marcadas.', code='incomplete', sections=problems),
+                status=status.HTTP_400_BAD_REQUEST)
+        if ficha.has_medical_data(reg) and not reg.consent_medical_data:
+            return Response(
+                error_body('Se requiere consentimiento de datos de salud para enviar información médica.'),
+                status=status.HTTP_400_BAD_REQUEST)
+        ficha.sign_and_submit(reg, request.data, guardians, request)
+        ficha.email_ficha_submitted(reg)
+        return Response({'status': 'submitted', 'message': 'Ficha de inscripción enviada.',
+                         'submitted_at': reg.submitted_at})
 
 
 @method_decorator(ratelimit('registration-upload', '20/m', key='ip', method='POST'), name='dispatch')

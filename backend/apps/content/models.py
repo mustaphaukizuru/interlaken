@@ -66,6 +66,11 @@ class SiteSettings(models.Model):
 
     # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
     tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')
+    # Ficha de inscripción (2026-11): off = only the private link the office
+    # sends opens a ficha; the public start answers 403 (admissions.ficha).
+    admissions_public_start = models.BooleanField(
+        'Permitir iniciar la ficha sin enlace', default=True,
+        help_text='Apagado: la ficha de inscripción solo se abre con el enlace que envía el colegio.')
 
     # ── Navegación (CMS phase 6). [] = menú integrado del frontend ───
     menu = models.JSONField('Menú del sitio', default=list, blank=True)
