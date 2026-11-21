@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight, CircleDollarSign, Clock, GraduationCap, Info,
+  ArrowRight, CircleDollarSign, Clock, GraduationCap, Hourglass, Info,
   ShieldCheck, Sparkles, Wallet,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -55,6 +55,8 @@ export interface PricingCopy {
   daycareLabel: string; daycareTitle: string; daycareSubtitle: string;
   /** Small badge next to each card title saying which year's prices it shows («Precios 2027»); empty hides it. */
   feesYear: string; tuitionYear: string; insuranceYear: string; extrasYear: string; daycareYear: string;
+  /** Amber «pending» status next to the year badge for a card whose next-year prices are not set yet; empty hides it. */
+  feesPending: string; tuitionPending: string; insurancePending: string; extrasPending: string; daycarePending: string;
   policiesTitle: string;
   /** Policies that mention one of these words (comma separated, accents ignored) stand out. */
   policyHighlight: string;
@@ -87,6 +89,9 @@ export const PRICING_COPY: PricingCopy = {
   // year's prices; seguros, extraescolares and estancia still this year's.
   feesYear: 'Precios 2027', tuitionYear: 'Precios 2027',
   insuranceYear: 'Precios 2026', extrasYear: 'Precios 2026', daycareYear: 'Precios 2026',
+  // Seguros, extraescolares and estancia have no 2027 prices yet (price sheet: crossed out).
+  feesPending: '', tuitionPending: '',
+  insurancePending: 'Precios 2027: pendientes', extrasPending: 'Precios 2027: pendientes', daycarePending: 'Precios 2027: pendientes',
   policiesTitle: 'Políticas de pago',
   policyHighlight: 'recargo, devolución',
   errorTitle: 'No fue posible cargar los costos',
@@ -114,11 +119,13 @@ export function policyMatcher(words: string): (text: string) => boolean {
 const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
 
 /** Card shell shared by every pricing section (and the generic «Tabla» block's card style). */
-export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, children }: {
+export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, pending, children }: {
   tone: 'green' | 'purple' | 'coral' | 'pink';
   icon: any; label: string; title: string; subtitle?: string;
   /** Short pill next to the title, e.g. «Precios 2027». */
   badge?: string;
+  /** Amber status pill after the badge, e.g. «Precios 2027: pendientes». */
+  pending?: string;
   children: React.ReactNode;
 }) {
   const tones = {
@@ -136,10 +143,15 @@ export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, chi
         <div>
           <p className={`text-[11px] font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
           {/* Without a badge the heading renders exactly as before (the generic «Tabla» block uses this card too). */}
-          {badge ? (
+          {badge || pending ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
-              <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tones.chip}`}>{badge}</span>
+              {badge && <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tones.chip}`}>{badge}</span>}
+              {pending && (
+                <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber/10 px-2.5 py-0.5 text-[11px] font-bold text-amber">
+                  <Hourglass className="h-3 w-3" aria-hidden="true" />{pending}
+                </span>
+              )}
             </div>
           ) : (
             <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
@@ -257,6 +269,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   title={t(c.feesTitle)}
                   subtitle={t(c.feesSubtitle)}
                   badge={t(c.feesYear) || undefined}
+                  pending={t(c.feesPending) || undefined}
                 >
                   <div className="flex gap-2 border-b border-ink/5 px-5 py-3" role="group" aria-label="Modalidad de inscripción">
                     {([['nuevo_ingreso', t(c.newTag)], ['reinscripcion', t(c.returningTag)]] as const).map(([key, tag]) => (
@@ -310,6 +323,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   tone="purple" icon={Wallet} label={t(c.tuitionLabel)} title={t(c.tuitionTitle)}
                   subtitle={t(c.tuitionSubtitle)}
                   badge={t(c.tuitionYear) || undefined}
+                  pending={t(c.tuitionPending) || undefined}
                 >
                   <ul>
                     {tuition.map((r) => (
@@ -324,6 +338,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     title={t(c.insuranceTitle)}
                     subtitle={t(c.insuranceSubtitle)}
                     badge={t(c.insuranceYear) || undefined}
+                    pending={t(c.insurancePending) || undefined}
                   >
                     <ul>
                       {seguros.map((s) => (
@@ -342,6 +357,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     title={t(c.extrasTitle)}
                     subtitle={t(c.extrasSubtitle)}
                     badge={t(c.extrasYear) || undefined}
+                    pending={t(c.extrasPending) || undefined}
                   >
                     <ul>
                       {extras.map((e) => (
@@ -357,6 +373,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     title={t(c.daycareTitle)}
                     subtitle={t(c.daycareSubtitle)}
                     badge={t(c.daycareYear) || undefined}
+                    pending={t(c.daycarePending) || undefined}
                   >
                     <ul>
                       {estancia.map((d) => (

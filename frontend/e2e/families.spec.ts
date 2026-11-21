@@ -13,7 +13,9 @@ import { DEV_ADMIN, login } from './helpers';
  */
 // Trailing slash + relative paths: a leading «/» would drop the /api/v1 prefix.
 const API = 'http://localhost:8800/api/v1/';
-const FAMILY_PASSWORD = 'Hermanos-E2E-2026!';
+// Shares nothing with the generated names («Hermanos<run> Ruiz», Ana, Luis): Django's
+// similarity validator rejected the old 'Hermanos-E2E-2026!' on some runs (flaky).
+const FAMILY_PASSWORD = 'Lluvia-Azul-7319!';
 const SHOTS = process.env.FAMILY_SHOTS;
 
 /** Desktop and phone screenshots for a design review (local only, FAMILY_SHOTS set). */

@@ -82,8 +82,26 @@ describe('PricingSections copy', () => {
     expect(within(tuitionCard).getByText('Precios 2027')).toBeInTheDocument();
   });
 
+  it('marks the cards without next-year prices as pending, and only those', async () => {
+    renderWithProviders(<PricingSections />);
+    await screen.findByRole('table', { name: /Nuevo ingreso/ });
+    // Seguros, extraescolares and estancia keep their 2026 prices with a «pendientes» status.
+    expect(screen.getAllByText('Precios 2027: pendientes')).toHaveLength(3);
+    const insurance = screen.getByRole('heading', { name: 'Seguros y credenciales' }).parentElement!;
+    expect(within(insurance).getByText('Precios 2026')).toBeInTheDocument();
+    expect(within(insurance).getByText('Precios 2027: pendientes')).toBeInTheDocument();
+    const tuition = screen.getByRole('heading', { name: 'Colegiaturas' }).parentElement!;
+    expect(within(tuition).queryByText(/pendientes/)).not.toBeInTheDocument();
+  });
+
+  it('hides the pending status once it is emptied in Contenido', async () => {
+    renderWithProviders(<PricingSections copy={{ insurancePending: '', extrasPending: '', daycarePending: '' }} />);
+    await screen.findByRole('table', { name: /Nuevo ingreso/ });
+    expect(screen.queryByText(/pendientes/)).not.toBeInTheDocument();
+  });
+
   it('hides a badge left empty and shows an edited one', async () => {
-    renderWithProviders(<PricingSections copy={{ feesYear: '', tuitionYear: 'Ciclo {{ciclo}}', insuranceYear: '', extrasYear: '', daycareYear: '' }} />);
+    renderWithProviders(<PricingSections copy={{ feesYear: '', tuitionYear: 'Ciclo {{ciclo}}', insuranceYear: '', extrasYear: '', daycareYear: '', insurancePending: '', extrasPending: '', daycarePending: '' }} />);
     await screen.findByRole('table', { name: /Nuevo ingreso/ });
     expect(screen.queryByText(/^Precios 20/)).not.toBeInTheDocument();
     expect(screen.getByText(/^Ciclo 20\d\d/)).toBeInTheDocument();
