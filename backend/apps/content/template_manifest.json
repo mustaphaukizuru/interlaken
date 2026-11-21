@@ -89,14 +89,6 @@
         "description": "Colegio bilingüe en Tlalnepantla, Estado de México: preescolar, primaria y secundaria con {{anios}} años de trayectoria. Agende su visita."
       }
     },
-    "inscripcion": {
-      "path": "/inscripcion",
-      "title": "Inscripción",
-      "seo": {
-        "title": "Inscripción formal",
-        "description": "Complete la inscripción formal en el Colegio Interlaken tras su pre-registro."
-      }
-    },
     "inscripcion-documentos": {
       "path": "/inscripcion/documentos",
       "title": "Documentos de inscripción",
@@ -147,10 +139,10 @@
     },
     "pre-registro": {
       "path": "/pre-registro",
-      "title": "Pre-registro",
+      "title": "Ficha de inscripción",
       "seo": {
-        "title": "Pre-registro en línea",
-        "description": "Inicie su pre-registro en línea para el ciclo escolar {{ciclo}} en el Colegio Interlaken. Un asesor le contactará en 2 días hábiles."
+        "title": "Ficha de inscripción en línea",
+        "description": "Llene en línea la ficha de inscripción al Colegio Interlaken (ciclo {{ciclo}} o el siguiente): unos 15 minutos, en pasos que puede guardar y continuar después."
       }
     },
     "preescolar": {

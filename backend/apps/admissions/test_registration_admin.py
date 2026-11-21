@@ -46,7 +46,7 @@ class TestPreRegistrationInvite:
         body = resp.json()
         # A shareable, token-bearing link back to the enrollment wizard.
         assert body['invite_url'].endswith(
-            f"/inscripcion?rid={body['registration_id']}&token={body['invite_token']}")
+            f"/pre-registro?rid={body['registration_id']}&token={body['invite_token']}")
         reg = Registration.objects.get(id=body['registration_id'])
         # Draft pre-filled from the pre-registration.
         assert reg.pre_registration_id == pre.id

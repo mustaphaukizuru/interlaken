@@ -202,6 +202,8 @@ class FieldSpec:
             "unit": self.unit or None,
             "min": self.min,
             "max": self.max,
+            # The message when it is required and missing (None: the generic one).
+            "message": self.message or None,
         }
 
 

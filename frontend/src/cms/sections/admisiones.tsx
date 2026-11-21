@@ -258,7 +258,7 @@ function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string;
   );
 }
 
-/* ── Documentos + llamado al pre-registro ───────────────────────────────── */
+/* ── Documentos + llamado a la ficha de inscripción ─────────────────────── */
 interface DocsCtaProps {
   docsTitle?: string; docsSummary?: string; docsNote?: string;
   image?: number | string; imageAlt?: string; badge?: string; title?: string; text?: string; primary?: CmsLink; secondary?: CmsLink;
@@ -316,7 +316,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
           </div>
         </Reveal>
 
-        {/* CTA con foto del salón: llena el espacio y motiva el pre-registro */}
+        {/* CTA con foto del salón: llena el espacio y motiva la ficha de inscripción */}
         <Reveal direction="left">
           <div className="group relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-[20px] shadow-card">
             {img.src && (
@@ -378,8 +378,8 @@ const faqChunk = () => import('./admisiones.faq');
 const FAQS: FaqItem[] = [
   { cat: 'Niveles', q: '¿Qué niveles educativos ofrece Colegio Interlaken?', a: 'Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe (español–inglés) en cada nivel.' },
   { cat: 'Niveles', q: '¿En qué consiste el modelo bilingüe?', a: 'Inglés intensivo desde el nivel inicial, con preparación para certificaciones internacionales de la Universidad de Cambridge en secundaria.' },
-  { cat: 'Inscripción', q: '¿Cuánto tarda el pre-registro en línea?', a: 'Menos de 5 minutos. Recibirá confirmación inmediata y un asesor le contactará en un plazo de 2 días hábiles.' },
-  { cat: 'Inscripción', q: '¿Cómo es el proceso de admisión?', a: 'Pre-registro en línea, entrega de documentos, examen de valoración y confirmación de lugar. Un asesor le guía en cada paso.' },
+  { cat: 'Inscripción', q: '¿Cuánto tarda la ficha de inscripción en línea?', a: 'Unos 15 minutos. Se guarda en cada paso, así que puede dejarla y continuar después con el enlace que le enviamos a su correo. Un asesor le contactará en un plazo de 2 días hábiles.' },
+  { cat: 'Inscripción', q: '¿Cómo es el proceso de admisión?', a: 'Ficha de inscripción en línea, entrega de documentos, examen de valoración y confirmación de lugar. Un asesor le guía en cada paso.' },
   { cat: 'Documentos', q: '¿Qué documentos necesito para inscribir a mi hijo?', a: 'Acta de nacimiento, CURP del alumno y de los tutores, INE del tutor, comprobante de domicilio, boletas del ciclo anterior, entre otros. Consulte la lista completa con enlaces oficiales en la sección de Documentación.' },
   { cat: 'Costos', q: '¿Cómo están estructurados los costos?', a: 'Las colegiaturas se pagan en 11 mensualidades, de agosto a junio. Consulte el desglose por sección en la página de Costos.' },
   { cat: 'Costos', q: '¿Ofrecen becas o descuentos?', a: 'Contamos con apoyos para hermanos y casos especiales. Escríbanos desde la sección de Contacto para conocer las opciones vigentes.' },
@@ -387,12 +387,12 @@ const FAQS: FaqItem[] = [
   { cat: 'Privacidad', q: '¿Cómo protege el colegio los datos de mi familia?', a: 'Tratamos sus datos personales conforme a la LFPDPPP. Consulte nuestro Aviso de Privacidad para conocer y ejercer sus derechos ARCO.' },
 ];
 
-/** Funnel timeline: from any step a parent reaches a human, a visit or the pre-registro in one tap. */
+/** Funnel timeline: from any step a parent reaches a human, a visit or the ficha de inscripción in one tap. */
 const STEPS: StepItem[] = [
   { icon: 'WhatsApp', step: '01', key: 'informes', title: 'Informes', text: 'Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.', color: 'var(--green)', link: { label: '', href: '' } },
   { icon: 'CalendarDays', step: '02', key: 'visita_guiada', title: 'Visita guiada', text: 'Conozca las instalaciones y al equipo docente en un recorrido personalizado.', color: 'var(--purple)', link: { label: 'Agendar visita', href: '/agendar-visita' } },
   { icon: 'FileText', step: '03', key: 'documentacion', title: 'Documentación', text: 'Consulte la lista de documentos requeridos, con enlaces a trámites oficiales.', color: 'var(--pink)', link: { label: 'Ver documentación', href: '/admisiones/documentacion' } },
-  { icon: 'ClipboardList', step: '04', key: 'inscripcion', title: 'Inscripción', text: 'Complete el pre-registro en línea en menos de 5 minutos y asegure su lugar.', color: 'var(--green)', link: { label: 'Iniciar pre-registro', href: '/pre-registro' } },
+  { icon: 'ClipboardList', step: '04', key: 'inscripcion', title: 'Inscripción', text: 'Llene en línea la ficha de inscripción (unos 15 minutos; puede guardarla y continuar después) y asegure su lugar.', color: 'var(--green)', link: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' } },
 ];
 
 export const sections = [
@@ -472,7 +472,7 @@ export const sections = [
     },
   }),
   section({
-    type: 'docs_cta', label: 'Admisiones · Documentos y pre-registro', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado al pre-registro. La lista se edita en la página Documentación.',
+    type: 'docs_cta', label: 'Admisiones · Documentos y ficha de inscripción', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado a la ficha de inscripción. La lista se edita en la página Documentación.',
     component: AdmDocsCtaView,
     fields: [
       ...grouped('Documentos requeridos', [
@@ -480,7 +480,7 @@ export const sections = [
         f.text('docsSummary', 'Documentos: resumen'),
         f.textarea('docsNote', 'Documentos: nota al pie'),
       ]),
-      ...grouped('Llamado al pre-registro', [
+      ...grouped('Llamado a la ficha de inscripción', [
         f.image('image', 'Foto del llamado'),
         f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
         f.text('badge', 'Insignia'),
@@ -495,8 +495,8 @@ export const sections = [
       docsNote: 'Los enlaces llevan a los portales oficiales del gobierno (gob.mx / INE) para obtener o consultar cada documento en línea.',
       image: '/assets/classroom.webp', imageAlt: 'Salón de clases del Colegio Interlaken',
       badge: 'Inscripciones abiertas · Ciclo {{ciclo}}', title: '¿Listo para comenzar?',
-      text: 'El pre-registro toma menos de 5 minutos. Recibirá confirmación inmediata y le contactaremos para coordinar los siguientes pasos.',
-      primary: { label: 'Inicie su pre-registro', href: '/pre-registro' },
+      text: 'La ficha de inscripción toma unos 15 minutos y puede guardarla y continuar después. Le contactaremos para coordinar los siguientes pasos.',
+      primary: { label: 'Llene la ficha de inscripción', href: '/pre-registro' },
       secondary: { label: 'Agendar una visita', href: '/agendar-visita' },
     },
   }),

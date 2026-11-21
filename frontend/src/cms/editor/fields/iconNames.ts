@@ -52,7 +52,7 @@ export const ICON_NAMES: Record<string, { name: string; words?: string }> = {
   Utensils: { name: 'Cubiertos', words: 'comida cafetería alimentos' },
   WhatsApp: { name: 'WhatsApp', words: 'mensaje chat' },
   // Menu-only icons (Navegación).
-  UserPlus: { name: 'Persona nueva', words: 'pre-registro alta inscripción' },
+  UserPlus: { name: 'Persona nueva', words: 'ficha pre-registro alta inscripción' },
   MonitorSmartphone: { name: 'Pantalla y celular', words: 'plataformas digital' },
 };
 

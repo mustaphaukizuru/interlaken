@@ -71,6 +71,13 @@ class TestSchemaEndpoint:
             "Doctorado",
         }
 
+    def test_fields_carry_their_own_required_message(self, api_client):
+        steps = {s["key"]: s for s in api_client.get(reverse("ficha-schema")).json()["steps"]}
+        consent = next(f for f in steps["salud"]["fields"] if f["name"] == "consent_medical_data")
+        assert consent["message"].startswith("Para enviar los datos de salud")
+        street = next(f for f in steps["domicilio"]["fields"] if f["name"] == "address_street")
+        assert street["message"] is None
+
     def test_every_select_names_a_known_list(self, api_client):
         data = api_client.get(reverse("ficha-schema")).json()
         for step in data["steps"]:

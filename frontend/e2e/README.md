@@ -14,6 +14,7 @@ and admin/portal data are stubbed with `page.route` so runs are deterministic.
 | `admin.spec.ts` | Comunicado publish from the admin console; the parent portal no longer shows comunicados (bitácora punto 10) |
 | `console-frame.spec.ts` | The console never slides up: wheel, End, focus() and scrollIntoView() near the bottom of /admin/pagos leave the document and the frame unscrolled (1919×937 and 390×844) |
 | `layout-shift.spec.ts` | /admisiones/costos: with the CMS check held open the footer stays below the fold, and the page loads with layout shift < 0.1 |
+| `ficha.spec.ts` | Ficha de inscripción at 390 px: public start, Alumno (CURP fills birth date, sex and state), Domicilio and Salud; a fresh invitation from Admisiones opens the first step with something missing in a new browser (token leaves the URL); Padre «No aplica», Madre prefilled from who fills the ficha, Emergencia, signature and confirmation. `FICHA_SHOTS=<dir>` saves every screen |
 | `visual.spec.ts` | `toHaveScreenshot` baselines at 390×844 and 1280×800 for home, costos, admisiones, login, parent dashboard (stubbed) |
 | `public-pages.spec.ts` | CMS visual guard: every designed public page plus the 404, full height at 390 and 1280 px, unpublished (templates) and with every template published from the design through the admin API (zero pre-publish issues asserted). Published must equal defaults in the same run; both must match the committed baselines once they exist ([docs/cms/safe-publish.md](../../docs/cms/safe-publish.md)) |
 

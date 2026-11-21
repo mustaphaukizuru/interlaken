@@ -61,8 +61,8 @@ describe('AdminPages: one list of the site', () => {
     renderList();
     const site = await screen.findByRole('list', { name: 'Páginas del sitio' }, { timeout: 8000 });
     expect(list).toHaveBeenCalledWith({ page: 1, page_size: 100 });
-    // 18 designed pages + the 4 app screens (iniciar-sesion, inscripcion, inscripcion-documentos, confirmar-correo).
-    expect(within(site).getAllByRole('listitem')).toHaveLength(22);
+    // 18 designed pages + the 3 app screens (iniciar-sesion, inscripcion-documentos, confirmar-correo).
+    expect(within(site).getAllByRole('listitem')).toHaveLength(21);
     expect(screen.getAllByText('Nosotros', { selector: 'a' })).toHaveLength(1);
     expect(within(group('Páginas propias')).getAllByRole('listitem')).toHaveLength(2);
 

@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { RegistrationReviewModal } from './RegistrationReviewModal';
 import { admissionsAdminApi, api } from '@/services/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import fichaSchema from '@/components/admissions/ficha/fixtures/schema.json';
 
 const getRegistration = vi.mocked(admissionsAdminApi.getRegistration);
 const updateStatus = vi.mocked(admissionsAdminApi.updateRegistrationStatus);
@@ -309,5 +310,27 @@ describe('RegistrationReviewModal', () => {
       action: 'reject', ids: [44, 45], all_matching: false, filters: undefined, dry_run: false,
       payload: { note: 'Ilegibles', notify: true },
     }));
+  });
+  it('a ficha (version 2) shows its sections grouped like the Excel instead of the old summary', async () => {
+    apiGet.mockImplementation(async (url: string) => {
+      if (url === '/admissions/ficha/schema/') return { data: fichaSchema } as never;
+      if (url === '/admissions/register/9/ficha/') {
+        return { data: {
+          id: 9, status: 'submitted', ficha_version: 2, editable: true, child_name: 'Sofía Ruiz', medical_masked: true,
+          sections: { alumno: { child_given_names: 'Sofía', child_paternal_surname: 'Ruiz' }, padre: { not_applicable: true }, madre: {}, domicilio: {}, salud: {}, emergencia: {}, contacto: {} },
+          firma: { signed_name: 'María Ruiz', signed_at: '2026-08-01T15:31:00Z', consent_photos_media: false, privacy_accepted_at: null, privacy_notice_version: '' },
+          completeness: { sections: {}, complete: true },
+        } } as never;
+      }
+      return { data: { id: 9, status: 'submitted', admin_notes: '' } } as never;
+    });
+    renderModal();
+    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Datos del padre' }).closest('section')).toHaveTextContent('No aplica');
+    expect(screen.getByText(/Datos de salud protegidos/)).toBeInTheDocument();
+    expect(screen.getByText('María Ruiz')).toBeInTheDocument();
+    // The old one-line summary is gone; consents and documents stay.
+    expect(screen.queryByText('Tutor principal')).not.toBeInTheDocument();
+    expect(screen.getByText('Consentimientos')).toBeInTheDocument();
   });
 });

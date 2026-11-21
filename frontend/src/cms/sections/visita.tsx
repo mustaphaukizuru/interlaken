@@ -48,7 +48,7 @@ function VisitHeroView(p: HeroProps) {
 }
 
 /* ── Cómo funciona ──────────────────────────────────────────────────────── */
-// Cómo funciona: pre-registro → fecha → confirmación
+// Cómo funciona: ficha de inscripción → fecha → confirmación
 function VisitStepsView(p: { items?: { text?: string }[]; link?: CmsLink }) {
   const t = useTokens();
   const link = asLink(p.link);
@@ -352,21 +352,21 @@ export const sections = [
     fields: [f.text('label', 'Etiqueta superior', { hint: 'Puede usar {{ciclo}}.' }), f.text('title', 'Título', { required: true }), f.textarea('subtitle', 'Subtítulo'), f.image('image', 'Foto de fondo')],
     defaults: {
       label: 'Ciclo Escolar {{ciclo}} · Admisiones', title: 'Agendar Visita',
-      subtitle: 'Un recorrido personalizado para su familia: complete su pre-registro, elija la fecha que le convenga y confirme su cita.',
+      subtitle: 'Un recorrido personalizado para su familia: elija la fecha que le convenga, confirme su cita y llene la ficha de inscripción cuando guste.',
       image: '/assets/facade.webp',
     },
   }),
   section({
-    type: 'steps', label: 'Agendar visita · Cómo funciona', description: 'Franja con los pasos numerados y un enlace al pre-registro.',
+    type: 'steps', label: 'Agendar visita · Cómo funciona', description: 'Franja con los pasos numerados y un enlace a la ficha de inscripción.',
     component: VisitStepsView,
     fields: [f.items('items', 'Pasos', [f.text('text', 'Paso', { required: true })]), f.link('link', 'Enlace bajo los pasos')],
     defaults: {
       items: [
-        { text: 'Complete su pre-registro con los datos de su hijo/a' },
+        { text: 'Llene la ficha de inscripción con los datos de su hijo/a' },
         { text: 'Elija fecha y horario disponibles aquí mismo' },
         { text: 'Reciba la confirmación de su visita por correo' },
       ],
-      link: { label: '¿Aún no se pre-registra? Inicie su pre-registro aquí →', href: '/pre-registro' },
+      link: { label: '¿Aún no llena la ficha de inscripción? Empiece aquí →', href: '/pre-registro' },
     },
   }),
   section({

@@ -138,7 +138,7 @@ class TestPublicStart:
         family = next(m for m in mail.outbox if m.to == ["marta.ficha@ejemplo.test"])
         assert "Ficha de inscripción iniciada" in family.subject
         assert "Recibimos el inicio" in family.body
-        assert f"/inscripcion?rid={reg_id}&token=" in family.body
+        assert f"/pre-registro?rid={reg_id}&token=" in family.body
         office = next(m for m in mail.outbox if m.to == ["admisiones@ejemplo.test"])
         assert "Nueva ficha de inscripción" in office.subject
         assert office.reply_to == ["marta.ficha@ejemplo.test"]
@@ -667,7 +667,7 @@ class TestResume:
         assert known.status_code == unknown.status_code == 200
         assert known.data == unknown.data
         assert len(mail.outbox) == 1 and mail.outbox[0].to == ["marta.ficha@ejemplo.test"]
-        assert f"/inscripcion?rid={reg_id}&token=" in mail.outbox[0].body
+        assert f"/pre-registro?rid={reg_id}&token=" in mail.outbox[0].body
         assert Registration.objects.get(pk=reg_id).invite_token_hash != before
         assert sync_background == ["admissions-resume"]
 

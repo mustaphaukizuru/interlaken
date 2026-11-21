@@ -30,9 +30,9 @@ SEO_ROUTES = {
                     'jsonLd': [{'@type': 'BreadcrumbList', 'name': '</script><script>alert(1)</script>'}]},
     '/nosotros': {'title': 'Nosotros · Colegio Interlaken', 'description': 'Historia.',
                   'canonical': 'https://interlaken.edu.mx/nosotros', 'image': 'https://interlaken.edu.mx/og-image.png', 'jsonLd': []},
-    '/inscripcion': {'title': 'Inscripción formal · Colegio Interlaken', 'description': 'Flujo privado.',
-                     'canonical': 'https://interlaken.edu.mx/inscripcion', 'image': 'https://interlaken.edu.mx/og-image.png',
-                     'robots': 'noindex', 'jsonLd': []},
+    '/inscripcion/documentos': {'title': 'Documentos de inscripción · Colegio Interlaken', 'description': 'Flujo privado.',
+                                'canonical': 'https://interlaken.edu.mx/inscripcion/documentos',
+                                'image': 'https://interlaken.edu.mx/og-image.png', 'robots': 'noindex', 'jsonLd': []},
     '/confirmar-correo': {'title': 'Confirmar correo · Colegio Interlaken', 'description': 'Privado.',
                           'canonical': 'https://interlaken.edu.mx/confirmar-correo', 'image': 'https://interlaken.edu.mx/og-image.png',
                           'robots': 'noindex', 'jsonLd': []},
@@ -97,7 +97,7 @@ def test_each_route_gets_its_own_head_in_the_raw_html(client, built_site):
 
 @pytest.mark.django_db
 def test_private_flows_and_app_screens_say_noindex(client, built_site):
-    assert _head(client.get('/inscripcion').content.decode())['robots'] == ['noindex']
+    assert _head(client.get('/inscripcion/documentos').content.decode())['robots'] == ['noindex']
     login = client.get('/login')
     assert login.status_code == 200 and _head(login.content.decode())['robots'] == ['noindex']
     assert client.get('/admin/alumnos').status_code == 200
@@ -135,6 +135,9 @@ def test_trailing_slash_and_aliases_redirect_permanently(client, built_site):
     assert r.status_code == 301 and r['Location'] == '/contacto?utm_source=fb'
     r = client.get('/puertas-abiertas')
     assert r.status_code == 301 and r['Location'] == '/agendar-visita'
+    # Staff links sent before the ficha (Fase 2) keep their rid/token.
+    r = client.get('/inscripcion?rid=7&token=abc')
+    assert r.status_code == 301 and r['Location'] == '/pre-registro?rid=7&token=abc'
     # Consoles and the portal keep answering with or without the slash.
     assert client.get('/admin/alumnos/').status_code == 200
     assert client.get('/portal/').status_code == 200
@@ -176,7 +179,7 @@ def test_sitemap_lists_the_built_routes_minus_noindex(client, built_site):
     xml = client.get('/sitemap.xml').content.decode()
     locs = re.findall(r'<loc>([^<]+)</loc>', xml)
     assert 'https://interlaken.edu.mx/admisiones' in locs
-    assert 'https://interlaken.edu.mx/inscripcion' not in locs
+    assert 'https://interlaken.edu.mx/inscripcion/documentos' not in locs
 
 
 def test_apply_head_rewrites_title_description_image_and_noindex():

@@ -157,7 +157,7 @@ describe('BlockForm field kinds (C5)', () => {
     renderWithProviders(<Harness initial={{ id: 'f', type: 'form', props: { form: '' } }} />);
     const select = byId('f-f-form');
     expect(select.tagName).toBe('SELECT');
-    expect(within(select).getByRole('option', { name: /Pre-registro/ })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: /Ficha de inscripción/ })).toBeInTheDocument();
     expect(await within(select).findByRole('option', { name: 'Encuesta de padres (no publicado)' })).toBeInTheDocument();
   });
 });

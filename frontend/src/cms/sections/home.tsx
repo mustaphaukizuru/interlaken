@@ -143,7 +143,7 @@ export const sections = [
     defaults: {
       showLogo: true, title: 'Formando líderes', titleAccent: 'con excelencia',
       subtitle: 'Educación bilingüe en Tlalnepantla, de preescolar a secundaria — ciclo {{ciclo}}.',
-      primary: { label: 'Inicie su pre-registro', href: '/pre-registro' },
+      primary: { label: 'Llene la ficha de inscripción', href: '/pre-registro' },
       secondary: { label: 'Portal Cafetería', href: '/login' },
       poster: '/assets/court-wide.webp', posterAlt: 'Campus Colegio Interlaken', video: '',
     },
@@ -274,8 +274,8 @@ export const sections = [
     component: lazySection(below, 'HomeCta', '20vh'),
     fields: [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.link('primary', 'Botón principal'), f.link('secondary', 'Botón secundario')],
     defaults: {
-      title: 'Comience el futuro de su hijo hoy', text: 'Agende una visita o inicie su pre-registro en línea en solo unos minutos.',
-      primary: { label: 'Inicie su pre-registro', href: '/pre-registro' }, secondary: { label: 'Agendar visita', href: '/agendar-visita' },
+      title: 'Comience el futuro de su hijo hoy', text: 'Agende una visita o llene en línea la ficha de inscripción: unos 15 minutos, y puede continuar después.',
+      primary: { label: 'Llene la ficha de inscripción', href: '/pre-registro' }, secondary: { label: 'Agendar visita', href: '/agendar-visita' },
     },
   }),
 ];

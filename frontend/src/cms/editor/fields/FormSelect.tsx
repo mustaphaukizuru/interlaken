@@ -8,7 +8,7 @@ import { describedBy, FieldLabel, FieldNotes, invalidClass, type FieldBaseProps 
 
 /** Forms built into the site (cms/blocks/generic.tsx BUILTIN_FORMS): the block shows a button to their page. */
 export const SITE_FORMS: { value: string; label: string }[] = [
-  { value: 'pre-registro', label: 'Pre-registro (botón a su página)' },
+  { value: 'pre-registro', label: 'Ficha de inscripción (botón a su página)' },
   { value: 'contacto', label: 'Contacto (botón a su página)' },
   { value: 'facturacion', label: 'Solicitud de factura (botón a su página)' },
   { value: 'agendar-visita', label: 'Agendar visita (botón a su página)' },

@@ -48,6 +48,9 @@ APP_PREFIXES = ('/portal', '/staff', '/admin', '/alumno', '/login', '/pago/')
 # Aliases App.tsx used to resolve with <Navigate>; a 301 passes their ranking on.
 CODE_REDIRECTS = {
     '/puertas-abiertas': '/agendar-visita',
+    # The ficha de inscripción replaced the old wizard (Fase 2); staff links
+    # sent before it carry /inscripcion?rid=&token= (the query is kept).
+    '/inscripcion': '/pre-registro',
     '/comunidad/plataformas': '/pagos',
     '/calendario': '/',
 }

@@ -108,7 +108,10 @@ export function trackEvent(name: string, props: Record<string, unknown> = {}): v
 export const FunnelEvent = {
   ViewAdmissions: 'funnel_view_admisiones',
   StartPreRegister: 'funnel_start_pre_registro',
+  /** The ficha's step 0 created the draft and its lead (what the short pre-registro form used to send). */
   SubmitPreRegister: 'funnel_submit_pre_registro',
+  /** The whole ficha de inscripción was signed and sent. */
+  SubmitFicha: 'funnel_submit_ficha',
   ViewInscripcion: 'funnel_view_inscripcion',
   BookingConversion: 'conversion_agendar_visita',
 } as const;

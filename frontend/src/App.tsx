@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ComponentType } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastHost } from '@/components/ui/ToastHost';
 
@@ -38,7 +38,6 @@ const AdmissionsPage  = cmsRoute('admisiones', () => import('./pages/public/Admi
 const DocumentacionPage = cmsRoute('documentacion', () => import('./pages/public/DocumentacionPage'));
 const CostosPage      = cmsRoute('costos', () => import('./pages/public/CostosPage'));
 const PreRegisterPage = cmsRoute('pre-registro', () => import('./pages/public/PreRegisterPage'));
-const RegisterPage    = cmsRoute('inscripcion', () => import('./pages/public/RegisterPage'));
 const BookVisitPage   = cmsRoute('agendar-visita', () => import('./pages/public/BookVisitPage'));
 const ContactPage     = cmsRoute('contacto', () => import('./pages/public/ContactPage'));
 const AvisoPrivacidadPage = cmsRoute('aviso-de-privacidad', () => import('./pages/public/AvisoPrivacidadPage'));
@@ -115,6 +114,12 @@ const queryClient = new QueryClient({
 // Cached data belongs to one user: empty it on every login/logout/switch.
 bindQueryCacheToUser(queryClient);
 
+/** /inscripcion → /pre-registro with the same query (a staff link's rid and token). */
+function ToFicha() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/pre-registro', search }} replace />;
+}
+
 /** Lightweight fallback shown while a route chunk loads. */
 function RouteFallback() {
   return (
@@ -153,7 +158,8 @@ export default function App() {
               <Route path="/admisiones/documentacion" element={<DocumentacionPage />} />
               <Route path="/admisiones/costos" element={<CostosPage />} />
               <Route path="/pre-registro"  element={<PreRegisterPage />} />
-              <Route path="/inscripcion"   element={<RegisterPage />} />
+              {/* The old wizard's staff links (?rid=&token=) open the ficha; the server also answers a 301. */}
+              <Route path="/inscripcion"   element={<ToFicha />} />
               <Route path="/inscripcion/documentos" element={<DocumentsUploadPage />} />
               {/* Puertas Abiertas is admin-only now (bookings console); public URL redirects. */}
               <Route path="/puertas-abiertas" element={<Navigate to="/agendar-visita" replace />} />

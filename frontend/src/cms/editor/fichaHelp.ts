@@ -1,0 +1,142 @@
+/**
+ * Help under every field of «Ficha de inscripción · Formulario»
+ * (cms/sections/preregistro.tsx, words in components/admissions/ficha/copy.ts).
+ * Console bundle only; fieldHelp.test.ts checks every field has its own.
+ */
+const button = (what: string) => `Lo que dice el botón ${what}.`;
+const title = (where: string) => `Encabezado ${where}.`;
+const explain = (where: string) => `Frase bajo el encabezado ${where}. Puede dejarla vacía.`;
+const shortStep = (what: string) => `Nombre corto del paso ${what} en la barra de avance de la ficha.`;
+
+export const FICHA_HELP: Record<string, string> = {
+  // Pasos y botones
+  stepsLabel: 'No se ve en pantalla: lo escucha quien usa un lector de pantalla. Nombra la lista de pasos.',
+  stepOf: 'Sobre el título de cada paso, por ejemplo «Paso 2 de 7». Escriba {n} (el paso) y {total} (cuántos son).',
+  stepsToggle: 'En el celular, el botón que despliega la lista de todos los pasos.',
+  stepsHide: 'En el celular, el botón que vuelve a plegar la lista de pasos.',
+  stateDone: 'Lo que escucha un lector de pantalla junto a un paso completo.',
+  stateMissing: 'Lo que escucha un lector de pantalla junto a un paso con datos faltantes.',
+  statePending: 'Lo que escucha un lector de pantalla junto a un paso que todavía no se abre.',
+  stateCurrent: 'Lo que escucha un lector de pantalla junto al paso en el que está la familia.',
+  nextLabel: button('principal de cada paso: guarda y pasa al siguiente'),
+  backLabel: button('para volver al paso anterior (guarda lo que cambió)'),
+  reviewReturn: button('principal cuando la familia llegó a corregir desde la revisión'),
+  laterLabel: button('que guarda el paso y envía al correo un enlace para seguir después'),
+  optionalMark: 'Palabra pequeña junto a la etiqueta de un dato que no es obligatorio, por ejemplo «opcional».',
+  selectPlaceholder: 'Lo que muestran las listas (grado, estado) mientras no se elige nada.',
+  // Guardado y errores
+  saving: 'Se ve junto al botón mientras se guarda el paso.',
+  saved: 'Se ve junto al botón cuando el paso quedó guardado.',
+  saveError: 'Se ve si un paso no se pudo guardar, por ejemplo sin internet.',
+  errorSummary: 'Encabezado del recuadro rojo que lista, arriba del paso, los datos por revisar.',
+  errRequired: 'Mensaje en rojo bajo un dato obligatorio que quedó vacío.',
+  loadError: 'Se ve si la ficha no se pudo abrir (sin internet o el servidor no respondió).',
+  retryLabel: button('para volver a intentar abrir la ficha'),
+  expiredTitle: 'Título cuando la sesión de la ficha venció (pasadas 24 horas).',
+  sessionExpired: 'Explica que la sesión venció y que con su correo recibe un enlace nuevo.',
+  // Nombres cortos de los pasos
+  stepAlumno: shortStep('del alumno'),
+  stepDomicilio: shortStep('del domicilio'),
+  stepSalud: shortStep('de salud'),
+  stepPadre: shortStep('del padre'),
+  stepMadre: shortStep('de la madre'),
+  stepEmergencia: shortStep('del contacto de emergencia'),
+  stepFirma: shortStep('final, la revisión y la firma'),
+  // Antes de empezar
+  startTitle: title('del primer paso, el que llena la familia sin enlace'),
+  startIntro: 'Explica qué pasa al empezar: se guarda la ficha y llega un enlace al correo. Diga cuánto tarda.',
+  checklistTitle: 'Encabezado de la lista de lo que conviene tener a la mano antes de empezar.',
+  checklist: 'Lo que conviene tener a la mano antes de empezar la ficha, un punto por elemento.',
+  'checklist[].text': 'Un punto de la lista, por ejemplo «La CURP del alumno».',
+  whoTitle: title('de los datos de quien llena la ficha'),
+  childTitle: title('de los primeros datos del alumno'),
+  moreTitle: title('de las preguntas finales (cómo nos conoció, visita, comentarios)'),
+  startSubmit: button('que guarda el primer paso y abre la ficha'),
+  startError: 'Se ve arriba del primer paso si no se pudo guardar, por ejemplo sin internet.',
+  // Continuar una ficha
+  resumeToggle: 'Enlace bajo el primer paso para quien ya empezó y necesita un enlace nuevo.',
+  resumeText: 'Explica que con su correo recibe un enlace para continuar.',
+  resumeEmail: 'Lo que dice arriba del campo del correo para pedir el enlace.',
+  resumeSubmit: button('que pide el enlace nuevo'),
+  resumeDone: 'La respuesta, siempre la misma aunque el correo no tenga una ficha (así nadie averigua quién se inscribe).',
+  resumeError: 'Se ve si la solicitud del enlace no se pudo enviar.',
+  // Ficha solo con enlace
+  closedTitle: 'Título cuando en Ajustes se apagó «Permitir iniciar la ficha sin enlace».',
+  closedText: 'Explica que la ficha se llena con el enlace del colegio y cómo pedirlo.',
+  closedCall: button('para llamar al teléfono del colegio (el de Ajustes)'),
+  closedWhatsapp: button('de WhatsApp (el número de Ajustes)'),
+  closedWaMessage: 'Texto que aparece ya escrito cuando la familia abre WhatsApp para pedir su enlace.',
+  // Enlace personal
+  booting: 'Lo que se ve un momento mientras se abre el enlace que envió el colegio.',
+  invitedTitle: 'Inicio en negritas del aviso para quien llega con el enlace del colegio.',
+  invitedText: 'Resto del aviso para quien llega con el enlace del colegio.',
+  inviteErrorTitle: 'Título cuando el enlace ya se usó o venció.',
+  inviteErrorText: 'Explica qué hacer cuando el enlace ya no sirve; debajo va el campo para pedir otro.',
+  sentTitle: 'Título si se abre el enlace de una ficha que ya se envió.',
+  sentText: 'Explica cómo corregir un dato de una ficha ya enviada.',
+  // Paso: alumno
+  alumnoTitle: title('del paso con los datos del alumno'),
+  alumnoIntro: explain('del paso del alumno'),
+  curpHint: 'Nota bajo la CURP: escrita primero, llena sola la fecha de nacimiento, el sexo y el estado.',
+  curpFilled: 'Aviso en verde cuando la CURP llenó la fecha de nacimiento, el sexo o el estado.',
+  curpLink: 'Enlace junto a la nota de la CURP a la consulta oficial en gob.mx.',
+  levelLabel: 'Palabra antes del nivel que se calcula con el grado, por ejemplo «Nivel: Primaria».',
+  ageHint: 'Se ve si la edad no corresponde al grado. Escriba {grado}, {edad} (la que pide el grado), {anio} y {tiene} (la del alumno): se llenan solos.',
+  countryMexico: 'Primera opción del país de nacimiento.',
+  countryOther: 'Segunda opción del país de nacimiento; abre un campo para escribirlo.',
+  countryOtherLabel: 'Lo que dice arriba del campo para escribir otro país.',
+  stateOtherLabel: 'Lo que dice arriba del estado de nacimiento cuando nació en otro país (texto libre).',
+  // Paso: domicilio
+  domicilioTitle: title('del paso del domicilio'),
+  domicilioIntro: explain('del paso del domicilio'),
+  // Paso: salud
+  saludTitle: title('del paso de salud'),
+  saludIntro: 'Frase bajo el encabezado del paso de salud; conviene recordar que los datos se guardan cifrados.',
+  // Pasos: padre y madre
+  padreTitle: title('del paso con los datos del padre'),
+  madreTitle: title('del paso con los datos de la madre'),
+  tutorIntro: explain('de los pasos del padre y de la madre'),
+  prefillFromContact: 'Aviso cuando el bloque se llenó con los datos de quien llena la ficha (si dijo ser la madre o el padre).',
+  naConfirmTitle: 'Título de la ventana que pide confirmar «No aplica» cuando el bloque ya tiene datos.',
+  naConfirmText: 'Explica que al marcar «No aplica» se borran los datos del bloque.',
+  naConfirm: button('que confirma «No aplica» y borra los datos del bloque'),
+  naCollapsed: 'Se ve en lugar de los campos cuando el bloque no aplica.',
+  // Paso: emergencia
+  emergenciaTitle: title('del paso del contacto de emergencia'),
+  emergenciaIntro: explain('del paso del contacto de emergencia'),
+  // Quién llena la ficha
+  contactoTitle: 'Encabezado de los datos de quien llena la ficha, en la revisión y al corregirlos.',
+  contactoIntro: explain('de los datos de quien llena la ficha'),
+  // Revisión y firma
+  reviewTitle: title('del último paso, la revisión y la firma'),
+  reviewIntro: explain('de la revisión'),
+  reviewEdit: button('de cada sección de la revisión para corregirla'),
+  reviewEmpty: 'Se ve en la revisión junto a un dato que quedó vacío.',
+  reviewYes: 'Cómo se lee en la revisión un dato marcado.',
+  reviewNo: 'Cómo se lee en la revisión un dato sin marcar.',
+  reviewNotApplicable: 'Se ve en la revisión en el bloque del padre o de la madre que no aplica.',
+  reviewMissing: 'Aviso en una sección de la revisión a la que le faltan datos.',
+  privacyTitle: 'Encabezado del recuadro del aviso de privacidad, antes de firmar.',
+  privacyText: 'Resumen breve del aviso de privacidad; el enlace al aviso completo va después. Cambie el sentido solo con la aprobación de Dirección.',
+  privacyLink: 'Enlace al Aviso de Privacidad completo.',
+  signTitle: 'Encabezado del campo donde la familia escribe su nombre como firma.',
+  submitLabel: button('final que envía la ficha a Admisiones'),
+  submitError: 'Se ve si la ficha no se pudo enviar, por ejemplo sin internet.',
+  incompleteTitle: 'Título del aviso cuando al enviar faltan datos en otras secciones.',
+  incompleteText: 'Explica que corrija lo marcado; debajo va la lista de secciones con su botón para corregir.',
+  fixLabel: button('junto a cada sección con datos faltantes'),
+  // Guardar y continuar después
+  laterTitle: 'Título al guardar para continuar después.',
+  laterText: 'Lo que ve la familia al guardar para después. Escriba {correo} donde va su correo: se llena solo.',
+  laterBack: button('para seguir llenando en ese momento'),
+  laterError: 'Se ve si el avance se guardó pero el correo con el enlace no salió.',
+  // Confirmación
+  doneTitle: 'Encabezado que ve la familia al enviar la ficha.',
+  doneText: 'Lo que ve la familia al enviar. Escriba {nombre} donde va el nombre del alumno: sale en negritas.',
+  doneStepsTitle: 'Encabezado de la lista de lo que sigue después de enviar.',
+  doneSteps: 'Lo que sigue después de enviar la ficha, en orden.',
+  'doneSteps[].text': 'Un paso de lo que sigue, por ejemplo «Le llamamos para agendar la visita».',
+  doneVisit: 'Botón de la confirmación para agendar la visita.',
+  donePrimary: 'Segundo botón de la confirmación.',
+  doneSecondary: 'Tercer botón de la confirmación, el más discreto.',
+};

@@ -27,7 +27,7 @@ describe('resolveMenu', () => {
     expect(shape).toEqual([
       ['El Colegio', ['Quiénes Somos', 'Modelo Educativo', 'Galería']],
       ['Niveles Educativos', ['Preescolar', 'Primaria', 'Secundaria']],
-      ['Admisiones', ['Proceso de Inscripción', 'Documentación', 'Costos', 'Pre-Registro']],
+      ['Admisiones', ['Proceso de Inscripción', 'Documentación', 'Costos', 'Ficha de inscripción']],
       ['Familias', ['Pagar colegiatura', 'Colegiaturas y cafetería', 'Facturación', 'Plataformas']],
     ]);
     const pay = DEFAULT_MENU[3].items[0];
