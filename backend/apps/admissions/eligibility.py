@@ -43,14 +43,19 @@ def age_on_dec31(dob: date, year: int | None = None) -> int:
     return ref.year - dob.year - ((ref.month, ref.day) < (dob.month, dob.day))
 
 
-def eligibility_error(dob: date, grade: str) -> str | None:
-    """None when eligible; otherwise a Spanish message for the form."""
+def eligibility_error(dob: date, grade: str, year: int | None = None) -> str | None:
+    """None when eligible; otherwise a Spanish message for the form.
+
+    ``year`` is the year whose 31 December counts (default: this year). The
+    ficha passes the first year of the cycle applied for, so a family that
+    applies in November for the next cycle is measured on that cycle's date.
+    """
     need = required_age(grade)
     if need is None or dob is None:
         return None
-    have = age_on_dec31(dob)
+    year = year or timezone.localdate().year
+    have = age_on_dec31(dob, year)
     if have == need:
         return None
-    year = timezone.localdate().year
     return (f'Para {grade} el alumno debe tener {need} años cumplidos al 31 de diciembre de {year} '
             f'(tendrá {have}). Elija el grado que corresponde a su edad o contacte a admisiones.')
