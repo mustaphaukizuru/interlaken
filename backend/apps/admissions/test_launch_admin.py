@@ -28,6 +28,7 @@ from apps.admissions.models import (
     RequiredDocument,
 )
 from apps.admissions.pipeline import checklist
+from apps.admissions.process_fixtures import admitted
 
 pytestmark = pytest.mark.django_db
 
@@ -113,7 +114,7 @@ class TestReinvite:
     def test_keeps_the_familys_corrections_and_writes_to_the_current_address(
         self, api_client, admin
     ):
-        pre = _pre()
+        pre = admitted(_pre())  # the ficha is private: only once «Aceptado»
         assert api_client.post(reverse("pre-register-invite", args=[pre.pk])).status_code == 201
         reg = pre.registrations.get()
         Registration.objects.filter(pk=reg.pk).update(
@@ -130,14 +131,14 @@ class TestReinvite:
         assert [m.to for m in mail.outbox] == [["nuevo@test.mx"]]
 
     def test_a_blank_draft_field_is_filled_again(self, api_client, admin):
-        pre = _pre()
+        pre = admitted(_pre())
         api_client.post(reverse("pre-register-invite", args=[pre.pk]))
         Registration.objects.filter(pre_registration=pre).update(grade_applying="")
         api_client.post(reverse("pre-register-invite", args=[pre.pk]))
         assert pre.registrations.get().grade_applying == "Primaria 1°"
 
     def test_no_new_link_once_the_inscripcion_was_sent(self, api_client, admin):
-        pre = _pre()
+        pre = admitted(_pre())
         _reg(pre_registration=pre)  # submitted
         mail.outbox.clear()
 

@@ -27,9 +27,11 @@ describe('resolveMenu', () => {
     expect(shape).toEqual([
       ['El Colegio', ['Quiénes Somos', 'Modelo Educativo', 'Galería']],
       ['Niveles Educativos', ['Preescolar', 'Primaria', 'Secundaria']],
-      ['Admisiones', ['Proceso de Inscripción', 'Documentación', 'Costos', 'Ficha de inscripción']],
+      // The ficha de inscripción is private (sent after admission): the menu offers the visit.
+      ['Admisiones', ['Proceso de Inscripción', 'Documentación', 'Costos', 'Agendar visita']],
       ['Familias', ['Pagar colegiatura', 'Colegiaturas y cafetería', 'Facturación', 'Plataformas']],
     ]);
+    expect(DEFAULT_MENU.flatMap((g) => g.items.map((i) => i.to))).not.toContain('/pre-registro');
     const pay = DEFAULT_MENU[3].items[0];
     expect(pay.to).toBe('https://interlaken.servoescolar.mx');
     expect(pay.icon).toBe(CreditCard);

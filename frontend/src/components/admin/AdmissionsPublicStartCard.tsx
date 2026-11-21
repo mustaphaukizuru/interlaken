@@ -8,23 +8,24 @@ import type { SiteSettings } from '@/types/content';
 
 /**
  * Ajustes → «Ficha de inscripción en línea»: the «Permitir iniciar la ficha sin
- * enlace» switch (SiteSettings.admissions_public_start). On: any family can
- * start the ficha from /pre-registro. Off: only the private link the school
- * sends from the Expediente opens a ficha (the public start answers 403 and the
- * page shows «Solicite su enlace»). Saved on its own, at once: it is not part
- * of the contact form's «Guardar».
+ * enlace» switch (SiteSettings.admissions_public_start). Off (the default since
+ * 2026-11-21, recommended): the ficha is private, only the personal link the
+ * school sends from the Expediente once the exam is «Aceptado» opens one (the
+ * public start answers 403 and /pre-registro shows «La ficha de inscripción es
+ * personal»). On: anyone could start a ficha from /pre-registro. Saved on its
+ * own, at once: it is not part of the contact form's «Guardar».
  */
 export function AdmissionsPublicStartCard({ value, loaded }: { value: boolean | undefined; loaded: boolean }) {
   const qc = useQueryClient();
-  const enabled = value !== false; // the backend default is on
+  const enabled = value === true; // the backend default is off
   const save = useMutation({
     mutationFn: (next: boolean) => contentApi.adminUpdateSettings({ admissions_public_start: next }),
     onSuccess: (_res, next) => {
       qc.setQueryData<Partial<SiteSettings>>(['admin-site-settings'], (prev) => ({ ...prev, admissions_public_start: next }));
       qc.invalidateQueries({ queryKey: ['admin-site-settings'] });
       toast.success(next
-        ? 'Listo: cualquier familia puede iniciar la ficha desde el sitio.'
-        : 'Listo: la ficha solo se abre con el enlace que envía el colegio.');
+        ? 'Listo: cualquier persona puede iniciar una ficha desde el sitio.'
+        : 'Listo: la ficha solo se abre con el enlace personal que envía el colegio.');
     },
     onError: (err) => toast.error(apiFieldErrors(err).detail || 'No se pudo guardar el ajuste.'),
   });
@@ -36,13 +37,16 @@ export function AdmissionsPublicStartCard({ value, loaded }: { value: boolean | 
         <div className="min-w-0 space-y-1.5 text-sm">
           <p id="public-start-label" className="font-semibold text-ink">Permitir iniciar la ficha sin enlace</p>
           <p className="text-subtle">
-            Encendido: cualquier familia puede iniciar la ficha desde el sitio (Ficha de inscripción) y recibe por correo un enlace para continuarla.
-            Apagado: la ficha solo se abre con el enlace que el colegio envía desde el Expediente.
+            La ficha de inscripción es personal: el colegio la envía desde el Expediente a cada familia cuando su hijo/a es admitido
+            («Enviar resultado y ficha»). Déjelo apagado.
+          </p>
+          <p className="text-subtle">
+            Encendido, cualquier persona podría iniciar una ficha desde el sitio sin visita ni examen. No se recomienda.
           </p>
           <p className="inline-flex items-center gap-1.5 font-medium text-ink" aria-live="polite">
             {enabled
-              ? <><Globe className="h-4 w-4 text-green-dark" aria-hidden="true" /> Ahora: abierta a todas las familias</>
-              : <><Link2 className="h-4 w-4 text-purple" aria-hidden="true" /> Ahora: solo con enlace del colegio</>}
+              ? <><Globe className="h-4 w-4 text-amber" aria-hidden="true" /> Ahora: abierta a cualquier persona (no recomendado)</>
+              : <><Link2 className="h-4 w-4 text-purple" aria-hidden="true" /> Ahora: solo con el enlace personal del colegio</>}
           </p>
         </div>
         <button

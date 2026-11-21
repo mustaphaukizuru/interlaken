@@ -325,6 +325,7 @@ class CaseActionView(APIView):
         kwargs = {"channel": ser.validated_data.get("channel") or None}
         if action == "send-ficha-link":
             kwargs["override"] = ser.validated_data.get("override", False)
+            kwargs["override_reason"] = ser.validated_data.get("override_reason", "")
         lead = get_object_or_404(PreRegistration, pk=pk)
         try:
             out = fn(lead, request.user, **kwargs)

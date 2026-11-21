@@ -9,7 +9,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { contentApi } from '@/services/api';
 import { formatPrice } from '@/lib/format';
 import { useTokens, type CmsLink } from '@/cms/runtime';
-import { CmsAnchor } from '@/cms/sections/kit';
+import { CmsAnchor, INFORMES_CTA, VISIT_CTA } from '@/cms/sections/kit';
 
 interface EnrollmentFee {
   section: string;
@@ -101,9 +101,9 @@ export const PRICING_COPY: PricingCopy = {
   noteLinkLead: 'Para becas, hermanos o planes de pago,',
   noteLink: { label: 'contacte a admisiones', href: '/contacto' },
   ctaTitle: 'Asegure el lugar de su hijo/a',
-  ctaText: 'Llene la ficha de inscripción para el ciclo {{ciclo}}: toma unos 15 minutos, puede continuar después y un asesor le contactará.',
-  ctaPrimary: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' },
-  ctaSecondary: { label: 'Agendar visita', href: '/agendar-visita' },
+  ctaText: 'Agende una visita para el ciclo {{ciclo}} o escríbanos para recibir informes. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción.',
+  ctaPrimary: VISIT_CTA,
+  ctaSecondary: INFORMES_CTA,
 };
 
 /** Lower case, accents removed: «Devolución» and «devolucion» match. */

@@ -8,8 +8,9 @@ The lead (``PreRegistration``) walks the school's five stages (Proceso.xlsx):
 2. **Visita guiada**: «Asistió y agenda examen», «Asistió, no le interesa» or
    «No asistió» (reschedule, or close).
 3. **Examen**: date and time, when the results are given, Aceptado or
-   No aceptado (with reason). The ficha link may go out from «Examen
-   agendado» on (owner decision).
+   No aceptado (with reason). The ficha de inscripción is private: its link
+   goes out only once the result is «Aceptado» (``ficha_link_gate``), with
+   the result message itself («Enviar resultado y ficha»).
 4. **Documentación y acuerdos**: documents (the Fase 4 checklist of
    ``required_docs``, see ``documents_state``) and the becas/descuentos agreed (``AdmissionDiscount``).
 5. **Inscrito**: the inscripción payment recorded (``EnrollmentPayment``) and
@@ -124,7 +125,7 @@ def stage_label(stage: str) -> str:
 
 
 def is_admin_role(user) -> bool:
-    """The overrides (ficha link before the exam, documents waiver) are for
+    """The overrides (ficha link before «Aceptado», documents waiver) are for
     ``role=admin`` (or a superuser), never for a staff account with the area."""
     return bool(
         user and (getattr(user, "role", None) == "admin" or getattr(user, "is_superuser", False))
@@ -624,19 +625,68 @@ def exam_scheduled(lead) -> bool:
     return lead.exam_at is not None
 
 
+def admitted(lead) -> bool:
+    """The exam result is «Aceptado» and the case is in «Documentación y acuerdos»."""
+    return (
+        lead.exam_result == PreRegistration.ExamResult.ACEPTADO
+        and lead.stage == Stage.DOCUMENTACION
+    )
+
+
+MSG_NOT_ADMITTED = (
+    "La ficha de inscripción se envía cuando el examen está registrado como Aceptado."
+)
+MSG_OVERRIDE_REASON = "Escriba por qué envía la ficha antes del resultado «Aceptado»."
+
+
 def ficha_link_gate(lead) -> dict:
-    """«Enviar ficha» is allowed from «Examen agendado» on (owner decision)."""
+    """The ficha de inscripción is private: its link goes out only to a family
+    whose child was admitted (exam «Aceptado», stage «Documentación y
+    acuerdos»). Before that an administrator may override it with a written
+    reason (audited); a closed or enrolled case never gets one.
+
+    Every path that issues a ficha link checks it: the Expediente actions
+    (``send-ficha-link``, ``send-exam-result``), the legacy
+    ``pre-register/<pk>/invite/`` and the bulk «invite» action (all through
+    ``services.invite_preregistration``)."""
     if lead.stage == Stage.CERRADO:
-        return {"allowed": False, "overridable": False, "reason": MSG_CLOSED}
+        return {"allowed": False, "overridable": False, "code": "closed", "reason": MSG_CLOSED}
     if lead.stage == Stage.INSCRITO:
-        return {"allowed": False, "overridable": False, "reason": MSG_ENROLLED}
-    if lead.stage == Stage.DOCUMENTACION or (lead.stage == Stage.EXAMEN and exam_scheduled(lead)):
-        return {"allowed": True, "overridable": False, "reason": ""}
+        return {"allowed": False, "overridable": False, "code": "enrolled", "reason": MSG_ENROLLED}
+    if admitted(lead):
+        return {"allowed": True, "overridable": False, "code": "", "reason": ""}
     return {
         "allowed": False,
         "overridable": True,
-        "reason": "La ficha se envía cuando el examen ya está agendado.",
+        "code": "not_admitted",
+        "reason": MSG_NOT_ADMITTED,
     }
+
+
+def clean_reason(value) -> str:
+    return " ".join(str(value or "").split())[:500]
+
+
+def check_ficha_link(lead, *, actor=None, override=False, override_reason="") -> str:
+    """Raise ``CaseConflict`` (or a ``ValidationError`` for a missing reason)
+    unless a ficha link may go out for ``lead`` now.
+
+    Returns the cleaned override reason when an administrator overrode the
+    gate (the caller audits it), else ``''``."""
+    gate = ficha_link_gate(lead)
+    if gate["allowed"]:
+        return ""
+    if not (gate["overridable"] and override):
+        raise CaseConflict(gate["reason"], code=gate["code"], overridable=gate["overridable"])
+    if not is_admin_role(actor):
+        raise CaseConflict(
+            "Solo un administrador puede enviar la ficha antes del resultado «Aceptado».",
+            code="admin_only",
+        )
+    reason = clean_reason(override_reason)
+    if not reason:
+        raise ValidationError({"override_reason": [MSG_OVERRIDE_REASON]})
+    return reason
 
 
 # ── «Marcar como inscrito» ────────────────────────────────────────────────
@@ -915,6 +965,9 @@ def next_action(lead, now=None) -> dict | None:
     if s == Stage.DOCUMENTACION:
         reg = case_registration(lead)
         if reg is None or (reg.status == Registration.Status.DRAFT and not lead.ficha_link_sent_at):
+            # One message: the «Aceptado» result carries the ficha link.
+            if admitted(lead) and not lead.exam_result_sent_at:
+                return {"code": "send_exam_result", "label": "Enviar resultado y ficha"}
             return {"code": "send_ficha_link", "label": "Enviar ficha de inscripción"}
         if reg.status == Registration.Status.DRAFT:
             return {"code": "await_ficha", "label": "Esperando la ficha de la familia"}

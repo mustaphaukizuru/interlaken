@@ -48,7 +48,8 @@ class TestSchemaEndpoint:
             "madre",
             "emergencia",
         ]
-        assert data["public_start_enabled"] is True
+        # The ficha is private (2026-11-21): no public start unless Ajustes allows it.
+        assert data["public_start_enabled"] is False
         choices = data["choices"]
         assert len(choices["estados"]) == 32
         assert [g["value"] for g in choices["grados"]][:2] == ["Maternal", "1° Preescolar"]
@@ -85,12 +86,10 @@ class TestSchemaEndpoint:
                 if field["choices"]:
                     assert field["choices"] in data["choices"], (step["key"], field["name"])
 
-    def test_reflects_the_public_start_toggle(self, api_client):
-        from apps.content.models import SiteSettings
-
-        s = SiteSettings.load()
-        s.admissions_public_start = False
-        s.save()
+    def test_reflects_the_public_start_toggle(self, api_client, public_start):
+        assert api_client.get(reverse("ficha-schema")).json()["public_start_enabled"] is True
+        public_start.admissions_public_start = False
+        public_start.save()
         assert api_client.get(reverse("ficha-schema")).json()["public_start_enabled"] is False
 
     def test_no_em_dash_in_any_label(self, api_client):

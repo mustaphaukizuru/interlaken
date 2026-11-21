@@ -65,10 +65,10 @@ export function makeCase(stage: StageKey = 'informes', over: Partial<CaseDetail>
     inscrito: { enrolled_at: null, payments: [], gates: gates({ stage: stage === 'documentacion', ficha: false, payment: false }) },
     ficha: null,
     ficha_link: closed
-      ? { allowed: false, overridable: false, reason: 'El expediente está cerrado. Reábralo para modificarlo.', sent_at: null, can_override: false }
+      ? { allowed: false, overridable: false, code: 'closed', reason: 'El expediente está cerrado. Reábralo para modificarlo.', sent_at: null, can_override: false }
       : stage === 'documentacion'
-        ? { allowed: true, overridable: false, reason: '', sent_at: null, can_override: false }
-        : { allowed: false, overridable: true, reason: 'La ficha se envía cuando el examen ya está agendado.', sent_at: null, can_override: true },
+        ? { allowed: true, overridable: false, code: '', reason: '', sent_at: null, can_override: false }
+        : { allowed: false, overridable: true, code: 'not_admitted', reason: 'La ficha de inscripción se envía cuando el examen está registrado como Aceptado.', sent_at: null, can_override: true },
     history: [
       {
         id: 1, at: '2026-11-18T10:00:00-06:00', actor: 'admin@ejemplo.test', action: 'update', object_type: 'admissions.preregistration',

@@ -6,9 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { contentApi, type FormDefinitionAdmin } from '@/services/api';
 import { describedBy, FieldLabel, FieldNotes, invalidClass, type FieldBaseProps } from './FieldShell';
 
-/** Forms built into the site (cms/blocks/generic.tsx BUILTIN_FORMS): the block shows a button to their page. */
+/**
+ * Forms built into the site (cms/blocks/generic.tsx BUILTIN_FORMS): the block shows a button to their page.
+ * The ficha de inscripción is not one: it is private (the school sends each admitted family its link).
+ */
 export const SITE_FORMS: { value: string; label: string }[] = [
-  { value: 'pre-registro', label: 'Ficha de inscripción (botón a su página)' },
   { value: 'contacto', label: 'Contacto (botón a su página)' },
   { value: 'facturacion', label: 'Solicitud de factura (botón a su página)' },
   { value: 'agendar-visita', label: 'Agendar visita (botón a su página)' },

@@ -118,7 +118,7 @@ export const BLOCKS: BlockSpec[] = [
   { type: 'video', label: 'Video', description: 'YouTube o Vimeo.', fields: [
     { key: 'url', label: 'URL del video', kind: 'url', required: true },
   ] },
-  { type: 'form', label: 'Formulario', description: 'Un formulario de Formularios, o uno del sitio (ficha de inscripción, contacto, facturación, agendar visita).', fields: [
+  { type: 'form', label: 'Formulario', description: 'Un formulario de Formularios, o uno del sitio (contacto, facturación, agendar visita).', fields: [
     { key: 'form', label: 'Formulario', kind: 'form', required: true, hint: 'Elija uno de los formularios del sitio o uno creado en Contenido, Formularios.' },
   ] },
   { type: 'timeline', label: 'Línea de tiempo', description: 'Hitos por año.', fields: [

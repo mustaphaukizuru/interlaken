@@ -107,13 +107,6 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description:
       `Costos del Colegio Interlaken para el ciclo ${CURRENT_CYCLE}: inscripción, colegiaturas, seguros, extraescolares y estancia de preescolar, primaria y secundaria.`,
   },
-  '/pre-registro': {
-    title: 'Ficha de inscripción en línea',
-    crumb: 'Ficha de inscripción',
-    parent: '/admisiones',
-    description:
-      `Llene en línea la ficha de inscripción al Colegio Interlaken (ciclo ${CURRENT_CYCLE} o el siguiente): unos 15 minutos, en pasos que puede guardar y continuar después.`,
-  },
   '/agendar-visita': {
     title: 'Agende una visita al colegio',
     crumb: 'Agendar visita',
@@ -154,6 +147,16 @@ export const ROUTE_META: Record<string, RouteMeta> = {
       'Aviso de privacidad del Colegio Interlaken conforme a la LFPDPPP: qué datos recabamos, con qué fin los tratamos y cómo ejercer sus derechos ARCO.',
   },
   // Personal-data flows: reachable, never indexed.
+  // The ficha de inscripción is private (2026-11-21): the school sends each
+  // admitted family its link, so it is neither indexed nor in the sitemap.
+  '/pre-registro': {
+    title: 'Ficha de inscripción',
+    crumb: 'Ficha de inscripción',
+    parent: '/admisiones',
+    noindex: true,
+    description:
+      'La ficha de inscripción del Colegio Interlaken es personal: el colegio envía el enlace a cada familia admitida después del examen de valoración.',
+  },
   '/inscripcion/documentos': {
     title: 'Documentos de inscripción',
     noindex: true,

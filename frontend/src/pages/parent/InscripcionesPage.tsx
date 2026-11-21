@@ -38,7 +38,7 @@ const statusVariant: Record<string, 'neutral' | 'info' | 'warning' | 'success' |
 function nextActionHint(status: string): string {
   switch (status) {
     case 'draft':
-      return 'Complete y envíe su solicitud para iniciar la revisión.';
+      return 'Complete y envíe su ficha con el enlace personal que le enviamos.';
     case 'submitted':
       return 'Recibida. Un asesor la revisará en los próximos días hábiles.';
     case 'reviewing':
@@ -78,10 +78,11 @@ export default function InscripcionesPage() {
         subtitle="Consulte el estado de las solicitudes de inscripción vinculadas a su correo."
       />
 
-      {/* Next-action strip */}
+      {/* Next-action strip. The ficha is private (the school sends it after
+          admission), so a new admission starts with a visit. */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Link to="/pre-registro" className="btn-pink inline-flex min-h-[44px] items-center justify-center text-sm">
-          Iniciar pre-registro <ArrowRight size={15} />
+        <Link to="/agendar-visita" className="btn-pink inline-flex min-h-[44px] items-center justify-center text-sm">
+          Agendar visita <ArrowRight size={15} aria-hidden="true" />
         </Link>
         <Link to="/contacto" className="btn-outline inline-flex min-h-[44px] items-center justify-center text-sm">
           <MessageCircle size={15} /> Contactar admisiones
@@ -112,10 +113,10 @@ export default function InscripcionesPage() {
           <EmptyState
             icon={ClipboardList}
             title="Sin inscripciones"
-            description="Cuando inicie o complete una inscripción con este correo, el estado aparecerá aquí."
+            description="Cuando el colegio le envíe la ficha de inscripción a este correo, su estado aparecerá aquí."
             action={
-              <Link to="/pre-registro" className="btn-pink inline-flex min-h-[44px] items-center">
-                Ir a pre-registro
+              <Link to="/agendar-visita" className="btn-pink inline-flex min-h-[44px] items-center">
+                Agendar visita
               </Link>
             }
           />
@@ -162,14 +163,14 @@ export default function InscripcionesPage() {
       <p className="mt-4 flex items-start gap-2 text-sm text-muted">
         <ExternalLink className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
         <span>
-          ¿Aún no tiene una solicitud? Comience por el{' '}
-          <Link to="/pre-registro" className="font-medium text-green-dark underline">
-            pre-registro
+          ¿Aún no tiene una solicitud? Comience por{' '}
+          <Link to="/agendar-visita" className="font-medium text-green-dark underline">
+            agendar una visita
           </Link>
           {' '}o escriba a{' '}
           <Link to="/contacto" className="font-medium text-green-dark underline">
             contacto
-          </Link>.
+          </Link>. Si su hijo/a es admitido, el colegio le envía la ficha de inscripción.
         </span>
       </p>
     </>

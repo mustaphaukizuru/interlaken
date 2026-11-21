@@ -199,9 +199,13 @@ function OpenSchoolBlock() {
   );
 }
 
-/** Form block: a CMS-built form by slug, or a link to one of the built-in (code) forms. */
+/**
+ * Form block: a CMS-built form by slug, or a link to one of the built-in (code) forms.
+ * 'pre-registro' is no longer offered (the ficha is private, sent by the school
+ * after admission): a block that still names it shows «Agendar visita».
+ */
 const BUILTIN_FORMS: Record<string, { label: string; to: string }> = {
-  'pre-registro': { label: 'Llenar la ficha de inscripción', to: '/pre-registro' },
+  'pre-registro': { label: 'Agendar visita', to: '/agendar-visita' },
   'contacto': { label: 'Escribirnos', to: '/contacto' },
   'facturacion': { label: 'Solicitar factura', to: '/comunidad/facturacion' },
   'agendar-visita': { label: 'Agendar visita', to: '/agendar-visita' },

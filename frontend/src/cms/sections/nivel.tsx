@@ -12,7 +12,7 @@ import { LEVELS, type LevelData } from '@/lib/levels';
 import { LEVEL_STORIES, type StorySection } from '@/lib/levelStories';
 import { useSep } from '@/hooks/useSep';
 import { cmsColor, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, grouped, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, INFORMES_CTA, sectionsOf, VISIT_CTA } from './kit';
 import type { PageTemplate } from './types';
 
 const section = sectionsOf('nivel');
@@ -82,7 +82,9 @@ function NivelHeroView(p: HeroProps) {
               {t(primary.label)} <ArrowRight size={16} aria-hidden="true" />
             </CmsAnchor>
             <CmsAnchor link={secondary} className="btn-ghost">
-              <CalendarCheck size={16} aria-hidden="true" /> {t(secondary.label)}
+              {/wa\.me\//.test(secondary.href ?? '')
+                ? <MessageCircle size={16} aria-hidden="true" />
+                : <CalendarCheck size={16} aria-hidden="true" />} {t(secondary.label)}
             </CmsAnchor>
           </div>
         )}
@@ -326,8 +328,8 @@ const levelColor = (l: LevelData) => `var(--nivel-${l.slug})`;
 
 const heroProps = (l: LevelData) => ({
   label: 'Niveles Educativos', title: l.name, headline: l.headline, text: l.intro, image: l.hero, accent: l.accent, color: levelColor(l),
-  primary: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' },
-  secondary: { label: 'Agendar visita', href: '/agendar-visita' },
+  primary: VISIT_CTA,
+  secondary: INFORMES_CTA,
 });
 
 /** The school's text as editable parts: subtitle, paragraphs (a blank line between them), program cards, closing quote. */

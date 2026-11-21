@@ -2,7 +2,8 @@
 Admin-side admissions from the React console:
 
   * #2 invite-only enrollment — admin issues a pre-filled enrollment invite from a
-    pre-registration (idempotent, advances the pre-reg, returns a shareable link).
+    pre-registration (idempotent, returns a shareable link). The ficha is private:
+    only once the exam is «Aceptado», or an administrator's override with a reason.
   * #1 registration review — admin lists registrations, approves/rejects them, and
     verifies uploaded documents. All actions are admin-only.
 """
@@ -12,6 +13,8 @@ from django.urls import reverse
 
 from apps.accounts.factories import AdminFactory, ParentFactory
 from apps.admissions.models import PreRegistration, Registration, RegistrationDocument
+from apps.admissions.process_fixtures import admitted
+from apps.core.models import AuditLog
 
 
 def _pre(**over):
@@ -39,7 +42,7 @@ class TestPreRegistrationInvite:
     """#2 — admin issues an enrollment invite from a pre-registration."""
 
     def test_admin_invite_creates_prefilled_draft_and_link(self, api_client):
-        pre = _pre()
+        pre = admitted(_pre())
         api_client.force_authenticate(AdminFactory())
         resp = api_client.post(reverse('pre-register-invite', args=[pre.id]))
         assert resp.status_code == 201, resp.content
@@ -53,13 +56,36 @@ class TestPreRegistrationInvite:
         assert reg.status == Registration.Status.DRAFT
         assert reg.child_first_name == 'Ana' and reg.grade_applying == 'Primaria 2°'
         assert reg.parent1_email == 'rp@test.mx'
-        # Issuing the invite advances the pipeline out of "pending".
         pre.refresh_from_db()
         assert pre.status == PreRegistration.Status.CONTACTED
 
+    def test_invite_is_refused_until_the_exam_is_accepted(self, api_client):
+        """The legacy endpoint obeys the Expediente's rule: no ficha before «Aceptado»."""
+        pre = _pre()
+        api_client.force_authenticate(AdminFactory())
+        resp = api_client.post(reverse('pre-register-invite', args=[pre.id]))
+        assert resp.status_code == 409 and resp.data['code'] == 'not_admitted'
+        assert resp.data['detail'] == (
+            'La ficha de inscripción se envía cuando el examen está registrado como Aceptado.')
+        assert pre.registrations.count() == 0
+        pre.refresh_from_db()
+        assert pre.status == PreRegistration.Status.PENDING
+
+    def test_admin_override_needs_a_reason_and_is_audited(self, api_client):
+        pre = _pre()
+        api_client.force_authenticate(AdminFactory())
+        url = reverse('pre-register-invite', args=[pre.id])
+        missing = api_client.post(url, {'override': True}, format='json')
+        assert missing.status_code == 400 and 'override_reason' in missing.data
+        assert pre.registrations.count() == 0
+        ok = api_client.post(url, {'override': True, 'override_reason': 'Autorizó la dirección.'}, format='json')
+        assert ok.status_code == 201, ok.content
+        row = AuditLog.objects.filter(object_type='admissions.preregistration', object_id=str(pre.pk)).latest('pk')
+        assert row.changes['override'] is True and row.changes['override_reason'] == 'Autorizó la dirección.'
+
     def test_invite_is_idempotent(self, api_client):
         """Re-inviting refreshes the token on the SAME draft, never duplicates."""
-        pre = _pre()
+        pre = admitted(_pre())
         api_client.force_authenticate(AdminFactory())
         first = api_client.post(reverse('pre-register-invite', args=[pre.id])).json()
         second = api_client.post(reverse('pre-register-invite', args=[pre.id])).json()

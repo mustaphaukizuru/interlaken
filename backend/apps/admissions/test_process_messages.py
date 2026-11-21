@@ -1,5 +1,6 @@
 """Expediente (Fase 5): editable templates, the five «send» actions, the ficha
-link gate and the signed visit link."""
+link gate (private ficha: only once the exam is «Aceptado») and the signed
+visit link."""
 
 import datetime as dt
 from urllib.parse import parse_qs, unquote, urlparse
@@ -11,6 +12,7 @@ from django.urls import reverse
 from apps.admissions import process, process_messages
 from apps.admissions.models import PreRegistration, Registration
 from apps.admissions.process_fixtures import (
+    admitted,
     at_stage,
     future,
     make_lead,
@@ -75,6 +77,12 @@ def test_templates_endpoint(admin_client):
     got = admin_client.get(url).data
     assert set(got["templates"]) == set(process_messages.DEFAULTS)
     assert "{liga}" in got["placeholders"]["costs"] and got["customized"] == []
+    # «Aceptado» carries the ficha link: its data and the hint say so.
+    assert {"{liga}", "{vence}"} <= set(got["placeholders"]["exam_result_accepted"])
+    assert "{liga}" in got["defaults"]["exam_result_accepted"]
+    assert "{vence}" in got["defaults"]["exam_result_accepted"]
+    assert "Enviar resultado y ficha" in got["hints"]["exam_result_accepted"]
+    assert "Aceptado" in got["hints"]["ficha_link"]
     bad = admin_client.patch(url, {"costs": "Hola {nombre}", "inventada": "x"}, format="json")
     assert bad.status_code == 400 and set(bad.data) == {"costs", "inventada"}
     ok = admin_client.patch(
@@ -207,31 +215,46 @@ def test_expired_visit_token_is_ignored(monkeypatch):
     assert process.lead_from_token(token) is None
 
 
-# ── ficha link gate ───────────────────────────────────────────────────────
-def test_ficha_link_is_refused_before_the_exam_is_scheduled(admin_client):
-    lead = at_stage(make_lead(), Stage.VISITA)
+# ── ficha link gate (the ficha is private) ──────────────────────────────────
+@pytest.mark.parametrize(
+    "stage,extra",
+    [
+        (Stage.INFORMES, {}),
+        (Stage.VISITA, {}),
+        (Stage.EXAMEN, {}),
+        # «Examen agendado» used to be enough: not any more.
+        (Stage.EXAMEN, {"exam_at": future(3)}),
+        # Moved to «Documentación» by hand, without the result «Aceptado».
+        (Stage.DOCUMENTACION, {"exam_at": future(-2)}),
+    ],
+)
+def test_ficha_link_is_refused_until_the_exam_is_accepted(admin_client, stage, extra):
+    lead = at_stage(make_lead(), stage, **extra)
     r = admin_client.post(action(lead, "send-ficha-link"), {}, format="json")
-    assert r.status_code == 409 and r.data["code"] == "too_early" and r.data["overridable"] is True
+    assert r.status_code == 409 and r.data["code"] == "not_admitted"
+    assert r.data["overridable"] is True
+    assert r.data["detail"] == (
+        "La ficha de inscripción se envía cuando el examen está registrado como Aceptado."
+    )
     assert not Registration.objects.filter(pre_registration=lead).exists()
-    lead = at_stage(lead, Stage.EXAMEN)  # stage Examen but no date yet: still too early
-    assert admin_client.post(action(lead, "send-ficha-link"), {}, format="json").status_code == 409
+    lead.refresh_from_db()
+    assert lead.ficha_link_sent_at is None
 
 
-def test_ficha_link_from_examen_agendado_reuses_the_invite(admin_client):
-    lead = at_stage(make_lead(), Stage.EXAMEN, exam_at=future(3))
+def test_ficha_link_once_accepted_reuses_the_invite(admin_client):
+    lead = admitted(make_lead())
+    assert process.ficha_link_gate(lead)["allowed"] is True
     r = admin_client.post(action(lead, "send-ficha-link"), {}, format="json")
     assert r.status_code == 200, r.data
     reg = Registration.objects.get(pre_registration=lead)
     assert reg.status == "draft" and reg.invite_token_hash
     # The ficha link is Fase 2's (services.invite_url_for): same origin, rid + token.
-    assert r.data["link"].startswith("https://colegio.ejemplo.test/")
+    assert r.data["link"].startswith("https://colegio.ejemplo.test/pre-registro?")
     assert f"?rid={reg.pk}&token=" in r.data["link"]
     assert r.data["sent"] is True and r.data["link"] in r.data["whatsapp_text"]
     assert len(mail.outbox) == 1 and r.data["link"] in mail.outbox[0].body
     lead.refresh_from_db()
-    assert (
-        lead.ficha_link_sent_at and lead.stage == "examen"
-    )  # the invite does not move the stage back
+    assert lead.ficha_link_sent_at and lead.stage == "documentacion"
     # Sending again refreshes the same draft's token (no second ficha).
     again = admin_client.post(
         action(lead, "send-ficha-link"), {"channel": "whatsapp"}, format="json"
@@ -242,24 +265,77 @@ def test_ficha_link_from_examen_agendado_reuses_the_invite(admin_client):
     assert len(mail.outbox) == 1  # WhatsApp only: no email
 
 
-def test_ficha_link_override_is_for_admins_only(admin_client):
-    lead = make_lead()
+def test_ficha_link_override_needs_an_admin_and_a_reason(admin_client):
+    lead = at_stage(make_lead(), Stage.EXAMEN, exam_at=future(3))
     secretaria = staff_client("admisiones")
-    denied = secretaria.post(action(lead, "send-ficha-link"), {"override": True}, format="json")
+    denied = secretaria.post(
+        action(lead, "send-ficha-link"),
+        {"override": True, "override_reason": "La dirección lo autorizó."},
+        format="json",
+    )
     assert denied.status_code == 409 and denied.data["code"] == "admin_only"
-    ok = admin_client.post(action(lead, "send-ficha-link"), {"override": True}, format="json")
+    # No reason, no override (the admin is told what is missing).
+    for body in ({"override": True}, {"override": True, "override_reason": "   "}):
+        missing = admin_client.post(action(lead, "send-ficha-link"), body, format="json")
+        assert missing.status_code == 400 and "override_reason" in missing.data
+    assert not Registration.objects.filter(pre_registration=lead).exists()
+    ok = admin_client.post(
+        action(lead, "send-ficha-link"),
+        {"override": True, "override_reason": "  Hermano ya inscrito;  examen el lunes. "},
+        format="json",
+    )
     assert ok.status_code == 200 and ok.data["override"] is True
     row = AuditLog.objects.filter(
         object_type="admissions.preregistration", object_id=str(lead.pk), changes__sent="ficha_link"
     ).latest("pk")
     assert row.changes["override"] is True
+    assert row.changes["override_reason"] == "Hermano ya inscrito; examen el lunes."
+    invite = AuditLog.objects.filter(
+        object_type="admissions.preregistration", object_id=str(lead.pk), changes__has_key="invite"
+    ).latest("pk")
+    assert invite.changes["override_reason"] == "Hermano ya inscrito; examen el lunes."
+
+
+def test_override_is_not_needed_nor_used_once_accepted(admin_client):
+    lead = admitted(make_lead())
+    r = admin_client.post(
+        action(lead, "send-ficha-link"),
+        {"override": True, "override_reason": "Por si acaso."},
+        format="json",
+    )
+    assert r.status_code == 200 and r.data["override"] is False
+
+
+@pytest.mark.parametrize(
+    "stage,code",
+    [(Stage.CERRADO, "closed"), (Stage.INSCRITO, "enrolled")],
+)
+def test_closed_or_enrolled_cases_never_get_a_ficha_link(admin_client, stage, code):
+    lead = at_stage(make_lead(), stage, exam_result="aceptado", exam_at=future(-3))
+    r = admin_client.post(
+        action(lead, "send-ficha-link"),
+        {"override": True, "override_reason": "Prueba."},
+        format="json",
+    )
+    assert r.status_code == 409 and r.data["code"] == code and r.data["overridable"] is False
 
 
 def test_ficha_link_refused_once_the_ficha_was_sent(admin_client):
-    lead = at_stage(make_lead(), Stage.DOCUMENTACION)
+    lead = admitted(make_lead())
     make_registration(lead, status=Registration.Status.SUBMITTED)
     r = admin_client.post(action(lead, "send-ficha-link"), {}, format="json")
     assert r.status_code == 409 and r.data["code"] == "already_applied"
+
+
+def test_case_detail_explains_the_gate(admin_client):
+    lead = at_stage(make_lead(), Stage.EXAMEN, exam_at=future(3))
+    gate = admin_client.get(reverse("case-detail", args=[lead.pk])).data["ficha_link"]
+    assert gate["allowed"] is False and gate["code"] == "not_admitted"
+    assert gate["reason"].startswith("La ficha de inscripción se envía cuando")
+    assert gate["can_override"] is True  # the admin_client is an administrator
+    lead = admitted(lead)
+    gate = admin_client.get(reverse("case-detail", args=[lead.pk])).data["ficha_link"]
+    assert gate["allowed"] is True and gate["reason"] == ""
 
 
 # ── exam date and result ──────────────────────────────────────────────────
@@ -283,9 +359,98 @@ def test_send_exam_date_and_result(admin_client):
     res = admin_client.post(
         action(lead, "send-exam-result"), {"channel": "whatsapp"}, format="json"
     )
-    assert res.status_code == 200 and "fue aceptado(a)" in res.data["whatsapp_text"]
+    assert res.status_code == 200 and "fue aceptado/a" in res.data["whatsapp_text"]
     lead.refresh_from_db()
     assert lead.exam_date_sent_at and lead.exam_result_sent_at
+    # «Aceptado» carries the ficha (one message): the link went with it.
+    assert lead.ficha_link_sent_at and res.data["link"] in res.data["whatsapp_text"]
+
+
+# ── «Enviar resultado y ficha» ────────────────────────────────────────────
+def test_accepted_result_carries_the_ficha_link_by_email(admin_client):
+    lead = admitted(make_lead())
+    r = admin_client.post(action(lead, "send-exam-result"), {}, format="json")
+    assert r.status_code == 200 and r.data["sent"] is True, r.data
+    reg = Registration.objects.get(pre_registration=lead)
+    assert reg.status == "draft" and r.data["registration"] == reg.pk
+    assert r.data["link"].startswith(
+        f"https://colegio.ejemplo.test/pre-registro?rid={reg.pk}&token="
+    )
+    text = r.data["whatsapp_text"]
+    assert text.startswith("¡Felicidades, Marta Ejemplo! Lucía Prueba Ejemplo fue aceptado/a")
+    assert f"enlace personal: {r.data['link']} (vence el " in text
+    assert "{" not in text and "—" not in text
+    # The email: the result, the link as its button, the plain part verbatim.
+    assert len(mail.outbox) == 1
+    msg = mail.outbox[0]
+    assert msg.subject == "Resultado del examen de admisión de Lucía Prueba Ejemplo"
+    assert r.data["link"] in msg.body
+    html = msg.alternatives[0][0]
+    assert "Llenar la ficha de inscripción" in html and "enlace personal (vence el" in html
+    lead.refresh_from_db()
+    assert lead.exam_result_sent_at and lead.ficha_link_sent_at
+    assert lead.exam_result_sent_at == lead.ficha_link_sent_at
+    row = AuditLog.objects.filter(
+        object_type="admissions.preregistration",
+        object_id=str(lead.pk),
+        changes__sent="exam_result_accepted",
+    ).latest("pk")
+    assert row.changes["registration"] == reg.pk
+    # The next step is no longer «Enviar resultado y ficha».
+    assert process.next_action(lead)["code"] == "await_ficha"
+
+
+def test_next_step_after_accepted_is_result_and_ficha(admin_client):
+    lead = at_stage(make_lead(), Stage.EXAMEN, exam_at=future(-1))
+    admin_client.patch(
+        reverse("case-stage", args=[lead.pk, "examen"]), {"result": "aceptado"}, format="json"
+    )
+    lead.refresh_from_db()
+    assert lead.stage == "documentacion"
+    assert process.next_action(lead) == {
+        "code": "send_exam_result",
+        "label": "Enviar resultado y ficha",
+    }
+    # Sent by WhatsApp: no email, both stamps.
+    r = admin_client.post(action(lead, "send-exam-result"), {"channel": "whatsapp"}, format="json")
+    assert r.status_code == 200 and r.data["channel"] == "whatsapp" and not mail.outbox
+    assert r.data["whatsapp_url"].startswith("https://wa.me/525512345678?text=")
+    lead.refresh_from_db()
+    assert lead.ficha_link_sent_at and lead.exam_result_sent_at
+    # A resend of the ficha alone stays available.
+    assert process.next_action(lead)["code"] == "await_ficha"
+    assert (
+        admin_client.post(
+            action(lead, "send-ficha-link"), {"channel": "whatsapp"}, format="json"
+        ).status_code
+        == 200
+    )
+
+
+def test_edited_accepted_template_without_link_still_gets_it(admin_client):
+    SiteSettings.objects.update_or_create(
+        pk=1,
+        defaults={
+            "tpl_process": {"exam_result_accepted": "Hola {tutor}, {alumno} fue aceptado/a."}
+        },
+    )
+    lead = admitted(make_lead())
+    r = admin_client.post(action(lead, "send-exam-result"), {"channel": "whatsapp"}, format="json")
+    text = r.data["whatsapp_text"]
+    assert text.startswith("Hola Marta Ejemplo, Lucía Prueba Ejemplo fue aceptado/a.")
+    assert text.rstrip().endswith(")."), text
+    assert f"enlace personal: {r.data['link']} (vence el " in text
+
+
+def test_accepted_result_without_a_possible_link_is_the_result_alone(admin_client):
+    lead = admitted(make_lead())
+    make_registration(lead, status=Registration.Status.SUBMITTED)  # the ficha was already sent
+    r = admin_client.post(action(lead, "send-exam-result"), {"channel": "whatsapp"}, format="json")
+    assert r.status_code == 200
+    assert r.data["link"] == "" and "fue aceptado/a" in r.data["whatsapp_text"]
+    assert "{liga}" not in r.data["whatsapp_text"] and "enlace" not in r.data["whatsapp_text"]
+    lead.refresh_from_db()
+    assert lead.exam_result_sent_at and lead.ficha_link_sent_at is None
 
 
 def test_not_accepted_result_text(admin_client):

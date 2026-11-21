@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileSignature, Info } from 'lucide-react';
+import { FileSignature, Info, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import type { FieldErrorMap } from '@/lib/apiErrors';
@@ -29,8 +29,11 @@ export function examenSummary(d: CaseDetail): string {
 /**
  * 3 · Examen: date and time, notes, when the results are given, the result
  * (Aceptado / No aceptado with a reason, which closes the case) and the
- * messages: exam date, result and the ficha de inscripción link (from
- * «Examen agendado» on; an administrator may send it earlier).
+ * messages: exam date and result. The ficha de inscripción is private: its
+ * link goes out only once the result is «Aceptado», in the same message as
+ * the result («Enviar resultado y ficha»); «Enviar ficha de inscripción»
+ * resends it. Before «Aceptado» the button stays disabled with the reason
+ * (an administrator may override it with a written reason).
  */
 export function ExamenCard({ detail, state, open, onToggle, onSend }: {
   detail: CaseDetail;
@@ -86,7 +89,9 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
     patchResult.mutate({ result, ...(result === 'no_aceptado' ? { reason: reason.trim() } : {}) }, {
       onSuccess: (d) => {
         setResult(''); setReason(''); setChanging(false);
-        toast.success(result === 'no_aceptado' ? 'Expediente cerrado: no aceptado.' : `Aceptado. Expediente en «${d.stage_label}».`);
+        toast.success(result === 'no_aceptado'
+          ? 'Expediente cerrado: no aceptado.'
+          : `Aceptado. Expediente en «${d.stage_label}». Siguiente paso: enviar el resultado y la ficha.`);
       },
       onError: (e) => setResultErrors(errorsFrom(e)),
     });
@@ -94,6 +99,8 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
 
   const gate = detail.ficha_link;
   const scheduled = !!detail.examen.exam_at;
+  // «Aceptado» and the link may go out: one message carries the result and the ficha.
+  const resultWithFicha = detail.examen.result === 'aceptado' && gate.allowed;
 
   return (
     <StageCard stage="examen" state={state} open={open} onToggle={onToggle} summary={examenSummary(detail)}>
@@ -126,8 +133,10 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
       <div className="grid gap-3 lg:grid-cols-2">
         <SentRow label="Fecha del examen a la familia" sentAt={detail.examen.date_sent_at} buttonLabel="Enviar fecha"
           onSend={() => onSend('send-exam-date')} disabled={!scheduled || !openCase} hint={scheduled ? 'Sin enviar' : 'Agende primero el examen'} />
-        <SentRow label="Resultado a la familia" sentAt={detail.examen.result_sent_at} buttonLabel="Enviar resultado"
-          onSend={() => onSend('send-exam-result')} disabled={!detail.examen.result} hint={detail.examen.result ? 'Sin enviar' : 'Registre primero el resultado'} />
+        <SentRow label={resultWithFicha ? 'Resultado y ficha a la familia' : 'Resultado a la familia'} sentAt={detail.examen.result_sent_at}
+          buttonLabel={resultWithFicha ? 'Enviar resultado y ficha' : 'Enviar resultado'}
+          onSend={() => onSend('send-exam-result')} disabled={!detail.examen.result}
+          hint={!detail.examen.result ? 'Registre primero el resultado' : resultWithFicha ? 'Sin enviar: lleva la liga de la ficha' : 'Sin enviar'} />
       </div>
 
       <div className="space-y-3 rounded-xl2 border border-line p-4">
@@ -148,7 +157,7 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
               onChange={(v) => { setResult(v); setResultErrors({}); }}
               error={resultErrors.result}
               options={[
-                { value: 'aceptado', label: 'Aceptado', hint: 'Pasa a «Documentación y acuerdos».' },
+                { value: 'aceptado', label: 'Aceptado', hint: 'Pasa a «Documentación y acuerdos» y habilita la ficha de inscripción.' },
                 { value: 'no_aceptado', label: 'No aceptado', hint: 'Cierra el expediente.', tone: 'negative' },
               ]}
             />
@@ -177,17 +186,25 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
               {detail.ficha && detail.ficha.status !== 'draft' ? ` La familia la envió (${detail.ficha.status_label.toLowerCase()}).` : ''}
             </p>
           </div>
-          <Button type="button" variant={gate.allowed ? 'primary' : 'secondary'} size="sm" onClick={() => onSend('send-ficha-link')}
-            disabled={!gate.allowed && !gate.can_override}>
-            Enviar ficha de inscripción
+          <Button type="button" variant="secondary"
+            onClick={() => onSend('send-ficha-link')} disabled={!gate.allowed && !gate.can_override}
+            aria-describedby={!gate.allowed && gate.reason ? 'ficha-link-reason' : undefined}>
+            {gate.sent_at ? 'Reenviar ficha de inscripción' : 'Enviar ficha de inscripción'}
           </Button>
         </div>
-        {!gate.allowed && gate.reason && (
-          <p className="flex items-start gap-2 text-xs text-muted">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" aria-hidden="true" />
-            <span>{gate.reason}{gate.can_override ? ' Como administrador puede enviarla antes.' : ''}</span>
-          </p>
-        )}
+        <p id="ficha-link-reason" role="status" aria-live="polite" className="flex items-start gap-2 text-xs text-muted">
+          {!gate.allowed && gate.reason ? (
+            <>
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" aria-hidden="true" />
+              <span>{gate.reason}{gate.can_override ? ' Como administrador puede enviarla antes, con un motivo.' : ''}</span>
+            </>
+          ) : gate.allowed && !gate.sent_at && !detail.examen.result_sent_at ? (
+            <>
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple" aria-hidden="true" />
+              <span>La liga va con el resultado: use «Enviar resultado y ficha».</span>
+            </>
+          ) : null}
+        </p>
       </div>
     </StageCard>
   );

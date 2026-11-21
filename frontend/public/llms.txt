@@ -20,7 +20,6 @@
 - [Costos](https://interlaken.edu.mx/admisiones/costos): inscripción, colegiaturas y servicios del ciclo vigente
 - [Documentación](https://interlaken.edu.mx/admisiones/documentacion): documentos para el examen de valoración e inscripción
 - [Agendar visita](https://interlaken.edu.mx/agendar-visita): reserva en línea de un recorrido por el colegio
-- [Pre-registro](https://interlaken.edu.mx/pre-registro): solicitud de admisión en línea
 
 ## El colegio
 

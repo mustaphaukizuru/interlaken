@@ -7,6 +7,11 @@
  * prop of it. The hero and the trust strip show only next to the start: the
  * wizard publishes a page-local view flag and they step aside on the other
  * screens (steps, confirmation, links), so a phone sees the form first.
+ *
+ * The ficha is private (2026-11-21): the school sends each admitted family
+ * its personal link. Without one, «the start» is the panel «La ficha de
+ * inscripción es personal» (PrivateFicha); the page is noindex and out of
+ * the sitemap, and no public page links here.
  */
 import { createElement, useMemo, useSyncExternalStore } from 'react';
 import { CalendarDays, Clock } from 'lucide-react';
@@ -106,24 +111,24 @@ const formFields = FICHA_GROUPS.flatMap(({ group, texts, links = [], lists = [] 
 
 export const sections = [
   section({
-    type: 'hero', label: 'Ficha de inscripción · Portada', description: 'Portada oscura con foto, título, subtítulo y los pasos del proceso de admisión. Solo se ve en el inicio de la ficha.',
+    type: 'hero', label: 'Ficha de inscripción · Portada', description: 'Portada oscura con foto, título, subtítulo y los pasos del proceso de admisión. Solo se ve sobre el aviso «La ficha de inscripción es personal» (sin enlace), no con el enlace del colegio.',
     component: PreRegisterHeroView,
     fields: [f.text('label', 'Etiqueta superior', { hint: 'Puede usar {{ciclo}}.' }), f.text('title', 'Título', { required: true }), f.textarea('subtitle', 'Subtítulo'), f.image('image', 'Foto de fondo')],
     defaults: {
       label: 'Ciclo Escolar {{ciclo}} · Admisiones', title: 'Ficha de inscripción',
-      subtitle: 'Unos 15 minutos, en pasos que se guardan al continuar. Puede dejarla y seguir después con el enlace que le enviamos a su correo.',
+      subtitle: 'Es el último paso de la admisión: el colegio envía a cada familia admitida su enlace personal para llenarla en línea.',
       image: '/assets/hopscotch.webp',
     },
   }),
   section({
-    type: 'trust', label: 'Ficha de inscripción · Franja de confianza', description: 'Franja clara bajo la portada con dos datos breves (tiempo y ciclo escolar). Solo se ve en el inicio de la ficha.',
+    type: 'trust', label: 'Ficha de inscripción · Franja de confianza', description: 'Franja clara bajo la portada con dos datos breves (tiempo y ciclo escolar). Solo se ve sobre el aviso «La ficha de inscripción es personal» (sin enlace).',
     component: PreRegisterTrustView,
     fields: [f.text('first', 'Dato 1'), f.icon('firstIcon', 'Ícono del dato 1'), f.text('second', 'Dato 2', { hint: 'Puede usar {{ciclo}}.' }), f.icon('secondIcon', 'Ícono del dato 2')],
     defaults: { first: 'Unos 15 minutos, puede continuar después', firstIcon: 'Clock', second: 'Ciclo Escolar {{ciclo}} o el siguiente', secondIcon: 'CalendarDays' },
   }),
   section({
     type: 'form', label: 'Ficha de inscripción · Formulario', locked: true,
-    description: 'La ficha de inscripción en línea, también la que abre el enlace que envía Admisiones. Aquí se editan los textos de alrededor (títulos, explicaciones, botones, avisos, firma y confirmación); los campos, sus opciones y sus reglas vienen de la ficha del colegio y no cambian aquí.',
+    description: 'La ficha de inscripción en línea que abre el enlace personal que Admisiones envía a cada familia admitida, y el aviso «La ficha de inscripción es personal» para quien llega sin enlace. Aquí se editan los textos de alrededor (títulos, explicaciones, botones, avisos, firma y confirmación); los campos, sus opciones y sus reglas vienen de la ficha del colegio y no cambian aquí.',
     component: FichaFormView,
     fields: formFields,
     defaults: {

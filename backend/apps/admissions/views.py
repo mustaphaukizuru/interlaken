@@ -54,8 +54,9 @@ logger = logging.getLogger(__name__)
 
 FICHA_BY_SECTIONS = ('Esta ficha de inscripción se guarda por secciones. Actualice la página '
                      'para continuarla.')
-PUBLIC_START_OFF = ('En este momento la ficha de inscripción solo se puede iniciar con el enlace '
-                    'que le envía el colegio. Escríbanos o llámenos y con gusto le enviamos el suyo.')
+PUBLIC_START_OFF = ('La ficha de inscripción es personal: el colegio envía el enlace a cada familia '
+                    'cuando su hijo/a es admitido, después del examen de valoración. Para empezar, '
+                    'agende una visita o escríbanos.')
 
 
 def _is_staff(request):
@@ -228,16 +229,26 @@ class PreRegistrationInviteView(APIView):
     (``/pre-registro?rid=&token=``, the ficha). The invite is also emailed to the applicant
     (fail-soft). Idempotent: re-inviting the same pre-registration refreshes the
     token on the existing draft rather than spawning duplicates.
+
+    Same rule as the Expediente: only once the exam result is «Aceptado» (409
+    ``not_admitted`` before), unless an administrator sends ``override`` with
+    an ``override_reason`` (audited).
     """
     admin_area = 'admisiones'
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
+        from .process import CaseConflict
         from .services import AlreadyApplied
 
         pre = get_object_or_404(PreRegistration, pk=pk)
+        override = str(request.data.get('override', '')).strip().lower() in ('1', 'true', 'on', 'si', 'sí')
         try:
-            out = invite_preregistration(pre, request.user)
+            out = invite_preregistration(pre, request.user, override=override,
+                                         override_reason=request.data.get('override_reason', ''))
+        except CaseConflict as exc:
+            return Response(error_body(exc.message, code=exc.code, **exc.extra),
+                            status=status.HTTP_409_CONFLICT)
         except AlreadyApplied as exc:
             return Response({'detail': f'La familia {exc}.'}, status=status.HTTP_409_CONFLICT)
         reg = out['registration']
@@ -302,8 +313,9 @@ class RegistrationListCreateView(RegistrationListConfig, generics.ListCreateAPIV
         return RegistrationSerializer
 
     def create(self, request, *args, **kwargs):
-        # «Permitir iniciar la ficha sin enlace» (Ajustes). Off: only the link
-        # the office sends opens a ficha (that path never comes through here).
+        # «Permitir iniciar la ficha sin enlace» (Ajustes), off by default since
+        # the ficha is private (2026-11-21): only the link the office sends once
+        # the exam is «Aceptado» opens a ficha (that path never comes through here).
         if not _is_staff(request) and not ficha.public_start_enabled():
             return Response(error_body(PUBLIC_START_OFF, code='public_start_disabled'),
                             status=status.HTTP_403_FORBIDDEN)

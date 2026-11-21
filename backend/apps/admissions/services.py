@@ -89,9 +89,22 @@ def sent_registration(pre: PreRegistration):
 
 
 def invite_preregistration(
-    pre: PreRegistration, actor=None, *, context: str = "", audit=True, email=True
+    pre: PreRegistration,
+    actor=None,
+    *,
+    context: str = "",
+    audit=True,
+    email=True,
+    override=False,
+    override_reason="",
 ) -> dict:
     """Create or refresh the DRAFT registration for ``pre`` and email the invite.
+
+    The ficha de inscripción is private: the link goes out only once the
+    exam result is «Aceptado» (``process.check_ficha_link``: a ``CaseConflict``
+    otherwise, code ``not_admitted``), unless an administrator overrides it
+    with a written reason (``override`` + ``override_reason``, audited).
+    Every caller (Expediente, legacy invite endpoint, bulk) comes through here.
 
     Idempotent: re-inviting refreshes the token on the existing draft. The
     draft is seeded from the pre-registro when it is created; a re-invite only
@@ -102,6 +115,11 @@ def invite_preregistration(
     pending → contacted, so it never needs a note. The email goes out once the
     row is committed (``after_commit``), never before its token exists.
     """
+    from .process import check_ficha_link
+
+    overridden = check_ficha_link(
+        pre, actor=actor, override=override, override_reason=override_reason
+    )
     sent = sent_registration(pre)
     if sent is not None:
         raise AlreadyApplied(
@@ -147,6 +165,9 @@ def invite_preregistration(
     to = pre.parent_email or reg.parent1_email
 
     changes = {"invite": reg.id}
+    if overridden:
+        changes["override"] = True
+        changes["override_reason"] = overridden
     if pre.status == PreRegistration.Status.PENDING:
         stage = pre.stage
         pre.status = PreRegistration.Status.CONTACTED
@@ -159,7 +180,13 @@ def invite_preregistration(
         after_commit(partial(email_invite, reg, url, to=to))
     if audit:
         record("update", pre, changes, actor=actor, context=context or "admissions: invitación")
-    return {"registration": reg, "raw": raw, "url": url, "changes": changes}
+    return {
+        "registration": reg,
+        "raw": raw,
+        "url": url,
+        "changes": changes,
+        "override_reason": overridden,
+    }
 
 
 def _child(reg) -> str:

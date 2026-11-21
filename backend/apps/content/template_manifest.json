@@ -141,8 +141,8 @@
       "path": "/pre-registro",
       "title": "Ficha de inscripción",
       "seo": {
-        "title": "Ficha de inscripción en línea",
-        "description": "Llene en línea la ficha de inscripción al Colegio Interlaken (ciclo {{ciclo}} o el siguiente): unos 15 minutos, en pasos que puede guardar y continuar después."
+        "title": "Ficha de inscripción",
+        "description": "La ficha de inscripción del Colegio Interlaken es personal: el colegio envía el enlace a cada familia admitida después del examen de valoración."
       }
     },
     "preescolar": {

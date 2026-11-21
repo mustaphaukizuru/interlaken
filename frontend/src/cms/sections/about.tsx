@@ -11,7 +11,7 @@ import { HistoryTimeline, type Milestone } from '@/components/public/HistoryTime
 import { CARD_SIZES } from '@/lib/images';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, useMediaAlt, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, headingFields, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, headingFields, INFORMES_CTA, sectionsOf, VISIT_CTA } from './kit';
 import './page';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
@@ -326,8 +326,8 @@ export const sections = [
     component: AboutCtaView,
     fields: [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.link('primary', 'Botón principal'), f.link('secondary', 'Botón secundario')],
     defaults: {
-      title: '¿Desea conocernos de cerca?', text: 'Agende una visita o llene en línea la ficha de inscripción: unos 15 minutos, y puede continuar después.',
-      primary: { label: 'Llene la ficha de inscripción', href: '/pre-registro' }, secondary: { label: 'Agendar visita', href: '/agendar-visita' },
+      title: '¿Desea conocernos de cerca?', text: 'Agende una visita para conocer el colegio o escríbanos para recibir informes. Le acompañamos en cada paso de la admisión.',
+      primary: VISIT_CTA, secondary: INFORMES_CTA,
     },
   }),
 ];

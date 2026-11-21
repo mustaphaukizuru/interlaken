@@ -39,6 +39,17 @@ def at_stage(lead, stage, **extra) -> PreRegistration:
     return lead
 
 
+def admitted(lead, **extra) -> PreRegistration:
+    """The exam is «Aceptado» (stage «Documentación y acuerdos»): the ficha link may go out."""
+    return at_stage(
+        lead,
+        PreRegistration.Stage.DOCUMENTACION,
+        exam_at=extra.pop("exam_at", None) or future(-2),
+        exam_result=PreRegistration.ExamResult.ACEPTADO,
+        **extra,
+    )
+
+
 def make_registration(lead, status=Registration.Status.SUBMITTED, **kw) -> Registration:
     data = dict(
         pre_registration=lead,

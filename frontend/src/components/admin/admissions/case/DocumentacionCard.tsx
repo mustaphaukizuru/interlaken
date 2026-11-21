@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, CircleAlert, Eye, FileSignature, Info, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Eye, FileSignature, Info, Lock, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
@@ -66,6 +66,9 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
   const docMeta = docs ? DOC_STATE[docs.state] : null;
   const DocIcon = docMeta?.icon ?? Info;
   const agreementsValue = agreements ?? detail.documentacion.agreements_note;
+  const gate = detail.ficha_link;
+  // The first ficha link goes with the «Aceptado» result (one message).
+  const resultWithFicha = gate.allowed && detail.examen.result === 'aceptado' && !detail.examen.result_sent_at && !gate.sent_at;
 
   const saveAgreements = () => {
     setErrors({});
@@ -93,7 +96,11 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
                 {fichaProgress(detail) ? ` · ${fichaProgress(detail)}` : ''}
               </p>
             ) : (
-              <p className="mt-0.5 text-sm text-muted">Todavía no hay ficha. Envíe la liga para que la familia la llene.</p>
+              <p className="mt-0.5 text-sm text-muted">
+                {resultWithFicha
+                  ? 'Todavía no hay ficha. Envíe el resultado con la liga de la ficha para que la familia la llene.'
+                  : 'Todavía no hay ficha. Envíe la liga para que la familia la llene.'}
+              </p>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -102,14 +109,23 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
                 <Eye size={15} aria-hidden="true" /> Revisar ficha
               </Button>
             )}
-            {openCase && (!ficha || ficha.status === 'draft') && (
-              <Button type="button" size="sm" onClick={() => onSend('send-ficha-link')}
-                disabled={!detail.ficha_link.allowed && !detail.ficha_link.can_override}>
-                {detail.ficha_link.sent_at ? 'Reenviar liga de la ficha' : 'Enviar liga de la ficha'}
+            {openCase && (!ficha || ficha.status === 'draft') && (resultWithFicha ? (
+              <Button type="button" onClick={() => onSend('send-exam-result')}>Enviar resultado y ficha</Button>
+            ) : (
+              <Button type="button" onClick={() => onSend('send-ficha-link')}
+                disabled={!gate.allowed && !gate.can_override}
+                aria-describedby={!gate.allowed && gate.reason ? 'docs-ficha-reason' : undefined}>
+                {gate.sent_at ? 'Reenviar liga de la ficha' : 'Enviar liga de la ficha'}
               </Button>
-            )}
+            ))}
           </div>
         </div>
+        {openCase && !gate.allowed && gate.reason && (!ficha || ficha.status === 'draft') && (
+          <p id="docs-ficha-reason" className="mt-2 flex items-start gap-2 text-xs text-muted">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" aria-hidden="true" />
+            <span>{gate.reason}{gate.can_override ? ' Como administrador puede enviarla antes, con un motivo.' : ''}</span>
+          </p>
+        )}
       </div>
 
       {docs && docMeta && (

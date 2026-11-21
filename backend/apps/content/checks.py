@@ -33,6 +33,11 @@ from .pages import Page, image_ref_paths, located_error, manifest, section_schem
 
 HREF_RE = re.compile(r'href=["\']([^"\']+)["\']', re.I)
 ROUTE_PREFIXES = ('/niveles/', '/portal', '/admin', '/staff', '/login', '/p/')
+# The ficha de inscripción is private (2026-11-21): the school sends each
+# admitted family its link. A public page linking to it is flagged.
+PRIVATE_PATHS = ('/pre-registro', '/inscripcion')
+MSG_PRIVATE_LINK = ('La ficha de inscripción es personal: el colegio envía el enlace a cada familia admitida. '
+                    'Use «Agendar visita» (/agendar-visita) o «Admisiones» (/admisiones).')
 SEO_TITLE_MAX = 60
 SEO_DESCRIPTION_MAX = 160
 
@@ -149,6 +154,9 @@ def run_checks(page: Page) -> list[dict]:
             at('error', 'relative_link', i, path, f'El enlace «{h}» debe empezar con / (página del sitio) o con https://.')
             continue
         target = h.split('?')[0].split('#')[0].rstrip('/') or '/'
+        if target in PRIVATE_PATHS:
+            at('warning', 'private_link', i, path, MSG_PRIVATE_LINK)
+            continue
         if target in known or target.startswith(ROUTE_PREFIXES):
             continue
         at('error', 'broken_link', i, path, f'Enlace roto: {h} no lleva a ninguna página ni redirección. Elija otro destino.',

@@ -71,7 +71,8 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
       { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
       { label: 'Documentación', to: '/admisiones/documentacion', icon: FileText },
       { label: 'Costos', to: '/admisiones/costos', icon: CircleDollarSign },
-      { label: 'Ficha de inscripción', to: '/pre-registro', icon: UserPlus },
+      // The ficha de inscripción is private (sent after admission): the menu offers the visit.
+      { label: 'Agendar visita', to: '/agendar-visita', icon: CalendarDays },
     ],
   },
   {

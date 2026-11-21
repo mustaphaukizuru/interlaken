@@ -20,7 +20,7 @@ DESIGNED = [
     {'id': 'costos-1', 'type': 'costos.hero', 'props': {'title': 'Costos {{ciclo}}', 'image': '/assets/facade.webp',
                                                         'subtitle': 'Inscripción y colegiaturas'}},
     {'id': 'costos-2', 'type': 'costos.prices', 'props': {'note': 'Cifras informativas.',
-                                                          'cta': {'label': 'Pre-registro', 'href': '/pre-registro'},
+                                                          'cta': {'label': 'Agendar visita', 'href': '/agendar-visita'},
                                                           'links': [{'label': 'WhatsApp', 'href': 'https://wa.me/5215555555555'},
                                                                     {'label': 'Llamar', 'href': 'tel:+525553791188'},
                                                                     {'label': 'Documentos', 'href': '/admisiones/documentacion'},
@@ -104,3 +104,16 @@ def test_messages_name_the_section_and_the_field():
     assert msgs['broken_link'].startswith('Enlace roto. Sección 2 (')
     assert 'campo «Enlaces › elemento 1 › Enlace»' in msgs['broken_link']
     assert 'campo «Enlaces › elemento 2 › Enlace»' in msgs['relative_link']
+
+
+def test_a_link_to_the_private_ficha_is_flagged():
+    """The ficha de inscripción is private (sent after admission): a public link to it is a warning."""
+    page = Page(slug='costos', title='Costos', seo={}, draft_blocks=[
+        {'id': 'p', 'type': 'costos.prices', 'props': {'ctaPrimary': {'label': 'Ficha', 'href': '/pre-registro'},
+                                                       'ctaSecondary': {'label': 'Ficha', 'href': '/inscripcion?x=1'}}},
+    ])
+    issues = [i for i in run_checks(page) if i['code'] == 'private_link']
+    assert len(issues) == 2 and all(i['level'] == 'warning' for i in issues)
+    assert 'la ficha de inscripción es personal' in issues[0]['message'].lower()
+    assert '/agendar-visita' in issues[0]['message']
+    assert not [i for i in run_checks(page) if i['level'] == 'error']   # never blocks publishing
