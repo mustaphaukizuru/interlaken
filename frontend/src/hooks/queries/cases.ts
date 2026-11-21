@@ -223,7 +223,11 @@ export interface CaseDetail extends CaseRow {
   };
   inscrito: { enrolled_at: string | null; payments: CasePayment[]; gates: { ready: boolean; items: GateItem[] } };
   ficha: CaseFicha | null;
-  ficha_link: { allowed: boolean; overridable: boolean; reason: string; sent_at: string | null; can_override: boolean };
+  /**
+   * The ficha is private: its link goes out once the exam is «Aceptado» (`allowed`).
+   * Before that `code` is `not_admitted` and an administrator may override it with a reason.
+   */
+  ficha_link: { allowed: boolean; overridable: boolean; code?: string; reason: string; sent_at: string | null; can_override: boolean };
   history: CaseHistoryEntry[];
 }
 
@@ -241,6 +245,8 @@ export interface SendResult {
   registration?: number;
   expires_at?: string | null;
   override?: boolean;
+  /** «Enviar resultado» when «Aceptado»: the ficha link went with it. */
+  ficha_link_sent_at?: string | null;
 }
 
 export interface Credential { email: string; password: string | null; name: string }
@@ -274,6 +280,8 @@ export interface CaseTemplates {
   defaults: Record<string, string>;
   placeholders: Record<string, string[]>;
   labels: Record<string, string>;
+  /** What the office should know about a template (some have none). */
+  hints?: Record<string, string>;
 }
 
 export interface ExamItem {
@@ -307,7 +315,7 @@ export const casesApi = {
   move: (id: number, data: { stage: string; note?: string }) => api.post<CaseDetail>(`${base}/${id}/move/`, data),
   close: (id: number, data: { outcome: string; reason: string }) => api.post<CaseDetail>(`${base}/${id}/close/`, data),
   reopen: (id: number, data: { note: string; stage?: string }) => api.post<CaseDetail>(`${base}/${id}/reopen/`, data),
-  action: (id: number, action: CaseAction, data: { channel?: 'email' | 'whatsapp' | null; override?: boolean }) =>
+  action: (id: number, action: CaseAction, data: { channel?: 'email' | 'whatsapp' | null; override?: boolean; override_reason?: string }) =>
     api.post<SendResult>(`${base}/${id}/actions/${action}/`, data),
   addDiscount: (id: number, data: DiscountInput) => api.post<CaseDiscount>(`${base}/${id}/discounts/`, data),
   updateDiscount: (id: number, item: number, data: Partial<DiscountInput>) =>

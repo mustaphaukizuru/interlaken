@@ -210,47 +210,95 @@ describe('AdminCase (Expediente)', () => {
       expect(within(dialog).getByRole('radio', { name: /Por WhatsApp/ })).toBeChecked();
     });
 
-    it('the ficha before the exam: an administrator overrides it', async () => {
+    it('the ficha before «Aceptado»: disabled reason on the card, an administrator overrides it with a reason', async () => {
       const user = userEvent.setup();
       serve(makeCase('visita'));
       post.mockResolvedValue(sendResult({ link: 'https://ejemplo.test/pre-registro?rid=3&token=x', expires_at: '2026-12-05T10:00:00-06:00', override: true }) as never);
       renderCase();
       await user.click(await screen.findByRole('button', { name: '3. Examen: pendiente' }));
-      await user.click(await screen.findByRole('button', { name: 'Enviar ficha de inscripción' }));
+      // The card says why, with an icon and words (not colour alone).
+      const button = await screen.findByRole('button', { name: 'Enviar ficha de inscripción' });
+      expect(button).toHaveAccessibleDescription(/se envía cuando el examen está registrado como Aceptado\. Como administrador puede enviarla antes, con un motivo\./);
+      await user.click(button);
       const dialog = await screen.findByRole('dialog', { name: 'Enviar ficha de inscripción' });
-      expect(within(dialog).getByText('La ficha se envía cuando el examen ya está agendado.')).toBeInTheDocument();
+      expect(within(dialog).getByText('La ficha de inscripción se envía cuando el examen está registrado como Aceptado.')).toBeInTheDocument();
       const submit = within(dialog).getByRole('button', { name: 'Enviar por correo' });
       expect(submit).toBeDisabled();
       await user.click(within(dialog).getByRole('checkbox', { name: /Enviar de todos modos/ }));
+      // The reason is required: asked for, never sent without it.
+      expect(submit).toBeEnabled();
       await user.click(submit);
-      await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/admin/cases/7/actions/send-ficha-link/', { channel: 'email', override: true }));
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('Escriba por qué envía la ficha antes del resultado «Aceptado».');
+      expect(post).not.toHaveBeenCalled();
+      await user.type(within(dialog).getByLabelText('Motivo (obligatorio)'), 'Hermano inscrito; examen el lunes.');
+      await user.click(submit);
+      await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/admin/cases/7/actions/send-ficha-link/', {
+        channel: 'email', override: true, override_reason: 'Hermano inscrito; examen el lunes.',
+      }));
       expect(await within(dialog).findByText(/La liga vence el/)).toBeInTheDocument();
     });
 
-    it('a 409 «too_early» from the server offers the override to an administrator', async () => {
+    it('a 409 «not_admitted» from the server offers the override to an administrator', async () => {
       const user = userEvent.setup();
       // The page thinks it is allowed (stale): the server refuses.
       serve(makeCase('examen', { ficha_link: { allowed: true, overridable: false, reason: '', sent_at: null, can_override: false } }));
-      post.mockRejectedValueOnce({ response: { status: 409, data: { detail: 'La ficha se envía cuando el examen ya está agendado.', code: 'too_early', overridable: true } } });
+      post.mockRejectedValueOnce({ response: { status: 409, data: { detail: 'La ficha de inscripción se envía cuando el examen está registrado como Aceptado.', code: 'not_admitted', overridable: true } } });
       post.mockResolvedValueOnce(sendResult() as never);
       renderCase();
       await user.click(await screen.findByRole('button', { name: 'Enviar ficha de inscripción' }));
       const dialog = await screen.findByRole('dialog', { name: 'Enviar ficha de inscripción' });
       await user.click(within(dialog).getByRole('button', { name: 'Enviar por correo' }));
       const override = await within(dialog).findByRole('checkbox', { name: /Enviar de todos modos/ });
+      expect(within(dialog).getByText('La ficha de inscripción se envía cuando el examen está registrado como Aceptado.')).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Enviar por correo' })).toBeDisabled();
       await user.click(override);
+      await user.type(within(dialog).getByLabelText('Motivo (obligatorio)'), 'Autorizó la dirección.');
       await user.click(within(dialog).getByRole('button', { name: 'Enviar por correo' }));
-      await waitFor(() => expect(post).toHaveBeenLastCalledWith('/admissions/admin/cases/7/actions/send-ficha-link/', { channel: 'email', override: true }));
+      await waitFor(() => expect(post).toHaveBeenLastCalledWith('/admissions/admin/cases/7/actions/send-ficha-link/', {
+        channel: 'email', override: true, override_reason: 'Autorizó la dirección.',
+      }));
     });
 
     it('staff without the admin role cannot override the ficha gate', async () => {
       const user = userEvent.setup();
       asStaff();
-      serve(makeCase('visita', { ficha_link: { allowed: false, overridable: true, reason: 'La ficha se envía cuando el examen ya está agendado.', sent_at: null, can_override: false } }));
+      serve(makeCase('visita', { ficha_link: { allowed: false, overridable: true, code: 'not_admitted', reason: 'La ficha de inscripción se envía cuando el examen está registrado como Aceptado.', sent_at: null, can_override: false } }));
       renderCase();
       await user.click(await screen.findByRole('button', { name: '3. Examen: pendiente' }));
-      expect(await screen.findByRole('button', { name: 'Enviar ficha de inscripción' })).toBeDisabled();
+      const button = await screen.findByRole('button', { name: 'Enviar ficha de inscripción' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription('La ficha de inscripción se envía cuando el examen está registrado como Aceptado.');
+    });
+
+    it('«Aceptado»: the next step sends the result and the ficha in one message', async () => {
+      const user = userEvent.setup();
+      serve(makeCase('documentacion', {
+        next_action: { code: 'send_exam_result', label: 'Enviar resultado y ficha' },
+        examen: { exam_at: '2026-11-18T09:00:00-06:00', exam_notes: '', exam_results_at: null, result: 'aceptado', result_label: 'Aceptado', reason: '', date_sent_at: null, result_sent_at: null },
+      }));
+      post.mockResolvedValue(sendResult({
+        link: 'https://ejemplo.test/pre-registro?rid=3&token=x', expires_at: '2026-12-05T10:00:00-06:00', ficha_link_sent_at: '2026-11-21T10:00:00-06:00',
+        whatsapp_text: '¡Felicidades, Marta Ejemplo! Lucía fue aceptado/a. Llene su ficha: https://ejemplo.test/pre-registro?rid=3&token=x (vence el 5 de diciembre de 2026).',
+      }) as never);
+      renderCase();
+      await screen.findByRole('heading', { level: 1, name: 'Lucía Prueba Ejemplo' });
+      await user.click(nextStep().getByRole('button', { name: /Enviar resultado y ficha/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Enviar resultado y ficha' });
+      expect(within(dialog).getByText(/El resultado «Aceptado» y la liga personal a la ficha de inscripción, en un solo mensaje/)).toBeInTheDocument();
+      // Copied, the whole message travels (it carries the link).
+      expect(within(dialog).getByRole('radio', { name: /Copiar mensaje/ })).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Enviar por correo' }));
+      await waitFor(() => expect(post).toHaveBeenCalledWith('/admissions/admin/cases/7/actions/send-exam-result/', { channel: 'email' }));
+      // The Examen card offers the same single message.
+      await user.click(screen.getByRole('button', { name: 'Listo' }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Etapas del proceso de admisión' })).getByRole('button', { name: /^3\. Examen/ }));
+      await waitFor(() => expect(document.getElementById('etapa-examen')).not.toBeNull());
+      const examen = within(document.getElementById('etapa-examen')!);
+      expect(await examen.findByRole('button', { name: /Enviar resultado y ficha/ })).toBeInTheDocument();
+      expect(examen.getByText('La liga va con el resultado: use «Enviar resultado y ficha».')).toBeInTheDocument();
+      // «Documentación y acuerdos» says the same (no ficha yet).
+      const docs = within(document.getElementById('etapa-documentacion')!);
+      expect(docs.getByRole('button', { name: 'Enviar resultado y ficha' })).toBeInTheDocument();
     });
   });
 

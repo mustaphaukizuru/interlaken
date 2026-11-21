@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ClipboardCopy, Mail, MessageCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCopy, Lock, Mail, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Modal } from '@/components/ui/Modal';
@@ -34,7 +34,7 @@ export const ACTION_COPY: Record<CaseAction, ActionCopy> = {
   },
   'send-ficha-link': {
     title: 'Enviar ficha de inscripción',
-    intro: 'Una liga personal para llenar la ficha de inscripción en línea. Cada envío genera una liga nueva y la anterior deja de servir.',
+    intro: 'La liga personal a la ficha de inscripción de una familia admitida. Normalmente va con el resultado «Aceptado»; úsela para reenviarla. Cada envío genera una liga nueva y la anterior deja de servir.',
     hasLink: true,
     lastSent: (c) => c.ficha_link.sent_at,
   },
@@ -51,6 +51,21 @@ export const ACTION_COPY: Record<CaseAction, ActionCopy> = {
     lastSent: (c) => c.examen.result_sent_at,
   },
 };
+
+/** «Aceptado» with the ficha link allowed: the result and the family's ficha in one message. */
+const RESULT_WITH_FICHA: ActionCopy = {
+  title: 'Enviar resultado y ficha',
+  intro: 'El resultado «Aceptado» y la liga personal a la ficha de inscripción, en un solo mensaje. La liga vence a los 14 días; cada envío genera una nueva.',
+  // Copied, the whole message travels (it already carries the link).
+  hasLink: false,
+  lastSent: (c) => c.examen.result_sent_at,
+};
+
+/** The words of `action` for this case (the «Aceptado» result carries the ficha). */
+export function actionCopy(action: CaseAction, detail: CaseDetail): ActionCopy {
+  if (action === 'send-exam-result' && detail.examen.result === 'aceptado' && detail.ficha_link.allowed) return RESULT_WITH_FICHA;
+  return ACTION_COPY[action];
+}
 
 const OPTION = 'flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 text-sm transition focus-within:ring-2 focus-within:ring-purple/40';
 
@@ -76,8 +91,9 @@ async function copyText(text: string): Promise<boolean> {
  * «Enviar…» for every Expediente action: by email (the school's branded
  * message, the costs PDF attached), by WhatsApp (the text ready in a new tab)
  * or copying the link or the text to paste anywhere. Shows when it was last
- * sent and, for the ficha before the exam is scheduled, the administrator's
- * override (audited by the server).
+ * sent. The ficha de inscripción is private: before the exam is «Aceptado»
+ * it is refused with the reason, and only an administrator may override it,
+ * writing why (audited by the server).
  */
 export function SendDialog({ open, onClose, action, detail, isAdmin }: {
   open: boolean;
@@ -86,7 +102,7 @@ export function SendDialog({ open, onClose, action, detail, isAdmin }: {
   detail: CaseDetail;
   isAdmin: boolean;
 }) {
-  const title = action ? ACTION_COPY[action].title : '';
+  const title = action ? actionCopy(action, detail).title : '';
   return (
     <Modal open={open && !!action} onClose={onClose} title={title} maxWidth={520}>
       {action && <SendBody key={action} action={action} detail={detail} isAdmin={isAdmin} onClose={onClose} />}
@@ -95,26 +111,29 @@ export function SendDialog({ open, onClose, action, detail, isAdmin }: {
 }
 
 function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; detail: CaseDetail; isAdmin: boolean; onClose: () => void }) {
-  const copy = ACTION_COPY[action];
+  const copy = actionCopy(action, detail);
   const hasEmail = !!detail.parent_email;
   const [channel, setChannel] = useState<Channel>(hasEmail ? 'email' : 'whatsapp');
   const [override, setOverride] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [reasonError, setReasonError] = useState('');
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [result, setResult] = useState<(SendResult & { requested: Channel; copied?: boolean }) | null>(null);
   const doneRef = useRef<HTMLHeadingElement>(null);
 
-  const send = useCaseSideWrite(detail.id, (vars: { channel: 'email' | 'whatsapp'; override?: boolean }) =>
+  const send = useCaseSideWrite(detail.id, (vars: { channel: 'email' | 'whatsapp'; override?: boolean; override_reason?: string }) =>
     casesApi.action(detail.id, action, vars).then((r) => r.data));
 
-  // The ficha before «Examen agendado»: refused unless an administrator
-  // overrides it. The server has the last word: a 409 «too_early» (the page
-  // was stale) opens the same override.
+  // The ficha before «Aceptado»: refused unless an administrator overrides it
+  // with a written reason. The server has the last word: a 409 «not_admitted»
+  // (the page was stale) opens the same override.
   const fichaGate = action === 'send-ficha-link' ? detail.ficha_link : null;
-  const tooEarly = error?.code === 'too_early';
+  const tooEarly = error?.code === 'not_admitted';
   const blocked = (!!fichaGate && !fichaGate.allowed) || tooEarly;
   const refused = !!fichaGate && !fichaGate.allowed && !fichaGate.overridable;
   const canOverride = blocked && !refused && isAdmin && (tooEarly || !!fichaGate?.can_override);
   const needsOverride = blocked && !override;
+  const reasonId = 'send-override-reason';
 
   useEffect(() => {
     if (result) doneRef.current?.focus();
@@ -122,9 +141,18 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
 
   const submit = async () => {
     setError(null);
+    if (blocked && override && !overrideReason.trim()) {
+      setReasonError('Escriba por qué envía la ficha antes del resultado «Aceptado».');
+      document.getElementById(reasonId)?.focus();
+      return;
+    }
+    setReasonError('');
     const win = channel === 'whatsapp' ? openBlankTab() : null;
     try {
-      const res = await send.mutateAsync({ channel: channel === 'email' ? 'email' : 'whatsapp', ...(override ? { override: true } : {}) });
+      const res = await send.mutateAsync({
+        channel: channel === 'email' ? 'email' : 'whatsapp',
+        ...(blocked && override ? { override: true, override_reason: overrideReason.trim() } : {}),
+      });
       let copied: boolean | undefined;
       if (channel === 'email') {
         if (res.sent) toast.success(`Enviado por correo a ${res.sent_to}.`);
@@ -144,6 +172,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
       win?.close();
       const code = apiErrorCode(e);
       const fields = apiFieldErrors(e);
+      if (fields.override_reason) { setReasonError(fields.override_reason); return; }
       setError({ message: fields.channel || apiErrorMessage(e, 'No se pudo enviar.'), code });
     }
   };
@@ -163,8 +192,8 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
       {fichaGate && (
         <div className={clsx('rounded-xl px-3 py-2.5 text-sm', blocked ? 'bg-amber/10 text-ink' : 'bg-cream text-muted')}>
           {blocked ? (
-            <p className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
+            <p className="flex items-start gap-2" role="status" aria-live="polite">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
               <span>{fichaGate.reason || error?.message}</span>
             </p>
           ) : (
@@ -173,12 +202,29 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
           {blocked && canOverride && (
             <label className="mt-2 flex min-h-[44px] cursor-pointer items-center gap-2.5 font-medium">
               <input type="checkbox" className="h-4 w-4 rounded border-line text-purple focus:ring-purple/40"
-                checked={override} onChange={(e) => setOverride(e.target.checked)} />
+                checked={override} onChange={(e) => { setOverride(e.target.checked); setReasonError(''); }} />
               Enviar de todos modos (administrador; queda en el historial)
             </label>
           )}
+          {blocked && canOverride && override && (
+            <div className="mt-1">
+              <label htmlFor={reasonId} className="label">Motivo (obligatorio)</label>
+              <textarea
+                id={reasonId}
+                className={clsx('input-field min-h-[88px] text-sm', reasonError && 'border-coral-400')}
+                value={overrideReason}
+                maxLength={500}
+                aria-invalid={reasonError ? true : undefined}
+                aria-describedby={reasonError ? `${reasonId}-error` : `${reasonId}-hint`}
+                onChange={(e) => { setOverrideReason(e.target.value); setReasonError(''); }}
+              />
+              {reasonError
+                ? <p id={`${reasonId}-error`} role="alert" className="mt-1.5 text-xs text-coral-600">{reasonError}</p>
+                : <p id={`${reasonId}-hint`} className="mt-1.5 text-xs text-muted">Queda en el historial del expediente.</p>}
+            </div>
+          )}
           {blocked && !canOverride && !refused && (
-            <p className="mt-1 text-xs text-muted">Solo un administrador puede enviarla antes de agendar el examen.</p>
+            <p className="mt-1 text-xs text-muted">Solo un administrador puede enviarla antes del resultado «Aceptado».</p>
           )}
         </div>
       )}

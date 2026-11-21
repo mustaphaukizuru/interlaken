@@ -16,7 +16,9 @@ const ORDER = ['costs', 'visit_link', 'exam_date', 'exam_result_accepted', 'exam
  * Ajustes → «Mensajes del expediente»: the texts the Expediente sends
  * (cuotas, liga de visita, fecha y resultado del examen, liga de la ficha).
  * Each one lists the data it may use as chips (a tap inserts it where the
- * cursor is); an empty or restored text goes back to the built-in wording.
+ * cursor is) and, when the server gives one, a hint (the «Aceptado» result
+ * carries the private ficha link); an empty or restored text goes back to
+ * the built-in wording.
  */
 export function CaseTemplatesCard() {
   const qc = useQueryClient();
@@ -79,6 +81,8 @@ export function CaseTemplatesCard() {
           const custom = data.customized.includes(k);
           const isDefault = value(k).trim() === (data.defaults[k] ?? '').trim();
           const errId = `tpl-${k}-error`;
+          const hint = data.hints?.[k];
+          const hintId = `tpl-${k}-hint`;
           return (
             <div key={k} className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -93,6 +97,7 @@ export function CaseTemplatesCard() {
                   </button>
                 ))}
               </div>
+              {hint && <p id={hintId} className="text-xs text-muted">{hint}</p>}
               <textarea
                 id={`tpl-${k}`}
                 ref={(el) => { refs.current[k] = el; }}
@@ -100,7 +105,7 @@ export function CaseTemplatesCard() {
                 value={value(k)}
                 maxLength={2000}
                 aria-invalid={errors[k] ? true : undefined}
-                aria-describedby={errors[k] ? errId : undefined}
+                aria-describedby={[errors[k] ? errId : '', hint ? hintId : ''].filter(Boolean).join(' ') || undefined}
                 onChange={(e) => { setDrafts((d) => ({ ...d, [k]: e.target.value })); setSaved(''); }}
               />
               {errors[k] && <p id={errId} className="text-xs text-coral-600">{errors[k]}</p>}

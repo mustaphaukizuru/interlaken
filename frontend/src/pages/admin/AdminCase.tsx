@@ -49,6 +49,8 @@ const NEXT: Record<string, NextDo> = {
   send_exam_date: { kind: 'send', action: 'send-exam-date' },
   exam_scheduled: { kind: 'wait', card: 'examen' },
   exam_result: { kind: 'jump', card: 'examen' },
+  // «Aceptado»: one message with the result and the ficha link.
+  send_exam_result: { kind: 'send', action: 'send-exam-result' },
   send_ficha_link: { kind: 'send', action: 'send-ficha-link' },
   await_ficha: { kind: 'wait', card: 'documentacion' },
   review_documents: { kind: 'jump', card: 'documentacion' },
