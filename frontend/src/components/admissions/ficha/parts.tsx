@@ -1,10 +1,10 @@
 /**
- * Small shared pieces of the ficha: the step heading (focused on every step
- * change), the error summary at the top of a step, the «Guardado» status,
- * the action row and the full-width status panels (link sent, closed start,
- * invalid link…).
+ * Small shared pieces of the ficha: the heading of an unnumbered screen
+ * (focused on every change), the numbered step title, the error summary at
+ * the top of a step, the «Guardado» status, the titled blocks a step is made
+ * of and the full-width status panels (link sent, closed start, invalid link…).
  */
-import { forwardRef, type ReactNode, type Ref } from 'react';
+import { forwardRef, useId, type ReactNode, type Ref } from 'react';
 import { clsx } from 'clsx';
 import { AlertTriangle, Check, CloudOff, Loader2 } from 'lucide-react';
 
@@ -18,6 +18,24 @@ export const StepHeading = forwardRef<HTMLHeadingElement, { title: string; intro
   ),
 );
 StepHeading.displayName = 'StepHeading';
+
+/**
+ * «Paso 2 de 7» over a step's title (review sections, lists), read as one
+ * «Paso 2 de 7: Domicilio». Unnumbered screens pass no number.
+ */
+export function NumberedTitle({ number, title }: { number?: string; title: string }) {
+  return (
+    <>
+      {number ? (
+        <>
+          <span aria-hidden="true" className="mb-0.5 block text-[11px] font-bold uppercase leading-4 tracking-[0.12em] text-pink">{number}</span>
+          <span className="sr-only">{number}: </span>
+        </>
+      ) : null}
+      {title}
+    </>
+  );
+}
 
 export interface SummaryItem { id: string; label: string; message: string }
 
@@ -46,9 +64,10 @@ export const ErrorSummary = forwardRef<HTMLDivElement, { title: string; items: S
           <ul className="mt-2 space-y-1 pl-7 text-sm">
             {items.map((it) => (
               <li key={it.id}>
+                {/* Inline padding: a taller target without changing how the line wraps. */}
                 <a
                   href={`#${it.id}`}
-                  className="font-medium text-coral-800 underline underline-offset-2 hover:text-coral-900"
+                  className="py-3 font-medium text-coral-800 underline underline-offset-2 hover:text-coral-900"
                   onClick={(e) => { e.preventDefault(); go(it.id); }}
                 >
                   {it.label}
@@ -105,17 +124,41 @@ export function Panel({ icon, tone = 'neutral', title, children, headingRef }: {
   );
 }
 
-/** The two-line field grid used by most steps (one column on a phone). */
+/** Two short fields side by side from 640 px (one column on a phone). */
 export function Row({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={clsx('grid grid-cols-1 gap-5 sm:grid-cols-2', className)}>{children}</div>;
 }
 
-/** A titled block inside a step («Sus datos», «Datos del alumno»). */
-export function Block({ title, children }: { title?: string; children: ReactNode }) {
+/** A field that only needs half the width from 640 px (a grade, a phone). */
+export const HALF = 'sm:max-w-[50%] sm:pr-2.5';
+
+/** The blocks of a step, one under the other. */
+export function Blocks({ children }: { children: ReactNode }) {
+  return <div className="space-y-6">{children}</div>;
+}
+
+/**
+ * A titled block inside a step («Nombre», «Nacimiento», «Contacto») with a
+ * one-line hint, so a long step reads as a few short groups. Only a visual
+ * group: every block of a step still saves with that step. A screen reader
+ * hears the title (and the hint) on entering the group; a divider separates
+ * it from what comes before.
+ */
+export function Block({ title, hint, children }: { title?: string; hint?: string; children: ReactNode }) {
+  const id = useId();
+  if (!title) return <div className="space-y-5">{children}</div>;
   return (
-    <section className="space-y-5">
-      {title ? <h3 className="border-b border-line pb-2 text-sm font-bold uppercase tracking-[0.1em] text-subtle">{title}</h3> : null}
+    <div
+      role="group"
+      aria-labelledby={`${id}-title`}
+      aria-describedby={hint ? `${id}-hint` : undefined}
+      className="space-y-5 border-t border-line pt-6 first:border-t-0 first:pt-0"
+    >
+      <div>
+        <h3 id={`${id}-title`} className="font-head text-base font-bold leading-snug text-ink">{title}</h3>
+        {hint ? <p id={`${id}-hint`} className="mt-0.5 text-sm leading-snug text-muted">{hint}</p> : null}
+      </div>
       {children}
-    </section>
+    </div>
   );
 }

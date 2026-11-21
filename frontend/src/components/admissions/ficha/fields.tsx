@@ -183,7 +183,10 @@ function cardsGrid(options: Choice[]): { grid: string; compact: boolean } {
   return { grid: 'grid-cols-1 sm:grid-cols-2', compact: false };
 }
 
-/** A short list as tap-to-choose cards: a radio group under one legend. */
+/**
+ * A short list as tap-to-choose cards: a radio group under one legend
+ * (`radiogroup`, so it may say it is required and invalid).
+ */
 function OptionCards({ spec, label, className, after }: SpecProps) {
   const { form, id, error, required, helpId, errorId, optional, value } = useFieldBits(spec);
   const options = choicesFor(form.schema, spec);
@@ -191,6 +194,7 @@ function OptionCards({ spec, label, className, after }: SpecProps) {
   return (
     <fieldset
       id={id}
+      role="radiogroup"
       tabIndex={-1}
       className={clsx('min-w-0 focus:outline-none', className)}
       aria-required={required || undefined}

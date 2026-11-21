@@ -7,8 +7,9 @@
  * with its data prefilled.
  *
  * The schema is the server's own (fixtures/schema.json, exported from
- * ficha_schema.schema_json for 2026-11-20); regenerate it when the schema
- * changes. Synthetic people only; the CURP carries a valid check digit.
+ * ficha_schema.schema_json for 2026-11-20; builders in fixtures/wizardKit.ts);
+ * regenerate it when the schema changes. Synthetic people only; the CURP
+ * carries a valid check digit.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -31,51 +32,13 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { useAuthStore, type User } from '@/store/authStore';
 import { FichaWizard } from './FichaWizard';
 import { defaultCopy } from './copy';
-import schemaJson from './fixtures/schema.json';
-import type { Completeness, FichaPayload, FichaSchema, Values } from './types';
+import { ALUMNO_START, CONTACT, CURP, RID, SECTIONS, completeness, fail, payload, schema } from './fixtures/wizardKit';
+import type { FichaPayload, FichaSchema, Values } from './types';
 
-const schema = schemaJson as unknown as FichaSchema;
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
 const patch = vi.mocked(api.patch);
 const exchange = vi.mocked(exchangeOnce);
-
-const CURP = 'LOHA200501MDFRRNA5'; // 2020-05-01 · femenino · Ciudad de México (backend-generated)
-const RID = 7;
-
-const SECTIONS = ['contacto', 'alumno', 'domicilio', 'salud', 'padre', 'madre', 'emergencia'];
-
-function blankSection(key: string): Values {
-  const step = schema.steps.find((s) => s.key === key)!;
-  return Object.fromEntries(step.fields.map((f) => [f.name, f.type === 'boolean' ? false : f.type === 'date' ? null : '']));
-}
-
-function completeness(done: string[] = []): Completeness {
-  return {
-    sections: Object.fromEntries(SECTIONS.map((k) => [k, { complete: done.includes(k), missing: done.includes(k) ? [] : ['x'] }])),
-    complete: done.length === SECTIONS.length,
-  };
-}
-
-function payload(sections: Record<string, Values> = {}, done: string[] = ['contacto']): FichaPayload {
-  return {
-    id: RID, status: 'draft', status_label: 'Borrador', ficha_version: 2, editable: true,
-    child_name: 'Ana Sofía López Hernández', level: 'primaria', level_label: 'Primaria', cycle: '2026-2027',
-    pre_registration: 3,
-    sections: Object.fromEntries(SECTIONS.map((k) => [k, { ...blankSection(k), ...(sections[k] ?? {}) }])),
-    medical_masked: false,
-    firma: { privacy_accepted_at: null, privacy_notice_version: '', signed_name: '', signed_at: null, consent_photos_media: false },
-    completeness: completeness(done),
-    submitted_at: null, created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z',
-  };
-}
-
-const CONTACT = {
-  contact_name: 'Marta Hernández Gil', contact_email: 'marta.ficha@ejemplo.test', contact_phone: '5511112222', contact_relationship: 'Madre',
-};
-const ALUMNO_START = { child_given_names: 'Ana Sofía', child_paternal_surname: 'López', child_maternal_surname: 'Hernández', grade_applying: '1° Primaria', cycle: '2026-2027' };
-
-const fail = (status: number, data: unknown) => Promise.reject({ response: { status, data } });
 
 /** api.get by URL: the schema, and the ficha of RID. */
 function serve(ficha: FichaPayload | null, s: FichaSchema = schema) {
@@ -143,10 +106,10 @@ describe('FichaWizard · public start', () => {
       contact_name: CONTACT.contact_name, contact_email: CONTACT.contact_email, contact_relationship: 'Madre',
       child_given_names: 'Ana Sofía', child_paternal_surname: 'López', grade_applying: '1° Primaria', cycle: '2026-2027', wants_visit: false,
     })));
-    const heading = await screen.findByRole('heading', { name: 'Datos del alumno' });
+    const heading = await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByLabelText('Apellido paterno')).toHaveValue('López');
-    expect(screen.getByText('Paso 1 de 7')).toBeInTheDocument();
+    expect(screen.getByText('Paso 1 de 7')).toHaveAttribute('aria-hidden', 'true'); // read with the heading
     expect(trackEvent).toHaveBeenCalledWith('funnel_submit_pre_registro', { grade: '1° Primaria' });
     expect(JSON.parse(sessionStorage.getItem('interlaken:ficha-session')!)).toMatchObject({ id: RID, token: 'S1' });
   });
@@ -218,7 +181,7 @@ describe('FichaWizard · private ficha (no link)', () => {
     serve(payload({ contacto: CONTACT, alumno: ALUMNO_START }), { ...schema, public_start_enabled: false });
     exchange.mockResolvedValue({ data: { session_token: 'S9', expires_at: '2099-01-01T00:00:00Z' } } as never);
     renderWizard(`/pre-registro?rid=${RID}&token=un-token-de-prueba`);
-    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(exchange).toHaveBeenCalledWith(RID, 'un-token-de-prueba');
     expect(screen.queryByRole('heading', { name: 'La ficha de inscripción es personal' })).not.toBeInTheDocument();
   });
@@ -227,7 +190,7 @@ describe('FichaWizard · private ficha (no link)', () => {
     serve(payload({ contacto: CONTACT, alumno: ALUMNO_START }), { ...schema, public_start_enabled: false });
     sessionStorage.setItem('interlaken:ficha-session', JSON.stringify({ id: RID, token: 'S8', expires: '2099-01-01T00:00:00Z' }));
     renderWizard();
-    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'La ficha de inscripción es personal' })).not.toBeInTheDocument();
   });
 
@@ -248,7 +211,7 @@ describe('FichaWizard · staff link and saving', () => {
 
   it('exchanges the link once, skips step 0 and opens the prefilled alumno step', async () => {
     invited();
-    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(exchange).toHaveBeenCalledTimes(1);
     expect(exchange).toHaveBeenCalledWith(RID, 'un-token-de-prueba');
     expect(get).toHaveBeenCalledWith(`/admissions/register/${RID}/ficha/`, { headers: { 'X-Session-Token': 'S2' } });
@@ -262,7 +225,7 @@ describe('FichaWizard · staff link and saving', () => {
   it('fills birth date, sex and state from the CURP, saves the step and moves on', async () => {
     const user = userEvent.setup();
     invited();
-    await screen.findByRole('heading', { name: 'Datos del alumno' });
+    await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' });
     await user.type(screen.getByLabelText('CURP'), CURP.toLowerCase());
     expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('2020-05-01');
     expect(screen.getByRole('radio', { name: 'Femenino' })).toBeChecked();
@@ -280,26 +243,26 @@ describe('FichaWizard · staff link and saving', () => {
       child_curp: CURP, child_dob: '2020-05-01', child_sex: 'femenino', child_birth_country: 'México',
       child_birth_state: 'Ciudad de México', grade_applying: '1° Primaria',
     }), { headers: { 'X-Session-Token': 'S2' } });
-    expect(await screen.findByRole('heading', { name: 'Domicilio' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 2 de 7: Domicilio' })).toBeInTheDocument();
     expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Guardado');
   });
 
   it('shows the server format errors next to the field and in the summary', async () => {
     const user = userEvent.setup();
     invited();
-    await screen.findByRole('heading', { name: 'Datos del alumno' });
+    await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' });
     patch.mockImplementation(() => fail(400, { child_curp: ['El último dígito de la CURP no corresponde a los demás.'] }) as never);
     await user.click(screen.getByRole('button', { name: /Guardar y continuar$/ }));
     const summary = await screen.findByRole('alert');
     expect(within(summary).getByRole('link', { name: 'CURP' })).toHaveAttribute('href', `#ficha-alumno-child_curp`);
     expect(screen.getByLabelText('CURP')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
   });
 
   it('stays on the step and names what is missing after a save', async () => {
     const user = userEvent.setup();
     invited();
-    await screen.findByRole('heading', { name: 'Datos del alumno' });
+    await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' });
     patch.mockImplementation((_url: string, body: unknown) => Promise.resolve({ data: {
       section: 'alumno', data: body as Values,
       completeness: { ...completeness(['contacto']), sections: { ...completeness(['contacto']).sections, alumno: { complete: false, missing: ['child_dob'] } } },
@@ -309,7 +272,7 @@ describe('FichaWizard · staff link and saving', () => {
     const summary = await screen.findByRole('alert');
     expect(within(summary).getByRole('link', { name: 'Fecha de nacimiento' })).toBeInTheDocument();
     expect(within(summary).getByText(/Este dato es obligatorio/)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
   });
 
   it('a block marked «No aplica» with data asks first, then collapses', async () => {
@@ -317,7 +280,7 @@ describe('FichaWizard · staff link and saving', () => {
     serve(payload({ contacto: CONTACT, padre: { paternal_surname: 'Ríos' } }, ['contacto', 'alumno', 'domicilio', 'salud']));
     sessionStorage.setItem('interlaken:ficha-session', JSON.stringify({ id: RID, token: 'S3', expires: '2099-01-01T00:00:00Z' }));
     renderWizard();
-    expect(await screen.findByRole('heading', { name: 'Datos del padre' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 4 de 7: Información del padre' })).toBeInTheDocument();
     await user.click(screen.getByRole('switch', { name: /No aplica/ }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Sí, no aplica' }));
@@ -344,8 +307,8 @@ describe('FichaWizard · review and submit', () => {
     }) as never);
     renderWizard();
 
-    expect(await screen.findByRole('heading', { name: 'Revisión y firma' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Datos del padre' }).closest('section')).toHaveTextContent('No aplica');
+    expect(await screen.findByRole('heading', { name: 'Paso 7 de 7: Revisión y firma' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Paso 4 de 7: Información del padre' }).closest('section')).toHaveTextContent('No aplica');
     // Signature first: the form checks it before asking the server.
     await user.click(screen.getByRole('button', { name: 'Enviar la ficha de inscripción' }));
     expect(await screen.findByText('Debe aceptar el Aviso de Privacidad para enviar la ficha.', { selector: 'p' })).toBeInTheDocument();
@@ -359,8 +322,9 @@ describe('FichaWizard · review and submit', () => {
 
     const summary = await screen.findByRole('alert');
     expect(within(summary).getByText('Faltan datos en algunas secciones')).toBeInTheDocument();
-    await user.click(within(summary).getByRole('button', { name: 'Corregir' }));
-    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(within(summary).getByText('Paso 1 de 7: Información del alumno')).toBeInTheDocument();
+    await user.click(within(summary).getByRole('button', { name: 'Corregir: Paso 1 de 7: Información del alumno' }));
+    expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(screen.getByText(/La CURP indica que la fecha de nacimiento es 01\/05\/2020/, { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar y volver a la revisión/ })).toBeInTheDocument();
   });
@@ -371,7 +335,7 @@ describe('FichaWizard · review and submit', () => {
     sessionStorage.setItem('interlaken:ficha-session', JSON.stringify({ id: RID, token: 'S5', expires: '2099-01-01T00:00:00Z' }));
     post.mockResolvedValue({ data: { status: 'submitted', message: 'Ficha de inscripción enviada.', submitted_at: '2026-11-20T11:00:00Z' } } as never);
     renderWizard();
-    await screen.findByRole('heading', { name: 'Revisión y firma' });
+    await screen.findByRole('heading', { name: 'Paso 7 de 7: Revisión y firma' });
     await user.click(screen.getByLabelText(/He leído y acepto el Aviso de Privacidad/));
     await user.click(screen.getByLabelText(/Autorizo el uso de fotografías/));
     await user.type(screen.getByLabelText('Nombre completo de quien firma'), 'Marta Hernández Gil');
@@ -425,7 +389,7 @@ describe('FichaWizard · the school staff (Vista del personal)', () => {
     await user.selectOptions(screen.getByLabelText('Grado al que se inscribe'), '1° Primaria');
     await user.click(screen.getByRole('radio', { name: /2026-2027/ }));
     await user.click(screen.getByRole('button', { name: /Comenzar la ficha/ }));
-    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Vista del personal' })).toBeInTheDocument();
     expect(trackEvent).not.toHaveBeenCalled();
   });
@@ -479,7 +443,7 @@ describe('FichaWizard · the school staff (Vista del personal)', () => {
     serve(payload({ contacto: CONTACT, alumno: ALUMNO_START }), privateSchema());
     exchange.mockResolvedValue({ data: { session_token: 'S7', expires_at: '2099-01-01T00:00:00Z' } } as never);
     renderWizard(`/pre-registro?rid=${RID}&token=un-token-de-prueba`);
-    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Paso 1 de 7: Información del alumno' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Vista del personal' })).not.toBeInTheDocument();
   });
 });

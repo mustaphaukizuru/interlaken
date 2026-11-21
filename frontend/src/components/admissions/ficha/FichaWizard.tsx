@@ -11,8 +11,15 @@
  * family at the office. Until a remembered staff login is confirmed the
  * page shows its loading state, so a visitor never sees the form flash.
  *
- *   0 Antes de empezar (public start only) · 1 Alumno · 2 Domicilio · 3 Salud
- *   4 Padre · 5 Madre · 6 Emergencia · 7 Revisión y firma
+ *   0 Antes de empezar (public start only, unnumbered) · 1 Información del
+ *   alumno · 2 Domicilio · 3 Información de salud · 4 Información del padre ·
+ *   5 Información de la madre · 6 Contacto de emergencia · 7 Revisión y firma
+ *
+ * Every numbered step reads «Paso n de 7: título» (its heading, the list
+ * «Ver los pasos», the review, «Corregir»), is made of short titled blocks
+ * and, on a phone, ends in a sticky action bar («Anterior» / «Guardar y
+ * continuar») that docks at the end of the form, steps aside while the
+ * keyboard is up, and takes the floating WhatsApp button's place.
  *
  * Steps, fields, options and required rules come from GET ficha/schema/; the
  * words around them are the CMS props (`copy`). Each step is saved when the
@@ -22,9 +29,10 @@
  * opens on the first step with something missing; the token then leaves the
  * address bar. «Guardar y continuar después» saves and emails a fresh link.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FocusEvent, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { clsx } from 'clsx';
 import { AlertTriangle, ArrowLeft, ArrowRight, Link2Off, MailCheck, Send } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useReducedMotion } from '@/hooks/useMediaQuery';
@@ -32,7 +40,7 @@ import { apiErrorCode, apiErrorMessage, apiErrorStatus, apiFieldErrors } from '@
 import { FunnelEvent, trackEvent } from '@/services/analytics';
 import { fichaApi } from './api';
 import { bodyFor, fieldId, initialValues, isBlank, messagesFor, sectionMissing, splitFullName, stepField } from './choices';
-import { fillText, type FichaCopy, type TextKey } from './copy';
+import { fillText, numberedTitle, stepNumber, type FichaCopy, type TextKey } from './copy';
 import { FichaDone } from './FichaDone';
 import { Field } from './fields';
 import { FichaFormProvider } from './context';
@@ -62,7 +70,7 @@ const FIRMA = 'firma';
 const CONTACTO = 'contacto';
 const GUARDIANS: Record<string, string> = { padre: 'Padre', madre: 'Madre' };
 
-/** Step key → its title / short label in the copy. */
+/** Step key → its title in the copy (the step's heading, list, review and «Corregir»). */
 const TITLE_KEY: Record<string, TextKey> = {
   alumno: 'alumnoTitle', domicilio: 'domicilioTitle', salud: 'saludTitle', padre: 'padreTitle', madre: 'madreTitle',
   emergencia: 'emergenciaTitle', contacto: 'contactoTitle', firma: 'reviewTitle',
@@ -71,9 +79,26 @@ const INTRO_KEY: Record<string, TextKey> = {
   alumno: 'alumnoIntro', domicilio: 'domicilioIntro', salud: 'saludIntro', padre: 'tutorIntro', madre: 'tutorIntro',
   emergencia: 'emergenciaIntro', contacto: 'contactoIntro', firma: 'reviewIntro',
 };
-const SHORT_KEY: Record<string, TextKey> = {
-  alumno: 'stepAlumno', domicilio: 'stepDomicilio', salud: 'stepSalud', padre: 'stepPadre', madre: 'stepMadre',
-  emergencia: 'stepEmergencia', firma: 'stepFirma',
+
+/** A control that brings up the phone's keyboard (or a picker) when focused. */
+const TYPING = 'input:not([type=radio]):not([type=checkbox]):not([type=button]):not([type=submit]), select, textarea';
+const typingIn = (el: EventTarget | null) => el instanceof Element && el.matches(TYPING);
+
+/**
+ * Whether an on-screen keyboard is up: the visual viewport is clearly
+ * shorter than the window (iOS, and Android Chrome since it resizes only the
+ * visual viewport). A desktop window never shrinks this way, and a phone
+ * whose keyboard was put away with the field still focused counts as down.
+ * Without the API (old browsers, tests) the focused field alone decides.
+ */
+function subscribeViewport(onChange: () => void) {
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+  vv?.addEventListener('resize', onChange);
+  return () => vv?.removeEventListener('resize', onChange);
+}
+const keyboardUp = () => {
+  const vv = window.visualViewport;
+  return !vv || vv.height * vv.scale < window.innerHeight - 120;
 };
 
 const snapshot = (step: FichaStep, values: Values | undefined) => JSON.stringify(bodyFor(step, values ?? {}));
@@ -125,6 +150,11 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const [invitedBanner, setInvitedBanner] = useState(false);
   const [submitProblems, setSubmitProblems] = useState<string[]>([]);
   const [later, setLater] = useState<{ email: string; state: 'sending' | 'sent' | 'error' } | null>(null);
+  // A field with the keyboard up: the phone's action bar stops floating over the form
+  // (it stays docked at the end of the form, where Enter also sends the step).
+  const [typing, setTyping] = useState(false);
+  const keyboard = useSyncExternalStore(subscribeViewport, keyboardUp, () => false);
+  const barDocked = typing && keyboard;
   const baseline = useRef<Record<string, string>>({});
   const headingRef = useRef<HTMLHeadingElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -153,9 +183,20 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   useEffect(() => {
     if (!moved.current) return;
     moved.current = false;
+    setTyping(false);
     topRef.current?.scrollIntoView?.({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
     headingRef.current?.focus({ preventScroll: true });
   }, [stepKey, phase, reduced]);
+
+  // On the steps the phone's action bar owns the bottom of the screen: the
+  // floating WhatsApp button (PublicLayout) steps aside below 768 px.
+  const onSteps = phase === 'wizard';
+  useEffect(() => {
+    if (!onSteps) return undefined;
+    const root = document.documentElement;
+    root.setAttribute('data-ficha-steps', '');
+    return () => root.removeAttribute('data-ficha-steps');
+  }, [onSteps]);
 
   const move = useCallback((next: Phase | null, key?: string) => {
     moved.current = true;
@@ -517,9 +558,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     if (i < reached || Object.keys(errors[key] ?? {}).length) return 'missing';
     return 'pending';
   };
+  const titleOf = (key: string) => copy.t(TITLE_KEY[key] ?? 'reviewTitle') || stepOf(key)?.title || key;
+  /** «Paso 2 de 7» for the numbered steps; none for «Quién llena la ficha». */
+  const numberOf = (key: string) => (order.includes(key) ? stepNumber(copy, order.indexOf(key) + 1, order.length) : undefined);
   const items: StepBarItem[] = order.map((key, i) => ({
     key,
-    label: copy.t(SHORT_KEY[key] ?? 'stepFirma') || stepOf(key)?.title || key,
+    label: titleOf(key),
     state: stateOf(key, i),
     reachable: i <= reached || (key !== FIRMA && !!sections[key]?.complete),
   }));
@@ -527,10 +571,20 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const summaryItems: SummaryItem[] = Object.entries(stepErrors).map(([name, message]) => ({
     id: fieldId(stepKey, name), label: stepField(step, name)?.label ?? name, message,
   }));
-  const reviewSections = (schema.patch_sections ?? []).map((key) => ({ key, title: copy.t(TITLE_KEY[key] ?? 'reviewTitle') || stepOf(key)?.title || key }));
+  // The review follows the numbered steps; who fills the ficha (unnumbered) comes last.
+  const patchKeys = schema.patch_sections ?? [];
+  const reviewSections = [...order.filter((k) => patchKeys.includes(k)), ...patchKeys.filter((k) => !order.includes(k))]
+    .map((key) => ({ key, title: titleOf(key), number: numberOf(key) }));
+  const sectionLabel = (key: string) => {
+    const sec = reviewSections.find((x) => x.key === key);
+    return sec ? numberedTitle(sec.number, sec.title) : key;
+  };
   const incomplete = new Set(Object.entries(sections).filter(([, v]) => !v.complete).map(([k]) => k));
   const isFirma = stepKey === FIRMA;
   const onSubmit = (e: FormEvent) => { e.preventDefault(); void (isFirma ? submit() : next()); };
+  const onFormFocus = (e: FocusEvent<HTMLFormElement>) => setTyping(typingIn(e.target));
+  const onFormBlur = (e: FocusEvent<HTMLFormElement>) => { if (!typingIn(e.relatedTarget)) setTyping(false); };
+  const intro = copy.t(INTRO_KEY[stepKey] ?? 'reviewIntro') || step.description;
   const primaryLabel = isFirma ? copy.t('submitLabel') : stepKey === CONTACTO || toReview ? copy.t('reviewReturn') : copy.t('nextLabel');
 
   let body: ReactNode;
@@ -556,13 +610,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           <p><strong>{copy.t('invitedTitle')}</strong> {copy.t('invitedText')}</p>
         </div>
       ) : null}
-      {stepKey !== CONTACTO ? <StepBar items={items} current={stepKey} copy={copy} onPick={(k) => void leaveTo(k)} /> : null}
-      <div className="card mt-4 p-4 sm:p-8">
-        <StepHeading
-          ref={headingRef}
-          title={copy.t(TITLE_KEY[stepKey] ?? 'reviewTitle') || step.title}
-          intro={copy.t(INTRO_KEY[stepKey] ?? 'reviewIntro') || step.description}
-        />
+      <div className="card p-4 sm:p-8">
+        {stepKey !== CONTACTO ? (
+          <StepBar key={stepKey} items={items} current={stepKey} copy={copy} onPick={(k) => void leaveTo(k)} intro={intro} headingRef={headingRef} />
+        ) : (
+          <StepHeading ref={headingRef} title={titleOf(stepKey)} intro={intro} />
+        )}
         <ErrorSummary
           ref={summaryRef}
           title={isFirma && submitProblems.length ? copy.t('incompleteTitle') : copy.t('errorSummary')}
@@ -570,11 +623,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           detail={detail ?? (isFirma && submitProblems.length ? copy.t('incompleteText') : undefined)}
         >
           {isFirma && submitProblems.length ? (
-            <ul className="mt-3 space-y-2 pl-7">
+            <ul className="mt-3 space-y-2 sm:pl-7">
               {submitProblems.map((k) => (
-                <li key={k} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm text-coral-800">
-                  <span className="font-semibold">{reviewSections.find((s) => s.key === k)?.title ?? k}</span>
-                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-full px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream"
+                <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 rounded-xl bg-white/70 py-1 pl-3 pr-1 text-sm text-coral-800">
+                  <span className="min-w-0 font-semibold">{sectionLabel(k)}</span>
+                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-full px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                    aria-label={`${copy.t('fixLabel')}: ${sectionLabel(k)}`}
                     onClick={() => go(k, { review: true })}>
                     {copy.t('fixLabel')}
                   </button>
@@ -584,27 +638,41 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           ) : null}
         </ErrorSummary>
         <FichaFormProvider value={{ schema, step, values: values[stepKey] ?? {}, errors: stepErrors, set: setField(stepKey), setMany: setFields(stepKey), copy }}>
-          <form noValidate onSubmit={onSubmit}>
+          {/* Fields scrolled to by the focus stay clear of the sticky header and the phone's action bar. */}
+          <form noValidate onSubmit={onSubmit} onFocus={onFormFocus} onBlur={onFormBlur}
+            className="[&_:is(input,select,textarea)]:scroll-mb-32 [&_:is(input,select,textarea)]:scroll-mt-28">
             {body}
-            <div className="mt-8 flex flex-col-reverse gap-4 border-t border-line pt-6 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                {index > 0 || stepKey === CONTACTO ? (
-                  <button type="button" onClick={back} disabled={busy}
-                    className="btn-outline min-h-[44px] px-5 py-2.5 text-sm disabled:opacity-50">
-                    <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {copy.t('backLabel')}
-                  </button>
-                ) : null}
-                <button type="button" onClick={() => void saveForLater()} disabled={busy}
-                  className="inline-flex min-h-[44px] items-center rounded-full px-2 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50">
-                  {copy.t('laterLabel')}
+            {/* The action bar: on a phone sticky at the bottom of the screen (edge to edge of
+                the card) until it docks under the last field; from 640 px a plain row under a
+                divider. «Continuar después» and the save status come after it. */}
+            <div
+              data-ficha-actions=""
+              data-sticky={barDocked ? undefined : ''}
+              className={clsx(
+                'z-20 -mx-4 mt-8 flex items-center gap-2 border-t border-line bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+                'shadow-[0_-12px_24px_-18px_rgba(64,26,142,0.45)] backdrop-blur',
+                barDocked ? 'static' : 'sticky bottom-0',
+                'sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-6 sm:shadow-none sm:backdrop-blur-none',
+              )}
+            >
+              {index > 0 || stepKey === CONTACTO ? (
+                <button type="button" onClick={back} disabled={busy}
+                  className="btn-outline min-h-[44px] min-w-[44px] shrink-0 gap-1.5 px-3 py-2 text-sm disabled:opacity-50 min-[400px]:px-4 sm:px-5">
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only min-[400px]:not-sr-only">{copy.t('backLabel')}</span>
                 </button>
-              </div>
-              <div className="flex flex-col items-stretch gap-2 sm:items-end">
-                <Button type="submit" variant={isFirma ? 'cta' : 'primary'} size="lg" loading={busy} className="w-full sm:w-auto">
-                  {primaryLabel} {isFirma ? null : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
-                </Button>
-                <SaveStatus state={saveState} labels={{ saving: copy.t('saving'), saved: copy.t('saved'), error: copy.t('saveError') }} />
-              </div>
+              ) : null}
+              <Button type="submit" variant={isFirma ? 'cta' : 'primary'} loading={busy}
+                className="min-w-0 flex-1 text-center leading-tight sm:ml-auto sm:flex-none">
+                {primaryLabel} {isFirma ? null : <ArrowRight className="h-4 w-4 shrink-0 max-[359px]:hidden" aria-hidden="true" />}
+              </Button>
+            </div>
+            <div className="mt-2 flex flex-col items-center gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+              <button type="button" onClick={() => void saveForLater()} disabled={busy}
+                className="-mx-2 inline-flex min-h-[44px] items-center rounded-full px-2 text-sm font-semibold text-purple underline underline-offset-4 hover:text-purple-mid focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40 disabled:opacity-50">
+                {copy.t('laterLabel')}
+              </button>
+              <SaveStatus state={saveState} labels={{ saving: copy.t('saving'), saved: copy.t('saved'), error: copy.t('saveError') }} />
             </div>
           </form>
         </FichaFormProvider>

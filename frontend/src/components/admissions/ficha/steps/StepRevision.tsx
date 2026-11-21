@@ -1,16 +1,20 @@
 /**
- * Paso 7 · Revisión y firma: every answer grouped by section with «Editar»,
- * the short privacy paragraph with the link to the Aviso, the acceptance,
- * the photo consent and the full name typed as the signature.
+ * Paso 7 · Revisión y firma: every answer grouped by step («Paso 1 de 7:
+ * Información del alumno»…, then «Quién llena la ficha») with «Editar», the
+ * short privacy paragraph with the link to the Aviso, the acceptance, the
+ * photo consent and the full name typed as the signature.
  */
 import { AlertCircle, Pencil } from 'lucide-react';
 import { CmsAnchor } from '@/cms/sections/kit';
 import { displayValue, isHidden, stepField } from '../choices';
+import { numberedTitle } from '../copy';
 import { Field } from '../fields';
 import { useFichaForm } from '../context';
+import { NumberedTitle } from '../parts';
 import type { FieldErrors, Values } from '../types';
 
-export interface ReviewSection { key: string; title: string }
+/** A section of the review; `number` («Paso 2 de 7») for the wizard's numbered steps. */
+export interface ReviewSection { key: string; title: string; number?: string }
 
 export function StepRevision({ sections, all, errors, incomplete, onEdit }: {
   sections: ReviewSection[];
@@ -25,7 +29,7 @@ export function StepRevision({ sections, all, errors, incomplete, onEdit }: {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        {sections.map(({ key, title }) => {
+        {sections.map(({ key, title, number }) => {
           const step = schema.steps.find((s) => s.key === key);
           if (!step) return null;
           const values = all[key] ?? {};
@@ -36,12 +40,14 @@ export function StepRevision({ sections, all, errors, incomplete, onEdit }: {
           return (
             <section key={key} aria-labelledby={headingId} className="rounded-xl2 border border-line bg-white">
               <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-                <h3 id={headingId} className="min-w-0 text-[15px] font-bold text-ink">{title}</h3>
+                <h3 id={headingId} className="min-w-0 break-words text-[15px] font-bold leading-snug text-ink">
+                  <NumberedTitle number={number} title={title} />
+                </h3>
                 <button
                   type="button"
                   onClick={() => onEdit(key)}
-                  className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-purple hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
-                  aria-label={`${copy.t('reviewEdit')}: ${title}`}
+                  className="-mr-2 inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-purple hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                  aria-label={`${copy.t('reviewEdit')}: ${numberedTitle(number, title)}`}
                 >
                   <Pencil className="h-4 w-4" aria-hidden="true" /> {copy.t('reviewEdit')}
                 </button>
