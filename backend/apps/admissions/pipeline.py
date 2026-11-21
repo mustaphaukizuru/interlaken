@@ -120,9 +120,12 @@ class RequestDocsView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
-        from .services import request_missing_documents
+        from .services import FichaPending, request_missing_documents
         reg = get_object_or_404(Registration, pk=pk)
-        out = request_missing_documents(reg, request.user)
+        try:
+            out = request_missing_documents(reg, request.user)
+        except FichaPending as exc:
+            return Response({'detail': exc.message, 'code': exc.code}, status=status.HTTP_409_CONFLICT)
         if not out['missing']:
             return Response({'detail': 'No falta ningún documento.'}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'sent_to': out['sent_to'], 'missing': out['missing'], 'text': out['text']})

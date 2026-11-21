@@ -100,6 +100,14 @@ describe('DocumentChecklist', () => {
     await waitFor(() => expect(del).toHaveBeenCalledWith('/admissions/admin/register/9/checklist/boleta-sep/state/'));
   });
 
+  it('waits for the ficha before any reminder (the ficha link would stop working)', async () => {
+    get.mockResolvedValue({ data: { ...CHECKLIST, ficha_submitted: false } } as never);
+    render();
+    expect(await screen.findByRole('button', { name: /Por correo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Por WhatsApp/ })).toBeDisabled();
+    expect(screen.getByText(/Disponible cuando la familia envíe la ficha/)).toBeInTheDocument();
+  });
+
   it('sends the email reminder', async () => {
     post.mockResolvedValue({ data: { channel: 'email', sent_to: 'maria@test.mx', missing: CHECKLIST.missing, text: 'x' } } as never);
     render();

@@ -413,7 +413,12 @@ class DocumentsLinkView(APIView):
     permission_classes = [IsAdmin]
 
     def post(self, request, pk):
+        from .services import FichaPending, ensure_ficha_sent
         reg = get_object_or_404(Registration, pk=pk)
+        try:
+            ensure_ficha_sent(reg)
+        except FichaPending as exc:
+            return Response(error_body(exc.message, code=exc.code), status=status.HTTP_409_CONFLICT)
         raw = issue_invite(reg)
         url = f'{settings.FRONTEND_URL}/inscripcion/documentos?rid={reg.id}&token={raw}'
         from .pipeline import checklist

@@ -22,5 +22,7 @@ export interface SiteSettings {
   chrome?: Partial<import('@/lib/siteChrome').SiteChrome> & import('@/lib/siteChrome').SiteTexts;
   /** Official SEP registrations (P3-8). Empty = built-in flyer values. */
   sep_incorporations?: { level: 'Preescolar' | 'Primaria' | 'Secundaria'; label: string }[];
+  /** «Permitir iniciar la ficha sin enlace» (Ajustes): off = only the school's private link opens a ficha. */
+  admissions_public_start?: boolean;
   updated_at?: string;
 }

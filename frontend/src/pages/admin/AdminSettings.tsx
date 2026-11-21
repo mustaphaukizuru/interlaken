@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
+import { AdmissionsPublicStartCard } from '@/components/admin/AdmissionsPublicStartCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -357,6 +358,8 @@ export default function AdminSettings() {
                 />
               </div>
             </Card>
+
+            <AdmissionsPublicStartCard value={data?.admissions_public_start} loaded={loaded} />
 
             <AdmissionTemplatesCard />
 
