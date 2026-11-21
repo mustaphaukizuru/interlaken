@@ -1,5 +1,5 @@
 """
-admissions/models.py — Pre-registration, Registration, Open School Day
+admissions/models.py — Pre-registration, Registration (the ficha), guardians, documents
 """
 from uuid import uuid4
 
@@ -39,7 +39,9 @@ class PreRegistration(models.Model):
     # Child info
     child_first_name = models.CharField(max_length=100, verbose_name='Nombre del alumno')
     child_last_name  = models.CharField(max_length=100, verbose_name='Apellidos del alumno')
-    child_dob        = models.DateField(verbose_name='Fecha de nacimiento')
+    # Nullable since the ficha (2026-11): its public start (step 0) creates the
+    # lead before the family reaches the student's birth date.
+    child_dob        = models.DateField(null=True, blank=True, verbose_name='Fecha de nacimiento')
     level            = models.CharField(max_length=20, choices=Level.choices, verbose_name='Nivel educativo')
     grade_applying   = models.CharField(max_length=30, verbose_name='Grado a solicitar')
     cycle            = models.CharField(max_length=20, default=current_school_cycle, verbose_name='Ciclo escolar')
@@ -110,15 +112,52 @@ class Registration(models.Model):
     pre_registration = models.ForeignKey(PreRegistration, null=True, blank=True,
                                          on_delete=models.SET_NULL, related_name='registrations')
 
-    # Student info
+    class FichaVersion(models.IntegerChoices):
+        LEGACY = 1, 'Formulario anterior'
+        FICHA  = 2, 'Ficha de inscripción'
+
+    # Which form fills this record. 1 = the old /inscripcion wizard (lax submit,
+    # kept until Fase 2 replaces it); 2 = the ficha (step 0 start or any save
+    # through the /ficha/ endpoints): submit runs the full required rules.
+    ficha_version = models.PositiveSmallIntegerField(
+        choices=FichaVersion.choices, default=FichaVersion.LEGACY, verbose_name='Versión del formulario')
+
+    # ── Antes de empezar (step 0): who fills the ficha in ──────────────────
+    # parent1_* is derived from this contact (admissions.guardians).
+    contact_name         = models.CharField(max_length=200, blank=True, verbose_name='Nombre de quien llena la ficha')
+    contact_email        = models.EmailField(blank=True, verbose_name='Correo de quien llena la ficha')
+    contact_phone        = models.CharField(max_length=20, blank=True, verbose_name='Celular de quien llena la ficha')
+    contact_relationship = models.CharField(max_length=50, blank=True, verbose_name='Parentesco con el alumno')
+
+    # Student info. child_first_name / child_last_name are kept in sync from the
+    # ficha's given names and surnames (lists, emails, dedupe, exports, convert).
     child_first_name = models.CharField(max_length=100)
     child_last_name  = models.CharField(max_length=100)
-    child_dob        = models.DateField()
+    child_given_names      = models.CharField(max_length=100, blank=True, verbose_name='Nombre(s)')
+    child_paternal_surname = models.CharField(max_length=100, blank=True, verbose_name='Apellido paterno')
+    child_maternal_surname = models.CharField(max_length=100, blank=True, verbose_name='Apellido materno')
+    # Nullable since the ficha: the public start comes before the birth date.
+    child_dob        = models.DateField(null=True, blank=True, verbose_name='Fecha de nacimiento')
+    child_sex        = models.CharField(max_length=10, blank=True, verbose_name='Sexo')
+    child_birth_country = models.CharField(max_length=60, blank=True, verbose_name='País de nacimiento')
+    child_birth_state   = models.CharField(max_length=60, blank=True, verbose_name='Estado de nacimiento')
     child_curp       = models.CharField(max_length=20, blank=True, verbose_name='CURP')
     child_nationality= models.CharField(max_length=50, default='Mexicana')
+    previous_school  = models.CharField(max_length=200, blank=True, verbose_name='Escuela anterior')
     level            = models.CharField(max_length=20)
     grade_applying   = models.CharField(max_length=30)
     cycle            = models.CharField(max_length=20, default=current_school_cycle)
+
+    # ── Domicilio ─────────────────────────────────────────────────────────
+    address_street          = models.CharField(max_length=150, blank=True, verbose_name='Calle')
+    address_ext_number      = models.CharField(max_length=20, blank=True, verbose_name='Núm. exterior')
+    address_int_number      = models.CharField(max_length=20, blank=True, verbose_name='Núm. interior')
+    address_between_streets = models.CharField(max_length=200, blank=True, verbose_name='Entre calles')
+    address_state           = models.CharField(max_length=60, blank=True, verbose_name='Estado')
+    address_municipality    = models.CharField(max_length=100, blank=True, verbose_name='Municipio o alcaldía')
+    address_neighborhood    = models.CharField(max_length=100, blank=True, verbose_name='Colonia')
+    address_postal_code     = models.CharField(max_length=5, blank=True, verbose_name='Código postal')
+    home_phone              = models.CharField(max_length=20, blank=True, verbose_name='Teléfono de casa')
 
     # Parent 1
     parent1_name     = models.CharField(max_length=200)
@@ -131,9 +170,13 @@ class Registration(models.Model):
     parent2_email    = models.EmailField(blank=True)
     parent2_phone    = models.CharField(max_length=20, blank=True)
 
-    # Emergency contact
+    # Emergency contact. emergency_name is kept in sync from the ficha's
+    # given names + surnames (convert copies it to the student file).
     emergency_name   = models.CharField(max_length=200, blank=True)
+    emergency_surnames     = models.CharField(max_length=150, blank=True, verbose_name='Apellido(s) del contacto')
+    emergency_given_names  = models.CharField(max_length=100, blank=True, verbose_name='Nombre(s) del contacto')
     emergency_phone  = models.CharField(max_length=20, blank=True)
+    emergency_mobile = models.CharField(max_length=20, blank=True, verbose_name='Celular del contacto')
     emergency_rel    = models.CharField(max_length=50, blank=True)
 
     # Medical — sensitive personal data, ENCRYPTED AT REST (IK-LEGAL B4) and gated
@@ -143,6 +186,9 @@ class Registration(models.Model):
     medical_notes    = EncryptedTextField(blank=True, default='')
     estatura         = EncryptedTextField(blank=True, default='', verbose_name='Estatura')
     peso             = EncryptedTextField(blank=True, default='', verbose_name='Peso')
+    # Ficha «Datos adicionales»: '' | 'si' | 'no' (``allergies`` holds «¿cuáles?»).
+    has_allergies      = EncryptedTextField(blank=True, default='', verbose_name='¿Tiene alergias?')
+    chronic_conditions = EncryptedTextField(blank=True, default='', verbose_name='Enfermedades crónicas')
 
     # Status
     status       = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -161,6 +207,10 @@ class Registration(models.Model):
     privacy_accepted_at    = models.DateTimeField(null=True, blank=True)
     consent_photos_media   = models.BooleanField(default=False)
     consent_medical_data   = models.BooleanField(default=False)
+    # Ficha step 7: the full name typed as signature, when and from where.
+    signed_name = models.CharField(max_length=200, blank=True, verbose_name='Nombre completo (firma)')
+    signed_at   = models.DateTimeField(null=True, blank=True, verbose_name='Firmada')
+    signed_ip   = models.GenericIPAddressField(null=True, blank=True, verbose_name='IP de la firma')
 
     class Meta:
         verbose_name = 'Inscripción'
@@ -174,6 +224,8 @@ class Registration(models.Model):
             models.Index(Lower('parent1_email'), name='adm_reg_p1email_lower'),
             models.Index(Lower('parent2_email'), name='adm_reg_p2email_lower'),
             models.Index(fields=['child_curp'], name='adm_reg_child_curp'),
+            # «Continuar mi ficha» looks drafts up by the contact's email.
+            models.Index(Lower('contact_email'), name='adm_reg_contact_email_lower'),
         ]
 
     def __str__(self):
@@ -183,6 +235,56 @@ class Registration(models.Model):
         self.status = self.Status.SUBMITTED
         self.submitted_at = timezone.now()
         self.save()
+
+
+class RegistrationGuardian(models.Model):
+    """«Datos del padre» / «Datos de la madre» of the ficha (one row per role).
+
+    A block may be «No aplica» (single-parent families) and either may be the
+    legal guardian. The legacy ``Registration.parent1_*`` / ``parent2_*``
+    fields are derived from these rows and the step-0 contact by
+    ``admissions.guardians.sync_legacy_parents`` (convert, lists, emails).
+    """
+
+    class Role(models.TextChoices):
+        PADRE = 'padre', 'Padre'
+        MADRE = 'madre', 'Madre'
+
+    registration      = models.ForeignKey(Registration, on_delete=models.CASCADE, related_name='guardians')
+    role              = models.CharField(max_length=10, choices=Role.choices, verbose_name='Bloque')
+    not_applicable    = models.BooleanField(default=False, verbose_name='No aplica')
+    is_legal_guardian = models.BooleanField(default=False, verbose_name='Es tutor/a legal')
+
+    paternal_surname  = models.CharField(max_length=100, blank=True, verbose_name='Apellido paterno')
+    maternal_surname  = models.CharField(max_length=100, blank=True, verbose_name='Apellido materno')
+    given_names       = models.CharField(max_length=100, blank=True, verbose_name='Nombre(s)')
+    sex               = models.CharField(max_length=10, blank=True, verbose_name='Sexo')
+    dob               = models.DateField(null=True, blank=True, verbose_name='Fecha de nacimiento')
+    birth_country     = models.CharField(max_length=60, blank=True, verbose_name='País de nacimiento')
+    birth_state       = models.CharField(max_length=60, blank=True, verbose_name='Estado de nacimiento')
+    curp              = models.CharField(max_length=20, blank=True, verbose_name='CURP')
+    marital_status    = models.CharField(max_length=20, blank=True, verbose_name='Estado civil')
+    education_level   = models.CharField(max_length=20, blank=True, verbose_name='Grado académico')
+    occupation        = models.CharField(max_length=40, blank=True, verbose_name='Ocupación')
+    occupation_other  = models.CharField(max_length=100, blank=True, verbose_name='Otra ocupación')
+    mobile            = models.CharField(max_length=20, blank=True, verbose_name='Celular')
+    office_phone      = models.CharField(max_length=20, blank=True, verbose_name='Teléfono de oficina')
+    office_ext        = models.CharField(max_length=10, blank=True, verbose_name='Extensión')
+    email             = models.EmailField(blank=True, verbose_name='Correo electrónico')
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Padre, madre o tutor (ficha)'
+        verbose_name_plural = 'Padres, madres o tutores (ficha)'
+        ordering = ['registration_id', 'role']
+        constraints = [
+            models.UniqueConstraint(fields=['registration', 'role'], name='adm_guardian_role_unique'),
+        ]
+
+    def __str__(self):
+        return f'{self.get_role_display()} de la inscripción {self.registration_id}'
 
 
 class RegistrationDocument(models.Model):

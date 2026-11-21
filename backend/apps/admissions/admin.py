@@ -4,7 +4,13 @@ from unfold.admin import ModelAdmin
 # OpenSchoolDay is retired for publishing — live /puertas-abiertas reads
 # bookings.AvailabilitySlot(visit_type=open_class). Manage dates in
 # /admin/visitas (React) or bookings.AvailabilitySlot.
-from .models import PreRegistration, Registration, RegistrationDocument
+from .models import PreRegistration, Registration, RegistrationDocument, RegistrationGuardian
+
+
+class RegistrationGuardianInline(admin.StackedInline):
+    model = RegistrationGuardian
+    extra = 0
+    max_num = 2
 
 
 @admin.register(PreRegistration)
@@ -36,7 +42,9 @@ class RegistrationAdmin(ModelAdmin):
     readonly_fields = ('status', 'access_token', 'invite_token_hash', 'invite_expires_at',
                        'invite_used_at', 'session_token_hash', 'session_expires_at',
                        'privacy_notice_version', 'privacy_accepted_at',
+                       'signed_name', 'signed_at', 'signed_ip',
                        'submitted_at', 'created_at', 'updated_at')
+    inlines = [RegistrationGuardianInline]
 
 
 @admin.register(RegistrationDocument)

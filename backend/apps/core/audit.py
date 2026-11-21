@@ -277,9 +277,10 @@ def connect_default_tracking():
                                     'blood_type', 'allergies', 'medical_notes'],
                    'student.personal',
                    sensitive=['blood_type', 'allergies', 'medical_notes'])
-    register_audit(Registration, ['blood_type', 'allergies', 'medical_notes'],
-                   'student.medical',
-                   sensitive=['blood_type', 'allergies', 'medical_notes'])
+    # Every encrypted health field of the ficha (admissions.ficha_schema).
+    reg_medical = ['blood_type', 'allergies', 'medical_notes', 'estatura', 'peso',
+                   'has_allergies', 'chronic_conditions']
+    register_audit(Registration, reg_medical, 'student.medical', sensitive=reg_medical)
     # Role + permission changes.
     register_audit(User, ['role', 'is_staff', 'is_superuser', 'is_active'],
                    'account.permission')

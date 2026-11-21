@@ -170,7 +170,8 @@ def build_spec() -> ImportSpec:
                 .values_list("parent_email", "child_first_name", "child_last_name", "child_dob")
             )
             existing[email] = {
-                (e.lower(), f.strip().lower(), last.strip().lower(), d.isoformat())
+                # A ficha's lead has no birth date until the family types it.
+                (e.lower(), f.strip().lower(), last.strip().lower(), d.isoformat() if d else "")
                 for e, f, last, d in rows
             }
         return existing[email]
