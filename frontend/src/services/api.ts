@@ -919,6 +919,8 @@ export const bookingsApi = {
     child_name?: string;
     child_grade?: string;
     num_attendees?: number;
+    /** Signed token of the Expediente's visit link (`/agendar-visita?lead=…`). */
+    lead_token?: string;
   }) => api.post('/bookings/', data),
 
 

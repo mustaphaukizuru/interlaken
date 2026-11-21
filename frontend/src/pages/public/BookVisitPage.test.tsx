@@ -44,12 +44,12 @@ const SLOT = {
   is_active: true,
 };
 
-function renderPage() {
+function renderPage(route = '/agendar-visita') {
   return renderWithProviders(
     <HelmetProvider>
       <BookVisitPage />
     </HelmetProvider>,
-    { route: '/agendar-visita' },
+    { route },
   );
 }
 
@@ -110,5 +110,40 @@ describe('BookVisitPage', () => {
       );
     });
     expect(await screen.findByText('¡Visita confirmada!')).toBeInTheDocument();
+  });
+
+  it('sends the visit link of the Expediente (?lead=) with the booking and never shows it', async () => {
+    const user = userEvent.setup();
+    mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);
+    mockedCreate.mockResolvedValue({ data: { id: 1 } } as never);
+    const token = 'eyJsIjo3fQ:1tTEST:signature';
+
+    const { container } = renderPage(`/agendar-visita?lead=${encodeURIComponent(token)}`);
+    await user.click(await screen.findByRole('button', { name: /15 de junio/i }));
+    await user.click(await screen.findByRole('button', { name: /09:00/i }));
+    await user.type(await screen.findByLabelText(/Nombre completo/i), 'Marta Ejemplo');
+    await user.type(screen.getByLabelText(/Correo electrónico/i), 'marta@ejemplo.test');
+    await user.type(screen.getByLabelText(/Teléfono/i), '5512345678');
+    expect(container.innerHTML).not.toContain('1tTEST');
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ slot: 42, lead_token: token })));
+    expect(await screen.findByText('¡Visita confirmada!')).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain('1tTEST');
+  });
+
+  it('books without a token when the page has none', async () => {
+    const user = userEvent.setup();
+    mockedAvail.mockResolvedValue({ data: { results: [SLOT] } } as never);
+    mockedCreate.mockResolvedValue({ data: { id: 1 } } as never);
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: /15 de junio/i }));
+    await user.click(await screen.findByRole('button', { name: /09:00/i }));
+    await user.type(await screen.findByLabelText(/Nombre completo/i), 'Marta Ejemplo');
+    await user.type(screen.getByLabelText(/Correo electrónico/i), 'marta@ejemplo.test');
+    await user.type(screen.getByLabelText(/Teléfono/i), '5512345678');
+    await user.click(screen.getByRole('button', { name: /Confirmar visita/i }));
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalled());
+    expect(mockedCreate.mock.calls[0][0]).not.toHaveProperty('lead_token');
   });
 });
