@@ -1,0 +1,2193 @@
+{
+ "version": 2,
+ "public_start_enabled": true,
+ "steps": [
+  {
+   "key": "inicio",
+   "title": "Antes de empezar",
+   "description": "Con estos datos guardamos su ficha y le enviamos un enlace para continuarla.",
+   "patchable": false,
+   "target": "start",
+   "skip_if": null,
+   "rules": [],
+   "fields": [
+    {
+     "name": "contact_name",
+     "label": "Nombre completo",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 200,
+     "help": "De la persona que llena la ficha.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "contact_email",
+     "label": "Correo electrónico",
+     "type": "email",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 254,
+     "help": "Aquí le enviaremos el enlace para continuar la ficha.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "contact_phone",
+     "label": "Celular",
+     "type": "phone",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "10 dígitos.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "contact_relationship",
+     "label": "Parentesco con el alumno",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "parentesco",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_given_names",
+     "label": "Nombre(s) del alumno",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_paternal_surname",
+     "label": "Apellido paterno del alumno",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_maternal_surname",
+     "label": "Apellido materno del alumno",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "grade_applying",
+     "label": "Grado al que se inscribe",
+     "type": "grade",
+     "required": true,
+     "required_if": null,
+     "choices": "grados",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "cycle",
+     "label": "Ciclo escolar",
+     "type": "cycle",
+     "required": true,
+     "required_if": null,
+     "choices": "ciclo",
+     "choices_if": null,
+     "max_length": null,
+     "help": "El ciclo en curso o el próximo.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "referral_source",
+     "label": "¿Cómo nos conoció?",
+     "type": "select",
+     "required": false,
+     "required_if": null,
+     "choices": "como_nos_conocio",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "wants_visit",
+     "label": "¿Desea agendar una visita al colegio?",
+     "type": "boolean",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "message",
+     "label": "Comentarios",
+     "type": "textarea",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 2000,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "contacto",
+   "title": "Quién llena la ficha",
+   "description": "",
+   "patchable": true,
+   "target": "registration",
+   "skip_if": null,
+   "rules": [],
+   "fields": [
+    {
+     "name": "contact_name",
+     "label": "Nombre completo",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 200,
+     "help": "De la persona que llena la ficha.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "contact_email",
+     "label": "Correo electrónico",
+     "type": "email",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 254,
+     "help": "Aquí le enviaremos el enlace para continuar la ficha.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "contact_phone",
+     "label": "Celular",
+     "type": "phone",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "10 dígitos.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "contact_relationship",
+     "label": "Parentesco con el alumno",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "parentesco",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "alumno",
+   "title": "Datos del alumno",
+   "description": "",
+   "patchable": true,
+   "target": "registration",
+   "skip_if": null,
+   "rules": [],
+   "fields": [
+    {
+     "name": "child_paternal_surname",
+     "label": "Apellido paterno",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_maternal_surname",
+     "label": "Apellido materno",
+     "type": "text",
+     "required": false,
+     "required_if": {
+      "field": "child_birth_country",
+      "equals": "México"
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_given_names",
+     "label": "Nombre(s)",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "grade_applying",
+     "label": "Grado al que se inscribe",
+     "type": "grade",
+     "required": true,
+     "required_if": null,
+     "choices": "grados",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "level",
+     "label": "Nivel",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": "niveles",
+     "choices_if": null,
+     "max_length": null,
+     "help": "Se calcula con el grado.",
+     "default": null,
+     "read_only": true,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "cycle",
+     "label": "Ciclo escolar",
+     "type": "cycle",
+     "required": true,
+     "required_if": null,
+     "choices": "ciclo",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "previous_school",
+     "label": "Escuela anterior",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 200,
+     "help": "Sólo si aplica.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_sex",
+     "label": "Sexo",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "sexo",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_dob",
+     "label": "Fecha de nacimiento",
+     "type": "date",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_birth_country",
+     "label": "País de nacimiento",
+     "type": "country",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 60,
+     "help": "",
+     "default": "México",
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_birth_state",
+     "label": "Estado de nacimiento",
+     "type": "state",
+     "required": false,
+     "required_if": {
+      "field": "child_birth_country",
+      "equals": "México"
+     },
+     "choices": "estados",
+     "choices_if": {
+      "field": "child_birth_country",
+      "equals": "México"
+     },
+     "max_length": 60,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "child_curp",
+     "label": "CURP",
+     "type": "curp",
+     "required": false,
+     "required_if": {
+      "field": "child_birth_country",
+      "equals": "México"
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "Obligatoria si nació en México. Debe coincidir con la fecha de nacimiento y el sexo.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "domicilio",
+   "title": "Domicilio",
+   "description": "",
+   "patchable": true,
+   "target": "registration",
+   "skip_if": null,
+   "rules": [],
+   "fields": [
+    {
+     "name": "address_street",
+     "label": "Calle",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 150,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_ext_number",
+     "label": "Núm. exterior",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 20,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_int_number",
+     "label": "Núm. interior",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 20,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_between_streets",
+     "label": "Entre calles",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 200,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_state",
+     "label": "Estado",
+     "type": "state",
+     "required": true,
+     "required_if": null,
+     "choices": "estados",
+     "choices_if": null,
+     "max_length": 60,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_municipality",
+     "label": "Municipio o alcaldía",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_neighborhood",
+     "label": "Colonia",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "address_postal_code",
+     "label": "Código postal",
+     "type": "postal_code",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "home_phone",
+     "label": "Teléfono de casa",
+     "type": "phone",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "10 dígitos.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "salud",
+   "title": "Datos adicionales (salud)",
+   "description": "Datos sensibles: se guardan cifrados y solo los consulta la dirección.",
+   "patchable": true,
+   "target": "registration",
+   "skip_if": null,
+   "rules": [],
+   "fields": [
+    {
+     "name": "blood_type",
+     "label": "Tipo de sangre",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "tipo_sangre",
+     "choices_if": null,
+     "max_length": null,
+     "help": "Si no lo sabe, elija «No lo sé».",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "estatura",
+     "label": "Estatura",
+     "type": "number",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": "cm",
+     "min": 30,
+     "max": 230,
+     "message": null
+    },
+    {
+     "name": "peso",
+     "label": "Peso",
+     "type": "number",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": "kg",
+     "min": 2,
+     "max": 250,
+     "message": null
+    },
+    {
+     "name": "has_allergies",
+     "label": "¿Tiene alergias?",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "alergias",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "allergies",
+     "label": "¿Cuáles?",
+     "type": "textarea",
+     "required": false,
+     "required_if": {
+      "field": "has_allergies",
+      "equals": "si"
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": 500,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "chronic_conditions",
+     "label": "Enfermedades crónicas",
+     "type": "textarea",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 1000,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "medical_notes",
+     "label": "Otras indicaciones médicas",
+     "type": "textarea",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 2000,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": true,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "consent_medical_data",
+     "label": "Autorizo al Colegio Interlaken a tratar los datos de salud del alumno conforme al Aviso de Privacidad.",
+     "type": "boolean",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": "Para enviar los datos de salud necesitamos su autorización."
+    }
+   ]
+  },
+  {
+   "key": "padre",
+   "title": "Datos del padre",
+   "description": "",
+   "patchable": true,
+   "target": "guardian",
+   "skip_if": {
+    "field": "not_applicable",
+    "equals": true
+   },
+   "rules": [],
+   "fields": [
+    {
+     "name": "not_applicable",
+     "label": "No aplica",
+     "type": "boolean",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "Márquelo si este bloque no aplica a su familia.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "is_legal_guardian",
+     "label": "Es tutor/a legal",
+     "type": "boolean",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "paternal_surname",
+     "label": "Apellido paterno",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "maternal_surname",
+     "label": "Apellido materno",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "given_names",
+     "label": "Nombre(s)",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "sex",
+     "label": "Sexo",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "sexo",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "dob",
+     "label": "Fecha de nacimiento",
+     "type": "date",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "birth_country",
+     "label": "País de nacimiento",
+     "type": "country",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 60,
+     "help": "",
+     "default": "México",
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "birth_state",
+     "label": "Estado de nacimiento",
+     "type": "state",
+     "required": false,
+     "required_if": null,
+     "choices": "estados",
+     "choices_if": {
+      "field": "birth_country",
+      "in": [
+       "México",
+       ""
+      ]
+     },
+     "max_length": 60,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "curp",
+     "label": "CURP",
+     "type": "curp",
+     "required": false,
+     "required_if": {
+      "field": "birth_country",
+      "in": [
+       "México",
+       ""
+      ]
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "Obligatoria si nació en México.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "marital_status",
+     "label": "Estado civil",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "estado_civil",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "education_level",
+     "label": "Grado académico",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "grado_academico",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "occupation",
+     "label": "Ocupación",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "ocupacion",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "occupation_other",
+     "label": "¿Cuál ocupación?",
+     "type": "text",
+     "required": false,
+     "required_if": {
+      "field": "occupation",
+      "equals": "otro"
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "mobile",
+     "label": "Celular",
+     "type": "phone",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "10 dígitos.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "office_phone",
+     "label": "Teléfono de oficina",
+     "type": "phone",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "office_ext",
+     "label": "Extensión",
+     "type": "extension",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "email",
+     "label": "Correo electrónico",
+     "type": "email",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 254,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "madre",
+   "title": "Datos de la madre",
+   "description": "",
+   "patchable": true,
+   "target": "guardian",
+   "skip_if": {
+    "field": "not_applicable",
+    "equals": true
+   },
+   "rules": [],
+   "fields": [
+    {
+     "name": "not_applicable",
+     "label": "No aplica",
+     "type": "boolean",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "Márquelo si este bloque no aplica a su familia.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "is_legal_guardian",
+     "label": "Es tutor/a legal",
+     "type": "boolean",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "paternal_surname",
+     "label": "Apellido paterno",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "maternal_surname",
+     "label": "Apellido materno",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "given_names",
+     "label": "Nombre(s)",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "sex",
+     "label": "Sexo",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "sexo",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "dob",
+     "label": "Fecha de nacimiento",
+     "type": "date",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "birth_country",
+     "label": "País de nacimiento",
+     "type": "country",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 60,
+     "help": "",
+     "default": "México",
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "birth_state",
+     "label": "Estado de nacimiento",
+     "type": "state",
+     "required": false,
+     "required_if": null,
+     "choices": "estados",
+     "choices_if": {
+      "field": "birth_country",
+      "in": [
+       "México",
+       ""
+      ]
+     },
+     "max_length": 60,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "curp",
+     "label": "CURP",
+     "type": "curp",
+     "required": false,
+     "required_if": {
+      "field": "birth_country",
+      "in": [
+       "México",
+       ""
+      ]
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "Obligatoria si nació en México.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "marital_status",
+     "label": "Estado civil",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "estado_civil",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "education_level",
+     "label": "Grado académico",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "grado_academico",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "occupation",
+     "label": "Ocupación",
+     "type": "select",
+     "required": true,
+     "required_if": null,
+     "choices": "ocupacion",
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "occupation_other",
+     "label": "¿Cuál ocupación?",
+     "type": "text",
+     "required": false,
+     "required_if": {
+      "field": "occupation",
+      "equals": "otro"
+     },
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "mobile",
+     "label": "Celular",
+     "type": "phone",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "10 dígitos.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "office_phone",
+     "label": "Teléfono de oficina",
+     "type": "phone",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "office_ext",
+     "label": "Extensión",
+     "type": "extension",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "email",
+     "label": "Correo electrónico",
+     "type": "email",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 254,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "emergencia",
+   "title": "Contacto de emergencia",
+   "description": "Alguien distinto de los padres a quien llamar si no les localizamos.",
+   "patchable": true,
+   "target": "registration",
+   "skip_if": null,
+   "rules": [
+    {
+     "rule": "at_least_one",
+     "fields": [
+      "emergency_phone",
+      "emergency_mobile"
+     ],
+     "message": "Escriba al menos un teléfono del contacto de emergencia."
+    }
+   ],
+   "fields": [
+    {
+     "name": "emergency_surnames",
+     "label": "Apellido(s)",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 150,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "emergency_given_names",
+     "label": "Nombre(s)",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 100,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "emergency_rel",
+     "label": "Parentesco",
+     "type": "text",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 50,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "emergency_phone",
+     "label": "Teléfono",
+     "type": "phone",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "emergency_mobile",
+     "label": "Celular",
+     "type": "phone",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    }
+   ]
+  },
+  {
+   "key": "firma",
+   "title": "Aviso de privacidad y firma",
+   "description": "",
+   "patchable": false,
+   "target": "submit",
+   "skip_if": null,
+   "rules": [],
+   "fields": [
+    {
+     "name": "accept_privacy",
+     "label": "He leído y acepto el Aviso de Privacidad.",
+     "type": "boolean",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": "Debe aceptar el Aviso de Privacidad para enviar la ficha."
+    },
+    {
+     "name": "consent_photos_media",
+     "label": "Autorizo el uso de fotografías y videos del alumno en los medios del colegio.",
+     "type": "boolean",
+     "required": false,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": null,
+     "help": "",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": null
+    },
+    {
+     "name": "signed_name",
+     "label": "Nombre completo de quien firma",
+     "type": "text",
+     "required": true,
+     "required_if": null,
+     "choices": null,
+     "choices_if": null,
+     "max_length": 200,
+     "help": "Escriba su nombre y apellidos: equivale a su firma.",
+     "default": null,
+     "read_only": false,
+     "medical": false,
+     "unit": null,
+     "min": null,
+     "max": null,
+     "message": "Escriba su nombre completo (nombre y apellidos) como firma."
+    }
+   ]
+  }
+ ],
+ "patch_sections": [
+  "contacto",
+  "alumno",
+  "domicilio",
+  "salud",
+  "padre",
+  "madre",
+  "emergencia"
+ ],
+ "rules": [
+  {
+   "rule": "at_least_one_applies",
+   "sections": [
+    "padre",
+    "madre"
+   ],
+   "field": "not_applicable",
+   "message": "Escriba los datos de al menos el padre o la madre (o de quien tenga la tutela)."
+  }
+ ],
+ "choices": {
+  "grados": [
+   {
+    "value": "Maternal",
+    "label": "Maternal",
+    "level": "preescolar"
+   },
+   {
+    "value": "1° Preescolar",
+    "label": "1° Preescolar",
+    "level": "preescolar"
+   },
+   {
+    "value": "2° Preescolar",
+    "label": "2° Preescolar",
+    "level": "preescolar"
+   },
+   {
+    "value": "3° Preescolar",
+    "label": "3° Preescolar",
+    "level": "preescolar"
+   },
+   {
+    "value": "1° Primaria",
+    "label": "1° Primaria",
+    "level": "primaria"
+   },
+   {
+    "value": "2° Primaria",
+    "label": "2° Primaria",
+    "level": "primaria"
+   },
+   {
+    "value": "3° Primaria",
+    "label": "3° Primaria",
+    "level": "primaria"
+   },
+   {
+    "value": "4° Primaria",
+    "label": "4° Primaria",
+    "level": "primaria"
+   },
+   {
+    "value": "5° Primaria",
+    "label": "5° Primaria",
+    "level": "primaria"
+   },
+   {
+    "value": "6° Primaria",
+    "label": "6° Primaria",
+    "level": "primaria"
+   },
+   {
+    "value": "1° Secundaria",
+    "label": "1° Secundaria",
+    "level": "secundaria"
+   },
+   {
+    "value": "2° Secundaria",
+    "label": "2° Secundaria",
+    "level": "secundaria"
+   },
+   {
+    "value": "3° Secundaria",
+    "label": "3° Secundaria",
+    "level": "secundaria"
+   }
+  ],
+  "niveles": [
+   {
+    "value": "preescolar",
+    "label": "Preescolar"
+   },
+   {
+    "value": "primaria",
+    "label": "Primaria"
+   },
+   {
+    "value": "secundaria",
+    "label": "Secundaria"
+   }
+  ],
+  "sexo": [
+   {
+    "value": "femenino",
+    "label": "Femenino"
+   },
+   {
+    "value": "masculino",
+    "label": "Masculino"
+   }
+  ],
+  "estados": [
+   {
+    "value": "Aguascalientes",
+    "label": "Aguascalientes"
+   },
+   {
+    "value": "Baja California",
+    "label": "Baja California"
+   },
+   {
+    "value": "Baja California Sur",
+    "label": "Baja California Sur"
+   },
+   {
+    "value": "Campeche",
+    "label": "Campeche"
+   },
+   {
+    "value": "Chiapas",
+    "label": "Chiapas"
+   },
+   {
+    "value": "Chihuahua",
+    "label": "Chihuahua"
+   },
+   {
+    "value": "Ciudad de México",
+    "label": "Ciudad de México"
+   },
+   {
+    "value": "Coahuila",
+    "label": "Coahuila"
+   },
+   {
+    "value": "Colima",
+    "label": "Colima"
+   },
+   {
+    "value": "Durango",
+    "label": "Durango"
+   },
+   {
+    "value": "Estado de México",
+    "label": "Estado de México"
+   },
+   {
+    "value": "Guanajuato",
+    "label": "Guanajuato"
+   },
+   {
+    "value": "Guerrero",
+    "label": "Guerrero"
+   },
+   {
+    "value": "Hidalgo",
+    "label": "Hidalgo"
+   },
+   {
+    "value": "Jalisco",
+    "label": "Jalisco"
+   },
+   {
+    "value": "Michoacán",
+    "label": "Michoacán"
+   },
+   {
+    "value": "Morelos",
+    "label": "Morelos"
+   },
+   {
+    "value": "Nayarit",
+    "label": "Nayarit"
+   },
+   {
+    "value": "Nuevo León",
+    "label": "Nuevo León"
+   },
+   {
+    "value": "Oaxaca",
+    "label": "Oaxaca"
+   },
+   {
+    "value": "Puebla",
+    "label": "Puebla"
+   },
+   {
+    "value": "Querétaro",
+    "label": "Querétaro"
+   },
+   {
+    "value": "Quintana Roo",
+    "label": "Quintana Roo"
+   },
+   {
+    "value": "San Luis Potosí",
+    "label": "San Luis Potosí"
+   },
+   {
+    "value": "Sinaloa",
+    "label": "Sinaloa"
+   },
+   {
+    "value": "Sonora",
+    "label": "Sonora"
+   },
+   {
+    "value": "Tabasco",
+    "label": "Tabasco"
+   },
+   {
+    "value": "Tamaulipas",
+    "label": "Tamaulipas"
+   },
+   {
+    "value": "Tlaxcala",
+    "label": "Tlaxcala"
+   },
+   {
+    "value": "Veracruz",
+    "label": "Veracruz"
+   },
+   {
+    "value": "Yucatán",
+    "label": "Yucatán"
+   },
+   {
+    "value": "Zacatecas",
+    "label": "Zacatecas"
+   }
+  ],
+  "tipo_sangre": [
+   {
+    "value": "A+",
+    "label": "A+"
+   },
+   {
+    "value": "A-",
+    "label": "A-"
+   },
+   {
+    "value": "B+",
+    "label": "B+"
+   },
+   {
+    "value": "B-",
+    "label": "B-"
+   },
+   {
+    "value": "AB+",
+    "label": "AB+"
+   },
+   {
+    "value": "AB-",
+    "label": "AB-"
+   },
+   {
+    "value": "O+",
+    "label": "O+"
+   },
+   {
+    "value": "O-",
+    "label": "O-"
+   },
+   {
+    "value": "no_se",
+    "label": "No lo sé"
+   }
+  ],
+  "alergias": [
+   {
+    "value": "si",
+    "label": "Sí"
+   },
+   {
+    "value": "no",
+    "label": "No"
+   }
+  ],
+  "estado_civil": [
+   {
+    "value": "soltero",
+    "label": "Soltero/a"
+   },
+   {
+    "value": "casado",
+    "label": "Casado/a"
+   },
+   {
+    "value": "union_libre",
+    "label": "Unión libre"
+   },
+   {
+    "value": "divorciado",
+    "label": "Divorciado/a"
+   },
+   {
+    "value": "viudo",
+    "label": "Viudo/a"
+   }
+  ],
+  "grado_academico": [
+   {
+    "value": "tecnico",
+    "label": "Técnico"
+   },
+   {
+    "value": "licenciatura",
+    "label": "Lic. / Ing."
+   },
+   {
+    "value": "maestria",
+    "label": "Maestría"
+   },
+   {
+    "value": "doctorado",
+    "label": "Doctorado"
+   }
+  ],
+  "ocupacion": [
+   {
+    "value": "asalariado_sin_estudios",
+    "label": "Asalariado sin estudios profesionales"
+   },
+   {
+    "value": "asalariado_con_estudios",
+    "label": "Asalariado con estudios profesionales"
+   },
+   {
+    "value": "negocio_propio",
+    "label": "Negocio propio"
+   },
+   {
+    "value": "independiente",
+    "label": "Independiente"
+   },
+   {
+    "value": "comerciante",
+    "label": "Comerciante"
+   },
+   {
+    "value": "ama_de_casa",
+    "label": "Ama de casa"
+   },
+   {
+    "value": "otro",
+    "label": "Otro"
+   }
+  ],
+  "parentesco": [
+   {
+    "value": "Madre",
+    "label": "Madre"
+   },
+   {
+    "value": "Padre",
+    "label": "Padre"
+   },
+   {
+    "value": "Tutor/a legal",
+    "label": "Tutor/a legal"
+   },
+   {
+    "value": "Abuelo/a",
+    "label": "Abuelo/a"
+   },
+   {
+    "value": "Otro familiar",
+    "label": "Otro familiar"
+   }
+  ],
+  "como_nos_conocio": [
+   {
+    "value": "referido",
+    "label": "Recomendación de otra familia"
+   },
+   {
+    "value": "redes",
+    "label": "Redes sociales"
+   },
+   {
+    "value": "google",
+    "label": "Búsqueda en Google"
+   },
+   {
+    "value": "espectacular",
+    "label": "Espectacular o anuncio"
+   },
+   {
+    "value": "otro",
+    "label": "Otro"
+   }
+  ],
+  "ciclo": [
+   {
+    "key": "actual",
+    "value": "2026-2027",
+    "label": "2026-2027 (ciclo en curso)"
+   },
+   {
+    "key": "proximo",
+    "value": "2027-2028",
+    "label": "2027-2028 (próximo ciclo)"
+   }
+  ]
+ },
+ "medical_fields": [
+  "blood_type",
+  "allergies",
+  "medical_notes",
+  "estatura",
+  "peso",
+  "has_allergies",
+  "chronic_conditions"
+ ]
+}

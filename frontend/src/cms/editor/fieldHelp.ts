@@ -224,10 +224,6 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
     first: 'Primer dato de confianza junto al formulario, por ejemplo «Respuesta en 24 horas».',
     second: 'Segundo dato de confianza junto al formulario.',
   },
-  'preregistro.form': {
-    successTitle: 'Encabezado que ve la familia al enviar el pre-registro.',
-    successText: 'Lo que ve la familia al enviar: qué sigue.',
-  },
   'home.hero': {
     showLogo: 'Muestra el logo del colegio sobre la foto o el video de portada.',
     title: 'El título grande de la portada (primera línea).',

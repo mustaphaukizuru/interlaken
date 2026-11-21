@@ -41,8 +41,8 @@ describe('ROUTE_META', () => {
     expect(ld.itemListElement.map((i) => i.name)).toEqual(['Inicio', 'Admisiones', 'Costos']);
     expect(ld.itemListElement[2].item).toBe('https://interlaken.edu.mx/admisiones/costos');
     expect(breadcrumbLd('/')).toBeNull();
-    expect(routeHead('/inscripcion')!.robots).toBe('noindex');
-    expect(routeHead('/inscripcion')!.jsonLd).toEqual([]);
+    expect(routeHead('/inscripcion/documentos')!.robots).toBe('noindex');
+    expect(routeHead('/inscripcion/documentos')!.jsonLd).toEqual([]);
   });
 });
 
