@@ -142,8 +142,11 @@ export function PaidTopUpQueue() {
           ) : (
             <span className="mt-0.5 block font-semibold text-green-700">Ya está en Loyverse; se aplica sola en minutos</span>
           ))}
+          {d.loyverse_auto && d.loyverse_push_state !== 'waiting' && !gapIsThisTopUp(d) && (
+            <span className="mt-0.5 block font-semibold text-green-700">Se carga sola en Loyverse: no la cargue a mano</span>
+          )}
           {d.loyverse_push_state === 'waiting' && (
-            <span className="mt-0.5 block text-brand-700">Carga automática en espera{d.loyverse_push_note ? `: ${d.loyverse_push_note}` : ''}</span>
+            <span className="mt-0.5 block text-brand-700">Carga automática en espera (no la cargue a mano){d.loyverse_push_note ? `: ${d.loyverse_push_note}` : ''}</span>
           )}
           {d.loyverse_push_state === 'failed' && (
             <span className="mt-0.5 block font-semibold text-coral">No se cargó sola{d.loyverse_push_note ? `: ${d.loyverse_push_note}` : ''}</span>

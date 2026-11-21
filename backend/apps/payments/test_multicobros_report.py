@@ -650,6 +650,41 @@ class TestCommit:
         checkout.refresh_from_db()
         assert checkout.verified_at is not None
 
+    def test_with_auto_load_on_staff_are_told_not_to_load_it(self, api_client, admin, settings):
+        """CAFETERIA_TOPUP_LOYVERSE_PUSH on: a verified row the app will write
+        into Loyverse itself must never say «cárguela»: a manual load on top of
+        the app's would put the money on the card twice."""
+        settings.PAYMENTS_LIVE = True
+        settings.CAFETERIA_TOPUP_LOYVERSE_PUSH = "verified"
+        checkout = card_payment()
+        CafeteriaBalance.objects.create(
+            student=checkout.payment.related_topup.student,
+            balance=Decimal("3"),
+            last_synced=timezone.now(),
+        )
+        with (
+            patch(LOYVERSE, return_value={"id": "x", "total_points": 3}),
+            patch("apps.cafeteria.services.set_customer_points") as write,
+        ):
+            resp = upload(api_client, xlsx([sale(checkout)]), dry_run=False)
+        row = outcome_of(resp, checkout.control_number)
+        assert row["apply_state"] == "auto_waiting" and resp.data["waiting"] == 1
+        assert "la app la carga sola en Loyverse" in row["message"]
+        assert "No la cargue a mano" in row["message"]
+        write.assert_not_called()  # the 5-minute pass writes it, not the upload request
+
+    def test_out_of_time_with_auto_load_on_is_still_the_apps(
+        self, api_client, admin, settings, monkeypatch
+    ):
+        settings.PAYMENTS_LIVE = True
+        settings.CAFETERIA_TOPUP_LOYVERSE_PUSH = "verified"
+        monkeypatch.setattr(mr, "APPLY_BUDGET_SECONDS", -1)
+        checkout = card_payment()
+        with patch(LOYVERSE) as read:
+            resp = upload(api_client, xlsx([sale(checkout)]), dry_run=False)
+        read.assert_not_called()
+        assert outcome_of(resp, checkout.control_number)["apply_state"] == "auto_waiting"
+
     def test_a_change_since_the_preview_is_left_for_a_person(self, api_client, admin):
         checkout = card_payment()
         report = mr.analyze(mr.parse_report(xlsx([sale(checkout)])))

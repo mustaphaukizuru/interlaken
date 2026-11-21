@@ -1422,7 +1422,9 @@ def apply_after_verification(payment, *, quick_read=False) -> dict:
     with another paid top-up of the student still to verify: the mirror only
     applies a gap it can explain entirely, so both go in once that one is
     verified; the 2026-11-18 $200 + $244 case), ``waiting_pos`` (Loyverse
-    does not show it yet), ``pos_unknown`` (Loyverse could not be read) or
+    does not show it yet: staff load it), ``auto_waiting`` (not in Loyverse
+    yet, but the app writes it there itself, ``loyverse_push``: staff must
+    NOT load it), ``pos_unknown`` (Loyverse could not be read) or
     ``not_applicable`` (not a paid card top-up waiting for its POS load).
 
     ``quick_read`` reads the Loyverse card in one short attempt
@@ -1455,21 +1457,29 @@ def apply_after_verification(payment, *, quick_read=False) -> dict:
         pushed = loyverse_push.push_topup(payment)
         if pushed['state'] == 'pushed':
             return {'apply_state': 'applied', 'balance': pushed['balance']}
+    def waiting(state):
+        # The app will write it into Loyverse itself (now failed to, or the
+        # cron's next pass): staff must not type it into the POS, or the card
+        # gets it twice. Only «waiting_pos» asks them to load it by hand.
+        topup.refresh_from_db(fields=['status', 'loyverse_push_state'])
+        if state in ('waiting_pos', 'pos_unknown') and loyverse_push.will_load(topup):
+            state = 'auto_waiting'
+        return {'apply_state': state, 'balance': None}
+
     try:
         with _guard_read_budget() if quick_read else nullcontext():
             customer = get_customer_by_id(student.loyverse_id)
     except LoyverseError as exc:
         logger.warning('Apply after verification of payment #%s: Loyverse read failed (%s); '
                        'the next sync applies it.', payment.pk, exc)
-        return {'apply_state': 'pos_unknown', 'balance': None}
+        return waiting('pos_unknown')
 
     # One customer in the list: the counters describe this student only.
     result = mirror_pos_topups(customers=[customer], fresh=True)
 
     topup.refresh_from_db(fields=['status'])
     if topup.status != TopUpRequest.Status.COMPLETED:
-        state = 'waiting_verification' if result.get('held_unverified') else 'waiting_pos'
-        return {'apply_state': state, 'balance': None}
+        return waiting('waiting_verification' if result.get('held_unverified') else 'waiting_pos')
     balance = (CafeteriaBalance.objects.filter(student=student)
                .values_list('balance', flat=True).first())
     return {'apply_state': 'applied',

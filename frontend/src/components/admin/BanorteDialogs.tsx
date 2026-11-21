@@ -98,6 +98,12 @@ function verifyOutcome(row: TopUpLogEntry, data: BanorteVerifyResult): VerifyOut
         title: 'Verificada · falta verificar otra recarga de este alumno',
         text: `Loyverse ya tiene esta recarga junto con otra de ${who} sin verificar. Verifique esa también en «Por aplicar» y las dos se suman al saldo.`,
       };
+    case 'auto_waiting':
+      return {
+        applied: false,
+        title: 'Verificada · la app la carga en Loyverse en unos minutos',
+        text: `No la cargue a mano en el POS: la app la carga sola y la suma al saldo de ${who}. Cárguela usted solo si recibe el aviso «Cargar a mano».`,
+      };
     case 'waiting_pos':
       return {
         applied: false,

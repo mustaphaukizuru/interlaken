@@ -416,7 +416,8 @@ class TestVerifiedMode:
     def test_the_report_upload_leaves_it_to_the_cron(self, push, loyverse):
         student, _, payment = paid_topup("200.00", checkout="PRD", balance=100)
         verified(payment)
-        assert apply_after_verification(payment, quick_read=True)["apply_state"] == "waiting_pos"
+        # The staff are told the app loads it (never «cárguela»).
+        assert apply_after_verification(payment, quick_read=True)["apply_state"] == "auto_waiting"
         assert loyverse.writes == []
         assert loyverse_push.push_due_topups()["pushed"] == 1
         assert wallet(student) == Decimal("300")
@@ -524,3 +525,89 @@ class TestPolicy:
         settings.PAYMENTS_LIVE = True
         settings.CAFETERIA_TOPUP_LOYVERSE_PUSH = "yes please"
         assert loyverse_push.push_mode() == "off" and not loyverse_push.is_enabled()
+
+
+# ── what the staff are told (2026-11-21 follow-up: never «cárguela» when the
+# app will load it, or the card gets the money twice) ─────────────────────────
+class TestStaffAreToldNotToLoadIt:
+    def test_verify_says_the_app_loads_it_when_it_must_wait(self, push, loyverse):
+        _, _, payment = paid_topup("200.00", checkout="PRD", balance=100)
+        verified(payment)
+        loyverse.set(130)  # a sale in flight: the push waits for the cron
+        assert apply_after_verification(payment)["apply_state"] == "auto_waiting"
+        assert loyverse.writes == []
+
+    def test_verify_asks_for_a_manual_load_only_after_the_app_gave_up(self, push, loyverse):
+        _, _, payment = paid_topup("200.00", checkout="PRD", balance=100)
+        verified(payment)
+        loyverse.reject = True
+        assert apply_after_verification(payment)["apply_state"] == "waiting_pos"
+
+    def test_auto_load_off_keeps_the_old_answer(self, settings, loyverse):
+        settings.PAYMENTS_LIVE = True
+        _, _, payment = paid_topup("200.00", checkout="PRD", balance=100)
+        verified(payment)
+        assert apply_after_verification(payment)["apply_state"] == "waiting_pos"
+
+    def test_the_upload_path_says_the_app_loads_it(self, push, loyverse):
+        _, _, payment = paid_topup("200.00", checkout="PRD", balance=100)
+        verified(payment)
+        assert apply_after_verification(payment, quick_read=True)["apply_state"] == "auto_waiting"
+        assert loyverse.writes == []
+
+    def test_the_queue_row_flags_it(self, push, loyverse):
+        from apps.cafeteria.serializers import TopUpLogSerializer as Row
+
+        _, topup, payment = paid_topup("200.00", checkout="PRD", balance=100)
+        assert Row(topup).data["loyverse_auto"] is False  # still to verify
+        verified(payment)
+        assert Row(TopUpRequest.objects.get(pk=topup.pk)).data["loyverse_auto"] is True
+        push.CAFETERIA_TOPUP_LOYVERSE_PUSH = "off"
+        assert Row(TopUpRequest.objects.get(pk=topup.pk)).data["loyverse_auto"] is False
+
+
+class TestMorningReport:
+    def report(self):
+        out = StringIO()
+        with patch(SEND, return_value=True) as send:
+            call_command("topup_apply_report", stdout=out)
+        return out.getvalue(), send
+
+    def test_auto_load_on_says_verify_and_do_not_type(self, push, loyverse):
+        from apps.accounts.factories import ParentFactory, StudentProfileFactory
+
+        def kid(n):
+            return StudentProfileFactory(parents=[ParentFactory()], loyverse_id=f"lv-r{n}")
+
+        AdminFactory()
+        paid_topup("200.00", student=kid(1), checkout="PRD", balance=100)
+        _, _, payment = paid_topup("150.00", student=kid(2), checkout="PRD", balance=50)
+        verified(payment)
+        _, failed_topup, _ = paid_topup("80.00", student=kid(3), checkout="PRD", balance=20)
+        TopUpRequest.objects.filter(pk=failed_topup.pk).update(loyverse_push_state=S.FAILED)
+        TopUpRequest.objects.filter(status=TopUpRequest.Status.PAID).update(
+            apply_due_at=timezone.now()
+        )
+
+        log, send = self.report()
+
+        assert "SE CARGA SOLA" in log and "CARGAR A MANO" in log
+        body = send.call_args.args[1]
+        assert "por aplicar" in send.call_args.args[0]
+        assert "Al verificarla, la app la carga sola en Loyverse" in body
+        assert "CARGAR A MANO: la app no pudo cargarla" in body
+        assert "No cargue a mano en el POS ninguna otra recarga" in body
+        assert "Cargue cada monto al cliente de Loyverse" not in body
+
+    def test_auto_load_off_keeps_the_schools_steps(self, settings, loyverse):
+        settings.PAYMENTS_LIVE = True
+        AdminFactory()
+        paid_topup("200.00", checkout="PRD", balance=100)
+        TopUpRequest.objects.filter(status=TopUpRequest.Status.PAID).update(
+            apply_due_at=timezone.now()
+        )
+        log, send = self.report()
+        body = send.call_args.args[1]
+        assert "por cargar en el POS" in send.call_args.args[0]
+        assert "Cargue cada monto al cliente de Loyverse" in body
+        assert "SE CARGA SOLA" not in log and "la app la carga sola" not in body

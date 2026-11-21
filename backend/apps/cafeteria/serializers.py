@@ -303,6 +303,7 @@ class TopUpLogSerializer(serializers.ModelSerializer):
         source='get_applied_via_display', read_only=True)
     loyverse_push_state_display = serializers.CharField(
         source='get_loyverse_push_state_display', read_only=True)
+    loyverse_auto = serializers.SerializerMethodField()
     needs_apply = serializers.SerializerMethodField()
     apply_overdue = serializers.SerializerMethodField()
     payer = serializers.SerializerMethodField()
@@ -324,7 +325,7 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'applied_by_name', 'needs_apply', 'apply_overdue',
             'loyverse_code', 'loyverse_points', 'wallet_balance', 'payer',
             'loyverse_push_state', 'loyverse_push_state_display', 'loyverse_push_note',
-            'loyverse_push_at',
+            'loyverse_push_at', 'loyverse_auto',
         ]
 
     def get_payer(self, obj):
@@ -341,6 +342,18 @@ class TopUpLogSerializer(serializers.ModelSerializer):
             'paid_at': p.completed_at or p.created_at,
             'card_brand': checkout.marca_tarjeta if checkout else '',
         }
+
+    def get_loyverse_auto(self, obj):
+        """The app will write this PAID top-up into Loyverse by itself
+        (``loyverse_push``): staff must not type it into the POS. No query
+        when the push is off (the payment and its Banorte row are prefetched)."""
+        from apps.cafeteria import loyverse_push
+
+        if obj.status != TopUpRequest.Status.PAID or not loyverse_push.is_enabled():
+            return False
+        if not obj.student.loyverse_id:
+            return False
+        return loyverse_push.ineligible_reason(self._payment(obj), obj) == ''
 
     def get_needs_apply(self, obj):
         if obj.method != TopUpRequest.Method.ONLINE or obj.status != TopUpRequest.Status.PAID:

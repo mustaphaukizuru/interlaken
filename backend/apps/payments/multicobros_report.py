@@ -79,7 +79,9 @@ QUERY_CHUNK = 500
 VIA = "multicobros-upload"
 # ``apply_state`` of a verified top-up that reaches the wallet once it is in
 # the POS (``pending_sync``: the apply budget ran out, the mirror applies it).
-WAITING_STATES = frozenset({"waiting_pos", "waiting_verification", "pos_unknown", "pending_sync"})
+WAITING_STATES = frozenset(
+    {"waiting_pos", "waiting_verification", "pos_unknown", "pending_sync", "auto_waiting"}
+)
 AUDIT_CONTEXT = "payments.banorte.multicobros_upload"
 
 OUTCOMES = (
@@ -808,6 +810,8 @@ def commit(report: Report, actor) -> Report:
     paid_before = {
         o.payment.pk for o in newly if topup_status(o.payment) == TopUpRequest.Status.PAID
     }
+    from apps.cafeteria.loyverse_push import will_load
+
     deadline = time.monotonic() + APPLY_BUDGET_SECONDS
     for out in newly:
         payment = out.payment
@@ -818,6 +822,8 @@ def commit(report: Report, actor) -> Report:
             state = "pending_sync"  # the 5-minute POS mirror applies it
         else:
             state = apply_verified(payment, quick_read=True)["apply_state"]
+        if state == "pending_sync" and will_load(payment.related_topup_id):
+            state = "auto_waiting"  # the 5-minute pass writes it into Loyverse
         out.apply_state = state
         if state == "applied":
             balance = (
@@ -829,6 +835,11 @@ def commit(report: Report, actor) -> Report:
             )
             suffix = f", saldo {_mxn(balance)}" if balance is not None else ""
             out.message = f"Verificada y aplicada (ya estaba en Loyverse{suffix})."
+        elif state == "auto_waiting":
+            out.message = (
+                "Verificada: la app la carga sola en Loyverse en unos minutos. "
+                "No la cargue a mano en el POS."
+            )
         elif state in WAITING_STATES:
             out.message = "Verificada: se aplica sola cuando esté cargada en el POS de Loyverse."
         else:

@@ -287,6 +287,13 @@ record back with the new balance, reads it again and credits the wallet only
 when Loyverse shows exactly the expected figure. Nothing is typed by hand, and
 the rows simply never reach «Por aplicar» (or leave it on verification).
 
+**The one rule for staff while it is on: never type into Loyverse a top-up the
+app will load.** A manual load on top of the app's puts the money on the card
+twice. The console, the verify dialog, the report upload and the 07:05 list
+all say which ones are the app's («Se carga sola», «la app la carga sola en
+Loyverse… No la cargue a mano»); only a row marked **CARGAR A MANO** (the app
+gave up) is loaded by hand, after checking Loyverse does not already have it.
+
 What staff still see:
 
 - **«Carga automática en espera»** on a row: Loyverse and the app did not agree
