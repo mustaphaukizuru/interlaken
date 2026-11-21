@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdmissionTemplatesCard } from '@/components/admin/AdmissionTemplatesCard';
+import { CaseTemplatesCard } from '@/components/admin/admissions/CaseTemplatesCard';
 import toast from 'react-hot-toast';
 import {
   Save, Phone, Mail, MapPin, MessageCircle,
@@ -355,6 +356,8 @@ export default function AdminSettings() {
             </Card>
 
             <AdmissionTemplatesCard />
+
+            <CaseTemplatesCard />
 
             <Card title="Incorporaciones SEP">
               <p className="mb-3 text-sm text-subtle">
