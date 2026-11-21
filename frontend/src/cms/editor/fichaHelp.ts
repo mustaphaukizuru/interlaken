@@ -6,6 +6,8 @@
 const button = (what: string) => `Lo que dice el botón ${what}.`;
 const title = (where: string) => `Encabezado ${where}.`;
 const explain = (where: string) => `Frase bajo el encabezado ${where}. Puede dejarla vacía.`;
+const blockTitle = (what: string) => `Título del bloque ${what} dentro del paso.`;
+const blockHint = (what: string) => `Frase de una línea bajo el título del bloque ${what}. Puede dejarla vacía.`;
 
 export const FICHA_HELP: Record<string, string> = {
   // Pasos y botones
@@ -72,7 +74,13 @@ export const FICHA_HELP: Record<string, string> = {
   // Paso: alumno
   alumnoTitle: 'Título del paso 1, con los datos del alumno. Se lee «Paso 1 de 7: …» y es el mismo en la lista de pasos y en la revisión.',
   alumnoIntro: explain('del paso del alumno'),
-  curpHint: 'Nota bajo la CURP: escrita primero, llena sola la fecha de nacimiento, el sexo y el estado.',
+  alumnoNameTitle: blockTitle('del nombre del alumno'),
+  alumnoNameHint: blockHint('del nombre'),
+  alumnoBirthTitle: blockTitle('del nacimiento y la CURP del alumno'),
+  alumnoBirthHint: blockHint('del nacimiento (conviene decir que la CURP llena sola la fecha, el sexo y el estado)'),
+  alumnoSchoolTitle: blockTitle('del grado, el ciclo y la escuela anterior'),
+  alumnoSchoolHint: blockHint('de la escuela'),
+  curpHint: 'Nota bajo la CURP, antes del enlace a la consulta en gob.mx. Puede dejarla vacía.',
   curpFilled: 'Aviso en verde cuando la CURP llenó la fecha de nacimiento, el sexo o el estado.',
   curpLink: 'Enlace junto a la nota de la CURP a la consulta oficial en gob.mx.',
   levelLabel: 'Palabra antes del nivel que se calcula con el grado, por ejemplo «Nivel: Primaria».',
@@ -84,13 +92,31 @@ export const FICHA_HELP: Record<string, string> = {
   // Paso: domicilio
   domicilioTitle: 'Título del paso 2, el domicilio (se lee «Paso 2 de 7: …»).',
   domicilioIntro: explain('del paso del domicilio'),
+  domicilioAddressTitle: blockTitle('de la dirección'),
+  domicilioAddressHint: blockHint('de la dirección'),
+  domicilioPhoneTitle: blockTitle('del teléfono de casa'),
+  domicilioPhoneHint: blockHint('del teléfono'),
   // Paso: salud
   saludTitle: 'Título del paso 3, la salud del alumno (se lee «Paso 3 de 7: …»).',
   saludIntro: 'Frase bajo el encabezado del paso de salud; conviene recordar que los datos se guardan cifrados.',
+  saludGeneralTitle: blockTitle('del tipo de sangre, la estatura y el peso'),
+  saludGeneralHint: blockHint('de datos generales'),
+  saludCareTitle: blockTitle('de alergias, enfermedades e indicaciones médicas'),
+  saludCareHint: blockHint('de alergias'),
+  saludConsentTitle: blockTitle('de la autorización para tratar los datos de salud'),
+  saludConsentHint: blockHint('de la autorización'),
   // Pasos: padre y madre
   padreTitle: 'Título del paso 4, con los datos del padre (se lee «Paso 4 de 7: …»).',
   madreTitle: 'Título del paso 5, con los datos de la madre (se lee «Paso 5 de 7: …»).',
   tutorIntro: explain('de los pasos del padre y de la madre'),
+  tutorPersonalTitle: blockTitle('de nombre, apellidos y estado civil (padre y madre)'),
+  tutorPersonalHint: blockHint('de datos personales'),
+  tutorBirthTitle: blockTitle('de nacimiento y CURP (padre y madre)'),
+  tutorBirthHint: blockHint('de nacimiento y CURP'),
+  tutorWorkTitle: blockTitle('de estudios y ocupación (padre y madre)'),
+  tutorWorkHint: blockHint('de estudios y ocupación'),
+  tutorContactTitle: blockTitle('de celular, correo y oficina (padre y madre)'),
+  tutorContactHint: blockHint('de contacto'),
   prefillFromContact: 'Aviso cuando el bloque se llenó con los datos de quien llena la ficha (si dijo ser la madre o el padre).',
   naConfirmTitle: 'Título de la ventana que pide confirmar «No aplica» cuando el bloque ya tiene datos.',
   naConfirmText: 'Explica que al marcar «No aplica» se borran los datos del bloque.',
@@ -99,6 +125,8 @@ export const FICHA_HELP: Record<string, string> = {
   // Paso: emergencia
   emergenciaTitle: 'Título del paso 6, el contacto de emergencia (se lee «Paso 6 de 7: …»).',
   emergenciaIntro: explain('del paso del contacto de emergencia'),
+  emergenciaBlockTitle: blockTitle('con los datos del contacto de emergencia'),
+  emergenciaBlockHint: blockHint('del contacto de emergencia'),
   // Quién llena la ficha
   contactoTitle: 'Encabezado de los datos de quien llena la ficha, en la revisión y al corregirlos (sin número de paso).',
   contactoIntro: explain('de los datos de quien llena la ficha'),

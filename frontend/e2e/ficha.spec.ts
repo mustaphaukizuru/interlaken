@@ -68,7 +68,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await expect(page.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(page).toHaveURL(/\/pre-registro$/); // the token left the address bar
   await expect(page.getByLabel('Apellido paterno')).toHaveValue(`López${run}`);
-  await page.getByLabel('CURP').fill(CHILD_CURP.toLowerCase());
+  await page.getByLabel('CURP', { exact: true }).fill(CHILD_CURP.toLowerCase());
   await expect(page.getByLabel('Fecha de nacimiento')).toHaveValue(CHILD_DOB);
   await expect(page.getByRole('radio', { name: 'Femenino' })).toBeChecked();
   await expect(page.getByLabel('Estado de nacimiento')).toHaveValue('Ciudad de México');
@@ -118,7 +118,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   // ── 5 · Madre: prefilled from who fills the ficha ──────────────────────
   await expect(later.getByLabel('Nombre(s)')).toHaveValue('Marta');
   await expect(later.getByLabel('Correo electrónico')).toHaveValue(email);
-  await later.getByLabel('CURP').fill(MOTHER_CURP);
+  await later.getByLabel('CURP', { exact: true }).fill(MOTHER_CURP);
   await expect(later.getByLabel('Fecha de nacimiento')).toHaveValue('1988-03-15');
   await choose(later, 'Casado/a');
   await choose(later, 'Lic. / Ing.');

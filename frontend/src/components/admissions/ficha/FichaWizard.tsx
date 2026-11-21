@@ -16,7 +16,8 @@
  *   5 Información de la madre · 6 Contacto de emergencia · 7 Revisión y firma
  *
  * Every numbered step reads «Paso n de 7: título» (its heading, the list
- * «Ver los pasos», the review, «Corregir»).
+ * «Ver los pasos», the review, «Corregir») and is made of short titled
+ * blocks.
  *
  * Steps, fields, options and required rules come from GET ficha/schema/; the
  * words around them are the CMS props (`copy`). Each step is saved when the

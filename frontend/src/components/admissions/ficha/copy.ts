@@ -1,6 +1,7 @@
 /**
  * Every word of the ficha that is not a field of the schema: step titles and
- * intros, buttons, save states, the private-ficha panel (no link), the start
+ * intros, the titled blocks inside each step («Nombre», «Nacimiento»…) and
+ * their one-line hints, buttons, save states, the private-ficha panel (no link), the start
  * screen (only when Ajustes allows a public start), «continuar después», the
  * review and signature, the confirmation. They are the props of the locked
  * «Ficha de inscripción · Formulario» section (cms/sections/preregistro.tsx),
@@ -71,8 +72,14 @@ export const FICHA_TEXT = {
   sentText: 'Si necesita corregir algún dato, responda al correo de confirmación o llame a admisiones.',
   // Paso: alumno
   alumnoTitle: 'Información del alumno',
-  alumnoIntro: 'Escríbalos como aparecen en el acta de nacimiento.',
-  curpHint: 'Si escribe primero la CURP, llenamos la fecha de nacimiento, el sexo y el estado de nacimiento.',
+  alumnoIntro: 'Tenga a la mano el acta de nacimiento y la CURP del alumno.',
+  alumnoNameTitle: 'Nombre',
+  alumnoNameHint: 'Como aparecen en el acta de nacimiento.',
+  alumnoBirthTitle: 'Nacimiento',
+  alumnoBirthHint: 'Con la CURP llenamos la fecha, el sexo y el estado.',
+  alumnoSchoolTitle: 'Escuela',
+  alumnoSchoolHint: 'El grado al que se inscribe y la escuela de la que viene.',
+  curpHint: '¿No tiene la CURP a la mano?',
   curpFilled: 'Llenamos la fecha de nacimiento, el sexo y el estado con la CURP. Revíselos.',
   levelLabel: 'Nivel',
   ageHint: 'Para {grado} el alumno debe tener {edad} años cumplidos al 31 de diciembre de {anio} (tendrá {tiene}). Revise el grado y la fecha de nacimiento, o llame a admisiones.',
@@ -83,13 +90,31 @@ export const FICHA_TEXT = {
   // Paso: domicilio
   domicilioTitle: 'Domicilio',
   domicilioIntro: 'El domicilio donde vive el alumno.',
+  domicilioAddressTitle: 'Dirección',
+  domicilioAddressHint: 'Como aparece en un recibo de luz, agua o teléfono.',
+  domicilioPhoneTitle: 'Teléfono',
+  domicilioPhoneHint: 'Si no tiene teléfono fijo, déjelo en blanco.',
   // Paso: salud
   saludTitle: 'Información de salud',
   saludIntro: 'Datos sensibles: se guardan cifrados y solo los consulta la dirección del colegio.',
+  saludGeneralTitle: 'Datos generales',
+  saludGeneralHint: 'La estatura y el peso pueden ser aproximados.',
+  saludCareTitle: 'Alergias y padecimientos',
+  saludCareHint: 'Lo que debemos saber para cuidar al alumno.',
+  saludConsentTitle: 'Autorización',
+  saludConsentHint: 'Necesaria para guardar los datos de salud.',
   // Pasos: padre y madre
   padreTitle: 'Información del padre',
   madreTitle: 'Información de la madre',
   tutorIntro: 'Escriba los datos como aparecen en su identificación oficial.',
+  tutorPersonalTitle: 'Datos personales',
+  tutorPersonalHint: 'Nombre, apellidos y estado civil.',
+  tutorBirthTitle: 'Nacimiento y CURP',
+  tutorBirthHint: 'Con la CURP llenamos la fecha, el sexo y el estado.',
+  tutorWorkTitle: 'Estudios y ocupación',
+  tutorWorkHint: 'El último grado de estudios y a qué se dedica.',
+  tutorContactTitle: 'Contacto',
+  tutorContactHint: 'Para comunicarnos sobre el alumno.',
   prefillFromContact: 'Usamos los datos de quien llena la ficha. Revíselos y complete los que faltan.',
   naConfirmTitle: 'Quitar los datos de este bloque',
   naConfirmText: 'Al marcar «No aplica» se borran los datos que escribió en este bloque.',
@@ -98,6 +123,8 @@ export const FICHA_TEXT = {
   // Paso: emergencia
   emergenciaTitle: 'Contacto de emergencia',
   emergenciaIntro: 'Alguien distinto de los padres a quien llamar si no les localizamos.',
+  emergenciaBlockTitle: 'Datos del contacto',
+  emergenciaBlockHint: 'Escriba al menos un teléfono.',
   // Quién llena la ficha
   contactoTitle: 'Quién llena la ficha',
   contactoIntro: 'A este correo y a este celular le escribiremos sobre la admisión.',
@@ -187,6 +214,9 @@ export const LONG_TEXTS: ReadonlySet<TextKey> = new Set<TextKey>([
 export const BLANKABLE: ReadonlySet<TextKey> = new Set<TextKey>([
   'startIntro', 'checklistTitle', 'alumnoIntro', 'domicilioIntro', 'saludIntro', 'tutorIntro', 'emergenciaIntro',
   'contactoIntro', 'reviewIntro', 'curpHint', 'invitedText', 'prefillFromContact', 'privacyText', 'incompleteText',
+  'alumnoNameHint', 'alumnoBirthHint', 'alumnoSchoolHint', 'domicilioAddressHint', 'domicilioPhoneHint',
+  'saludGeneralHint', 'saludCareHint', 'saludConsentHint', 'tutorPersonalHint', 'tutorBirthHint', 'tutorWorkHint',
+  'tutorContactHint', 'emergenciaBlockHint',
 ]);
 
 /**
@@ -196,6 +226,8 @@ export const BLANKABLE: ReadonlySet<TextKey> = new Set<TextKey>([
  */
 export const RETIRED_DEFAULTS: Partial<Record<TextKey, readonly string[]>> = {
   alumnoTitle: ['Datos del alumno'],
+  alumnoIntro: ['Escríbalos como aparecen en el acta de nacimiento.'],
+  curpHint: ['Si escribe primero la CURP, llenamos la fecha de nacimiento, el sexo y el estado de nacimiento.'],
   saludTitle: ['Salud'],
   padreTitle: ['Datos del padre'],
   madreTitle: ['Datos de la madre'],
@@ -262,25 +294,54 @@ export const FICHA_GROUPS: { group: string; texts: [TextKey, string][]; links?: 
   {
     group: 'Paso: alumno',
     texts: [
-      ['alumnoTitle', 'Título del paso del alumno'], ['alumnoIntro', 'Explicación del paso del alumno'], ['curpHint', 'Ayuda de la CURP'],
+      ['alumnoTitle', 'Título del paso del alumno'], ['alumnoIntro', 'Explicación del paso del alumno'],
+      ['alumnoNameTitle', 'Bloque del nombre: título'], ['alumnoNameHint', 'Bloque del nombre: ayuda'],
+      ['alumnoBirthTitle', 'Bloque del nacimiento: título'], ['alumnoBirthHint', 'Bloque del nacimiento: ayuda'],
+      ['alumnoSchoolTitle', 'Bloque de la escuela: título'], ['alumnoSchoolHint', 'Bloque de la escuela: ayuda'],
+      ['curpHint', 'Ayuda de la CURP'],
       ['curpFilled', 'Aviso al llenar con la CURP'], ['levelLabel', 'Etiqueta del nivel'], ['ageHint', 'Aviso de edad'],
       ['countryMexico', 'Opción México'], ['countryOther', 'Opción otro país'], ['countryOtherLabel', 'Etiqueta del país'],
       ['stateOtherLabel', 'Etiqueta del estado en el extranjero'],
     ],
     links: [['curpLink', 'Enlace para consultar la CURP']],
   },
-  { group: 'Paso: domicilio', texts: [['domicilioTitle', 'Título del paso del domicilio'], ['domicilioIntro', 'Explicación del paso del domicilio']] },
-  { group: 'Paso: salud', texts: [['saludTitle', 'Título del paso de salud'], ['saludIntro', 'Explicación del paso de salud']] },
+  {
+    group: 'Paso: domicilio',
+    texts: [
+      ['domicilioTitle', 'Título del paso del domicilio'], ['domicilioIntro', 'Explicación del paso del domicilio'],
+      ['domicilioAddressTitle', 'Bloque de la dirección: título'], ['domicilioAddressHint', 'Bloque de la dirección: ayuda'],
+      ['domicilioPhoneTitle', 'Bloque del teléfono: título'], ['domicilioPhoneHint', 'Bloque del teléfono: ayuda'],
+    ],
+  },
+  {
+    group: 'Paso: salud',
+    texts: [
+      ['saludTitle', 'Título del paso de salud'], ['saludIntro', 'Explicación del paso de salud'],
+      ['saludGeneralTitle', 'Bloque de datos generales: título'], ['saludGeneralHint', 'Bloque de datos generales: ayuda'],
+      ['saludCareTitle', 'Bloque de alergias: título'], ['saludCareHint', 'Bloque de alergias: ayuda'],
+      ['saludConsentTitle', 'Bloque de la autorización: título'], ['saludConsentHint', 'Bloque de la autorización: ayuda'],
+    ],
+  },
   {
     group: 'Pasos: padre y madre',
     texts: [
       ['padreTitle', 'Título del paso del padre'], ['madreTitle', 'Título del paso de la madre'], ['tutorIntro', 'Explicación de padre y madre'],
+      ['tutorPersonalTitle', 'Bloque de datos personales: título'], ['tutorPersonalHint', 'Bloque de datos personales: ayuda'],
+      ['tutorBirthTitle', 'Bloque de nacimiento y CURP: título'], ['tutorBirthHint', 'Bloque de nacimiento y CURP: ayuda'],
+      ['tutorWorkTitle', 'Bloque de estudios y ocupación: título'], ['tutorWorkHint', 'Bloque de estudios y ocupación: ayuda'],
+      ['tutorContactTitle', 'Bloque de contacto: título'], ['tutorContactHint', 'Bloque de contacto: ayuda'],
       ['prefillFromContact', 'Aviso de datos de quien llena'], ['naConfirmTitle', '«No aplica»: título de la confirmación'],
       ['naConfirmText', '«No aplica»: texto de la confirmación'], ['naConfirm', '«No aplica»: botón para confirmar'],
       ['naCollapsed', '«No aplica»: aviso del bloque cerrado'],
     ],
   },
-  { group: 'Paso: emergencia', texts: [['emergenciaTitle', 'Título del paso de emergencia'], ['emergenciaIntro', 'Explicación del paso de emergencia']] },
+  {
+    group: 'Paso: emergencia',
+    texts: [
+      ['emergenciaTitle', 'Título del paso de emergencia'], ['emergenciaIntro', 'Explicación del paso de emergencia'],
+      ['emergenciaBlockTitle', 'Bloque del contacto: título'], ['emergenciaBlockHint', 'Bloque del contacto: ayuda'],
+    ],
+  },
   { group: 'Quién llena la ficha', texts: [['contactoTitle', 'Título de los datos de quien llena'], ['contactoIntro', 'Explicación de los datos de quien llena']] },
   {
     group: 'Revisión y firma',

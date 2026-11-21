@@ -153,7 +153,7 @@ test('the office takes a prospect from the first call to «Inscrito»', async ({
     await f.goto(`${fichaUrl.pathname}${fichaUrl.search}`);
     await expect(f.getByRole('heading', { level: 2, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
     await expect(f.getByLabel('Apellido paterno')).toHaveValue(surname);
-    await f.getByLabel('CURP').fill(CHILD_CURP);
+    await f.getByLabel('CURP', { exact: true }).fill(CHILD_CURP);
     await expect(f.getByLabel('Fecha de nacimiento')).toHaveValue(CHILD_DOB);
     await next(f, 'Paso 2 de 7: Domicilio');
     await f.getByLabel('Calle', { exact: true }).fill('Calle Ficticia');
@@ -171,7 +171,7 @@ test('the office takes a prospect from the first call to «Inscrito»', async ({
     await f.locator('label').filter({ has: f.getByRole('switch', { name: /No aplica/ }) }).click();
     await next(f, 'Paso 5 de 7: Información de la madre');
     await expect(f.getByLabel('Correo electrónico')).toHaveValue(email);
-    await f.getByLabel('CURP').fill(MOTHER_CURP);
+    await f.getByLabel('CURP', { exact: true }).fill(MOTHER_CURP);
     await choose(f, 'Casado/a');
     await choose(f, 'Lic. / Ing.');
     await choose(f, 'Independiente');
