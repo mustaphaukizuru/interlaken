@@ -25,9 +25,12 @@ Public API::
 """
 from __future__ import annotations
 
+import functools
 import os
 import re
+import struct
 import unicodedata
+import zlib
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo
 
@@ -110,8 +113,72 @@ _SYMBOLS = {
 FONTS = {'F1': 'Helvetica', 'F2': 'Helvetica-Bold', 'F3': 'Helvetica-Oblique'}
 REGULAR, BOLD, ITALIC = 'F1', 'F2', 'F3'
 
+# ── More fonts (the ficha de inscripción) ───────────────────────────────────
+# The ficha draws the school's Excel form with stand-ins for the fonts it was
+# made with, each with the same metrics: Times New Roman → the standard
+# Times-Roman; Century Gothic → TeX Gyre Adventor and Calibri → Carlito, both
+# free fonts embedded from ``core/fonts`` (see its README.txt for the
+# licences); Symbol → the standard Symbol (the bullets). Documents that do
+# not ask for them (receipts, statements) keep the Helvetica family only.
+TIMES, SYMBOL = 'F4', 'F5'
+ADVENTOR, ADVENTOR_BOLD, CARLITO = 'F6', 'F7', 'F8'
+FONTS_DIR = os.path.join(os.path.dirname(__file__), 'fonts')
+STANDARD_FONTS = {**FONTS, TIMES: 'Times-Roman', SYMBOL: 'Symbol'}
+
+
+@dataclass(frozen=True)
+class FontFile:
+    filename: str
+    postscript_name: str
+    stem_v: int                     # FontDescriptor /StemV (no table holds it)
+
+
+EMBEDDED_FONTS = {
+    ADVENTOR: FontFile('texgyreadventor-regular.otf', 'TeXGyreAdventor-Regular', 84),
+    ADVENTOR_BOLD: FontFile('texgyreadventor-bold.otf', 'TeXGyreAdventor-Bold', 140),
+    CARLITO: FontFile('Carlito-Regular.ttf', 'Carlito', 80),
+}
+
+# Times-Roman (Adobe AFM) widths of the WinAnsi codes 32-255 (0 = no character).
+_TIMES_WINANSI = (
+    250, 333, 408, 500, 500, 833, 778, 180, 333, 333, 500, 564, 250, 333, 250, 278,
+    500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 278, 278, 564, 564, 564, 444,
+    921, 722, 667, 667, 722, 611, 556, 722, 722, 333, 389, 722, 611, 889, 722, 722,
+    556, 722, 667, 556, 611, 722, 722, 944, 722, 722, 611, 333, 278, 333, 469, 500,
+    333, 444, 500, 444, 500, 444, 333, 500, 500, 278, 278, 500, 278, 778, 500, 500,
+    500, 500, 333, 389, 278, 500, 500, 722, 500, 500, 444, 480, 200, 480, 541, 0,
+    500, 0, 333, 500, 444, 1000, 500, 500, 333, 1000, 556, 333, 889, 0, 611, 0,
+    0, 333, 333, 444, 444, 350, 500, 1000, 333, 980, 389, 333, 722, 0, 444, 722,
+    250, 333, 500, 500, 500, 500, 200, 500, 333, 760, 276, 500, 564, 333, 760, 500,
+    400, 564, 300, 300, 333, 500, 453, 250, 333, 300, 310, 500, 750, 750, 750, 444,
+    722, 722, 722, 722, 722, 722, 889, 667, 611, 611, 611, 611, 333, 333, 333, 333,
+    722, 722, 722, 722, 722, 722, 722, 564, 722, 722, 722, 722, 722, 722, 556, 500,
+    444, 444, 444, 444, 444, 444, 667, 444, 444, 444, 444, 444, 278, 278, 278, 278,
+    500, 500, 500, 500, 500, 500, 500, 564, 500, 500, 500, 500, 500, 500, 500, 500,
+)
+# Symbol (built-in encoding): code 0xB7 is its bullet.
+_SYMBOL_WIDTHS = {' ': 250, '·': 460}
+_WINANSI = tuple(bytes([c]).decode('cp1252', 'ignore') for c in range(32, 256))
+
+
+def _winansi_code(ch: str) -> int:
+    """The byte a character becomes in a content stream (``_enc``: «?» if none)."""
+    return ch.encode('cp1252', 'replace')[0]
+
+
+def _extra_width(ch: str, font: str) -> int:
+    if font == SYMBOL:
+        return _SYMBOL_WIDTHS.get(ch, 500)
+    code = _winansi_code(ch)
+    if code < 32:
+        return 0
+    widths = _TIMES_WINANSI if font == TIMES else embedded_font(font).widths
+    return widths[code - 32]
+
 
 def _char_width(ch: str, font: str) -> int:
+    if font not in _WIDTHS:
+        return _extra_width(ch, font)
     table = _WIDTHS[font]
     if ch in table:
         return table[ch]
@@ -262,6 +329,7 @@ class _Canvas:
 
     def __init__(self):
         self.ops: list[bytes] = []
+        self.fonts_used: set[str] = set()
 
     def _op(self, s: str):
         self.ops.append(s.encode('latin-1'))
@@ -299,17 +367,28 @@ class _Canvas:
         self.stroke(rgb)
         self._op(f'{_f(width)} w {_f(x1)} {_f(y1)} m {_f(x2)} {_f(y2)} l S')
 
-    def text(self, x, y, s, *, font=REGULAR, size=10.0, rgb=INK, align='left', spacing=0.0):
+    def text(self, x, y, s, *, font=REGULAR, size=10.0, rgb=INK, align='left', spacing=0.0,
+             word_spacing=0.0):
         if not s:
             return
         w = text_width(s, font, size) + spacing * max(len(str(s)) - 1, 0)
+        w += word_spacing * str(s).count(' ')
         if align == 'right':
             x -= w
         elif align == 'center':
             x -= w / 2
         self.fill(rgb)
-        head = f'BT /{font} {_f(size)} Tf {_f(spacing)} Tc 1 0 0 1 {_f(x)} {_f(y)} Tm ('.encode('latin-1')
+        self.fonts_used.add(font)
+        tw = f'{_f(word_spacing)} Tw ' if word_spacing else ''
+        head = f'BT /{font} {_f(size)} Tf {_f(spacing)} Tc {tw}1 0 0 1 {_f(x)} {_f(y)} Tm ('.encode('latin-1')
         self.ops.append(head + _enc(s) + b') Tj ET')
+
+    def clip(self, x, y, w, h):
+        """Start drawing inside the ``x, y, w, h`` rectangle only (until ``unclip``)."""
+        self._op(f'q {_f(x)} {_f(y)} {_f(w)} {_f(h)} re W n')
+
+    def unclip(self):
+        self._op('Q')
 
     def image(self, name, x, y, w, h):
         self._op(f'q {_f(w)} 0 0 {_f(h)} {_f(x)} {_f(y)} cm /{name} Do Q')
@@ -374,6 +453,186 @@ def _load_logo():
     if not size or size[2] not in (1, 3):
         return None
     return data, size
+
+
+# ── Embedded font files (sfnt: TrueType or OpenType-CFF) ────────────────────
+# A small reader for what a PDF simple font needs: the advance widths of the
+# WinAnsi characters (cmap + hmtx), the descriptor metrics (head, hhea, OS/2,
+# post) and the font program. A CFF font goes in as its bare 'CFF ' table
+# (FontFile3 /Type1C, glyphs found by name); a TrueType font as a subset that
+# keeps only the WinAnsi glyphs (FontFile2, glyph ids unchanged), so a PDF
+# carries a few dozen KB per font instead of the whole file.
+@dataclass(frozen=True)
+class EmbeddedFont:
+    postscript_name: str
+    cff: bool
+    program: bytes                       # the font program, uncompressed
+    widths: tuple[int, ...]              # WinAnsi codes 32-255, 1/1000 em
+    bbox: tuple[int, int, int, int]
+    ascent: int
+    descent: int
+    cap_height: int
+    italic_angle: float
+    stem_v: int
+
+
+def _sfnt_tables(data: bytes) -> tuple[bool, dict[str, bytes]]:
+    version, count = data[:4], struct.unpack('>H', data[4:6])[0]
+    tables = {}
+    for i in range(count):
+        tag, _checksum, offset, length = struct.unpack('>4sIII', data[12 + 16 * i:28 + 16 * i])
+        tables[tag.decode('latin-1')] = data[offset:offset + length]
+    return version == b'OTTO', tables
+
+
+def _cmap_lookup(cmap: bytes, codepoints) -> dict[int, int]:
+    """Unicode → glyph id from the Windows Unicode BMP (format 4) subtable."""
+    count = struct.unpack('>H', cmap[2:4])[0]
+    sub = None
+    for i in range(count):
+        platform, encoding, offset = struct.unpack('>HHI', cmap[4 + 8 * i:12 + 8 * i])
+        if (platform, encoding) in ((3, 1), (0, 3)) and struct.unpack('>H', cmap[offset:offset + 2])[0] == 4:
+            sub = offset
+            break
+    if sub is None:
+        raise ValueError('The font has no Unicode BMP (format 4) cmap.')
+    seg = struct.unpack('>H', cmap[sub + 6:sub + 8])[0] // 2
+    ends_at = sub + 14
+    starts_at = ends_at + 2 * seg + 2
+    deltas_at = starts_at + 2 * seg
+    ranges_at = deltas_at + 2 * seg
+
+    def u16(pos):
+        return struct.unpack('>H', cmap[pos:pos + 2])[0]
+
+    out = {}
+    for cp in codepoints:
+        for i in range(seg):
+            end = u16(ends_at + 2 * i)
+            if cp > end:
+                continue
+            start = u16(starts_at + 2 * i)
+            if cp < start:
+                break
+            delta, offset = u16(deltas_at + 2 * i), u16(ranges_at + 2 * i)
+            if offset == 0:
+                gid = (cp + delta) & 0xFFFF
+            else:
+                gid = u16(ranges_at + 2 * i + offset + 2 * (cp - start))
+                gid = (gid + delta) & 0xFFFF if gid else 0
+            if gid:
+                out[cp] = gid
+            break
+    return out
+
+
+def _composite_parts(glyph: bytes) -> list[int]:
+    """Glyph ids a composite TrueType glyph is built from."""
+    if len(glyph) < 10 or struct.unpack('>h', glyph[:2])[0] >= 0:
+        return []
+    parts, pos = [], 10
+    while True:
+        flags, gid = struct.unpack('>HH', glyph[pos:pos + 4])
+        parts.append(gid)
+        pos += 4 + (4 if flags & 0x0001 else 2)
+        pos += 2 if flags & 0x0008 else 4 if flags & 0x0040 else 8 if flags & 0x0080 else 0
+        if not flags & 0x0020:
+            return parts
+
+
+def _checksum(data: bytes) -> int:
+    data += b'\0' * (-len(data) % 4)
+    return sum(struct.unpack(f'>{len(data) // 4}I', data)) & 0xFFFFFFFF
+
+
+def _build_sfnt(tables: dict[str, bytes]) -> bytes:
+    tags = sorted(tables)
+    count = len(tags)
+    power = 1 << (count.bit_length() - 1)
+    header = struct.pack('>IHHHH', 0x00010000, count, power * 16, power.bit_length() - 1,
+                         count * 16 - power * 16)
+    offset = 12 + 16 * count
+    records, body = b'', b''
+    for tag in tags:
+        data = tables[tag]
+        records += struct.pack('>4sIII', tag.encode('latin-1'), _checksum(data), offset + len(body), len(data))
+        body += data + b'\0' * (-len(data) % 4)
+    font = bytearray(header + records + body)
+    head_at = 12 + 16 * count + sum(len(tables[t]) + (-len(tables[t]) % 4) for t in tags[:tags.index('head')])
+    struct.pack_into('>I', font, head_at + 8, (0xB1B0AFBA - _checksum(bytes(font))) & 0xFFFFFFFF)
+    return bytes(font)
+
+
+# The tables a PDF viewer needs from an embedded TrueType font.
+_TRUETYPE_TABLES = ('OS/2', 'cmap', 'cvt ', 'fpgm', 'glyf', 'head', 'hhea', 'hmtx', 'loca', 'maxp', 'prep')
+
+
+def _truetype_subset(tables: dict[str, bytes], keep: set[int]) -> bytes:
+    """The font with only the ``keep`` glyphs' outlines (ids unchanged)."""
+    head, glyf = tables['head'], tables['glyf']
+    count = struct.unpack('>H', tables['maxp'][4:6])[0]
+    if struct.unpack('>h', head[50:52])[0]:
+        offsets = struct.unpack(f'>{count + 1}I', tables['loca'][:4 * (count + 1)])
+    else:
+        offsets = tuple(2 * o for o in struct.unpack(f'>{count + 1}H', tables['loca'][:2 * (count + 1)]))
+    keep = set(keep) | {0}
+    todo = list(keep)
+    while todo:
+        gid = todo.pop()
+        for part in _composite_parts(glyf[offsets[gid]:offsets[gid + 1]]):
+            if part not in keep:
+                keep.add(part)
+                todo.append(part)
+    outlines, loca = bytearray(), []
+    for gid in range(count):
+        loca.append(len(outlines))
+        if gid in keep:
+            outlines += glyf[offsets[gid]:offsets[gid + 1]]
+            outlines += b'\0' * (-len(outlines) % 4)
+    loca.append(len(outlines))
+    new = {tag: tables[tag] for tag in _TRUETYPE_TABLES if tag in tables}
+    new['glyf'] = bytes(outlines)
+    new['loca'] = struct.pack(f'>{count + 1}I', *loca)
+    new['head'] = head[:8] + b'\0\0\0\0' + head[12:50] + struct.pack('>h', 1) + head[52:]
+    return _build_sfnt(new)
+
+
+@functools.cache
+def embedded_font(key: str) -> EmbeddedFont:
+    """The ``EMBEDDED_FONTS`` font ``key``, read once: WinAnsi widths and program."""
+    spec = EMBEDDED_FONTS[key]
+    with open(os.path.join(FONTS_DIR, spec.filename), 'rb') as fh:
+        cff, tables = _sfnt_tables(fh.read())
+    head, hhea = tables['head'], tables['hhea']
+    upm = struct.unpack('>H', head[18:20])[0]
+    metrics = struct.unpack('>H', hhea[34:36])[0]
+    advances = struct.unpack('>' + 'Hh' * metrics, tables['hmtx'][:4 * metrics])[0::2]
+    glyphs = _cmap_lookup(tables['cmap'], {ord(ch) for ch in _WINANSI if ch})
+
+    def scale(v):
+        return round(v * 1000 / upm)
+
+    widths = tuple(
+        scale(advances[min(glyphs[ord(ch)], metrics - 1)]) if ch and ord(ch) in glyphs else 0
+        for ch in _WINANSI
+    )
+    ascent, descent = struct.unpack('>hh', hhea[4:8])
+    os2 = tables['OS/2']
+    cap = struct.unpack('>h', os2[88:90])[0] if struct.unpack('>H', os2[:2])[0] >= 2 else ascent
+    italic = struct.unpack('>i', tables['post'][4:8])[0] / 65536
+    program = tables['CFF '] if cff else _truetype_subset(tables, set(glyphs.values()))
+    return EmbeddedFont(
+        postscript_name=spec.postscript_name,
+        cff=cff,
+        program=program,
+        widths=widths,
+        bbox=tuple(scale(v) for v in struct.unpack('>4h', head[36:44])),
+        ascent=scale(ascent),
+        descent=scale(descent),
+        cap_height=scale(cap),
+        italic_angle=italic,
+        stem_v=spec.stem_v,
+    )
 
 
 # ── Layout ──────────────────────────────────────────────────────────────────
@@ -615,7 +874,49 @@ def _pdf_string(text: str) -> bytes:
     return b'(' + _enc(text) + b')'
 
 
-def _assemble(pages: list[_Canvas], page_w: float, page_h: float, logo, title: str) -> bytes:
+def _info_string(text: str) -> bytes:
+    """Any text as a PDF text string (UTF-16BE with its byte order mark)."""
+    return b'<' + (b'\xfe\xff' + str(text).encode('utf-16-be')).hex().upper().encode() + b'>'
+
+
+@functools.cache
+def _compressed_program(key: str) -> bytes:
+    return zlib.compress(embedded_font(key).program, 9)
+
+
+def _embedded_font_objects(key: str, add) -> int:
+    font = embedded_font(key)
+    data = _compressed_program(key)
+    if font.cff:
+        file_key, extra, subtype = 'FontFile3', '/Subtype /Type1C', 'Type1'
+        name = font.postscript_name
+    else:
+        file_key, extra, subtype = 'FontFile2', f'/Length1 {len(font.program)}', 'TrueType'
+        name = f'IKFICH+{font.postscript_name}'    # a subset carries a tag
+    program = add(f'<< /Length {len(data)} /Filter /FlateDecode {extra} >>\nstream\n'.encode()
+                  + data + b'\nendstream')
+    bbox = ' '.join(str(v) for v in font.bbox)
+    descriptor = add(
+        f'<< /Type /FontDescriptor /FontName /{name} /Flags 32 /FontBBox [{bbox}] '
+        f'/ItalicAngle {_f(font.italic_angle)} /Ascent {font.ascent} /Descent {font.descent} '
+        f'/CapHeight {font.cap_height} /StemV {font.stem_v} /{file_key} {program} 0 R >>'.encode()
+    )
+    widths = ' '.join(str(w) for w in font.widths)
+    return add(
+        f'<< /Type /Font /Subtype /{subtype} /BaseFont /{name} /FirstChar 32 /LastChar 255 '
+        f'/Widths [{widths}] /Encoding /WinAnsiEncoding /FontDescriptor {descriptor} 0 R >>'.encode()
+    )
+
+
+def _font_object(key: str, add) -> int:
+    if key in EMBEDDED_FONTS:
+        return _embedded_font_objects(key, add)
+    encoding = '' if key == SYMBOL else ' /Encoding /WinAnsiEncoding'
+    return add(f'<< /Type /Font /Subtype /Type1 /BaseFont /{STANDARD_FONTS[key]}{encoding} >>'.encode())
+
+
+def _assemble(pages: list[_Canvas], page_w: float, page_h: float, logo, title: str,
+              fonts=None, subject: str = '', keywords: str = '') -> bytes:
     objects: list[bytes] = []
 
     def add(body: bytes) -> int:
@@ -624,8 +925,11 @@ def _assemble(pages: list[_Canvas], page_w: float, page_h: float, logo, title: s
 
     catalog = add(b'')                       # 1, filled below
     pages_id = add(b'')                      # 2, filled below
-    font_ids = {name: add(f'<< /Type /Font /Subtype /Type1 /BaseFont /{base} /Encoding /WinAnsiEncoding >>'.encode())
-                for name, base in FONTS.items()}
+    if fonts is None:
+        font_ids = {name: add(f'<< /Type /Font /Subtype /Type1 /BaseFont /{base} /Encoding /WinAnsiEncoding >>'.encode())
+                    for name, base in FONTS.items()}
+    else:
+        font_ids = {name: _font_object(name, add) for name in fonts}
     image_id = None
     if logo:
         data, (w, h, comps) = logo
@@ -648,7 +952,13 @@ def _assemble(pages: list[_Canvas], page_w: float, page_h: float, logo, title: s
     objects[catalog - 1] = f'<< /Type /Catalog /Pages {pages_id} 0 R >>'.encode()
     kids = ' '.join(f'{i} 0 R' for i in page_ids)
     objects[pages_id - 1] = f'<< /Type /Pages /Count {len(page_ids)} /Kids [{kids}] >>'.encode()
-    info_id = add(b'<< /Title ' + _pdf_string(title) + b' /Author (Colegio Interlaken) /Creator (Portal Interlaken) >>')
+    described = b''
+    if subject:
+        described += b' /Subject ' + _info_string(subject)
+    if keywords:
+        described += b' /Keywords ' + _info_string(keywords)
+    info_id = add(b'<< /Title ' + _pdf_string(title) + described
+                  + b' /Author (Colegio Interlaken) /Creator (Portal Interlaken) >>')
 
     out = bytearray(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
     offsets = []
@@ -664,10 +974,15 @@ def _assemble(pages: list[_Canvas], page_w: float, page_h: float, logo, title: s
     return bytes(out)
 
 
-def assemble_pdf(pages: list[_Canvas], page_size: tuple[float, float], *, logo=None, title: str = '') -> bytes:
-    """Pages drawn on ``Canvas`` objects → PDF bytes (Helvetica family; the
-    ``logo`` from ``jpeg_image`` is the ``/Logo`` image of every page)."""
-    return _assemble(pages, page_size[0], page_size[1], logo, title)
+def assemble_pdf(pages: list[_Canvas], page_size: tuple[float, float], *, logo=None, title: str = '',
+                 fonts=None, subject: str = '', keywords: str = '') -> bytes:
+    """Pages drawn on ``Canvas`` objects → PDF bytes; the ``logo`` from
+    ``jpeg_image`` is the ``/Logo`` image of every page.
+
+    ``fonts``: the font keys the pages use (``REGULAR``… ``CARLITO``); None
+    means the Helvetica family. ``subject`` / ``keywords`` go to the Info
+    dictionary (any text: UTF-16)."""
+    return _assemble(pages, page_size[0], page_size[1], logo, title, fonts, subject, keywords)
 
 
 def render_document_pdf(doc: Document, *, table_heading: str = 'Movimientos') -> bytes:

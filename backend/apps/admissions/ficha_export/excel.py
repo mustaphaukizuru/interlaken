@@ -1,11 +1,20 @@
 """
 admissions/ficha_export/excel.py — the ficha as the school's own Excel file.
 
-The anonymised template is filled cell by cell from ``data.FichaSheet``:
-logo, merged boxes, fills, borders and the print setup (Letter, 1 page wide,
-3 pages) stay exactly as the template has them. Long free text (allergies,
-chronic conditions) shrinks, and is cut with «…» only when even 6 pt cannot
-hold it, so nothing spills over the printed box.
+The template is the school's 2021 workbook itself with only the personal
+values removed (``test_ficha_template.py``). The export never re-saves it
+through a spreadsheet library: every part of the package is copied as it is
+and only the form's own value cells are written (``sheet1.xml`` and
+``sharedStrings.xml``), so column widths, row heights, margins, merges,
+fonts (the Symbol bullets included), fills, borders, alignments, the logo
+and the print setup stay exactly the original's. A value takes its cell's
+original font and alignment: a text too long for its box shows the way it
+would in the school's own file.
+
+The electronic acceptance of the privacy notice is not drawn on the form:
+it goes to the workbook's document properties (Description, which Excel
+shows as «Comentarios», and Keywords), as it goes to the PDF's Info
+dictionary.
 """
 
 from __future__ import annotations
@@ -13,72 +22,114 @@ from __future__ import annotations
 import io
 import re
 import unicodedata
-from copy import copy
+import zipfile
+from xml.sax.saxutils import escape
 
-from apps.core.pdf_document import REGULAR, fit_text
-
-from . import cellmap, template
+from . import template
 from .data import FichaSheet
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-# Free-text boxes: (max font size, min font size). Their width/height come
-# from the template grid; Helvetica metrics stand in for Times New Roman
-# (wider, so the estimate errs on the safe side).
-TEXT_AREAS = {
-    cellmap.CELLS["salud.alergias_cuales"]: (9.0, 6.0),
-    cellmap.CELLS["salud.enfermedades"]: (9.0, 6.0),
-}
-PADDING = 3.0
+SHEET_PART = "xl/worksheets/sheet1.xml"
+STRINGS_PART = "xl/sharedStrings.xml"
+CORE_PART = "docProps/core.xml"
+
+# A cell element of the sheet: <c r="B10" s="96"/> or <c r="B9" s="93" t="s"><v>4</v></c>.
+CELL_XML = re.compile(
+    r'<c r="(?P<ref>[A-Z]+[0-9]+)"(?P<attrs>(?: [a-z]+="[^"]*")*)(?:/>|>(?P<body>.*?)</c>)',
+    re.S,
+)
+# Characters XML 1.0 cannot carry (a pasted control character would break the file).
+_NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff￾￿]")
+# Excel reads «_x0041_» in a string as «A»: a literal one is written «_x005F_x0041_».
+_EXCEL_ESCAPE = re.compile(r"_(x[0-9A-Fa-f]{4}_)")
 
 
-def fitted_text(coord: str, text: str) -> tuple[float, str]:
-    """``(font size, text)`` that fits the template box at ``coord``."""
-    max_size, min_size = TEXT_AREAS[coord]
-    _page, _x, _y, w, h = template.grid().box(coord)
-    # Excel wraps the text itself (its own metrics, its own cell padding):
-    # estimate with a narrower box and a generous line pitch.
-    size, lines = fit_text(
-        text,
-        REGULAR,
-        w - 2 * PADDING - 8,
-        h - PADDING,
-        max_size=max_size,
-        min_size=min_size,
-        leading=1.4,
-    )
-    if lines and lines[-1].endswith("…") and not text.endswith("…"):
-        return size, " ".join(lines)
-    return size, text
+def _xml_text(value: str) -> str:
+    text = _NOT_XML.sub("", str(value).replace("\r\n", "\n").replace("\r", "\n"))
+    return escape(_EXCEL_ESCAPE.sub(r"_x005F_\1", text))
 
 
-def _write(cell, value) -> None:
-    cell.value = value
-    if isinstance(value, str) and cell.data_type == "f":
-        # openpyxl stores text starting with «=» as a live formula; a family
-        # typed it, so it stays text.
-        cell.data_type = "s"
+def _string_item(text: str) -> str:
+    space = ' xml:space="preserve"' if text != text.strip() or "\n" in text else ""
+    return f"<si><t{space}>{_xml_text(text)}</t></si>"
+
+
+def fill_cells(sheet_xml: str, strings_xml: str, cells: dict[str, object]) -> tuple[str, str]:
+    """Write ``cells`` ({"B10": "LÓPEZ", "G20": 16}) into the sheet: numbers as
+    numbers, text as shared strings, each cell keeping its own style.
+
+    Only cells the template already holds can be written (every box of the
+    form is a styled cell): an unknown coordinate is an error, never a new cell.
+    """
+    first = strings_xml.find("<si>")
+    end = strings_xml.rfind("</sst>")
+    head, tail = strings_xml[:first], strings_xml[end:]
+    items = re.findall(r"<si>.*?</si>", strings_xml[first:end], re.S)
+    added: list[str] = []
+    found: set[str] = set()
+
+    def put(m: re.Match) -> str:
+        ref = m.group("ref")
+        if ref not in cells:
+            return m.group(0)
+        found.add(ref)
+        value = cells[ref]
+        style = re.search(r' s="[0-9]+"', m.group("attrs"))
+        s = style.group(0) if style else ""
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return f'<c r="{ref}"{s}><v>{value!r}</v></c>'
+        added.append(_string_item(str(value)))
+        return f'<c r="{ref}"{s} t="s"><v>{len(items) + len(added) - 1}</v></c>'
+
+    sheet_xml = CELL_XML.sub(put, sheet_xml)
+    missing = set(cells) - found
+    if missing:
+        raise KeyError(f"Not a cell of the form: {', '.join(sorted(missing))}")
+    every = items + added
+    refs = len(re.findall(r'<c r="[A-Z]+[0-9]+"(?: [a-z]+="[^"]*")* t="s"', sheet_xml))
+    head = re.sub(r' count="[0-9]+"', f' count="{refs}"', head, count=1)
+    head = re.sub(r' uniqueCount="[0-9]+"', f' uniqueCount="{len(every)}"', head, count=1)
+    return sheet_xml, head + "".join(every) + tail
+
+
+def _core_properties(core_xml: str, *, description: str, keywords: str) -> str:
+    extra = ""
+    if description:
+        extra += f"<dc:description>{_xml_text(description)}</dc:description>"
+    if keywords:
+        extra += f"<cp:keywords>{_xml_text(keywords)}</cp:keywords>"
+    return core_xml.replace("</dc:title>", "</dc:title>" + extra, 1)
+
+
+def build_workbook(cells: dict[str, object], *, description: str = "", keywords: str = "") -> bytes:
+    """The template package with ``cells`` written and the document properties set."""
+    out = io.BytesIO()
+    with (
+        zipfile.ZipFile(io.BytesIO(template.template_bytes())) as src,
+        zipfile.ZipFile(out, "w") as dst,
+    ):
+        parts = {info.filename: src.read(info) for info in src.infolist()}
+        sheet_xml, strings_xml = fill_cells(
+            parts[SHEET_PART].decode("utf-8"), parts[STRINGS_PART].decode("utf-8"), cells
+        )
+        parts[SHEET_PART] = sheet_xml.encode("utf-8")
+        parts[STRINGS_PART] = strings_xml.encode("utf-8")
+        core = parts[CORE_PART].decode("utf-8")
+        parts[CORE_PART] = _core_properties(
+            core, description=description, keywords=keywords
+        ).encode("utf-8")
+        for info in src.infolist():
+            item = zipfile.ZipInfo(info.filename, date_time=info.date_time)
+            item.compress_type = info.compress_type
+            item.external_attr = info.external_attr
+            dst.writestr(item, parts[info.filename])
+    return out.getvalue()
 
 
 def build_xlsx(sheet: FichaSheet) -> bytes:
-    """The filled workbook as bytes."""
-    wb = template.load()
-    ws = wb[cellmap.SHEET]
-    for coord, value in sheet.cells().items():
-        cell = ws[coord]
-        if coord in TEXT_AREAS and isinstance(value, str):
-            size, value = fitted_text(coord, value)
-            font = copy(cell.font)
-            font.sz = size
-            cell.font = font
-        _write(cell, value)
-    props = wb.properties
-    props.creator = "Colegio Interlaken"
-    props.lastModifiedBy = "Colegio Interlaken"
-    props.title = "Ficha de inscripción"
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+    """The filled ficha as an .xlsx file (bytes)."""
+    return build_workbook(sheet.cells(), description=sheet.description, keywords=sheet.keywords)
 
 
 def ascii_part(text: str) -> str:

@@ -1,28 +1,36 @@
 """
-admissions/ficha_export/pdf.py — the ficha as a 3-page Letter PDF.
+admissions/ficha_export/pdf.py — the ficha as the school's form, on 3 Letter pages.
 
-No PDF library: the page is drawn with ``apps.core.pdf_document``'s canvas
-from the template grid itself (``template.grid()``), so the PDF mirrors the
-Excel file box for box: the logo, the black section bars with white bold
-text, the grey #BFBFBF label boxes, the bordered value boxes and the «X»
-marks, on the same three pages (page 2 starts at «DATOS DEL PADRE», page 3
-at the emergency bar). Helvetica replaces the form's fonts. Values shrink
-to fit their box; long free text wraps and shrinks, cut with «…» only past
-5 pt. Page 3 adds the electronic acceptance (who accepted the privacy
-notice, when, and which version) and every page says «Página n de 3».
+No PDF library: ``apps.core.pdf_document``'s canvas draws the template grid
+(``template.grid()``) where Excel prints it: the same three pages (rows
+1-45, 46-91, 92-137), margins, boxes, black bars, grey labels, borders and
+logo, nothing added (no footer, no box for the acceptance). Each label and
+each value takes its cell's own font, size, colour and alignment, laid out
+the way Excel lays out a cell: centred, left, justified or indented, top,
+centre or bottom, wrapped where the cell wraps, clipped to its box.
+
+The fonts stand in for the form's, with the same metrics: Times New Roman
+values → Times-Roman; Century Gothic (and the Neutra Text titles) → TeX
+Gyre Adventor; Calibri → Carlito; the Symbol bullets → Symbol. The
+electronic acceptance of the privacy notice goes to the Info dictionary
+(Subject and Keywords), never on the page.
 """
 
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
+
 from openpyxl.utils import coordinate_to_tuple, get_column_letter
 
 from apps.core.pdf_document import (
-    BOLD,
-    ITALIC,
-    REGULAR,
+    ADVENTOR,
+    ADVENTOR_BOLD,
+    CARLITO,
+    SYMBOL,
+    TIMES,
     Canvas,
     assemble_pdf,
-    fit_text,
     jpeg_image,
     text_width,
 )
@@ -33,242 +41,285 @@ from .template import CellStyle, Run
 
 PDF_CONTENT_TYPE = "application/pdf"
 PAGE_W, PAGE_H = 612.0, 792.0  # Letter
-SIDE, TOP, BOTTOM = 36.0, 26.0, 34.0
-PAD = 2.0
-INDENT_PT = 12.6  # one Excel indent level, printed
-MIN_SIZE = 4.5
 BLACK = (0.0, 0.0, 0.0)
-MUTED = (0.35, 0.35, 0.35)
-ACCEPT_FILL = (0.95, 0.95, 0.95)
-ACCEPT_LINE = (0.75, 0.75, 0.75)  # #BFBFBF, the form's label grey
-FOOTER = "Colegio Interlaken · Ficha de inscripción"
 
-TEXT_AREAS = {cellmap.CELLS["salud.alergias_cuales"], cellmap.CELLS["salud.enfermedades"]}
-ACCEPTANCE = cellmap.CELLS["firma.aceptacion"]
+# How Excel lays a cell's text out in print (measured on its PDF export).
+UNIT = 0.12  # its printer unit (1/600 in): font sizes and line boxes round to it
+LEADING = 1.44  # added under every line of wrapped text
+CENTER_SHIFT = 0.31  # a vertically centred line sits this much lower than the middle
+SINGLE_CELL_SHIFT = 0.48  # … and 0.48 lower still in a cell that is not merged
+CENTER_X = 0.42  # and a horizontally centred one this much right of it
+BOTTOM_GAP = 1.6  # bottom-aligned text: last line box ends this far above the gridline
+BOTTOM_GAP_LINE = 1.66  # the same for a single unwrapped line (whose box has no leading)
+ROW_DESCENT = 3.14  # in a row flagged «thickBot», text sits at least this descent high
+TOP_GAP = 0.87  # top-aligned text: from the gridline to the first ascender line
+RIGHT_PAD = 0.94  # justified / right-aligned text stops this far from the right gridline
+INDENT_STEP = 7.564  # one indent level
+UNDERLINE = (1.08, 0.72)  # single underline: gap under the baseline, thickness (at 11 pt)
 
-
-def _font(bold: bool, italic: bool) -> str:
-    if bold:
-        return BOLD
-    return ITALIC if italic else REGULAR
-
-
-class _Page:
-    """Sheet points → PDF points for one page (scaled, centred)."""
-
-    def __init__(self, canvas: Canvas, scale: float, width: float):
-        self.c = canvas
-        self.s = scale
-        self.x0 = (PAGE_W - width * scale) / 2
-        self.top = PAGE_H - TOP
-
-    def x(self, x: float) -> float:
-        return self.x0 + x * self.s
-
-    def y(self, y: float) -> float:
-        return self.top - y * self.s
-
-
-def _scale(grid) -> float:
-    by_width = (PAGE_W - 2 * SIDE) / grid.width
-    by_height = (PAGE_H - TOP - BOTTOM) / max(grid.page_heights)
-    return min(by_width, by_height)
+# The form's fonts → the PDF's, and the vertical metrics Excel lays them out
+# with (Windows ascent / descent, per em).
+FONT_KEYS = {
+    "Century Gothic": (ADVENTOR, ADVENTOR_BOLD),
+    "Neutra Text": (ADVENTOR, ADVENTOR_BOLD),
+    "Times New Roman": (TIMES, TIMES),
+    "Calibri": (CARLITO, CARLITO),
+    "Symbol": (SYMBOL, SYMBOL),
+}
+V_METRICS = {
+    "Century Gothic": ((1989 / 2048, 451 / 2048), (2032 / 2048, 451 / 2048)),
+    "Neutra Text": ((1989 / 2048, 451 / 2048), (2032 / 2048, 451 / 2048)),
+    "Times New Roman": ((1825 / 2048, 443 / 2048),) * 2,
+    "Calibri": ((1950 / 2048, 550 / 2048),) * 2,
+    "Symbol": ((2059 / 2048, 450 / 2048),) * 2,
+}
 
 
-# ── text ─────────────────────────────────────────────────────────────────
-def _parts(runs: list[Run], k: float) -> list[tuple[str, str, float, tuple]]:
-    return [(r.text, _font(r.bold, r.italic), r.size * k, r.rgb) for r in runs if r.text]
+def printed_size(size: float) -> float:
+    """Excel prints 11 pt as 11.04 pt, 7 as 6.96: sizes round to its unit."""
+    return round(size / UNIT) * UNIT
 
 
-def _width(parts) -> float:
-    return sum(text_width(t, f, s) for t, f, s, _ in parts)
+def _ceil_unit(v: float) -> float:
+    return math.ceil(v / UNIT - 1e-6) * UNIT
 
 
-def _wrap_parts(parts, width: float) -> list[list[tuple]]:
-    """Greedy word wrap over mixed runs; explicit line breaks respected."""
-    lines: list[list[tuple]] = [[]]
-    used = 0.0
-    for text, font, size, rgb in parts:
-        for n, chunk in enumerate(text.split("\n")):
+def font_key(run: Run) -> str:
+    regular, bold = FONT_KEYS.get(run.font, FONT_KEYS["Century Gothic"])
+    return bold if run.bold else regular
+
+
+def _v_metrics(run: Run) -> tuple[float, float]:
+    """(ascent, descent) in points at the printed size."""
+    pair = V_METRICS.get(run.font, V_METRICS["Century Gothic"])[1 if run.bold else 0]
+    size = printed_size(run.size)
+    return pair[0] * size, pair[1] * size
+
+
+def run_width(text: str, run: Run) -> float:
+    return text_width(text, font_key(run), printed_size(run.size))
+
+
+def pad_left(size: float) -> float:
+    """Excel's gap between a cell's left gridline and its text (grows with the size)."""
+    return min(1.92, 0.36 + 0.16 * printed_size(size))
+
+
+@dataclass
+class Piece:
+    """One run of text placed on a page (y measured down from the page top)."""
+
+    text: str
+    run: Run
+    x: float
+    baseline: float
+    word_spacing: float = 0.0
+
+
+@dataclass
+class Placed:
+    page: int
+    pieces: list[Piece]
+    clip: tuple[float, float] | None  # (x, width): the box's sides
+
+
+# ── wrapping ─────────────────────────────────────────────────────────────
+def _tokens(runs: list[Run]):
+    """(text, run) words and spaces; «\\n» as a hard break (None)."""
+    for run in runs:
+        for n, line in enumerate(run.text.split("\n")):
             if n:
-                lines.append([])
-                used = 0.0
-            for word in chunk.split(" "):
-                if not word:
-                    continue
-                token = word if not lines[-1] else f" {word}"
-                w = text_width(token, font, size)
-                if lines[-1] and used + w > width:
-                    lines.append([])
-                    token, w = word, text_width(word, font, size)
-                    used = 0.0
-                lines[-1].append((token, font, size, rgb))
-                used += w
-    return [ln for ln in lines if ln] or [[]]
+                yield None, run
+            word = ""
+            for ch in line:
+                if ch == " ":
+                    if word:
+                        yield word, run
+                        word = ""
+                    yield " ", run
+                else:
+                    word += ch
+            if word:
+                yield word, run
 
 
-def _align(style: CellStyle) -> str:
-    if style.horizontal in ("center", "centerContinuous", "distributed"):
-        return "center"
-    if style.horizontal == "right":
-        return "right"
-    return "left"
+def _merge(line: list[tuple[str, Run]]) -> list[tuple[str, Run]]:
+    out: list[tuple[str, Run]] = []
+    for text, run in line:
+        if out and out[-1][1] == run:
+            out[-1] = (out[-1][0] + text, run)
+        else:
+            out.append((text, run))
+    return out
 
 
-def _draw_lines(page: _Page, box, lines, style: CellStyle, *, overflow: bool) -> None:
-    """Lay ``lines`` (lists of runs) in ``box`` (sheet points) per the cell's alignment."""
-    _p, x, y, w, h = box
-    s = page.s
-    pitches = [max((p[2] for p in ln), default=style.size * s) * 1.15 for ln in lines]
-    block = sum(pitches)
-    inner_h = h * s
-    if style.vertical == "top":
-        top = PAD
-    elif style.vertical == "center":
-        top = (inner_h - block) / 2
-    else:  # Excel's default: bottom
-        top = inner_h - block - PAD
-    align = _align(style)
-    left = page.x(x) + PAD + style.indent * INDENT_PT * s
-    right = page.x(x + w) - PAD
-    if align == "left":
-        ax = left
-    elif align == "right":
-        ax = right
+def wrap_runs(runs: list[Run], width: float) -> list[list[tuple[str, Run]]]:
+    """Greedy word wrap over mixed runs: lines of (text, run); trailing spaces dropped."""
+    lines: list[list[tuple[str, Run]]] = [[]]
+    used = 0.0
+    for text, run in _tokens(runs):
+        if text is None:
+            lines.append([])
+            used = 0.0
+            continue
+        w = run_width(text, run)
+        if text != " " and lines[-1] and used + w > width:
+            while lines[-1] and lines[-1][-1][0] == " ":
+                lines[-1].pop()
+            lines.append([])
+            used = 0.0
+        if text == " " and not lines[-1]:
+            continue
+        lines[-1].append((text, run))
+        used += w
+    for line in lines:
+        while line and line[-1][0] == " ":
+            line.pop()
+    return [_merge(line) for line in lines]
+
+
+# ── one cell ─────────────────────────────────────────────────────────────
+def _line_box(line, runs) -> tuple[float, float, float]:
+    """(ascent, descent, height) of a line: its tallest run, rounded, plus leading."""
+    sample = [run for _text, run in line] or runs[:1]
+    asc = max(_v_metrics(r)[0] for r in sample)
+    desc = max(_v_metrics(r)[1] for r in sample)
+    return asc, desc, _ceil_unit(asc + desc) + LEADING
+
+
+def place_cell(grid, coord: str, runs: list[Run], style: CellStyle, *, number=False) -> Placed:
+    """Lay out ``runs`` in the box of ``coord`` the way Excel prints the cell."""
+    page, x, y, w, h = grid.box(coord)
+    r, c = coordinate_to_tuple(coord)
+    merged = (r, c) in grid.merges
+    left_pad = pad_left(max(run.size for run in runs))
+    horizontal = style.horizontal or ("right" if number else "left")
+    if style.wrap or horizontal == "justify":
+        lines = wrap_runs(runs, w - left_pad - RIGHT_PAD)
     else:
-        ax = (page.x(x) + page.x(x + w)) / 2
-    cursor = page.y(y) - top
-    for ln, pitch in zip(lines, pitches, strict=True):
-        size = max((p[2] for p in ln), default=style.size * s)
-        baseline = cursor - pitch + (pitch - size) / 2 + size * 0.22
-        if not overflow and align == "left":
-            ax = left
-        page.c.runs(ax, baseline, ln, align=align)
-        cursor -= pitch
+        lines = [_merge([(t, run) for t, run in _tokens(runs) if t is not None])]
+    boxes = [_line_box(line, runs) for line in lines]
+    block = sum(b[2] for b in boxes)
+    vertical = style.vertical or "bottom"
+    if vertical == "top":
+        top = y + TOP_GAP - LEADING
+    elif vertical == "center" or vertical == "distributed":
+        top = y + (h - block) / 2 + CENTER_SHIFT + (0 if merged else SINGLE_CELL_SHIFT)
+    elif style.wrap or horizontal == "justify":
+        top = y + h - BOTTOM_GAP - block
+    else:
+        asc, desc, _height = boxes[0]
+        last_row = grid.merges.get((r, c), (r, c, r, c))[2]
+        if last_row in grid.thick_bottom:
+            desc = max(desc, ROW_DESCENT)
+        top = y + h - BOTTOM_GAP_LINE - desc - asc
+    pieces = []
+    cursor = top
+    for n, (line, (asc, _desc, height)) in enumerate(zip(lines, boxes, strict=True)):
+        baseline = cursor + LEADING + asc if vertical == "top" else cursor + asc
+        cursor += height
+        widths = [run_width(text, run) for text, run in line]
+        total = sum(widths)
+        spacing = 0.0
+        if horizontal == "justify" and n < len(lines) - 1:
+            spaces = sum(text.count(" ") for text, _run in line)
+            if spaces:
+                spacing = (w - left_pad - RIGHT_PAD - total) / spaces
+            px = x + left_pad
+        elif horizontal in ("center", "centerContinuous", "distributed"):
+            px = x + (w - total) / 2 + CENTER_X
+        elif horizontal == "right":
+            px = x + w - RIGHT_PAD - total
+        else:  # left, general text, justify's last line, fill
+            px = x + left_pad + style.indent * INDENT_STEP
+        for (text, run), width in zip(line, widths, strict=True):
+            pieces.append(Piece(text, run, px, baseline, spacing))
+            px += width + spacing * text.count(" ")
+    # A merged box keeps its text between its sides, as in Excel; a taller
+    # accent (Adventor's «Ó» in a 14 pt title) is never cut at the top.
+    clip = (x, min(w, grid.right - x)) if merged else None
+    return Placed(page, pieces, clip)
 
 
-def _draw_cell(page: _Page, box, runs: list[Run], style: CellStyle, *, merged: bool) -> None:
-    """A label or a value with the cell's own font, alignment and wrapping."""
-    _p, x, y, w, h = box
-    s = page.s
-    room = w * s - 2 * PAD - style.indent * INDENT_PT * s
-    k = s
-    parts = _parts(runs, k)
-    if style.wrap:
-        lines = _wrap_parts(parts, room)
-        # Shrink until the wrapped block fits the box height.
-        while (
-            len(lines) > 1
-            and sum(max(p[2] for p in ln) * 1.15 for ln in lines) > h * s
-            and min(r.size for r in runs) * k > MIN_SIZE
-        ):
-            k *= 0.92
-            parts = _parts(runs, k)
-            lines = _wrap_parts(parts, room)
-        _draw_lines(page, box, lines, style, overflow=False)
-        return
-    single = list(parts)
-    text_w = _width(single)
-    # A merged box (or «shrink to fit») holds its text; a lone left-aligned
-    # cell lets it run over its empty neighbours, as Excel does.
-    if (merged or style.shrink or _align(style) != "left") and text_w > room > 0:
-        k *= room / text_w
-        single = _parts(runs, max(k, MIN_SIZE / max(r.size for r in runs)))
-    _draw_lines(page, box, [single], style, overflow=True)
+def layout(grid, cells: dict[str, object]) -> list[Placed]:
+    """Every label and value of the form, placed."""
+    values = {coordinate_to_tuple(coord): value for coord, value in cells.items()}
+    out = []
+    for r, c in sorted(set(grid.labels) | set(values)):
+        coord = f"{get_column_letter(c)}{r}"
+        style = grid.styles.get((r, c), CellStyle())
+        if (r, c) in values:
+            value = values[(r, c)]
+            if value is None or value == "":
+                continue
+            number = isinstance(value, (int, float)) and not isinstance(value, bool)
+            runs = [style.run(_display(value))]
+            out.append(place_cell(grid, coord, runs, style, number=number))
+        else:
+            out.append(place_cell(grid, coord, grid.labels[(r, c)], style))
+    return out
 
 
-def _draw_text_area(page: _Page, box, text: str, style: CellStyle) -> None:
-    _p, x, y, w, h = box
-    s = page.s
-    size, lines = fit_text(
-        text,
-        REGULAR,
-        w * s - 2 * PAD,
-        h * s - 2 * PAD,
-        max_size=style.size * s,
-        min_size=5.0,
-        leading=1.2,
-    )
-    cursor = page.y(y) - PAD
-    for line in lines:
-        cursor -= size * 1.2
-        page.c.text(page.x(x) + PAD, cursor + size * 0.22, line, font=REGULAR, size=size, rgb=BLACK)
+def _display(value) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
 
-def _draw_acceptance(page: _Page, box, text: str) -> None:
-    _p, x, y, w, h = box
-    s = page.s
-    left, top = page.x(x), page.y(y)
-    page.c.rect(left, top - h * s, w * s, h * s, fill=ACCEPT_FILL, stroke=ACCEPT_LINE, width=0.6)
-    size, lines = fit_text(
-        text, ITALIC, w * s - 16, h * s - 8, max_size=8.5, min_size=5.0, leading=1.25
-    )
-    block = len(lines) * size * 1.25
-    cursor = top - (h * s - block) / 2
-    for line in lines:
-        cursor -= size * 1.25
-        page.c.text(
-            left + w * s / 2,
-            cursor + size * 0.3,
-            line,
-            font=ITALIC,
+# ── drawing ──────────────────────────────────────────────────────────────
+def _draw_text(c: Canvas, placed: Placed) -> None:
+    if placed.clip:
+        x, w = placed.clip
+        c.clip(x, 0, w, PAGE_H)
+    for p in placed.pieces:
+        size = printed_size(p.run.size)
+        c.text(
+            p.x,
+            PAGE_H - p.baseline,
+            p.text,
+            font=font_key(p.run),
             size=size,
-            rgb=BLACK,
-            align="center",
+            rgb=p.run.rgb,
+            word_spacing=p.word_spacing,
         )
+        if p.run.underline and p.text.strip():
+            offset, thickness = (v * size / 11 for v in UNDERLINE)
+            width = run_width(p.text, p.run) + p.word_spacing * p.text.count(" ")
+            c.rect(p.x, PAGE_H - p.baseline - offset - thickness, width, thickness, fill=p.run.rgb)
+    if placed.clip:
+        c.unclip()
 
 
-# ── pages ────────────────────────────────────────────────────────────────
-def build_pdf(sheet: FichaSheet, *, title: str = "Ficha de inscripción") -> bytes:
-    """The ficha (``sheet``) as PDF bytes: always 3 Letter pages."""
+def render(cells: dict[str, object], *, title: str, subject: str = "", keywords: str = "") -> bytes:
+    """The form with ``cells`` ({"B10": "LÓPEZ", …}) as PDF bytes: 3 Letter pages."""
     g = template.grid()
-    scale = _scale(g)
-    pages = [_Page(Canvas(), scale, g.width) for _ in cellmap.PAGES]
-
+    pages = [Canvas() for _ in cellmap.PAGES]
+    # As Excel prints: fills, then borders, then the picture, then the text.
     for n, (x, y, w, h), rgb in g.fills:
-        p = pages[n]
-        p.c.rect(p.x(x), p.y(y + h), w * scale, h * scale, fill=rgb)
-    for n, (x1, y1, x2, y2), width in g.borders:
-        p = pages[n]
-        p.c.line(p.x(x1), p.y(y1), p.x(x2), p.y(y2), BLACK, width * scale)
-
+        pages[n].rect(x, PAGE_H - y - h, w, h, fill=rgb)
+    half = template.BORDER_WIDTH / 2
+    for n, (x1, y1, x2, y2) in g.borders:
+        if y1 == y2:  # horizontal: gridline to gridline
+            pages[n].rect(x1, PAGE_H - y1 - half, x2 - x1, 2 * half, fill=BLACK)
+        else:  # vertical: half a line past each end, so box corners are square
+            pages[n].rect(x1 - half, PAGE_H - y2 - half, 2 * half, y2 - y1 + 2 * half, fill=BLACK)
     logo = jpeg_image(template.logo_jpeg())
     if logo and g.logo:
         n, (x, y, w, h) = g.logo
-        p = pages[n]
-        p.c.image("Logo", p.x(x), p.y(y + h), w * scale, h * scale)
+        pages[n].image("Logo", x, PAGE_H - y - h, w, h)
+    for placed in layout(g, cells):
+        _draw_text(pages[placed.page], placed)
+    return assemble_pdf(
+        pages,
+        (PAGE_W, PAGE_H),
+        logo=logo,
+        title=title,
+        fonts=sorted(set().union(*(c.fonts_used for c in pages))),
+        subject=subject,
+        keywords=keywords,
+    )
 
-    values = sheet.cells()
-    by_pos = {coordinate_to_tuple(coord): value for coord, value in values.items()}
-    positions = set(g.labels) | set(by_pos)
-    for r, c in sorted(positions):
-        coord = f"{get_column_letter(c)}{r}"
-        style = g.styles.get((r, c), CellStyle())
-        box = g.box(coord)
-        page = pages[box[0]]
-        merged = (r, c) in g.merges
-        if (r, c) in by_pos:
-            value = by_pos[(r, c)]
-            if coord == ACCEPTANCE:
-                _draw_acceptance(page, box, str(value))
-            elif coord in TEXT_AREAS:
-                _draw_text_area(page, box, str(value), style)
-            else:
-                run = Run(str(value), style.bold, style.italic, style.size, style.rgb)
-                _draw_cell(page, box, [run], style, merged=merged)
-        else:
-            _draw_cell(page, box, g.labels[(r, c)], style, merged=merged)
 
-    total = len(pages)
-    for n, p in enumerate(pages, start=1):
-        p.c.text(SIDE, 18, FOOTER, font=REGULAR, size=7.5, rgb=MUTED)
-        p.c.text(
-            PAGE_W - SIDE,
-            18,
-            f"Página {n} de {total}",
-            font=REGULAR,
-            size=7.5,
-            rgb=MUTED,
-            align="right",
-        )
-    return assemble_pdf([p.c for p in pages], (PAGE_W, PAGE_H), logo=logo, title=title)
+def build_pdf(sheet: FichaSheet, *, title: str = "Ficha de inscripción") -> bytes:
+    """The ficha (``sheet``) as PDF bytes; the acceptance in Subject / Keywords."""
+    return render(sheet.cells(), title=title, subject=sheet.description, keywords=sheet.keywords)
