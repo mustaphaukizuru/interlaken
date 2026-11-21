@@ -21,7 +21,7 @@ interface EnrollmentFee {
   cuota: string;
   order: number;
 }
-interface TuitionRow { section: string; inscripcion: string | null; colegiatura: string; order: number }
+interface TuitionRow { section: string; colegiatura: string; order: number }
 interface FixedConcept { name: string; cost: string; mandatory: boolean; order: number }
 interface PricingBundle {
   enrollment_fees: EnrollmentFee[];

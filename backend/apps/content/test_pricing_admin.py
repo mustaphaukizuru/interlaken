@@ -65,7 +65,7 @@ def test_lists_every_table_in_public_order(admin_client):
     assert {"id", "is_active", "modality", "section", "gastos_administrativos", "cuota"} <= set(
         fees[0]
     )
-    assert fees[0]["cuota"] == "6800.00"
+    assert fees[0]["cuota"] == "7000.00"
     tuition = data["colegiaturas"]["rows"]
     assert [r["section"] for r in tuition] == [
         "Sección Maternal",
@@ -101,7 +101,7 @@ def test_change_one_amount_audits_before_and_after_and_refreshes_the_site(
     assert res.json()["counts"] == {"created": 0, "updated": 1, "deleted": 0}
     assert TuitionCost.objects.get(section="Primaria").colegiatura == Decimal("6700.50")
     entry = AuditLog.objects.filter(object_type="content.tuitioncost", action="update").latest("id")
-    assert entry.changes == {"colegiatura": ["6450.00", "6700.50"]}
+    assert entry.changes == {"colegiatura": ["6650.00", "6700.50"]}
     assert entry.context == "cms.pricing"
     public = api_client.get(PUBLIC).json()
     assert any(r["colegiatura"] == "6700.50" for r in public["tuition"])
@@ -193,7 +193,7 @@ def test_validation_lists_every_problem_and_writes_nothing(admin_client):
     )
     assert label == "Gastos administrativos"
     assert EnrollmentFee.objects.count() == 6
-    assert EnrollmentFee.objects.order_by("order", "id").first().cuota == Decimal("6800.00")
+    assert EnrollmentFee.objects.order_by("order", "id").first().cuota == Decimal("7000.00")
 
 
 def test_save_all_is_atomic_across_tables(admin_client):
@@ -331,7 +331,7 @@ def test_export_has_one_sheet_per_table_and_is_audited(admin_client):
     assert (
         first[0] == "Nuevo ingreso"
         and first[1] == "Preescolar"
-        and Decimal(str(first[3])) == Decimal("6800")
+        and Decimal(str(first[3])) == Decimal("7000")
     )
     assert ws["C2"].number_format == '"$"#,##0.00'
     assert AuditLog.objects.filter(action="export", object_type="export:content.pricing").exists()
@@ -361,7 +361,7 @@ def test_import_round_trip_reads_changes_without_writing(admin_client):
         "colegiatura": "7500.00",
     }
     # Nothing written.
-    assert TuitionCost.objects.get(section="Primaria").colegiatura == Decimal("6450.00")
+    assert TuitionCost.objects.get(section="Primaria").colegiatura == Decimal("6650.00")
     assert AuditLog.objects.filter(action="update").count() == before
 
 

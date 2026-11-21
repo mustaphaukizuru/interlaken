@@ -53,7 +53,7 @@ function toBundle(state: State) {
   const visible = (k: Key) => ordered(TABLES.find((d) => d.key === k)!, state[k].rows).filter((r) => r.is_active).map((r, i) => ({ v: r.values, order: i + 1 }));
   return {
     enrollment_fees: visible('inscripcion').map(({ v, order }) => ({ section: v.section, modality: v.modality, gastos_administrativos: money(v.gastos_administrativos) ?? '0.00', cuota: money(v.cuota) ?? '0.00', order })),
-    tuition: visible('colegiaturas').map(({ v, order }) => ({ section: v.section, inscripcion: null, colegiatura: money(v.colegiatura) ?? '0.00', order })),
+    tuition: visible('colegiaturas').map(({ v, order }) => ({ section: v.section, colegiatura: money(v.colegiatura) ?? '0.00', order })),
     fixed_concepts: visible('seguros').map(({ v, order }) => ({ name: v.name, cost: money(v.cost) ?? '0.00', mandatory: true, order })),
     extracurriculars: visible('extraescolares').map(({ v, order }) => ({ name: v.name, levels: v.levels, annual_cost: money(v.annual_cost) ?? '0.00', order })),
     daycare: visible('estancia').map(({ v, order }) => ({ schedule: v.schedule, service: v.service, daily_cost: money(v.daily_cost) ?? '0.00', monthly_cost: money(v.monthly_cost), monthly_note: v.monthly_note ?? '', order })),

@@ -43,7 +43,7 @@ def test_bundle_shape_and_seeded_2026_values():
     tuition = {row['section']: row['colegiatura'] for row in data['tuition']}
     by_match = {k: v for k, v in tuition.items()}
     assert any(v == '4190.00' for k, v in by_match.items() if 'Maternal' in k)
-    assert any(v == '6990.00' for k, v in by_match.items() if 'Secundaria' in k)
+    assert any(v == '7200.00' for k, v in by_match.items() if 'Secundaria' in k)
 
     # Seguros obligatorios y estancia con multa sin mensualidad.
     seguros = {c['name']: c for c in data['fixed_concepts']}

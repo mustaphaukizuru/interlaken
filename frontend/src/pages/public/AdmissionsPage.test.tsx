@@ -17,7 +17,7 @@ const BUNDLE = {
     { section: 'Preescolar', modality: 'nuevo_ingreso', gastos_administrativos: '2500.00', cuota: '6800.00', order: 1 },
   ],
   tuition: [
-    { section: '1° a 3° de Preescolar', inscripcion: '6800.00', colegiatura: '4920.00', order: 2 },
+    { section: '1° a 3° de Preescolar', colegiatura: '4920.00', order: 2 },
   ],
   fixed_concepts: [
     { name: 'Seguro accidentes', cost: '500.00', mandatory: true, order: 1 },

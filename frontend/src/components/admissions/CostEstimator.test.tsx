@@ -23,9 +23,9 @@ const BUNDLE = {
     { section: 'Primaria', modality: 'nuevo_ingreso', gastos_administrativos: '2500.00', cuota: '8800.00', order: 2 },
   ],
   tuition: [
-    { section: 'Sección Maternal', inscripcion: null, colegiatura: '4190.00', order: 1 },
-    { section: '1° a 3° de Preescolar', inscripcion: '6800.00', colegiatura: '4920.00', order: 2 },
-    { section: 'Primaria', inscripcion: '8800.00', colegiatura: '6450.00', order: 3 },
+    { section: 'Sección Maternal', colegiatura: '4190.00', order: 1 },
+    { section: '1° a 3° de Preescolar', colegiatura: '4920.00', order: 2 },
+    { section: 'Primaria', colegiatura: '6450.00', order: 3 },
   ],
   fixed_concepts: [
     { name: 'Seguro accidentes', cost: '500.00', mandatory: true, order: 1 },

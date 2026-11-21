@@ -21,8 +21,8 @@ const BUNDLE = {
     { section: 'Preescolar', modality: 'reinscripcion', gastos_administrativos: '2000.00', cuota: '5760.00', order: 1 },
   ],
   tuition: [
-    { section: 'Sección Maternal', inscripcion: null, colegiatura: '4190.00', order: 1 },
-    { section: 'Primaria', inscripcion: '8800.00', colegiatura: '6450.00', order: 3 },
+    { section: 'Sección Maternal', colegiatura: '4190.00', order: 1 },
+    { section: 'Primaria', colegiatura: '6450.00', order: 3 },
   ],
   fixed_concepts: [
     { name: 'Seguro accidentes', cost: '500.00', mandatory: true, order: 1 },
