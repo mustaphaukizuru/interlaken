@@ -18,6 +18,19 @@ class Command(BaseCommand):
                             help='Credit silently. Use ONCE for the deploy-day backlog catch-up.')
 
     def handle(self, *args, **options):
+        # CAFETERIA_TOPUP_LOYVERSE_PUSH on: write the paid card top-ups that
+        # are due into Loyverse first, so this pass already sees them in sync.
+        from apps.cafeteria.loyverse_push import push_due_topups
+        try:
+            pushed = push_due_topups()
+        except Exception as e:  # noqa: BLE001 (the mirror must always run)
+            self.stderr.write(self.style.ERROR(f'Loyverse push pass failed: {e}'))
+        else:
+            if pushed.get('enabled'):
+                self.stdout.write(
+                    f'Card top-ups written into Loyverse: {pushed["pushed"]}, waiting '
+                    f'{pushed["waiting"]}, failed {pushed["failed"]}, '
+                    f'checks resolved {pushed["resolved"]}.')
         try:
             r = mirror_pos_topups(notify=not options['no_notify'])
         except LoyverseError as e:

@@ -140,6 +140,15 @@ class TopUpRequest(models.Model):
         STAFF    = 'staff',    'Personal (cargada en POS)'
         POS_SYNC = 'pos_sync', 'Detectada en Loyverse'
         OVERRIDE = 'override', 'Personal, sin verificar en Loyverse'
+        AUTO_POS = 'auto_pos', 'Automática (la app la cargó en Loyverse)'
+
+    class PushState(models.TextChoices):
+        """The app writing this top-up into Loyverse (``cafeteria.loyverse_push``)."""
+        NONE    = '',        'Sin carga automática'
+        WAITING = 'waiting', 'Esperando para cargarla en Loyverse'
+        PUSHED  = 'pushed',  'Cargada en Loyverse por la app'
+        CHECK   = 'check',   'Cargada; una compra coincidió, revisar en Loyverse'
+        FAILED  = 'failed',  'No se pudo cargar; cárguela a mano'
 
     # PROTECT: top-up requests are part of the money trail.
     student      = models.ForeignKey(
@@ -207,6 +216,17 @@ class TopUpRequest(models.Model):
         help_text='Last staff notice that this top-up is in Loyverse but not verified.',
     )
     verify_alert_count = models.PositiveSmallIntegerField(default=0)
+
+    # The app writing this top-up into the student's Loyverse points
+    # (``cafeteria.loyverse_push``, CAFETERIA_TOPUP_LOYVERSE_PUSH). ``pushed``,
+    # ``check`` and ``failed`` are final: a write was sent (or its outcome is
+    # unknown), so it is never sent again; ``waiting`` is retried by the cron.
+    loyverse_push_state = models.CharField(max_length=10, choices=PushState.choices,
+                                           blank=True, default='')
+    loyverse_push_at = models.DateTimeField(
+        null=True, blank=True, help_text='Last time the app tried to write it into Loyverse.')
+    loyverse_push_attempts = models.PositiveSmallIntegerField(default=0)
+    loyverse_push_note = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         verbose_name = 'Solicitud de Recarga'

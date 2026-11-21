@@ -45,6 +45,8 @@ class PaymentSerializer(serializers.ModelSerializer):
             'status': topup.status,
             'apply_due_at': topup.apply_due_at,
             'applied_at': topup.applied_at,
+            # ``auto_pos``: the app already wrote it into Loyverse (spendable).
+            'applied_via': topup.applied_via,
         }
 
     def get_bank_reference(self, obj):

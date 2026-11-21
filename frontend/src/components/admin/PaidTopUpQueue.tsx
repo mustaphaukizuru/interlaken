@@ -142,6 +142,12 @@ export function PaidTopUpQueue() {
           ) : (
             <span className="mt-0.5 block font-semibold text-green-700">Ya está en Loyverse; se aplica sola en minutos</span>
           ))}
+          {d.loyverse_push_state === 'waiting' && (
+            <span className="mt-0.5 block text-brand-700">Carga automática en espera{d.loyverse_push_note ? `: ${d.loyverse_push_note}` : ''}</span>
+          )}
+          {d.loyverse_push_state === 'failed' && (
+            <span className="mt-0.5 block font-semibold text-coral">No se cargó sola{d.loyverse_push_note ? `: ${d.loyverse_push_note}` : ''}</span>
+          )}
         </span>
       ),
     },
@@ -324,7 +330,7 @@ export function AppliedTodayList() {
       id: 'how', header: 'Cómo se aplicó', minWidth: 190,
       cell: (d) => (
         <span className="block text-xs">
-          <Badge variant={d.applied_via === 'override' ? 'warning' : d.applied_via === 'pos_sync' ? 'info' : 'success'}>
+          <Badge variant={d.applied_via === 'override' || d.loyverse_push_state === 'check' ? 'warning' : d.applied_via === 'pos_sync' ? 'info' : 'success'}>
             {d.applied_via_display || '—'}
           </Badge>
           {d.applied_by_name && <span className="mt-0.5 block text-subtle">{d.applied_by_name}</span>}

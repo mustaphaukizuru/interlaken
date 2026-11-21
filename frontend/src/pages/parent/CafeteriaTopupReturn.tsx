@@ -70,7 +70,9 @@ export default function CafeteriaTopupReturn() {
           setPolledOutcome('success');
           toast.success(data.topup?.status === 'paid'
             ? 'Pago recibido. El colegio aplicará el saldo en la próxima carga.'
-            : 'Pago confirmado. El colegio cargará el saldo en el POS.');
+            : data.topup?.applied_via === 'auto_pos'
+              ? 'Pago confirmado. El saldo ya está en la cafetería.'
+              : 'Pago confirmado. El colegio cargará el saldo en el POS.');
           return;
         }
         if (data.status === 'refunded') {
@@ -129,7 +131,9 @@ export default function CafeteriaTopupReturn() {
       accent: 'bg-green/10',
       ring: 'ring-green/25',
       title: 'Pago confirmado',
-      text: 'Su pago quedó registrado y el saldo ya aparece en el portal. El colegio cargará el monto en el POS de cafetería para que su hijo(a) pueda usarlo al comprar; esto puede tomar un momento.',
+      text: paid?.topup?.applied_via === 'auto_pos'
+        ? 'Su pago quedó registrado y el saldo ya está cargado en la cafetería: su hijo(a) ya puede usarlo.'
+        : 'Su pago quedó registrado y el saldo ya aparece en el portal. El colegio cargará el monto en el POS de cafetería para que su hijo(a) pueda usarlo al comprar; esto puede tomar un momento.',
     },
     failed: {
       icon: <XCircle className="h-10 w-10 text-coral" />,
