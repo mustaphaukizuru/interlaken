@@ -3,6 +3,7 @@ from django.urls import path
 from . import ficha_views, views
 from .bulk import DocumentBulkView, PreRegistrationBulkView, RegistrationBulkView
 from .exports import PreRegistrationExportView, RegistrationExportView
+from .ficha_export import views as ficha_export
 from .imports import PreRegistrationImportTemplateView, PreRegistrationImportView
 from .pipeline import ConvertView, PipelineView, RequestDocsView, TemplatesView
 
@@ -17,6 +18,12 @@ urlpatterns = [
     path('register/resume/',           ficha_views.RegistrationResumeView.as_view(), name='register-resume'),
     path('ficha/schema/',              ficha_views.FichaSchemaView.as_view(),        name='ficha-schema'),
     path('register/<int:pk>/ficha/',   ficha_views.FichaView.as_view(),              name='register-ficha'),
+    # Fase 3 downloads; before the <slug:section> route, which would swallow «export».
+    path('register/<int:pk>/ficha/export/', ficha_export.FichaExportView.as_view(), name='register-ficha-export'),
+    path('register/fichas/export/',    ficha_export.FichasZipView.as_view(),         name='register-fichas-export'),
+    path('register/fichas/concentrado/', ficha_export.FichaConcentradoView.as_view(),
+         name='register-fichas-concentrado'),
+    path('ficha/blank/',               ficha_export.BlankFichaView.as_view(),        name='ficha-blank'),
     path('register/<int:pk>/ficha/<slug:section>/', ficha_views.FichaSectionView.as_view(),
          name='register-ficha-section'),
     path('register/<int:pk>/access/',  views.RegistrationAccessView.as_view(),      name='register-access'),
