@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import ficha_views, views
 from .bulk import DocumentBulkView, PreRegistrationBulkView, RegistrationBulkView
 from .exports import PreRegistrationExportView, RegistrationExportView
 from .imports import PreRegistrationImportTemplateView, PreRegistrationImportView
@@ -14,6 +14,11 @@ urlpatterns = [
     path('my-registrations/',          views.MyRegistrationsView.as_view(),         name='my-registrations'),
     path('register/export/',           RegistrationExportView.as_view(),             name='register-export'),
     path('register/',                  views.RegistrationListCreateView.as_view(),  name='register-create'),
+    path('register/resume/',           ficha_views.RegistrationResumeView.as_view(), name='register-resume'),
+    path('ficha/schema/',              ficha_views.FichaSchemaView.as_view(),        name='ficha-schema'),
+    path('register/<int:pk>/ficha/',   ficha_views.FichaView.as_view(),              name='register-ficha'),
+    path('register/<int:pk>/ficha/<slug:section>/', ficha_views.FichaSectionView.as_view(),
+         name='register-ficha-section'),
     path('register/<int:pk>/access/',  views.RegistrationAccessView.as_view(),      name='register-access'),
     path('register/<int:pk>/status/',  views.RegistrationStatusView.as_view(),      name='register-status'),
     path('register/<int:pk>/',         views.RegistrationDetailView.as_view(),      name='register-detail'),
