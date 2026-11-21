@@ -38,14 +38,6 @@ export const FICHA_TEXT = {
   retryLabel: 'Intentar de nuevo',
   expiredTitle: 'Su sesión terminó',
   sessionExpired: 'Por seguridad, su sesión venció. Pida un enlace nuevo con su correo para continuar; lo que ya guardó sigue ahí.',
-  // Nombres cortos de los pasos
-  stepAlumno: 'Alumno',
-  stepDomicilio: 'Domicilio',
-  stepSalud: 'Salud',
-  stepPadre: 'Padre',
-  stepMadre: 'Madre',
-  stepEmergencia: 'Emergencia',
-  stepFirma: 'Revisión y firma',
   // Antes de empezar
   startTitle: 'Antes de empezar',
   startIntro: 'Con estos datos guardamos su ficha y le enviamos a su correo un enlace para continuarla. Toda la ficha toma unos 15 minutos y puede guardarla y continuar después.',
@@ -78,7 +70,7 @@ export const FICHA_TEXT = {
   sentTitle: 'Esta ficha ya fue enviada',
   sentText: 'Si necesita corregir algún dato, responda al correo de confirmación o llame a admisiones.',
   // Paso: alumno
-  alumnoTitle: 'Datos del alumno',
+  alumnoTitle: 'Información del alumno',
   alumnoIntro: 'Escríbalos como aparecen en el acta de nacimiento.',
   curpHint: 'Si escribe primero la CURP, llenamos la fecha de nacimiento, el sexo y el estado de nacimiento.',
   curpFilled: 'Llenamos la fecha de nacimiento, el sexo y el estado con la CURP. Revíselos.',
@@ -92,11 +84,11 @@ export const FICHA_TEXT = {
   domicilioTitle: 'Domicilio',
   domicilioIntro: 'El domicilio donde vive el alumno.',
   // Paso: salud
-  saludTitle: 'Salud',
+  saludTitle: 'Información de salud',
   saludIntro: 'Datos sensibles: se guardan cifrados y solo los consulta la dirección del colegio.',
   // Pasos: padre y madre
-  padreTitle: 'Datos del padre',
-  madreTitle: 'Datos de la madre',
+  padreTitle: 'Información del padre',
+  madreTitle: 'Información de la madre',
   tutorIntro: 'Escriba los datos como aparecen en su identificación oficial.',
   prefillFromContact: 'Usamos los datos de quien llena la ficha. Revíselos y complete los que faltan.',
   naConfirmTitle: 'Quitar los datos de este bloque',
@@ -198,6 +190,18 @@ export const BLANKABLE: ReadonlySet<TextKey> = new Set<TextKey>([
 ]);
 
 /**
+ * Defaults the design used to ship (2026-11-21, «Paso 1 de 7: Información del
+ * alumno»). A CMS page that stored one of them before they changed shows the
+ * current default instead; a text the school wrote itself always wins.
+ */
+export const RETIRED_DEFAULTS: Partial<Record<TextKey, readonly string[]>> = {
+  alumnoTitle: ['Datos del alumno'],
+  saludTitle: ['Salud'],
+  padreTitle: ['Datos del padre'],
+  madreTitle: ['Datos de la madre'],
+};
+
+/**
  * Editor groups and labels, in the order the family meets them. Keys not
  * listed here are not editable (there are none: a test keeps them in step).
  */
@@ -220,14 +224,6 @@ export const FICHA_GROUPS: { group: string; texts: [TextKey, string][]; links?: 
       ['errorSummary', 'Encabezado de la lista de errores'], ['errRequired', 'Dato obligatorio vacío'],
       ['loadError', 'Si no se pudo abrir la ficha'], ['retryLabel', 'Botón para intentar de nuevo'],
       ['expiredTitle', 'Sesión vencida: título'], ['sessionExpired', 'Sesión vencida: texto'],
-    ],
-  },
-  {
-    group: 'Nombres cortos de los pasos',
-    texts: [
-      ['stepAlumno', 'Paso del alumno'], ['stepDomicilio', 'Paso del domicilio'], ['stepSalud', 'Paso de salud'],
-      ['stepPadre', 'Paso del padre'], ['stepMadre', 'Paso de la madre'], ['stepEmergencia', 'Paso de emergencia'],
-      ['stepFirma', 'Paso de revisión y firma'],
     ],
   },
   {
@@ -313,3 +309,9 @@ export const FICHA_GROUPS: { group: string; texts: [TextKey, string][]; links?: 
 export function fillText(text: string, values: Record<string, string | number>): string {
   return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
 }
+
+/** «Paso 2 de 7» (the copy's `stepOf`). */
+export const stepNumber = (copy: FichaCopy, n: number, total: number) => fillText(copy.t('stepOf'), { n, total });
+
+/** «Paso 2 de 7: Domicilio», how a numbered step is read aloud and named in lists. */
+export const numberedTitle = (number: string | undefined, title: string) => (number ? `${number}: ${title}` : title);

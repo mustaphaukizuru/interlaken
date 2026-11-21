@@ -1,8 +1,8 @@
 /**
- * Small shared pieces of the ficha: the step heading (focused on every step
- * change), the error summary at the top of a step, the «Guardado» status,
- * the action row and the full-width status panels (link sent, closed start,
- * invalid link…).
+ * Small shared pieces of the ficha: the heading of an unnumbered screen
+ * (focused on every change), the numbered step title, the error summary at
+ * the top of a step, the «Guardado» status, the action row and the
+ * full-width status panels (link sent, closed start, invalid link…).
  */
 import { forwardRef, type ReactNode, type Ref } from 'react';
 import { clsx } from 'clsx';
@@ -18,6 +18,24 @@ export const StepHeading = forwardRef<HTMLHeadingElement, { title: string; intro
   ),
 );
 StepHeading.displayName = 'StepHeading';
+
+/**
+ * «Paso 2 de 7» over a step's title (review sections, lists), read as one
+ * «Paso 2 de 7: Domicilio». Unnumbered screens pass no number.
+ */
+export function NumberedTitle({ number, title }: { number?: string; title: string }) {
+  return (
+    <>
+      {number ? (
+        <>
+          <span aria-hidden="true" className="mb-0.5 block text-[11px] font-bold uppercase leading-4 tracking-[0.12em] text-pink">{number}</span>
+          <span className="sr-only">{number}: </span>
+        </>
+      ) : null}
+      {title}
+    </>
+  );
+}
 
 export interface SummaryItem { id: string; label: string; message: string }
 

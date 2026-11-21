@@ -11,8 +11,12 @@
  * family at the office. Until a remembered staff login is confirmed the
  * page shows its loading state, so a visitor never sees the form flash.
  *
- *   0 Antes de empezar (public start only) · 1 Alumno · 2 Domicilio · 3 Salud
- *   4 Padre · 5 Madre · 6 Emergencia · 7 Revisión y firma
+ *   0 Antes de empezar (public start only, unnumbered) · 1 Información del
+ *   alumno · 2 Domicilio · 3 Información de salud · 4 Información del padre ·
+ *   5 Información de la madre · 6 Contacto de emergencia · 7 Revisión y firma
+ *
+ * Every numbered step reads «Paso n de 7: título» (its heading, the list
+ * «Ver los pasos», the review, «Corregir»).
  *
  * Steps, fields, options and required rules come from GET ficha/schema/; the
  * words around them are the CMS props (`copy`). Each step is saved when the
@@ -32,7 +36,7 @@ import { apiErrorCode, apiErrorMessage, apiErrorStatus, apiFieldErrors } from '@
 import { FunnelEvent, trackEvent } from '@/services/analytics';
 import { fichaApi } from './api';
 import { bodyFor, fieldId, initialValues, isBlank, messagesFor, sectionMissing, splitFullName, stepField } from './choices';
-import { fillText, type FichaCopy, type TextKey } from './copy';
+import { fillText, numberedTitle, stepNumber, type FichaCopy, type TextKey } from './copy';
 import { FichaDone } from './FichaDone';
 import { Field } from './fields';
 import { FichaFormProvider } from './context';
@@ -62,7 +66,7 @@ const FIRMA = 'firma';
 const CONTACTO = 'contacto';
 const GUARDIANS: Record<string, string> = { padre: 'Padre', madre: 'Madre' };
 
-/** Step key → its title / short label in the copy. */
+/** Step key → its title in the copy (the step's heading, list, review and «Corregir»). */
 const TITLE_KEY: Record<string, TextKey> = {
   alumno: 'alumnoTitle', domicilio: 'domicilioTitle', salud: 'saludTitle', padre: 'padreTitle', madre: 'madreTitle',
   emergencia: 'emergenciaTitle', contacto: 'contactoTitle', firma: 'reviewTitle',
@@ -70,10 +74,6 @@ const TITLE_KEY: Record<string, TextKey> = {
 const INTRO_KEY: Record<string, TextKey> = {
   alumno: 'alumnoIntro', domicilio: 'domicilioIntro', salud: 'saludIntro', padre: 'tutorIntro', madre: 'tutorIntro',
   emergencia: 'emergenciaIntro', contacto: 'contactoIntro', firma: 'reviewIntro',
-};
-const SHORT_KEY: Record<string, TextKey> = {
-  alumno: 'stepAlumno', domicilio: 'stepDomicilio', salud: 'stepSalud', padre: 'stepPadre', madre: 'stepMadre',
-  emergencia: 'stepEmergencia', firma: 'stepFirma',
 };
 
 const snapshot = (step: FichaStep, values: Values | undefined) => JSON.stringify(bodyFor(step, values ?? {}));
@@ -517,9 +517,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     if (i < reached || Object.keys(errors[key] ?? {}).length) return 'missing';
     return 'pending';
   };
+  const titleOf = (key: string) => copy.t(TITLE_KEY[key] ?? 'reviewTitle') || stepOf(key)?.title || key;
+  /** «Paso 2 de 7» for the numbered steps; none for «Quién llena la ficha». */
+  const numberOf = (key: string) => (order.includes(key) ? stepNumber(copy, order.indexOf(key) + 1, order.length) : undefined);
   const items: StepBarItem[] = order.map((key, i) => ({
     key,
-    label: copy.t(SHORT_KEY[key] ?? 'stepFirma') || stepOf(key)?.title || key,
+    label: titleOf(key),
     state: stateOf(key, i),
     reachable: i <= reached || (key !== FIRMA && !!sections[key]?.complete),
   }));
@@ -527,10 +530,18 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const summaryItems: SummaryItem[] = Object.entries(stepErrors).map(([name, message]) => ({
     id: fieldId(stepKey, name), label: stepField(step, name)?.label ?? name, message,
   }));
-  const reviewSections = (schema.patch_sections ?? []).map((key) => ({ key, title: copy.t(TITLE_KEY[key] ?? 'reviewTitle') || stepOf(key)?.title || key }));
+  // The review follows the numbered steps; who fills the ficha (unnumbered) comes last.
+  const patchKeys = schema.patch_sections ?? [];
+  const reviewSections = [...order.filter((k) => patchKeys.includes(k)), ...patchKeys.filter((k) => !order.includes(k))]
+    .map((key) => ({ key, title: titleOf(key), number: numberOf(key) }));
+  const sectionLabel = (key: string) => {
+    const sec = reviewSections.find((x) => x.key === key);
+    return sec ? numberedTitle(sec.number, sec.title) : key;
+  };
   const incomplete = new Set(Object.entries(sections).filter(([, v]) => !v.complete).map(([k]) => k));
   const isFirma = stepKey === FIRMA;
   const onSubmit = (e: FormEvent) => { e.preventDefault(); void (isFirma ? submit() : next()); };
+  const intro = copy.t(INTRO_KEY[stepKey] ?? 'reviewIntro') || step.description;
   const primaryLabel = isFirma ? copy.t('submitLabel') : stepKey === CONTACTO || toReview ? copy.t('reviewReturn') : copy.t('nextLabel');
 
   let body: ReactNode;
@@ -556,13 +567,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           <p><strong>{copy.t('invitedTitle')}</strong> {copy.t('invitedText')}</p>
         </div>
       ) : null}
-      {stepKey !== CONTACTO ? <StepBar items={items} current={stepKey} copy={copy} onPick={(k) => void leaveTo(k)} /> : null}
-      <div className="card mt-4 p-4 sm:p-8">
-        <StepHeading
-          ref={headingRef}
-          title={copy.t(TITLE_KEY[stepKey] ?? 'reviewTitle') || step.title}
-          intro={copy.t(INTRO_KEY[stepKey] ?? 'reviewIntro') || step.description}
-        />
+      <div className="card p-4 sm:p-8">
+        {stepKey !== CONTACTO ? (
+          <StepBar key={stepKey} items={items} current={stepKey} copy={copy} onPick={(k) => void leaveTo(k)} intro={intro} headingRef={headingRef} />
+        ) : (
+          <StepHeading ref={headingRef} title={titleOf(stepKey)} intro={intro} />
+        )}
         <ErrorSummary
           ref={summaryRef}
           title={isFirma && submitProblems.length ? copy.t('incompleteTitle') : copy.t('errorSummary')}
@@ -570,11 +580,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
           detail={detail ?? (isFirma && submitProblems.length ? copy.t('incompleteText') : undefined)}
         >
           {isFirma && submitProblems.length ? (
-            <ul className="mt-3 space-y-2 pl-7">
+            <ul className="mt-3 space-y-2 sm:pl-7">
               {submitProblems.map((k) => (
-                <li key={k} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm text-coral-800">
-                  <span className="font-semibold">{reviewSections.find((s) => s.key === k)?.title ?? k}</span>
-                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-full px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream"
+                <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 rounded-xl bg-white/70 py-1 pl-3 pr-1 text-sm text-coral-800">
+                  <span className="min-w-0 font-semibold">{sectionLabel(k)}</span>
+                  <button type="button" className="inline-flex min-h-[44px] items-center rounded-full px-3 font-semibold text-purple underline underline-offset-2 hover:bg-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40"
+                    aria-label={`${copy.t('fixLabel')}: ${sectionLabel(k)}`}
                     onClick={() => go(k, { review: true })}>
                     {copy.t('fixLabel')}
                   </button>

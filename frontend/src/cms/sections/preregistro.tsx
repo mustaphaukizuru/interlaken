@@ -19,7 +19,7 @@ import { FunnelHero } from '@/components/admissions/FunnelHero';
 import { FichaWizard, type FichaView } from '@/components/admissions/ficha/FichaWizard';
 import { fichaPdfSlot } from '@/components/admissions/ficha/FichaPdfSlot';
 import {
-  BLANKABLE, FICHA_GROUPS, FICHA_LINKS, FICHA_LISTS, FICHA_TEXT, LONG_TEXTS,
+  BLANKABLE, FICHA_GROUPS, FICHA_LINKS, FICHA_LISTS, FICHA_TEXT, LONG_TEXTS, RETIRED_DEFAULTS,
   type FichaCopy, type TextKey,
 } from '@/components/admissions/ficha/copy';
 import { iconResolver } from '../iconRuntime';
@@ -89,6 +89,8 @@ function FichaFormView(p: Record<string, unknown>) {
   const t = useTokens();
   const copy = useMemo<FichaCopy>(() => ({
     t: (key: TextKey) => {
+      // A default the design no longer ships, stored with the page, gives way to today's.
+      if (typeof p[key] === 'string' && RETIRED_DEFAULTS[key]?.includes(p[key] as string)) return t(FICHA_TEXT[key]);
       const own = t(p[key]);
       // A text left blank keeps its default, except the ones that may be left out (intros, hints).
       if (own || (BLANKABLE.has(key) && typeof p[key] === 'string')) return own;

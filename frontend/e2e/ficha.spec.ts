@@ -64,7 +64,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await page.goto(`${link.pathname}${link.search}`);
 
   // ── 1 · Alumno ─────────────────────────────────────────────────────────
-  await expect(page.getByRole('heading', { level: 2, name: 'Datos del alumno' })).toBeFocused();
+  await expect(page.getByRole('heading', { level: 2, name: 'Paso 1 de 7: Información del alumno' })).toBeFocused();
   await expect(page.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(page).toHaveURL(/\/pre-registro$/); // the token left the address bar
   await expect(page.getByLabel('Apellido paterno')).toHaveValue(`López${run}`);
@@ -73,7 +73,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await expect(page.getByRole('radio', { name: 'Femenino' })).toBeChecked();
   await expect(page.getByLabel('Estado de nacimiento')).toHaveValue('Ciudad de México');
   await shot(page, '01-alumno');
-  await next(page, 'Domicilio');
+  await next(page, 'Paso 2 de 7: Domicilio');
   await expect(page.getByRole('status').filter({ hasText: 'Guardado' })).toBeVisible();
 
   // ── 2 · Domicilio ──────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await page.getByLabel('Municipio o alcaldía').fill('Tlalnepantla');
   await page.getByLabel('Estado', { exact: true }).selectOption('Estado de México');
   await shot(page, '02-domicilio');
-  await next(page, 'Salud');
+  await next(page, 'Paso 3 de 7: Información de salud');
 
   // ── 3 · Salud, then stop ───────────────────────────────────────────────
   await choose(page, 'O+');
@@ -92,7 +92,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await choose(page, 'No');
   await page.getByLabel(/Autorizo al Colegio Interlaken a tratar los datos de salud/).check();
   await shot(page, '03-salud');
-  await next(page, 'Datos del padre');
+  await next(page, 'Paso 4 de 7: Información del padre');
   await page.close();
 
   // ── The office resends the ficha (Expediente «Enviar ficha de inscripción») ─
@@ -105,7 +105,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   const context = await browser.newContext({ viewport: PHONE, serviceWorkers: 'block' });
   const later = await context.newPage();
   await later.goto(`${again.pathname}${again.search}`);
-  await expect(later.getByRole('heading', { level: 2, name: 'Datos del padre' })).toBeFocused();
+  await expect(later.getByRole('heading', { level: 2, name: 'Paso 4 de 7: Información del padre' })).toBeFocused();
   await expect(later.getByText('Su ficha ya tiene los primeros datos.')).toBeVisible();
   await expect(later).toHaveURL(/\/pre-registro$/); // the token left the address bar
   await shot(later, '04-padre');
@@ -113,7 +113,7 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   // ── 4 · Padre: no aplica ───────────────────────────────────────────────
   await later.locator('label').filter({ has: later.getByRole('switch', { name: /No aplica/ }) }).click();
   await expect(later.getByText(/Marcó que este bloque no aplica/)).toBeVisible();
-  await next(later, 'Datos de la madre');
+  await next(later, 'Paso 5 de 7: Información de la madre');
 
   // ── 5 · Madre: prefilled from who fills the ficha ──────────────────────
   await expect(later.getByLabel('Nombre(s)')).toHaveValue('Marta');
@@ -124,19 +124,19 @@ test('a family fills the ficha in two sittings and sends it', async ({ page, bro
   await choose(later, 'Lic. / Ing.');
   await choose(later, 'Independiente');
   await shot(later, '05-madre');
-  await next(later, 'Contacto de emergencia');
+  await next(later, 'Paso 6 de 7: Contacto de emergencia');
 
   // ── 6 · Emergencia ─────────────────────────────────────────────────────
   await later.getByLabel('Nombre(s)').fill('Rosa');
   await later.getByLabel('Apellido(s)').fill('Gil Ramos');
   await later.getByLabel('Celular').fill('5577778888');
   await shot(later, '06-emergencia');
-  await next(later, 'Revisión y firma');
+  await next(later, 'Paso 7 de 7: Revisión y firma');
 
   // ── 7 · Revisión y firma ───────────────────────────────────────────────
-  const padre = later.getByRole('region', { name: 'Datos del padre' });
+  const padre = later.getByRole('region', { name: 'Paso 4 de 7: Información del padre' });
   await expect(padre).toContainText('No aplica');
-  await expect(later.getByRole('region', { name: 'Datos del alumno' })).toContainText(CHILD_CURP);
+  await expect(later.getByRole('region', { name: 'Paso 1 de 7: Información del alumno' })).toContainText(CHILD_CURP);
   await later.getByLabel(/He leído y acepto el Aviso de Privacidad/).check();
   await later.getByLabel('Nombre completo de quien firma').fill('Marta Prueba Gil');
   await shot(later, '07-revision');

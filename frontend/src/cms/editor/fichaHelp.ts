@@ -6,18 +6,17 @@
 const button = (what: string) => `Lo que dice el botón ${what}.`;
 const title = (where: string) => `Encabezado ${where}.`;
 const explain = (where: string) => `Frase bajo el encabezado ${where}. Puede dejarla vacía.`;
-const shortStep = (what: string) => `Nombre corto del paso ${what} en la barra de avance de la ficha.`;
 
 export const FICHA_HELP: Record<string, string> = {
   // Pasos y botones
   stepsLabel: 'No se ve en pantalla: lo escucha quien usa un lector de pantalla. Nombra la lista de pasos.',
-  stepOf: 'Sobre el título de cada paso, por ejemplo «Paso 2 de 7». Escriba {n} (el paso) y {total} (cuántos son).',
-  stepsToggle: 'En el celular, el botón que despliega la lista de todos los pasos.',
-  stepsHide: 'En el celular, el botón que vuelve a plegar la lista de pasos.',
-  stateDone: 'Lo que escucha un lector de pantalla junto a un paso completo.',
-  stateMissing: 'Lo que escucha un lector de pantalla junto a un paso con datos faltantes.',
-  statePending: 'Lo que escucha un lector de pantalla junto a un paso que todavía no se abre.',
-  stateCurrent: 'Lo que escucha un lector de pantalla junto al paso en el que está la familia.',
+  stepOf: 'Sobre el título de cada paso, por ejemplo «Paso 2 de 7»; también numera la lista de pasos y la revisión. Escriba {n} (el paso) y {total} (cuántos son).',
+  stepsToggle: 'El botón junto a «Paso 2 de 7» que despliega la lista de todos los pasos.',
+  stepsHide: 'El mismo botón cuando la lista de pasos está abierta: la vuelve a plegar.',
+  stateDone: 'Se ve en la lista de pasos bajo un paso completo.',
+  stateMissing: 'Se ve en la lista de pasos bajo un paso con datos faltantes.',
+  statePending: 'Se ve en la lista de pasos bajo un paso que todavía no se abre.',
+  stateCurrent: 'Se ve en la lista de pasos bajo el paso en el que está la familia.',
   nextLabel: button('principal de cada paso: guarda y pasa al siguiente'),
   backLabel: button('para volver al paso anterior (guarda lo que cambió)'),
   reviewReturn: button('principal cuando la familia llegó a corregir desde la revisión'),
@@ -34,14 +33,6 @@ export const FICHA_HELP: Record<string, string> = {
   retryLabel: button('para volver a intentar abrir la ficha'),
   expiredTitle: 'Título cuando la sesión de la ficha venció (pasadas 24 horas).',
   sessionExpired: 'Explica que la sesión venció y que con su correo recibe un enlace nuevo.',
-  // Nombres cortos de los pasos
-  stepAlumno: shortStep('del alumno'),
-  stepDomicilio: shortStep('del domicilio'),
-  stepSalud: shortStep('de salud'),
-  stepPadre: shortStep('del padre'),
-  stepMadre: shortStep('de la madre'),
-  stepEmergencia: shortStep('del contacto de emergencia'),
-  stepFirma: shortStep('final, la revisión y la firma'),
   // Antes de empezar
   startTitle: title('del primer paso, el que llena la familia sin enlace'),
   startIntro: 'Explica qué pasa al empezar: se guarda la ficha y llega un enlace al correo. Diga cuánto tarda.',
@@ -79,7 +70,7 @@ export const FICHA_HELP: Record<string, string> = {
   sentTitle: 'Título si se abre el enlace de una ficha que ya se envió.',
   sentText: 'Explica cómo corregir un dato de una ficha ya enviada.',
   // Paso: alumno
-  alumnoTitle: title('del paso con los datos del alumno'),
+  alumnoTitle: 'Título del paso 1, con los datos del alumno. Se lee «Paso 1 de 7: …» y es el mismo en la lista de pasos y en la revisión.',
   alumnoIntro: explain('del paso del alumno'),
   curpHint: 'Nota bajo la CURP: escrita primero, llena sola la fecha de nacimiento, el sexo y el estado.',
   curpFilled: 'Aviso en verde cuando la CURP llenó la fecha de nacimiento, el sexo o el estado.',
@@ -91,14 +82,14 @@ export const FICHA_HELP: Record<string, string> = {
   countryOtherLabel: 'Lo que dice arriba del campo para escribir otro país.',
   stateOtherLabel: 'Lo que dice arriba del estado de nacimiento cuando nació en otro país (texto libre).',
   // Paso: domicilio
-  domicilioTitle: title('del paso del domicilio'),
+  domicilioTitle: 'Título del paso 2, el domicilio (se lee «Paso 2 de 7: …»).',
   domicilioIntro: explain('del paso del domicilio'),
   // Paso: salud
-  saludTitle: title('del paso de salud'),
+  saludTitle: 'Título del paso 3, la salud del alumno (se lee «Paso 3 de 7: …»).',
   saludIntro: 'Frase bajo el encabezado del paso de salud; conviene recordar que los datos se guardan cifrados.',
   // Pasos: padre y madre
-  padreTitle: title('del paso con los datos del padre'),
-  madreTitle: title('del paso con los datos de la madre'),
+  padreTitle: 'Título del paso 4, con los datos del padre (se lee «Paso 4 de 7: …»).',
+  madreTitle: 'Título del paso 5, con los datos de la madre (se lee «Paso 5 de 7: …»).',
   tutorIntro: explain('de los pasos del padre y de la madre'),
   prefillFromContact: 'Aviso cuando el bloque se llenó con los datos de quien llena la ficha (si dijo ser la madre o el padre).',
   naConfirmTitle: 'Título de la ventana que pide confirmar «No aplica» cuando el bloque ya tiene datos.',
@@ -106,13 +97,13 @@ export const FICHA_HELP: Record<string, string> = {
   naConfirm: button('que confirma «No aplica» y borra los datos del bloque'),
   naCollapsed: 'Se ve en lugar de los campos cuando el bloque no aplica.',
   // Paso: emergencia
-  emergenciaTitle: title('del paso del contacto de emergencia'),
+  emergenciaTitle: 'Título del paso 6, el contacto de emergencia (se lee «Paso 6 de 7: …»).',
   emergenciaIntro: explain('del paso del contacto de emergencia'),
   // Quién llena la ficha
-  contactoTitle: 'Encabezado de los datos de quien llena la ficha, en la revisión y al corregirlos.',
+  contactoTitle: 'Encabezado de los datos de quien llena la ficha, en la revisión y al corregirlos (sin número de paso).',
   contactoIntro: explain('de los datos de quien llena la ficha'),
   // Revisión y firma
-  reviewTitle: title('del último paso, la revisión y la firma'),
+  reviewTitle: 'Título del paso 7, la revisión y la firma (se lee «Paso 7 de 7: …»).',
   reviewIntro: explain('de la revisión'),
   reviewEdit: button('de cada sección de la revisión para corregirla'),
   reviewEmpty: 'Se ve en la revisión junto a un dato que quedó vacío.',
