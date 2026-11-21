@@ -1,6 +1,7 @@
 /**
  * Every word of the ficha that is not a field of the schema: step titles and
- * intros, buttons, save states, the start screen, «continuar después», the
+ * intros, buttons, save states, the private-ficha panel (no link), the start
+ * screen (only when Ajustes allows a public start), «continuar después», the
  * review and signature, the confirmation. They are the props of the locked
  * «Ficha de inscripción · Formulario» section (cms/sections/preregistro.tsx),
  * edited in Contenido; these are today's defaults. Field labels, help and
@@ -55,18 +56,19 @@ export const FICHA_TEXT = {
   startSubmit: 'Comenzar la ficha',
   startError: 'No pudimos guardar sus datos. Revise su conexión e intente de nuevo.',
   // Continuar una ficha
-  resumeToggle: '¿Ya empezó su ficha? Reciba un enlace nuevo',
-  resumeText: 'Escriba el correo con el que empezó la ficha y le enviaremos un enlace para continuarla.',
+  resumeToggle: '¿Ya recibió su enlace y venció? Reciba uno nuevo',
+  resumeText: 'Escriba el correo al que le enviamos la ficha de inscripción y le mandamos un enlace nuevo para continuarla.',
   resumeEmail: 'Correo electrónico',
   resumeSubmit: 'Enviar enlace',
   resumeDone: 'Si hay una ficha en proceso con ese correo, le enviamos un enlace para continuarla. Revise su bandeja de entrada y la carpeta de correo no deseado.',
   resumeError: 'No pudimos enviar la solicitud. Intente de nuevo en un momento.',
-  // Ficha solo con enlace
-  closedTitle: 'Solicite su enlace',
-  closedText: 'En este momento la ficha de inscripción se llena con el enlace personal que le envía el colegio. Llámenos o escríbanos por WhatsApp y con gusto se lo enviamos.',
-  closedCall: 'Llamar al colegio',
-  closedWhatsapp: 'Escribir por WhatsApp',
-  closedWaMessage: 'Hola, quisiera el enlace para llenar la ficha de inscripción.',
+  // Ficha personal: /pre-registro without a link (the school sends it after admission)
+  privateTitle: 'La ficha de inscripción es personal',
+  privateText: 'El colegio envía la ficha de inscripción por correo o WhatsApp a cada familia cuando su hijo/a es admitido.',
+  privateStepsTitle: 'Así es el proceso de admisión',
+  privateWhatsapp: 'Escribir por WhatsApp',
+  privateWaMessage: 'Hola, me gustaría recibir informes de admisión del Colegio Interlaken.',
+  privateCall: '¿Prefiere llamar?',
   // Enlace personal
   booting: 'Abriendo su ficha…',
   invitedTitle: 'Su ficha ya tiene los primeros datos.',
@@ -138,7 +140,8 @@ export const FICHA_TEXT = {
 export const FICHA_LINKS = {
   curpLink: { label: 'Consultar la CURP en gob.mx', href: 'https://www.gob.mx/curp/' },
   privacyLink: { label: 'Leer el Aviso de Privacidad', href: '/aviso-de-privacidad' },
-  doneVisit: { label: 'Agendar la visita', href: '/agendar-visita' },
+  doneVisit: { label: 'Ver los documentos requeridos', href: '/admisiones/documentacion' },
+  privateVisit: { label: 'Agendar visita', href: '/agendar-visita' },
   donePrimary: { label: 'Ver el proceso de admisión', href: '/admisiones' },
   doneSecondary: { label: 'Volver al inicio', href: '/' },
 } satisfies Record<string, CmsLink>;
@@ -152,8 +155,13 @@ export const FICHA_LISTS = {
   ],
   doneSteps: [
     'Revisamos la ficha en un plazo de 3 a 5 días hábiles.',
-    'Le llamamos para agendar la visita y el examen de valoración.',
-    'Más adelante le pedimos los documentos del alumno con un enlace personal.',
+    'Le pedimos los documentos del alumno con un enlace personal.',
+    'Con los documentos y el pago de inscripción, su lugar queda asegurado.',
+  ],
+  privateSteps: [
+    'Agende una visita o solicite informes.',
+    'Su hijo/a presenta el examen de valoración.',
+    'Si su hijo/a es admitido, el colegio le envía su ficha de inscripción por correo o WhatsApp.',
   ],
 } as const;
 
@@ -177,7 +185,7 @@ export const defaultCopy: FichaCopy = {
 
 /** Long texts get a text area in the editor. */
 export const LONG_TEXTS: ReadonlySet<TextKey> = new Set<TextKey>([
-  'startIntro', 'resumeText', 'resumeDone', 'closedText', 'closedWaMessage', 'invitedText', 'inviteErrorText',
+  'startIntro', 'resumeText', 'resumeDone', 'privateText', 'privateWaMessage', 'invitedText', 'inviteErrorText',
   'sentText', 'alumnoIntro', 'curpHint', 'ageHint', 'saludIntro', 'tutorIntro', 'prefillFromContact', 'naConfirmText',
   'naCollapsed', 'emergenciaIntro', 'reviewIntro', 'privacyText', 'incompleteText', 'laterText', 'laterError',
   'doneText', 'sessionExpired', 'loadError', 'saveError', 'startError', 'resumeError', 'submitError', 'domicilioIntro', 'contactoIntro',
@@ -239,11 +247,13 @@ export const FICHA_GROUPS: { group: string; texts: [TextKey, string][]; links?: 
     ],
   },
   {
-    group: 'Ficha solo con enlace',
+    group: 'Ficha personal (sin enlace)',
     texts: [
-      ['closedTitle', 'Título del aviso'], ['closedText', 'Texto del aviso'], ['closedCall', 'Botón para llamar'],
-      ['closedWhatsapp', 'Botón de WhatsApp'], ['closedWaMessage', 'Mensaje inicial de WhatsApp'],
+      ['privateTitle', 'Título del aviso'], ['privateText', 'Texto del aviso'], ['privateStepsTitle', 'Encabezado de los pasos'],
+      ['privateWhatsapp', 'Botón de WhatsApp'], ['privateWaMessage', 'Mensaje inicial de WhatsApp'], ['privateCall', 'Texto antes del teléfono'],
     ],
+    lists: [['privateSteps', 'Pasos del proceso']],
+    links: [['privateVisit', 'Botón para agendar la visita']],
   },
   {
     group: 'Enlace personal',
@@ -295,7 +305,7 @@ export const FICHA_GROUPS: { group: string; texts: [TextKey, string][]; links?: 
     group: 'Confirmación',
     texts: [['doneTitle', 'Título de la confirmación'], ['doneText', 'Texto de la confirmación'], ['doneStepsTitle', 'Encabezado de los siguientes pasos']],
     lists: [['doneSteps', 'Siguientes pasos']],
-    links: [['doneVisit', 'Botón para agendar la visita'], ['donePrimary', 'Botón principal'], ['doneSecondary', 'Botón secundario']],
+    links: [['doneVisit', 'Botón destacado'], ['donePrimary', 'Botón principal'], ['doneSecondary', 'Botón secundario']],
   },
 ];
 

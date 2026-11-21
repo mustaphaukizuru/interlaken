@@ -20,7 +20,6 @@ export const SITE_PAGES: SitePage[] = [
   { path: '/admisiones', title: 'Admisiones', group: 'Admisiones' },
   { path: '/admisiones/costos', title: 'Costos', group: 'Admisiones' },
   { path: '/admisiones/documentacion', title: 'Documentación', group: 'Admisiones' },
-  { path: '/pre-registro', title: 'Ficha de inscripción', group: 'Admisiones' },
   { path: '/agendar-visita', title: 'Agendar visita', group: 'Admisiones' },
   { path: '/pagos', title: 'Colegiaturas y cafetería (pagos)', group: 'Comunidad' },
   { path: '/comunidad/facturacion', title: 'Facturación', group: 'Comunidad' },
@@ -29,8 +28,11 @@ export const SITE_PAGES: SitePage[] = [
   { path: '/aviso-de-privacidad', title: 'Aviso de privacidad', group: 'Comunidad' },
 ];
 
-/** Pages that only work from a personal link the school sends (a token): never offered as a destination. */
-export const PERSONAL_LINK_PATHS = ['/inscripcion/documentos', '/confirmar-correo'];
+/**
+ * Pages that only work from a personal link the school sends (a token): never offered as a destination.
+ * The ficha de inscripción (/pre-registro) is one: the school sends it after the admission exam.
+ */
+export const PERSONAL_LINK_PATHS = ['/pre-registro', '/inscripcion/documentos', '/confirmar-correo'];
 
 /** Sections of a page that can be linked directly (an id on the public page). */
 export const SITE_ANCHORS: Record<string, { hash: string; title: string }[]> = {
@@ -94,6 +96,9 @@ export function describeHref(href: string | undefined | null, pages: SitePage[] 
       const page = pages.find((p) => p.path === path);
       const hash = h.includes('#') ? h.slice(h.indexOf('#') + 1) : '';
       const anchor = hash ? SITE_ANCHORS[path]?.find((a) => a.hash === hash) : undefined;
+      if (!page && PERSONAL_LINK_PATHS.includes(path)) {
+        return { kind, title: `Página ${path}`, detail: h, warning: 'Esta página solo se abre con el enlace personal que envía el colegio. Elija otra, por ejemplo Agendar visita.' };
+      }
       if (!page) return { kind, title: `Página ${path}`, detail: h, warning: 'No encontramos esta página en el sitio. Revise que exista o elija otra.' };
       return { kind, title: anchor ? `${page.title} · ${anchor.title}` : page.title, detail: h, warning: page.note };
     }

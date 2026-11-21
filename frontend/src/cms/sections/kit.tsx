@@ -6,7 +6,7 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { FieldSpec } from '../blocks/registry';
-import { COLOR_OPTIONS, isExternal, type CmsLink } from '../runtime';
+import { COLOR_OPTIONS, isExternal, useTokens, type CmsLink } from '../runtime';
 import { registerModule } from './index';
 import type { PageTemplate, SectionModule, SectionSpec } from './types';
 
@@ -74,10 +74,40 @@ export const headingFields = (o: { eyebrow?: boolean; text?: boolean } = {}): Fi
 
 /* ── Links ───────────────────────────────────────────────────────────────── */
 
+/*
+ * The admission CTAs of the public pages. The ficha de inscripción is private
+ * (the school sends it to each admitted family after the exam), so no public
+ * page links to /pre-registro: the first step is a visit or a question.
+ * backend/apps/content/migrations/0033 mirrors these two values.
+ */
+/** «Agendar visita»: the first step of the admission process. */
+export const VISIT_CTA = { label: 'Agendar visita', href: '/agendar-visita' } as const satisfies CmsLink;
+/** «Solicitar informes» by WhatsApp: `{{whatsapp}}` is the number in Ajustes (no number = no button). */
+export const INFORMES_CTA = {
+  label: 'Solicitar informes',
+  href: 'https://wa.me/{{whatsapp}}?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20informes%20de%20admisi%C3%B3n%20del%20Colegio%20Interlaken.',
+} as const satisfies CmsLink;
+
+type AnchorProps = { link: CmsLink | undefined; className?: string; children?: ReactNode; ariaLabel?: string };
+
 /** Renders a CMS link prop as a router Link (internal) or <a> (external); nothing without href. */
-export function CmsAnchor({ link, className, children, ariaLabel }: { link: CmsLink | undefined; className?: string; children?: ReactNode; ariaLabel?: string }) {
-  const href = link?.href?.trim();
+export function CmsAnchor(props: AnchorProps) {
+  const href = props.link?.href?.trim();
   if (!href) return null;
+  // Site tokens in an href ({{whatsapp}}) need the settings: only those links read them.
+  if (href.includes('{{')) return <TokenAnchor {...props} href={href} />;
+  return <Anchor {...props} href={href} />;
+}
+
+function TokenAnchor({ href, ...props }: AnchorProps & { href: string }) {
+  const t = useTokens();
+  const resolved = t(href);
+  // A WhatsApp link without the school's number would open an empty chat.
+  if (/^https:\/\/wa\.me\/(\?|$)/.test(resolved)) return null;
+  return <Anchor {...props} href={resolved} />;
+}
+
+function Anchor({ link, href, className, children, ariaLabel }: AnchorProps & { href: string }) {
   const content = children ?? link?.label;
   if (isExternal(href)) {
     const newTab = href.startsWith('http');

@@ -166,7 +166,7 @@
       }
     },
     "admisiones.docs_cta": {
-      "label": "Admisiones · Documentos y ficha de inscripción",
+      "label": "Admisiones · Documentos y visita",
       "group": "admisiones",
       "locked": false,
       "required": {},
@@ -1373,11 +1373,15 @@
         "resumeSubmit": "Botón para enviar",
         "resumeDone": "Respuesta al enviar",
         "resumeError": "Si no se pudo enviar",
-        "closedTitle": "Título del aviso",
-        "closedText": "Texto del aviso",
-        "closedCall": "Botón para llamar",
-        "closedWhatsapp": "Botón de WhatsApp",
-        "closedWaMessage": "Mensaje inicial de WhatsApp",
+        "privateTitle": "Título del aviso",
+        "privateText": "Texto del aviso",
+        "privateStepsTitle": "Encabezado de los pasos",
+        "privateWhatsapp": "Botón de WhatsApp",
+        "privateWaMessage": "Mensaje inicial de WhatsApp",
+        "privateCall": "Texto antes del teléfono",
+        "privateSteps": "Pasos del proceso",
+        "privateSteps[].text": "Texto",
+        "privateVisit": "Botón para agendar la visita",
         "booting": "Mientras abre el enlace",
         "invitedTitle": "Aviso al abrir el enlace: inicio",
         "invitedText": "Aviso al abrir el enlace: resto",
@@ -1438,7 +1442,7 @@
         "doneStepsTitle": "Encabezado de los siguientes pasos",
         "doneSteps": "Siguientes pasos",
         "doneSteps[].text": "Texto",
-        "doneVisit": "Botón para agendar la visita",
+        "doneVisit": "Botón destacado",
         "donePrimary": "Botón principal",
         "doneSecondary": "Botón secundario"
       }

@@ -1,8 +1,10 @@
 /**
- * The ficha de inscripción wizard against a mocked API: the public start,
- * per-step saves (format errors, missing data, CURP auto-fill), «Reciba un
- * enlace nuevo», the submit with an «incomplete» answer, a staff link that
- * skips step 0 with its data prefilled, and the closed public start.
+ * The ficha de inscripción wizard against a mocked API: the private ficha
+ * (no link: «La ficha de inscripción es personal», the default since
+ * 2026-11-21), the public start when Ajustes allows it, per-step saves
+ * (format errors, missing data, CURP auto-fill), «Reciba uno nuevo», the
+ * submit with an «incomplete» answer, and a staff link that skips step 0
+ * with its data prefilled.
  *
  * The schema is the server's own (fixtures/schema.json, exported from
  * ficha_schema.schema_json for 2026-11-20); regenerate it when the schema
@@ -140,23 +142,14 @@ describe('FichaWizard · public start', () => {
     serve(null);
     post.mockResolvedValue({ data: { detail: 'Si hay una ficha…' } } as never);
     renderWizard();
-    await user.click(await screen.findByRole('button', { name: '¿Ya empezó su ficha? Reciba un enlace nuevo' }));
+    await user.click(await screen.findByRole('button', { name: '¿Ya recibió su enlace y venció? Reciba uno nuevo' }));
     await user.type(screen.getByLabelText('Correo electrónico', { selector: 'input[autocomplete="email"]:not([name])' }), 'nadie@ejemplo.test');
     await user.click(screen.getByRole('button', { name: 'Enviar enlace' }));
     expect(post).toHaveBeenCalledWith('/admissions/register/resume/', { email: 'nadie@ejemplo.test' });
     expect(await screen.findByText(/Si hay una ficha en proceso con ese correo/)).toBeInTheDocument();
   });
 
-  it('shows «Solicite su enlace» when the public start is off', async () => {
-    serve(null, { ...schema, public_start_enabled: false });
-    renderWizard();
-    expect(await screen.findByRole('heading', { name: 'Solicite su enlace' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Escribir por WhatsApp/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\d+\?text=/);
-    expect(screen.getByRole('link', { name: /Llamar al colegio/ })).toHaveAttribute('href', 'tel:+525553791188');
-    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
-  });
-
-  it('switches to «Solicite su enlace» when the server refuses the start (403)', async () => {
+  it('switches to «La ficha de inscripción es personal» when the server refuses the start (403)', async () => {
     const user = userEvent.setup();
     serve(null);
     post.mockImplementation(() => fail(403, { detail: 'Solo con enlace.', code: 'public_start_disabled' }) as never);
@@ -171,7 +164,64 @@ describe('FichaWizard · public start', () => {
     await user.selectOptions(screen.getByLabelText('Grado al que se inscribe'), '1° Primaria');
     await user.click(screen.getByRole('radio', { name: /2027-2028/ }));
     await user.click(screen.getByRole('button', { name: /Comenzar la ficha/ }));
-    expect(await screen.findByRole('heading', { name: 'Solicite su enlace' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'La ficha de inscripción es personal' })).toBeInTheDocument();
+  });
+});
+
+describe('FichaWizard · private ficha (no link)', () => {
+  it('explains the process and offers a visit, WhatsApp and a new link', async () => {
+    const user = userEvent.setup();
+    serve(null, { ...schema, public_start_enabled: false });
+    renderWizard();
+    const heading = await screen.findByRole('heading', { level: 2, name: 'La ficha de inscripción es personal' });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByText(/El colegio envía la ficha de inscripción por correo o WhatsApp a cada familia cuando su hijo\/a es admitido\./)).toBeInTheDocument();
+    // The three steps that lead to the ficha, in order.
+    const steps = within(screen.getByRole('list', { name: 'Así es el proceso de admisión' })).getAllByRole('listitem');
+    expect(steps.map((li) => li.textContent)).toEqual([
+      '1Agende una visita o solicite informes.',
+      '2Su hijo/a presenta el examen de valoración.',
+      '3Si su hijo/a es admitido, el colegio le envía su ficha de inscripción por correo o WhatsApp.',
+    ]);
+    expect(screen.getByRole('link', { name: 'Agendar visita' })).toHaveAttribute('href', '/agendar-visita');
+    const wa = screen.getByRole('link', { name: /Escribir por WhatsApp/ });
+    expect(wa.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\d+\?text=/);
+    expect(decodeURIComponent(wa.getAttribute('href')!)).toContain('recibir informes de admisión');
+    expect(screen.getByRole('link', { name: '(55) 5379-1188' })).toHaveAttribute('href', 'tel:+525553791188');
+    // Nothing of the form, and no way to start one.
+    expect(screen.queryByRole('heading', { name: 'Antes de empezar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Comenzar la ficha/ })).not.toBeInTheDocument();
+    // A family whose link expired asks for a new one (the same neutral answer).
+    post.mockResolvedValue({ data: { detail: 'Si hay una ficha…' } } as never);
+    await user.click(screen.getByRole('button', { name: '¿Ya recibió su enlace y venció? Reciba uno nuevo' }));
+    await user.type(screen.getByLabelText('Correo electrónico'), 'marta.ficha@ejemplo.test');
+    await user.click(screen.getByRole('button', { name: 'Enviar enlace' }));
+    expect(post).toHaveBeenCalledWith('/admissions/register/resume/', { email: 'marta.ficha@ejemplo.test' });
+    expect(await screen.findByText(/Si hay una ficha en proceso con ese correo/)).toBeInTheDocument();
+  });
+
+  it('a valid link still opens the ficha when the public start is off', async () => {
+    serve(payload({ contacto: CONTACT, alumno: ALUMNO_START }), { ...schema, public_start_enabled: false });
+    exchange.mockResolvedValue({ data: { session_token: 'S9', expires_at: '2099-01-01T00:00:00Z' } } as never);
+    renderWizard(`/pre-registro?rid=${RID}&token=un-token-de-prueba`);
+    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(exchange).toHaveBeenCalledWith(RID, 'un-token-de-prueba');
+    expect(screen.queryByRole('heading', { name: 'La ficha de inscripción es personal' })).not.toBeInTheDocument();
+  });
+
+  it('a session this tab already holds reopens the ficha too', async () => {
+    serve(payload({ contacto: CONTACT, alumno: ALUMNO_START }), { ...schema, public_start_enabled: false });
+    sessionStorage.setItem('interlaken:ficha-session', JSON.stringify({ id: RID, token: 'S8', expires: '2099-01-01T00:00:00Z' }));
+    renderWizard();
+    expect(await screen.findByRole('heading', { name: 'Datos del alumno' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'La ficha de inscripción es personal' })).not.toBeInTheDocument();
+  });
+
+  it('the private copy has no em dashes', () => {
+    for (const key of ['privateTitle', 'privateText', 'privateStepsTitle', 'privateWhatsapp', 'privateWaMessage', 'privateCall', 'resumeToggle', 'resumeText'] as const) {
+      expect(defaultCopy.t(key)).not.toMatch(/[\u2014\u2013]/);
+    }
+    for (const step of defaultCopy.list('privateSteps')) expect(step).not.toMatch(/[\u2014\u2013]/);
   });
 });
 
@@ -314,7 +364,7 @@ describe('FichaWizard · review and submit', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar la ficha de inscripción' }));
     expect(await screen.findByRole('heading', { name: 'Recibimos su ficha de inscripción' })).toBeInTheDocument();
     expect(screen.getByText('Ana Sofía López Hernández')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Agendar la visita/ })).toHaveAttribute('href', '/agendar-visita');
+    expect(screen.getByRole('link', { name: /Ver los documentos requeridos/ })).toHaveAttribute('href', '/admisiones/documentacion');
     expect(sessionStorage.getItem('interlaken:ficha-session')).toBeNull();
     expect(trackEvent).toHaveBeenCalledWith('funnel_submit_ficha', { grade: '1° Primaria' });
   });

@@ -2,6 +2,11 @@
  * The «Ficha de inscripción» at /pre-registro (Fase 2). It replaced the short
  * pre-registro form and the old /inscripcion wizard.
  *
+ * The ficha is private (2026-11-21): the school sends each family its link
+ * once the child is admitted (exam «Aceptado»). Opened without a link or a
+ * session, the page shows «La ficha de inscripción es personal»
+ * (PrivateFicha); step 0 only exists when Ajustes allows a public start.
+ *
  *   0 Antes de empezar (public start only) · 1 Alumno · 2 Domicilio · 3 Salud
  *   4 Padre · 5 Madre · 6 Emergencia · 7 Revisión y firma
  *
@@ -16,12 +21,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, ArrowRight, Link2Off, MailCheck, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Link2Off, MailCheck, Send } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useReducedMotion } from '@/hooks/useMediaQuery';
 import { apiErrorCode, apiErrorMessage, apiErrorStatus, apiFieldErrors } from '@/lib/apiErrors';
-import { waHref } from '@/lib/siteContact';
 import { FunnelEvent, trackEvent } from '@/services/analytics';
 import { fichaApi } from './api';
 import { bodyFor, fieldId, initialValues, isBlank, messagesFor, sectionMissing, splitFullName, stepField } from './choices';
@@ -30,6 +33,7 @@ import { FichaDone } from './FichaDone';
 import { Field } from './fields';
 import { FichaFormProvider } from './context';
 import { ErrorSummary, Panel, SaveStatus, StepHeading, type SaveState, type SummaryItem } from './parts';
+import { PrivateFicha } from './PrivateFicha';
 import { ResumeForm } from './ResumeForm';
 import { clearSession, loadSession, saveSession, type FichaSession } from './session';
 import { StepBar, type StepBarItem, type StepState } from './StepBar';
@@ -84,7 +88,6 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const reduced = useReducedMotion();
-  const site = useSiteSettings();
   // Read once: the link leaves the address bar as soon as it is exchanged.
   const [link] = useState(() => {
     const rid = Number(params.get('rid')) || 0;
@@ -426,20 +429,12 @@ export function FichaWizard({ copy, onView, downloadSlot }: FichaWizardProps) {
     );
   }
 
+  // The ficha is private: without a personal link (or a session) the page
+  // explains how a family gets one (Ajustes may still allow a public start).
   if (phase === 'closed' || closed) {
-    const call = site.phone_e164 ? `tel:${site.phone_e164}` : '';
-    const wa = site.whatsapp_number ? waHref(site.whatsapp_number, copy.t('closedWaMessage')) : '';
     return (
       <Shell topRef={topRef}>
-        <Panel icon={<ShieldCheck className="h-7 w-7" />} title={copy.t('closedTitle')} headingRef={headingRef}>
-          <p>{copy.t('closedText')}</p>
-          <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
-            {call ? <a href={call} className="btn-outline"><Phone className="h-4 w-4" aria-hidden="true" /> {copy.t('closedCall')}</a> : null}
-            {wa ? <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-green"><MessageCircle className="h-4 w-4" aria-hidden="true" /> {copy.t('closedWhatsapp')}</a> : null}
-          </div>
-          {site.phone_display ? <p className="mt-3 text-sm text-subtle">{site.phone_display}</p> : null}
-        </Panel>
-        <div className="card mt-4 p-4 sm:p-6"><ResumeForm copy={copy} /></div>
+        <PrivateFicha copy={copy} headingRef={headingRef} />
       </Shell>
     );
   }

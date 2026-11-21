@@ -4,17 +4,22 @@ import { CURRENT_CYCLE } from '@/lib/siteMeta';
 import { Blob } from '@/components/ui/Blob';
 import { useSiteTexts } from '@/hooks/useSiteSettings';
 
+/**
+ * The admission process as families walk it (2026-11-21): visit, exam, then
+ * the inscripción with the ficha the school sends to admitted families (it is
+ * private, so no step links to /pre-registro).
+ */
 const FUNNEL_STEPS = [
-  { n: '01', key: 'funnel_1', label: 'Ficha de inscripción', to: '/pre-registro' },
   // Covers both Puertas Abiertas (group) and Agendar Visita (individual).
-  { n: '02', key: 'funnel_2', label: 'Visita', to: '/agendar-visita' },
+  { n: '01', key: 'funnel_1', label: 'Visita', to: '/agendar-visita' },
+  { n: '02', key: 'funnel_2', label: 'Examen', to: '/admisiones' },
   { n: '03', key: 'funnel_3', label: 'Inscripción', to: '/admisiones/documentacion' },
   { n: '04', key: 'funnel_4', label: 'Bienvenida', to: '/admisiones' },
 ] as const;
 
 /** Built-in step words; Navegación → «Textos del sitio» edits them (SiteSettings.chrome funnel_*). */
 export const FUNNEL_DEFAULTS = {
-  funnel_1: 'Ficha de inscripción', funnel_2: 'Visita', funnel_3: 'Inscripción', funnel_4: 'Bienvenida',
+  funnel_1: 'Visita', funnel_2: 'Examen', funnel_3: 'Inscripción', funnel_4: 'Bienvenida',
   funnel_now: 'Ahora', funnel_done: 'Listo', funnel_next: 'Siguiente',
 } as const;
 
@@ -26,9 +31,10 @@ export type FunnelStepKey =
   | 'bienvenida';
 
 const STEP_INDEX: Record<FunnelStepKey, number> = {
-  'pre-registro': 0,
-  'puertas-abiertas': 1,
-  'agendar-visita': 1,
+  'puertas-abiertas': 0,
+  'agendar-visita': 0,
+  // The ficha de inscripción is part of the inscripción (sent after the exam).
+  'pre-registro': 2,
   inscripcion: 2,
   bienvenida: 3,
 };

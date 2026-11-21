@@ -29,14 +29,14 @@ beforeEach(() => {
 });
 
 describe('InscripcionesPage', () => {
-  it('shows empty state with pre-registro CTA when there are no registrations', async () => {
+  it('shows the empty state with «Agendar visita» (the ficha is private) when there are no registrations', async () => {
     getMine.mockResolvedValue({ data: [] } as never);
     renderPage();
     expect(await screen.findByText(/Sin inscripciones/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ir a pre-registro/i })).toHaveAttribute(
-      'href',
-      '/pre-registro',
-    );
+    const visits = screen.getAllByRole('link', { name: /Agendar visita/i });
+    expect(visits.length).toBeGreaterThan(0);
+    for (const link of visits) expect(link).toHaveAttribute('href', '/agendar-visita');
+    expect(document.querySelector('a[href^="/pre-registro"]')).toBeNull();
   });
 
   it('lists registrations with status badges', async () => {

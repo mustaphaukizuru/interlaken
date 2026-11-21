@@ -24,7 +24,7 @@ import { ESTIMATOR_COPY, type EstimatorCopy } from '@/components/admissions/esti
 import { trackEvent, ConversionEvent } from '@/services/analytics';
 import { iconResolver } from '../iconRuntime';
 import { cmsColor, imageSrc, imageSrcSet, isExternal, useCmsImage, useTokens, type CmsLink } from '../runtime';
-import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, lazySection, sectionsOf } from './kit';
+import { asLink, asList, CmsAnchor, defineModule, f, grouped, headingFields, INFORMES_CTA, lazySection, sectionsOf, VISIT_CTA } from './kit';
 
 /** The icons this module's defaults use; any other curated icon loads on demand. */
 const cmsIcon = iconResolver({ CalendarDays, ClipboardList, FileText });
@@ -259,7 +259,7 @@ function AdmEstimatorView({ eyebrow, title, text, ...copy }: { eyebrow?: string;
   );
 }
 
-/* ── Documentos + llamado a la ficha de inscripción ─────────────────────── */
+/* ── Documentos + llamado a agendar la visita ──────────────────────────── */
 interface DocsCtaProps {
   docsTitle?: string; docsSummary?: string; docsNote?: string; docsLink?: CmsLink; docsOnlyLabel?: string; docsError?: string;
   image?: number | string; imageAlt?: string; badge?: string; title?: string; text?: string; primary?: CmsLink; secondary?: CmsLink;
@@ -347,7 +347,7 @@ function AdmDocsCtaView(p: DocsCtaProps) {
           </div>
         </Reveal>
 
-        {/* CTA con foto del salón: llena el espacio y motiva la ficha de inscripción */}
+        {/* CTA con foto del salón: llena el espacio e invita a la visita (la ficha la envía el colegio) */}
         <Reveal direction="left">
           <div className="group relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-[20px] shadow-card">
             {img.src && (
@@ -409,8 +409,8 @@ const faqChunk = () => import('./admisiones.faq');
 const FAQS: FaqItem[] = [
   { cat: 'Niveles', q: '¿Qué niveles educativos ofrece Colegio Interlaken?', a: 'Ofrecemos preescolar, primaria y secundaria, con un modelo bilingüe (español–inglés) en cada nivel.' },
   { cat: 'Niveles', q: '¿En qué consiste el modelo bilingüe?', a: 'Inglés intensivo desde el nivel inicial, con preparación para certificaciones internacionales de la Universidad de Cambridge en secundaria.' },
-  { cat: 'Inscripción', q: '¿Cuánto tarda la ficha de inscripción en línea?', a: 'Unos 15 minutos. Se guarda en cada paso, así que puede dejarla y continuar después con el enlace que le enviamos a su correo. Un asesor le contactará en un plazo de 2 días hábiles.' },
-  { cat: 'Inscripción', q: '¿Cómo es el proceso de admisión?', a: 'Ficha de inscripción en línea, entrega de documentos, examen de valoración y confirmación de lugar. Un asesor le guía en cada paso.' },
+  { cat: 'Inscripción', q: '¿Cuándo se llena la ficha de inscripción?', a: 'Cuando su hijo/a es admitido después del examen de valoración, el colegio le envía por correo o WhatsApp un enlace personal a su ficha de inscripción. Se llena en línea en unos 15 minutos y puede guardarla y continuar después.' },
+  { cat: 'Inscripción', q: '¿Cómo es el proceso de admisión?', a: 'Informes, visita guiada y examen de valoración. Si su hijo/a es admitido, le enviamos su ficha de inscripción, entrega los documentos y confirma su lugar. Un asesor le guía en cada paso.' },
   { cat: 'Documentos', q: '¿Qué documentos necesito para inscribir a mi hijo?', a: 'Acta de nacimiento, CURP del alumno y de los tutores, INE del tutor, comprobante de domicilio, boletas del ciclo anterior, entre otros. Consulte la lista completa con enlaces oficiales en la sección de Documentación.' },
   { cat: 'Costos', q: '¿Cómo están estructurados los costos?', a: 'Las colegiaturas se pagan en 11 mensualidades, de agosto a junio. Consulte el desglose por sección en la página de Costos.' },
   { cat: 'Costos', q: '¿Ofrecen becas o descuentos?', a: 'Contamos con apoyos para hermanos y casos especiales. Escríbanos desde la sección de Contacto para conocer las opciones vigentes.' },
@@ -418,12 +418,16 @@ const FAQS: FaqItem[] = [
   { cat: 'Privacidad', q: '¿Cómo protege el colegio los datos de mi familia?', a: 'Tratamos sus datos personales conforme a la LFPDPPP. Consulte nuestro Aviso de Privacidad para conocer y ejercer sus derechos ARCO.' },
 ];
 
-/** Funnel timeline: from any step a parent reaches a human, a visit or the ficha de inscripción in one tap. */
+/**
+ * Funnel timeline: from any step a parent reaches a human or a visit in one
+ * tap. The ficha de inscripción is private (the school sends it after the
+ * exam), so no step links to it.
+ */
 const STEPS: StepItem[] = [
   { icon: 'WhatsApp', step: '01', key: 'informes', title: 'Informes', text: 'Escríbanos por WhatsApp y un asesor de admisiones resuelve sus dudas.', color: 'var(--green)', link: { label: '', href: '' } },
   { icon: 'CalendarDays', step: '02', key: 'visita_guiada', title: 'Visita guiada', text: 'Conozca las instalaciones y al equipo docente en un recorrido personalizado.', color: 'var(--purple)', link: { label: 'Agendar visita', href: '/agendar-visita' } },
-  { icon: 'FileText', step: '03', key: 'documentacion', title: 'Documentación', text: 'Consulte la lista de documentos requeridos, con enlaces a trámites oficiales.', color: 'var(--pink)', link: { label: 'Ver documentación', href: '/admisiones/documentacion' } },
-  { icon: 'ClipboardList', step: '04', key: 'inscripcion', title: 'Inscripción', text: 'Llene en línea la ficha de inscripción (unos 15 minutos; puede guardarla y continuar después) y asegure su lugar.', color: 'var(--green)', link: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' } },
+  { icon: 'FileText', step: '03', key: 'examen', title: 'Examen de valoración', text: 'Después de la visita agendamos el examen de valoración de su hijo/a. Consulte los documentos que se piden.', color: 'var(--pink)', link: { label: 'Ver documentación', href: '/admisiones/documentacion' } },
+  { icon: 'ClipboardList', step: '04', key: 'inscripcion', title: 'Inscripción', text: 'Si su hijo/a es admitido, le enviamos por correo o WhatsApp su ficha de inscripción personal para llenarla en línea y asegurar su lugar.', color: 'var(--green)', link: { label: 'Ver costos', href: '/admisiones/costos' } },
 ];
 
 export const sections = [
@@ -503,7 +507,7 @@ export const sections = [
     },
   }),
   section({
-    type: 'docs_cta', label: 'Admisiones · Documentos y ficha de inscripción', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado a la ficha de inscripción. La lista se edita en Admisiones → Documentos requeridos.',
+    type: 'docs_cta', label: 'Admisiones · Documentos y visita', description: 'Tarjeta con los documentos requeridos y, a su lado, una foto con el llamado a agendar una visita. La lista se edita en Admisiones → Documentos requeridos.',
     component: AdmDocsCtaView,
     fields: [
       ...grouped('Documentos requeridos', [
@@ -515,7 +519,7 @@ export const sections = [
         f.text('docsError', 'Documentos: si no carga la lista'),
         f.action('editList', 'Editar la lista de documentos', '/admin/admisiones/documentos', { hint: 'Los documentos y sus niveles se editan en «Documentos requeridos».' }),
       ]),
-      ...grouped('Llamado a la ficha de inscripción', [
+      ...grouped('Llamado a agendar visita', [
         f.image('image', 'Foto del llamado'),
         f.text('imageAlt', 'Descripción de la foto (accesibilidad)'),
         f.text('badge', 'Insignia'),
@@ -532,9 +536,9 @@ export const sections = [
       docsError: 'No se pudo cargar la lista de documentos.',
       image: '/assets/classroom.webp', imageAlt: 'Salón de clases del Colegio Interlaken',
       badge: 'Inscripciones abiertas · Ciclo {{ciclo}}', title: '¿Listo para comenzar?',
-      text: 'La ficha de inscripción toma unos 15 minutos y puede guardarla y continuar después. Le contactaremos para coordinar los siguientes pasos.',
-      primary: { label: 'Llene la ficha de inscripción', href: '/pre-registro' },
-      secondary: { label: 'Agendar una visita', href: '/agendar-visita' },
+      text: 'El primer paso es conocernos: agende una visita guiada o escríbanos para recibir informes. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción.',
+      primary: VISIT_CTA,
+      secondary: INFORMES_CTA,
     },
   }),
   section({

@@ -130,10 +130,10 @@ export const OVERRIDES: Record<string, Record<string, string>> = {
     docsSummary: 'Escriba {total} donde va el número de documentos y {online} donde va cuántos se tramitan en línea: se cuentan solos.',
     docsOnlyLabel: 'Palabra antes de los niveles en los documentos que no piden todos, por ejemplo «Solo» (Solo Preescolar).',
     docsError: 'Se ve si la lista de documentos no carga; el enlace a la lista por nivel va después.',
-    image: 'Foto del recuadro que invita al pre-registro.',
+    image: 'Foto del recuadro que invita a agendar una visita.',
     badge: 'Etiqueta pequeña sobre la foto, por ejemplo el ciclo escolar.',
-    title: 'Encabezado del recuadro que invita al pre-registro.',
-    text: 'Texto del recuadro que invita al pre-registro.',
+    title: 'Encabezado del recuadro que invita a agendar una visita.',
+    text: 'Texto del recuadro que invita a agendar una visita (la ficha de inscripción la envía el colegio después del examen).',
   },
   'modelo.pillars': {
     'items[].title': 'Nombre del pilar del modelo educativo.',

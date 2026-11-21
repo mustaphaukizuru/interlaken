@@ -12,7 +12,7 @@ import { clsx } from 'clsx';
 import { usePublicRequiredDocs, type LevelCode } from '@/hooks/queries/requiredDocsPublic';
 import { LEVELS, docsForLevel, docsSummary, levelLabel } from '@/lib/requiredDocs';
 import { imageSrc, imageSrcSet, useTokens, type CmsLink } from '../runtime';
-import { asLink, CmsAnchor, defineModule, f, sectionsOf } from './kit';
+import { asLink, CmsAnchor, defineModule, f, sectionsOf, VISIT_CTA } from './kit';
 
 const section = sectionsOf('documentacion');
 
@@ -186,7 +186,7 @@ export const sections = [
     },
   }),
   section({
-    type: 'list', label: 'Documentación · Documentos requeridos', description: 'La lista de documentos por nivel (Preescolar, Primaria, Secundaria) con lo que se entrega en físico y los enlaces a los trámites oficiales, y un llamado a la ficha de inscripción. Los documentos se editan en Admisiones → Documentos requeridos: es la misma lista que ven las familias al subir sus documentos.',
+    type: 'list', label: 'Documentación · Documentos requeridos', description: 'La lista de documentos por nivel (Preescolar, Primaria, Secundaria) con lo que se entrega en físico y los enlaces a los trámites oficiales, y un llamado a agendar una visita. Los documentos se editan en Admisiones → Documentos requeridos: es la misma lista que ven las familias al subir sus documentos.',
     component: DocsListView,
     fields: [
       f.action('editList', 'Editar la lista de documentos', '/admin/admisiones/documentos', { hint: 'Los documentos, sus niveles y lo que se entrega en físico se editan en «Documentos requeridos». Aquí, los textos que los acompañan.' }),
@@ -207,9 +207,9 @@ export const sections = [
       tabsLabel: 'Nivel educativo', physicalLabel: 'En físico:',
       emptyText: 'Por ahora no hay documentos publicados para este nivel. Consulte a admisiones.',
       errorTitle: 'No se pudo cargar la lista de documentos', errorText: 'Revise su conexión e intente de nuevo, o escríbanos.', retryLabel: 'Reintentar',
-      ctaTitle: '¿Documentos listos?',
-      ctaText: 'Llene la ficha de inscripción y coordine la entrega de documentos con nuestro equipo de admisiones.',
-      cta: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' },
+      ctaTitle: '¿Listo para conocernos?',
+      ctaText: 'Agende una visita guiada. Después del examen de valoración, si su hijo/a es admitido, le enviamos su ficha de inscripción y coordinamos con usted la entrega de documentos.',
+      cta: VISIT_CTA,
     },
   }),
 ];

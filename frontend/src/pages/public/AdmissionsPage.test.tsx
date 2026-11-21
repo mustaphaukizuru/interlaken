@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 
 vi.mock('@/services/api', () => ({
   contentApi: { getPricing: vi.fn(), getSettings: vi.fn() },
@@ -35,32 +35,41 @@ beforeEach(() => {
 
 describe('AdmissionsPage — funnel timeline', () => {
   it('renders the 4 steps with their CTAs and correct hrefs', async () => {
-    renderWithProviders(<AdmissionsPage />, { route: '/admisiones' });
+    const { container } = renderWithProviders(<AdmissionsPage />, { route: '/admisiones' });
 
-    // The four step titles.
+    // The four step titles: informes, visit, exam, then the inscripción.
     expect(await screen.findByRole('heading', { name: 'Informes' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Visita guiada' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Documentación' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Examen de valoración' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Inscripción' })).toBeInTheDocument();
+    // The school sends the ficha after admission: the page says so.
+    expect(screen.getByText(/Si su hijo\/a es admitido, le enviamos por correo o WhatsApp su ficha de inscripción personal/)).toBeInTheDocument();
 
     // Step CTAs point at the funnel destinations.
-    expect(screen.getByRole('link', { name: /Agendar visita/i })).toHaveAttribute(
-      'href',
-      '/agendar-visita',
-    );
+    const visits = screen.getAllByRole('link', { name: /Agendar visita/i });
+    expect(visits.length).toBeGreaterThan(0);
+    for (const link of visits) expect(link).toHaveAttribute('href', '/agendar-visita');
     expect(screen.getByRole('link', { name: /Ver documentación/i })).toHaveAttribute(
       'href',
       '/admisiones/documentacion',
     );
-    expect(screen.getByRole('link', { name: 'Llenar la ficha de inscripción' })).toHaveAttribute(
-      'href',
-      '/pre-registro',
-    );
+    expect(screen.getByRole('link', { name: /Ver costos/i })).toHaveAttribute('href', '/admisiones/costos');
+
+    // The ficha de inscripción is private: nothing on the page links to it.
+    expect(container.querySelector('a[href^="/pre-registro"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: /ficha de inscripción/i })).toBeNull();
 
     // Step 1 reaches a human on WhatsApp with the prefilled informes message.
     const wa = screen.getByRole('link', { name: 'WhatsApp' });
     expect(wa.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\d+\?text=/);
     expect(decodeURIComponent(wa.getAttribute('href')!)).toContain('informes de admisión');
+  });
+
+  it('«Solicitar informes» opens WhatsApp with the number from Ajustes', async () => {
+    renderWithProviders(<AdmissionsPage />, { route: '/admisiones' });
+    const informes = await screen.findByRole('link', { name: 'Solicitar informes' });
+    await waitFor(() => expect(informes.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/5215512345678\?text=/));
+    expect(decodeURIComponent(informes.getAttribute('href')!)).toContain('recibir informes de admisión');
   });
 
   it('includes the linkable cost estimator section', async () => {
