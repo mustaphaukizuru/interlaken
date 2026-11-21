@@ -7,8 +7,9 @@
  * with its data prefilled.
  *
  * The schema is the server's own (fixtures/schema.json, exported from
- * ficha_schema.schema_json for 2026-11-20); regenerate it when the schema
- * changes. Synthetic people only; the CURP carries a valid check digit.
+ * ficha_schema.schema_json for 2026-11-20; builders in fixtures/wizardKit.ts);
+ * regenerate it when the schema changes. Synthetic people only; the CURP
+ * carries a valid check digit.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -31,51 +32,13 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { useAuthStore, type User } from '@/store/authStore';
 import { FichaWizard } from './FichaWizard';
 import { defaultCopy } from './copy';
-import schemaJson from './fixtures/schema.json';
-import type { Completeness, FichaPayload, FichaSchema, Values } from './types';
+import { ALUMNO_START, CONTACT, CURP, RID, SECTIONS, completeness, fail, payload, schema } from './fixtures/wizardKit';
+import type { FichaPayload, FichaSchema, Values } from './types';
 
-const schema = schemaJson as unknown as FichaSchema;
 const get = vi.mocked(api.get);
 const post = vi.mocked(api.post);
 const patch = vi.mocked(api.patch);
 const exchange = vi.mocked(exchangeOnce);
-
-const CURP = 'LOHA200501MDFRRNA5'; // 2020-05-01 · femenino · Ciudad de México (backend-generated)
-const RID = 7;
-
-const SECTIONS = ['contacto', 'alumno', 'domicilio', 'salud', 'padre', 'madre', 'emergencia'];
-
-function blankSection(key: string): Values {
-  const step = schema.steps.find((s) => s.key === key)!;
-  return Object.fromEntries(step.fields.map((f) => [f.name, f.type === 'boolean' ? false : f.type === 'date' ? null : '']));
-}
-
-function completeness(done: string[] = []): Completeness {
-  return {
-    sections: Object.fromEntries(SECTIONS.map((k) => [k, { complete: done.includes(k), missing: done.includes(k) ? [] : ['x'] }])),
-    complete: done.length === SECTIONS.length,
-  };
-}
-
-function payload(sections: Record<string, Values> = {}, done: string[] = ['contacto']): FichaPayload {
-  return {
-    id: RID, status: 'draft', status_label: 'Borrador', ficha_version: 2, editable: true,
-    child_name: 'Ana Sofía López Hernández', level: 'primaria', level_label: 'Primaria', cycle: '2026-2027',
-    pre_registration: 3,
-    sections: Object.fromEntries(SECTIONS.map((k) => [k, { ...blankSection(k), ...(sections[k] ?? {}) }])),
-    medical_masked: false,
-    firma: { privacy_accepted_at: null, privacy_notice_version: '', signed_name: '', signed_at: null, consent_photos_media: false },
-    completeness: completeness(done),
-    submitted_at: null, created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z',
-  };
-}
-
-const CONTACT = {
-  contact_name: 'Marta Hernández Gil', contact_email: 'marta.ficha@ejemplo.test', contact_phone: '5511112222', contact_relationship: 'Madre',
-};
-const ALUMNO_START = { child_given_names: 'Ana Sofía', child_paternal_surname: 'López', child_maternal_surname: 'Hernández', grade_applying: '1° Primaria', cycle: '2026-2027' };
-
-const fail = (status: number, data: unknown) => Promise.reject({ response: { status, data } });
 
 /** api.get by URL: the schema, and the ficha of RID. */
 function serve(ficha: FichaPayload | null, s: FichaSchema = schema) {
