@@ -253,6 +253,8 @@ export interface TopUpLogEntry {
   loyverse_push_state_display?: string;
   loyverse_push_note?: string;
   loyverse_push_at?: string | null;
+  /** The app will write this paid top-up into Loyverse itself: do not load it by hand. */
+  loyverse_auto?: boolean;
   /** Paid, waiting to be loaded into the POS and applied. */
   needs_apply?: boolean;
   /** Past the time promised to the family. */
@@ -272,7 +274,8 @@ export interface BanorteVerifyResult {
   verified_at: string | null;
   verified_by_name: string;
   /** Absent on an older server. */
-  apply_state?: 'applied' | 'waiting_verification' | 'waiting_pos' | 'pos_unknown' | 'not_applicable';
+  /** `auto_waiting`: the app writes it into Loyverse itself within minutes; staff must not load it. */
+  apply_state?: 'applied' | 'waiting_verification' | 'waiting_pos' | 'pos_unknown' | 'auto_waiting' | 'not_applicable';
   /** The new wallet balance when applied. */
   balance?: string | null;
 }

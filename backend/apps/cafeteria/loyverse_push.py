@@ -146,6 +146,36 @@ def ineligible_reason(payment, topup) -> str:
     return ""
 
 
+def will_load(topup) -> bool:
+    """Will the app write this PAID top-up into Loyverse by itself (now or on
+    the 5-minute pass)? What the console and the 07:05 list tell the staff:
+    when True they must NOT type it into the POS (a manual load on top of the
+    app's would put the money on the card twice); only a ``failed`` one, or
+    one still waiting for «Verificar», is theirs."""
+    from apps.cafeteria.models import TopUpRequest
+
+    if topup is None or not is_enabled():
+        return False
+    if not isinstance(topup, TopUpRequest):
+        topup = TopUpRequest.objects.filter(pk=topup).first()
+        if topup is None:
+            return False
+    if not topup.student.loyverse_id:
+        return False
+    return ineligible_reason(services._paid_payment(topup), topup) == ""
+
+
+def needs_manual_load(topup) -> bool:
+    """The app gave up on this PAID top-up (``failed``): staff load it by hand."""
+    from apps.cafeteria.models import TopUpRequest
+
+    return (
+        is_enabled()
+        and topup.status == TopUpRequest.Status.PAID
+        and topup.loyverse_push_state == TopUpRequest.PushState.FAILED
+    )
+
+
 def _result(state, *, reason="", balance=None) -> dict:
     return {
         "state": state,

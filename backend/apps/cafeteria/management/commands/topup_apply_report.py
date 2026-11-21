@@ -78,6 +78,13 @@ class Command(BaseCommand):
         # ``rows``: the detailed log line (stdout, unchanged); ``lines``: the
         # compact one the staff read in the notice and the email.
         rows, lines, overdue_ids, unverified_ids = [], [], [], []
+        # CAFETERIA_TOPUP_LOYVERSE_PUSH on: the app writes verified top-ups
+        # into Loyverse itself. Staff must not type those (twice on the card);
+        # only the ones the app gave up on («CARGAR A MANO») are theirs.
+        from apps.cafeteria import loyverse_push
+
+        auto_on = loyverse_push.is_enabled()
+        auto_ids, manual_ids = [], []
         for t in topups:
             try:
                 code = t.student.loyverse_profile.customer_code or '-'
@@ -92,6 +99,13 @@ class Command(BaseCommand):
             unverified = payment is not None and payment.needs_bank_verification()
             if unverified:
                 unverified_ids.append(t.pk)
+            manual = auto_on and loyverse_push.needs_manual_load(t)
+            auto = auto_on and not manual and loyverse_push.will_load(t)
+            if manual:
+                manual_ids.append(t.pk)
+            elif auto:
+                auto_ids.append(t.pk)
+            marker = 'CARGAR A MANO' if manual else ('SE CARGA SOLA' if auto else '')
             checkout = payment.banorte_checkout() if payment is not None else None
             paid = timezone.localtime(t.processed_at) if t.processed_at else None
             rows.append(
@@ -103,6 +117,7 @@ class Command(BaseCommand):
                 + (' · SIN VERIFICAR: verifique en MultiCobros antes de cargarla'
                    + (f' (número de control {checkout.control_number})' if checkout else '')
                    if unverified else '')
+                + (f' · {marker}' if marker else '')
             )
             lines.append(' · '.join(filter(None, [
                 t.student.user.full_name, format_amount(t.amount), f'Loyverse {code}',
@@ -110,6 +125,7 @@ class Command(BaseCommand):
                 'VENCIDA' if late else '',
                 ('SIN VERIFICAR' + (f' (control {checkout.control_number})' if checkout else ''))
                 if unverified else '',
+                marker,
             ])))
         for row in rows:
             self.stdout.write(row)
@@ -123,7 +139,8 @@ class Command(BaseCommand):
             return
 
         total = sum((t.amount for t in topups), Decimal('0'))
-        title, body, content = _notice(lines, total, len(overdue_ids), len(unverified_ids))
+        title, body, content = _notice(lines, total, len(overdue_ids), len(unverified_ids),
+                                       auto_on=auto_on, manual=len(manual_ids))
         from apps.portal.models import Notification
         from apps.portal.services import notify, send_email
 
@@ -150,27 +167,44 @@ def _plural(n: int, one: str, many: str) -> str:
     return f'{n} {one if n == 1 else many}'
 
 
-def _notice(lines, total, overdue: int, unverified: int):
+def _notice(lines, total, overdue: int, unverified: int, *, auto_on: bool = False,
+            manual: int = 0):
     """``(title, text, EmailContent)`` of the staff notice: a short title, one
     compact line per top-up, and what to do said once at the end (it was one
-    long paragraph until 2026-11-18)."""
+    long paragraph until 2026-11-18). ``auto_on``: the app writes verified
+    top-ups into Loyverse itself (``loyverse_push``), so the steps say verify
+    and do NOT type them; ``manual`` counts the ones it gave up on."""
     from apps.cafeteria.schedule import format_amount
     from apps.cafeteria.services import PAID_QUEUE_PATH, PAID_QUEUE_WHERE
     from apps.portal.emailing import EmailContent, portal_url
 
+    what = 'por aplicar' if auto_on else 'por cargar en el POS'
     title = ' · '.join(filter(None, [
-        f'{_plural(len(lines), "recarga", "recargas")} por cargar en el POS',
+        f'{_plural(len(lines), "recarga", "recargas")} {what}',
         _plural(overdue, 'vencida', 'vencidas') if overdue else '',
         f'{unverified} sin verificar' if unverified else '',
+        f'{manual} a mano' if manual else '',
     ]))
     intro = f'Total {format_amount(total)}. Recargas con tarjeta ya cobradas que aún no están en el saldo:'
     steps = []
-    if unverified:
-        steps.append('SIN VERIFICAR: búsquela en MultiCobros por su número de control y confírmela '
-                     'con «Verificar en MultiCobros». Sin eso no se suma al saldo, aunque ya esté '
-                     'en Loyverse.')
-    steps.append('Cargue cada monto al cliente de Loyverse del alumno. La app lo aplica solo en unos '
-                 'minutos (o use «Aplicar»).')
+    if auto_on:
+        if unverified:
+            steps.append('SIN VERIFICAR: búsquela en MultiCobros por su número de control y '
+                         'confírmela con «Verificar en MultiCobros». Al verificarla, la app la carga '
+                         'sola en Loyverse y la suma al saldo.')
+        if manual:
+            steps.append('CARGAR A MANO: la app no pudo cargarla. Revise en Loyverse que no esté ya '
+                         'cargada; si no está, cárguela al cliente del alumno y la app la aplica '
+                         'sola en unos minutos.')
+        steps.append('No cargue a mano en el POS ninguna otra recarga: la app lo hace (cargarla '
+                     'además la pondría dos veces en la tarjeta).')
+    else:
+        if unverified:
+            steps.append('SIN VERIFICAR: búsquela en MultiCobros por su número de control y '
+                         'confírmela con «Verificar en MultiCobros». Sin eso no se suma al saldo, '
+                         'aunque ya esté en Loyverse.')
+        steps.append('Cargue cada monto al cliente de Loyverse del alumno. La app lo aplica solo '
+                     'en unos minutos (o use «Aplicar»).')
     todo = [f'{n}. {step}' for n, step in enumerate(steps, 1)]
     if overdue:
         todo.append('VENCIDA: ya pasó la hora prometida a la familia.')

@@ -28,10 +28,12 @@ export type McApplyState =
   | 'waiting_verification'
   | 'pos_unknown'
   | 'pending_sync'
+  /** The app writes it into Loyverse itself within minutes (do not load it by hand). */
+  | 'auto_waiting'
   | 'not_applicable';
 
 export const MC_WAITING: ReadonlySet<McApplyState> = new Set<McApplyState>([
-  'waiting_pos', 'waiting_verification', 'pos_unknown', 'pending_sync',
+  'waiting_pos', 'waiting_verification', 'pos_unknown', 'pending_sync', 'auto_waiting',
 ]);
 
 export interface McRow {
