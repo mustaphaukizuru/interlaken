@@ -39,10 +39,11 @@ function CostosPricesView(p: Partial<PricingCopy>) {
   return <PricingSections copy={p} />;
 }
 
-/** Label, title and subtitle of one price card, with the card's other texts, as one group in the editor. */
+/** Label, title, year badge and subtitle of one price card, with the card's other texts, as one group in the editor. */
 const card = (key: string, name: string, group: string, extra: FieldSpec[] = []): FieldSpec[] => grouped(group, [
   f.text(`${key}Label`, `${name}: etiqueta`),
   f.text(`${key}Title`, `${name}: título`),
+  f.text(`${key}Year`, `${name}: año de los precios`, { hint: 'Insignia junto al título, por ejemplo «Precios 2027». Déjelo vacío para ocultarla.' }),
   f.text(`${key}Subtitle`, `${name}: subtítulo`),
   ...extra,
 ]);

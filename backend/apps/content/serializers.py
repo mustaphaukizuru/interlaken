@@ -59,7 +59,10 @@ class AdminSiteSettingsSerializer(serializers.ModelSerializer):
 class TuitionCostSerializer(serializers.ModelSerializer):
     class Meta:
         model = TuitionCost
-        fields = ['section', 'inscripcion', 'colegiatura', 'order']
+        # `inscripcion` is no longer published: the fee lives in EnrollmentFee
+        # («Inscripción y reinscripción», edited in /admin/costos). The old
+        # column was shown nowhere and kept stale 2026 amounts.
+        fields = ['section', 'colegiatura', 'order']
         read_only_fields = fields
 
 

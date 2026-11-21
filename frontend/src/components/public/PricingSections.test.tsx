@@ -16,7 +16,7 @@ const BUNDLE = {
     { section: 'Preescolar', modality: 'nuevo_ingreso', gastos_administrativos: '2500.00', cuota: '6800.00', order: 1 },
     { section: 'Preescolar', modality: 'reinscripcion', gastos_administrativos: '2000.00', cuota: '5760.00', order: 1 },
   ],
-  tuition: [{ section: 'Primaria', inscripcion: null, colegiatura: '6450.00', order: 1 }, { section: 'Lactantes', inscripcion: null, colegiatura: '3900.00', order: 2 }],
+  tuition: [{ section: 'Primaria', colegiatura: '6450.00', order: 1 }, { section: 'Lactantes', colegiatura: '3900.00', order: 2 }],
   fixed_concepts: [{ name: 'Credenciales', cost: '350.00', mandatory: true, order: 1 }],
   extracurriculars: [{ name: 'Karate', levels: 'Primaria', annual_cost: '4200.00', order: 1 }],
   daycare: [{ schedule: 'Hasta 15:50', service: 'Comida', daily_cost: '150.00', monthly_cost: '2670.00', monthly_note: 'Matutina', order: 1 }],
@@ -70,6 +70,23 @@ describe('PricingSections copy', () => {
     expect(screen.getByText('$2,670.00 mensual (matutina)')).toBeInTheDocument();
     expect(screen.getByText(/11 mensualidades\./)).toHaveClass('font-medium');
     expect(screen.getByText(/devoluciones/)).toHaveClass('text-muted');
+  });
+
+  it('marks each card with the year of its prices; an edited badge shows, an empty one hides', async () => {
+    renderWithProviders(<PricingSections />);
+    await screen.findByRole('table', { name: /Nuevo ingreso/ });
+    // Inscripción and colegiaturas: 2027 (school price sheet, 2026-11); the other three cards: 2026.
+    expect(screen.getAllByText('Precios 2027')).toHaveLength(2);
+    expect(screen.getAllByText('Precios 2026')).toHaveLength(3);
+    const tuitionCard = screen.getByRole('heading', { name: 'Colegiaturas' }).parentElement!;
+    expect(within(tuitionCard).getByText('Precios 2027')).toBeInTheDocument();
+  });
+
+  it('hides a badge left empty and shows an edited one', async () => {
+    renderWithProviders(<PricingSections copy={{ feesYear: '', tuitionYear: 'Ciclo {{ciclo}}', insuranceYear: '', extrasYear: '', daycareYear: '' }} />);
+    await screen.findByRole('table', { name: /Nuevo ingreso/ });
+    expect(screen.queryByText(/^Precios 20/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Ciclo 20\d\d/)).toBeInTheDocument();
   });
 
   it('shows the edited error message', async () => {

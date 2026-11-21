@@ -18,7 +18,7 @@ interface EnrollmentFee {
   cuota: string;
   order: number;
 }
-interface TuitionRow { section: string; inscripcion: string | null; colegiatura: string; order: number }
+interface TuitionRow { section: string; colegiatura: string; order: number }
 interface FixedConcept { name: string; cost: string; mandatory: boolean; order: number }
 interface Extracurricular { name: string; levels: string; annual_cost: string; order: number }
 interface DaycareRate {
@@ -53,6 +53,8 @@ export interface PricingCopy {
   insuranceLabel: string; insuranceTitle: string; insuranceSubtitle: string;
   extrasLabel: string; extrasTitle: string; extrasSubtitle: string;
   daycareLabel: string; daycareTitle: string; daycareSubtitle: string;
+  /** Small badge next to each card title saying which year's prices it shows («Precios 2027»); empty hides it. */
+  feesYear: string; tuitionYear: string; insuranceYear: string; extrasYear: string; daycareYear: string;
   policiesTitle: string;
   /** Policies that mention one of these words (comma separated, accents ignored) stand out. */
   policyHighlight: string;
@@ -81,6 +83,10 @@ export const PRICING_COPY: PricingCopy = {
   insuranceLabel: 'Anual · obligatorio', insuranceTitle: 'Seguros y credenciales', insuranceSubtitle: 'Contratación obligatoria para todos los alumnos',
   extrasLabel: 'Anualidad', extrasTitle: 'Extraescolares', extrasSubtitle: '10 parcialidades de septiembre a junio · se definen en agosto',
   daycareLabel: 'Horario extendido', daycareTitle: 'Estancia', daycareSubtitle: 'Costo diario, con tarifa mensual opcional',
+  // The school's 2026-11 price sheet: inscripción and colegiaturas carry next
+  // year's prices; seguros, extraescolares and estancia still this year's.
+  feesYear: 'Precios 2027', tuitionYear: 'Precios 2027',
+  insuranceYear: 'Precios 2026', extrasYear: 'Precios 2026', daycareYear: 'Precios 2026',
   policiesTitle: 'Políticas de pago',
   policyHighlight: 'recargo, devolución',
   errorTitle: 'No fue posible cargar los costos',
@@ -108,9 +114,11 @@ export function policyMatcher(words: string): (text: string) => boolean {
 const STEP_BG = ['bg-green-strong', 'bg-purple', 'bg-coral'];
 
 /** Card shell shared by every pricing section (and the generic «Tabla» block's card style). */
-export function PriceCard({ tone, icon: Icon, label, title, subtitle, children }: {
+export function PriceCard({ tone, icon: Icon, label, title, subtitle, badge, children }: {
   tone: 'green' | 'purple' | 'coral' | 'pink';
   icon: any; label: string; title: string; subtitle?: string;
+  /** Short pill next to the title, e.g. «Precios 2027». */
+  badge?: string;
   children: React.ReactNode;
 }) {
   const tones = {
@@ -127,7 +135,15 @@ export function PriceCard({ tone, icon: Icon, label, title, subtitle, children }
         </span>
         <div>
           <p className={`text-[11px] font-bold uppercase tracking-wider ${tones.label}`}>{label}</p>
-          <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
+          {/* Without a badge the heading renders exactly as before (the generic «Tabla» block uses this card too). */}
+          {badge ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
+              <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tones.chip}`}>{badge}</span>
+            </div>
+          ) : (
+            <h2 className="font-head text-lg font-bold text-ink">{title}</h2>
+          )}
           {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
         </div>
       </div>
@@ -240,6 +256,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                   tone="green" icon={GraduationCap} label={t(c.feesLabel)}
                   title={t(c.feesTitle)}
                   subtitle={t(c.feesSubtitle)}
+                  badge={t(c.feesYear) || undefined}
                 >
                   <div className="flex gap-2 border-b border-ink/5 px-5 py-3" role="group" aria-label="Modalidad de inscripción">
                     {([['nuevo_ingreso', t(c.newTag)], ['reinscripcion', t(c.returningTag)]] as const).map(([key, tag]) => (
@@ -292,6 +309,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                 <PriceCard
                   tone="purple" icon={Wallet} label={t(c.tuitionLabel)} title={t(c.tuitionTitle)}
                   subtitle={t(c.tuitionSubtitle)}
+                  badge={t(c.tuitionYear) || undefined}
                 >
                   <ul>
                     {tuition.map((r) => (
@@ -305,6 +323,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="coral" icon={ShieldCheck} label={t(c.insuranceLabel)}
                     title={t(c.insuranceTitle)}
                     subtitle={t(c.insuranceSubtitle)}
+                    badge={t(c.insuranceYear) || undefined}
                   >
                     <ul>
                       {seguros.map((s) => (
@@ -322,6 +341,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="pink" icon={Sparkles} label={t(c.extrasLabel)}
                     title={t(c.extrasTitle)}
                     subtitle={t(c.extrasSubtitle)}
+                    badge={t(c.extrasYear) || undefined}
                   >
                     <ul>
                       {extras.map((e) => (
@@ -336,6 +356,7 @@ export function PricingSections({ copy }: { copy?: Partial<PricingCopy> } = {}) 
                     tone="purple" icon={Clock} label={t(c.daycareLabel)}
                     title={t(c.daycareTitle)}
                     subtitle={t(c.daycareSubtitle)}
+                    badge={t(c.daycareYear) || undefined}
                   >
                     <ul>
                       {estancia.map((d) => (

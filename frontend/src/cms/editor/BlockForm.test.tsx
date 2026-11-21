@@ -59,7 +59,7 @@ describe('BlockForm groups (C4)', () => {
     const fees = screen.getByRole('button', { name: /^Inscripción y reinscripción/ });
     expect(first).toHaveAttribute('aria-expanded', 'true');
     expect(fees).toHaveAttribute('aria-expanded', 'false');
-    expect(fees).toHaveTextContent('9 de 9');
+    expect(fees).toHaveTextContent('10 de 10');
     // «Editar precios» (the tables branch's action) sits above the groups.
     expect(screen.getByText(/Las cifras, los niveles y las políticas se editan/)).toBeInTheDocument();
     await userEvent.click(fees);

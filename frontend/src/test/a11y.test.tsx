@@ -78,7 +78,7 @@ vi.mock('@/services/api', async () => {
         enrollment_fees: [
           { section: 'Primaria', modality: 'nuevo_ingreso', gastos_administrativos: '2500.00', cuota: '6800.00', order: 1 },
         ],
-        tuition: [{ section: 'Primaria', inscripcion: '8800.00', colegiatura: '6450.00', order: 1 }],
+        tuition: [{ section: 'Primaria', colegiatura: '6450.00', order: 1 }],
         fixed_concepts: [{ name: 'Seguro accidentes', cost: '500.00', mandatory: true, order: 1 }],
         extracurriculars: [{ name: 'Karate', levels: 'Primaria', annual_cost: '4200.00', order: 1 }],
         daycare: [

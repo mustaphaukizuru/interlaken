@@ -70,9 +70,11 @@ class RedirectAdmin(ReadOnlyAdmin):
 class TuitionCostAdmin(ModelAdmin):
     """Costos INFORMATIVOS del sitio público — el colegio los actualiza cada
     ciclo. La aplicación NO cobra colegiaturas; estos montos solo se muestran."""
-    list_display = ('section', 'inscripcion', 'colegiatura', 'order',
-                    'is_active', 'updated_at')
-    list_editable = ('inscripcion', 'colegiatura', 'order', 'is_active')
+    # `inscripcion` stays in the table but is hidden: the fee is edited once, in
+    # «Inscripción y reinscripción» (/admin/costos); this copy was shown nowhere.
+    list_display = ('section', 'colegiatura', 'order', 'is_active', 'updated_at')
+    list_editable = ('colegiatura', 'order', 'is_active')
+    exclude = ('inscripcion',)
     ordering = ('order',)
 
     def changelist_view(self, request, extra_context=None):

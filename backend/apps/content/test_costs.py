@@ -27,9 +27,9 @@ def test_public_and_seeded(api_client):
     rows = resp.json()
     assert [r['section'] for r in rows] == [
         'Sección Maternal', '1° a 3° de Preescolar', 'Primaria', 'Secundaria']
-    # Maternal sin costo de inscripción → null (el sitio muestra "SIN COSTO").
-    assert rows[0]['inscripcion'] is None
-    assert rows[1]['inscripcion'] is not None
+    # The old «inscripción» column is no longer published: the fee lives in
+    # «Inscripción y reinscripción» (EnrollmentFee) only.
+    assert all('inscripcion' not in r for r in rows)
 
 
 def test_inactive_rows_hidden(api_client):
