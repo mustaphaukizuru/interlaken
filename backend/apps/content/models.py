@@ -66,6 +66,10 @@ class SiteSettings(models.Model):
 
     # ── Plantillas de mensajes de admisiones (P4-1), editables en Ajustes ───
     tpl_missing_docs = models.TextField('Plantilla: documentos faltantes', blank=True, default='')
+    # Expediente de admisión (Fase 5): {clave: texto} of the WhatsApp/email
+    # messages (cuotas, liga de visita, ficha, examen, resultado). A missing or
+    # empty key uses the built-in text (admissions.process_templates).
+    tpl_process = models.JSONField('Plantillas del proceso de admisión', default=dict, blank=True)
     # Ficha de inscripción (2026-11): off = only the private link the office
     # sends opens a ficha; the public start answers 403 (admissions.ficha).
     admissions_public_start = models.BooleanField(
