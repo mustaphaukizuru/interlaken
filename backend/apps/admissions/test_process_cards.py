@@ -148,7 +148,7 @@ def test_list_filters_counts_next_action_and_days_waiting(admin_client):
 
 
 def test_case_detail_shape(admin_client):
-    lead = at_stage(make_lead(), Stage.DOCUMENTACION, exam_at=future(-3))
+    lead = at_stage(make_lead(), Stage.DOCUMENTACION, exam_at=future(-3), exam_result="aceptado")
     reg = make_registration(lead)
     booking = make_booking(lead, status=Booking.Status.ATTENDED)
     make_payment(lead)

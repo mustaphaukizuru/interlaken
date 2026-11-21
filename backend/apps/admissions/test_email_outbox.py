@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from apps.accounts.factories import AdminFactory
 from apps.admissions.models import PreRegistration, Registration
+from apps.admissions.process_fixtures import admitted
 
 pytestmark = pytest.mark.django_db
 
@@ -46,7 +47,8 @@ def test_invite_and_approval_email_parent(api_client, settings):
         "email": "maria@test.mx",
         "phone": "5599999999",
     }, format="json")
-    pre = PreRegistration.objects.get()
+    # The ficha is private: the invite goes out once the exam is «Aceptado».
+    pre = admitted(PreRegistration.objects.get())
     mail.outbox.clear()
 
     admin = AdminFactory()

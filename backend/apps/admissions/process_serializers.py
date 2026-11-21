@@ -269,6 +269,15 @@ class ActionSerializer(serializers.Serializer):
         default=None,
     )
     override = serializers.BooleanField(required=False, default=False)
+    # «Enviar ficha de inscripción» before «Aceptado» (administrators only): why.
+    override_reason = serializers.CharField(
+        max_length=500, required=False, allow_blank=True, default=""
+    )
+
+    def validate(self, attrs):
+        if attrs.get("override") and not clean_text(attrs.get("override_reason")):
+            raise serializers.ValidationError({"override_reason": [process.MSG_OVERRIDE_REASON]})
+        return attrs
 
 
 # ── discounts and payments ────────────────────────────────────────────────

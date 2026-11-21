@@ -4,6 +4,7 @@ admissions/bulk.py — bulk actions of the Admisiones console (Data Ops C5).
     POST /api/v1/admissions/admin/pre-registrations/bulk/
         set_status  payload {status, note?}   guarded by the pre-registro table
         invite      —                        pending/contacted only; emails each family
+                                             whose exam is «Aceptado» (others skipped)
     POST /api/v1/admissions/admin/registrations/bulk/
         approve | reject | reviewing   payload {note?, notify?}  (email on approve/reject)
         request_docs                   emails the missing-documents template
@@ -28,6 +29,7 @@ from apps.core.bulk import EMAIL_CHUNK, AdminBulkView, BulkAction, BulkSkip, aft
 from apps.core.transitions import assert_transition
 
 from .models import PreRegistration, Registration, RegistrationDocument
+from .process import CaseConflict, ficha_link_gate
 from .services import (
     OUTCOME_STATES,
     PREREG_ENTITY,
@@ -82,14 +84,27 @@ def _prereg_status_handler(instance, payload, actor):
 
 
 def _invite_plan(instance, payload):
+    # The ficha is private: only admitted families (exam «Aceptado») get it.
+    # Bulk never overrides that rule; one case at a time from the Expediente.
+    gate = ficha_link_gate(instance)
+    if not gate["allowed"]:
+        raise BulkSkip(_skip_reason(gate["reason"]))
     sent = sent_registration(instance)
     if sent is not None:
         raise BulkSkip(f"ya envió su inscripción («{sent.get_status_display()}»)")
 
 
+def _skip_reason(message: str) -> str:
+    """A gate message as a skip reason («la ficha de inscripción se envía…», no final dot)."""
+    text = message.rstrip(".")
+    return text[:1].lower() + text[1:]
+
+
 def _invite_handler(instance, payload, actor):
     try:
         out = invite_preregistration(instance, actor, audit=False)
+    except CaseConflict as exc:
+        raise BulkSkip(_skip_reason(exc.message)) from None
     except AlreadyApplied as exc:
         raise BulkSkip(str(exc)) from None
     return out["changes"]

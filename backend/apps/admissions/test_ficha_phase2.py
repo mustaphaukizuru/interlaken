@@ -12,6 +12,7 @@ from django.urls import reverse
 from apps.accounts.factories import AdminFactory
 from apps.admissions.factories import alumno_data, start_payload
 from apps.admissions.models import PreRegistration, Registration
+from apps.admissions.process_fixtures import admitted
 
 pytestmark = pytest.mark.django_db
 
@@ -24,6 +25,7 @@ def _mail(settings):
 
 
 def _lead(**over):
+    """A family whose child was admitted (exam «Aceptado»): the ficha is private."""
     data = dict(
         child_first_name="Iker",
         child_last_name="Montes Rivas",
@@ -36,7 +38,7 @@ def _lead(**over):
         relationship="Madre",
     )
     data.update(over)
-    return PreRegistration.objects.create(**data)
+    return admitted(PreRegistration.objects.create(**data))
 
 
 def _invite(client, pre):
@@ -100,7 +102,7 @@ class TestLegacyPatch:
 
         return issue_session(reg)
 
-    def test_a_ficha_is_not_edited_through_the_old_wizard_patch(self, api_client):
+    def test_a_ficha_is_not_edited_through_the_old_wizard_patch(self, api_client, public_start):
         resp = api_client.post(reverse("register-create"), start_payload(), format="json")
         assert resp.status_code == 201
         rid, token = resp.data["id"], resp.data["session_token"]
@@ -121,7 +123,7 @@ class TestLegacyPatch:
         )
         assert new.status_code == 200, new.data
 
-    def test_staff_cannot_bypass_it_either(self, api_client):
+    def test_staff_cannot_bypass_it_either(self, api_client, public_start):
         resp = api_client.post(reverse("register-create"), start_payload(), format="json")
         api_client.force_authenticate(AdminFactory())
         old = api_client.patch(

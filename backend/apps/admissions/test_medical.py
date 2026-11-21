@@ -12,7 +12,9 @@ from django.urls import reverse
 from apps.accounts.factories import AdminFactory
 from apps.admissions.models import Registration
 
-pytestmark = pytest.mark.django_db
+# These tests start fichas from the public form, off by default since the
+# ficha is private (2026-11-21): the public_start fixture turns it on.
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("public_start")]
 
 BASE = {
     "child_first_name": "Niño", "child_last_name": "Prueba", "child_dob": "2018-05-01",

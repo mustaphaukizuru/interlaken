@@ -23,6 +23,7 @@ from apps.admissions.models import (
     RequiredDocument,
     current_school_cycle,
 )
+from apps.admissions.process_fixtures import admitted
 from apps.admissions.services import RETENTION_PLACEHOLDER
 from apps.core.models import AuditLog
 
@@ -98,7 +99,7 @@ class TestCycleDefault:
         assert _pre().cycle == current_school_cycle()
         assert _reg().cycle == current_school_cycle()
 
-    def test_public_registration_create_stamps_current_cycle(self, api_client):
+    def test_public_registration_create_stamps_current_cycle(self, api_client, public_start):
         resp = api_client.post(
             reverse("register-create"),
             {
@@ -319,16 +320,25 @@ class TestPreRegistrationBulk:
         assert keep.status == "pending"
 
     def test_bulk_invite(self, api_client, admin):
-        a = _pre()
+        a = admitted(_pre())
         rejected = _pre(child_first_name="No", status="rejected")
+        # The ficha is private: a family not admitted yet is skipped, with the reason.
+        waiting = _pre(child_first_name="Espera")
         mail.outbox.clear()
-        resp = _bulk(
-            api_client, "pre-register-bulk", {"action": "invite", "ids": [a.pk, rejected.pk]}
+        body = {"action": "invite", "ids": [a.pk, rejected.pk, waiting.pk]}
+        plan = _bulk(api_client, "pre-register-bulk", {**body, "dry_run": True}).data
+        assert plan["ok"] == 1
+        reasons = {row["id"]: row["reason"] for row in plan["skipped"]}
+        assert reasons[waiting.pk] == (
+            "la ficha de inscripción se envía cuando el examen está registrado como Aceptado"
         )
-        assert resp.data["ok"] == 1 and resp.data["skipped"][0]["id"] == rejected.pk
+        resp = _bulk(api_client, "pre-register-bulk", body)
+        assert resp.data["ok"] == 1
+        assert {row["id"] for row in resp.data["skipped"]} == {rejected.pk, waiting.pk}
         a.refresh_from_db()
         assert a.status == "contacted"
         assert a.registrations.filter(status="draft").count() == 1
+        assert not waiting.registrations.exists()
         assert [m.to for m in mail.outbox] == [["luis@test.mx"]]
 
     def test_families_are_forbidden(self, api_client):

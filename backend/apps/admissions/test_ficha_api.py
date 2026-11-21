@@ -23,10 +23,13 @@ from apps.admissions.factories import (
     start_payload,
 )
 from apps.admissions.models import PreRegistration, Registration, RegistrationGuardian
+from apps.admissions.process_fixtures import admitted
 from apps.content.models import SiteSettings
 from apps.core.models import AuditLog
 
-pytestmark = pytest.mark.django_db
+# These tests start fichas from the public form, off by default since the
+# ficha is private (2026-11-21): the public_start fixture turns it on.
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("public_start")]
 
 START = reverse("register-create")
 
@@ -254,6 +257,7 @@ class TestPublicStartSwitch:
             parent_email="ivan@ejemplo.test",
             parent_phone="5534343434",
         )
+        pre = admitted(pre)  # the link goes out once the exam is «Aceptado»
         invite = admin_client.post(reverse("pre-register-invite", args=[pre.pk]))
         assert invite.status_code == 201
         reg_id = invite.data["registration_id"]
@@ -277,6 +281,10 @@ class TestPublicStartSwitch:
         )
         assert resp.status_code == 200 and resp.data["admissions_public_start"] is False
         assert SiteSettings.load().admissions_public_start is False
+        resp = admin_client.patch(
+            reverse("admin-site-settings"), {"admissions_public_start": True}, format="json"
+        )
+        assert resp.status_code == 200 and SiteSettings.load().admissions_public_start is True
 
 
 # ── reading and saving sections ──────────────────────────────────────────
