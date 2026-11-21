@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, ChevronDown, CircleSlash, FileText, Hourglass, Mail, MessageCircle, MoveRight, Phone, RotateCcw,
+  ArrowLeft, ArrowRight, ArrowRightLeft, Ban, ChevronDown, Clock, FileText, Mail, MessageCircle, Phone, RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -151,7 +151,7 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
             </span>
             {openCase && (
               <span className={`inline-flex items-center gap-1 text-xs ${isStale(detail.days_waiting) ? 'font-semibold text-amber' : 'text-muted'}`}>
-                <Hourglass size={13} aria-hidden="true" /> {detail.days_waiting > 0 ? `${waitingText(detail.days_waiting)} en esta etapa` : 'Llegó hoy a esta etapa'}
+                <Clock size={13} aria-hidden="true" /> {detail.days_waiting > 0 ? `${waitingText(detail.days_waiting)} en esta etapa` : 'Llegó hoy a esta etapa'}
               </span>
             )}
           </div>
@@ -162,7 +162,7 @@ function CaseView({ detail, isAdmin }: { detail: CaseDetail; isAdmin: boolean })
           <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl bg-coral-50 px-4 py-3" role="status">
             <div className="min-w-0 text-sm">
               <p className="flex items-center gap-2 font-semibold text-coral-700">
-                <CircleSlash size={17} aria-hidden="true" /> Expediente cerrado: {detail.closed.outcome_label}
+                <Ban size={17} aria-hidden="true" /> Expediente cerrado: {detail.closed.outcome_label}
               </p>
               {detail.closed.reason && <p className="mt-1 text-ink">{detail.closed.reason}</p>}
               <p className="mt-1 text-xs text-muted">
@@ -294,10 +294,10 @@ function CaseMenu({ detail, onPick }: { detail: CaseDetail; onPick: (d: 'move' |
           {openCase ? (
             <>
               <button type="button" className={item} onClick={() => { close(); onPick('move'); }}>
-                <MoveRight size={16} className="text-purple" aria-hidden="true" /> Cambiar de etapa…
+                <ArrowRightLeft size={16} className="text-purple" aria-hidden="true" /> Cambiar de etapa…
               </button>
               <button type="button" className={`${item} text-coral-700`} onClick={() => { close(); onPick('close'); }}>
-                <CircleSlash size={16} aria-hidden="true" /> Cerrar expediente…
+                <Ban size={16} aria-hidden="true" /> Cerrar expediente…
               </button>
             </>
           ) : (

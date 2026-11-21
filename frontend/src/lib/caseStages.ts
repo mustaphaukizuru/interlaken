@@ -7,11 +7,14 @@
  * the same everywhere. Colour is never the only signal: each chip carries its
  * icon and its words.
  *
+ * Icons are ones the console's other routes do not import (or already share),
+ * so no new icon chunk lands in the public entry's preload list (perf budget).
+ *
  * Mirrors `backend/apps/admissions/models.py` (PreRegistration.Stage); the
  * server is the authority on moves.
  */
 import {
-  CircleSlash, FolderOpen, GraduationCap, MapPin, MessageSquareText, PenLine, type LucideIcon,
+  Ban, FolderOpenDot, GraduationCap, MapPin, MessageSquareText, PencilLine, type LucideIcon,
 } from 'lucide-react';
 
 export type StageKey = 'informes' | 'visita' | 'examen' | 'documentacion' | 'inscrito' | 'cerrado';
@@ -47,11 +50,11 @@ export const STAGE_META: Record<StageKey, StageMeta> = {
     chip: 'bg-amber/10 text-amber ring-amber/30', dot: 'bg-amber', text: 'text-amber',
   },
   examen: {
-    label: 'Examen', short: 'Examen', step: 3, icon: PenLine,
+    label: 'Examen', short: 'Examen', step: 3, icon: PencilLine,
     chip: 'bg-pink-light text-pink-dark ring-pink/25', dot: 'bg-pink', text: 'text-pink-dark',
   },
   documentacion: {
-    label: 'Documentación y acuerdos', short: 'Documentación', step: 4, icon: FolderOpen,
+    label: 'Documentación y acuerdos', short: 'Documentación', step: 4, icon: FolderOpenDot,
     chip: 'bg-brand-50 text-brand-700 ring-brand-600/20', dot: 'bg-purple', text: 'text-purple',
   },
   inscrito: {
@@ -59,7 +62,7 @@ export const STAGE_META: Record<StageKey, StageMeta> = {
     chip: 'bg-green-50 text-green-700 ring-green-600/20', dot: 'bg-green-strong', text: 'text-green-700',
   },
   cerrado: {
-    label: 'Cerrado', short: 'Cerrado', step: null, icon: CircleSlash,
+    label: 'Cerrado', short: 'Cerrado', step: null, icon: Ban,
     chip: 'bg-coral-50 text-coral-700 ring-coral-600/20', dot: 'bg-coral-600', text: 'text-coral-700',
   },
 };

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ClipboardCopy, Mail, MessageCircle, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCopy, Mail, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Modal } from '@/components/ui/Modal';
@@ -164,7 +164,7 @@ function SendBody({ action, detail, isAdmin, onClose }: { action: CaseAction; de
         <div className={clsx('rounded-xl px-3 py-2.5 text-sm', blocked ? 'bg-amber/10 text-ink' : 'bg-cream text-muted')}>
           {blocked ? (
             <p className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden="true" />
               <span>{fichaGate.reason || error?.message}</span>
             </p>
           ) : (

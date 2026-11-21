@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight, MessageCircle, MoveRight, ClipboardCheck, FolderOpen, PenLine } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, MessageCircle, MoveRight, ClipboardCheck, ExternalLink, PencilLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -13,13 +13,11 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { BOOKINGS_ENTITY, SLOTS_ENTITY } from '@/hooks/queries/bookings';
 import { invalidateEntity } from '@/hooks/queries/keys';
-import { bookingsApi, type WeekBooking, type WeekSlot } from '@/services/api';
+import { api, bookingsApi, type WeekBooking, type WeekSlot } from '@/services/api';
 import { apiFieldErrors } from '@/lib/apiErrors';
 import { BOOKING_STATUS_META, type BookingStatus } from '@/lib/status/booking';
-import { stageMeta } from '@/lib/caseStages';
 import { canOpen } from '@/lib/areas';
 import { useAuthStore } from '@/store/authStore';
-import { useExamsWeek, type ExamItem } from '@/hooks/queries/cases';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const OUTCOMES: [string, string][] = [['interested', 'Interesada, dar seguimiento'], ['enrolling', 'Se inscribirá'], ['not_now', 'No por ahora'], ['declined', 'No le interesó']];
@@ -49,6 +47,15 @@ export function weekEnd(monday: string): string {
 
 const EXAM_RESULT: Record<string, string> = { aceptado: 'Aceptado', no_aceptado: 'No aceptado' };
 
+/** Stage names for the outcome toast (lib/caseStages has the full metadata; it
+ *  stays out of this chunk so the public entry does not name another chunk). */
+const STAGE_LABEL: Record<string, string> = {
+  informes: 'Informes', visita: 'Visita guiada', examen: 'Examen', documentacion: 'Documentación y acuerdos', inscrito: 'Inscrito', cerrado: 'Cerrado',
+};
+
+/** One exam of the week (GET admissions/admin/exams/). */
+export interface WeekExam { case: number; child_name: string; grade_applying: string; time: string; result: string }
+
 /**
  * /admin/visitas/semana — weekly calendar, reschedule and post-visit outcome
  * (BACKLOG P4-2), with the week's admission exams (Fase 5) in the same grid
@@ -59,8 +66,12 @@ export default function AdminVisitsWeek() {
   const [start, setStart] = useState(() => mondayOf(new Date()));
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['visits-week', start], queryFn: async () => (await bookingsApi.adminWeek(start)).data });
   const seesAdmissions = useAuthStore((s) => canOpen(s.user, '/admin/admisiones'));
-  const exams = useExamsWeek(start, weekEnd(start), seesAdmissions);
-  const examsByDay = new Map<string, ExamItem[]>((exams.data?.days ?? []).map((d) => [d.date, d.exams]));
+  const exams = useQuery({
+    queryKey: ['admin', 'cases', 'exams', start],
+    queryFn: async () => (await api.get<{ days: { date: string; exams: WeekExam[] }[] }>('/admissions/admin/exams/', { params: { from: start, to: weekEnd(start) } })).data,
+    enabled: seesAdmissions,
+  });
+  const examsByDay = new Map<string, WeekExam[]>((exams.data?.days ?? []).map((d) => [d.date, d.exams]));
   const [moving, setMoving] = useState<WeekBooking | null>(null);
   const [outcomeFor, setOutcomeFor] = useState<WeekBooking | null>(null);
   const [outcome, setOutcome] = useState('interested');
@@ -82,7 +93,7 @@ export default function AdminVisitsWeek() {
     mutationFn: () => bookingsApi.adminOutcome(outcomeFor!.id, { outcome, note }),
     onSuccess: ({ data: r }) => {
       const pr = r.pre_registration;
-      const label = pr ? stageMeta(pr.stage ?? '').label : '';
+      const label = pr ? STAGE_LABEL[pr.stage ?? ''] ?? pr.stage ?? '' : '';
       toast.success(!pr ? 'Resultado guardado.' : pr.changed ? `Resultado guardado; expediente en «${label}».` : pr.skipped ? `Resultado guardado. ${pr.skipped}` : `Resultado guardado; el expediente sigue en «${label}».`);
       setOutcomeFor(null); setNote(''); invalidate();
     },
@@ -115,7 +126,7 @@ export default function AdminVisitsWeek() {
       {seesAdmissions && (
         <ul className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted" aria-label="Simbología">
           <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-subtle/50 bg-white" aria-hidden="true" /> Visita</li>
-          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-pink/40 bg-pink-light" aria-hidden="true" /> <PenLine size={12} className="text-pink-dark" aria-hidden="true" /> Examen de admisión</li>
+          <li className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-pink/40 bg-pink-light" aria-hidden="true" /> <PencilLine size={12} className="text-pink-dark" aria-hidden="true" /> Examen de admisión</li>
           {exams.isError && <li className="text-coral-700" role="status">No se pudieron cargar los exámenes.</li>}
         </ul>
       )}
@@ -146,7 +157,7 @@ export default function AdminVisitsWeek() {
                                 {(b.status === 'confirmed' || b.status === 'pending' || b.status === 'attended') && !b.outcome && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" onClick={() => { setOutcomeFor(b); setOutcome('interested'); setNote(''); }}><ClipboardCheck size={11} className="mr-0.5 inline" aria-hidden="true" />Resultado</button>}
                                 {(b.status === 'confirmed' || b.status === 'pending') && <button type="button" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-coral-600 hover:bg-white md:min-h-[32px]" disabled={action.isPending && action.variables?.id === b.id} onClick={() => setNoShowFor(b)}>{action.isPending && action.variables?.id === b.id ? 'Guardando…' : 'No asistió'}</button>}
                                 {b.parent_phone && <a href={`https://wa.me/52${b.parent_phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-subtle hover:bg-white hover:text-ink md:min-h-[32px]" aria-label={`WhatsApp a ${b.parent_name}`}><MessageCircle size={11} /></a>}
-                                {b.case && seesAdmissions && <Link to={`/admin/admisiones/${b.case}`} className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-purple hover:bg-white md:min-h-[32px]" aria-label={`Expediente de ${b.child_name || b.parent_name}`}><FolderOpen size={11} className="mr-0.5" aria-hidden="true" />Expediente</Link>}
+                                {b.case && seesAdmissions && <Link to={`/admin/admisiones/${b.case}`} className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-[11px] text-purple hover:bg-white md:min-h-[32px]" aria-label={`Expediente de ${b.child_name || b.parent_name}`}><ExternalLink size={11} className="mr-0.5" aria-hidden="true" />Expediente</Link>}
                               </div>
                             </li>
                           ))}
@@ -160,7 +171,7 @@ export default function AdminVisitsWeek() {
                         <li key={x.case}>
                           <Link to={`/admin/admisiones/${x.case}`}
                             className="block min-h-[44px] rounded-xl border border-pink/30 bg-pink-light p-2 text-xs hover:border-pink/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
-                            <span className="flex items-center gap-1 font-semibold text-pink-dark"><PenLine size={12} aria-hidden="true" /> {x.time} · Examen</span>
+                            <span className="flex items-center gap-1 font-semibold text-pink-dark"><PencilLine size={12} aria-hidden="true" /> {x.time} · Examen</span>
                             <span className="block truncate font-medium text-ink">{x.child_name}</span>
                             <span className="block truncate text-subtle">{x.grade_applying}{x.result ? ` · ${EXAM_RESULT[x.result] ?? x.result}` : ''}</span>
                           </Link>

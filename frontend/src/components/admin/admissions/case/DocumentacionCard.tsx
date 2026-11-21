@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, CircleAlert, CircleHelp, Eye, FileSignature, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Eye, FileSignature, Info, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
@@ -19,7 +19,7 @@ const DOC_STATE: Record<DocumentsState['state'], { label: string; icon: typeof C
   complete: { label: 'Documentos completos', icon: CheckCircle2, cls: 'bg-green-50 text-green-700' },
   waived: { label: 'Documentos dispensados', icon: ShieldCheck, cls: 'bg-brand-50 text-brand-700' },
   incomplete: { label: 'Faltan documentos', icon: CircleAlert, cls: 'bg-amber/10 text-amber' },
-  unknown: { label: 'Revisión manual', icon: CircleHelp, cls: 'bg-cream text-muted' },
+  unknown: { label: 'Revisión manual', icon: Info, cls: 'bg-cream text-muted' },
 };
 
 /** «4 de 7 secciones completas» from the ficha's completeness. */
@@ -64,7 +64,7 @@ export function DocumentacionCard({ detail, state, open, onToggle, onSend, isAdm
   const ficha = detail.ficha;
   const docs = ficha?.documents ?? null;
   const docMeta = docs ? DOC_STATE[docs.state] : null;
-  const DocIcon = docMeta?.icon ?? CircleHelp;
+  const DocIcon = docMeta?.icon ?? Info;
   const agreementsValue = agreements ?? detail.documentacion.agreements_note;
 
   const saveAgreements = () => {

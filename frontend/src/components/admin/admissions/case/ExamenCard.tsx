@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileSignature, ShieldAlert } from 'lucide-react';
+import { FileSignature, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import type { FieldErrorMap } from '@/lib/apiErrors';
@@ -184,7 +184,7 @@ export function ExamenCard({ detail, state, open, onToggle, onSend }: {
         </div>
         {!gate.allowed && gate.reason && (
           <p className="flex items-start gap-2 text-xs text-muted">
-            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" aria-hidden="true" />
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" aria-hidden="true" />
             <span>{gate.reason}{gate.can_override ? ' Como administrador puede enviarla antes.' : ''}</span>
           </p>
         )}

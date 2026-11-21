@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, Mail, MessageCircle, Phone, StickyNote, UserRound } from 'lucide-react';
+import { Contact, History, Mail, MessageCircle, Phone, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { waHref } from '@/lib/siteContact';
 import type { FieldErrorMap } from '@/lib/apiErrors';
@@ -40,7 +40,7 @@ export function CaseSidePanel({ detail }: { detail: CaseDetail }) {
     <aside className="space-y-4" aria-label="Contacto, notas e historial">
       <section className="card space-y-3" aria-labelledby="case-contact">
         <h2 id="case-contact" className="flex items-center gap-2 font-head text-[15px] font-bold text-ink">
-          <UserRound size={17} aria-hidden="true" /> Contacto
+          <Contact size={17} aria-hidden="true" /> Contacto
         </h2>
         <div>
           <p className="font-semibold text-ink">{detail.parent_name}</p>

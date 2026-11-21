@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useQueries } from '@tanstack/react-query';
-import { ArrowRight, Hourglass, List } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -25,18 +25,13 @@ export function columnParams(stage: StageKey): CaseListParams {
  */
 export default function AdminPipeline() {
   const navigate = useNavigate();
-  const results = useQueries({
-    queries: ALL_STAGES.map((stage) => {
-      const params = columnParams(stage);
-      return {
-        queryKey: caseKeys.list(params),
-        queryFn: async () => (await casesApi.list(params)).data,
-      };
-    }),
+  // One query for the six columns. (Not useQueries: it would add QueriesObserver
+  // to the shared @tanstack chunk that every public page downloads.)
+  const { data, isError, isLoading, refetch } = useQuery({
+    queryKey: caseKeys.list({ board: true }),
+    queryFn: () => Promise.all(ALL_STAGES.map(async (stage) => (await casesApi.list(columnParams(stage))).data)),
   });
-  const isError = results.some((r) => r.isError);
-  const isLoading = results.some((r) => r.isLoading);
-  const counts = results.find((r) => r.data)?.data?.counts ?? {};
+  const counts = data?.find((c) => c.counts)?.counts ?? {};
 
   return (
     <>
@@ -45,16 +40,16 @@ export default function AdminPipeline() {
         subtitle="Cada expediente en su etapa, del primer informe a la inscripción. Toque una tarjeta para abrir su expediente."
         actions={(
           <Link to="/admin/admisiones" className="btn-outline inline-flex min-h-[44px] items-center gap-2">
-            <List size={16} aria-hidden="true" /> Lista de expedientes
+            Lista de expedientes
           </Link>
         )}
       />
-      {isError ? <ErrorState onRetry={() => results.forEach((r) => r.isError && r.refetch())} /> : isLoading ? <ListSkeleton /> : (
+      {isError ? <ErrorState onRetry={() => refetch()} /> : isLoading || !data ? <ListSkeleton /> : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" role="list" aria-label="Etapas del proceso">
           {ALL_STAGES.map((stage, i) => {
             const meta = STAGE_META[stage];
             const Icon = meta.icon;
-            const cards = results[i].data?.results ?? [];
+            const cards = data[i]?.results ?? [];
             const total = counts[stage] ?? cards.length;
             return (
               <section key={stage} role="listitem" aria-labelledby={`col-${stage}`} className="flex min-w-0 flex-col rounded-xl2 bg-cream-2 p-2">
@@ -100,7 +95,7 @@ function BoardCard({ card: c, onOpen }: { card: CaseRow; onOpen: () => void }) {
         {c.next_action && <span className="mt-1.5 block text-xs font-medium text-ink">{c.next_action.label}</span>}
         {!done && (
           <span className={clsx('mt-1 inline-flex items-center gap-1 text-xs', isStale(c.days_waiting) ? 'font-semibold text-amber' : 'text-muted')}>
-            <Hourglass size={12} aria-hidden="true" /> {waitingText(c.days_waiting)}
+            <Clock size={12} aria-hidden="true" /> {waitingText(c.days_waiting)}
           </span>
         )}
       </button>

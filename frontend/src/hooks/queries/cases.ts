@@ -20,7 +20,7 @@ import { PREREG_ENTITY, REG_ENTITY } from './admissions';
 export const CASES_ENTITY = 'cases';
 export const caseKeys = {
   all: adminKeys.entity(CASES_ENTITY),
-  list: (params: CaseListParams) => adminKeys.list(CASES_ENTITY, params),
+  list: (params: CaseListParams | { board: true }) => adminKeys.list(CASES_ENTITY, params),
   detail: (id: number) => adminKeys.detail(CASES_ENTITY, id),
   exams: (from: string, to: string) => [...adminKeys.entity(CASES_ENTITY), 'exams', from, to] as const,
   templates: ['admin', 'case-templates'] as const,

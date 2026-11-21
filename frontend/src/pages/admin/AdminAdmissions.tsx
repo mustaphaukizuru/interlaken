@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, FileUp, FolderOpen, GraduationCap, Hourglass, KanbanSquare, UserPlus } from 'lucide-react';
+import { ClipboardList, Clock, FileUp, FolderOpenDot, GraduationCap, KanbanSquare, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card } from '@/components/ui/Card';
@@ -118,7 +118,7 @@ export default function AdminAdmissions() {
       />
 
       <div role="tablist" aria-label="Sección de admisiones" className="flex flex-wrap gap-2">
-        {tab('pre', 'Expedientes', FolderOpen)}
+        {tab('pre', 'Expedientes', FolderOpenDot)}
         {tab('inscripciones', 'Inscripciones', GraduationCap)}
       </div>
 
@@ -230,7 +230,7 @@ function CasesSection() {
       id: 'waiting', header: 'En la etapa', sortKey: 'stage_changed_at', minWidth: 90,
       cell: (c) => (c.stage === 'inscrito' || c.stage === 'cerrado' ? '' : (
         <span className={`inline-flex items-center gap-1 whitespace-nowrap ${isStale(c.days_waiting) ? 'font-semibold text-amber' : 'text-muted'}`}>
-          {isStale(c.days_waiting) && <Hourglass size={13} aria-hidden="true" />}
+          {isStale(c.days_waiting) && <Clock size={13} aria-hidden="true" />}
           {waitingText(c.days_waiting)}
         </span>
       )),
@@ -425,7 +425,7 @@ function RegistrationsSection({ onReview }: { onReview: (id: number) => void }) 
             {r.pre_registration ? (
               <Link to={`/admin/admisiones/${r.pre_registration}`} aria-label={`Abrir el expediente de admisión de ${r.child_name}`}
                 className="inline-flex min-h-[44px] items-center gap-1 rounded-lg px-3 text-xs font-semibold text-purple hover:bg-purple/5 sm:min-h-[36px]">
-                <FolderOpen size={14} aria-hidden="true" /> Expediente
+                <FolderOpenDot size={14} aria-hidden="true" /> Expediente
               </Link>
             ) : null}
             <FichaRowMenu id={r.id} childName={r.child_name} />

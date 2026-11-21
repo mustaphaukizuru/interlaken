@@ -75,7 +75,8 @@ const StaffDashboard  = lazy(() => import('./pages/staff/StaffDashboard'));
 const AdminDashboard  = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
 const AdminSettings   = lazy(() => import('./pages/admin/AdminSettings'));
-const AdminAdmissions = lazy(() => import('./pages/admin/AdminAdmissions'));
+// Admisiones list, pipeline and Expediente: one entry (see AdmissionsConsole).
+const AdmissionsConsole = lazy(() => import('./pages/admin/AdmissionsConsole'));
 const AdminCafeteria  = lazy(() => import('./pages/admin/AdminCafeteria'));
 const AdminCafeteriaStudent = lazy(() => import('./pages/admin/AdminCafeteriaStudent'));
 const AdminStudents   = lazy(() => import('./pages/admin/AdminStudents'));
@@ -86,8 +87,6 @@ import { prefetchPublishedPage } from './cms/published';
 const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const AdminVisitsWeek = lazy(() => import('./pages/admin/AdminVisitsWeek'));
-const AdminPipeline = lazy(() => import('./pages/admin/AdminPipeline'));
-const AdminCase = lazy(() => import('./pages/admin/AdminCase'));
 const AdminRequiredDocs = lazy(() => import('./pages/admin/AdminRequiredDocs'));
 const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
 const AdminGuardianMerge = lazy(() => import('./pages/admin/AdminGuardianMerge'));
@@ -244,10 +243,10 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index              element={<AdminDashboard />} />
-              <Route path="admisiones"  element={<AdminAdmissions />} />
-              <Route path="admisiones/pipeline" element={<AdminPipeline />} />
+              <Route path="admisiones"  element={<AdmissionsConsole page="list" />} />
+              <Route path="admisiones/pipeline" element={<AdmissionsConsole page="pipeline" />} />
               <Route path="admisiones/documentos" element={<AdminRequiredDocs />} />
-              <Route path="admisiones/:caseId" element={<AdminCase />} />
+              <Route path="admisiones/:caseId" element={<AdmissionsConsole page="case" />} />
               <Route path="visitas"     element={<AdminBookings />} />
               <Route path="visitas/semana" element={<AdminVisitsWeek />} />
               <Route path="cafeteria"   element={<AdminCafeteria />} />
