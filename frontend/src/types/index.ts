@@ -84,6 +84,8 @@ export interface StudentProfile {
   blood_type?: string;
   allergies?: string;
   medical_notes?: string;
+  /** The inscripción the student came from (convert); its ficha can be downloaded. */
+  registration?: number | null;
 }
 
 export interface CafeteriaBalance {
