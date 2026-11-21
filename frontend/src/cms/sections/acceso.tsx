@@ -419,7 +419,7 @@ export const sections = [
       pwBefore: '¿Olvidó su contraseña? Solicítela al colegio por', pwWhatsapp: 'WhatsApp', pwOr: 'o', pwEmail: 'correo',
       pwAfter: 'Un administrador le enviará una nueva.',
       problemsText: '¿Problemas?', problemsLink: { label: 'Contacte al colegio', href: '/contacto' },
-      signupText: '¿No tiene cuenta?', signupLink: { label: 'Inicie su pre-registro', href: '/pre-registro' },
+      signupText: '¿No tiene cuenta?', signupLink: { label: 'Llene la ficha de inscripción', href: '/pre-registro' },
       errCredentials: 'Credenciales incorrectas o cuenta sin contraseña. Use Google si su cuenta es institucional.',
       errOffline: 'No hay conexión con el servidor. Revise su internet e intente de nuevo.',
       errTooMany: 'Demasiados intentos. Espere unos minutos e intente de nuevo.',

@@ -88,7 +88,7 @@ export const SITE_TEXT_GROUPS: TextGroup[] = [
     ],
   },
   {
-    id: 'funnel', title: 'Pasos de admisión', where: 'Las cuatro casillas de las portadas de Pre-registro, Agendar visita e Inscripción.',
+    id: 'funnel', title: 'Pasos de admisión', where: 'Las cuatro casillas de las portadas de la Ficha de inscripción y de Agendar visita.',
     fields: [
       { key: 'funnel_1', label: 'Paso 1', builtIn: FUNNEL_DEFAULTS.funnel_1, max: 30 },
       { key: 'funnel_2', label: 'Paso 2', builtIn: FUNNEL_DEFAULTS.funnel_2, max: 30 },

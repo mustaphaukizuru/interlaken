@@ -5,7 +5,7 @@ import { Blob } from '@/components/ui/Blob';
 import { useSiteTexts } from '@/hooks/useSiteSettings';
 
 const FUNNEL_STEPS = [
-  { n: '01', key: 'funnel_1', label: 'Pre-Registro', to: '/pre-registro' },
+  { n: '01', key: 'funnel_1', label: 'Ficha de inscripción', to: '/pre-registro' },
   // Covers both Puertas Abiertas (group) and Agendar Visita (individual).
   { n: '02', key: 'funnel_2', label: 'Visita', to: '/agendar-visita' },
   { n: '03', key: 'funnel_3', label: 'Inscripción', to: '/admisiones/documentacion' },
@@ -14,7 +14,7 @@ const FUNNEL_STEPS = [
 
 /** Built-in step words; Navegación → «Textos del sitio» edits them (SiteSettings.chrome funnel_*). */
 export const FUNNEL_DEFAULTS = {
-  funnel_1: 'Pre-Registro', funnel_2: 'Visita', funnel_3: 'Inscripción', funnel_4: 'Bienvenida',
+  funnel_1: 'Ficha de inscripción', funnel_2: 'Visita', funnel_3: 'Inscripción', funnel_4: 'Bienvenida',
   funnel_now: 'Ahora', funnel_done: 'Listo', funnel_next: 'Siguiente',
 } as const;
 

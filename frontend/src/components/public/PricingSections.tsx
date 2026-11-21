@@ -96,8 +96,8 @@ export const PRICING_COPY: PricingCopy = {
   noteLinkLead: 'Para becas, hermanos o planes de pago,',
   noteLink: { label: 'contacte a admisiones', href: '/contacto' },
   ctaTitle: 'Asegure el lugar de su hijo/a',
-  ctaText: 'Inicie su pre-registro para el ciclo {{ciclo}} — toma menos de 5 minutos y un asesor le contactará.',
-  ctaPrimary: { label: 'Iniciar pre-registro', href: '/pre-registro' },
+  ctaText: 'Llene la ficha de inscripción para el ciclo {{ciclo}}: toma unos 15 minutos, puede continuar después y un asesor le contactará.',
+  ctaPrimary: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' },
   ctaSecondary: { label: 'Agendar visita', href: '/agendar-visita' },
 };
 

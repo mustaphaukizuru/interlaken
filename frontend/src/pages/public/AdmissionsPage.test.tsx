@@ -52,7 +52,7 @@ describe('AdmissionsPage — funnel timeline', () => {
       'href',
       '/admisiones/documentacion',
     );
-    expect(screen.getByRole('link', { name: 'Iniciar pre-registro' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Llenar la ficha de inscripción' })).toHaveAttribute(
       'href',
       '/pre-registro',
     );

@@ -201,7 +201,7 @@ function OpenSchoolBlock() {
 
 /** Form block: a CMS-built form by slug, or a link to one of the built-in (code) forms. */
 const BUILTIN_FORMS: Record<string, { label: string; to: string }> = {
-  'pre-registro': { label: 'Ir al pre-registro', to: '/pre-registro' },
+  'pre-registro': { label: 'Llenar la ficha de inscripción', to: '/pre-registro' },
   'contacto': { label: 'Escribirnos', to: '/contacto' },
   'facturacion': { label: 'Solicitar factura', to: '/comunidad/facturacion' },
   'agendar-visita': { label: 'Agendar visita', to: '/agendar-visita' },

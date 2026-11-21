@@ -100,7 +100,7 @@ export const sections = [
     },
   }),
   section({
-    type: 'list', label: 'Documentación · Documentos requeridos', description: 'Lista de documentos con enlaces a los trámites oficiales y un llamado al pre-registro. Esta lista es la única: Admisiones muestra la misma al publicar esta página.',
+    type: 'list', label: 'Documentación · Documentos requeridos', description: 'Lista de documentos con enlaces a los trámites oficiales y un llamado a la ficha de inscripción. Esta lista es la única: Admisiones muestra la misma al publicar esta página.',
     component: DocsListView,
     fields: [
       f.text('title', 'Título de la lista'),
@@ -114,8 +114,8 @@ export const sections = [
       title: 'Documentos requeridos', summary: '{total} documentos · {online} con trámite oficial en línea',
       items: ADMISSION_DOC_ITEMS,
       ctaTitle: '¿Documentos listos?',
-      ctaText: 'Inicie su pre-registro y coordine la entrega de documentos con nuestro equipo de admisiones.',
-      cta: { label: 'Iniciar pre-registro', href: '/pre-registro' },
+      ctaText: 'Llene la ficha de inscripción y coordine la entrega de documentos con nuestro equipo de admisiones.',
+      cta: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' },
     },
   }),
 ];

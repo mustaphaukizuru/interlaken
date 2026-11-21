@@ -26,7 +26,6 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 const HIDE_STICKY_CTA = [
   '/agendar-visita',
   '/pre-registro',
-  '/inscripcion',
   '/login',
 ];
 
@@ -72,7 +71,7 @@ export const DEFAULT_MENU: MenuGroupEntry[] = [
       { label: 'Proceso de Inscripción', to: '/admisiones', icon: ClipboardList },
       { label: 'Documentación', to: '/admisiones/documentacion', icon: FileText },
       { label: 'Costos', to: '/admisiones/costos', icon: CircleDollarSign },
-      { label: 'Pre-Registro', to: '/pre-registro', icon: UserPlus },
+      { label: 'Ficha de inscripción', to: '/pre-registro', icon: UserPlus },
     ],
   },
   {

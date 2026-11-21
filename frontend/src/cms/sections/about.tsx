@@ -148,7 +148,7 @@ function AboutValuesView(p: CardsProps) {
 
 /* ── Niveles ────────────────────────────────────────────────────────────── */
 // Levels use brand scales/tokens (green/brand/coral have numeric ramps).
-// Mirrors the levels offered in the pre-registro grade picker.
+// Mirrors the levels offered in the ficha de inscripción grade picker.
 const LEVEL_TONES: Record<string, string> = {
   green: 'bg-green-50 border-green-200 text-green-700',
   brand: 'bg-brand-50 border-brand-200 text-brand-700',
@@ -326,8 +326,8 @@ export const sections = [
     component: AboutCtaView,
     fields: [f.text('title', 'Título'), f.textarea('text', 'Texto'), f.link('primary', 'Botón principal'), f.link('secondary', 'Botón secundario')],
     defaults: {
-      title: '¿Desea conocernos de cerca?', text: 'Agende una visita o inicie su pre-registro en línea en solo unos minutos.',
-      primary: { label: 'Inicie su pre-registro', href: '/pre-registro' }, secondary: { label: 'Agendar visita', href: '/agendar-visita' },
+      title: '¿Desea conocernos de cerca?', text: 'Agende una visita o llene en línea la ficha de inscripción: unos 15 minutos, y puede continuar después.',
+      primary: { label: 'Llene la ficha de inscripción', href: '/pre-registro' }, secondary: { label: 'Agendar visita', href: '/agendar-visita' },
     },
   }),
 ];

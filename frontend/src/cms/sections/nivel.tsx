@@ -326,7 +326,7 @@ const levelColor = (l: LevelData) => `var(--nivel-${l.slug})`;
 
 const heroProps = (l: LevelData) => ({
   label: 'Niveles Educativos', title: l.name, headline: l.headline, text: l.intro, image: l.hero, accent: l.accent, color: levelColor(l),
-  primary: { label: 'Iniciar pre-registro', href: '/pre-registro' },
+  primary: { label: 'Llenar la ficha de inscripción', href: '/pre-registro' },
   secondary: { label: 'Agendar visita', href: '/agendar-visita' },
 });
 
