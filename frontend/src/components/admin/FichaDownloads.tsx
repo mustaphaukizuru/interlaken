@@ -94,11 +94,11 @@ export function FichasZipMenu({ ids, allMatching = false }: { ids: number[]; all
   );
 }
 
-/** Student file: «Ficha de inscripción» (Excel / PDF) of the inscripción the student came from. */
-export function StudentFichaDownload({ registrationId }: { registrationId: number }) {
+/** Student file (and the Expediente's «Exportar ficha»): the ficha in Excel / PDF. */
+export function StudentFichaDownload({ registrationId, label = 'Ficha de inscripción' }: { registrationId: number; label?: string }) {
   return (
     <FormatMenu
-      label="Ficha de inscripción"
+      label={label}
       icon={FileText}
       onPick={(fmt) => runFichaDownload(() => downloadFicha(registrationId, fmt), 'la ficha de inscripción')}
     />

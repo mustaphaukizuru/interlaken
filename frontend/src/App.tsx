@@ -87,6 +87,7 @@ const CmsPage = lazy(() => import('./cms/CmsPage'));
 const CmsOrNotFound = lazy(() => import('./cms/CmsOrNotFound'));
 const AdminVisitsWeek = lazy(() => import('./pages/admin/AdminVisitsWeek'));
 const AdminPipeline = lazy(() => import('./pages/admin/AdminPipeline'));
+const AdminCase = lazy(() => import('./pages/admin/AdminCase'));
 const AdminRequiredDocs = lazy(() => import('./pages/admin/AdminRequiredDocs'));
 const AdminArco = lazy(() => import('./pages/admin/AdminArco'));
 const AdminGuardianMerge = lazy(() => import('./pages/admin/AdminGuardianMerge'));
@@ -246,6 +247,7 @@ export default function App() {
               <Route path="admisiones"  element={<AdminAdmissions />} />
               <Route path="admisiones/pipeline" element={<AdminPipeline />} />
               <Route path="admisiones/documentos" element={<AdminRequiredDocs />} />
+              <Route path="admisiones/:caseId" element={<AdminCase />} />
               <Route path="visitas"     element={<AdminBookings />} />
               <Route path="visitas/semana" element={<AdminVisitsWeek />} />
               <Route path="cafeteria"   element={<AdminCafeteria />} />

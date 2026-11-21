@@ -205,7 +205,8 @@ function ReviewDecision({ registration, onClose }: { registration: Reg; onClose:
         ...(emailsFamily && !notify ? { notify: false } : {}),
       }),
     onSuccess: () => {
-      void invalidateEntity(qc, REG_ENTITY);
+      // The Expediente shows the ficha's status too.
+      void invalidateEntity(qc, REG_ENTITY, ['cases']);
       toast.success('Inscripción actualizada.');
       onClose();
     },

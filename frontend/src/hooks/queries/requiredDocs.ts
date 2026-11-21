@@ -199,10 +199,11 @@ export function useChecklistState(registrationId: number) {
   });
 }
 
-/** The inscripciones list and the pipeline show document counters. */
+/** The inscripciones list, the pipeline and the Expediente (its documents gate) show document counters. */
 export function refreshBoards(qc: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: [...adminKeys.entity(REG_ENTITY), 'list'] }),
     qc.invalidateQueries({ queryKey: ['admissions-pipeline'] }),
+    qc.invalidateQueries({ queryKey: adminKeys.entity('cases') }),
   ]);
 }
